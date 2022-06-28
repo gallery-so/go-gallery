@@ -39,9 +39,10 @@ type Config struct {
 
 type ResolverRoot interface {
 	Collection() CollectionResolver
-	CollectionCreatedFeedEvent() CollectionCreatedFeedEventResolver
-	CollectorsNoteAddedToCollectionFeedEvent() CollectorsNoteAddedToCollectionFeedEventResolver
-	CollectorsNoteAddedToTokenFeedEvent() CollectorsNoteAddedToTokenFeedEventResolver
+	CollectionCreatedFeedEventData() CollectionCreatedFeedEventDataResolver
+	CollectorsNoteAddedToCollectionFeedEventData() CollectorsNoteAddedToCollectionFeedEventDataResolver
+	CollectorsNoteAddedToTokenFeedEventData() CollectorsNoteAddedToTokenFeedEventDataResolver
+	FeedEvent() FeedEventResolver
 	FollowInfo() FollowInfoResolver
 	FollowUserPayload() FollowUserPayloadResolver
 	Gallery() GalleryResolver
@@ -51,10 +52,10 @@ type ResolverRoot interface {
 	Query() QueryResolver
 	Token() TokenResolver
 	TokenHolder() TokenHolderResolver
-	TokensAddedToCollectionFeedEvent() TokensAddedToCollectionFeedEventResolver
+	TokensAddedToCollectionFeedEventData() TokensAddedToCollectionFeedEventDataResolver
 	UnfollowUserPayload() UnfollowUserPayloadResolver
-	UserCreatedFeedEvent() UserCreatedFeedEventResolver
-	UserFollowedUsersFeedEvent() UserFollowedUsersFeedEventResolver
+	UserCreatedFeedEventData() UserCreatedFeedEventDataResolver
+	UserFollowedUsersFeedEventData() UserFollowedUsersFeedEventDataResolver
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
 	ChainAddressInput() ChainAddressInputResolver
@@ -99,12 +100,10 @@ type ComplexityRoot struct {
 		Version        func(childComplexity int) int
 	}
 
-	CollectionCreatedFeedEvent struct {
+	CollectionCreatedFeedEventData struct {
 		Action     func(childComplexity int) int
 		Collection func(childComplexity int) int
-		Dbid       func(childComplexity int) int
 		EventTime  func(childComplexity int) int
-		ID         func(childComplexity int) int
 		Owner      func(childComplexity int) int
 	}
 
@@ -119,21 +118,17 @@ type ComplexityRoot struct {
 		Token      func(childComplexity int) int
 	}
 
-	CollectorsNoteAddedToCollectionFeedEvent struct {
+	CollectorsNoteAddedToCollectionFeedEventData struct {
 		Action            func(childComplexity int) int
 		Collection        func(childComplexity int) int
-		Dbid              func(childComplexity int) int
 		EventTime         func(childComplexity int) int
-		ID                func(childComplexity int) int
 		NewCollectorsNote func(childComplexity int) int
 		Owner             func(childComplexity int) int
 	}
 
-	CollectorsNoteAddedToTokenFeedEvent struct {
+	CollectorsNoteAddedToTokenFeedEventData struct {
 		Action            func(childComplexity int) int
-		Dbid              func(childComplexity int) int
 		EventTime         func(childComplexity int) int
-		ID                func(childComplexity int) int
 		NewCollectorsNote func(childComplexity int) int
 		Owner             func(childComplexity int) int
 		Token             func(childComplexity int) int
@@ -195,7 +190,7 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrFeedEventNotFoundByID struct {
+	ErrFeedEventNotFound struct {
 		Message func(childComplexity int) int
 	}
 
@@ -246,6 +241,12 @@ type ComplexityRoot struct {
 	FeedEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
+	}
+
+	FeedEvent struct {
+		Dbid      func(childComplexity int) int
+		EventData func(childComplexity int) int
+		ID        func(childComplexity int) int
 	}
 
 	FollowInfo struct {
@@ -379,6 +380,7 @@ type ComplexityRoot struct {
 		CollectionByID      func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CommunityByAddress  func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
+		FeedByUserID        func(childComplexity int, userID persist.DBID, before *string, after *string, first *int, last *int) int
 		FeedEventByID       func(childComplexity int, id persist.DBID) int
 		GeneralAllowlist    func(childComplexity int) int
 		GlobalFeed          func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -445,12 +447,10 @@ type ComplexityRoot struct {
 		Wallets       func(childComplexity int) int
 	}
 
-	TokensAddedToCollectionFeedEvent struct {
+	TokensAddedToCollectionFeedEventData struct {
 		Action     func(childComplexity int) int
 		Collection func(childComplexity int) int
-		Dbid       func(childComplexity int) int
 		EventTime  func(childComplexity int) int
-		ID         func(childComplexity int) int
 		NewTokens  func(childComplexity int) int
 		Owner      func(childComplexity int) int
 	}
@@ -491,20 +491,16 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
-	UserCreatedFeedEvent struct {
+	UserCreatedFeedEventData struct {
 		Action    func(childComplexity int) int
-		Dbid      func(childComplexity int) int
 		EventTime func(childComplexity int) int
-		ID        func(childComplexity int) int
 		Owner     func(childComplexity int) int
 	}
 
-	UserFollowedUsersFeedEvent struct {
+	UserFollowedUsersFeedEventData struct {
 		Action    func(childComplexity int) int
-		Dbid      func(childComplexity int) int
 		EventTime func(childComplexity int) int
 		Followed  func(childComplexity int) int
-		ID        func(childComplexity int) int
 		Owner     func(childComplexity int) int
 	}
 
@@ -523,7 +519,6 @@ type ComplexityRoot struct {
 	}
 
 	Viewer struct {
-		Feed            func(childComplexity int, before *string, after *string, first *int, last *int) int
 		User            func(childComplexity int) int
 		ViewerGalleries func(childComplexity int) int
 	}
@@ -547,20 +542,23 @@ type CollectionResolver interface {
 
 	Tokens(ctx context.Context, obj *model.Collection) ([]*model.CollectionToken, error)
 }
-type CollectionCreatedFeedEventResolver interface {
-	Owner(ctx context.Context, obj *model.CollectionCreatedFeedEvent) (*model.GalleryUser, error)
+type CollectionCreatedFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.GalleryUser, error)
 
-	Collection(ctx context.Context, obj *model.CollectionCreatedFeedEvent) (*model.Collection, error)
+	Collection(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.Collection, error)
 }
-type CollectorsNoteAddedToCollectionFeedEventResolver interface {
-	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (*model.GalleryUser, error)
+type CollectorsNoteAddedToCollectionFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error)
 
-	Collection(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (*model.Collection, error)
+	Collection(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.Collection, error)
 }
-type CollectorsNoteAddedToTokenFeedEventResolver interface {
-	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEvent) (*model.GalleryUser, error)
+type CollectorsNoteAddedToTokenFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.GalleryUser, error)
 
-	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEvent) (*model.CollectionToken, error)
+	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error)
+}
+type FeedEventResolver interface {
+	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
 }
 type FollowInfoResolver interface {
 	User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error)
@@ -615,7 +613,8 @@ type QueryResolver interface {
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
-	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (model.FeedConnectionOrError, error)
+	FeedByUserID(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 }
 type TokenResolver interface {
@@ -628,25 +627,24 @@ type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
 }
-type TokensAddedToCollectionFeedEventResolver interface {
-	Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEvent) (*model.GalleryUser, error)
-	Collection(ctx context.Context, obj *model.TokensAddedToCollectionFeedEvent) (*model.Collection, error)
+type TokensAddedToCollectionFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error)
+	Collection(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.Collection, error)
 
-	NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEvent) ([]*model.CollectionToken, error)
+	NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error)
 }
 type UnfollowUserPayloadResolver interface {
 	User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error)
 }
-type UserCreatedFeedEventResolver interface {
-	Owner(ctx context.Context, obj *model.UserCreatedFeedEvent) (*model.GalleryUser, error)
+type UserCreatedFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error)
 }
-type UserFollowedUsersFeedEventResolver interface {
-	Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEvent) (*model.GalleryUser, error)
+type UserFollowedUsersFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEventData) (*model.GalleryUser, error)
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
-	Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 }
 type WalletResolver interface {
 	Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error)
@@ -798,47 +796,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Collection.Version(childComplexity), true
 
-	case "CollectionCreatedFeedEvent.action":
-		if e.complexity.CollectionCreatedFeedEvent.Action == nil {
+	case "CollectionCreatedFeedEventData.action":
+		if e.complexity.CollectionCreatedFeedEventData.Action == nil {
 			break
 		}
 
-		return e.complexity.CollectionCreatedFeedEvent.Action(childComplexity), true
+		return e.complexity.CollectionCreatedFeedEventData.Action(childComplexity), true
 
-	case "CollectionCreatedFeedEvent.collection":
-		if e.complexity.CollectionCreatedFeedEvent.Collection == nil {
+	case "CollectionCreatedFeedEventData.collection":
+		if e.complexity.CollectionCreatedFeedEventData.Collection == nil {
 			break
 		}
 
-		return e.complexity.CollectionCreatedFeedEvent.Collection(childComplexity), true
+		return e.complexity.CollectionCreatedFeedEventData.Collection(childComplexity), true
 
-	case "CollectionCreatedFeedEvent.dbid":
-		if e.complexity.CollectionCreatedFeedEvent.Dbid == nil {
+	case "CollectionCreatedFeedEventData.eventTime":
+		if e.complexity.CollectionCreatedFeedEventData.EventTime == nil {
 			break
 		}
 
-		return e.complexity.CollectionCreatedFeedEvent.Dbid(childComplexity), true
+		return e.complexity.CollectionCreatedFeedEventData.EventTime(childComplexity), true
 
-	case "CollectionCreatedFeedEvent.eventTime":
-		if e.complexity.CollectionCreatedFeedEvent.EventTime == nil {
+	case "CollectionCreatedFeedEventData.owner":
+		if e.complexity.CollectionCreatedFeedEventData.Owner == nil {
 			break
 		}
 
-		return e.complexity.CollectionCreatedFeedEvent.EventTime(childComplexity), true
-
-	case "CollectionCreatedFeedEvent.id":
-		if e.complexity.CollectionCreatedFeedEvent.ID == nil {
-			break
-		}
-
-		return e.complexity.CollectionCreatedFeedEvent.ID(childComplexity), true
-
-	case "CollectionCreatedFeedEvent.owner":
-		if e.complexity.CollectionCreatedFeedEvent.Owner == nil {
-			break
-		}
-
-		return e.complexity.CollectionCreatedFeedEvent.Owner(childComplexity), true
+		return e.complexity.CollectionCreatedFeedEventData.Owner(childComplexity), true
 
 	case "CollectionLayout.columns":
 		if e.complexity.CollectionLayout.Columns == nil {
@@ -875,103 +859,75 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CollectionToken.Token(childComplexity), true
 
-	case "CollectorsNoteAddedToCollectionFeedEvent.action":
-		if e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Action == nil {
+	case "CollectorsNoteAddedToCollectionFeedEventData.action":
+		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Action == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Action(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Action(childComplexity), true
 
-	case "CollectorsNoteAddedToCollectionFeedEvent.collection":
-		if e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Collection == nil {
+	case "CollectorsNoteAddedToCollectionFeedEventData.collection":
+		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Collection == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Collection(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Collection(childComplexity), true
 
-	case "CollectorsNoteAddedToCollectionFeedEvent.dbid":
-		if e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Dbid == nil {
+	case "CollectorsNoteAddedToCollectionFeedEventData.eventTime":
+		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.EventTime == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Dbid(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToCollectionFeedEventData.EventTime(childComplexity), true
 
-	case "CollectorsNoteAddedToCollectionFeedEvent.eventTime":
-		if e.complexity.CollectorsNoteAddedToCollectionFeedEvent.EventTime == nil {
+	case "CollectorsNoteAddedToCollectionFeedEventData.newCollectorsNote":
+		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.NewCollectorsNote == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToCollectionFeedEvent.EventTime(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToCollectionFeedEventData.NewCollectorsNote(childComplexity), true
 
-	case "CollectorsNoteAddedToCollectionFeedEvent.id":
-		if e.complexity.CollectorsNoteAddedToCollectionFeedEvent.ID == nil {
+	case "CollectorsNoteAddedToCollectionFeedEventData.owner":
+		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Owner == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToCollectionFeedEvent.ID(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Owner(childComplexity), true
 
-	case "CollectorsNoteAddedToCollectionFeedEvent.newCollectorsNote":
-		if e.complexity.CollectorsNoteAddedToCollectionFeedEvent.NewCollectorsNote == nil {
+	case "CollectorsNoteAddedToTokenFeedEventData.action":
+		if e.complexity.CollectorsNoteAddedToTokenFeedEventData.Action == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToCollectionFeedEvent.NewCollectorsNote(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToTokenFeedEventData.Action(childComplexity), true
 
-	case "CollectorsNoteAddedToCollectionFeedEvent.owner":
-		if e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Owner == nil {
+	case "CollectorsNoteAddedToTokenFeedEventData.eventTime":
+		if e.complexity.CollectorsNoteAddedToTokenFeedEventData.EventTime == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToCollectionFeedEvent.Owner(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToTokenFeedEventData.EventTime(childComplexity), true
 
-	case "CollectorsNoteAddedToTokenFeedEvent.action":
-		if e.complexity.CollectorsNoteAddedToTokenFeedEvent.Action == nil {
+	case "CollectorsNoteAddedToTokenFeedEventData.newCollectorsNote":
+		if e.complexity.CollectorsNoteAddedToTokenFeedEventData.NewCollectorsNote == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToTokenFeedEvent.Action(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToTokenFeedEventData.NewCollectorsNote(childComplexity), true
 
-	case "CollectorsNoteAddedToTokenFeedEvent.dbid":
-		if e.complexity.CollectorsNoteAddedToTokenFeedEvent.Dbid == nil {
+	case "CollectorsNoteAddedToTokenFeedEventData.owner":
+		if e.complexity.CollectorsNoteAddedToTokenFeedEventData.Owner == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToTokenFeedEvent.Dbid(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToTokenFeedEventData.Owner(childComplexity), true
 
-	case "CollectorsNoteAddedToTokenFeedEvent.eventTime":
-		if e.complexity.CollectorsNoteAddedToTokenFeedEvent.EventTime == nil {
+	case "CollectorsNoteAddedToTokenFeedEventData.token":
+		if e.complexity.CollectorsNoteAddedToTokenFeedEventData.Token == nil {
 			break
 		}
 
-		return e.complexity.CollectorsNoteAddedToTokenFeedEvent.EventTime(childComplexity), true
-
-	case "CollectorsNoteAddedToTokenFeedEvent.id":
-		if e.complexity.CollectorsNoteAddedToTokenFeedEvent.ID == nil {
-			break
-		}
-
-		return e.complexity.CollectorsNoteAddedToTokenFeedEvent.ID(childComplexity), true
-
-	case "CollectorsNoteAddedToTokenFeedEvent.newCollectorsNote":
-		if e.complexity.CollectorsNoteAddedToTokenFeedEvent.NewCollectorsNote == nil {
-			break
-		}
-
-		return e.complexity.CollectorsNoteAddedToTokenFeedEvent.NewCollectorsNote(childComplexity), true
-
-	case "CollectorsNoteAddedToTokenFeedEvent.owner":
-		if e.complexity.CollectorsNoteAddedToTokenFeedEvent.Owner == nil {
-			break
-		}
-
-		return e.complexity.CollectorsNoteAddedToTokenFeedEvent.Owner(childComplexity), true
-
-	case "CollectorsNoteAddedToTokenFeedEvent.token":
-		if e.complexity.CollectorsNoteAddedToTokenFeedEvent.Token == nil {
-			break
-		}
-
-		return e.complexity.CollectorsNoteAddedToTokenFeedEvent.Token(childComplexity), true
+		return e.complexity.CollectorsNoteAddedToTokenFeedEventData.Token(childComplexity), true
 
 	case "Community.chain":
 		if e.complexity.Community.Chain == nil {
@@ -1155,12 +1111,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrDoesNotOwnRequiredToken.Message(childComplexity), true
 
-	case "ErrFeedEventNotFoundByID.message":
-		if e.complexity.ErrFeedEventNotFoundByID.Message == nil {
+	case "ErrFeedEventNotFound.message":
+		if e.complexity.ErrFeedEventNotFound.Message == nil {
 			break
 		}
 
-		return e.complexity.ErrFeedEventNotFoundByID.Message(childComplexity), true
+		return e.complexity.ErrFeedEventNotFound.Message(childComplexity), true
 
 	case "ErrInvalidInput.message":
 		if e.complexity.ErrInvalidInput.Message == nil {
@@ -1273,6 +1229,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FeedEdge.Node(childComplexity), true
+
+	case "FeedEvent.dbid":
+		if e.complexity.FeedEvent.Dbid == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.Dbid(childComplexity), true
+
+	case "FeedEvent.eventData":
+		if e.complexity.FeedEvent.EventData == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.EventData(childComplexity), true
+
+	case "FeedEvent.id":
+		if e.complexity.FeedEvent.ID == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.ID(childComplexity), true
 
 	case "FollowInfo.followedBack":
 		if e.complexity.FollowInfo.FollowedBack == nil {
@@ -1948,6 +1925,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
+	case "Query.feedByUserId":
+		if e.complexity.Query.FeedByUserID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_feedByUserId_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FeedByUserID(childComplexity, args["userId"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
 			break
@@ -2284,54 +2273,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenHolder.Wallets(childComplexity), true
 
-	case "TokensAddedToCollectionFeedEvent.action":
-		if e.complexity.TokensAddedToCollectionFeedEvent.Action == nil {
+	case "TokensAddedToCollectionFeedEventData.action":
+		if e.complexity.TokensAddedToCollectionFeedEventData.Action == nil {
 			break
 		}
 
-		return e.complexity.TokensAddedToCollectionFeedEvent.Action(childComplexity), true
+		return e.complexity.TokensAddedToCollectionFeedEventData.Action(childComplexity), true
 
-	case "TokensAddedToCollectionFeedEvent.collection":
-		if e.complexity.TokensAddedToCollectionFeedEvent.Collection == nil {
+	case "TokensAddedToCollectionFeedEventData.collection":
+		if e.complexity.TokensAddedToCollectionFeedEventData.Collection == nil {
 			break
 		}
 
-		return e.complexity.TokensAddedToCollectionFeedEvent.Collection(childComplexity), true
+		return e.complexity.TokensAddedToCollectionFeedEventData.Collection(childComplexity), true
 
-	case "TokensAddedToCollectionFeedEvent.dbid":
-		if e.complexity.TokensAddedToCollectionFeedEvent.Dbid == nil {
+	case "TokensAddedToCollectionFeedEventData.eventTime":
+		if e.complexity.TokensAddedToCollectionFeedEventData.EventTime == nil {
 			break
 		}
 
-		return e.complexity.TokensAddedToCollectionFeedEvent.Dbid(childComplexity), true
+		return e.complexity.TokensAddedToCollectionFeedEventData.EventTime(childComplexity), true
 
-	case "TokensAddedToCollectionFeedEvent.eventTime":
-		if e.complexity.TokensAddedToCollectionFeedEvent.EventTime == nil {
+	case "TokensAddedToCollectionFeedEventData.newTokens":
+		if e.complexity.TokensAddedToCollectionFeedEventData.NewTokens == nil {
 			break
 		}
 
-		return e.complexity.TokensAddedToCollectionFeedEvent.EventTime(childComplexity), true
+		return e.complexity.TokensAddedToCollectionFeedEventData.NewTokens(childComplexity), true
 
-	case "TokensAddedToCollectionFeedEvent.id":
-		if e.complexity.TokensAddedToCollectionFeedEvent.ID == nil {
+	case "TokensAddedToCollectionFeedEventData.owner":
+		if e.complexity.TokensAddedToCollectionFeedEventData.Owner == nil {
 			break
 		}
 
-		return e.complexity.TokensAddedToCollectionFeedEvent.ID(childComplexity), true
-
-	case "TokensAddedToCollectionFeedEvent.newTokens":
-		if e.complexity.TokensAddedToCollectionFeedEvent.NewTokens == nil {
-			break
-		}
-
-		return e.complexity.TokensAddedToCollectionFeedEvent.NewTokens(childComplexity), true
-
-	case "TokensAddedToCollectionFeedEvent.owner":
-		if e.complexity.TokensAddedToCollectionFeedEvent.Owner == nil {
-			break
-		}
-
-		return e.complexity.TokensAddedToCollectionFeedEvent.Owner(childComplexity), true
+		return e.complexity.TokensAddedToCollectionFeedEventData.Owner(childComplexity), true
 
 	case "UnfollowUserPayload.user":
 		if e.complexity.UnfollowUserPayload.User == nil {
@@ -2417,82 +2392,54 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateUserInfoPayload.Viewer(childComplexity), true
 
-	case "UserCreatedFeedEvent.action":
-		if e.complexity.UserCreatedFeedEvent.Action == nil {
+	case "UserCreatedFeedEventData.action":
+		if e.complexity.UserCreatedFeedEventData.Action == nil {
 			break
 		}
 
-		return e.complexity.UserCreatedFeedEvent.Action(childComplexity), true
+		return e.complexity.UserCreatedFeedEventData.Action(childComplexity), true
 
-	case "UserCreatedFeedEvent.dbid":
-		if e.complexity.UserCreatedFeedEvent.Dbid == nil {
+	case "UserCreatedFeedEventData.eventTime":
+		if e.complexity.UserCreatedFeedEventData.EventTime == nil {
 			break
 		}
 
-		return e.complexity.UserCreatedFeedEvent.Dbid(childComplexity), true
+		return e.complexity.UserCreatedFeedEventData.EventTime(childComplexity), true
 
-	case "UserCreatedFeedEvent.eventTime":
-		if e.complexity.UserCreatedFeedEvent.EventTime == nil {
+	case "UserCreatedFeedEventData.owner":
+		if e.complexity.UserCreatedFeedEventData.Owner == nil {
 			break
 		}
 
-		return e.complexity.UserCreatedFeedEvent.EventTime(childComplexity), true
+		return e.complexity.UserCreatedFeedEventData.Owner(childComplexity), true
 
-	case "UserCreatedFeedEvent.id":
-		if e.complexity.UserCreatedFeedEvent.ID == nil {
+	case "UserFollowedUsersFeedEventData.action":
+		if e.complexity.UserFollowedUsersFeedEventData.Action == nil {
 			break
 		}
 
-		return e.complexity.UserCreatedFeedEvent.ID(childComplexity), true
+		return e.complexity.UserFollowedUsersFeedEventData.Action(childComplexity), true
 
-	case "UserCreatedFeedEvent.owner":
-		if e.complexity.UserCreatedFeedEvent.Owner == nil {
+	case "UserFollowedUsersFeedEventData.eventTime":
+		if e.complexity.UserFollowedUsersFeedEventData.EventTime == nil {
 			break
 		}
 
-		return e.complexity.UserCreatedFeedEvent.Owner(childComplexity), true
+		return e.complexity.UserFollowedUsersFeedEventData.EventTime(childComplexity), true
 
-	case "UserFollowedUsersFeedEvent.action":
-		if e.complexity.UserFollowedUsersFeedEvent.Action == nil {
+	case "UserFollowedUsersFeedEventData.followed":
+		if e.complexity.UserFollowedUsersFeedEventData.Followed == nil {
 			break
 		}
 
-		return e.complexity.UserFollowedUsersFeedEvent.Action(childComplexity), true
+		return e.complexity.UserFollowedUsersFeedEventData.Followed(childComplexity), true
 
-	case "UserFollowedUsersFeedEvent.dbid":
-		if e.complexity.UserFollowedUsersFeedEvent.Dbid == nil {
+	case "UserFollowedUsersFeedEventData.owner":
+		if e.complexity.UserFollowedUsersFeedEventData.Owner == nil {
 			break
 		}
 
-		return e.complexity.UserFollowedUsersFeedEvent.Dbid(childComplexity), true
-
-	case "UserFollowedUsersFeedEvent.eventTime":
-		if e.complexity.UserFollowedUsersFeedEvent.EventTime == nil {
-			break
-		}
-
-		return e.complexity.UserFollowedUsersFeedEvent.EventTime(childComplexity), true
-
-	case "UserFollowedUsersFeedEvent.followed":
-		if e.complexity.UserFollowedUsersFeedEvent.Followed == nil {
-			break
-		}
-
-		return e.complexity.UserFollowedUsersFeedEvent.Followed(childComplexity), true
-
-	case "UserFollowedUsersFeedEvent.id":
-		if e.complexity.UserFollowedUsersFeedEvent.ID == nil {
-			break
-		}
-
-		return e.complexity.UserFollowedUsersFeedEvent.ID(childComplexity), true
-
-	case "UserFollowedUsersFeedEvent.owner":
-		if e.complexity.UserFollowedUsersFeedEvent.Owner == nil {
-			break
-		}
-
-		return e.complexity.UserFollowedUsersFeedEvent.Owner(childComplexity), true
+		return e.complexity.UserFollowedUsersFeedEventData.Owner(childComplexity), true
 
 	case "VideoMedia.contentRenderURLs":
 		if e.complexity.VideoMedia.ContentRenderURLs == nil {
@@ -2549,18 +2496,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.VideoURLSet.Small(childComplexity), true
-
-	case "Viewer.feed":
-		if e.complexity.Viewer.Feed == nil {
-			break
-		}
-
-		args, err := ec.field_Viewer_feed_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Viewer.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Viewer.user":
 		if e.complexity.Viewer.User == nil {
@@ -3030,7 +2965,6 @@ type ViewerGallery {
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -3067,72 +3001,64 @@ enum Action {
     TokensAddedToCollection
 }
 
-interface FeedEvent implements Node {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser!
-    action: Action!
-}
-
 type FollowInfo {
     user: GalleryUser @goField(forceResolver: true)
     followedBack: Boolean
 }
 
-type UserCreatedFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+interface FeedEventData {
+    eventTime: Time
+    owner: GalleryUser
+    action: Action
 }
 
-type UserFollowedUsersFeedEvent implements Node & FeedEvent {
+type FeedEvent implements Node {
     id: ID!
     dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+    eventData: FeedEventData @goField(forceResolver: true)
+}
+
+type UserCreatedFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+}
+
+type UserFollowedUsersFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     followed: [FollowInfo]
 }
 
-type CollectorsNoteAddedToTokenFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     token: CollectionToken @goField(forceResolver: true)
     newCollectorsNote: String
 }
 
-type CollectionCreatedFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+type CollectionCreatedFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     collection: Collection @goField(forceResolver: true)
 }
 
-type CollectorsNoteAddedToCollectionFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     collection: Collection @goField(forceResolver: true)
     newCollectorsNote: String
 }
 
-type TokensAddedToCollectionFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
+type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelper {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
     collection: Collection @goField(forceResolver: true)
-    action: Action!
+    action: Action
     newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
@@ -3140,24 +3066,18 @@ type ErrUnknownAction implements Error {
     message: String!
 }
 
-type ErrFeedEventNotFoundByID implements Error {
+type ErrFeedEventNotFound implements Error {
     message: String!
 }
 
-union FeedConnectionOrError = 
-    FeedConnection
-    | ErrNotAuthorized
+union FeedEventOrError = 
+    FeedEvent
+    | ErrFeedEventNotFound
     | ErrUnknownAction
-    | ErrFeedEventNotFoundByID
 
-union FeedEventByIdOrError =
-    | UserCreatedFeedEvent
-    | UserFollowedUsersFeedEvent
-    | CollectorsNoteAddedToTokenFeedEvent
-    | CollectionCreatedFeedEvent
-    | CollectorsNoteAddedToCollectionFeedEvent
-    | TokensAddedToCollectionFeedEvent
-    | ErrFeedEventNotFoundByID
+union FeedEventByIdOrError = 
+    FeedEvent
+    | ErrFeedEventNotFound
     | ErrUnknownAction
 
 type PageInfo {
@@ -3169,7 +3089,7 @@ type PageInfo {
 }
 
 type FeedEdge {
-    node: FeedEvent
+    node: FeedEventOrError
     cursor: String!
 }
 
@@ -3189,7 +3109,8 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnectionOrError
+    feedByUserId(userId: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
+    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
 
@@ -3894,6 +3815,57 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_feedByUserId_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["userId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["userId"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg4
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_feedEventById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -4023,48 +3995,6 @@ func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context,
 		}
 	}
 	args["username"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Viewer_feed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *string
-	if tmp, ok := rawArgs["before"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["before"] = arg0
-	var arg1 *string
-	if tmp, ok := rawArgs["after"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
-		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["after"] = arg1
-	var arg2 *int
-	if tmp, ok := rawArgs["first"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
-		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["first"] = arg2
-	var arg3 *int
-	if tmp, ok := rawArgs["last"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
-		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["last"] = arg3
 	return args, nil
 }
 
@@ -4688,7 +4618,7 @@ func (ec *executionContext) _Collection_tokens(ctx context.Context, field graphq
 	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionCreatedFeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionCreatedFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4696,77 +4626,7 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_id(ctx context.Context, 
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionCreatedFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CollectionCreatedFeedEvent_dbid(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CollectionCreatedFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CollectionCreatedFeedEvent_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CollectionCreatedFeedEvent",
+		Object:     "CollectionCreatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -4783,17 +4643,14 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_eventTime(ctx context.Co
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionCreatedFeedEvent_owner(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionCreatedFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4801,7 +4658,7 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_owner(ctx context.Contex
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionCreatedFeedEvent",
+		Object:     "CollectionCreatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -4811,24 +4668,21 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_owner(ctx context.Contex
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.CollectionCreatedFeedEvent().Owner(rctx, obj)
+		return ec.resolvers.CollectionCreatedFeedEventData().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
-	return ec.marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionCreatedFeedEvent_action(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionCreatedFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4836,7 +4690,7 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_action(ctx context.Conte
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionCreatedFeedEvent",
+		Object:     "CollectionCreatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -4853,17 +4707,14 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_action(ctx context.Conte
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.Action)
+	res := resTmp.(*persist.Action)
 	fc.Result = res
-	return ec.marshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionCreatedFeedEvent_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionCreatedFeedEventData_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4871,7 +4722,7 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_collection(ctx context.C
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionCreatedFeedEvent",
+		Object:     "CollectionCreatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -4881,7 +4732,7 @@ func (ec *executionContext) _CollectionCreatedFeedEvent_collection(ctx context.C
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.CollectionCreatedFeedEvent().Collection(rctx, obj)
+		return ec.resolvers.CollectionCreatedFeedEventData().Collection(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5058,7 +4909,7 @@ func (ec *executionContext) _CollectionToken_collection(ctx context.Context, fie
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5066,77 +4917,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_id(ctx con
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToCollectionFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_dbid(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToCollectionFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToCollectionFeedEvent",
+		Object:     "CollectorsNoteAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -5153,17 +4934,14 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_eventTime(
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_owner(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5171,7 +4949,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_owner(ctx 
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToCollectionFeedEvent",
+		Object:     "CollectorsNoteAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -5181,24 +4959,21 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_owner(ctx 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.CollectorsNoteAddedToCollectionFeedEvent().Owner(rctx, obj)
+		return ec.resolvers.CollectorsNoteAddedToCollectionFeedEventData().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
-	return ec.marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_action(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5206,7 +4981,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_action(ctx
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToCollectionFeedEvent",
+		Object:     "CollectorsNoteAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -5223,17 +4998,14 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_action(ctx
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.Action)
+	res := resTmp.(*persist.Action)
 	fc.Result = res
-	return ec.marshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5241,7 +5013,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_collection
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToCollectionFeedEvent",
+		Object:     "CollectorsNoteAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -5251,7 +5023,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_collection
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.CollectorsNoteAddedToCollectionFeedEvent().Collection(rctx, obj)
+		return ec.resolvers.CollectorsNoteAddedToCollectionFeedEventData().Collection(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5265,7 +5037,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_collection
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5273,7 +5045,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_newCollect
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToCollectionFeedEvent",
+		Object:     "CollectorsNoteAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -5297,7 +5069,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent_newCollect
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5305,77 +5077,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_id(ctx context.
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToTokenFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_dbid(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToTokenFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToTokenFeedEvent",
+		Object:     "CollectorsNoteAddedToTokenFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -5392,17 +5094,14 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_eventTime(ctx c
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_owner(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5410,7 +5109,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_owner(ctx conte
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToTokenFeedEvent",
+		Object:     "CollectorsNoteAddedToTokenFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -5420,24 +5119,21 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_owner(ctx conte
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.CollectorsNoteAddedToTokenFeedEvent().Owner(rctx, obj)
+		return ec.resolvers.CollectorsNoteAddedToTokenFeedEventData().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
-	return ec.marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_action(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5445,7 +5141,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_action(ctx cont
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToTokenFeedEvent",
+		Object:     "CollectorsNoteAddedToTokenFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -5462,17 +5158,14 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_action(ctx cont
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.Action)
+	res := resTmp.(*persist.Action)
 	fc.Result = res
-	return ec.marshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_token(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_token(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5480,7 +5173,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_token(ctx conte
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToTokenFeedEvent",
+		Object:     "CollectorsNoteAddedToTokenFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -5490,7 +5183,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_token(ctx conte
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.CollectorsNoteAddedToTokenFeedEvent().Token(rctx, obj)
+		return ec.resolvers.CollectorsNoteAddedToTokenFeedEventData().Token(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5504,7 +5197,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_token(ctx conte
 	return ec.marshalOCollectionToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5512,7 +5205,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent_newCollectorsNo
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectorsNoteAddedToTokenFeedEvent",
+		Object:     "CollectorsNoteAddedToTokenFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6392,7 +6085,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken_message(ctx context.Cont
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrFeedEventNotFoundByID_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrFeedEventNotFoundByID) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrFeedEventNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrFeedEventNotFound) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6400,7 +6093,7 @@ func (ec *executionContext) _ErrFeedEventNotFoundByID_message(ctx context.Contex
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ErrFeedEventNotFoundByID",
+		Object:     "ErrFeedEventNotFound",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -6941,9 +6634,9 @@ func (ec *executionContext) _FeedEdge_node(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.FeedEvent)
+	res := resTmp.(model.FeedEventOrError)
 	fc.Result = res
-	return ec.marshalOFeedEvent2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
+	return ec.marshalOFeedEventOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FeedEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.FeedEdge) (ret graphql.Marshaler) {
@@ -6979,6 +6672,108 @@ func (ec *executionContext) _FeedEdge_cursor(ctx context.Context, field graphql.
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_dbid(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_eventData(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FeedEvent().EventData(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.FeedEventData)
+	fc.Result = res
+	return ec.marshalOFeedEventData2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventData(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FollowInfo_user(ctx context.Context, field graphql.CollectedField, obj *model.FollowInfo) (ret graphql.Marshaler) {
@@ -10317,6 +10112,45 @@ func (ec *executionContext) _Query_generalAllowlist(ctx context.Context, field g
 	return ec.marshalOChainAddress2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_feedByUserId(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_feedByUserId_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FeedByUserID(rctx, args["userId"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedConnection)
+	fc.Result = res
+	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -10351,9 +10185,9 @@ func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.FeedConnectionOrError)
+	res := resTmp.(*model.FeedConnection)
 	fc.Result = res
-	return ec.marshalOFeedConnectionOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnectionOrError(ctx, field.Selections, res)
+	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_feedEventById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -11560,7 +11394,7 @@ func (ec *executionContext) _TokenHolder_previewTokens(ctx context.Context, fiel
 	return ec.marshalOString2ᚕᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -11568,77 +11402,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_id(ctx context.Con
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "TokensAddedToCollectionFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent_dbid(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "TokensAddedToCollectionFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "TokensAddedToCollectionFeedEvent",
+		Object:     "TokensAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -11655,17 +11419,14 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_eventTime(ctx cont
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent_owner(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -11673,7 +11434,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_owner(ctx context.
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "TokensAddedToCollectionFeedEvent",
+		Object:     "TokensAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -11683,24 +11444,21 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_owner(ctx context.
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TokensAddedToCollectionFeedEvent().Owner(rctx, obj)
+		return ec.resolvers.TokensAddedToCollectionFeedEventData().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
-	return ec.marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent_collection(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData_collection(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -11708,7 +11466,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_collection(ctx con
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "TokensAddedToCollectionFeedEvent",
+		Object:     "TokensAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -11718,7 +11476,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_collection(ctx con
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TokensAddedToCollectionFeedEvent().Collection(rctx, obj)
+		return ec.resolvers.TokensAddedToCollectionFeedEventData().Collection(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -11732,7 +11490,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_collection(ctx con
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent_action(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -11740,7 +11498,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_action(ctx context
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "TokensAddedToCollectionFeedEvent",
+		Object:     "TokensAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -11757,17 +11515,14 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_action(ctx context
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.Action)
+	res := resTmp.(*persist.Action)
 	fc.Result = res
-	return ec.marshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent_newTokens(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData_newTokens(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -11775,7 +11530,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_newTokens(ctx cont
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "TokensAddedToCollectionFeedEvent",
+		Object:     "TokensAddedToCollectionFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -11785,7 +11540,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent_newTokens(ctx cont
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TokensAddedToCollectionFeedEvent().NewTokens(rctx, obj)
+		return ec.resolvers.TokensAddedToCollectionFeedEventData().NewTokens(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12183,7 +11938,7 @@ func (ec *executionContext) _UpdateUserInfoPayload_viewer(ctx context.Context, f
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserCreatedFeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserCreatedFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12191,77 +11946,7 @@ func (ec *executionContext) _UserCreatedFeedEvent_id(ctx context.Context, field 
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UserCreatedFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _UserCreatedFeedEvent_dbid(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "UserCreatedFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _UserCreatedFeedEvent_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "UserCreatedFeedEvent",
+		Object:     "UserCreatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -12278,17 +11963,14 @@ func (ec *executionContext) _UserCreatedFeedEvent_eventTime(ctx context.Context,
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserCreatedFeedEvent_owner(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserCreatedFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12296,7 +11978,7 @@ func (ec *executionContext) _UserCreatedFeedEvent_owner(ctx context.Context, fie
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UserCreatedFeedEvent",
+		Object:     "UserCreatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -12306,24 +11988,21 @@ func (ec *executionContext) _UserCreatedFeedEvent_owner(ctx context.Context, fie
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.UserCreatedFeedEvent().Owner(rctx, obj)
+		return ec.resolvers.UserCreatedFeedEventData().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
-	return ec.marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserCreatedFeedEvent_action(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserCreatedFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.UserCreatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12331,7 +12010,7 @@ func (ec *executionContext) _UserCreatedFeedEvent_action(ctx context.Context, fi
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UserCreatedFeedEvent",
+		Object:     "UserCreatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -12348,17 +12027,14 @@ func (ec *executionContext) _UserCreatedFeedEvent_action(ctx context.Context, fi
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.Action)
+	res := resTmp.(*persist.Action)
 	fc.Result = res
-	return ec.marshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserFollowedUsersFeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserFollowedUsersFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12366,77 +12042,7 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent_id(ctx context.Context, 
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UserFollowedUsersFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _UserFollowedUsersFeedEvent_dbid(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "UserFollowedUsersFeedEvent",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dbid, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.DBID)
-	fc.Result = res
-	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _UserFollowedUsersFeedEvent_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEvent) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "UserFollowedUsersFeedEvent",
+		Object:     "UserFollowedUsersFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -12453,17 +12059,14 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent_eventTime(ctx context.Co
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserFollowedUsersFeedEvent_owner(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserFollowedUsersFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12471,7 +12074,7 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent_owner(ctx context.Contex
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UserFollowedUsersFeedEvent",
+		Object:     "UserFollowedUsersFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -12481,24 +12084,21 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent_owner(ctx context.Contex
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.UserFollowedUsersFeedEvent().Owner(rctx, obj)
+		return ec.resolvers.UserFollowedUsersFeedEventData().Owner(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
-	return ec.marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserFollowedUsersFeedEvent_action(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserFollowedUsersFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12506,7 +12106,7 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent_action(ctx context.Conte
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UserFollowedUsersFeedEvent",
+		Object:     "UserFollowedUsersFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -12523,17 +12123,14 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent_action(ctx context.Conte
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(persist.Action)
+	res := resTmp.(*persist.Action)
 	fc.Result = res
-	return ec.marshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserFollowedUsersFeedEvent_followed(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEvent) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserFollowedUsersFeedEventData_followed(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12541,7 +12138,7 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent_followed(ctx context.Con
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UserFollowedUsersFeedEvent",
+		Object:     "UserFollowedUsersFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -12883,45 +12480,6 @@ func (ec *executionContext) _Viewer_viewerGalleries(ctx context.Context, field g
 	res := resTmp.([]*model.ViewerGallery)
 	fc.Result = res
 	return ec.marshalOViewerGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGallery(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Viewer_feed(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Viewer",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Viewer_feed_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Viewer().Feed(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.FeedConnection)
-	fc.Result = res
-	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ViewerGallery_gallery(ctx context.Context, field graphql.CollectedField, obj *model.ViewerGallery) (ret graphql.Marshaler) {
@@ -15169,13 +14727,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrUnknownAction(ctx, sel, obj)
-	case model.ErrFeedEventNotFoundByID:
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, &obj)
-	case *model.ErrFeedEventNotFoundByID:
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, obj)
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -15258,24 +14816,24 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 	}
 }
 
-func (ec *executionContext) _FeedConnectionOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedConnectionOrError) graphql.Marshaler {
+func (ec *executionContext) _FeedEventByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedEventByIDOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.FeedConnection:
-		return ec._FeedConnection(ctx, sel, &obj)
-	case *model.FeedConnection:
+	case model.FeedEvent:
+		return ec._FeedEvent(ctx, sel, &obj)
+	case *model.FeedEvent:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._FeedConnection(ctx, sel, obj)
-	case model.ErrNotAuthorized:
-		return ec._ErrNotAuthorized(ctx, sel, &obj)
-	case *model.ErrNotAuthorized:
+		return ec._FeedEvent(ctx, sel, obj)
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrNotAuthorized(ctx, sel, obj)
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
 	case model.ErrUnknownAction:
 		return ec._ErrUnknownAction(ctx, sel, &obj)
 	case *model.ErrUnknownAction:
@@ -15283,122 +14841,80 @@ func (ec *executionContext) _FeedConnectionOrError(ctx context.Context, sel ast.
 			return graphql.Null
 		}
 		return ec._ErrUnknownAction(ctx, sel, obj)
-	case model.ErrFeedEventNotFoundByID:
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, &obj)
-	case *model.ErrFeedEventNotFoundByID:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
 }
 
-func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet, obj model.FeedEvent) graphql.Marshaler {
+func (ec *executionContext) _FeedEventData(ctx context.Context, sel ast.SelectionSet, obj model.FeedEventData) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.UserCreatedFeedEvent:
-		return ec._UserCreatedFeedEvent(ctx, sel, &obj)
-	case *model.UserCreatedFeedEvent:
+	case model.UserCreatedFeedEventData:
+		return ec._UserCreatedFeedEventData(ctx, sel, &obj)
+	case *model.UserCreatedFeedEventData:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._UserCreatedFeedEvent(ctx, sel, obj)
-	case model.UserFollowedUsersFeedEvent:
-		return ec._UserFollowedUsersFeedEvent(ctx, sel, &obj)
-	case *model.UserFollowedUsersFeedEvent:
+		return ec._UserCreatedFeedEventData(ctx, sel, obj)
+	case model.UserFollowedUsersFeedEventData:
+		return ec._UserFollowedUsersFeedEventData(ctx, sel, &obj)
+	case *model.UserFollowedUsersFeedEventData:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._UserFollowedUsersFeedEvent(ctx, sel, obj)
-	case model.CollectorsNoteAddedToTokenFeedEvent:
-		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, &obj)
-	case *model.CollectorsNoteAddedToTokenFeedEvent:
+		return ec._UserFollowedUsersFeedEventData(ctx, sel, obj)
+	case model.CollectorsNoteAddedToTokenFeedEventData:
+		return ec._CollectorsNoteAddedToTokenFeedEventData(ctx, sel, &obj)
+	case *model.CollectorsNoteAddedToTokenFeedEventData:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, obj)
-	case model.CollectionCreatedFeedEvent:
-		return ec._CollectionCreatedFeedEvent(ctx, sel, &obj)
-	case *model.CollectionCreatedFeedEvent:
+		return ec._CollectorsNoteAddedToTokenFeedEventData(ctx, sel, obj)
+	case model.CollectionCreatedFeedEventData:
+		return ec._CollectionCreatedFeedEventData(ctx, sel, &obj)
+	case *model.CollectionCreatedFeedEventData:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._CollectionCreatedFeedEvent(ctx, sel, obj)
-	case model.CollectorsNoteAddedToCollectionFeedEvent:
-		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, &obj)
-	case *model.CollectorsNoteAddedToCollectionFeedEvent:
+		return ec._CollectionCreatedFeedEventData(ctx, sel, obj)
+	case model.CollectorsNoteAddedToCollectionFeedEventData:
+		return ec._CollectorsNoteAddedToCollectionFeedEventData(ctx, sel, &obj)
+	case *model.CollectorsNoteAddedToCollectionFeedEventData:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, obj)
-	case model.TokensAddedToCollectionFeedEvent:
-		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, &obj)
-	case *model.TokensAddedToCollectionFeedEvent:
+		return ec._CollectorsNoteAddedToCollectionFeedEventData(ctx, sel, obj)
+	case model.TokensAddedToCollectionFeedEventData:
+		return ec._TokensAddedToCollectionFeedEventData(ctx, sel, &obj)
+	case *model.TokensAddedToCollectionFeedEventData:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, obj)
+		return ec._TokensAddedToCollectionFeedEventData(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
 }
 
-func (ec *executionContext) _FeedEventByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedEventByIDOrError) graphql.Marshaler {
+func (ec *executionContext) _FeedEventOrError(ctx context.Context, sel ast.SelectionSet, obj model.FeedEventOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.UserCreatedFeedEvent:
-		return ec._UserCreatedFeedEvent(ctx, sel, &obj)
-	case *model.UserCreatedFeedEvent:
+	case model.FeedEvent:
+		return ec._FeedEvent(ctx, sel, &obj)
+	case *model.FeedEvent:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._UserCreatedFeedEvent(ctx, sel, obj)
-	case model.UserFollowedUsersFeedEvent:
-		return ec._UserFollowedUsersFeedEvent(ctx, sel, &obj)
-	case *model.UserFollowedUsersFeedEvent:
+		return ec._FeedEvent(ctx, sel, obj)
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._UserFollowedUsersFeedEvent(ctx, sel, obj)
-	case model.CollectorsNoteAddedToTokenFeedEvent:
-		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, &obj)
-	case *model.CollectorsNoteAddedToTokenFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, obj)
-	case model.CollectionCreatedFeedEvent:
-		return ec._CollectionCreatedFeedEvent(ctx, sel, &obj)
-	case *model.CollectionCreatedFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._CollectionCreatedFeedEvent(ctx, sel, obj)
-	case model.CollectorsNoteAddedToCollectionFeedEvent:
-		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, &obj)
-	case *model.CollectorsNoteAddedToCollectionFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, obj)
-	case model.TokensAddedToCollectionFeedEvent:
-		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, &obj)
-	case *model.TokensAddedToCollectionFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, obj)
-	case model.ErrFeedEventNotFoundByID:
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, &obj)
-	case *model.ErrFeedEventNotFoundByID:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrFeedEventNotFoundByID(ctx, sel, obj)
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
 	case model.ErrUnknownAction:
 		return ec._ErrUnknownAction(ctx, sel, &obj)
 	case *model.ErrUnknownAction:
@@ -15764,52 +15280,12 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 		}
 		return ec._Contract(ctx, sel, obj)
 	case model.FeedEvent:
+		return ec._FeedEvent(ctx, sel, &obj)
+	case *model.FeedEvent:
 		if obj == nil {
 			return graphql.Null
 		}
 		return ec._FeedEvent(ctx, sel, obj)
-	case model.UserCreatedFeedEvent:
-		return ec._UserCreatedFeedEvent(ctx, sel, &obj)
-	case *model.UserCreatedFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._UserCreatedFeedEvent(ctx, sel, obj)
-	case model.UserFollowedUsersFeedEvent:
-		return ec._UserFollowedUsersFeedEvent(ctx, sel, &obj)
-	case *model.UserFollowedUsersFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._UserFollowedUsersFeedEvent(ctx, sel, obj)
-	case model.CollectorsNoteAddedToTokenFeedEvent:
-		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, &obj)
-	case *model.CollectorsNoteAddedToTokenFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._CollectorsNoteAddedToTokenFeedEvent(ctx, sel, obj)
-	case model.CollectionCreatedFeedEvent:
-		return ec._CollectionCreatedFeedEvent(ctx, sel, &obj)
-	case *model.CollectionCreatedFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._CollectionCreatedFeedEvent(ctx, sel, obj)
-	case model.CollectorsNoteAddedToCollectionFeedEvent:
-		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, &obj)
-	case *model.CollectorsNoteAddedToCollectionFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._CollectorsNoteAddedToCollectionFeedEvent(ctx, sel, obj)
-	case model.TokensAddedToCollectionFeedEvent:
-		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, &obj)
-	case *model.TokensAddedToCollectionFeedEvent:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._TokensAddedToCollectionFeedEvent(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -16526,46 +16002,23 @@ func (ec *executionContext) _Collection(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var collectionCreatedFeedEventImplementors = []string{"CollectionCreatedFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
+var collectionCreatedFeedEventDataImplementors = []string{"CollectionCreatedFeedEventData", "FeedEventData"}
 
-func (ec *executionContext) _CollectionCreatedFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionCreatedFeedEvent) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, collectionCreatedFeedEventImplementors)
+func (ec *executionContext) _CollectionCreatedFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionCreatedFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionCreatedFeedEventDataImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("CollectionCreatedFeedEvent")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionCreatedFeedEvent_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionCreatedFeedEvent_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			out.Values[i] = graphql.MarshalString("CollectionCreatedFeedEventData")
 		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionCreatedFeedEvent_eventTime(ctx, field, obj)
+				return ec._CollectionCreatedFeedEventData_eventTime(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "owner":
 			field := field
 
@@ -16575,10 +16028,7 @@ func (ec *executionContext) _CollectionCreatedFeedEvent(ctx context.Context, sel
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._CollectionCreatedFeedEvent_owner(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
+				res = ec._CollectionCreatedFeedEventData_owner(ctx, field, obj)
 				return res
 			}
 
@@ -16588,14 +16038,11 @@ func (ec *executionContext) _CollectionCreatedFeedEvent(ctx context.Context, sel
 			})
 		case "action":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionCreatedFeedEvent_action(ctx, field, obj)
+				return ec._CollectionCreatedFeedEventData_action(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "collection":
 			field := field
 
@@ -16605,7 +16052,7 @@ func (ec *executionContext) _CollectionCreatedFeedEvent(ctx context.Context, sel
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._CollectionCreatedFeedEvent_collection(ctx, field, obj)
+				res = ec._CollectionCreatedFeedEventData_collection(ctx, field, obj)
 				return res
 			}
 
@@ -16704,46 +16151,23 @@ func (ec *executionContext) _CollectionToken(ctx context.Context, sel ast.Select
 	return out
 }
 
-var collectorsNoteAddedToCollectionFeedEventImplementors = []string{"CollectorsNoteAddedToCollectionFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
+var collectorsNoteAddedToCollectionFeedEventDataImplementors = []string{"CollectorsNoteAddedToCollectionFeedEventData", "FeedEventData"}
 
-func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.CollectorsNoteAddedToCollectionFeedEvent) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, collectorsNoteAddedToCollectionFeedEventImplementors)
+func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.CollectorsNoteAddedToCollectionFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectorsNoteAddedToCollectionFeedEventDataImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("CollectorsNoteAddedToCollectionFeedEvent")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToCollectionFeedEvent_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToCollectionFeedEvent_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			out.Values[i] = graphql.MarshalString("CollectorsNoteAddedToCollectionFeedEventData")
 		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToCollectionFeedEvent_eventTime(ctx, field, obj)
+				return ec._CollectorsNoteAddedToCollectionFeedEventData_eventTime(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "owner":
 			field := field
 
@@ -16753,10 +16177,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx contex
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._CollectorsNoteAddedToCollectionFeedEvent_owner(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
+				res = ec._CollectorsNoteAddedToCollectionFeedEventData_owner(ctx, field, obj)
 				return res
 			}
 
@@ -16766,14 +16187,11 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx contex
 			})
 		case "action":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToCollectionFeedEvent_action(ctx, field, obj)
+				return ec._CollectorsNoteAddedToCollectionFeedEventData_action(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "collection":
 			field := field
 
@@ -16783,7 +16201,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx contex
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._CollectorsNoteAddedToCollectionFeedEvent_collection(ctx, field, obj)
+				res = ec._CollectorsNoteAddedToCollectionFeedEventData_collection(ctx, field, obj)
 				return res
 			}
 
@@ -16793,7 +16211,7 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx contex
 			})
 		case "newCollectorsNote":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToCollectionFeedEvent_newCollectorsNote(ctx, field, obj)
+				return ec._CollectorsNoteAddedToCollectionFeedEventData_newCollectorsNote(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -16809,46 +16227,23 @@ func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEvent(ctx contex
 	return out
 }
 
-var collectorsNoteAddedToTokenFeedEventImplementors = []string{"CollectorsNoteAddedToTokenFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
+var collectorsNoteAddedToTokenFeedEventDataImplementors = []string{"CollectorsNoteAddedToTokenFeedEventData", "FeedEventData"}
 
-func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.CollectorsNoteAddedToTokenFeedEvent) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, collectorsNoteAddedToTokenFeedEventImplementors)
+func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.CollectorsNoteAddedToTokenFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectorsNoteAddedToTokenFeedEventDataImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("CollectorsNoteAddedToTokenFeedEvent")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToTokenFeedEvent_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToTokenFeedEvent_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			out.Values[i] = graphql.MarshalString("CollectorsNoteAddedToTokenFeedEventData")
 		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToTokenFeedEvent_eventTime(ctx, field, obj)
+				return ec._CollectorsNoteAddedToTokenFeedEventData_eventTime(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "owner":
 			field := field
 
@@ -16858,10 +16253,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._CollectorsNoteAddedToTokenFeedEvent_owner(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
+				res = ec._CollectorsNoteAddedToTokenFeedEventData_owner(ctx, field, obj)
 				return res
 			}
 
@@ -16871,14 +16263,11 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 			})
 		case "action":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToTokenFeedEvent_action(ctx, field, obj)
+				return ec._CollectorsNoteAddedToTokenFeedEventData_action(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "token":
 			field := field
 
@@ -16888,7 +16277,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._CollectorsNoteAddedToTokenFeedEvent_token(ctx, field, obj)
+				res = ec._CollectorsNoteAddedToTokenFeedEventData_token(ctx, field, obj)
 				return res
 			}
 
@@ -16898,7 +16287,7 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 			})
 		case "newCollectorsNote":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectorsNoteAddedToTokenFeedEvent_newCollectorsNote(ctx, field, obj)
+				return ec._CollectorsNoteAddedToTokenFeedEventData_newCollectorsNote(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -17330,19 +16719,19 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel
 	return out
 }
 
-var errFeedEventNotFoundByIDImplementors = []string{"ErrFeedEventNotFoundByID", "Error", "FeedConnectionOrError", "FeedEventByIdOrError"}
+var errFeedEventNotFoundImplementors = []string{"ErrFeedEventNotFound", "Error", "FeedEventOrError", "FeedEventByIdOrError"}
 
-func (ec *executionContext) _ErrFeedEventNotFoundByID(ctx context.Context, sel ast.SelectionSet, obj *model.ErrFeedEventNotFoundByID) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errFeedEventNotFoundByIDImplementors)
+func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrFeedEventNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errFeedEventNotFoundImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrFeedEventNotFoundByID")
+			out.Values[i] = graphql.MarshalString("ErrFeedEventNotFound")
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrFeedEventNotFoundByID_message(ctx, field, obj)
+				return ec._ErrFeedEventNotFound_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -17474,7 +16863,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "FeedConnectionOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -17577,7 +16966,7 @@ func (ec *executionContext) _ErrTokenNotFound(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedConnectionOrError", "FeedEventByIdOrError"}
+var errUnknownActionImplementors = []string{"ErrUnknownAction", "Error", "FeedEventOrError", "FeedEventByIdOrError"}
 
 func (ec *executionContext) _ErrUnknownAction(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUnknownAction) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUnknownActionImplementors)
@@ -17670,7 +17059,7 @@ func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.Select
 	return out
 }
 
-var feedConnectionImplementors = []string{"FeedConnection", "FeedConnectionOrError"}
+var feedConnectionImplementors = []string{"FeedConnection"}
 
 func (ec *executionContext) _FeedConnection(ctx context.Context, sel ast.SelectionSet, obj *model.FeedConnection) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, feedConnectionImplementors)
@@ -17735,6 +17124,64 @@ func (ec *executionContext) _FeedEdge(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var feedEventImplementors = []string{"FeedEvent", "Node", "FeedEventOrError", "FeedEventByIdOrError"}
+
+func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.FeedEvent) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedEventImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedEvent")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._FeedEvent_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._FeedEvent_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "eventData":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedEvent_eventData(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -18996,6 +18443,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "feedByUserId":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_feedByUserId(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "globalFeed":
 			field := field
 
@@ -19502,46 +18969,23 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var tokensAddedToCollectionFeedEventImplementors = []string{"TokensAddedToCollectionFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
+var tokensAddedToCollectionFeedEventDataImplementors = []string{"TokensAddedToCollectionFeedEventData", "FeedEventData"}
 
-func (ec *executionContext) _TokensAddedToCollectionFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.TokensAddedToCollectionFeedEvent) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, tokensAddedToCollectionFeedEventImplementors)
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.TokensAddedToCollectionFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokensAddedToCollectionFeedEventDataImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("TokensAddedToCollectionFeedEvent")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokensAddedToCollectionFeedEvent_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokensAddedToCollectionFeedEvent_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			out.Values[i] = graphql.MarshalString("TokensAddedToCollectionFeedEventData")
 		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokensAddedToCollectionFeedEvent_eventTime(ctx, field, obj)
+				return ec._TokensAddedToCollectionFeedEventData_eventTime(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "owner":
 			field := field
 
@@ -19551,10 +18995,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent(ctx context.Contex
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._TokensAddedToCollectionFeedEvent_owner(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
+				res = ec._TokensAddedToCollectionFeedEventData_owner(ctx, field, obj)
 				return res
 			}
 
@@ -19571,7 +19012,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent(ctx context.Contex
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._TokensAddedToCollectionFeedEvent_collection(ctx, field, obj)
+				res = ec._TokensAddedToCollectionFeedEventData_collection(ctx, field, obj)
 				return res
 			}
 
@@ -19581,14 +19022,11 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent(ctx context.Contex
 			})
 		case "action":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._TokensAddedToCollectionFeedEvent_action(ctx, field, obj)
+				return ec._TokensAddedToCollectionFeedEventData_action(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "newTokens":
 			field := field
 
@@ -19598,7 +19036,7 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEvent(ctx context.Contex
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._TokensAddedToCollectionFeedEvent_newTokens(ctx, field, obj)
+				res = ec._TokensAddedToCollectionFeedEventData_newTokens(ctx, field, obj)
 				return res
 			}
 
@@ -19879,46 +19317,23 @@ func (ec *executionContext) _UpdateUserInfoPayload(ctx context.Context, sel ast.
 	return out
 }
 
-var userCreatedFeedEventImplementors = []string{"UserCreatedFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
+var userCreatedFeedEventDataImplementors = []string{"UserCreatedFeedEventData", "FeedEventData"}
 
-func (ec *executionContext) _UserCreatedFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.UserCreatedFeedEvent) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, userCreatedFeedEventImplementors)
+func (ec *executionContext) _UserCreatedFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.UserCreatedFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userCreatedFeedEventDataImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("UserCreatedFeedEvent")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserCreatedFeedEvent_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserCreatedFeedEvent_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			out.Values[i] = graphql.MarshalString("UserCreatedFeedEventData")
 		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserCreatedFeedEvent_eventTime(ctx, field, obj)
+				return ec._UserCreatedFeedEventData_eventTime(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "owner":
 			field := field
 
@@ -19928,10 +19343,7 @@ func (ec *executionContext) _UserCreatedFeedEvent(ctx context.Context, sel ast.S
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._UserCreatedFeedEvent_owner(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
+				res = ec._UserCreatedFeedEventData_owner(ctx, field, obj)
 				return res
 			}
 
@@ -19941,14 +19353,11 @@ func (ec *executionContext) _UserCreatedFeedEvent(ctx context.Context, sel ast.S
 			})
 		case "action":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserCreatedFeedEvent_action(ctx, field, obj)
+				return ec._UserCreatedFeedEventData_action(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -19960,46 +19369,23 @@ func (ec *executionContext) _UserCreatedFeedEvent(ctx context.Context, sel ast.S
 	return out
 }
 
-var userFollowedUsersFeedEventImplementors = []string{"UserFollowedUsersFeedEvent", "Node", "FeedEvent", "FeedEventByIdOrError"}
+var userFollowedUsersFeedEventDataImplementors = []string{"UserFollowedUsersFeedEventData", "FeedEventData"}
 
-func (ec *executionContext) _UserFollowedUsersFeedEvent(ctx context.Context, sel ast.SelectionSet, obj *model.UserFollowedUsersFeedEvent) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, userFollowedUsersFeedEventImplementors)
+func (ec *executionContext) _UserFollowedUsersFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.UserFollowedUsersFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userFollowedUsersFeedEventDataImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("UserFollowedUsersFeedEvent")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserFollowedUsersFeedEvent_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "dbid":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserFollowedUsersFeedEvent_dbid(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			out.Values[i] = graphql.MarshalString("UserFollowedUsersFeedEventData")
 		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserFollowedUsersFeedEvent_eventTime(ctx, field, obj)
+				return ec._UserFollowedUsersFeedEventData_eventTime(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "owner":
 			field := field
 
@@ -20009,10 +19395,7 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent(ctx context.Context, sel
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._UserFollowedUsersFeedEvent_owner(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
+				res = ec._UserFollowedUsersFeedEventData_owner(ctx, field, obj)
 				return res
 			}
 
@@ -20022,17 +19405,14 @@ func (ec *executionContext) _UserFollowedUsersFeedEvent(ctx context.Context, sel
 			})
 		case "action":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserFollowedUsersFeedEvent_action(ctx, field, obj)
+				return ec._UserFollowedUsersFeedEventData_action(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "followed":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserFollowedUsersFeedEvent_followed(ctx, field, obj)
+				return ec._UserFollowedUsersFeedEventData_followed(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -20183,23 +19563,6 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Viewer_viewerGalleries(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "feed":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Viewer_feed(ctx, field, obj)
 				return res
 			}
 
@@ -20748,22 +20111,6 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) unmarshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx context.Context, v interface{}) (persist.Action, error) {
-	tmp, err := graphql.UnmarshalString(v)
-	res := persist.Action(tmp)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNAction2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx context.Context, sel ast.SelectionSet, v persist.Action) graphql.Marshaler {
-	res := graphql.MarshalString(string(v))
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "must not be null")
-		}
-	}
-	return res
-}
-
 func (ec *executionContext) unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, v interface{}) (persist.Address, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.Address(tmp)
@@ -20915,20 +20262,6 @@ func (ec *executionContext) marshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	return ret
 }
 
-func (ec *executionContext) marshalNGalleryUser2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v model.GalleryUser) graphql.Marshaler {
-	return ec._GalleryUser(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v *model.GalleryUser) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	return ec._GalleryUser(ctx, sel, v)
-}
-
 func (ec *executionContext) unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx context.Context, v interface{}) (model.GqlID, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := model.GqlID(tmp)
@@ -21047,21 +20380,6 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
-}
-
-func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
-	res, err := graphql.UnmarshalTime(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
-	res := graphql.MarshalTime(v)
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "must not be null")
-		}
-	}
-	return res
 }
 
 func (ec *executionContext) unmarshalNUpdateCollectionHiddenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenInput(ctx context.Context, v interface{}) (model.UpdateCollectionHiddenInput, error) {
@@ -21344,6 +20662,23 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 			ec.Errorf(ctx, "must not be null")
 		}
 	}
+	return res
+}
+
+func (ec *executionContext) unmarshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx context.Context, v interface{}) (*persist.Action, error) {
+	if v == nil {
+		return nil, nil
+	}
+	tmp, err := graphql.UnmarshalString(v)
+	res := persist.Action(tmp)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx context.Context, sel ast.SelectionSet, v *persist.Action) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := graphql.MarshalString(string(*v))
 	return res
 }
 
@@ -21663,13 +20998,6 @@ func (ec *executionContext) marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋ
 	return ec._FeedConnection(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOFeedConnectionOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnectionOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedConnectionOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._FeedConnectionOrError(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalOFeedEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEdge(ctx context.Context, sel ast.SelectionSet, v []*model.FeedEdge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -21718,18 +21046,25 @@ func (ec *executionContext) marshalOFeedEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 	return ec._FeedEdge(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOFeedEvent2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx context.Context, sel ast.SelectionSet, v model.FeedEvent) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._FeedEvent(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalOFeedEventByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEventByIDOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._FeedEventByIdOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEventData2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventData(ctx context.Context, sel ast.SelectionSet, v model.FeedEventData) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventData(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEventOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEventOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEventOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFollowInfo2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowInfo(ctx context.Context, sel ast.SelectionSet, v []*model.FollowInfo) graphql.Marshaler {

@@ -34,6 +34,10 @@ type HelperTokenHolderData struct {
 	WalletIds []persist.DBID
 }
 
+type HelperTokensAddedToCollectionFeedEventDataData struct {
+	FeedEventId persist.DBID
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

@@ -46,28 +46,32 @@ func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection) 
 	return output, nil
 }
 
-func (r *collectionCreatedFeedEventResolver) Owner(ctx context.Context, obj *model.CollectionCreatedFeedEvent) (*model.GalleryUser, error) {
+func (r *collectionCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *collectionCreatedFeedEventResolver) Collection(ctx context.Context, obj *model.CollectionCreatedFeedEvent) (*model.Collection, error) {
+func (r *collectionCreatedFeedEventDataResolver) Collection(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.Collection, error) {
 	return resolveCollectionByCollectionID(ctx, obj.Collection.Dbid)
 }
 
-func (r *collectorsNoteAddedToCollectionFeedEventResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (*model.GalleryUser, error) {
+func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *collectorsNoteAddedToCollectionFeedEventResolver) Collection(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEvent) (*model.Collection, error) {
+func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Collection(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.Collection, error) {
 	return resolveCollectionByCollectionID(ctx, obj.Collection.Dbid)
 }
 
-func (r *collectorsNoteAddedToTokenFeedEventResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEvent) (*model.GalleryUser, error) {
+func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *collectorsNoteAddedToTokenFeedEventResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEvent) (*model.CollectionToken, error) {
+func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error) {
 	return resolveCollectionTokenByIDs(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
+}
+
+func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
+	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -543,7 +547,17 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainA
 	return resolveGeneralAllowlist(ctx)
 }
 
-func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (model.FeedConnectionOrError, error) {
+func (r *queryResolver) FeedByUserID(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	feed, err := resolveFeedByUserID(ctx, userID, before, after, first, last)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return feed, nil
+}
+
+func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	feed, err := resolveGlobalFeed(ctx, before, after, first, last)
 
 	if err != nil {
@@ -554,28 +568,7 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 }
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
-	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, id)
-
-	if err != nil {
-		return nil, err
-	}
-
-	switch event.Action {
-	case persist.ActionUserCreated:
-		return eventToUserCreatedFeedEventModel(event), nil
-	case persist.ActionUserFollowedUsers:
-		return eventToUserFollowedUsersFeedEventModel(event), nil
-	case persist.ActionCollectorsNoteAddedToToken:
-		return eventToCollectorsNoteAddedToTokenFeedEventModel(event), nil
-	case persist.ActionCollectionCreated:
-		return eventToCollectionCreatedFeedEventModel(event), nil
-	case persist.ActionCollectorsNoteAddedToCollection:
-		return eventToCollectorsNoteAddedToCollectionFeedEventModel(event), nil
-	case persist.ActionTokensAddedToCollection:
-		return eventToTokensAddedToCollectionFeedEventModel(event), nil
-	default:
-		return nil, persist.ErrUnknownAction{Action: event.Action}
-	}
+	return resolveFeedEventByEventID(ctx, id)
 }
 
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
@@ -619,27 +612,27 @@ func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) 
 	return resolveGalleryUserByUserID(ctx, obj.UserId)
 }
 
-func (r *tokensAddedToCollectionFeedEventResolver) Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEvent) (*model.GalleryUser, error) {
+func (r *tokensAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *tokensAddedToCollectionFeedEventResolver) Collection(ctx context.Context, obj *model.TokensAddedToCollectionFeedEvent) (*model.Collection, error) {
+func (r *tokensAddedToCollectionFeedEventDataResolver) Collection(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.Collection, error) {
 	return resolveCollectionByCollectionID(ctx, obj.Collection.Dbid)
 }
 
-func (r *tokensAddedToCollectionFeedEventResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEvent) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.Dbid)
+func (r *tokensAddedToCollectionFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error) {
+	return resolveNewTokensByEventID(ctx, obj.HelperTokensAddedToCollectionFeedEventDataData.FeedEventId)
 }
 
 func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
 }
 
-func (r *userCreatedFeedEventResolver) Owner(ctx context.Context, obj *model.UserCreatedFeedEvent) (*model.GalleryUser, error) {
+func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *userFollowedUsersFeedEventResolver) Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEvent) (*model.GalleryUser, error) {
+func (r *userFollowedUsersFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
@@ -666,16 +659,6 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	return output, nil
 }
 
-func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	feed, err := resolveViewerFeed(ctx, before, after, first, last)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return feed, nil
-}
-
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
 	return resolveTokensByWalletID(ctx, obj.Dbid)
 }
@@ -691,20 +674,23 @@ func (r *chainAddressInputResolver) Chain(ctx context.Context, obj *persist.Chai
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
-// CollectionCreatedFeedEvent returns generated.CollectionCreatedFeedEventResolver implementation.
-func (r *Resolver) CollectionCreatedFeedEvent() generated.CollectionCreatedFeedEventResolver {
-	return &collectionCreatedFeedEventResolver{r}
+// CollectionCreatedFeedEventData returns generated.CollectionCreatedFeedEventDataResolver implementation.
+func (r *Resolver) CollectionCreatedFeedEventData() generated.CollectionCreatedFeedEventDataResolver {
+	return &collectionCreatedFeedEventDataResolver{r}
 }
 
-// CollectorsNoteAddedToCollectionFeedEvent returns generated.CollectorsNoteAddedToCollectionFeedEventResolver implementation.
-func (r *Resolver) CollectorsNoteAddedToCollectionFeedEvent() generated.CollectorsNoteAddedToCollectionFeedEventResolver {
-	return &collectorsNoteAddedToCollectionFeedEventResolver{r}
+// CollectorsNoteAddedToCollectionFeedEventData returns generated.CollectorsNoteAddedToCollectionFeedEventDataResolver implementation.
+func (r *Resolver) CollectorsNoteAddedToCollectionFeedEventData() generated.CollectorsNoteAddedToCollectionFeedEventDataResolver {
+	return &collectorsNoteAddedToCollectionFeedEventDataResolver{r}
 }
 
-// CollectorsNoteAddedToTokenFeedEvent returns generated.CollectorsNoteAddedToTokenFeedEventResolver implementation.
-func (r *Resolver) CollectorsNoteAddedToTokenFeedEvent() generated.CollectorsNoteAddedToTokenFeedEventResolver {
-	return &collectorsNoteAddedToTokenFeedEventResolver{r}
+// CollectorsNoteAddedToTokenFeedEventData returns generated.CollectorsNoteAddedToTokenFeedEventDataResolver implementation.
+func (r *Resolver) CollectorsNoteAddedToTokenFeedEventData() generated.CollectorsNoteAddedToTokenFeedEventDataResolver {
+	return &collectorsNoteAddedToTokenFeedEventDataResolver{r}
 }
+
+// FeedEvent returns generated.FeedEventResolver implementation.
+func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
 
 // FollowInfo returns generated.FollowInfoResolver implementation.
 func (r *Resolver) FollowInfo() generated.FollowInfoResolver { return &followInfoResolver{r} }
@@ -735,9 +721,9 @@ func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 // TokenHolder returns generated.TokenHolderResolver implementation.
 func (r *Resolver) TokenHolder() generated.TokenHolderResolver { return &tokenHolderResolver{r} }
 
-// TokensAddedToCollectionFeedEvent returns generated.TokensAddedToCollectionFeedEventResolver implementation.
-func (r *Resolver) TokensAddedToCollectionFeedEvent() generated.TokensAddedToCollectionFeedEventResolver {
-	return &tokensAddedToCollectionFeedEventResolver{r}
+// TokensAddedToCollectionFeedEventData returns generated.TokensAddedToCollectionFeedEventDataResolver implementation.
+func (r *Resolver) TokensAddedToCollectionFeedEventData() generated.TokensAddedToCollectionFeedEventDataResolver {
+	return &tokensAddedToCollectionFeedEventDataResolver{r}
 }
 
 // UnfollowUserPayload returns generated.UnfollowUserPayloadResolver implementation.
@@ -745,14 +731,14 @@ func (r *Resolver) UnfollowUserPayload() generated.UnfollowUserPayloadResolver {
 	return &unfollowUserPayloadResolver{r}
 }
 
-// UserCreatedFeedEvent returns generated.UserCreatedFeedEventResolver implementation.
-func (r *Resolver) UserCreatedFeedEvent() generated.UserCreatedFeedEventResolver {
-	return &userCreatedFeedEventResolver{r}
+// UserCreatedFeedEventData returns generated.UserCreatedFeedEventDataResolver implementation.
+func (r *Resolver) UserCreatedFeedEventData() generated.UserCreatedFeedEventDataResolver {
+	return &userCreatedFeedEventDataResolver{r}
 }
 
-// UserFollowedUsersFeedEvent returns generated.UserFollowedUsersFeedEventResolver implementation.
-func (r *Resolver) UserFollowedUsersFeedEvent() generated.UserFollowedUsersFeedEventResolver {
-	return &userFollowedUsersFeedEventResolver{r}
+// UserFollowedUsersFeedEventData returns generated.UserFollowedUsersFeedEventDataResolver implementation.
+func (r *Resolver) UserFollowedUsersFeedEventData() generated.UserFollowedUsersFeedEventDataResolver {
+	return &userFollowedUsersFeedEventDataResolver{r}
 }
 
 // Viewer returns generated.ViewerResolver implementation.
@@ -767,9 +753,10 @@ func (r *Resolver) ChainAddressInput() generated.ChainAddressInputResolver {
 }
 
 type collectionResolver struct{ *Resolver }
-type collectionCreatedFeedEventResolver struct{ *Resolver }
-type collectorsNoteAddedToCollectionFeedEventResolver struct{ *Resolver }
-type collectorsNoteAddedToTokenFeedEventResolver struct{ *Resolver }
+type collectionCreatedFeedEventDataResolver struct{ *Resolver }
+type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
+type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
+type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
@@ -779,10 +766,10 @@ type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
-type tokensAddedToCollectionFeedEventResolver struct{ *Resolver }
+type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
-type userCreatedFeedEventResolver struct{ *Resolver }
-type userFollowedUsersFeedEventResolver struct{ *Resolver }
+type userCreatedFeedEventDataResolver struct{ *Resolver }
+type userFollowedUsersFeedEventDataResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }

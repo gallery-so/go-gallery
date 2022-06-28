@@ -339,7 +339,6 @@ type ViewerGallery {
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -376,72 +375,64 @@ enum Action {
     TokensAddedToCollection
 }
 
-interface FeedEvent implements Node {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser!
-    action: Action!
-}
-
 type FollowInfo {
     user: GalleryUser @goField(forceResolver: true)
     followedBack: Boolean
 }
 
-type UserCreatedFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+interface FeedEventData {
+    eventTime: Time
+    owner: GalleryUser
+    action: Action
 }
 
-type UserFollowedUsersFeedEvent implements Node & FeedEvent {
+type FeedEvent implements Node {
     id: ID!
     dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+    eventData: FeedEventData @goField(forceResolver: true)
+}
+
+type UserCreatedFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+}
+
+type UserFollowedUsersFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     followed: [FollowInfo]
 }
 
-type CollectorsNoteAddedToTokenFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     token: CollectionToken @goField(forceResolver: true)
     newCollectorsNote: String
 }
 
-type CollectionCreatedFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+type CollectionCreatedFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     collection: Collection @goField(forceResolver: true)
 }
 
-type CollectorsNoteAddedToCollectionFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
-    action: Action!
+type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
     collection: Collection @goField(forceResolver: true)
     newCollectorsNote: String
 }
 
-type TokensAddedToCollectionFeedEvent implements Node & FeedEvent {
-    id: ID!
-    dbid: DBID!
-    eventTime: Time!
-    owner: GalleryUser! @goField(forceResolver: true)
+type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelper {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
     collection: Collection @goField(forceResolver: true)
-    action: Action!
+    action: Action
     newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
@@ -449,24 +440,18 @@ type ErrUnknownAction implements Error {
     message: String!
 }
 
-type ErrFeedEventNotFoundByID implements Error {
+type ErrFeedEventNotFound implements Error {
     message: String!
 }
 
-union FeedConnectionOrError = 
-    FeedConnection
-    | ErrNotAuthorized
+union FeedEventOrError =
+    FeedEvent
+    | ErrFeedEventNotFound
     | ErrUnknownAction
-    | ErrFeedEventNotFoundByID
 
 union FeedEventByIdOrError =
-    | UserCreatedFeedEvent
-    | UserFollowedUsersFeedEvent
-    | CollectorsNoteAddedToTokenFeedEvent
-    | CollectionCreatedFeedEvent
-    | CollectorsNoteAddedToCollectionFeedEvent
-    | TokensAddedToCollectionFeedEvent
-    | ErrFeedEventNotFoundByID
+    FeedEvent
+    | ErrFeedEventNotFound
     | ErrUnknownAction
 
 type PageInfo {
@@ -478,7 +463,7 @@ type PageInfo {
 }
 
 type FeedEdge {
-    node: FeedEvent
+    node: FeedEventOrError
     cursor: String!
 }
 
@@ -498,7 +483,8 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnectionOrError
+    feedByUserId(userId: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
+    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
 

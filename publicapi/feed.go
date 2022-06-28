@@ -36,12 +36,7 @@ func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*sql
 	return &event, nil
 }
 
-func (api FeedAPI) ViewerFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
-	userID, err := getAuthenticatedUser(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+func (api FeedAPI) GetFeedByUserID(ctx context.Context, userID persist.DBID, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
