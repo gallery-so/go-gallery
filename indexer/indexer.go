@@ -194,6 +194,7 @@ func (i *indexer) Start() {
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
 	for {
 		i.startNewBlocksPipeline(lastSyncedBlock, topics)
+		logrus.Infof("Finished processing set of new logs, waiting for new blocks again...")
 	}
 }
 
@@ -466,7 +467,6 @@ func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 
 	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: lastSyncedBlock.BigInt(),
-		ToBlock:   lastSyncedBlock.BigInt().Add(lastSyncedBlock.BigInt(), big.NewInt(10)),
 		Topics:    topics,
 	}, subscriptions)
 	if err != nil {
@@ -478,10 +478,15 @@ func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 			if !ok {
 				return
 			}
-			lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
-			i.lastSyncedBlock = lastSyncedBlock.Uint64()
+			i.lastSyncedBlock = log.BlockNumber
 			ts := logsToTransfers([]types.Log{log}, i.ethClient)
 			transfers <- transfersToTransfersAtBlock(ts)
+			// if the block of this log is greater than 10 of the last synced block, we can stop and unsubscribe
+			if log.BlockNumber >= lastSyncedBlock.Uint64()+10 {
+				sub.Unsubscribe()
+				return
+			}
+
 		case err := <-sub.Err():
 			panic(fmt.Sprintf("error in log subscription: %s", err))
 		}
