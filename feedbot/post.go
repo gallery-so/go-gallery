@@ -63,12 +63,12 @@ func (r *PostRenderer) createUserCreatedPost(ctx context.Context, message task.F
 		return "", err
 	}
 
-	if evt.FeedEvent.UserCreated.Owner.Username == "" {
+	if evt.FeedEvent.Event.EventData.UserCreated.Owner.Username == "" {
 		return "", nil
 	}
 
 	return fmt.Sprintf("**%s** joined Gallery: %s",
-		evt.FeedEvent.UserCreated.Owner.Username, userURL(evt.FeedEvent.UserCreated.Owner.Username),
+		evt.FeedEvent.Event.EventData.UserCreated.Owner.Username, userURL(evt.FeedEvent.Event.EventData.UserCreated.Owner.Username),
 	), nil
 }
 
@@ -81,22 +81,22 @@ func (r *PostRenderer) createUserFollowedUsersPost(ctx context.Context, message 
 		return "", err
 	}
 
-	if evt.FeedEvent.UserFollowedUsers.Owner.Username == "" {
+	if evt.FeedEvent.Event.EventData.UserFollowedUsers.Owner.Username == "" {
 		return "", nil
 	}
 
-	if len(evt.FeedEvent.UserFollowedUsers.Followed) == 1 {
+	if len(evt.FeedEvent.Event.EventData.UserFollowedUsers.Followed) == 1 {
 		return fmt.Sprintf("**%s** followed **%s**: %s",
-			evt.FeedEvent.UserFollowedUsers.Owner.Username,
-			evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username,
-			userURL(evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username),
+			evt.FeedEvent.Event.EventData.UserFollowedUsers.Owner.Username,
+			evt.FeedEvent.Event.EventData.UserFollowedUsers.Followed[0].User.Username,
+			userURL(evt.FeedEvent.Event.EventData.UserFollowedUsers.Followed[0].User.Username),
 		), nil
 	} else {
 		return fmt.Sprintf("**%s** followed **%s** and %d other(s): %s",
-			evt.FeedEvent.UserFollowedUsers.Owner.Username,
-			evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username,
-			len(evt.FeedEvent.UserFollowedUsers.Followed)-1,
-			userURL(evt.FeedEvent.UserFollowedUsers.Followed[0].User.Username),
+			evt.FeedEvent.Event.EventData.UserFollowedUsers.Owner.Username,
+			evt.FeedEvent.Event.EventData.UserFollowedUsers.Followed[0].User.Username,
+			len(evt.FeedEvent.Event.EventData.UserFollowedUsers.Followed)-1,
+			userURL(evt.FeedEvent.Event.EventData.UserFollowedUsers.Followed[0].User.Username),
 		), nil
 	}
 }
@@ -110,27 +110,27 @@ func (r *PostRenderer) createCollectorsNoteAddedToTokenPost(ctx context.Context,
 		return "", err
 	}
 
-	if evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username == "" {
+	if evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username == "" {
 		return "", nil
 	}
 
-	if evt.FeedEvent.CollectorsNoteAddedToToken.Token.Token.Name != "" {
+	if evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Token.Token.Name != "" {
 		return fmt.Sprintf("**%s** added a collector's note to *%s*: %s",
-			evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-			evt.FeedEvent.CollectorsNoteAddedToToken.Token.Token.Name,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Token.Token.Name,
 			tokenURL(
-				evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-				evt.FeedEvent.CollectorsNoteAddedToToken.Token.Collection.Dbid,
-				evt.FeedEvent.CollectorsNoteAddedToToken.Token.Token.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Token.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Token.Token.Dbid,
 			),
 		), nil
 	} else {
 		return fmt.Sprintf("**%s** added a collector's note to their piece: %s",
-			evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
 			tokenURL(
-				evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-				evt.FeedEvent.CollectorsNoteAddedToToken.Token.Collection.Dbid,
-				evt.FeedEvent.CollectorsNoteAddedToToken.Token.Token.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Token.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Token.Token.Dbid,
 			),
 		), nil
 	}
@@ -145,25 +145,25 @@ func (r *PostRenderer) createCollectionCreatedPost(ctx context.Context, message 
 		return "", err
 	}
 
-	if evt.FeedEvent.CollectionCreated.Owner.Username == "" {
+	if evt.FeedEvent.Event.EventData.CollectionCreated.Owner.Username == "" {
 		return "", nil
 	}
 
-	if evt.FeedEvent.CollectionCreated.Collection.Name != "" {
+	if evt.FeedEvent.Event.EventData.CollectionCreated.Collection.Name != "" {
 		return fmt.Sprintf("**%s** created a collection titled '*%s'*: %s",
-			evt.FeedEvent.CollectionCreated.Owner.Username,
-			evt.FeedEvent.CollectionCreated.Collection.Name,
+			evt.FeedEvent.Event.EventData.CollectionCreated.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectionCreated.Collection.Name,
 			collectionURL(
-				evt.FeedEvent.CollectionCreated.Owner.Username,
-				evt.FeedEvent.CollectionCreated.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectionCreated.Owner.Username,
+				evt.FeedEvent.Event.EventData.CollectionCreated.Collection.Dbid,
 			),
 		), nil
 	} else {
 		return fmt.Sprintf("**%s** created a collection: %s",
-			evt.FeedEvent.CollectionCreated.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectionCreated.Owner.Username,
 			collectionURL(
-				evt.FeedEvent.CollectionCreated.Owner.Username,
-				evt.FeedEvent.CollectionCreated.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectionCreated.Owner.Username,
+				evt.FeedEvent.Event.EventData.CollectionCreated.Collection.Dbid,
 			),
 		), nil
 	}
@@ -178,25 +178,25 @@ func (r *PostRenderer) createCollectorsNoteAddedToCollectionPost(ctx context.Con
 		return "", err
 	}
 
-	if evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username == "" {
+	if evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Owner.Username == "" {
 		return "", nil
 	}
 
-	if evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Name != "" {
+	if evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Collection.Name != "" {
 		return fmt.Sprintf("**%s** added a collector's note to their collection, *%s*: %s",
-			evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
-			evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Name,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Collection.Name,
 			collectionURL(
-				evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
-				evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Owner.Username,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Collection.Dbid,
 			),
 		), nil
 	} else {
 		return fmt.Sprintf("**%s** added a collector's note to their collection: %s",
-			evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Owner.Username,
 			collectionURL(
-				evt.FeedEvent.CollectorsNoteAddedToCollection.Owner.Username,
-				evt.FeedEvent.CollectorsNoteAddedToCollection.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Owner.Username,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToCollection.Collection.Dbid,
 			),
 		), nil
 	}
@@ -211,77 +211,77 @@ func (r *PostRenderer) createTokensAddedToCollectionPost(ctx context.Context, me
 		return "", err
 	}
 
-	if evt.FeedEvent.TokensAddedToCollection.Owner.Username == "" {
+	if evt.FeedEvent.Event.EventData.TokensAddedToCollection.Owner.Username == "" {
 		return "", nil
 	}
 
-	tokensAdded := len(evt.FeedEvent.TokensAddedToCollection.NewTokens)
+	tokensAdded := len(evt.FeedEvent.Event.EventData.TokensAddedToCollection.NewTokens)
 
 	var tokenName string
-	for _, token := range evt.FeedEvent.TokensAddedToCollection.NewTokens {
+	for _, token := range evt.FeedEvent.Event.EventData.TokensAddedToCollection.NewTokens {
 		if token.Token.Name != "" {
 			tokenName = token.Token.Name
 			break
 		}
 	}
 
-	if evt.FeedEvent.TokensAddedToCollection.Collection.Name != "" && tokenName != "" {
-		msg := fmt.Sprintf("**%s** added *%s* ", evt.FeedEvent.TokensAddedToCollection.Owner.Username, tokenName)
+	if evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name != "" && tokenName != "" {
+		msg := fmt.Sprintf("**%s** added *%s* ", evt.FeedEvent.Event.EventData.TokensAddedToCollection.Owner.Username, tokenName)
 		if tokensAdded == 1 {
 			msg += fmt.Sprintf("to their collection, *%s*: %s",
-				evt.FeedEvent.TokensAddedToCollection.Collection.Name,
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name,
 				collectionURL(
-					evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-					evt.FeedEvent.TokensAddedToCollection.Collection.Dbid,
+					evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+					evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
 				),
 			)
 			return msg, nil
 		} else {
 			msg += fmt.Sprintf("and %v other NFT(s) to their collection, *%s*: %s",
 				tokensAdded-1,
-				evt.FeedEvent.TokensAddedToCollection.Collection.Name,
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name,
 				collectionURL(
-					evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-					evt.FeedEvent.TokensAddedToCollection.Collection.Dbid,
+					evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+					evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
 				),
 			)
 			return msg, nil
 		}
-	} else if evt.FeedEvent.TokensAddedToCollection.Collection.Name == "" && tokenName != "" {
-		msg := fmt.Sprintf("**%s** added *%s* ", evt.FeedEvent.TokensAddedToCollection.Owner.Username, tokenName)
+	} else if evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name == "" && tokenName != "" {
+		msg := fmt.Sprintf("**%s** added *%s* ", evt.FeedEvent.Event.EventData.TokensAddedToCollection.Owner.Username, tokenName)
 		if tokensAdded == 1 {
 			msg += fmt.Sprintf("to their collection: %s", collectionURL(
-				evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-				evt.FeedEvent.TokensAddedToCollection.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
 			))
 			return msg, nil
 		} else {
 			msg += fmt.Sprintf("and %v other NFT(s) to their collection: %s",
 				tokensAdded-1,
 				collectionURL(
-					evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-					evt.FeedEvent.TokensAddedToCollection.Collection.Dbid,
+					evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+					evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
 				),
 			)
 			return msg, nil
 		}
-	} else if evt.FeedEvent.TokensAddedToCollection.Collection.Name != "" && tokenName == "" {
+	} else if evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name != "" && tokenName == "" {
 		return fmt.Sprintf("**%s** added %v NFT(s) to their collection, *%s*: %s",
-			evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
 			tokensAdded,
-			evt.FeedEvent.TokensAddedToCollection.Collection.Name,
+			evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name,
 			collectionURL(
-				evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-				evt.FeedEvent.TokensAddedToCollection.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
 			),
 		), nil
 	} else {
 		return fmt.Sprintf("**%s** added %v NFT(s) to their collection: %s",
-			evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
+			evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
 			tokensAdded,
 			collectionURL(
-				evt.FeedEvent.CollectorsNoteAddedToToken.Owner.Username,
-				evt.FeedEvent.TokensAddedToCollection.Collection.Dbid,
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
 			),
 		), nil
 	}
@@ -332,36 +332,40 @@ type CollectionFragment struct {
 
 type FeedEventQuery struct {
 	FeedEvent struct {
-		UserCreated struct {
-			Owner UserFragment
-		} `graphql:"...on UserCreatedFeedEvent"`
-		UserFollowedUsers struct {
-			Owner    UserFragment
-			Followed []struct {
-				User UserFragment
+		Event struct {
+			EventData struct {
+				UserCreated struct {
+					Owner UserFragment
+				} `graphql:"...on UserCreatedFeedEventData"`
+				UserFollowedUsers struct {
+					Owner    UserFragment
+					Followed []struct {
+						User UserFragment
+					}
+				} `graphql:"...on UserFollowedUsersFeedEventData"`
+				CollectorsNoteAddedToToken struct {
+					Owner UserFragment
+					Token struct {
+						Token      TokenFragment
+						Collection CollectionFragment
+					}
+				} `graphql:"...on CollectorsNoteAddedToTokenFeedEventData"`
+				CollectionCreated struct {
+					Owner      UserFragment
+					Collection CollectionFragment
+				} `graphql:"...on CollectionCreatedFeedEventData"`
+				CollectorsNoteAddedToCollection struct {
+					Owner      UserFragment
+					Collection CollectionFragment
+				} `graphql:"...on CollectorsNoteAddedToCollectionFeedEventData"`
+				TokensAddedToCollection struct {
+					Owner      UserFragment
+					Collection CollectionFragment
+					NewTokens  []struct {
+						Token TokenFragment
+					}
+				} `graphql:"...on TokensAddedToCollectionFeedEventData"`
 			}
-		} `graphql:"...on UserFollowedUsersFeedEvent"`
-		CollectorsNoteAddedToToken struct {
-			Owner UserFragment
-			Token struct {
-				Token      TokenFragment
-				Collection CollectionFragment
-			}
-		} `graphql:"...on CollectorsNoteAddedToTokenFeedEvent"`
-		CollectionCreated struct {
-			Owner      UserFragment
-			Collection CollectionFragment
-		} `graphql:"...on CollectionCreatedFeedEvent"`
-		CollectorsNoteAddedToCollection struct {
-			Owner      UserFragment
-			Collection CollectionFragment
-		} `graphql:"...on CollectorsNoteAddedToCollectionFeedEvent"`
-		TokensAddedToCollection struct {
-			Owner      UserFragment
-			Collection CollectionFragment
-			NewTokens  []struct {
-				Token TokenFragment
-			}
-		} `graphql:"...on TokensAddedToCollectionFeedEvent"`
+		} `graphql:"...on FeedEvent"`
 	} `graphql:"feedEventById(id: $id)"`
 }
