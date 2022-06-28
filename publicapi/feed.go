@@ -8,6 +8,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 var defaultTokenParam = "<notset>"
@@ -46,11 +47,29 @@ func (api FeedAPI) GetFeedByUserID(ctx context.Context, userID persist.DBID, bef
 		return nil, err
 	}
 
+	if err := api.validator.Struct(validate.ConnectionPaginationParams{
+		Before: before,
+		After:  after,
+		First:  first,
+		Last:   last,
+	}); err != nil {
+		return nil, err
+	}
+
 	params := sqlc.GetUserFeedViewBatchParams{
 		Follower:  userID,
 		CurBefore: defaultTokenParam,
 		CurAfter:  defaultTokenParam,
-		UnsetFlag: defaultTokenParam,
+	}
+
+	if first != nil {
+		params.FromFirst = true
+		params.Limit = int32(*first)
+	}
+
+	if last != nil {
+		params.FromFirst = false
+		params.Limit = int32(*last)
 	}
 
 	if before != nil {
@@ -61,13 +80,7 @@ func (api FeedAPI) GetFeedByUserID(ctx context.Context, userID persist.DBID, bef
 		params.CurAfter = string(*after)
 	}
 
-	events, err := api.loaders.FeedByUserId.Load(params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
+	return api.loaders.FeedByUserId.Load(params)
 }
 
 func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
@@ -79,10 +92,25 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 		return nil, err
 	}
 
-	params := sqlc.GetGlobalFeedViewBatchParams{
-		CurBefore: defaultTokenParam,
-		CurAfter:  defaultTokenParam,
-		UnsetFlag: defaultTokenParam,
+	if err := api.validator.Struct(validate.ConnectionPaginationParams{
+		Before: before,
+		After:  after,
+		First:  first,
+		Last:   last,
+	}); err != nil {
+		return nil, err
+	}
+
+	params := sqlc.GetGlobalFeedViewBatchParams{}
+
+	if first != nil {
+		params.FromFirst = true
+		params.Limit = int32(*first)
+	}
+
+	if last != nil {
+		params.FromFirst = false
+		params.Limit = int32(*last)
 	}
 
 	if before != nil {
@@ -93,11 +121,5 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 		params.CurAfter = string(*after)
 	}
 
-	events, err := api.loaders.GlobalFeed.Load(params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
+	return api.loaders.GlobalFeed.Load(params)
 }

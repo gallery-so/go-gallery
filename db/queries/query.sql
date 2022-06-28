@@ -187,48 +187,45 @@ SELECT EXISTS(
 -- name: GetGlobalFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (
-        SELECT CASE WHEN @cur_before = @unset_flag
-        THEN now()
-        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false)
-        END
-    ) AS cur_before,
-    (
-        SELECT CASE WHEN @cur_after = @unset_flag
-        THEN make_date(1970, 1, 1)
-        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false)
-        END
-    ) AS cur_after
+    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after::varchar AND deleted = false) END) AS cur_after
 ), edges AS (
     SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors)
+    WHERE event_time > (SELECT cur_after FROM cursors)
+    AND event_time < (SELECT cur_before FROM cursors)
     AND deleted = false
+), offsets AS (
+    SELECT
+        CASE WHEN NOT @from_first::bool AND count(id) - $1::int > 0
+        THEN count(id) - $1::int
+        ELSE 0 END pos
+    FROM edges
 )
-SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
-    AND $1::bool= $1::bool -- sqlc bug requiring at least one positional param
-    ORDER BY event_time ASC;
+SELECT * FROM feed_events
+    WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY event_time ASC
+    LIMIT $1 OFFSET (SELECT pos FROM offsets);
 
 -- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (
-        SELECT CASE WHEN @cur_before = @unset_flag
-        THEN now()
-        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false)
-        END
-    ) AS cur_before,
-    (
-        SELECT CASE WHEN @cur_after = @unset_flag
-        THEN make_date(1970, 1, 1)
-        ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false)
-        END
-    ) AS cur_after
+    (SELECT CASE WHEN @cur_before = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN @cur_after = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false) END) AS cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false
-    WHERE event_time > (SELECT cur_after FROM cursors) AND event_time < (SELECT cur_before FROM cursors)
+    WHERE event_time > (SELECT cur_after FROM cursors)
+    AND event_time < (SELECT cur_before FROM cursors)
+), offsets AS (
+    SELECT
+        CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
+        THEN count(id) - $2::int
+        ELSE 0 END pos
+    FROM edges
 )
-SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges) ORDER BY event_time ASC;
+SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY event_time ASC
+    LIMIT $2 OFFSET (SELECT pos FROM offsets);
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
