@@ -4,10 +4,7 @@ import (
 	"context"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
-	"github.com/mikeydub/go-gallery/event"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/spf13/viper"
 
@@ -191,29 +188,18 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	go func(ctx context.Context) {
-		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-			sentryutil.SetEventContext(hub.Scope(), userID, tokenID, persist.ActionCollectorsNoteAddedToToken)
-		}
-
-		err := event.DispatchEventToFeed(ctx, sqlc.Event{
-			ActorID:        userID,
-			Action:         persist.ActionCollectorsNoteAddedToToken,
-			ResourceTypeID: persist.ResourceTypeToken,
-			TokenID:        tokenID,
-			SubjectID:      tokenID,
-			Data: persist.EventData{
-				TokenCollectionID:   collectionID,
-				TokenCollectorsNote: collectorsNote,
-			},
-			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
-		})
-
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-	}(sentryutil.NewSentryHubGinContext(ctx))
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionCollectorsNoteAddedToToken,
+		ResourceTypeID: persist.ResourceTypeToken,
+		TokenID:        tokenID,
+		SubjectID:      tokenID,
+		Data: persist.EventData{
+			TokenCollectionID:   collectionID,
+			TokenCollectorsNote: collectorsNote,
+		},
+		FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
+	})
 
 	return nil
 }

@@ -7,11 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
-	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/spf13/viper"
 )
@@ -109,29 +106,18 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	go func(ctx context.Context) {
-		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-			sentryutil.SetEventContext(hub.Scope(), userID, collectionID, persist.ActionCollectionCreated)
-		}
-
-		err = event.DispatchEventToFeed(ctx, sqlc.Event{
-			ActorID:        userID,
-			Action:         persist.ActionCollectionCreated,
-			ResourceTypeID: persist.ResourceTypeCollection,
-			CollectionID:   collectionID,
-			SubjectID:      collectionID,
-			Data: persist.EventData{
-				CollectionTokenIDs:       createdCollection.Nfts,
-				CollectionCollectorsNote: collectorsNote,
-			},
-			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
-		})
-
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-	}(sentryutil.NewSentryHubGinContext(ctx))
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionCollectionCreated,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data: persist.EventData{
+			CollectionTokenIDs:       createdCollection.Nfts,
+			CollectionCollectorsNote: collectorsNote,
+		},
+		FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
+	})
 
 	return &createdCollection, err
 }
@@ -191,26 +177,15 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	go func(ctx context.Context) {
-		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-			sentryutil.SetEventContext(hub.Scope(), userID, collectionID, persist.ActionCollectorsNoteAddedToCollection)
-		}
-
-		err := event.DispatchEventToFeed(ctx, sqlc.Event{
-			ActorID:        userID,
-			Action:         persist.ActionCollectorsNoteAddedToCollection,
-			ResourceTypeID: persist.ResourceTypeCollection,
-			CollectionID:   collectionID,
-			SubjectID:      collectionID,
-			Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
-			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
-		})
-
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-	}(sentryutil.NewSentryHubGinContext(ctx))
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionCollectorsNoteAddedToCollection,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
+		FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
+	})
 
 	return nil
 }
@@ -245,26 +220,15 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	go func(ctx context.Context) {
-		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-			sentryutil.SetEventContext(hub.Scope(), userID, collectionID, persist.ActionTokensAddedToCollection)
-		}
-
-		err := event.DispatchEventToFeed(ctx, sqlc.Event{
-			ActorID:        userID,
-			Action:         persist.ActionTokensAddedToCollection,
-			ResourceTypeID: persist.ResourceTypeCollection,
-			CollectionID:   collectionID,
-			SubjectID:      collectionID,
-			Data:           persist.EventData{CollectionTokenIDs: tokens},
-			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
-		})
-
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-	}(sentryutil.NewSentryHubGinContext(ctx))
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionTokensAddedToCollection,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data:           persist.EventData{CollectionTokenIDs: tokens},
+		FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
+	})
 
 	return nil
 }

@@ -10,10 +10,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/sqlc"
-	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -151,26 +149,15 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	go func(ctx context.Context) {
-		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-			sentryutil.SetEventContext(hub.Scope(), userID, userID, persist.ActionUserCreated)
-		}
-
-		err := event.DispatchEventToFeed(ctx, sqlc.Event{
-			ActorID:        userID,
-			Action:         persist.ActionUserCreated,
-			ResourceTypeID: persist.ResourceTypeUser,
-			UserID:         userID,
-			SubjectID:      userID,
-			Data:           persist.EventData{UserBio: bio},
-			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
-		})
-
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-	}(sentryutil.NewSentryHubGinContext(ctx))
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionUserCreated,
+		ResourceTypeID: persist.ResourceTypeUser,
+		UserID:         userID,
+		SubjectID:      userID,
+		Data:           persist.EventData{UserBio: bio},
+		FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
+	})
 
 	return nil
 }
@@ -275,33 +262,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	}
 
 	// Send event
-	go func(ctx context.Context) {
-		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-			sentryutil.SetEventContext(hub.Scope(), userID, userID, persist.ActionUserFollowedUsers)
-		}
-
-		followedBack, err := api.repos.UserRepository.UserFollowsUser(ctx, userID, curUserID)
-
-		if err != nil {
-			sentryutil.ReportError(ctx, err)
-			return
-		}
-
-		err = event.DispatchEventToFeed(ctx, sqlc.Event{
-			ActorID:        curUserID,
-			Action:         persist.ActionUserFollowedUsers,
-			ResourceTypeID: persist.ResourceTypeUser,
-			UserID:         userID,
-			SubjectID:      userID,
-			Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
-			FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
-		})
-
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-	}(sentryutil.NewSentryHubGinContext(ctx))
+	go dispatchFollowEventToFeed(sentryutil.NewSentryHubGinContext(ctx), api, curUserID, userID, refollowed)
 
 	return nil
 }
@@ -320,4 +281,23 @@ func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error 
 	}
 
 	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
+}
+
+func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persist.DBID, followedUserID persist.DBID, refollowed bool) {
+	followedBack, err := api.repos.UserRepository.UserFollowsUser(ctx, followedUserID, curUserID)
+
+	if err != nil {
+		sentryutil.ReportError(ctx, err)
+		return
+	}
+
+	pushFeedEvent(ctx, sqlc.Event{
+		ActorID:        curUserID,
+		Action:         persist.ActionUserFollowedUsers,
+		ResourceTypeID: persist.ResourceTypeUser,
+		UserID:         curUserID,
+		SubjectID:      followedUserID,
+		Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+		FeedWindowSize: viper.GetInt("GCLOUD_FEED_BUFFER_SECS"),
+	})
 }

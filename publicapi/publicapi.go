@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/event"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -14,8 +15,10 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -127,4 +130,22 @@ func (e ErrInvalidInput) Error() string {
 	}
 
 	return str
+}
+
+func dispatchEventToFeed(ctx context.Context, evt sqlc.Event) {
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
+	go pushFeedEvent(ctx, evt)
+}
+
+func pushFeedEvent(ctx context.Context, evt sqlc.Event) {
+	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+		sentryutil.SetEventContext(hub.Scope(), evt.ActorID, evt.SubjectID, evt.Action)
+	}
+
+	err := event.DispatchEventToFeed(ctx, evt)
+
+	if err != nil {
+		logger.For(ctx).Error(err)
+		sentryutil.ReportError(ctx, err)
+	}
 }
