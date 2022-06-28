@@ -2553,7 +2553,7 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    galleryOfTheWeekWinners: [GalleryUser!] @goField(forceResolver: true)
+    galleryOfTheWeekWinners: [GalleryUser!]
 }
 
 input CollectionLayoutInput {
