@@ -380,7 +380,7 @@ type ComplexityRoot struct {
 		CollectionByID      func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CommunityByAddress  func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
-		FeedByUserID        func(childComplexity int, userID persist.DBID, before *string, after *string, first *int, last *int) int
+		FeedByUserID        func(childComplexity int, id persist.DBID, before *string, after *string, first *int, last *int) int
 		FeedEventByID       func(childComplexity int, id persist.DBID) int
 		GeneralAllowlist    func(childComplexity int) int
 		GlobalFeed          func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -613,7 +613,7 @@ type QueryResolver interface {
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
-	FeedByUserID(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	FeedByUserID(ctx context.Context, id persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 }
@@ -1935,7 +1935,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.FeedByUserID(childComplexity, args["userId"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Query.FeedByUserID(childComplexity, args["id"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
@@ -3070,12 +3070,12 @@ type ErrFeedEventNotFound implements Error {
     message: String!
 }
 
-union FeedEventOrError = 
+union FeedEventOrError =
     FeedEvent
     | ErrFeedEventNotFound
     | ErrUnknownAction
 
-union FeedEventByIdOrError = 
+union FeedEventByIdOrError =
     FeedEvent
     | ErrFeedEventNotFound
     | ErrUnknownAction
@@ -3109,7 +3109,7 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    feedByUserId(userId: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
+    feedByUserId(id: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
@@ -3819,14 +3819,14 @@ func (ec *executionContext) field_Query_feedByUserId_args(ctx context.Context, r
 	var err error
 	args := map[string]interface{}{}
 	var arg0 persist.DBID
-	if tmp, ok := rawArgs["userId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
 		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["userId"] = arg0
+	args["id"] = arg0
 	var arg1 *string
 	if tmp, ok := rawArgs["before"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
@@ -10137,7 +10137,7 @@ func (ec *executionContext) _Query_feedByUserId(ctx context.Context, field graph
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().FeedByUserID(rctx, args["userId"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+		return ec.resolvers.Query().FeedByUserID(rctx, args["id"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

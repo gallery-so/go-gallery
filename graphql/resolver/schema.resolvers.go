@@ -547,8 +547,8 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainA
 	return resolveGeneralAllowlist(ctx)
 }
 
-func (r *queryResolver) FeedByUserID(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	feed, err := resolveFeedByUserID(ctx, userID, before, after, first, last)
+func (r *queryResolver) FeedByUserID(ctx context.Context, id persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	feed, err := resolveFeedByUserID(ctx, id, before, after, first, last)
 
 	if err != nil {
 		return nil, err

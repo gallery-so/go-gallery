@@ -483,7 +483,7 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
-    feedByUserId(userId: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
+    feedByUserId(id: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
