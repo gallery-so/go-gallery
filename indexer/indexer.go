@@ -192,7 +192,9 @@ func (i *indexer) Start() {
 	}
 	wp.StopWait()
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
-	i.startNewBlocksPipeline(lastSyncedBlock, topics)
+	for {
+		i.startNewBlocksPipeline(lastSyncedBlock, topics)
+	}
 }
 
 func (i *indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
@@ -464,6 +466,7 @@ func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 
 	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: lastSyncedBlock.BigInt(),
+		ToBlock:   lastSyncedBlock.BigInt().Add(lastSyncedBlock.BigInt(), big.NewInt(10)),
 		Topics:    topics,
 	}, subscriptions)
 	if err != nil {
@@ -471,7 +474,10 @@ func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 	}
 	for {
 		select {
-		case log := <-subscriptions:
+		case log, ok := <-subscriptions:
+			if !ok {
+				return
+			}
 			lastSyncedBlock = persist.BlockNumber(log.BlockNumber)
 			i.lastSyncedBlock = lastSyncedBlock.Uint64()
 			ts := logsToTransfers([]types.Log{log}, i.ethClient)

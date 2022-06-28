@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
+	goartypes "github.com/everFinance/goar/types"
 	"github.com/gorilla/websocket"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
@@ -322,7 +323,7 @@ func removeBOM(bs []byte) []byte {
 }
 
 func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
-	url := fmt.Sprintf("https://cloudflare-ipfs.com/ipfs/%s", path)
+	url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 	if err != nil {
@@ -348,7 +349,7 @@ func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
 
 // GetIPFSHeaders returns the headers for the given IPFS hash
 func GetIPFSHeaders(pCtx context.Context, path string) (http.Header, error) {
-	url := fmt.Sprintf("https://cloudfare-ipfs.com/ipfs/%s", path)
+	url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 
 	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 	if err != nil {
@@ -483,15 +484,58 @@ func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAdd
 	return "", fmt.Errorf("could not find contract creator")
 }
 
+/*
+{
+  "manifest": "arweave/paths",
+  "version": "0.1.0",
+  "index": { "path": "0" },
+  "paths": {
+    "0": { "id": "4vdubhlnXQp7jGjEjXwWjOa-6Pm44zOF7o6lAHEAYB4" },
+    "1": { "id": "O6ZosH1YVePA7n31UVKJLY9OORIs2ukxwarxE7JYJdY" },
+    "2": { "id": "1ROXHTSaTTKSCpPVlDhRpxEJ6JE3WQ5ZAgfglo_z4W8" },
+    "3": { "id": "LF7g-RV4dob0yNAjIaPEjxs8UgXShJI4GFxx6CjVavM" },
+    "4": { "id": "fudz-Ig2CtM4ZhZcwEn9jnWFWH9S4loZ2taoJoQP1b8" },
+    "5": { "id": "qYaBEv7QaBKeXPZP9LohHHzr1rwYWMY3bJrDaRoRQ2Q" },
+    "6": { "id": "jI-4Q2_Z9ZpefzBVBeowpDizAmFtXFSe7w5eOP_CCvA" },
+    "7": { "id": "2B_s60w4ZS0_QdO6dd0qi0GKqAkYeTJ_bL05kr_tkgk" }
+  }
+}
+*/
+type arweaveManifest struct {
+	Manifest string `json:"manifest"`
+	Version  string `json:"version"`
+	Index    struct {
+		Path string `json:"path"`
+	} `json:"index"`
+	Paths map[string]struct {
+		ID string `json:"id"`
+	} `json:"paths"`
+}
+
 // GetArweaveData returns the data from an Arweave transaction
 func GetArweaveData(client *goar.Client, id string) ([]byte, error) {
-	tx, err := client.GetTransactionByID(id)
-	if err != nil {
-		return nil, err
-	}
-	data, err := client.GetTransactionData(id)
-	if err != nil {
-		return nil, err
+	splitPath := strings.Split(id, "/")
+	var data []byte
+	var tx *goartypes.Transaction
+	currentID := splitPath[0]
+	for i := range splitPath {
+		t, err := client.GetTransactionByID(currentID)
+		if err != nil {
+			return nil, err
+		}
+		tx = t
+		data, err = client.GetTransactionData(currentID)
+		if err != nil {
+			return nil, err
+		}
+		if i < len(splitPath)-1 {
+			var manifest arweaveManifest
+			err = json.Unmarshal(data, &manifest)
+			if err != nil {
+				return nil, err
+			}
+			currentID = manifest.Paths[splitPath[i+1]].ID
+		}
 	}
 
 	decoded, err := base64.RawURLEncoding.DecodeString(string(data))

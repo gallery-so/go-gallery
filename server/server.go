@@ -99,7 +99,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("IPFS_URL", "https://ipfs.io")
+	viper.SetDefault("IPFS_URL", "https://gallery-ipfs.mypinata.cloud")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
