@@ -66,6 +66,13 @@ SELECT t.* FROM users u, collections c, unnest(c.nfts)
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
     AND c.id = $1 AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord;
 
+-- name: GetNewTokensByFeedEventIdBatch :batchmany
+WITH new_tokens AS (
+    SELECT added.id, row_number() OVER () added_order
+    FROM (SELECT jsonb_array_elements_text(data -> 'collection_new_token_ids') id FROM feed_events f WHERE f.id = $1 AND f.deleted = false) added
+)
+SELECT t.* FROM new_tokens a JOIN tokens t ON a.id = t.id AND t.deleted = false ORDER BY a.added_order;
+
 -- name: GetMembershipByMembershipId :one
 SELECT * FROM membership WHERE id = $1 AND deleted = false;
 
@@ -136,3 +143,149 @@ SELECT tokens.* FROM tokens, users
       AND tokens.deleted = false AND users.deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
+-- name: CreateUserEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+
+-- name: CreateTokenEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+
+-- name: CreateCollectionEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+
+-- name: GetEvent :one
+SELECT * FROM events WHERE id = $1 AND deleted = false;
+
+-- name: GetEventsInWindow :many
+WITH RECURSIVE activity AS (
+    SELECT * FROM events WHERE events.id = $1 AND deleted = false
+    UNION
+    SELECT e.* FROM events e, activity a
+    WHERE e.actor_id = a.actor_id
+        AND e.action = a.action
+        AND e.created_at < a.created_at
+        AND e.created_at >= a.created_at - make_interval(secs => $2)
+        AND e.deleted = false
+)
+SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC;
+
+-- name: IsWindowActive :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND deleted = false
+    AND created_at > @window_start AND created_at <= @window_end
+    LIMIT 1
+);
+
+-- name: IsWindowActiveWithSubject :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
+    AND created_at > @window_start AND created_at <= @window_end
+    LIMIT 1
+);
+
+-- name: GetGlobalFeedViewBatch :batchmany
+WITH cursors AS (
+    SELECT
+    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after::varchar AND deleted = false) END) AS cur_after
+), edges AS (
+    SELECT id FROM feed_events
+    WHERE event_time > (SELECT cur_after FROM cursors)
+    AND event_time < (SELECT cur_before FROM cursors)
+    AND deleted = false
+), offsets AS (
+    SELECT
+        CASE WHEN NOT @from_first::bool AND count(id) - $1::int > 0
+        THEN count(id) - $1::int
+        ELSE 0 END pos
+    FROM edges
+)
+SELECT * FROM feed_events
+    WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY event_time ASC
+    LIMIT $1 OFFSET (SELECT pos FROM offsets);
+
+-- name: GlobalFeedHasMoreEvents :one
+SELECT
+    CASE WHEN @from_first::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1
+    )
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1)
+    END::bool;
+
+-- name: GetUserFeedViewBatch :batchmany
+WITH cursors AS (
+    SELECT
+    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after::varchar AND deleted = false) END) AS cur_after
+), edges AS (
+    SELECT fe.id FROM feed_events fe
+    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+    WHERE event_time > (SELECT cur_after FROM cursors)
+    AND event_time < (SELECT cur_before FROM cursors)
+    AND fe.deleted = false and fl.deleted = false
+), offsets AS (
+    SELECT
+        CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
+        THEN count(id) - $2::int
+        ELSE 0 END pos
+    FROM edges
+)
+SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY event_time ASC
+    LIMIT $2 OFFSET (SELECT pos FROM offsets);
+
+-- name: UserFeedHasMoreEvents :one
+SELECT
+    CASE WHEN @from_first::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1)
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1
+    )
+    END::bool;
+
+-- name: GetEventByIdBatch :batchone
+SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
+
+-- name: CreateFeedEvent :one
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: GetLastFeedEvent :one
+SELECT * FROM feed_events
+    WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1;
+
+-- name: GetLastFeedEventForToken :one
+SELECT * FROM feed_events
+    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = @token_id::varchar AND event_time < $3 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1;
+
+-- name: GetLastFeedEventForCollection :one
+SELECT * FROM feed_events
+    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = @collection_id::varchar AND event_time < $3 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1;

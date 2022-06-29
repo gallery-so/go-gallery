@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	sentry "github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -28,7 +29,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
@@ -116,10 +116,10 @@ func setDefaults() {
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
-	viper.SetDefault("GCLOUD_FEED_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
-	viper.SetDefault("GCLOUD_FEED_TASK_BUFFER_SECS", 5)
-	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.SetDefault("SENTRY_DSN", "")
+	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
+	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
+	viper.SetDefault("FEED_SECRET", "feed-secret")
 
 	viper.AutomaticEnv()
 
@@ -154,21 +154,18 @@ func newRepos(db *sql.DB) *persist.Repositories {
 	galleryTokenRepo := postgres.NewGalleryTokenRepository(db, galleriesCacheToken)
 
 	return &persist.Repositories{
-		UserRepository:            postgres.NewUserRepository(db),
-		NonceRepository:           postgres.NewNonceRepository(db),
-		LoginRepository:           postgres.NewLoginRepository(db),
-		TokenRepository:           postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
-		CollectionRepository:      postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
-		GalleryRepository:         galleryTokenRepo,
-		ContractRepository:        postgres.NewContractGalleryRepository(db),
-		BackupRepository:          postgres.NewBackupRepository(db),
-		MembershipRepository:      postgres.NewMembershipRepository(db),
-		UserEventRepository:       postgres.NewUserEventRepository(db),
-		CollectionEventRepository: postgres.NewCollectionEventRepository(db),
-		NftEventRepository:        postgres.NewNftEventRepository(db),
-		CommunityRepository:       postgres.NewCommunityTokenRepository(db, redis.NewCache(redis.CommunitiesDB)),
-		WalletRepository:          postgres.NewWalletRepository(db),
-		EarlyAccessRepository:     postgres.NewEarlyAccessRepository(db),
+		UserRepository:        postgres.NewUserRepository(db),
+		NonceRepository:       postgres.NewNonceRepository(db),
+		LoginRepository:       postgres.NewLoginRepository(db),
+		TokenRepository:       postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
+		CollectionRepository:  postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
+		GalleryRepository:     galleryTokenRepo,
+		ContractRepository:    postgres.NewContractGalleryRepository(db),
+		BackupRepository:      postgres.NewBackupRepository(db),
+		MembershipRepository:  postgres.NewMembershipRepository(db),
+		CommunityRepository:   postgres.NewCommunityTokenRepository(db, redis.NewCache(redis.CommunitiesDB)),
+		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
+		WalletRepository:      postgres.NewWalletRepository(db),
 	}
 }
 

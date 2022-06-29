@@ -8,9 +8,171 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
+
+const createCollectionEvent = `-- name: CreateCollectionEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+`
+
+type CreateCollectionEventParams struct {
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	CollectionID   persist.DBID
+	Data           persist.EventData
+}
+
+func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createCollectionEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.CollectionID,
+		arg.Data,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createFeedEvent = `-- name: CreateFeedEvent :one
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at
+`
+
+type CreateFeedEventParams struct {
+	ID        persist.DBID
+	OwnerID   persist.DBID
+	Action    persist.Action
+	Data      persist.FeedEventData
+	EventTime time.Time
+	EventIds  persist.DBIDList
+}
+
+func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, createFeedEvent,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventTime,
+		arg.EventIds,
+	)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createTokenEvent = `-- name: CreateTokenEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+`
+
+type CreateTokenEventParams struct {
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	TokenID        persist.DBID
+	Data           persist.EventData
+}
+
+func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createTokenEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.TokenID,
+		arg.Data,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createUserEvent = `-- name: CreateUserEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+`
+
+type CreateUserEventParams struct {
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	UserID         persist.DBID
+	Data           persist.EventData
+}
+
+func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createUserEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.UserID,
+		arg.Data,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
 
 const getCollectionById = `-- name: GetCollectionById :one
 SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout FROM collections WHERE id = $1 AND deleted = false
@@ -123,6 +285,84 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 	return i, err
 }
 
+const getEvent = `-- name: GetEvent :one
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) {
+	row := q.db.QueryRow(ctx, getEvent, id)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getEventsInWindow = `-- name: GetEventsInWindow :many
+WITH RECURSIVE activity AS (
+    SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE events.id = $1 AND deleted = false
+    UNION
+    SELECT e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at FROM events e, activity a
+    WHERE e.actor_id = a.actor_id
+        AND e.action = a.action
+        AND e.created_at < a.created_at
+        AND e.created_at >= a.created_at - make_interval(secs => $2)
+        AND e.deleted = false
+)
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC
+`
+
+type GetEventsInWindowParams struct {
+	ID   persist.DBID
+	Secs float64
+}
+
+func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, getEventsInWindow, arg.ID, arg.Secs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.ActorID,
+			&i.ResourceTypeID,
+			&i.SubjectID,
+			&i.UserID,
+			&i.TokenID,
+			&i.CollectionID,
+			&i.Action,
+			&i.Data,
+			&i.Deleted,
+			&i.LastUpdated,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getGalleriesByUserId = `-- name: GetGalleriesByUserId :many
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE owner_user_id = $1 AND deleted = false
 `
@@ -189,6 +429,111 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 		&i.Version,
 		&i.OwnerUserID,
 		&i.Collections,
+	)
+	return i, err
+}
+
+const getLastFeedEvent = `-- name: GetLastFeedEvent :one
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+    WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1
+`
+
+type GetLastFeedEventParams struct {
+	OwnerID   persist.DBID
+	Action    persist.Action
+	EventTime time.Time
+}
+
+func (q *Queries) GetLastFeedEvent(ctx context.Context, arg GetLastFeedEventParams) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, getLastFeedEvent, arg.OwnerID, arg.Action, arg.EventTime)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $4::varchar AND event_time < $3 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1
+`
+
+type GetLastFeedEventForCollectionParams struct {
+	OwnerID      persist.DBID
+	Action       persist.Action
+	EventTime    time.Time
+	CollectionID string
+}
+
+func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLastFeedEventForCollectionParams) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, getLastFeedEventForCollection,
+		arg.OwnerID,
+		arg.Action,
+		arg.EventTime,
+		arg.CollectionID,
+	)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getLastFeedEventForToken = `-- name: GetLastFeedEventForToken :one
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $4::varchar AND event_time < $3 AND deleted = false
+    ORDER BY event_time DESC
+    LIMIT 1
+`
+
+type GetLastFeedEventForTokenParams struct {
+	OwnerID   persist.DBID
+	Action    persist.Action
+	EventTime time.Time
+	TokenID   string
+}
+
+func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedEventForTokenParams) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, getLastFeedEventForToken,
+		arg.OwnerID,
+		arg.Action,
+		arg.EventTime,
+		arg.TokenID,
+	)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -512,4 +857,127 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 		return nil, err
 	}
 	return items, nil
+}
+
+const globalFeedHasMoreEvents = `-- name: GlobalFeedHasMoreEvents :one
+SELECT
+    CASE WHEN $2::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1
+    )
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1)
+    END::bool
+`
+
+type GlobalFeedHasMoreEventsParams struct {
+	ID        persist.DBID
+	FromFirst bool
+}
+
+func (q *Queries) GlobalFeedHasMoreEvents(ctx context.Context, arg GlobalFeedHasMoreEventsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, globalFeedHasMoreEvents, arg.ID, arg.FromFirst)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const isWindowActive = `-- name: IsWindowActive :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND deleted = false
+    AND created_at > $3 AND created_at <= $4
+    LIMIT 1
+)
+`
+
+type IsWindowActiveParams struct {
+	ActorID     persist.DBID
+	Action      persist.Action
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+func (q *Queries) IsWindowActive(ctx context.Context, arg IsWindowActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isWindowActive,
+		arg.ActorID,
+		arg.Action,
+		arg.WindowStart,
+		arg.WindowEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const isWindowActiveWithSubject = `-- name: IsWindowActiveWithSubject :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
+    AND created_at > $4 AND created_at <= $5
+    LIMIT 1
+)
+`
+
+type IsWindowActiveWithSubjectParams struct {
+	ActorID     persist.DBID
+	Action      persist.Action
+	SubjectID   persist.DBID
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowActiveWithSubjectParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isWindowActiveWithSubject,
+		arg.ActorID,
+		arg.Action,
+		arg.SubjectID,
+		arg.WindowStart,
+		arg.WindowEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const userFeedHasMoreEvents = `-- name: UserFeedHasMoreEvents :one
+SELECT
+    CASE WHEN $3::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1)
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1
+    )
+    END::bool
+`
+
+type UserFeedHasMoreEventsParams struct {
+	Follower  persist.DBID
+	ID        persist.DBID
+	FromFirst bool
+}
+
+func (q *Queries) UserFeedHasMoreEvents(ctx context.Context, arg UserFeedHasMoreEventsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, userFeedHasMoreEvents, arg.Follower, arg.ID, arg.FromFirst)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }

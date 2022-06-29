@@ -4,9 +4,7 @@ import (
 	"context"
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
-	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -58,6 +56,25 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	}
 
 	tokens, err := api.loaders.TokensByCollectionID.Load(collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+// GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
+// Since its possible for tokens to be deleted, the return size may not be the same size of
+// the tokens added, so the caller should handle the matching of arguments to response if used in that context.
+func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persist.DBID) ([]sqlc.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"eventID": {eventID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.NewTokensByFeedEventID.Load(eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -170,34 +187,17 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	nftData := persist.NftEvent{CollectionID: collectionID, CollectorsNote: persist.NullString(collectorsNote)}
-	dispatchNftEvent(ctx, persist.NftCollectorsNoteAddedEvent, userID, tokenID, nftData)
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionCollectorsNoteAddedToToken,
+		ResourceTypeID: persist.ResourceTypeToken,
+		TokenID:        tokenID,
+		SubjectID:      tokenID,
+		Data: persist.EventData{
+			TokenCollectionID:   collectionID,
+			TokenCollectorsNote: collectorsNote,
+		},
+	})
 
 	return nil
-}
-
-func dispatchTokenEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, nftID persist.DBID, nftData persist.NftEvent) {
-	gc := util.GinContextFromContext(ctx)
-	nftHandlers := event.For(gc).Nft
-	evt := persist.NftEventRecord{
-		UserID: userID,
-		NftID:  nftID,
-		Code:   eventCode,
-		Data:   nftData,
-	}
-
-	nftHandlers.Dispatch(ctx, evt)
-}
-
-func dispatchNftEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, nftID persist.DBID, nftData persist.NftEvent) {
-	gc := util.GinContextFromContext(ctx)
-	nftHandlers := event.For(gc).Nft
-	evt := persist.NftEventRecord{
-		UserID: userID,
-		NftID:  nftID,
-		Code:   eventCode,
-		Data:   nftData,
-	}
-
-	nftHandlers.Dispatch(ctx, evt)
 }

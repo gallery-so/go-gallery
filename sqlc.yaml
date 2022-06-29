@@ -55,6 +55,36 @@ overrides:
   - column: "follows.follower"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
 
+  # Events
+  - column: "events.actor_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "events.resource_type_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.ResourceType"
+  - column: "events.user_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "events.token_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "events.collection_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "events.subject_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "events.action"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
+  - column: "events.data"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.EventData"
+  - column: "events.feed_window_size"
+    go_type: "int"
+
+  # Feed Events
+  - column: "feed_events.owner_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "feed_events.action"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
+  - column: "feed_events.event_ids"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+  - column: "feed_events.data"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.FeedEventData"
+
   # Wildcards
   # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
   - column: "*.id"

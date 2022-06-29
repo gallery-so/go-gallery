@@ -365,6 +365,113 @@ union CollectionTokenByIdOrError =
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
+# Actions a user can take on a resource
+enum Action {
+    UserCreated
+    UserFollowedUsers
+    CollectorsNoteAddedtoToken
+    CollectionCreated
+    CollectorsNoteAddedToCollection
+    TokensAddedToCollection
+}
+
+type FollowInfo {
+    user: GalleryUser @goField(forceResolver: true)
+    followedBack: Boolean
+}
+
+interface FeedEventData {
+    eventTime: Time
+    owner: GalleryUser
+    action: Action
+}
+
+type FeedEvent implements Node {
+    id: ID!
+    dbid: DBID!
+    eventData: FeedEventData @goField(forceResolver: true)
+}
+
+type UserCreatedFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+}
+
+type UserFollowedUsersFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+    followed: [FollowInfo]
+}
+
+type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+    token: CollectionToken @goField(forceResolver: true)
+    newCollectorsNote: String
+}
+
+type CollectionCreatedFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+    collection: Collection @goField(forceResolver: true)
+}
+
+type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+    collection: Collection @goField(forceResolver: true)
+    newCollectorsNote: String
+}
+
+type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelper {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    collection: Collection @goField(forceResolver: true)
+    action: Action
+    newTokens: [CollectionToken] @goField(forceResolver: true)
+}
+
+type ErrUnknownAction implements Error {
+    message: String!
+}
+
+type ErrFeedEventNotFound implements Error {
+    message: String!
+}
+
+union FeedEventOrError =
+    FeedEvent
+    | ErrFeedEventNotFound
+    | ErrUnknownAction
+
+union FeedEventByIdOrError =
+    FeedEvent
+    | ErrFeedEventNotFound
+    | ErrUnknownAction
+
+type PageInfo {
+    size: Int!
+    hasPreviousPage: Boolean!
+    hasNextPage: Boolean!
+    startCursor: String!
+    endCursor: String!
+}
+
+type FeedEdge {
+    node: FeedEventOrError
+    cursor: String!
+}
+
+type FeedConnection @goEmbedHelper {
+    edges: [FeedEdge]
+    pageInfo: PageInfo! @goField(forceResolver: true)
+}
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -376,6 +483,10 @@ type Query {
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
+    galleryOfTheWeekWinners: [GalleryUser!]
+    feedByUserId(id: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
+    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+    feedEventById(id: DBID!): FeedEventByIdOrError
 }
 
 input CollectionLayoutInput {

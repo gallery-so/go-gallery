@@ -38,10 +38,10 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
-  cloudtasks:
-    image: ghcr.io/aertje/cloud-tasks-emulator:latest
-    command: -host 0.0.0.0 -port 8123 -queue "projects/gallery-local/locations/here/queues/feed-event"
+  # Used to proxy cloud tasks requests
+  nginx:
+    image: nginx
     ports:
-      - "8123:8123"
-    environment:
-      - APP_ENGINE_EMULATOR_HOST=http://host.docker.internal:4123
+      - "8080:80"
+    volumes:
+      - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf

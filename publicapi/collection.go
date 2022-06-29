@@ -8,9 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 )
 
@@ -107,10 +105,19 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	collectionData := persist.CollectionEvent{NFTs: createdCollection.Nfts, CollectorsNote: persist.NullString(createdCollection.CollectorsNote.String)}
-	dispatchCollectionEvent(ctx, persist.CollectionCreatedEvent, userID, createdCollection.ID, collectionData)
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionCollectionCreated,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data: persist.EventData{
+			CollectionTokenIDs:       createdCollection.Nfts,
+			CollectionCollectorsNote: collectorsNote,
+		},
+	})
 
-	return &createdCollection, nil
+	return &createdCollection, err
 }
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
@@ -168,8 +175,14 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	collectionData := persist.CollectionEvent{CollectorsNote: persist.NullString(collectorsNote)}
-	dispatchCollectionEvent(ctx, persist.CollectionCollectorsNoteAdded, userID, collectionID, collectionData)
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionCollectorsNoteAddedToCollection,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
+	})
 
 	return nil
 }
@@ -204,8 +217,14 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	collectionData := persist.CollectionEvent{NFTs: tokens}
-	dispatchCollectionEvent(ctx, persist.CollectionTokensAdded, userID, collectionID, collectionData)
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionTokensAddedToCollection,
+		ResourceTypeID: persist.ResourceTypeCollection,
+		CollectionID:   collectionID,
+		SubjectID:      collectionID,
+		Data:           persist.EventData{CollectionTokenIDs: tokens},
+	})
 
 	return nil
 }
@@ -233,17 +252,4 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 	api.loaders.ClearAllCaches()
 
 	return nil
-}
-
-func dispatchCollectionEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, collectionID persist.DBID, collectionData persist.CollectionEvent) {
-	gc := util.GinContextFromContext(ctx)
-	collectionHandlers := event.For(gc).Collection
-	evt := persist.CollectionEventRecord{
-		UserID:       userID,
-		CollectionID: collectionID,
-		Code:         eventCode,
-		Data:         collectionData,
-	}
-
-	collectionHandlers.Dispatch(ctx, evt)
 }

@@ -77,6 +77,22 @@ type EarlyAccess struct {
 	Address string
 }
 
+type Event struct {
+	ID             persist.DBID
+	Version        int32
+	ActorID        persist.DBID
+	ResourceTypeID persist.ResourceType
+	SubjectID      persist.DBID
+	UserID         persist.DBID
+	TokenID        persist.DBID
+	CollectionID   persist.DBID
+	Action         persist.Action
+	Data           persist.EventData
+	Deleted        bool
+	LastUpdated    time.Time
+	CreatedAt      time.Time
+}
+
 type Feature struct {
 	ID                  persist.DBID
 	Deleted             bool
@@ -90,6 +106,19 @@ type Feature struct {
 	IsEnabled           sql.NullBool
 	AdminOnly           sql.NullBool
 	ForceEnabledUserIds []string
+}
+
+type FeedEvent struct {
+	ID          persist.DBID
+	Version     int32
+	OwnerID     persist.DBID
+	Action      persist.Action
+	Data        persist.FeedEventData
+	EventTime   time.Time
+	EventIds    persist.DBIDList
+	Deleted     bool
+	LastUpdated time.Time
+	CreatedAt   time.Time
 }
 
 type Follow struct {
