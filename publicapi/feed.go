@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -13,6 +14,7 @@ import (
 )
 
 var defaultTokenParam = "<notset>"
+var errNotAuthorizedToViewFeed = errors.New("not authorized to view feed")
 
 type FeedAPI struct {
 	repos     *persist.Repositories
@@ -20,12 +22,6 @@ type FeedAPI struct {
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
-}
-
-type ErrNotAuthorizedToViewFeed struct{}
-
-func (e ErrNotAuthorizedToViewFeed) Error() string {
-	return "not authorized to view feed"
 }
 
 func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*sqlc.FeedEvent, error) {
@@ -159,7 +155,7 @@ func (api FeedAPI) ensureViewableToUser(ctx context.Context, userID persist.DBID
 	}
 
 	if userID != authedUserID {
-		return ErrNotAuthorizedToViewFeed{}
+		return errNotAuthorizedToViewFeed
 	}
 
 	return nil
