@@ -21,6 +21,12 @@ type FeedAPI struct {
 	ethClient *ethclient.Client
 }
 
+type ErrNotAuthorizedToViewFeed struct{}
+
+func (e ErrNotAuthorizedToViewFeed) Error() string {
+	return "not authorized to view feed"
+}
+
 func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*sqlc.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -56,11 +62,11 @@ func (api FeedAPI) GetFeedByUserID(ctx context.Context, userID persist.DBID, bef
 		return nil, err
 	}
 
-	params := sqlc.GetUserFeedViewBatchParams{
-		Follower:  userID,
-		CurBefore: defaultTokenParam,
-		CurAfter:  defaultTokenParam,
+	if err := api.ensureViewableToUser(ctx, userID); err != nil {
+		return nil, err
 	}
+
+	params := sqlc.GetUserFeedViewBatchParams{Follower: userID}
 
 	if first != nil {
 		params.FromFirst = true
@@ -122,4 +128,18 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 	}
 
 	return api.loaders.GlobalFeed.Load(params)
+}
+
+func (api FeedAPI) ensureViewableToUser(ctx context.Context, userID persist.DBID) error {
+	authedUserID, err := getAuthenticatedUser(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	if userID != authedUserID {
+		return ErrNotAuthorizedToViewFeed{}
+	}
+
+	return nil
 }

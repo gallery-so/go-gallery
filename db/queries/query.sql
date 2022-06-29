@@ -209,8 +209,8 @@ SELECT * FROM feed_events
 -- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT CASE WHEN @cur_before = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN @cur_after = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after AND deleted = false) END) AS cur_after
+    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after::varchar AND deleted = false) END) AS cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false

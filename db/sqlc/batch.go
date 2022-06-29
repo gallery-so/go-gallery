@@ -1156,8 +1156,8 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 const getUserFeedViewBatch = `-- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
-    (SELECT CASE WHEN $3 = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = $3 AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN $4 = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = $4 AND deleted = false) END) AS cur_after
+    (SELECT CASE WHEN $3::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = $3::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN $4::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = $4::varchar AND deleted = false) END) AS cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false
@@ -1183,8 +1183,8 @@ type GetUserFeedViewBatchBatchResults struct {
 type GetUserFeedViewBatchParams struct {
 	Follower  persist.DBID
 	Limit     int32
-	CurBefore interface{}
-	CurAfter  interface{}
+	CurBefore string
+	CurAfter  string
 	FromFirst bool
 }
 
