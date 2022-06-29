@@ -551,6 +551,17 @@ func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainA
 	return resolveGeneralAllowlist(ctx)
 }
 
+func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error) {
+	winners, err := publicapi.For(ctx).Misc.GetGalleryOfTheWeekWinners(ctx)
+
+	var output = make([]*model.GalleryUser, len(winners))
+	for i, user := range winners {
+		output[i] = userToModel(ctx, user)
+	}
+
+	return output, err
+}
+
 func (r *queryResolver) FeedByUserID(ctx context.Context, id persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	feed, err := resolveFeedByUserID(ctx, id, before, after, first, last)
 

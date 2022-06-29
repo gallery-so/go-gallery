@@ -11,6 +11,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 type alchemyGetOwnersForTokensResponse struct {
@@ -95,7 +96,7 @@ type indexerTokenResponse struct {
 // }
 
 func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress) ([]persist.EthereumAddress, error) {
-	url := fmt.Sprintf("https://indexer-dot-gallery-prod-325303.wl.r.appspot.com/nfts/get?token_id=%s&contract_address=%s", tid, contractAddress)
+	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s", viper.GetString("INDEXER_HOST"), tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

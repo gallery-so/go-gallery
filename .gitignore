@@ -28,3 +28,5 @@ _internal*
 *.jpg
 
 refresh.json
+
+bin/*
