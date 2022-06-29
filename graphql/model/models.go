@@ -1,12 +1,16 @@
 package model
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type GqlID string
+
+var Cursor connCursor
 
 func (r *CollectionToken) GetGqlIDField_TokenID() string {
 	return r.TokenId.String()
@@ -34,6 +38,15 @@ type HelperTokenHolderData struct {
 	WalletIds []persist.DBID
 }
 
+type HelperTokensAddedToCollectionFeedEventDataData struct {
+	FeedEventId persist.DBID
+}
+
+type HelperFeedConnectionData struct {
+	UserId  persist.DBID
+	ByFirst bool
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }
@@ -48,4 +61,27 @@ type ErrInvalidIDType struct {
 
 func (e ErrInvalidIDType) Error() string {
 	return fmt.Sprintf("no fetch method found for ID type '%s'", e.typeName)
+}
+
+var errBadCursorFormat = errors.New("bad cursor format")
+
+type connCursor struct{}
+
+func (connCursor) DBIDEncodeToCursor(id persist.DBID) string {
+	return base64.StdEncoding.EncodeToString([]byte(id))
+}
+
+func (connCursor) DecodeToDBID(s *string) (*persist.DBID, error) {
+	if s == nil {
+		return nil, nil
+	}
+
+	dec, err := base64.StdEncoding.DecodeString(string(*s))
+	if err != nil {
+		return nil, errBadCursorFormat
+	}
+
+	dbid := persist.DBID(dec)
+
+	return &dbid, nil
 }

@@ -1,8 +1,9 @@
 package server
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
+
+	"cloud.google.com/go/storage"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -12,15 +13,15 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/sentry"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/spf13/viper"
 )
 
@@ -82,7 +83,7 @@ func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClien
 		}
 
 		mediamapper.AddTo(c)
-		event.AddTo(c, repos)
+		event.AddTo(c, queries)
 		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp)
 		h.ServeHTTP(c.Writer, c.Request)
 	}

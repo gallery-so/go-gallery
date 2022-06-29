@@ -1,0 +1,3 @@
+[submodule "cloud-tasks-emulator"]
+	path = cloud-tasks-emulator
+	url = https://github.com/aertje/cloud-tasks-emulator

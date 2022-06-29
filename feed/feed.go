@@ -1,4 +1,4 @@
-package feedbot
+package feed
 
 import (
 	"net/http"
@@ -8,7 +8,6 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/shurcooL/graphql"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -16,8 +15,8 @@ import (
 func Init() {
 	setDefaults()
 
-	initSentry()
 	initLogger()
+	initSentry()
 
 	router := coreInit()
 	http.Handle("/", router)
@@ -29,30 +28,28 @@ func coreInit() *gin.Engine {
 	router := gin.Default()
 	router.Use(middleware.ErrLogger(), middleware.Sentry(true), middleware.Tracing())
 
-	gql := graphql.NewClient(viper.GetString("GALLERY_API"), http.DefaultClient)
-
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	return handlersInit(router, gql)
+	return handlersInit(router)
 }
 
 func setDefaults() {
 	viper.SetDefault("ENV", "local")
-	viper.SetDefault("AGENT_NAME", "DiscordBot (github.com/gallery-so, 0.0.1)")
-	viper.SetDefault("DISCORD_API", "https://discord.com/api/v9")
-	viper.SetDefault("CHANNEL_ID", "977428719402627092")
-	viper.SetDefault("BOT_TOKEN", "")
-	viper.SetDefault("GALLERY_HOST", "http://localhost:3000")
-	viper.SetDefault("GALLERY_API", "http://localhost:4000/glry/graphql/query")
-	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
+	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
+	viper.SetDefault("POSTGRES_PORT", 5432)
+	viper.SetDefault("POSTGRES_USER", "postgres")
+	viper.SetDefault("POSTGRES_PASSWORD", "")
+	viper.SetDefault("POSTGRES_DB", "postgres")
+	viper.SetDefault("PORT", 4124)
+	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("SENTRY_DSN", "")
+	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
+	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
+	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
+	viper.SetDefault("FEED_WINDOW_SIZE", 5)
 	viper.AutomaticEnv()
-
-	if viper.GetString("BOT_TOKEN") == "" {
-		panic("BOT_TOKEN must be set")
-	}
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")
@@ -90,7 +87,7 @@ func initSentry() {
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-			event = sentryutil.ScrubEventHeaders(event, hint)
+			event = sentryutil.ScrubEventCookies(event, hint)
 			event = sentryutil.UpdateErrorFingerprints(event, hint)
 			return event
 		},

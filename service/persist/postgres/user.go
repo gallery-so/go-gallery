@@ -31,6 +31,7 @@ type UserRepository struct {
 	deleteWalletStmt         *sql.Stmt
 	addFollowerStmt          *sql.Stmt
 	removeFollowerStmt       *sql.Stmt
+	followsUserStmt          *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -84,10 +85,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	deleteWalletStmt, err := db.PrepareContext(ctx, `UPDATE wallets SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
 
-	addFollowerStmt, err := db.PrepareContext(ctx, `INSERT INTO follows (ID, FOLLOWER, FOLLOWEE, DELETED) VALUES ($1, $2, $3, false) ON CONFLICT (FOLLOWER, FOLLOWEE) DO UPDATE SET deleted = false`)
+	addFollowerStmt, err := db.PrepareContext(ctx, `INSERT INTO follows (ID, FOLLOWER, FOLLOWEE, DELETED) VALUES ($1, $2, $3, false) ON CONFLICT (FOLLOWER, FOLLOWEE) DO UPDATE SET deleted = false, LAST_UPDATED = now() RETURNING LAST_UPDATED > CREATED_AT;`)
 	checkNoErr(err)
 
 	removeFollowerStmt, err := db.PrepareContext(ctx, `UPDATE follows SET DELETED = true, LAST_UPDATED = NOW() WHERE FOLLOWER = $1 AND FOLLOWEE = $2`)
+	checkNoErr(err)
+
+	followsUserStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM follows WHERE follower = $1 AND followee = $2 AND deleted = false);`)
 	checkNoErr(err)
 
 	return &UserRepository{
@@ -110,6 +114,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 		deleteWalletStmt:         deleteWalletStmt,
 		addFollowerStmt:          addFollowerStmt,
 		removeFollowerStmt:       removeFollowerStmt,
+		followsUserStmt:          followsUserStmt,
 	}
 }
 
@@ -400,12 +405,38 @@ func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.D
 	return tx.Commit()
 }
 
-func (u *UserRepository) AddFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
-	_, err := u.addFollowerStmt.ExecContext(pCtx, persist.GenerateID(), follower, followee)
-	return err
+func (u *UserRepository) AddFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) (refollowed bool, err error) {
+	err = u.addFollowerStmt.QueryRowContext(pCtx, persist.GenerateID(), follower, followee).Scan(&refollowed)
+	if err != nil {
+		return false, err
+	}
+
+	return refollowed, nil
 }
 
 func (u *UserRepository) RemoveFollower(pCtx context.Context, follower persist.DBID, followee persist.DBID) error {
 	_, err := u.removeFollowerStmt.ExecContext(pCtx, follower, followee)
 	return err
+}
+
+func (u *UserRepository) UserFollowsUser(pCtx context.Context, follower persist.DBID, followee persist.DBID) (bool, error) {
+	res, err := u.followsUserStmt.QueryContext(pCtx, follower, followee)
+	if err != nil {
+		return false, err
+	}
+	defer res.Close()
+
+	var follows bool
+	for res.Next() {
+		err = res.Scan(&follows)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	if err = res.Err(); err != nil {
+		return false, err
+	}
+
+	return follows, nil
 }

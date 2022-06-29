@@ -12,9 +12,9 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/event"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -148,8 +148,14 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	userData := persist.UserEvent{Bio: persist.NullString(bio)}
-	dispatchUserEvent(ctx, persist.UserCreatedEvent, userID, userData)
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionUserCreated,
+		ResourceTypeID: persist.ResourceTypeUser,
+		UserID:         userID,
+		SubjectID:      userID,
+		Data:           persist.EventData{UserBio: bio},
+	})
 
 	return nil
 }
@@ -248,13 +254,15 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		return err
 	}
 
-	err = api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
+	refollowed, err := api.repos.UserRepository.AddFollower(ctx, curUserID, userID)
+	if err != nil {
+		return err
+	}
 
 	// Send event
-	userData := persist.UserEvent{FollowedUserID: userID}
-	dispatchUserEvent(ctx, persist.UserFollowedEvent, curUserID, userData)
+	go dispatchFollowEventToFeed(sentryutil.NewSentryHubGinContext(ctx), api, curUserID, userID, refollowed)
 
-	return err
+	return nil
 }
 
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
@@ -273,14 +281,20 @@ func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error 
 	return api.repos.UserRepository.RemoveFollower(ctx, curUserID, userID)
 }
 
-func dispatchUserEvent(ctx context.Context, eventCode persist.EventCode, userID persist.DBID, userData persist.UserEvent) {
-	gc := util.GinContextFromContext(ctx)
-	userHandlers := event.For(gc).User
-	evt := persist.UserEventRecord{
-		UserID: userID,
-		Code:   eventCode,
-		Data:   userData,
+func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persist.DBID, followedUserID persist.DBID, refollowed bool) {
+	followedBack, err := api.repos.UserRepository.UserFollowsUser(ctx, followedUserID, curUserID)
+
+	if err != nil {
+		sentryutil.ReportError(ctx, err)
+		return
 	}
 
-	userHandlers.Dispatch(ctx, evt)
+	pushFeedEvent(ctx, sqlc.Event{
+		ActorID:        curUserID,
+		Action:         persist.ActionUserFollowedUsers,
+		ResourceTypeID: persist.ResourceTypeUser,
+		UserID:         curUserID,
+		SubjectID:      followedUserID,
+		Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+	})
 }

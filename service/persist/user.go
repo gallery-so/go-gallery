@@ -43,8 +43,9 @@ type UserRepository interface {
 	GetByUsername(context.Context, string) (User, error)
 	Delete(context.Context, DBID) error
 	MergeUsers(context.Context, DBID, DBID) error
-	AddFollower(pCtx context.Context, follower DBID, followee DBID) error
+	AddFollower(pCtx context.Context, follower DBID, followee DBID) (refollowed bool, err error)
 	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
+	UserFollowsUser(pCtx context.Context, userA DBID, userB DBID) (bool, error)
 }
 
 // ErrUserNotFound is returned when a user is not found

@@ -46,6 +46,10 @@ func (r *Contract) ID() GqlID {
 	return GqlID(fmt.Sprintf("Contract:%s", r.Dbid))
 }
 
+func (r *FeedEvent) ID() GqlID {
+	return GqlID(fmt.Sprintf("FeedEvent:%s", r.Dbid))
+}
+
 func (r *Gallery) ID() GqlID {
 	return GqlID(fmt.Sprintf("Gallery:%s", r.Dbid))
 }
@@ -71,6 +75,7 @@ type NodeFetcher struct {
 	OnCollectionToken func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
 	OnCommunity       func(ctx context.Context, contractAddress string, chain string) (*Community, error)
 	OnContract        func(ctx context.Context, dbid persist.DBID) (*Contract, error)
+	OnFeedEvent       func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
 	OnGallery         func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser     func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier  func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
@@ -108,6 +113,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Contract' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnContract(ctx, persist.DBID(ids[0]))
+	case "FeedEvent":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'FeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnFeedEvent(ctx, persist.DBID(ids[0]))
 	case "Gallery":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Gallery' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -148,6 +158,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCommunity")
 	case n.OnContract == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnContract")
+	case n.OnFeedEvent == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnFeedEvent")
 	case n.OnGallery == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGallery")
 	case n.OnGalleryUser == nil:

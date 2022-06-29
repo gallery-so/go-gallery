@@ -73,6 +73,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterAlias("bio", "max_string_length=600")
 
 	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
+	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
 }
 
 func ChainAddressValidator(sl validator.StructLevel) {
@@ -88,6 +89,29 @@ func ChainAddressValidator(sl validator.StructLevel) {
 
 	if chain < 0 || chain > persist.MaxChainValue {
 		sl.ReportError(chain, "Chain", "Chain", "valid_chain_type", "")
+	}
+}
+
+type ConnectionPaginationParams struct {
+	Before *persist.DBID
+	After  *persist.DBID
+	First  *int
+	Last   *int
+}
+
+func ConnectionPaginationParamsValidator(sl validator.StructLevel) {
+	pageArgs := sl.Current().Interface().(ConnectionPaginationParams)
+
+	// must specify some sort of limit
+	if pageArgs.First == nil && pageArgs.Last == nil {
+		sl.ReportError(pageArgs.First, "First", "First", "required_without", "firstorlast")
+		sl.ReportError(pageArgs.Last, "Last", "Last", "required_without", "firstorlast")
+	}
+
+	// can lead to confusing results if both are specified
+	if pageArgs.First != nil && pageArgs.Last != nil {
+		sl.ReportError(pageArgs.First, "First", "First", "excluded_with", "firstandlast")
+		sl.ReportError(pageArgs.Last, "Last", "Last", "excluded_with", "firstandlast")
 	}
 }
 
