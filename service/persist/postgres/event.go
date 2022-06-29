@@ -6,6 +6,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/spf13/viper"
 )
 
 type EventRepository struct {
@@ -37,7 +38,6 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event sqlc.Event) (*
 		ResourceTypeID: event.ResourceTypeID,
 		UserID:         event.SubjectID,
 		Data:           event.Data,
-		FeedWindowSize: event.FeedWindowSize,
 	})
 	return &event, err
 }
@@ -50,7 +50,6 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event sqlc.Event) (
 		ResourceTypeID: event.ResourceTypeID,
 		TokenID:        event.SubjectID,
 		Data:           event.Data,
-		FeedWindowSize: event.FeedWindowSize,
 	})
 	return &event, err
 }
@@ -63,7 +62,6 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Eve
 		ResourceTypeID: event.ResourceTypeID,
 		CollectionID:   event.SubjectID,
 		Data:           event.Data,
-		FeedWindowSize: event.FeedWindowSize,
 	})
 	return &event, err
 }
@@ -74,7 +72,7 @@ func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (b
 		ActorID:     event.ActorID,
 		Action:      event.Action,
 		WindowStart: event.CreatedAt,
-		WindowEnd:   event.CreatedAt.Add(time.Duration(event.FeedWindowSize) * time.Second),
+		WindowEnd:   event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second),
 	})
 }
 
@@ -86,7 +84,7 @@ func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc
 		Action:      event.Action,
 		SubjectID:   event.SubjectID,
 		WindowStart: event.CreatedAt,
-		WindowEnd:   event.CreatedAt.Add(time.Duration(event.FeedWindowSize) * time.Second),
+		WindowEnd:   event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second),
 	})
 }
 

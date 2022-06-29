@@ -48,6 +48,7 @@ func setDefaults() {
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
+	viper.SetDefault("FEED_WINDOW_SIZE", 5)
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {

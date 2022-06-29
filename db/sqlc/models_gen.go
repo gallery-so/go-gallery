@@ -91,7 +91,6 @@ type Event struct {
 	Deleted        bool
 	LastUpdated    time.Time
 	CreatedAt      time.Time
-	FeedWindowSize int
 }
 
 type Feature struct {

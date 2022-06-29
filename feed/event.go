@@ -7,6 +7,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/spf13/viper"
 )
 
 type EventBuilder struct {
@@ -91,7 +92,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 	events := []sqlc.Event{event}
 
 	if feedEvent != nil {
-		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, event.FeedWindowSize)
+		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"))
 		if err != nil {
 			return nil, err
 		}
