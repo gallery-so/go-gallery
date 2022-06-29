@@ -7,6 +7,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -128,6 +129,26 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 	}
 
 	return api.loaders.GlobalFeed.Load(params)
+}
+
+func (api FeedAPI) HasPage(ctx context.Context, cursor string, userId persist.DBID, byFirst bool) (bool, error) {
+	eventID, err := model.Cursor.DecodeToDBID(&cursor)
+	if err != nil {
+		return false, err
+	}
+
+	if userId != "" {
+		return api.queries.UserFeedHasMoreEvents(ctx, sqlc.UserFeedHasMoreEventsParams{
+			Follower:  userId,
+			ID:        *eventID,
+			FromFirst: byFirst,
+		})
+	} else {
+		return api.queries.GlobalFeedHasMoreEvents(ctx, sqlc.GlobalFeedHasMoreEventsParams{
+			ID:        *eventID,
+			FromFirst: byFirst,
+		})
+	}
 }
 
 func (api FeedAPI) ensureViewableToUser(ctx context.Context, userID persist.DBID) error {

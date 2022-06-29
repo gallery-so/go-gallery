@@ -42,6 +42,7 @@ type ResolverRoot interface {
 	CollectionCreatedFeedEventData() CollectionCreatedFeedEventDataResolver
 	CollectorsNoteAddedToCollectionFeedEventData() CollectorsNoteAddedToCollectionFeedEventDataResolver
 	CollectorsNoteAddedToTokenFeedEventData() CollectorsNoteAddedToTokenFeedEventDataResolver
+	FeedConnection() FeedConnectionResolver
 	FeedEvent() FeedEventResolver
 	FollowInfo() FollowInfoResolver
 	FollowUserPayload() FollowUserPayloadResolver
@@ -556,6 +557,9 @@ type CollectorsNoteAddedToTokenFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.GalleryUser, error)
 
 	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error)
+}
+type FeedConnectionResolver interface {
+	PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error)
 }
 type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
@@ -3079,7 +3083,6 @@ union FeedEventByIdOrError =
     FeedEvent
     | ErrFeedEventNotFound
     | ErrUnknownAction
-    | ErrNotAuthorized
 
 type PageInfo {
     size: Int!
@@ -3094,9 +3097,9 @@ type FeedEdge {
     cursor: String!
 }
 
-type FeedConnection {
+type FeedConnection @goEmbedHelper {
     edges: [FeedEdge]
-    pageInfo: PageInfo!
+    pageInfo: PageInfo! @goField(forceResolver: true)
 }
 
 type Query {
@@ -6584,14 +6587,14 @@ func (ec *executionContext) _FeedConnection_pageInfo(ctx context.Context, field 
 		Object:     "FeedConnection",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PageInfo, nil
+		return ec.resolvers.FeedConnection().PageInfo(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -14842,13 +14845,6 @@ func (ec *executionContext) _FeedEventByIdOrError(ctx context.Context, sel ast.S
 			return graphql.Null
 		}
 		return ec._ErrUnknownAction(ctx, sel, obj)
-	case model.ErrNotAuthorized:
-		return ec._ErrNotAuthorized(ctx, sel, &obj)
-	case *model.ErrNotAuthorized:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -16871,7 +16867,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "FeedEventByIdOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -17085,15 +17081,25 @@ func (ec *executionContext) _FeedConnection(ctx context.Context, sel ast.Selecti
 			out.Values[i] = innerFunc(ctx)
 
 		case "pageInfo":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._FeedConnection_pageInfo(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedConnection_pageInfo(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -20331,6 +20337,10 @@ func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.S
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalNPageInfo2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v model.PageInfo) graphql.Marshaler {
+	return ec._PageInfo(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {

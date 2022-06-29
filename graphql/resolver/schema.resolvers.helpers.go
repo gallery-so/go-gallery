@@ -423,7 +423,20 @@ func resolveFeedByUserID(ctx context.Context, userID persist.DBID, before *strin
 		return nil, err
 	}
 
-	return eventsToFeed(events, first, last)
+	edges, err := eventsToFeedEdges(events)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: nil, // handled by dedicated resolver,
+		HelperFeedConnectionData: model.HelperFeedConnectionData{
+			UserId:  userID,
+			ByFirst: first != nil,
+		},
+	}, nil
 }
 
 func resolveGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
@@ -442,7 +455,20 @@ func resolveGlobalFeed(ctx context.Context, before *string, after *string, first
 		return nil, err
 	}
 
-	return eventsToFeed(events, first, last)
+	edges, err := eventsToFeedEdges(events)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: nil, // handled by dedicated resolver,
+		HelperFeedConnectionData: model.HelperFeedConnectionData{
+			UserId:  "",
+			ByFirst: first != nil,
+		},
+	}, nil
 }
 
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
@@ -481,6 +507,43 @@ func resolveNewTokensByEventID(ctx context.Context, eventID persist.DBID) ([]*mo
 	}
 
 	return newTokens, nil
+}
+
+func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*model.PageInfo, error) {
+	pageInfo := model.PageInfo{Size: len(feedConn.Edges)}
+
+	if len(feedConn.Edges) == 0 {
+		return &pageInfo, nil
+	}
+
+	pageInfo.StartCursor = feedConn.Edges[0].Cursor
+	pageInfo.EndCursor = feedConn.Edges[len(feedConn.Edges)-1].Cursor
+
+	var cursor string
+
+	if feedConn.HelperFeedConnectionData.ByFirst {
+		cursor = pageInfo.EndCursor
+	} else {
+		cursor = pageInfo.StartCursor
+	}
+
+	hasPage, err := publicapi.For(ctx).Feed.HasPage(
+		ctx,
+		cursor,
+		feedConn.HelperFeedConnectionData.UserId,
+		feedConn.HelperFeedConnectionData.ByFirst,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if feedConn.HelperFeedConnectionData.ByFirst {
+		pageInfo.HasNextPage = hasPage
+	} else {
+		pageInfo.HasPreviousPage = hasPage
+	}
+
+	return &pageInfo, nil
 }
 
 func feedEventToDataModel(event *sqlc.FeedEvent) (model.FeedEventData, error) {
@@ -573,23 +636,8 @@ func eventToTokensAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.Fe
 	}
 }
 
-func eventsToFeed(events []sqlc.FeedEvent, first *int, last *int) (*model.FeedConnection, error) {
-	var pageInfo model.PageInfo
-
-	// trim to size of first
-	if first != nil && len(events) > *first {
-		events = events[:*first]
-		pageInfo.HasNextPage = true
-	}
-
-	// trim to size of last
-	if last != nil && len(events) > *last {
-		events = events[len(events)-*last:]
-		pageInfo.HasPreviousPage = true
-	}
-
+func eventsToFeedEdges(events []sqlc.FeedEvent) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
-	pageInfo.Size = len(edges)
 
 	for i, evt := range events {
 		data, err := feedEventToDataModel(&evt)
@@ -610,12 +658,7 @@ func eventsToFeed(events []sqlc.FeedEvent, first *int, last *int) (*model.FeedCo
 		}
 	}
 
-	if len(edges) > 0 {
-		pageInfo.StartCursor = edges[0].Cursor
-		pageInfo.EndCursor = edges[len(edges)-1].Cursor
-	}
-
-	return &model.FeedConnection{Edges: edges, PageInfo: &pageInfo}, nil
+	return edges, nil
 }
 
 func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {

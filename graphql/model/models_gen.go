@@ -403,7 +403,6 @@ type ErrNotAuthorized struct {
 }
 
 func (ErrNotAuthorized) IsViewerOrError()                          {}
-func (ErrNotAuthorized) IsFeedEventByIDOrError()                   {}
 func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
@@ -462,6 +461,7 @@ func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
 func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
 
 type FeedConnection struct {
+	HelperFeedConnectionData
 	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
 }

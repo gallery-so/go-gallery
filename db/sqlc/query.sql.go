@@ -870,6 +870,37 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 	return items, nil
 }
 
+const globalFeedHasMoreEvents = `-- name: GlobalFeedHasMoreEvents :one
+SELECT
+    CASE WHEN $2::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1
+    )
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1)
+    END::bool
+`
+
+type GlobalFeedHasMoreEventsParams struct {
+	ID        persist.DBID
+	FromFirst bool
+}
+
+func (q *Queries) GlobalFeedHasMoreEvents(ctx context.Context, arg GlobalFeedHasMoreEventsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, globalFeedHasMoreEvents, arg.ID, arg.FromFirst)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const isWindowActive = `-- name: IsWindowActive :one
 SELECT EXISTS(
     SELECT 1 FROM events
@@ -926,4 +957,38 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const userFeedHasMoreEvents = `-- name: UserFeedHasMoreEvents :one
+SELECT
+    CASE WHEN $3::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1)
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1
+    )
+    END::bool
+`
+
+type UserFeedHasMoreEventsParams struct {
+	Follower  persist.DBID
+	ID        persist.DBID
+	FromFirst bool
+}
+
+func (q *Queries) UserFeedHasMoreEvents(ctx context.Context, arg UserFeedHasMoreEventsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, userFeedHasMoreEvents, arg.Follower, arg.ID, arg.FromFirst)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }

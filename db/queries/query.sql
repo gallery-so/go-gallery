@@ -206,6 +206,24 @@ SELECT * FROM feed_events
     ORDER BY event_time ASC
     LIMIT $1 OFFSET (SELECT pos FROM offsets);
 
+-- name: GlobalFeedHasMoreEvents :one
+SELECT
+    CASE WHEN @from_first::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1
+    )
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
+        AND deleted = false
+        LIMIT 1)
+    END::bool;
+
 -- name: GetUserFeedViewBatch :batchmany
 WITH cursors AS (
     SELECT
@@ -213,9 +231,10 @@ WITH cursors AS (
     (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after::varchar AND deleted = false) END) AS cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
-    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false
+    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
+    AND fe.deleted = false and fl.deleted = false
 ), offsets AS (
     SELECT
         CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
@@ -226,6 +245,26 @@ WITH cursors AS (
 SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
     ORDER BY event_time ASC
     LIMIT $2 OFFSET (SELECT pos FROM offsets);
+
+-- name: UserFeedHasMoreEvents :one
+SELECT
+    CASE WHEN @from_first::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1)
+    ELSE EXISTS(
+        SELECT 1
+        FROM feed_events fe
+        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND fe.deleted = false AND fl.deleted = false
+        LIMIT 1
+    )
+    END::bool;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

@@ -70,6 +70,10 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Cont
 	return resolveCollectionTokenByIDs(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
 }
 
+func (r *feedConnectionResolver) PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error) {
+	return resolveFeedPageInfo(ctx, obj)
+}
+
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
 }
@@ -689,6 +693,11 @@ func (r *Resolver) CollectorsNoteAddedToTokenFeedEventData() generated.Collector
 	return &collectorsNoteAddedToTokenFeedEventDataResolver{r}
 }
 
+// FeedConnection returns generated.FeedConnectionResolver implementation.
+func (r *Resolver) FeedConnection() generated.FeedConnectionResolver {
+	return &feedConnectionResolver{r}
+}
+
 // FeedEvent returns generated.FeedEventResolver implementation.
 func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
 
@@ -756,6 +765,7 @@ type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
+type feedConnectionResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }

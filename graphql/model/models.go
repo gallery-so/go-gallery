@@ -42,6 +42,11 @@ type HelperTokensAddedToCollectionFeedEventDataData struct {
 	FeedEventId persist.DBID
 }
 
+type HelperFeedConnectionData struct {
+	UserId  persist.DBID
+	ByFirst bool
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

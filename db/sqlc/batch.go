@@ -1160,9 +1160,10 @@ WITH cursors AS (
     (SELECT CASE WHEN $4::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = $4::varchar AND deleted = false) END) AS cur_after
 ), edges AS (
     SELECT fe.id FROM feed_events fe
-    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1 AND fe.deleted = false and fl.deleted = false
+    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
+    AND fe.deleted = false and fl.deleted = false
 ), offsets AS (
     SELECT
         CASE WHEN NOT $5::bool AND count(id) - $2::int > 0
