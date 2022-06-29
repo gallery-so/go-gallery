@@ -541,10 +541,6 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		newMetadata = md
 		newURI = u
 	} else {
-		if _, ok := newMetadata["error"]; ok || newURI == persist.InvalidTokenURI || mediaType == persist.MediaTypeInvalid {
-			logrus.Debugf("skipping token %s-%s", contractAddress, tokenID)
-			return tokenUpdateMedia{}, nil
-		}
 
 		u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
 		if err != nil {

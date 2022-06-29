@@ -192,8 +192,9 @@ func (i *indexer) Start() {
 	}
 	wp.StopWait()
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
+	i.lastSyncedBlock = uint64(lastSyncedBlock)
 	for {
-		i.startNewBlocksPipeline(lastSyncedBlock, topics)
+		i.startNewBlocksPipeline(persist.BlockNumber(i.lastSyncedBlock), topics)
 		logrus.Infof("Finished processing set of new logs, waiting for new blocks again...")
 	}
 }
@@ -472,7 +473,7 @@ func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 	if err != nil {
 		panic(fmt.Sprintf("error subscribing to logs: %s", err))
 	}
-	for {
+	for j := 0; j < 50; j++ {
 		select {
 		case log, ok := <-subscriptions:
 			if !ok {
@@ -481,12 +482,6 @@ func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 			i.lastSyncedBlock = log.BlockNumber
 			ts := logsToTransfers([]types.Log{log}, i.ethClient)
 			transfers <- transfersToTransfersAtBlock(ts)
-			// if the block of this log is greater than 10 of the last synced block, we can stop and unsubscribe
-			if log.BlockNumber >= lastSyncedBlock.Uint64()+10 {
-				sub.Unsubscribe()
-				return
-			}
-
 		case err := <-sub.Err():
 			panic(fmt.Sprintf("error in log subscription: %s", err))
 		}
