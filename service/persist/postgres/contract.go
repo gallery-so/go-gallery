@@ -11,11 +11,10 @@ import (
 
 // ContractRepository represents a contract repository in the postgres database
 type ContractRepository struct {
-	db                    *sql.DB
-	getByAddressStmt      *sql.Stmt
-	getByOwnerAddressStmt *sql.Stmt
-	upsertByAddressStmt   *sql.Stmt
-	updateByAddressStmt   *sql.Stmt
+	db                  *sql.DB
+	getByAddressStmt    *sql.Stmt
+	upsertByAddressStmt *sql.Stmt
+	updateByAddressStmt *sql.Stmt
 }
 
 // NewContractRepository creates a new postgres repository for interacting with contracts
@@ -32,9 +31,7 @@ func NewContractRepository(db *sql.DB) *ContractRepository {
 	updateByAddressStmt, err := db.PrepareContext(ctx, `UPDATE contracts SET NAME = $2, SYMBOL = $3, CREATOR_ADDRESS = $4, LATEST_BLOCK = $5, LAST_UPDATED = $6 WHERE ADDRESS = $1;`)
 	checkNoErr(err)
 
-	getByOwnerAddressStmt, err := db.PrepareContext(ctx, `SELECT c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM contracts c, tokens t WHERE ADDRESS = t.CONTRACT_ADDRESS AND t.OWNER_ADDRESS = $1 AND DELETED = false;`)
-
-	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, updateByAddressStmt: updateByAddressStmt, getByOwnerAddressStmt: getByOwnerAddressStmt}
+	return &ContractRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, updateByAddressStmt: updateByAddressStmt}
 }
 
 // GetByAddress returns the contract with the given address
