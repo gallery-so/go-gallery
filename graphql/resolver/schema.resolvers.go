@@ -202,7 +202,7 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		Whitespace: input.Layout.Whitespace,
 	}
 
-	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout)
+	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout, input.TokenSettings)
 
 	if err != nil {
 		return nil, err

@@ -262,6 +262,7 @@ type CollectionToken implements Node
     id: ID!
     token: Token
     collection: Collection
+    renderLive: Boolean
 }
 
 type CollectionLayout {
@@ -496,12 +497,18 @@ input CollectionLayoutInput {
     whitespace: [Int!]!
 }
 
+input CollectionTokenSettingsInput {
+    tokenId: DBID!
+    renderLive: Boolean!
+}
+
 input CreateCollectionInput {
     galleryId: DBID!
     name: String!
     collectorsNote: String!
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
+    tokenSettings: [CollectionTokenSettingsInput!]!
 }
 
 union CreateCollectionPayloadOrError =
@@ -527,6 +534,7 @@ input UpdateCollectionInfoInput {
     collectionId: DBID!
     name: String!
     collectorsNote: String!
+    tokenSettings: [CollectionTokenSettingsInput!]!
 }
 
 union UpdateCollectionInfoPayloadOrError =

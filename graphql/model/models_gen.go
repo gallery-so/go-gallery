@@ -219,10 +219,16 @@ type CollectionToken struct {
 	HelperCollectionTokenData
 	Token      *Token      `json:"token"`
 	Collection *Collection `json:"collection"`
+	RenderLive *bool       `json:"renderLive"`
 }
 
 func (CollectionToken) IsNode()                       {}
 func (CollectionToken) IsCollectionTokenByIDOrError() {}
+
+type CollectionTokenSettingsInput struct {
+	TokenID    persist.DBID `json:"tokenId"`
+	RenderLive bool         `json:"renderLive"`
+}
 
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`
@@ -270,11 +276,12 @@ type Contract struct {
 func (Contract) IsNode() {}
 
 type CreateCollectionInput struct {
-	GalleryID      persist.DBID           `json:"galleryId"`
-	Name           string                 `json:"name"`
-	CollectorsNote string                 `json:"collectorsNote"`
-	Tokens         []persist.DBID         `json:"tokens"`
-	Layout         *CollectionLayoutInput `json:"layout"`
+	GalleryID      persist.DBID                    `json:"galleryId"`
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	Tokens         []persist.DBID                  `json:"tokens"`
+	Layout         *CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
 }
 
 type CreateCollectionPayload struct {
@@ -737,9 +744,10 @@ type UpdateCollectionHiddenPayload struct {
 func (UpdateCollectionHiddenPayload) IsUpdateCollectionHiddenPayloadOrError() {}
 
 type UpdateCollectionInfoInput struct {
-	CollectionID   persist.DBID `json:"collectionId"`
-	Name           string       `json:"name"`
-	CollectorsNote string       `json:"collectorsNote"`
+	CollectionID   persist.DBID                    `json:"collectionId"`
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
 }
 
 type UpdateCollectionInfoPayload struct {
