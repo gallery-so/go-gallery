@@ -7,6 +7,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/spf13/viper"
 )
 
@@ -24,11 +25,20 @@ func NewEventBuilder() *EventBuilder {
 }
 
 func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (*sqlc.FeedEvent, error) {
+	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
+	defer tracing.FinishSpan(span)
+
 	event, err := b.eventRepo.Get(ctx, message.ID)
 
 	if err != nil {
 		return nil, err
 	}
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{
+		"Message ID": message.ID,
+		"Event ID":   event.ID,
+		"Action":     event.Action,
+	})
 
 	switch event.Action {
 	case persist.ActionUserCreated:
