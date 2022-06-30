@@ -149,7 +149,7 @@ jobs:
           command: apt-get update
       - run:
           name: "Install cli dependencies"
-          command: apt-get -y install unzip curl sudo python3
+          command: apt-get -y install unzip curl sudo python3 make
       - run:
           name: "Unzip secrets file"
           command: echo "A" | unzip _deploy.zip
