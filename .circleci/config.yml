@@ -3,18 +3,21 @@ workflows:
   main:
     jobs:
       - build
-      - integration-tests
-      - unit-tests:
+      # - integration-tests
+      # - unit-tests:
+      #     requires:
+      #       - build
+      - deploy:
           requires:
             - build
-      - deploy:
-          filters:
-            branches:
-              only:
-                - "main"
-      - post-deploy:
-          requires:
-            - deploy
+      # - deploy:
+      #     filters:
+      #       branches:
+      #         only:
+      #           - "main"
+      # - post-deploy:
+      #     requires:
+      #       - deploy
 jobs:
   build:
     working_directory: ~/go-gallery
@@ -198,9 +201,15 @@ jobs:
               exit 1
             fi
           name: Initialize gcloud CLI to connect to Google Cloud
+      # - run:
+      #     name: "Deploy Backend"
+      #     command: gcloud beta app deploy --quiet --appyaml app-backend.yaml --version $(echo ${CIRCLE_BRANCH}-${CIRCLE_SHA1} | sed 's/[^a-zA-Z0-9]/-/g')
       - run:
-          name: "Deploy Backend"
-          command: gcloud beta app deploy --quiet --appyaml app-backend.yaml --version $(echo ${CIRCLE_BRANCH}-${CIRCLE_SHA1} | sed 's/[^a-zA-Z0-9]/-/g')
+          name: "Deploy Feed"
+          command: make deploy-dev-feed
+      - run:
+          name: "Deploy Feedbot"
+          command: make deploy-dev-feedbot
       # - run:
       #     name: "Deploy Indexer"
       #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
