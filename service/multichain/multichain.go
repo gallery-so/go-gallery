@@ -3,6 +3,7 @@ package multichain
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -74,11 +75,13 @@ type ErrChainNotFound struct {
 }
 
 type chainTokens struct {
-	chain  persist.Chain
-	tokens []ChainAgnosticToken
+	priority int
+	chain    persist.Chain
+	tokens   []ChainAgnosticToken
 }
 
 type chainContracts struct {
+	priority  int
 	chain     persist.Chain
 	contracts []ChainAgnosticContract
 }
@@ -165,8 +168,8 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 				}
 				subWg := &sync.WaitGroup{}
 				subWg.Add(len(providers))
-				for _, p := range providers {
-					go func(provider ChainProvider) {
+				for i, p := range providers {
+					go func(provider ChainProvider, priority int) {
 						defer subWg.Done()
 						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr)
 						if err != nil {
@@ -174,9 +177,9 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 							return
 						}
 
-						incomingTokens <- chainTokens{chain: chain, tokens: tokens}
-						incomingContracts <- chainContracts{chain: chain, contracts: contracts}
-					}(p)
+						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
+						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
+					}(p, i)
 				}
 				subWg.Wait()
 				logrus.Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
@@ -299,7 +302,7 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return nil
 }
 
-func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
@@ -309,7 +312,12 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 		normalizedAddress := wallet.Chain.NormalizeAddress(wallet.Address)
 		addressToWallets[normalizedAddress] = wallet
 	}
-	for _, chainToken := range chaintokens {
+
+	sort.SliceStable(tokens, func(i int, j int) bool {
+		return tokens[i].priority < tokens[j].priority
+	})
+
+	for _, chainToken := range tokens {
 		for _, token := range chainToken.tokens {
 
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
@@ -366,6 +374,11 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 
 func contractsToContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
 	seen := make(map[persist.ChainAddress]persist.ContractGallery)
+
+	sort.SliceStable(contracts, func(i, j int) bool {
+		return contracts[i].priority < contracts[j].priority
+	})
+
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
 			if it, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; ok {
