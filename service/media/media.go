@@ -71,23 +71,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": turi, "imgURL": imgURL, "vURL": vURL, "name": name}).Debug("MakePreviewsForMetadata initial")
 
-	// use videoURI to check if SVG
-	res, err := preHandleSVG(pCtx, videoAsURI, ipfsClient, arweaveClient)
-	if err != nil {
-		return res, err
-	}
-	if res.MediaURL != "" {
-		return res, nil
-	}
-
-	// use imageURI to check if SVG
-	res, err = preHandleSVG(pCtx, imgAsURI, ipfsClient, arweaveClient)
-	if err != nil {
-		return res, err
-	}
-	if res.MediaURL != "" {
-		return res, nil
-	}
+	var res persist.Media
 
 	mediaType, err := downloadAndCache(pCtx, imgURL, name, ipfsClient, arweaveClient, storageClient)
 	if err != nil {
@@ -152,27 +136,6 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	logger.For(pCtx).Infof("media for %s of type %s: %+v", name, mediaType, res)
 
-	return res, nil
-}
-
-func preHandleSVG(pCtx context.Context, uri persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.Media, error) {
-	res := persist.Media{}
-	switch uri.Type() {
-	case persist.URITypeBase64SVG:
-		res.MediaType = persist.MediaTypeSVG
-		data, err := rpc.GetDataFromURI(pCtx, uri, ipfsClient, arweaveClient)
-		if err != nil {
-			return persist.Media{}, fmt.Errorf("error getting data from base64 svg uri %s: %s", uri, err)
-		}
-		res.MediaURL = persist.NullString(data)
-		res.ThumbnailURL = res.MediaURL
-		return res, nil
-	case persist.URITypeSVG:
-		res.MediaType = persist.MediaTypeSVG
-		res.MediaURL = persist.NullString(uri.String())
-		res.ThumbnailURL = res.MediaURL
-		return res, nil
-	}
 	return res, nil
 }
 
@@ -293,19 +256,13 @@ func downloadAndCache(pCtx context.Context, url, name string, ipfsClient *shell.
 
 	asURI := persist.TokenURI(url)
 
-	if asURI.Type() == persist.URITypeBase64SVG {
-		return persist.MediaTypeBase64SVG, nil
-	} else if asURI.Type() == persist.URITypeSVG {
-		return persist.MediaTypeSVG, nil
-	}
-
 	mediaType, _ := PredictMediaType(pCtx, url)
 
 	logger.For(pCtx).Infof("predicted media type for %s: %s", url, mediaType)
 
 outer:
 	switch mediaType {
-	case persist.MediaTypeVideo, persist.MediaTypeGIF, persist.MediaTypeUnknown:
+	case persist.MediaTypeVideo, persist.MediaTypeGIF, persist.MediaTypeUnknown, persist.MediaTypeSVG, persist.MediaTypeBase64SVG:
 		break outer
 	default:
 		switch asURI.Type() {
@@ -378,6 +335,8 @@ outer:
 		}
 
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	case persist.MediaTypeSVG:
+		return persist.MediaTypeSVG, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
 	case persist.MediaTypeUnknown:
 		mediaType = GuessMediaType(bs)
 		fallthrough
