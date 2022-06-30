@@ -149,7 +149,7 @@ jobs:
           command: apt-get update
       - run:
           name: "Install cli dependencies"
-          command: apt-get -y install unzip curl sudo python3 make git
+          command: apt-get -y install unzip curl sudo python3
       - run:
           name: "Unzip secrets file"
           command: echo "A" | unzip _deploy.zip
@@ -159,6 +159,12 @@ jobs:
       - run:
           name: "Copy Indexer app.yaml"
           command: cp -R dev/app-dev-indexer.yaml ./app-indexer.yaml
+      - run:
+          name: "Copy Feed app.yaml"
+          command: cp -R dev/app-dev-feed.yaml ./app-feed.yaml
+      - run:
+          name: "Copy Feedbot app.yaml"
+          command: cp -R dev/app-dev-feedbot.yaml ./app-feedbot.yaml
       - run:
           command: |
             install () {
@@ -206,10 +212,10 @@ jobs:
       #     command: gcloud beta app deploy --quiet --appyaml app-backend.yaml --version $(echo ${CIRCLE_BRANCH}-${CIRCLE_SHA1} | sed 's/[^a-zA-Z0-9]/-/g')
       - run:
           name: "Deploy Feed"
-          command: make deploy-dev-feed
+          command: gcloud beta app deploy --quiet --appyaml app-feed.yaml --version $(echo ${CIRCLE_BRANCH}-${CIRCLE_SHA1} | sed 's/[^a-zA-Z0-9]/-/g')
       - run:
           name: "Deploy Feedbot"
-          command: make deploy-dev-feedbot
+          command: gcloud beta app deploy --quiet --appyaml app-feedbot.yaml --version $(echo ${CIRCLE_BRANCH}-${CIRCLE_SHA1} | sed 's/[^a-zA-Z0-9]/-/g')
       # - run:
       #     name: "Deploy Indexer"
       #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
