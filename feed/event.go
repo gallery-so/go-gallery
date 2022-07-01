@@ -278,7 +278,8 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		// compare against the create collection event
 		added = newTokens(event.Data.CollectionTokenIDs, createEvent.Data.CollectionTokenIDs)
 	} else {
-		// don't have the create event for whatever reason
+		// don't have the create event, likely because the collection was created
+		// before the feed
 		isPreFeed = true
 	}
 
