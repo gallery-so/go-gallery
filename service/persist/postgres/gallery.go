@@ -38,9 +38,9 @@ type GalleryTokenRepository struct {
 	galleriesCache memstore.Cache
 }
 
-// NewGalleryTokenRepository creates a new GalleryTokenRepository
+// NewGalleryRepository creates a new GalleryTokenRepository
 // TODO another join to addresses
-func NewGalleryTokenRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenRepository {
+func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryTokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

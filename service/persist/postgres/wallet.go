@@ -23,7 +23,7 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	insertStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID,VERSION,ADDRESS,CHAIN,WALLET_TYPE) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (ADDRESS,CHAIN) DO NOTHING;`)
+	insertStmt, err := db.PrepareContext(ctx, `INSERT INTO wallets (ID,VERSION,ADDRESS,CHAIN,WALLET_TYPE,DELETED) VALUES ($1,$2,$3,$4,$5,false) ON CONFLICT (ADDRESS,CHAIN) WHERE DELETED = false DO NOTHING;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,WALLET_TYPE,CHAIN FROM wallets WHERE ID = $1 AND DELETED = FALSE;`)

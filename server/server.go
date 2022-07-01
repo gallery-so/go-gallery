@@ -151,7 +151,7 @@ func setDefaults() {
 
 func newRepos(db *sql.DB) *persist.Repositories {
 	galleriesCacheToken := redis.NewCache(1)
-	galleryTokenRepo := postgres.NewGalleryTokenRepository(db, galleriesCacheToken)
+	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
 
 	return &persist.Repositories{
 		UserRepository:        postgres.NewUserRepository(db),
