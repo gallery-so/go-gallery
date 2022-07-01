@@ -268,7 +268,8 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		return nil, err
 	}
 
-	var added []persist.DBID
+	added := make([]persist.DBID, 0)
+	var isPreFeed bool
 
 	if feedEvent != nil {
 		// compare against last token added event
@@ -277,13 +278,9 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		// compare against the create collection event
 		added = newTokens(event.Data.CollectionTokenIDs, createEvent.Data.CollectionTokenIDs)
 	} else {
-		// don't have the create event for whatever reason, so treat all tokens as new
-		added = event.Data.CollectionTokenIDs
-	}
-
-	// only show if new tokens were added
-	if len(added) < 1 {
-		return nil, nil
+		// don't have the create event, likely because the collection was created
+		// before the feed
+		isPreFeed = true
 	}
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
@@ -294,6 +291,7 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 			CollectionID:          event.SubjectID,
 			CollectionTokenIDs:    event.Data.CollectionTokenIDs,
 			CollectionNewTokenIDs: added,
+			CollectionIsPreFeed:   isPreFeed,
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},

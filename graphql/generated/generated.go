@@ -453,6 +453,7 @@ type ComplexityRoot struct {
 		Action     func(childComplexity int) int
 		Collection func(childComplexity int) int
 		EventTime  func(childComplexity int) int
+		IsPreFeed  func(childComplexity int) int
 		NewTokens  func(childComplexity int) int
 		Owner      func(childComplexity int) int
 	}
@@ -2307,6 +2308,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokensAddedToCollectionFeedEventData.EventTime(childComplexity), true
 
+	case "TokensAddedToCollectionFeedEventData.isPreFeed":
+		if e.complexity.TokensAddedToCollectionFeedEventData.IsPreFeed == nil {
+			break
+		}
+
+		return e.complexity.TokensAddedToCollectionFeedEventData.IsPreFeed(childComplexity), true
+
 	case "TokensAddedToCollectionFeedEventData.newTokens":
 		if e.complexity.TokensAddedToCollectionFeedEventData.NewTokens == nil {
 			break
@@ -3073,6 +3081,7 @@ type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelpe
     collection: Collection @goField(forceResolver: true)
     action: Action
     newTokens: [CollectionToken] @goField(forceResolver: true)
+    isPreFeed: Boolean
 }
 
 type ErrUnknownAction implements Error {
@@ -11600,6 +11609,38 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData_newTokens(ctx 
 	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData_isPreFeed(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokensAddedToCollectionFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsPreFeed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19120,6 +19161,13 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData(ctx context.Co
 				return innerFunc(ctx)
 
 			})
+		case "isPreFeed":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokensAddedToCollectionFeedEventData_isPreFeed(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

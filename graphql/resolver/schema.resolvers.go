@@ -636,7 +636,7 @@ func (r *tokensAddedToCollectionFeedEventDataResolver) Collection(ctx context.Co
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.HelperTokensAddedToCollectionFeedEventDataData.FeedEventId)
+	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
 }
 
 func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
