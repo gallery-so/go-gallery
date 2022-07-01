@@ -3,6 +3,7 @@ package feed
 import (
 	"context"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -16,8 +17,8 @@ type EventBuilder struct {
 	feedRepo  *postgres.FeedRepository
 }
 
-func NewEventBuilder() *EventBuilder {
-	queries := sqlc.New(postgres.NewPgxClient())
+func NewEventBuilder(pgx *pgxpool.Pool) *EventBuilder {
+	queries := sqlc.New(pgx)
 	return &EventBuilder{
 		eventRepo: &postgres.EventRepository{Queries: queries},
 		feedRepo:  &postgres.FeedRepository{Queries: queries},

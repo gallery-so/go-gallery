@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/spf13/viper"
 )
 
@@ -32,8 +33,8 @@ func taskRequired() gin.HandlerFunc {
 	}
 }
 
-func handlersInit(router *gin.Engine) *gin.Engine {
+func handlersInit(router *gin.Engine, pgx *pgxpool.Pool) *gin.Engine {
 	router.GET("/ping", ping())
-	router.POST("/tasks/feed-event", taskRequired(), handleEvent())
+	router.POST("/tasks/feed-event", taskRequired(), handleEvent(pgx))
 	return router
 }
