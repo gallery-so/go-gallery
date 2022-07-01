@@ -49,6 +49,8 @@ var nodeFetcher = model.NodeFetcher{
 	},
 }
 
+var defaultTokenSettings = persist.CollectionTokenSettings{}
+
 func init() {
 	nodeFetcher.ValidateHandlers()
 }
@@ -272,8 +274,9 @@ func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, coll
 			TokenId:      tokenID,
 			CollectionId: collectionID,
 		},
-		Token:      token,
-		Collection: collection,
+		Token:         token,
+		Collection:    collection,
+		TokenSettings: nil, // handled by dedicated resolver
 	}
 
 	return collectionToken, nil
@@ -552,6 +555,20 @@ func resolveNewTokensByEventID(ctx context.Context, eventID persist.DBID) ([]*mo
 	return newTokens, nil
 }
 
+func resolveTokenSettingsByIDs(ctx context.Context, tokenID, collectionID persist.DBID) (*model.CollectionTokenSettings, error) {
+	collection, err := publicapi.For(ctx).Collection.GetCollectionById(ctx, collectionID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if settings, ok := collection.TokenSettings[tokenID]; ok {
+		return &model.CollectionTokenSettings{RenderLive: &settings.RenderLive}, nil
+	}
+
+	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive}, nil
+}
+
 func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*model.PageInfo, error) {
 	pageInfo := model.PageInfo{Size: len(feedConn.Edges)}
 
@@ -639,8 +656,9 @@ func eventToCollectorsNoteAddedToTokenFeedEventData(event *sqlc.FeedEvent) model
 		EventTime: &event.EventTime,
 		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
 		Token: &model.CollectionToken{
-			Token:      &model.Token{Dbid: event.Data.TokenID},                // remaining fields handled by dedicated resolver
-			Collection: &model.Collection{Dbid: event.Data.TokenCollectionID}, // remaining fields handled by dedicated resolver
+			Token:         &model.Token{Dbid: event.Data.TokenID},                // remaining fields handled by dedicated resolver
+			Collection:    &model.Collection{Dbid: event.Data.TokenCollectionID}, // remaining fields handled by dedicated resolver
+			TokenSettings: nil,                                                   // handled by dedicated resolver
 		},
 		Action:            &event.Action,
 		NewCollectorsNote: util.StringToPointer(event.Data.TokenNewCollectorsNote),

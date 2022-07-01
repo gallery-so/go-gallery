@@ -217,13 +217,17 @@ type CollectionLayoutInput struct {
 
 type CollectionToken struct {
 	HelperCollectionTokenData
-	Token      *Token      `json:"token"`
-	Collection *Collection `json:"collection"`
-	RenderLive *bool       `json:"renderLive"`
+	Token         *Token                   `json:"token"`
+	Collection    *Collection              `json:"collection"`
+	TokenSettings *CollectionTokenSettings `json:"tokenSettings"`
 }
 
 func (CollectionToken) IsNode()                       {}
 func (CollectionToken) IsCollectionTokenByIDOrError() {}
+
+type CollectionTokenSettings struct {
+	RenderLive *bool `json:"renderLive"`
+}
 
 type CollectionTokenSettingsInput struct {
 	TokenID    persist.DBID `json:"tokenId"`
@@ -744,10 +748,9 @@ type UpdateCollectionHiddenPayload struct {
 func (UpdateCollectionHiddenPayload) IsUpdateCollectionHiddenPayloadOrError() {}
 
 type UpdateCollectionInfoInput struct {
-	CollectionID   persist.DBID                    `json:"collectionId"`
-	Name           string                          `json:"name"`
-	CollectorsNote string                          `json:"collectorsNote"`
-	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+	CollectionID   persist.DBID `json:"collectionId"`
+	Name           string       `json:"name"`
+	CollectorsNote string       `json:"collectorsNote"`
 }
 
 type UpdateCollectionInfoPayload struct {
@@ -757,9 +760,10 @@ type UpdateCollectionInfoPayload struct {
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
 type UpdateCollectionTokensInput struct {
-	CollectionID persist.DBID           `json:"collectionId"`
-	Tokens       []persist.DBID         `json:"tokens"`
-	Layout       *CollectionLayoutInput `json:"layout"`
+	CollectionID  persist.DBID                    `json:"collectionId"`
+	Tokens        []persist.DBID                  `json:"tokens"`
+	Layout        *CollectionLayoutInput          `json:"layout"`
+	TokenSettings []*CollectionTokenSettingsInput `json:"tokenSettings"`
 }
 
 type UpdateCollectionTokensPayload struct {

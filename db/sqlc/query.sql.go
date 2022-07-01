@@ -175,7 +175,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 }
 
 const getCollectionById = `-- name: GetCollectionById :one
-SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout FROM collections WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings FROM collections WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetCollectionById(ctx context.Context, id persist.DBID) (Collection, error) {
@@ -193,12 +193,13 @@ func (q *Queries) GetCollectionById(ctx context.Context, id persist.DBID) (Colle
 		&i.CollectorsNote,
 		&i.Name,
 		&i.Layout,
+		&i.TokenSettings,
 	)
 	return i, err
 }
 
 const getCollectionsByGalleryId = `-- name: GetCollectionsByGalleryId :many
-SELECT c.id, c.deleted, c.owner_user_id, c.nfts, c.version, c.last_updated, c.created_at, c.hidden, c.collectors_note, c.name, c.layout FROM galleries g, unnest(g.collections)
+SELECT c.id, c.deleted, c.owner_user_id, c.nfts, c.version, c.last_updated, c.created_at, c.hidden, c.collectors_note, c.name, c.layout, c.token_settings FROM galleries g, unnest(g.collections)
     WITH ORDINALITY AS x(coll_id, coll_ord)
     INNER JOIN collections c ON c.id = x.coll_id
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord
@@ -225,6 +226,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 			&i.CollectorsNote,
 			&i.Name,
 			&i.Layout,
+			&i.TokenSettings,
 		); err != nil {
 			return nil, err
 		}

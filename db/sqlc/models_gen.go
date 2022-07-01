@@ -46,6 +46,7 @@ type Collection struct {
 	CollectorsNote sql.NullString
 	Name           sql.NullString
 	Layout         TokenLayout
+	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings
 }
 
 type CollectionEvent struct {

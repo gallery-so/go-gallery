@@ -1,0 +1,1 @@
+ALTER TABLE collections DROP COLUMN IF EXISTS token_settings;

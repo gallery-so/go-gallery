@@ -262,12 +262,16 @@ type CollectionToken implements Node
     id: ID!
     token: Token
     collection: Collection
-    renderLive: Boolean
+    tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
 }
 
 type CollectionLayout {
     columns: Int
     whitespace: [Int]
+}
+
+type CollectionTokenSettings {
+    renderLive: Boolean
 }
 
 type Collection implements Node {
@@ -534,7 +538,6 @@ input UpdateCollectionInfoInput {
     collectionId: DBID!
     name: String!
     collectorsNote: String!
-    tokenSettings: [CollectionTokenSettingsInput!]!
 }
 
 union UpdateCollectionInfoPayloadOrError =
@@ -550,6 +553,7 @@ input UpdateCollectionTokensInput {
     collectionId: DBID!
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
+    tokenSettings: [CollectionTokenSettingsInput!]!
 }
 
 union UpdateCollectionTokensPayloadOrError =
