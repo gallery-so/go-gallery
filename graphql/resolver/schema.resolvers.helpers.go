@@ -610,6 +610,10 @@ func eventToCollectionCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEven
 		Owner:      &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
 		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:     &event.Action,
+		NewTokens:  nil, // handled by dedicated resolver
+		HelperCollectionCreatedFeedEventDataData: model.HelperCollectionCreatedFeedEventDataData{
+			FeedEventId: event.ID,
+		},
 	}
 }
 

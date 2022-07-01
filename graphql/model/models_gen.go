@@ -195,10 +195,12 @@ func (Collection) IsNode()                  {}
 func (Collection) IsCollectionByIDOrError() {}
 
 type CollectionCreatedFeedEventData struct {
-	EventTime  *time.Time      `json:"eventTime"`
-	Owner      *GalleryUser    `json:"owner"`
-	Action     *persist.Action `json:"action"`
-	Collection *Collection     `json:"collection"`
+	HelperCollectionCreatedFeedEventDataData
+	EventTime  *time.Time         `json:"eventTime"`
+	Owner      *GalleryUser       `json:"owner"`
+	Action     *persist.Action    `json:"action"`
+	Collection *Collection        `json:"collection"`
+	NewTokens  []*CollectionToken `json:"newTokens"`
 }
 
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}

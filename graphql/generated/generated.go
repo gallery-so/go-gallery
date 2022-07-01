@@ -105,6 +105,7 @@ type ComplexityRoot struct {
 		Action     func(childComplexity int) int
 		Collection func(childComplexity int) int
 		EventTime  func(childComplexity int) int
+		NewTokens  func(childComplexity int) int
 		Owner      func(childComplexity int) int
 	}
 
@@ -549,6 +550,7 @@ type CollectionCreatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.GalleryUser, error)
 
 	Collection(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.Collection, error)
+	NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error)
 }
 type CollectorsNoteAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error)
@@ -823,6 +825,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionCreatedFeedEventData.EventTime(childComplexity), true
+
+	case "CollectionCreatedFeedEventData.newTokens":
+		if e.complexity.CollectionCreatedFeedEventData.NewTokens == nil {
+			break
+		}
+
+		return e.complexity.CollectionCreatedFeedEventData.NewTokens(childComplexity), true
 
 	case "CollectionCreatedFeedEventData.owner":
 		if e.complexity.CollectionCreatedFeedEventData.Owner == nil {
@@ -3060,11 +3069,12 @@ type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
     newCollectorsNote: String
 }
 
-type CollectionCreatedFeedEventData implements FeedEventData {
+type CollectionCreatedFeedEventData implements FeedEventData @goEmbedHelper {
     eventTime: Time
     owner: GalleryUser @goField(forceResolver: true)
     action: Action
     collection: Collection @goField(forceResolver: true)
+    newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
 type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
@@ -4767,6 +4777,38 @@ func (ec *executionContext) _CollectionCreatedFeedEventData_collection(ctx conte
 	res := resTmp.(*model.Collection)
 	fc.Result = res
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionCreatedFeedEventData_newTokens(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionCreatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CollectionCreatedFeedEventData().NewTokens(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CollectionToken)
+	fc.Result = res
+	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CollectionLayout_columns(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
@@ -16140,6 +16182,23 @@ func (ec *executionContext) _CollectionCreatedFeedEventData(ctx context.Context,
 					}
 				}()
 				res = ec._CollectionCreatedFeedEventData_collection(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "newTokens":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionCreatedFeedEventData_newTokens(ctx, field, obj)
 				return res
 			}
 
