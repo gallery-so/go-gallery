@@ -283,6 +283,11 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		isPreFeed = true
 	}
 
+	// only send if tokens added
+	if !isPreFeed && len(added) == 0 {
+		return nil, nil
+	}
+
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
