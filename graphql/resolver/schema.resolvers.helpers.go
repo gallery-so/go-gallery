@@ -521,7 +521,7 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 
 	var cursor string
 
-	if feedConn.HelperFeedConnectionData.ByFirst {
+	if feedConn.ByFirst {
 		cursor = pageInfo.EndCursor
 	} else {
 		cursor = pageInfo.StartCursor
@@ -530,14 +530,14 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 	hasPage, err := publicapi.For(ctx).Feed.HasPage(
 		ctx,
 		cursor,
-		feedConn.HelperFeedConnectionData.UserId,
-		feedConn.HelperFeedConnectionData.ByFirst,
+		feedConn.UserId,
+		feedConn.ByFirst,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if feedConn.HelperFeedConnectionData.ByFirst {
+	if feedConn.ByFirst {
 		pageInfo.HasNextPage = hasPage
 	} else {
 		pageInfo.HasPreviousPage = hasPage
@@ -630,6 +630,7 @@ func eventToTokensAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.Fe
 		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
+		IsPreFeed:  util.BoolToPointer(event.Data.CollectionIsPreFeed),
 		HelperTokensAddedToCollectionFeedEventDataData: model.HelperTokensAddedToCollectionFeedEventDataData{
 			FeedEventId: event.ID,
 		},

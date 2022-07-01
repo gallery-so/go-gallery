@@ -434,6 +434,7 @@ type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelpe
     collection: Collection @goField(forceResolver: true)
     action: Action
     newTokens: [CollectionToken] @goField(forceResolver: true)
+    isPreFeed: Boolean
 }
 
 type ErrUnknownAction implements Error {

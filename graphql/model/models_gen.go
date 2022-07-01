@@ -692,6 +692,7 @@ type TokensAddedToCollectionFeedEventData struct {
 	Collection *Collection        `json:"collection"`
 	Action     *persist.Action    `json:"action"`
 	NewTokens  []*CollectionToken `json:"newTokens"`
+	IsPreFeed  *bool              `json:"isPreFeed"`
 }
 
 func (TokensAddedToCollectionFeedEventData) IsFeedEventData() {}
