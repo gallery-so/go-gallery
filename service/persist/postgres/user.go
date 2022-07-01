@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(WALLETS) AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
+	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = TRUE WHERE ID = $1;`)
@@ -124,10 +125,18 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 	switch pUpdate.(type) {
 	case persist.UserUpdateInfoInput:
 		update := pUpdate.(persist.UserUpdateInfoInput)
-		aUser, _ := u.GetByUsername(pCtx, update.Username.String())
-		if aUser.ID != "" && aUser.ID != pID {
-			return persist.ErrUserAlreadyExists{Username: update.Username.String()}
+		aUser, err := u.GetByUsername(pCtx, update.Username.String())
+		if err != nil {
+			errNotFound := persist.ErrUserNotFound{}
+			if !errors.As(err, &errNotFound) {
+				return err
+			}
+		} else {
+			if aUser.ID != "" && aUser.ID != pID {
+				return persist.ErrUserAlreadyExists{Username: update.Username.String()}
+			}
 		}
+
 		res, err := u.updateInfoStmt.ExecContext(pCtx, pID, update.Username, strings.ToLower(update.UsernameIdempotent.String()), update.LastUpdated, update.Bio)
 		if err != nil {
 			return err
