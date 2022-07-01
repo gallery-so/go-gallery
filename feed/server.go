@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
-func handleEvent() gin.HandlerFunc {
+func handleEvent(pgx *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		message := task.FeedMessage{}
 
@@ -21,7 +22,7 @@ func handleEvent() gin.HandlerFunc {
 			return
 		}
 
-		builder := NewEventBuilder()
+		builder := NewEventBuilder(pgx)
 		event, err := builder.NewEvent(c.Request.Context(), message)
 
 		if err != nil {
