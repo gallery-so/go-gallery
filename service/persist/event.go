@@ -13,6 +13,7 @@ const (
 	ResourceTypeCollection
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
+	ActionUserFollowedByUsers             Action = "UserFollowedByUsers"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
 	ActionCollectionCreated               Action = "CollectionCreated"
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"
@@ -32,6 +33,7 @@ type EventData struct {
 type FeedEventData struct {
 	UserBio                     string   `json:"user_bio"`
 	UserFollowedIDs             DBIDList `json:"user_followed_ids"`
+	UserFollowerIDs             DBIDList `json:"user_follower_ids"`
 	UserFollowedBack            []bool   `json:"user_followed_back"`
 	TokenID                     DBID     `json:"token_id"`
 	TokenCollectionID           DBID     `json:"token_collection_id"`

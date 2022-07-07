@@ -1161,9 +1161,18 @@ WITH cursors AS (
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+    AND event_time > (SELECT cur_after FROM cursors)
+    AND event_time < (SELECT cur_before FROM cursors)
+    AND fe.deleted = false AND fl.deleted = false
+
+    -- Can UNION ALL because a user can't follow themselves
+    UNION ALL
+
+    SELECT id FROM feed_events
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
-    AND fe.deleted = false and fl.deleted = false
+    AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
+    AND deleted = false
 ), offsets AS (
     SELECT
         CASE WHEN NOT $5::bool AND count(id) - $2::int > 0

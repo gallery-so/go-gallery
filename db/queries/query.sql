@@ -155,12 +155,25 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
 
--- name: GetEventsInWindow :many
+-- name: GetEventsInWindowForActor :many
 WITH RECURSIVE activity AS (
     SELECT * FROM events WHERE events.id = $1 AND deleted = false
     UNION
     SELECT e.* FROM events e, activity a
     WHERE e.actor_id = a.actor_id
+        AND e.action = a.action
+        AND e.created_at < a.created_at
+        AND e.created_at >= a.created_at - make_interval(secs => $2)
+        AND e.deleted = false
+)
+SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC;
+
+-- name: GetEventsInWindowForSubject :many
+WITH RECURSIVE activity AS (
+    SELECT * FROM events WHERE events.id = $1 AND deleted = false
+    UNION
+    SELECT e.* FROM events e, activity a
+    WHERE e.subject_id = a.subject_id
         AND e.action = a.action
         AND e.created_at < a.created_at
         AND e.created_at >= a.created_at - make_interval(secs => $2)
@@ -232,9 +245,18 @@ WITH cursors AS (
 ), edges AS (
     SELECT fe.id FROM feed_events fe
     INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
+    AND event_time > (SELECT cur_after FROM cursors)
+    AND event_time < (SELECT cur_before FROM cursors)
+    AND fe.deleted = false AND fl.deleted = false
+
+    -- Can UNION ALL because a user can't follow themselves
+    UNION ALL
+
+    SELECT id FROM feed_events
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
-    AND fe.deleted = false and fl.deleted = false
+    AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
+    AND deleted = false
 ), offsets AS (
     SELECT
         CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
@@ -250,19 +272,40 @@ SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
 SELECT
     CASE WHEN @from_first::bool
     THEN EXISTS(
-        SELECT 1
+        (SELECT 1
         FROM feed_events fe
         INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
         WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
         LIMIT 1)
+
+        -- Can UNION ALL because a user can't follow themselves
+        UNION ALL
+
+        (SELECT 1
+        FROM feed_events
+        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
+        AND deleted = false
+        LIMIT 1)
+    )
     ELSE EXISTS(
-        SELECT 1
+        (SELECT 1
         FROM feed_events fe
         INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
         WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1
+        LIMIT 1)
+
+        -- Can UNION ALL because a user can't follow themselves
+        UNION ALL
+
+        (SELECT 1
+        FROM feed_events
+        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
+        AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
+        AND deleted = false
+        LIMIT 1)
     )
     END::bool;
 

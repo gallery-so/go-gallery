@@ -793,6 +793,15 @@ type UserCreatedFeedEventData struct {
 
 func (UserCreatedFeedEventData) IsFeedEventData() {}
 
+type UserFollowedByUsersFeedEventData struct {
+	EventTime  *time.Time      `json:"eventTime"`
+	Owner      *GalleryUser    `json:"owner"`
+	Action     *persist.Action `json:"action"`
+	FollowedBy []*FollowInfo   `json:"followedBy"`
+}
+
+func (UserFollowedByUsersFeedEventData) IsFeedEventData() {}
+
 type UserFollowedUsersFeedEventData struct {
 	EventTime *time.Time      `json:"eventTime"`
 	Owner     *GalleryUser    `json:"owner"`

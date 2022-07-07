@@ -48,18 +48,6 @@ type Collection struct {
 	Layout         TokenLayout
 }
 
-type CollectionEvent struct {
-	ID           persist.DBID
-	UserID       sql.NullString
-	CollectionID sql.NullString
-	Version      sql.NullInt32
-	EventCode    sql.NullInt32
-	CreatedAt    time.Time
-	LastUpdated  time.Time
-	Data         pgtype.JSONB
-	Sent         sql.NullBool
-}
-
 type Contract struct {
 	ID             persist.DBID
 	Deleted        bool
@@ -167,18 +155,6 @@ type Membership struct {
 	Owners      persist.TokenHolderList
 }
 
-type NftEvent struct {
-	ID          persist.DBID
-	UserID      sql.NullString
-	NftID       sql.NullString
-	Version     sql.NullInt32
-	EventCode   sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Data        pgtype.JSONB
-	Sent        sql.NullBool
-}
-
 type Nonce struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -225,17 +201,6 @@ type User struct {
 	UsernameIdempotent sql.NullString
 	Wallets            persist.WalletList
 	Bio                sql.NullString
-}
-
-type UserEvent struct {
-	ID          persist.DBID
-	UserID      sql.NullString
-	Version     sql.NullInt32
-	EventCode   sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Data        pgtype.JSONB
-	Sent        sql.NullBool
 }
 
 type Wallet struct {

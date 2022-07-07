@@ -45,7 +45,7 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	case persist.ActionUserCreated:
 		return b.createUserCreatedEvent(ctx, event)
 	case persist.ActionUserFollowedUsers:
-		return b.createUserFollowedUsersEvent(ctx, event)
+		return b.createrUserFollowedByUsersEvent(ctx, event)
 	case persist.ActionCollectorsNoteAddedToToken:
 		return b.createCollectorsNoteAddedToTokenEvent(ctx, event)
 	case persist.ActionCollectionCreated:
@@ -60,7 +60,7 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 }
 
 func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActive(ctx, event)
+	isActive, err := b.eventRepo.WindowActiveForActor(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -87,31 +87,26 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Ev
 	})
 }
 
+// createUserFollowedUsersEvent creates an aggregated feed event for the forward edge of a follow event
+// e.g. UserA followed UserB, UserC, and UserD.
 func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActive(ctx, event)
+	isActive, err := b.eventRepo.WindowActiveForActor(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
 		return nil, err
 	}
 
-	feedEvent, err := b.feedRepo.LastEventFrom(ctx, event)
+	events, err := b.eventRepo.EventsInWindowForActor(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"))
 	if err != nil {
 		return nil, err
 	}
 
-	events := []sqlc.Event{event}
-
-	if feedEvent != nil {
-		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var followedIDs []persist.DBID
-	var followedBack []bool
-	var eventIDs []persist.DBID
+	var (
+		followedIDs  []persist.DBID
+		followedBack []bool
+		eventIDs     []persist.DBID
+	)
 
 	for _, event := range events {
 		if !event.Data.UserRefollowed {
@@ -138,8 +133,54 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 	})
 }
 
+// createUserFollowedUsersEvent creates an aggregated feed event for the back edge of a follow event
+// e.g. UserD was followed by UserA, UserB, and UserC.
+func (b *EventBuilder) createrUserFollowedByUsersEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+	isActive, err := b.eventRepo.WindowActiveForActorAndSubject(ctx, event)
+
+	// more recent events are bufferred
+	if err != nil || isActive {
+		return nil, err
+	}
+
+	events, err := b.eventRepo.EventsInWindowForSubject(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"))
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		followerIDs  []persist.DBID
+		followedBack []bool
+		eventIDs     []persist.DBID
+	)
+
+	for _, event := range events {
+		if !event.Data.UserRefollowed {
+			followerIDs = append(followerIDs, event.SubjectID)
+			followedBack = append(followedBack, event.Data.UserFollowedBack)
+			eventIDs = append(eventIDs, event.ID)
+		}
+	}
+
+	if len(followerIDs) < 1 {
+		return nil, nil
+	}
+
+	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
+		ID:      persist.GenerateID(),
+		OwnerID: event.SubjectID,
+		Action:  persist.ActionUserFollowedByUsers,
+		Data: persist.FeedEventData{
+			UserFollowerIDs:  followerIDs,
+			UserFollowedBack: followedBack,
+		},
+		EventTime: event.CreatedAt,
+		EventIds:  eventIDs,
+	})
+}
+
 func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
+	isActive, err := b.eventRepo.WindowActiveForActorAndSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -181,7 +222,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 }
 
 func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
+	isActive, err := b.eventRepo.WindowActiveForActorAndSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -209,7 +250,7 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event s
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
+	isActive, err := b.eventRepo.WindowActiveForActorAndSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {
@@ -245,7 +286,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 }
 
 func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
+	isActive, err := b.eventRepo.WindowActiveForActorAndSubject(ctx, event)
 
 	// more recent events are bufferred
 	if err != nil || isActive {

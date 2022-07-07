@@ -641,6 +641,10 @@ func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
+func (r *userFollowedByUsersFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserFollowedByUsersFeedEventData) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
+}
+
 func (r *userFollowedUsersFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
@@ -754,6 +758,11 @@ func (r *Resolver) UserCreatedFeedEventData() generated.UserCreatedFeedEventData
 	return &userCreatedFeedEventDataResolver{r}
 }
 
+// UserFollowedByUsersFeedEventData returns generated.UserFollowedByUsersFeedEventDataResolver implementation.
+func (r *Resolver) UserFollowedByUsersFeedEventData() generated.UserFollowedByUsersFeedEventDataResolver {
+	return &userFollowedByUsersFeedEventDataResolver{r}
+}
+
 // UserFollowedUsersFeedEventData returns generated.UserFollowedUsersFeedEventDataResolver implementation.
 func (r *Resolver) UserFollowedUsersFeedEventData() generated.UserFollowedUsersFeedEventDataResolver {
 	return &userFollowedUsersFeedEventDataResolver{r}
@@ -788,6 +797,7 @@ type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
 type userCreatedFeedEventDataResolver struct{ *Resolver }
+type userFollowedByUsersFeedEventDataResolver struct{ *Resolver }
 type userFollowedUsersFeedEventDataResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }

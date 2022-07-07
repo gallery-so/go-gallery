@@ -66,8 +66,8 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Eve
 	return &event, err
 }
 
-// WindowActive checks if there are more recent events with an action that matches the provided event.
-func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (bool, error) {
+// WindowActiveForActor checks if there are more recent events with the same actor and action as the provided event.
+func (r *EventRepository) WindowActiveForActor(ctx context.Context, event sqlc.Event) (bool, error) {
 	return r.Queries.IsWindowActive(ctx, sqlc.IsWindowActiveParams{
 		ActorID:     event.ActorID,
 		Action:      event.Action,
@@ -76,9 +76,9 @@ func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (b
 	})
 }
 
-// WindowActiveForSubject checks if there are more recent events with an action on a specific resource such as
-// as a collection or a token.
-func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc.Event) (bool, error) {
+// WindowActiveForActorAndSubject checks if there are more recent events with the same actor and action applied to a specific subject such as
+// for a particular collection or token.
+func (r *EventRepository) WindowActiveForActorAndSubject(ctx context.Context, event sqlc.Event) (bool, error) {
 	return r.Queries.IsWindowActiveWithSubject(ctx, sqlc.IsWindowActiveWithSubjectParams{
 		ActorID:     event.ActorID,
 		Action:      event.Action,
@@ -88,9 +88,18 @@ func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc
 	})
 }
 
-// EventsInWindow returns events belonging to the same window of activity as the given eventID.
-func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
-	return r.Queries.GetEventsInWindow(ctx, sqlc.GetEventsInWindowParams{
+// EventsInWindowForActor returns events with the same actor and action that belong to the same window of activity as the given eventID.
+func (r *EventRepository) EventsInWindowForActor(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
+	return r.Queries.GetEventsInWindowForActor(ctx, sqlc.GetEventsInWindowForActorParams{
+		ID:   eventID,
+		Secs: float64(windowSeconds),
+	})
+}
+
+// EventsInWindowForSubject returns events with the same subject and action that belong to the same window of activity as the given eventID
+// irregardless of the actor.
+func (r *EventRepository) EventsInWindowForSubject(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
+	return r.Queries.GetEventsInWindowForSubject(ctx, sqlc.GetEventsInWindowForSubjectParams{
 		ID:   eventID,
 		Secs: float64(windowSeconds),
 	})

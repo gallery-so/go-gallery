@@ -552,6 +552,8 @@ func feedEventToDataModel(event *sqlc.FeedEvent) (model.FeedEventData, error) {
 		return eventToUserCreatedFeedEventData(event), nil
 	case persist.ActionUserFollowedUsers:
 		return eventToUserFollowedUsersFeedEventData(event), nil
+	case persist.ActionUserFollowedByUsers:
+		return eventToUserFollowedByUsersFeedEventData(event), nil
 	case persist.ActionCollectorsNoteAddedToToken:
 		return eventToCollectorsNoteAddedToTokenFeedEventData(event), nil
 	case persist.ActionCollectionCreated:
@@ -588,6 +590,24 @@ func eventToUserFollowedUsersFeedEventData(event *sqlc.FeedEvent) model.FeedEven
 		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
 		Action:    &event.Action,
 		Followed:  followed,
+	}
+}
+
+func eventToUserFollowedByUsersFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
+	followedBy := make([]*model.FollowInfo, len(event.Data.UserFollowerIDs))
+
+	for i, userID := range event.Data.UserFollowerIDs {
+		followedBy[i] = &model.FollowInfo{
+			User:         &model.GalleryUser{Dbid: userID}, // remaining fields handled by dedicated resolver
+			FollowedBack: util.BoolToPointer(event.Data.UserFollowedBack[i]),
+		}
+	}
+
+	return model.UserFollowedByUsersFeedEventData{
+		EventTime:  &event.EventTime,
+		Owner:      &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
+		Action:     &event.Action,
+		FollowedBy: followedBy,
 	}
 }
 

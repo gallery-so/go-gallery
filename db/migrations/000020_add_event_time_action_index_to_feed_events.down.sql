@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS feed_events_event_time_action_idx;
