@@ -439,7 +439,7 @@ func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfer
 	defer close(transfers)
 
 	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
-		FromBlock: lastSyncedBlock.BigInt(),
+		FromBlock: lastSyncedBlock.BigInt().Sub(lastSyncedBlock.BigInt(), big.NewInt(50)),
 		Topics:    topics,
 	}, subscriptions)
 	if err != nil {

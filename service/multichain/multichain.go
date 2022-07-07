@@ -118,9 +118,6 @@ func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGall
 		if err != nil {
 			panic(err)
 		}
-		if _, ok := c[info.Chain]; !ok {
-			c[info.Chain] = []ChainProvider{}
-		}
 		c[info.Chain] = append(c[info.Chain], chain)
 	}
 	return &Provider{
@@ -210,7 +207,7 @@ outer:
 			return err
 		}
 	}
-	newContracts, err := contractsToContracts(ctx, allContracts)
+	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
 	if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
 		return fmt.Errorf("error upserting contracts: %s", err)
 	}
@@ -233,7 +230,7 @@ outer:
 		}
 	}
 
-	newTokens, err := tokensToTokens(ctx, allTokens, addressesToContracts, user)
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
 	if err := d.TokenRepo.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
@@ -302,7 +299,7 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return nil
 }
 
-func tokensToTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
@@ -327,6 +324,15 @@ func tokensToTokens(ctx context.Context, tokens []chainTokens, contractAddressID
 					continue
 				}
 				logrus.Debugf("updating token %s because current version is invalid", ti)
+			} else {
+				if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
+					seenWallets[ti] = append(seenWallets[ti], w)
+				}
+				if q, ok := seenQuantities[ti]; ok {
+					seenQuantities[ti] = q.Add(token.Quantity)
+				} else {
+					seenQuantities[ti] = token.Quantity
+				}
 			}
 
 			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
@@ -334,15 +340,6 @@ func tokensToTokens(ctx context.Context, tokens []chainTokens, contractAddressID
 				return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
 			}
 
-			if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
-				seenWallets[ti] = append(seenWallets[ti], w)
-			}
-
-			if q, ok := seenQuantities[ti]; ok {
-				seenQuantities[ti] = q.Add(token.Quantity)
-			} else {
-				seenQuantities[ti] = token.Quantity
-			}
 			t := persist.TokenGallery{
 				Media:            token.Media,
 				TokenType:        token.TokenType,
@@ -372,7 +369,7 @@ func tokensToTokens(ctx context.Context, tokens []chainTokens, contractAddressID
 
 }
 
-func contractsToContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
+func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
 	seen := make(map[persist.ChainAddress]persist.ContractGallery)
 
 	sort.SliceStable(contracts, func(i, j int) bool {

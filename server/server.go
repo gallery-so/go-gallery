@@ -220,5 +220,5 @@ func initSentry() {
 }
 
 func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client) *multichain.Provider {
-	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, eth.NewDataRetriever(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient))
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient))
 }

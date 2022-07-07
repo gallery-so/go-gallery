@@ -33,8 +33,8 @@ type Provider struct {
 	ethClient      *ethclient.Client
 }
 
-// NewDataRetriever creates a new DataRetriever
-func NewDataRetriever(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client) *Provider {
+// NewProvider creates a new DataRetriever
+func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client) *Provider {
 	return &Provider{
 		indexerBaseURL: indexerBaseURL,
 		httpClient:     httpClient,
@@ -63,9 +63,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return nil, nil, fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+		return nil, nil, getErrFromResp(res)
 	}
 
 	var tokens indexer.GetTokensOutput
@@ -91,9 +89,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+		return nil, multichain.ChainAgnosticContract{}, getErrFromResp(res)
 	}
 
 	var tokens indexer.GetTokensOutput
@@ -122,9 +118,8 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return nil, nil, fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+
+		return nil, nil, getErrFromResp(res)
 	}
 
 	var tokens indexer.GetTokensOutput
@@ -149,9 +144,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return multichain.ChainAgnosticContract{}, fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+		return multichain.ChainAgnosticContract{}, getErrFromResp(res)
 	}
 	var contract indexer.GetContractOutput
 	err = json.NewDecoder(res.Body).Decode(&contract)
@@ -187,9 +180,8 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+
+		return getErrFromResp(res)
 	}
 
 	return nil
@@ -221,9 +213,7 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+		return getErrFromResp(res)
 	}
 
 	return nil
@@ -253,9 +243,7 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+		return getErrFromResp(res)
 	}
 
 	return nil
@@ -283,9 +271,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		errResp := map[string]interface{}{}
-		json.NewDecoder(res.Body).Decode(&errResp)
-		return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
+		return getErrFromResp(res)
 	}
 
 	return nil
@@ -457,4 +443,10 @@ func ethereumAddressAtBlockToChainAgnostic(addrs []persist.EthereumAddressAtBloc
 		}
 	}
 	return res
+}
+
+func getErrFromResp(res *http.Response) error {
+	errResp := map[string]interface{}{}
+	json.NewDecoder(res.Body).Decode(&errResp)
+	return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
 }
