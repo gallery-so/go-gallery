@@ -339,6 +339,7 @@ type ViewerGallery {
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -488,6 +489,7 @@ type Query {
     galleryOfTheWeekWinners: [GalleryUser!]
     feedByUserId(id: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+    # Remove when frontend uses feed field on Viewer
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
 

@@ -678,6 +678,10 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	return output, nil
 }
 
+func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	return resolveViewerFeed(ctx, before, after, first, last)
+}
+
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
 	return resolveTokensByWalletID(ctx, obj.Dbid)
 }

@@ -822,6 +822,7 @@ type VideoURLSet struct {
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
+	Feed            *FeedConnection  `json:"feed"`
 }
 
 func (Viewer) IsViewerOrError() {}

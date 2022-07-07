@@ -40,6 +40,7 @@ func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*sql
 	return &event, nil
 }
 
+// Remove when frontend uses feed field on Viewer
 func (api FeedAPI) GetFeedByUserID(ctx context.Context, userID persist.DBID, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -84,6 +85,55 @@ func (api FeedAPI) GetFeedByUserID(ctx context.Context, userID persist.DBID, bef
 	}
 
 	return api.loaders.FeedByUserId.Load(params)
+}
+
+func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) (persist.DBID, []sqlc.FeedEvent, error) {
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+		"first":  {first, "omitempty,gte=0"},
+		"last":   {last, "omitempty,gte=0"},
+	}); err != nil {
+		return "", nil, err
+	}
+
+	if err := api.validator.Struct(validate.ConnectionPaginationParams{
+		Before: before,
+		After:  after,
+		First:  first,
+		Last:   last,
+	}); err != nil {
+		return "", nil, err
+	}
+
+	params := sqlc.GetUserFeedViewBatchParams{Follower: userID}
+
+	if first != nil {
+		params.FromFirst = true
+		params.Limit = int32(*first)
+	}
+
+	if last != nil {
+		params.FromFirst = false
+		params.Limit = int32(*last)
+	}
+
+	if before != nil {
+		params.CurBefore = string(*before)
+	}
+
+	if after != nil {
+		params.CurAfter = string(*after)
+	}
+
+	events, err := api.loaders.FeedByUserId.Load(params)
+
+	return userID, events, err
 }
 
 func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {

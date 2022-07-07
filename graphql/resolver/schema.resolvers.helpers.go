@@ -406,6 +406,7 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
 }
 
+// Remove when frontend uses feed field on Viewer
 func resolveFeedByUserID(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	beforeToken, err := model.Cursor.DecodeToDBID(before)
 	if err != nil {
@@ -418,6 +419,39 @@ func resolveFeedByUserID(ctx context.Context, userID persist.DBID, before *strin
 	}
 
 	events, err := publicapi.For(ctx).Feed.GetFeedByUserID(ctx, userID, beforeToken, afterToken, first, last)
+
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: nil, // handled by dedicated resolver,
+		HelperFeedConnectionData: model.HelperFeedConnectionData{
+			UserId:  userID,
+			ByFirst: first != nil,
+		},
+	}, nil
+}
+
+func resolveViewerFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	beforeToken, err := model.Cursor.DecodeToDBID(before)
+	if err != nil {
+		return nil, err
+	}
+
+	afterToken, err := model.Cursor.DecodeToDBID(after)
+	if err != nil {
+		return nil, err
+	}
+
+	userID, events, err := publicapi.For(ctx).Feed.GetViewerFeed(ctx, beforeToken, afterToken, first, last)
 
 	if err != nil {
 		return nil, err
