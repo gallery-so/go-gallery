@@ -428,7 +428,7 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 		res, err = t.updateMediaUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pID)
 	case persist.TokenUpdateOwnerInput:
 		update := pUpdate.(persist.TokenUpdateOwnerInput)
-		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, persist.LastUpdatedTime{}, pID)
+		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, update.BlockNumber, persist.LastUpdatedTime{}, pID)
 	case persist.TokenUpdateBalanceInput:
 		update := pUpdate.(persist.TokenUpdateBalanceInput)
 		res, err = t.updateBalanceUnsafeStmt.ExecContext(pCtx, update.Quantity, update.BlockNumber, persist.LastUpdatedTime{}, pID)
