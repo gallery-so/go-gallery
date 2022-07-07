@@ -125,7 +125,7 @@ func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress
 }
 
 func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
-	url := fmt.Sprintf("https://indexer-dot-gallery-prod-325303.wl.r.appspot.com/nfts/get?token_id=%s&contract_address=%s&limit=1", tid, contractAddress)
+	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s&limit=1", viper.GetString("INDEXER_HOST"), tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
