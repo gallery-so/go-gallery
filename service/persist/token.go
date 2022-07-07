@@ -35,10 +35,6 @@ const (
 	MediaTypeGIF MediaType = "gif"
 	// MediaTypeSVG represents an SVG
 	MediaTypeSVG MediaType = "svg"
-	// MediaTypeBase64JSON represents a base64 encoded JSON document
-	MediaTypeBase64JSON MediaType = "base64json"
-	// MediaTypeBase64SVG represents a base64 encoded SVG
-	MediaTypeBase64SVG MediaType = "base64svg"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
 	// MediaTypeHTML represents html

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -121,44 +120,44 @@ func getTokens(nftRepository persist.TokenRepository, contractRepository persist
 			return
 		}
 
+		newCtx := c.Copy()
+		go func() {
+			tokensWithoutMedia := make([]persist.Token, 0, len(tokens))
+			contractsWithoutMedia := make([]persist.Contract, 0, len(contracts))
+			for _, token := range tokens {
+				if token.Media.MediaURL == "" || token.Media.MediaType == "" || token.Media.MediaType == persist.MediaTypeUnknown {
+					tokensWithoutMedia = append(tokensWithoutMedia, token)
+				}
+			}
+			for _, contract := range contracts {
+				if contract.Name == "" {
+					contractsWithoutMedia = append(contractsWithoutMedia, contract)
+				}
+			}
+
+			wp := workerpool.New(10)
+			for _, token := range tokensWithoutMedia {
+				t := token
+				wp.Submit(func() {
+					err := updateMediaForToken(newCtx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
+					if err != nil {
+						logrus.Errorf("failed to update token media: %s", err)
+					}
+				})
+			}
+			for _, contract := range contractsWithoutMedia {
+				c := contract
+				wp.Submit(func() {
+					err := updateMediaForContract(newCtx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
+					if err != nil {
+						logrus.Errorf("failed to update contract media: %s", err)
+					}
+				})
+			}
+			wp.StopWait()
+		}()
+
 		c.JSON(http.StatusOK, GetTokensOutput{NFTs: tokens, Contracts: contracts})
-
-		newCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-		defer cancel()
-
-		tokensWithoutMedia := make([]persist.Token, 0, len(tokens))
-		contractsWithoutMedia := make([]persist.Contract, 0, len(contracts))
-		for _, token := range tokens {
-			if token.Media.MediaURL == "" || token.Media.MediaType == "" || token.Media.MediaType == persist.MediaTypeUnknown {
-				tokensWithoutMedia = append(tokensWithoutMedia, token)
-			}
-		}
-		for _, contract := range contracts {
-			if contract.Name == "" {
-				contractsWithoutMedia = append(contractsWithoutMedia, contract)
-			}
-		}
-
-		wp := workerpool.New(10)
-		for _, token := range tokensWithoutMedia {
-			t := token
-			wp.Submit(func() {
-				err := updateMediaForToken(newCtx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
-				if err != nil {
-					logrus.Errorf("failed to update token media: %s", err)
-				}
-			})
-		}
-		for _, contract := range contractsWithoutMedia {
-			c := contract
-			wp.Submit(func() {
-				err := updateMediaForContract(newCtx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
-				if err != nil {
-					logrus.Errorf("failed to update contract media: %s", err)
-				}
-			})
-		}
-		wp.StopWait()
 	}
 }
 
@@ -475,8 +474,8 @@ func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRe
 			return err
 		}
 		token := tokens[0]
-		uniqueHandlers := getUniqueMetadataHandlers()
-		up, err := getUpdateForToken(c, uniqueHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient)
+
+		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			return err
 		}
@@ -485,6 +484,7 @@ func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRe
 		}
 		return nil
 	}
+
 	var tokens []persist.Token
 	var err error
 	if input.OwnerAddress != "" {
@@ -543,12 +543,11 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 	errChan := make(chan error)
 	wp := workerpool.New(10)
 
-	uniqueHandlers := getUniqueMetadataHandlers()
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
 
-			up, err := getUpdateForToken(pCtx, uniqueHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient)
+			up, err := getUpdateForToken(pCtx, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient)
 			if err != nil {
 				errChan <- err
 				return
@@ -566,30 +565,27 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, mediaType persist.MediaType, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (tokenUpdateMedia, error) {
 	newMetadata := metadata
 	newURI := uri
+
+	u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
+	if err != nil {
+		return tokenUpdateMedia{}, fmt.Errorf("failed to get token URI: %v", err)
+	}
+	newURI = u.ReplaceID(tokenID)
+
 	if handler, ok := uniqueHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
 		logrus.Infof("Using %v metadata handler for %s", handler, contractAddress)
-		u, md, err := handler(uri, persist.EthereumAddress(contractAddress.String()), tokenID)
+		u, md, err := handler(newURI, persist.EthereumAddress(contractAddress.String()), tokenID)
 		if err != nil {
 			return tokenUpdateMedia{}, fmt.Errorf("failed to get unique metadata for token %s: %s", uri, err)
 		}
 		newMetadata = md
 		newURI = u
 	} else {
-
-		u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
-		if err != nil {
-			return tokenUpdateMedia{}, fmt.Errorf("failed to get token URI: %v", err)
-		}
-		newURI = u
-
-		newURI = newURI.ReplaceID(tokenID)
-
 		md, err := rpc.GetMetadataFromURI(pCtx, newURI, ipfsClient, arweaveClient)
 		if err != nil {
 			return tokenUpdateMedia{}, fmt.Errorf("failed to get metadata for token %s: %v", tokenID, err)
 		}
 		newMetadata = md
-
 	}
 
 	name, ok := util.GetValueFromMap(newMetadata, "name", util.DefaultSearchDepth).(string)

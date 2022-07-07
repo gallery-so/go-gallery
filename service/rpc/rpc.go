@@ -86,9 +86,31 @@ func NewEthClient() *ethclient.Client {
 
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
-	sh := shell.NewShell(viper.GetString("IPFS_URL"))
+	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), NewClientForIpfs(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET")))
 	sh.SetTimeout(time.Minute * 2)
 	return sh
+}
+
+func NewClientForIpfs(projectId, projectSecret string) *http.Client {
+	return &http.Client{
+		Transport: authTransport{
+			RoundTripper:  http.DefaultTransport,
+			ProjectId:     projectId,
+			ProjectSecret: projectSecret,
+		},
+	}
+}
+
+// authTransport decorates each request with a basic auth header.
+type authTransport struct {
+	http.RoundTripper
+	ProjectId     string
+	ProjectSecret string
+}
+
+func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r.SetBasicAuth(t.ProjectId, t.ProjectSecret)
+	return t.RoundTripper.RoundTrip(r)
 }
 
 // NewArweaveClient returns an Arweave client
@@ -150,7 +172,10 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			decoded, err = base64.RawStdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			}
 		}
 
 		return removeBOM(decoded), nil
@@ -159,7 +184,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		path = strings.ReplaceAll(path, "ipfs/", "")
 		path = strings.Split(path, "?")[0]
 
-		bs, err := GetIPFSData(ctx, path)
+		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
 			return nil, err
 		}
@@ -200,7 +225,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 		path := parsedURL.Query().Get("arg")
-		bs, err := GetIPFSData(ctx, path)
+		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
 			return nil, err
 		}
@@ -251,22 +276,11 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		path = strings.ReplaceAll(path, "ipfs/", "")
 		path = strings.Split(path, "?")[0]
 
-		it, err := ipfsClient.Cat(path)
+		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
-			if err == context.Canceled {
-				c, cancel := context.WithTimeout(context.Background(), time.Second*10)
-				defer cancel()
-				ctx = c
-			}
-			bs, nextErr := GetIPFSData(ctx, path)
-			if nextErr == nil {
-				return json.Unmarshal(bs, into)
-			}
-
-			return fmt.Errorf("error getting data from ipfs: %s | %s - cat: %s", err, nextErr, path)
+			return err
 		}
-		defer it.Close()
-		return json.NewDecoder(it).Decode(into)
+		return json.Unmarshal(bs, into)
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
@@ -322,28 +336,41 @@ func removeBOM(bs []byte) []byte {
 	return bs
 }
 
-func GetIPFSData(pCtx context.Context, path string) ([]byte, error) {
-	url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
-
-	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
+	dataReader, err := ipfsClient.Cat(path)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %s", err)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error getting data from http: %s", err)
-	}
-	if resp.StatusCode > 399 || resp.StatusCode < 200 {
-		return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
-	}
-	defer resp.Body.Close()
 
+		logger.For(pCtx).WithError(err).Errorf("error getting cat data from ipfs: %s", path)
+
+		url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+
+		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %s", err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("error getting data from http: %s", err)
+		}
+		if resp.StatusCode > 399 || resp.StatusCode < 200 {
+			return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
+		}
+		defer resp.Body.Close()
+
+		buf := &bytes.Buffer{}
+		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
+		if err != nil {
+			return nil, err
+		}
+
+		return buf.Bytes(), nil
+	}
+	defer dataReader.Close()
 	buf := &bytes.Buffer{}
-	err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
+	err = util.CopyMax(buf, dataReader, 1024*1024*1024)
 	if err != nil {
 		return nil, err
 	}
-
 	return buf.Bytes(), nil
 }
 
@@ -529,10 +556,11 @@ func GetArweaveData(client *goar.Client, id string) ([]byte, error) {
 			return nil, err
 		}
 		if i < len(splitPath)-1 {
+			decoded, err := base64.RawStdEncoding.DecodeString(string(data))
 			var manifest arweaveManifest
-			err = json.Unmarshal(data, &manifest)
+			err = json.Unmarshal(decoded, &manifest)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error unmarshalling manifest: %s - %s", err.Error(), string(decoded))
 			}
 			currentID = manifest.Paths[splitPath[i+1]].ID
 		}

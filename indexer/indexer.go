@@ -36,6 +36,12 @@ var defaultStartingBlock persist.BlockNumber = 13768584
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
+var uniqueMetadataHandlers = uniqueMetadatas{
+	persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
+	persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
+	persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
+}
+
 const defaultWorkerPoolSize = 8
 
 const defaultWorkerPoolWaitSize = 25
@@ -147,7 +153,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 
 		eventHashes:     pEvents,
 		mostRecentBlock: mostRecentBlockUint64,
-		uniqueMetadatas: getUniqueMetadataHandlers(),
+		uniqueMetadatas: uniqueMetadataHandlers,
 	}
 }
 
@@ -1075,14 +1081,6 @@ func fillContractFields(ethClient *ethclient.Client, contractAddress persist.Eth
 }
 
 // HELPER FUNCS ---------------------------------------------------------------
-
-func getUniqueMetadataHandlers() uniqueMetadatas {
-	return uniqueMetadatas{
-		persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
-		persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
-		persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
-	}
-}
 
 func findFirstFieldFromMetadata(metadata persist.TokenMetadata, fields ...string) interface{} {
 

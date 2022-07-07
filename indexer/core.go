@@ -100,6 +100,9 @@ func coreInitServer() *gin.Engine {
 func setDefaults() {
 	viper.SetDefault("RPC_URL", "wss://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
 	viper.SetDefault("IPFS_URL", "https://gallery-ipfs.mypinata.cloud")
+	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
+	viper.SetDefault("IPFS_PROJECT_ID", "")
+	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
