@@ -41,11 +41,11 @@ type UpdateTokenMediaInput struct {
 	UpdateAll       bool                    `json:"update_all"`
 }
 
-type tokenUpdateMedia struct {
+type tokenUpdate struct {
 	TokenDBID       persist.DBID
 	TokenID         persist.TokenID
 	ContractAddress persist.EthereumAddress
-	Update          persist.TokenUpdateMediaInput
+	Update          interface{}
 }
 
 type getTokensInput struct {
@@ -140,7 +140,7 @@ func getTokens(nftRepository persist.TokenRepository, contractRepository persist
 			for _, token := range tokensWithoutMedia {
 				t := token
 				wp.Submit(func() {
-					err := updateMediaForToken(newCtx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
+					err := refreshToken(newCtx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
 					if err != nil {
 						logrus.Errorf("failed to update token media: %s", err)
 					}
@@ -448,7 +448,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	return nil
 }
 
-func updateTokenMedia(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
+func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := UpdateTokenMediaInput{}
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -456,7 +456,7 @@ func updateTokenMedia(tokenRepository persist.TokenRepository, ethClient *ethcli
 			return
 		}
 
-		err := updateMediaForToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient)
+		err := refreshToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -466,8 +466,8 @@ func updateTokenMedia(tokenRepository persist.TokenRepository, ethClient *ethcli
 	}
 }
 
-// updateMediaForToken will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
-func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) error {
+// refreshToken will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
+func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) error {
 	if input.TokenID != "" && input.ContractAddress != "" {
 		logrus.Infof("updating media for token %s-%s", input.TokenID, input.ContractAddress)
 		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
@@ -475,6 +475,16 @@ func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRe
 			return err
 		}
 		token := tokens[0]
+
+		owner, balance, block, err := getOwnershipUpdate(c, token, ethClient, input.OwnerAddress)
+		if err != nil {
+			return err
+		}
+
+		err = updateOwnershipStatus(c, tokenRepository, token.ID, token.TokenType, owner, token.OwnerAddress, balance, token.Quantity, block)
+		if err != nil {
+			return err
+		}
 
 		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
@@ -516,19 +526,20 @@ func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRe
 		tokens = res
 	}
 
-	if len(tokens) == 0 {
-		return nil
-	}
-
-	updates, errChan := updateMediaForTokens(c, tokens, ethClient, ipfsClient, arweaveClient, storageClient)
-	for i := 0; i < len(tokens); i++ {
+	tokenUpdateChan := make(chan tokenUpdate)
+	errChan := make(chan error)
+	// iterate over len tokens
+	updateMediaForTokens(c, tokenUpdateChan, errChan, tokens, ethClient, ipfsClient, arweaveClient, storageClient)
+	// iterate again also len tokens
+	updateOwnershipForTokens(c, tokenUpdateChan, errChan, tokens, ethClient)
+	// == len(tokens) * 2
+	for i := 0; i < len(tokens)*2; i++ {
 		select {
-		case update := <-updates:
+		case update := <-tokenUpdateChan:
 			if err := tokenRepository.UpdateByID(c, update.TokenDBID, update.Update); err != nil {
 				logrus.WithError(err).Error("failed to update token in database")
 				return err
 			}
-
 		case err := <-errChan:
 			if err != nil {
 				logrus.WithError(err).Error("failed to update media for token")
@@ -538,10 +549,62 @@ func updateMediaForToken(c context.Context, input UpdateTokenMediaInput, tokenRe
 	return nil
 }
 
+func updateOwnershipStatus(ctx context.Context, tokenRepository persist.TokenRepository, tokenDBID persist.DBID, tokenType persist.TokenType, curOwner, supposedOwner persist.EthereumAddress, curBalance, supposedBalance persist.HexString, block persist.BlockNumber) error {
+	switch tokenType {
+	case persist.TokenTypeERC1155:
+		if strings.EqualFold(curBalance.String(), supposedBalance.String()) {
+			return nil
+		}
+		return tokenRepository.UpdateByID(ctx, tokenDBID, persist.TokenUpdateBalanceInput{Quantity: curBalance, BlockNumber: block})
+	case persist.TokenTypeERC721:
+		if strings.EqualFold(curOwner.String(), supposedOwner.String()) {
+			return nil
+		}
+		return tokenRepository.UpdateByID(ctx, tokenDBID, persist.TokenUpdateOwnerInput{OwnerAddress: curOwner, BlockNumber: block})
+	default:
+		return fmt.Errorf("unsupported token type: %s", tokenType)
+	}
+}
+
+func getOwnershipUpdate(ctx context.Context, token persist.Token, ethClient *ethclient.Client, ownerAddress persist.EthereumAddress) (persist.EthereumAddress, persist.HexString, persist.BlockNumber, error) {
+	block, err := ethClient.BlockNumber(ctx)
+	if err != nil {
+		return "", "", 0, err
+	}
+	switch token.TokenType {
+	case persist.TokenTypeERC721:
+		erc721, err := contracts.NewIERC721Caller(token.ContractAddress.Address(), ethClient)
+		if err != nil {
+			return "", "", 0, err
+		}
+		owner, err := erc721.OwnerOf(&bind.CallOpts{Context: ctx}, token.TokenID.BigInt())
+		if err != nil {
+			return "", "", 0, err
+		}
+		if strings.EqualFold(owner.String(), ownerAddress.String()) {
+			return persist.EthereumAddress(owner.String()), token.Quantity, persist.BlockNumber(block), nil
+		}
+	case persist.TokenTypeERC1155:
+		erc1155, err := contracts.NewIERC1155Caller(token.ContractAddress.Address(), ethClient)
+		if err != nil {
+			return "", "", 0, err
+		}
+		bal, err := erc1155.BalanceOf(&bind.CallOpts{Context: ctx}, ownerAddress.Address(), token.TokenID.BigInt())
+		if err != nil {
+			return "", "", 0, err
+		}
+		if bal.Cmp(big.NewInt(0)) > 0 {
+			return token.OwnerAddress, "0", persist.BlockNumber(block), nil
+		}
+	default:
+		return "", "", 0, fmt.Errorf("unsupported token type %s", token.TokenType)
+	}
+	return ownerAddress, token.Quantity, persist.BlockNumber(block), nil
+}
+
 // updateMediaForTokens will return two channels that will collectively receive the length of the tokens passed in
-func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (<-chan tokenUpdateMedia, <-chan error) {
-	updateChan := make(chan tokenUpdateMedia)
-	errChan := make(chan error)
+func updateMediaForTokens(pCtx context.Context, updateChan chan<- tokenUpdate, errChan chan<- error, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
+
 	wp := workerpool.New(10)
 
 	for _, t := range tokens {
@@ -560,16 +623,47 @@ func updateMediaForTokens(pCtx context.Context, tokens []persist.Token, ethClien
 
 		})
 	}
-	return updateChan, errChan
 }
 
-func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, mediaType persist.MediaType, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (tokenUpdateMedia, error) {
+func updateOwnershipForTokens(c context.Context, tokenUpdateChan chan<- tokenUpdate, errChan chan error, tokens []persist.Token, ethClient *ethclient.Client) {
+	updateChan := make(chan tokenUpdate)
+	wp := workerpool.New(10)
+
+	for _, t := range tokens {
+		token := t
+		wp.Submit(func() {
+
+			owner, balance, block, err := getOwnershipUpdate(c, token, ethClient, token.OwnerAddress)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			switch token.TokenType {
+			case persist.TokenTypeERC1155:
+				updateChan <- tokenUpdate{TokenDBID: token.ID, Update: persist.TokenUpdateBalanceInput{
+					Quantity:    balance,
+					BlockNumber: block,
+				}}
+			case persist.TokenTypeERC721:
+				updateChan <- tokenUpdate{TokenDBID: token.ID, Update: persist.TokenUpdateOwnerInput{
+					OwnerAddress: owner,
+					BlockNumber:  block,
+				}}
+			default:
+				errChan <- fmt.Errorf("unsupported token type %s", token.TokenType)
+			}
+		})
+	}
+}
+
+func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, mediaType persist.MediaType, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (tokenUpdate, error) {
 	newMetadata := metadata
 	newURI := uri
 
 	u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
 	if err != nil {
-		return tokenUpdateMedia{}, fmt.Errorf("failed to get token URI: %v", err)
+		return tokenUpdate{}, fmt.Errorf("failed to get token URI: %v", err)
 	}
 	newURI = u.ReplaceID(tokenID)
 
@@ -577,14 +671,14 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		logrus.Infof("Using %v metadata handler for %s", handler, contractAddress)
 		u, md, err := handler(newURI, persist.EthereumAddress(contractAddress.String()), tokenID)
 		if err != nil {
-			return tokenUpdateMedia{}, fmt.Errorf("failed to get unique metadata for token %s: %s", uri, err)
+			return tokenUpdate{}, fmt.Errorf("failed to get unique metadata for token %s: %s", uri, err)
 		}
 		newMetadata = md
 		newURI = u
 	} else {
 		md, err := rpc.GetMetadataFromURI(pCtx, newURI, ipfsClient, arweaveClient)
 		if err != nil {
-			return tokenUpdateMedia{}, fmt.Errorf("failed to get metadata for token %s: %v", tokenID, err)
+			return tokenUpdate{}, fmt.Errorf("failed to get metadata for token %s: %v", tokenID, err)
 		}
 		newMetadata = md
 	}
@@ -600,9 +694,9 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 
 	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, contractAddress.String(), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient)
 	if err != nil {
-		return tokenUpdateMedia{}, fmt.Errorf("failed to make media for token %s-%s: %v", contractAddress, tokenID, err)
+		return tokenUpdate{}, fmt.Errorf("failed to make media for token %s-%s: %v", contractAddress, tokenID, err)
 	}
-	up := tokenUpdateMedia{
+	up := tokenUpdate{
 		TokenID:         tokenID,
 		ContractAddress: persist.EthereumAddress(contractAddress),
 		Update: persist.TokenUpdateMediaInput{

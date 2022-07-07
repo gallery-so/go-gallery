@@ -274,6 +274,16 @@ type ContractCollectionNFT struct {
 	ContractImage NullString `json:"image_url"`
 }
 
+type TokenUpdateOwnerInput struct {
+	OwnerAddress EthereumAddress `json:"owner_address"`
+	BlockNumber  BlockNumber     `json:"block_number"`
+}
+
+type TokenUpdateBalanceInput struct {
+	Quantity    HexString   `json:"quantity"`
+	BlockNumber BlockNumber `json:"block_number"`
+}
+
 // TokenRepository represents a repository for interacting with persisted tokens
 type TokenRepository interface {
 	CreateBulk(context.Context, []Token) ([]DBID, error)

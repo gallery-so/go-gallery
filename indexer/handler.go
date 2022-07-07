@@ -18,7 +18,7 @@ func handlersInit(router *gin.Engine, i *indexer, tokenRepository persist.TokenR
 func handlersInitServer(router *gin.Engine, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
 
 	nftsGroup := router.Group("/nfts")
-	nftsGroup.POST("/refresh", updateTokenMedia(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	nftsGroup.POST("/refresh", updateTokens(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 	nftsGroup.POST("/validate", validateWalletsNFTs(tokenRepository, contractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
 	nftsGroup.GET("/get", getTokens(tokenRepository, contractRepository, ipfsClient, ethClient, arweaveClient, storageClient))
 

@@ -27,6 +27,8 @@ type TokenRepository struct {
 	getByIDStmt                             *sql.Stmt
 	updateMediaStmt                         *sql.Stmt
 	updateMediaUnsafeStmt                   *sql.Stmt
+	updateOwnerUnsafeStmt                   *sql.Stmt
+	updateBalanceUnsafeStmt                 *sql.Stmt
 	updateMediaByTokenIdentifiersUnsafeStmt *sql.Stmt
 	mostRecentBlockStmt                     *sql.Stmt
 	countTokensStmt                         *sql.Stmt
@@ -76,6 +78,12 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	updateMediaStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE ID = $7 AND OWNER_ADDRESS = ANY($8);`)
 	checkNoErr(err)
 
+	updateOwnerUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET OWNER_ADDRESS = $1, OWNERSHIP_HISTORY = $2 || OWNERSHIP_HISTORY, BLOCK_NUMBER = $3, LAST_UPDATED = $4 WHERE ID = $5;`)
+	checkNoErr(err)
+
+	updateBalanceUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET QUANTITY = $1, BLOCK_NUMBER = $2, LAST_UPDATED = $3 WHERE ID = $4;`)
+	checkNoErr(err)
+
 	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE TOKEN_ID = $7 AND CONTRACT_ADDRESS = $8;`)
 	checkNoErr(err)
 
@@ -106,6 +114,8 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		getByIDStmt:                             getByIDStmt,
 		updateMediaUnsafeStmt:                   updateMediaUnsafeStmt,
 		updateMediaStmt:                         updateMediaStmt,
+		updateOwnerUnsafeStmt:                   updateOwnerUnsafeStmt,
+		updateBalanceUnsafeStmt:                 updateBalanceUnsafeStmt,
 		updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt,
 		mostRecentBlockStmt:                     mostRecentBlockStmt,
 		countTokensStmt:                         countTokensStmt,
@@ -416,6 +426,12 @@ func (t *TokenRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUp
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		res, err = t.updateMediaUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pID)
+	case persist.TokenUpdateOwnerInput:
+		update := pUpdate.(persist.TokenUpdateOwnerInput)
+		res, err = t.updateOwnerUnsafeStmt.ExecContext(pCtx, update.OwnerAddress, []persist.AddressAtBlock{{Address: persist.Address(update.OwnerAddress), Block: update.BlockNumber}}, persist.LastUpdatedTime{}, pID)
+	case persist.TokenUpdateBalanceInput:
+		update := pUpdate.(persist.TokenUpdateBalanceInput)
+		res, err = t.updateBalanceUnsafeStmt.ExecContext(pCtx, update.Quantity, update.BlockNumber, persist.LastUpdatedTime{}, pID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
