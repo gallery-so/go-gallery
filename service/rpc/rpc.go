@@ -170,9 +170,9 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:
 		// decode the base64 encoded json
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
-		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			decoded, err = base64.RawStdEncoding.DecodeString(string(b64data))
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
 			if err != nil {
 				return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
 			}
@@ -339,7 +339,6 @@ func removeBOM(bs []byte) []byte {
 func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
 	dataReader, err := ipfsClient.Cat(path)
 	if err != nil {
-
 		logger.For(pCtx).WithError(err).Errorf("error getting cat data from ipfs: %s", path)
 
 		url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)

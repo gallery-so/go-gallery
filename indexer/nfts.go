@@ -22,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 )
 
@@ -379,8 +380,8 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 
 		logrus.Debugf("metadata: %+v", metadata)
 		t := persist.Token{
-			Name:            persist.NullString(a.Name),
-			Description:     persist.NullString(a.Description),
+			Name:            persist.NullString(validate.SanitizationPolicy.Sanitize(a.Name)),
+			Description:     persist.NullString(validate.SanitizationPolicy.Sanitize(a.Description)),
 			Chain:           persist.ChainETH,
 			TokenID:         persist.TokenID(a.TokenID.ToBase16()),
 			ContractAddress: a.Contract.ContractAddress,
@@ -608,8 +609,8 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 			TokenURI:    newURI,
 			Metadata:    newMetadata,
 			Media:       newMedia,
-			Name:        persist.NullString(name),
-			Description: persist.NullString(description),
+			Name:        persist.NullString(validate.SanitizationPolicy.Sanitize(name)),
+			Description: persist.NullString(validate.SanitizationPolicy.Sanitize(description)),
 		},
 	}
 	return up, nil

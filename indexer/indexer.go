@@ -360,40 +360,6 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 			})
 
 			logrus.Debugf("Processed transfer event in %s", time.Since(initial))
-		// case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationMintedEventHash)):
-
-		// 	if len(pLog.Topics) < 4 {
-		// 		continue
-		// 	}
-
-		// 	result = append(result, rpc.Transfer{
-		// 		From:            persist.ZeroAddress,
-		// 		To:              persist.EthereumAddress(pLog.Topics[1].Hex()),
-		// 		TokenID:         persist.TokenID(pLog.Topics[2].Hex()),
-		// 		Amount:          1,
-		// 		BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-		// 		ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
-		// 		TokenType:       persist.TokenTypeERC721,
-		// 	})
-
-		// 	logrus.Debugf("Processed foundation mint event in %s", time.Since(initial))
-		// case strings.EqualFold(pLog.Topics[0].Hex(), string(foundationTransferEventHash)):
-
-		// 	if len(pLog.Topics) < 4 {
-		// 		continue
-		// 	}
-
-		// 	result = append(result, rpc.Transfer{
-		// 		From:            persist.EthereumAddress(pLog.Topics[2].Hex()),
-		// 		To:              persist.EthereumAddress(pLog.Topics[3].Hex()),
-		// 		TokenID:         persist.TokenID(pLog.Topics[1].Hex()),
-		// 		Amount:          1,
-		// 		BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-		// 		ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
-		// 		TokenType:       persist.TokenTypeERC721,
-		// 	})
-
-		// 	logrus.Debugf("Processed foundation transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
@@ -715,6 +681,7 @@ func getBalances(contractAddress persist.EthereumAddress, from persist.EthereumA
 
 func getURI(contractAddress persist.EthereumAddress, tokenID persist.TokenID, tokenType persist.TokenType, ethClient *ethclient.Client) persist.TokenURI {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	defer cancel()
 	u, err := rpc.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{"id": tokenID, "contract": contractAddress}).Error("error getting URI for token")
@@ -722,7 +689,6 @@ func getURI(contractAddress persist.EthereumAddress, tokenID persist.TokenID, to
 			u = persist.InvalidTokenURI
 		}
 	}
-	cancel()
 
 	uriReplaced := u.ReplaceID(tokenID)
 	return uriReplaced
@@ -1096,7 +1062,7 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 	transfersMap := map[persist.BlockNumber]transfersAtBlock{}
 
 	for _, transfer := range transfers {
-		if _, ok := transfersMap[transfer.BlockNumber]; !ok {
+		if tab, ok := transfersMap[transfer.BlockNumber]; !ok {
 			transfers := make([]rpc.Transfer, 0, 10)
 			transfers = append(transfers, transfer)
 			transfersMap[transfer.BlockNumber] = transfersAtBlock{
@@ -1104,7 +1070,6 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 				transfers: transfers,
 			}
 		} else {
-			tab := transfersMap[transfer.BlockNumber]
 			tab.transfers = append(tab.transfers, transfer)
 			transfersMap[transfer.BlockNumber] = tab
 		}
