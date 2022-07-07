@@ -54,6 +54,10 @@ func (r *collectionCreatedFeedEventDataResolver) Collection(ctx context.Context,
 	return resolveCollectionByCollectionID(ctx, obj.Collection.Dbid)
 }
 
+func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error) {
+	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
+}
+
 func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
@@ -562,16 +566,6 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 	return output, err
 }
 
-func (r *queryResolver) FeedByUserID(ctx context.Context, id persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	feed, err := resolveFeedByUserID(ctx, id, before, after, first, last)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return feed, nil
-}
-
 func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	feed, err := resolveGlobalFeed(ctx, before, after, first, last)
 
@@ -636,7 +630,7 @@ func (r *tokensAddedToCollectionFeedEventDataResolver) Collection(ctx context.Co
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.HelperTokensAddedToCollectionFeedEventDataData.FeedEventId)
+	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
 }
 
 func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
@@ -672,6 +666,10 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 	}
 
 	return output, nil
+}
+
+func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	return resolveViewerFeed(ctx, before, after, first, last)
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {

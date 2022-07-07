@@ -225,6 +225,27 @@ func (r *PostRenderer) createTokensAddedToCollectionPost(ctx context.Context, me
 		}
 	}
 
+	if evt.FeedEvent.Event.EventData.TokensAddedToCollection.IsPreFeed {
+		if evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name != "" {
+			msg := fmt.Sprintf("**%s** added pieces to their collection, *%s*: %s",
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Owner.Username,
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name,
+				collectionURL(
+					evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+					evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
+				),
+			)
+			return msg, nil
+		}
+		return fmt.Sprintf("**%s** added pieces to their collection: %s",
+			evt.FeedEvent.Event.EventData.TokensAddedToCollection.Owner.Username,
+			collectionURL(
+				evt.FeedEvent.Event.EventData.CollectorsNoteAddedToToken.Owner.Username,
+				evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Dbid,
+			),
+		), nil
+	}
+
 	if evt.FeedEvent.Event.EventData.TokensAddedToCollection.Collection.Name != "" && tokenName != "" {
 		msg := fmt.Sprintf("**%s** added *%s* ", evt.FeedEvent.Event.EventData.TokensAddedToCollection.Owner.Username, tokenName)
 		if tokensAdded == 1 {
@@ -364,6 +385,7 @@ type FeedEventQuery struct {
 					NewTokens  []struct {
 						Token TokenFragment
 					}
+					IsPreFeed bool
 				} `graphql:"...on TokensAddedToCollectionFeedEventData"`
 			}
 		} `graphql:"...on FeedEvent"`

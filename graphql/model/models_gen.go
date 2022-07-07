@@ -195,10 +195,12 @@ func (Collection) IsNode()                  {}
 func (Collection) IsCollectionByIDOrError() {}
 
 type CollectionCreatedFeedEventData struct {
-	EventTime  *time.Time      `json:"eventTime"`
-	Owner      *GalleryUser    `json:"owner"`
-	Action     *persist.Action `json:"action"`
-	Collection *Collection     `json:"collection"`
+	HelperCollectionCreatedFeedEventDataData
+	EventTime  *time.Time         `json:"eventTime"`
+	Owner      *GalleryUser       `json:"owner"`
+	Action     *persist.Action    `json:"action"`
+	Collection *Collection        `json:"collection"`
+	NewTokens  []*CollectionToken `json:"newTokens"`
 }
 
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}
@@ -692,6 +694,7 @@ type TokensAddedToCollectionFeedEventData struct {
 	Collection *Collection        `json:"collection"`
 	Action     *persist.Action    `json:"action"`
 	NewTokens  []*CollectionToken `json:"newTokens"`
+	IsPreFeed  *bool              `json:"isPreFeed"`
 }
 
 func (TokensAddedToCollectionFeedEventData) IsFeedEventData() {}
@@ -819,6 +822,7 @@ type VideoURLSet struct {
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
+	Feed            *FeedConnection  `json:"feed"`
 }
 
 func (Viewer) IsViewerOrError() {}

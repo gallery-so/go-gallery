@@ -42,6 +42,10 @@ type HelperTokensAddedToCollectionFeedEventDataData struct {
 	FeedEventId persist.DBID
 }
 
+type HelperCollectionCreatedFeedEventDataData struct {
+	FeedEventId persist.DBID
+}
+
 type HelperFeedConnectionData struct {
 	UserId  persist.DBID
 	ByFirst bool

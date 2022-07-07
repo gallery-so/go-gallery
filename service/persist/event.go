@@ -40,6 +40,7 @@ type FeedEventData struct {
 	CollectionTokenIDs          DBIDList `json:"collection_token_ids"`
 	CollectionNewTokenIDs       DBIDList `json:"collection_new_token_ids"`
 	CollectionNewCollectorsNote string   `json:"collection_new_collectors_note"`
+	CollectionIsPreFeed         bool     `json:"collection_is_pre_feed"`
 }
 
 type ErrFeedEventNotFoundByID struct {

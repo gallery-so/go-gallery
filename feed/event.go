@@ -3,10 +3,12 @@ package feed
 import (
 	"context"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/spf13/viper"
 )
 
@@ -15,8 +17,8 @@ type EventBuilder struct {
 	feedRepo  *postgres.FeedRepository
 }
 
-func NewEventBuilder() *EventBuilder {
-	queries := sqlc.New(postgres.NewPgxClient())
+func NewEventBuilder(pgx *pgxpool.Pool) *EventBuilder {
+	queries := sqlc.New(pgx)
 	return &EventBuilder{
 		eventRepo: &postgres.EventRepository{Queries: queries},
 		feedRepo:  &postgres.FeedRepository{Queries: queries},
@@ -24,11 +26,20 @@ func NewEventBuilder() *EventBuilder {
 }
 
 func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (*sqlc.FeedEvent, error) {
+	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
+	defer tracing.FinishSpan(span)
+
 	event, err := b.eventRepo.Get(ctx, message.ID)
 
 	if err != nil {
 		return nil, err
 	}
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{
+		"Message ID": message.ID,
+		"Event ID":   event.ID,
+		"Action":     event.Action,
+	})
 
 	switch event.Action {
 	case persist.ActionUserCreated:
@@ -258,7 +269,8 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		return nil, err
 	}
 
-	var added []persist.DBID
+	added := make([]persist.DBID, 0)
+	var isPreFeed bool
 
 	if feedEvent != nil {
 		// compare against last token added event
@@ -267,12 +279,13 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		// compare against the create collection event
 		added = newTokens(event.Data.CollectionTokenIDs, createEvent.Data.CollectionTokenIDs)
 	} else {
-		// don't have the create event for whatever reason, so treat all tokens as new
-		added = event.Data.CollectionTokenIDs
+		// don't have the create event, likely because the collection was created
+		// before the feed
+		isPreFeed = true
 	}
 
-	// only show if new tokens were added
-	if len(added) < 1 {
+	// only send if tokens added
+	if !isPreFeed && len(added) == 0 {
 		return nil, nil
 	}
 
@@ -284,6 +297,7 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 			CollectionID:          event.SubjectID,
 			CollectionTokenIDs:    event.Data.CollectionTokenIDs,
 			CollectionNewTokenIDs: added,
+			CollectionIsPreFeed:   isPreFeed,
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},

@@ -406,7 +406,7 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
 }
 
-func resolveFeedByUserID(ctx context.Context, userID persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+func resolveViewerFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	beforeToken, err := model.Cursor.DecodeToDBID(before)
 	if err != nil {
 		return nil, err
@@ -417,7 +417,7 @@ func resolveFeedByUserID(ctx context.Context, userID persist.DBID, before *strin
 		return nil, err
 	}
 
-	events, err := publicapi.For(ctx).Feed.GetFeedByUserID(ctx, userID, beforeToken, afterToken, first, last)
+	userID, events, err := publicapi.For(ctx).Feed.GetViewerFeed(ctx, beforeToken, afterToken, first, last)
 
 	if err != nil {
 		return nil, err
@@ -521,7 +521,7 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 
 	var cursor string
 
-	if feedConn.HelperFeedConnectionData.ByFirst {
+	if feedConn.ByFirst {
 		cursor = pageInfo.EndCursor
 	} else {
 		cursor = pageInfo.StartCursor
@@ -530,14 +530,14 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 	hasPage, err := publicapi.For(ctx).Feed.HasPage(
 		ctx,
 		cursor,
-		feedConn.HelperFeedConnectionData.UserId,
-		feedConn.HelperFeedConnectionData.ByFirst,
+		feedConn.UserId,
+		feedConn.ByFirst,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if feedConn.HelperFeedConnectionData.ByFirst {
+	if feedConn.ByFirst {
 		pageInfo.HasNextPage = hasPage
 	} else {
 		pageInfo.HasPreviousPage = hasPage
@@ -610,6 +610,10 @@ func eventToCollectionCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEven
 		Owner:      &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
 		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:     &event.Action,
+		NewTokens:  nil, // handled by dedicated resolver
+		HelperCollectionCreatedFeedEventDataData: model.HelperCollectionCreatedFeedEventDataData{
+			FeedEventId: event.ID,
+		},
 	}
 }
 
@@ -630,6 +634,7 @@ func eventToTokensAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.Fe
 		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
+		IsPreFeed:  util.BoolToPointer(event.Data.CollectionIsPreFeed),
 		HelperTokensAddedToCollectionFeedEventDataData: model.HelperTokensAddedToCollectionFeedEventDataData{
 			FeedEventId: event.ID,
 		},
@@ -893,9 +898,9 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 		return getHtmlMedia(ctx, med)
 	case persist.MediaTypeAnimation:
 		return getGltfMedia(ctx, med)
-	case persist.MediaTypeJSON, persist.MediaTypeBase64JSON:
+	case persist.MediaTypeJSON:
 		return getJsonMedia(ctx, med)
-	case persist.MediaTypeSVG, persist.MediaTypeText, persist.MediaTypeBase64SVG, persist.MediaTypeBase64Text:
+	case persist.MediaTypeSVG, persist.MediaTypeText, persist.MediaTypeBase64Text:
 		return getTextMedia(ctx, med)
 	default:
 		return getUnknownMedia(ctx, med)

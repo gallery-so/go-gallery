@@ -105,6 +105,7 @@ type ComplexityRoot struct {
 		Action     func(childComplexity int) int
 		Collection func(childComplexity int) int
 		EventTime  func(childComplexity int) int
+		NewTokens  func(childComplexity int) int
 		Owner      func(childComplexity int) int
 	}
 
@@ -381,7 +382,6 @@ type ComplexityRoot struct {
 		CollectionByID          func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
-		FeedByUserID            func(childComplexity int, id persist.DBID, before *string, after *string, first *int, last *int) int
 		FeedEventByID           func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners func(childComplexity int) int
 		GeneralAllowlist        func(childComplexity int) int
@@ -453,6 +453,7 @@ type ComplexityRoot struct {
 		Action     func(childComplexity int) int
 		Collection func(childComplexity int) int
 		EventTime  func(childComplexity int) int
+		IsPreFeed  func(childComplexity int) int
 		NewTokens  func(childComplexity int) int
 		Owner      func(childComplexity int) int
 	}
@@ -521,6 +522,7 @@ type ComplexityRoot struct {
 	}
 
 	Viewer struct {
+		Feed            func(childComplexity int, before *string, after *string, first *int, last *int) int
 		User            func(childComplexity int) int
 		ViewerGalleries func(childComplexity int) int
 	}
@@ -548,6 +550,7 @@ type CollectionCreatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.GalleryUser, error)
 
 	Collection(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.Collection, error)
+	NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error)
 }
 type CollectorsNoteAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error)
@@ -619,7 +622,6 @@ type QueryResolver interface {
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
-	FeedByUserID(ctx context.Context, id persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 }
@@ -651,6 +653,7 @@ type UserFollowedUsersFeedEventDataResolver interface {
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
+	Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 }
 type WalletResolver interface {
 	Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error)
@@ -822,6 +825,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionCreatedFeedEventData.EventTime(childComplexity), true
+
+	case "CollectionCreatedFeedEventData.newTokens":
+		if e.complexity.CollectionCreatedFeedEventData.NewTokens == nil {
+			break
+		}
+
+		return e.complexity.CollectionCreatedFeedEventData.NewTokens(childComplexity), true
 
 	case "CollectionCreatedFeedEventData.owner":
 		if e.complexity.CollectionCreatedFeedEventData.Owner == nil {
@@ -1931,18 +1941,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
-	case "Query.feedByUserId":
-		if e.complexity.Query.FeedByUserID == nil {
-			break
-		}
-
-		args, err := ec.field_Query_feedByUserId_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.FeedByUserID(childComplexity, args["id"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
-
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
 			break
@@ -2307,6 +2305,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokensAddedToCollectionFeedEventData.EventTime(childComplexity), true
 
+	case "TokensAddedToCollectionFeedEventData.isPreFeed":
+		if e.complexity.TokensAddedToCollectionFeedEventData.IsPreFeed == nil {
+			break
+		}
+
+		return e.complexity.TokensAddedToCollectionFeedEventData.IsPreFeed(childComplexity), true
+
 	case "TokensAddedToCollectionFeedEventData.newTokens":
 		if e.complexity.TokensAddedToCollectionFeedEventData.NewTokens == nil {
 			break
@@ -2509,6 +2514,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.VideoURLSet.Small(childComplexity), true
+
+	case "Viewer.feed":
+		if e.complexity.Viewer.Feed == nil {
+			break
+		}
+
+		args, err := ec.field_Viewer_feed_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Viewer.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Viewer.user":
 		if e.complexity.Viewer.User == nil {
@@ -2978,6 +2995,7 @@ type ViewerGallery {
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -3052,11 +3070,12 @@ type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
     newCollectorsNote: String
 }
 
-type CollectionCreatedFeedEventData implements FeedEventData {
+type CollectionCreatedFeedEventData implements FeedEventData @goEmbedHelper {
     eventTime: Time
     owner: GalleryUser @goField(forceResolver: true)
     action: Action
     collection: Collection @goField(forceResolver: true)
+    newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
 type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
@@ -3073,6 +3092,7 @@ type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelpe
     collection: Collection @goField(forceResolver: true)
     action: Action
     newTokens: [CollectionToken] @goField(forceResolver: true)
+    isPreFeed: Boolean
 }
 
 type ErrUnknownAction implements Error {
@@ -3123,7 +3143,6 @@ type Query {
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
     galleryOfTheWeekWinners: [GalleryUser!]
-    feedByUserId(id: DBID!, before: String, after: String, first: Int, last: Int): FeedConnection
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
 }
@@ -3829,57 +3848,6 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_feedByUserId_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["id"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["id"] = arg0
-	var arg1 *string
-	if tmp, ok := rawArgs["before"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
-		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["before"] = arg1
-	var arg2 *string
-	if tmp, ok := rawArgs["after"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
-		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["after"] = arg2
-	var arg3 *int
-	if tmp, ok := rawArgs["first"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
-		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["first"] = arg3
-	var arg4 *int
-	if tmp, ok := rawArgs["last"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
-		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["last"] = arg4
-	return args, nil
-}
-
 func (ec *executionContext) field_Query_feedEventById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -4009,6 +3977,48 @@ func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context,
 		}
 	}
 	args["username"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Viewer_feed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -4758,6 +4768,38 @@ func (ec *executionContext) _CollectionCreatedFeedEventData_collection(ctx conte
 	res := resTmp.(*model.Collection)
 	fc.Result = res
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionCreatedFeedEventData_newTokens(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionCreatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CollectionCreatedFeedEventData().NewTokens(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CollectionToken)
+	fc.Result = res
+	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CollectionLayout_columns(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
@@ -10158,45 +10200,6 @@ func (ec *executionContext) _Query_galleryOfTheWeekWinners(ctx context.Context, 
 	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_feedByUserId(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Query_feedByUserId_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().FeedByUserID(rctx, args["id"].(persist.DBID), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.FeedConnection)
-	fc.Result = res
-	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -11600,6 +11603,38 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData_newTokens(ctx 
 	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TokensAddedToCollectionFeedEventData_isPreFeed(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokensAddedToCollectionFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsPreFeed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -12526,6 +12561,45 @@ func (ec *executionContext) _Viewer_viewerGalleries(ctx context.Context, field g
 	res := resTmp.([]*model.ViewerGallery)
 	fc.Result = res
 	return ec.marshalOViewerGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Viewer_feed(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Viewer_feed_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Viewer().Feed(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedConnection)
+	fc.Result = res
+	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ViewerGallery_gallery(ctx context.Context, field graphql.CollectedField, obj *model.ViewerGallery) (ret graphql.Marshaler) {
@@ -16106,6 +16180,23 @@ func (ec *executionContext) _CollectionCreatedFeedEventData(ctx context.Context,
 				return innerFunc(ctx)
 
 			})
+		case "newTokens":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionCreatedFeedEventData_newTokens(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -18519,26 +18610,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
-		case "feedByUserId":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_feedByUserId(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
 		case "globalFeed":
 			field := field
 
@@ -19120,6 +19191,13 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData(ctx context.Co
 				return innerFunc(ctx)
 
 			})
+		case "isPreFeed":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokensAddedToCollectionFeedEventData_isPreFeed(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -19639,6 +19717,23 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Viewer_viewerGalleries(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "feed":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_feed(ctx, field, obj)
 				return res
 			}
 

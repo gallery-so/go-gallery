@@ -5,8 +5,10 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -18,11 +20,11 @@ func Init() {
 	initLogger()
 	initSentry()
 
-	router := coreInit()
+	router := coreInit(postgres.NewPgxClient())
 	http.Handle("/", router)
 }
 
-func coreInit() *gin.Engine {
+func coreInit(pgx *pgxpool.Pool) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	router := gin.Default()
@@ -32,7 +34,7 @@ func coreInit() *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	return handlersInit(router)
+	return handlersInit(router, pgx)
 }
 
 func setDefaults() {
