@@ -566,16 +566,6 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 	return output, err
 }
 
-func (r *queryResolver) FeedByUserID(ctx context.Context, id persist.DBID, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	feed, err := resolveFeedByUserID(ctx, id, before, after, first, last)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return feed, nil
-}
-
 func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	feed, err := resolveGlobalFeed(ctx, before, after, first, last)
 
