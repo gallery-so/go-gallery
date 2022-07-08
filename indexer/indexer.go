@@ -200,9 +200,11 @@ func (i *indexer) Start() {
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
 	for {
-		i.startNewBlocksPipeline(persist.BlockNumber(i.lastSyncedBlock), topics)
-		logrus.Infof("Finished processing set of new logs, waiting for new blocks again...")
+		timeAfterWait := <-time.After(time.Minute * 2)
+		i.startNewBlocksPipeline(topics)
+		logrus.Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
 	}
+
 }
 
 func (i *indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
@@ -222,7 +224,7 @@ func (i *indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 	}
 	logrus.Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
-func (i *indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]common.Hash) {
+func (i *indexer) startNewBlocksPipeline(topics [][]common.Hash) {
 	i.isListening = true
 	uris := make(chan tokenURI)
 	metadatas := make(chan tokenMetadata)
@@ -232,7 +234,7 @@ func (i *indexer) startNewBlocksPipeline(start persist.BlockNumber, topics [][]c
 	medias := make(chan tokenMedia)
 	transfers := make(chan []transfersAtBlock)
 	subscriptions := make(chan types.Log)
-	go i.subscribeNewLogs(start, transfers, subscriptions, topics)
+	go i.subscribeNewLogs(transfers, subscriptions, topics)
 	go i.processNewTransfers(transfers, uris, metadatas, owners, previousOwners, balances, medias)
 	i.processNewTokens(uris, metadatas, owners, previousOwners, balances, medias)
 }
@@ -434,30 +436,103 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 	return result
 }
 
-func (i *indexer) subscribeNewLogs(lastSyncedBlock persist.BlockNumber, transfers chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
+func (i *indexer) subscribeNewLogs(transfersChan chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
 
-	defer close(transfers)
+	defer close(transfersChan)
 
-	sub, err := i.ethClient.SubscribeFilterLogs(context.Background(), ethereum.FilterQuery{
-		FromBlock: lastSyncedBlock.BigInt().Sub(lastSyncedBlock.BigInt(), big.NewInt(50)),
-		Topics:    topics,
-	}, subscriptions)
+	mostRecentBlock, err := i.ethClient.BlockNumber(context.Background())
 	if err != nil {
-		panic(fmt.Sprintf("error subscribing to logs: %s", err))
+		panic(err)
 	}
-	for j := 0; j < 50; j++ {
-		select {
-		case log, ok := <-subscriptions:
-			if !ok {
-				return
-			}
-			i.lastSyncedBlock = log.BlockNumber
-			ts := logsToTransfers([]types.Log{log}, i.ethClient)
-			transfers <- transfersToTransfersAtBlock(ts)
-		case err := <-sub.Err():
-			panic(fmt.Sprintf("error in log subscription: %s", err))
-		}
+
+	logrus.Infof("Subscribing to new logs from block %d starting with block %d", mostRecentBlock, i.lastSyncedBlock)
+
+	wp := workerpool.New(10)
+	for j := i.lastSyncedBlock; j <= mostRecentBlock; j += blocksPerLogsCall {
+		wp.Submit(
+			func() {
+				curBlock := j
+				nextBlock := curBlock + blocksPerLogsCall
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+				defer cancel()
+
+				var logsTo []types.Log
+				reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
+				if err == nil {
+					defer reader.Close()
+					err = json.NewDecoder(reader).Decode(&logsTo)
+					if err != nil {
+						panic(err)
+					}
+				}
+				if len(logsTo) > 0 {
+					lastLog := logsTo[len(logsTo)-1]
+					if nextBlock-lastLog.BlockNumber > (blocksPerLogsCall / 5) {
+						logsTo = []types.Log{}
+					}
+				}
+				if len(logsTo) == 0 {
+
+					logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+						FromBlock: persist.BlockNumber(j).BigInt(),
+						ToBlock:   persist.BlockNumber(j + blocksPerLogsCall).BigInt(),
+						Topics:    topics,
+					})
+					if err != nil {
+						ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+						defer cancel()
+						storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-%d-%d", i.lastSyncedBlock, mostRecentBlock)).NewWriter(ctx)
+						defer storageWriter.Close()
+						errData := map[string]interface{}{
+							"from": curBlock,
+							"to":   nextBlock,
+							"err":  err.Error(),
+						}
+						logrus.Error(errData)
+						err = json.NewEncoder(storageWriter).Encode(errData)
+						if err != nil {
+							panic(err)
+						}
+						return
+					}
+
+					obj := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock))
+					obj.Delete(ctx)
+					storageWriter := obj.NewWriter(ctx)
+					defer storageWriter.Close()
+
+					if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
+						panic(err)
+					}
+				}
+				logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock)
+
+				transfers := logsToTransfers(logsTo, i.ethClient)
+
+				logrus.Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
+
+				transfersAtBlocks := transfersToTransfersAtBlock(transfers)
+
+				if len(transfersAtBlocks) > 0 && transfersAtBlocks != nil {
+					logrus.Debugf("Sending %d total transfers to transfers channel", len(transfers))
+					interval := len(transfersAtBlocks) / 4
+					if interval == 0 {
+						interval = 1
+					}
+					for j := 0; j < len(transfersAtBlocks); j += interval {
+						to := j + interval
+						if to > len(transfersAtBlocks) {
+							to = len(transfersAtBlocks)
+						}
+						transfersChan <- transfersAtBlocks[j:to]
+					}
+				}
+			})
 	}
+	wp.StopWait()
+	logrus.Infof("Processed logs from %d to %d.", i.lastSyncedBlock, mostRecentBlock)
+	// to ensure the most recent block is always an increment of blocksPerLogsCall, set lastSyncedBlock to the most recent increment of 50 less than curBlock
+	i.lastSyncedBlock = mostRecentBlock - (mostRecentBlock % blocksPerLogsCall) - blocksPerLogsCall
 }
 
 // TRANSFERS FUNCS -------------------------------------------------------------

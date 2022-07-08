@@ -23,7 +23,8 @@ func main() {
 
 	p := postgres.NewClient()
 
-	rows, err := p.Query(`SELECT
+	for {
+		rows, err := p.Query(`SELECT
     token_id, contract_address
 FROM
     tokens
@@ -31,46 +32,53 @@ WHERE TOKEN_TYPE = 'ERC-721' AND DELETED = false
 GROUP BY
     contract_address, token_id
 HAVING 
-    COUNT(*) > 1 LIMIT 10000;`)
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	receivedTokenIdentifiers := make(chan tid)
-
-	go func() {
-		defer wg.Done()
-		wp := workerpool.New(50)
-		for t := range receivedTokenIdentifiers {
-			token := t
-			wp.Submit(func() {
-				fmt.Printf("%s %s\n", token.tokenID, token.contractAddress)
-
-				findAndMergeInaccurateDupes(p, token.tokenID, token.contractAddress)
-
-				fmt.Printf("done %s %s\n", token.tokenID, token.contractAddress)
-			})
-		}
-		wp.StopWait()
-	}()
-
-	for rows.Next() {
-		var tokenID, contractAddress string
-
-		err := rows.Scan(&tokenID, &contractAddress)
+    COUNT(*) > 1 LIMIT 1000;`)
 		if err != nil {
 			panic(err)
 		}
-		receivedTokenIdentifiers <- tid{tokenID, contractAddress}
+		defer rows.Close()
+
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		receivedTokenIdentifiers := make(chan tid)
+
+		go func() {
+			defer wg.Done()
+			wp := workerpool.New(50)
+			for t := range receivedTokenIdentifiers {
+				token := t
+				wp.Submit(func() {
+					fmt.Printf("%s %s\n", token.tokenID, token.contractAddress)
+
+					findAndMergeInaccurateDupes(p, token.tokenID, token.contractAddress)
+
+					fmt.Printf("done %s %s\n", token.tokenID, token.contractAddress)
+				})
+			}
+			wp.StopWait()
+		}()
+
+		i := 0
+		for ; rows.Next(); i++ {
+			var tokenID, contractAddress string
+
+			err := rows.Scan(&tokenID, &contractAddress)
+			if err != nil {
+				panic(err)
+			}
+			receivedTokenIdentifiers <- tid{tokenID, contractAddress}
+		}
+
+		if i == 0 {
+			break
+		}
+
+		close(receivedTokenIdentifiers)
+
+		wg.Wait()
 	}
 
-	close(receivedTokenIdentifiers)
-
-	wg.Wait()
-
+	fmt.Println("done")
 }
 
 type mergeData struct {

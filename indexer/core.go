@@ -3,13 +3,16 @@ package indexer
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
@@ -94,7 +97,7 @@ func coreInitServer() *gin.Engine {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
+	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, newThrottler())
 }
 
 func setDefaults() {
@@ -120,4 +123,8 @@ func setDefaults() {
 func newRepos() (persist.TokenRepository, persist.ContractRepository) {
 	pgClient := postgres.NewClient()
 	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
+}
+
+func newThrottler() *throttle.Locker {
+	return throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleDB), time.Minute*5)
 }

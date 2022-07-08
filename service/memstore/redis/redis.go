@@ -3,19 +3,23 @@ package redis
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/tracing"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/memstore"
+	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/viper"
 )
 
 const (
-	GalleriesDB      = 0
-	GalleriesTokenDB = 1
-	CommunitiesDB    = 2
-	RequireNftsDB    = 3
-	TestSuiteDB      = 5
+	GalleriesDB             = 0
+	GalleriesTokenDB        = 1
+	CommunitiesDB           = 2
+	RequireNftsDB           = 3
+	TestSuiteDB             = 5
+	IndexerServerThrottleDB = 6
+	RefreshNFTsThrottleDB   = 7
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.
@@ -82,7 +86,14 @@ func (c *Cache) Set(pCtx context.Context, key string, value []byte, expiration t
 
 // Get gets a value from the redis cache
 func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
-	return c.client.Get(pCtx, key).Bytes()
+	bs, err := c.client.Get(pCtx, key).Bytes()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, memstore.ErrKeyNotFound{Key: key}
+		}
+		return nil, err
+	}
+	return bs, nil
 }
 
 // Delete deletes a value from the redis cache
