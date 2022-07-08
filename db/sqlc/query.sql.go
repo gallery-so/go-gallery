@@ -92,6 +92,42 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 	return i, err
 }
 
+const createFeedEventNoOwner = `-- name: CreateFeedEventNoOwner :one
+INSERT INTO feed_events (id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at
+`
+
+type CreateFeedEventNoOwnerParams struct {
+	ID        persist.DBID
+	Action    persist.Action
+	Data      persist.FeedEventData
+	EventTime time.Time
+	EventIds  persist.DBIDList
+}
+
+func (q *Queries) CreateFeedEventNoOwner(ctx context.Context, arg CreateFeedEventNoOwnerParams) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, createFeedEventNoOwner,
+		arg.ID,
+		arg.Action,
+		arg.Data,
+		arg.EventTime,
+		arg.EventIds,
+	)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createTokenEvent = `-- name: CreateTokenEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -1011,10 +1047,7 @@ SELECT
         WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
         LIMIT 1)
-
-        -- Can UNION ALL because a user can't follow themselves
         UNION ALL
-
         (SELECT 1
         FROM feed_events
         WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
@@ -1029,10 +1062,7 @@ SELECT
         WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
         LIMIT 1)
-
-        -- Can UNION ALL because a user can't follow themselves
         UNION ALL
-
         (SELECT 1
         FROM feed_events
         WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)

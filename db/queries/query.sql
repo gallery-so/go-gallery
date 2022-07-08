@@ -248,10 +248,7 @@ WITH cursors AS (
     AND event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
     AND fe.deleted = false AND fl.deleted = false
-
-    -- Can UNION ALL because a user can't follow themselves
     UNION ALL
-
     SELECT id FROM feed_events
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
@@ -278,10 +275,7 @@ SELECT
         WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
         LIMIT 1)
-
-        -- Can UNION ALL because a user can't follow themselves
         UNION ALL
-
         (SELECT 1
         FROM feed_events
         WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
@@ -296,10 +290,7 @@ SELECT
         WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
         LIMIT 1)
-
-        -- Can UNION ALL because a user can't follow themselves
         UNION ALL
-
         (SELECT 1
         FROM feed_events
         WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
@@ -314,6 +305,9 @@ SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
 -- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: CreateFeedEventNoOwner :one
+INSERT INTO feed_events (id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: GetLastFeedEvent :one
 SELECT * FROM feed_events

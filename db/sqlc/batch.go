@@ -1164,10 +1164,7 @@ WITH cursors AS (
     AND event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
     AND fe.deleted = false AND fl.deleted = false
-
-    -- Can UNION ALL because a user can't follow themselves
     UNION ALL
-
     SELECT id FROM feed_events
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)

@@ -604,8 +604,11 @@ func eventToUserFollowedByUsersFeedEventData(event *sqlc.FeedEvent) model.FeedEv
 	}
 
 	return model.UserFollowedByUsersFeedEventData{
-		EventTime:  &event.EventTime,
-		Owner:      &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
+		EventTime: &event.EventTime,
+		Owner:     nil, // no owner for this event type
+		UserFollowed: &model.GalleryUser{
+			Dbid: event.Data.UserFollowedIDs[0], // remaining fields handled by dedicated resolver
+		},
 		Action:     &event.Action,
 		FollowedBy: followedBy,
 	}

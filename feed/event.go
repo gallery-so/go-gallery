@@ -156,7 +156,7 @@ func (b *EventBuilder) createrUserFollowedByUsersEvent(ctx context.Context, even
 
 	for _, event := range events {
 		if !event.Data.UserRefollowed {
-			followerIDs = append(followerIDs, event.SubjectID)
+			followerIDs = append(followerIDs, event.ActorID)
 			followedBack = append(followedBack, event.Data.UserFollowedBack)
 			eventIDs = append(eventIDs, event.ID)
 		}
@@ -167,12 +167,12 @@ func (b *EventBuilder) createrUserFollowedByUsersEvent(ctx context.Context, even
 	}
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
-		ID:      persist.GenerateID(),
-		OwnerID: event.SubjectID,
-		Action:  persist.ActionUserFollowedByUsers,
+		ID:     persist.GenerateID(),
+		Action: persist.ActionUserFollowedByUsers,
 		Data: persist.FeedEventData{
 			UserFollowerIDs:  followerIDs,
 			UserFollowedBack: followedBack,
+			UserFollowedIDs:  []persist.DBID{event.SubjectID},
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  eventIDs,

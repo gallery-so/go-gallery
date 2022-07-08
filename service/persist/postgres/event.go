@@ -97,7 +97,7 @@ func (r *EventRepository) EventsInWindowForActor(ctx context.Context, eventID pe
 }
 
 // EventsInWindowForSubject returns events with the same subject and action that belong to the same window of activity as the given eventID
-// irregardless of the actor.
+// regardless of the actor.
 func (r *EventRepository) EventsInWindowForSubject(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
 	return r.Queries.GetEventsInWindowForSubject(ctx, sqlc.GetEventsInWindowForSubjectParams{
 		ID:   eventID,

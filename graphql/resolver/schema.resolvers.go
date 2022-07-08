@@ -641,8 +641,8 @@ func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *userFollowedByUsersFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserFollowedByUsersFeedEventData) (*model.GalleryUser, error) {
-	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
+func (r *userFollowedByUsersFeedEventDataResolver) UserFollowed(ctx context.Context, obj *model.UserFollowedByUsersFeedEventData) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.UserFollowed.Dbid)
 }
 
 func (r *userFollowedUsersFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserFollowedUsersFeedEventData) (*model.GalleryUser, error) {

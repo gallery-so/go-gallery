@@ -1,0 +1,1 @@
+ALTER TABLE feed_events ALTER COLUMN owner_id DROP NOT NULL;

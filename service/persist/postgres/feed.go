@@ -15,6 +15,17 @@ type FeedRepository struct {
 }
 
 func (r *FeedRepository) Add(ctx context.Context, event sqlc.FeedEvent) (*sqlc.FeedEvent, error) {
+	if event.OwnerID == "" {
+		evt, err := r.Queries.CreateFeedEventNoOwner(ctx, sqlc.CreateFeedEventNoOwnerParams{
+			ID:        persist.GenerateID(),
+			Action:    event.Action,
+			Data:      event.Data,
+			EventTime: event.EventTime,
+			EventIds:  event.EventIds,
+		})
+		return &evt, err
+	}
+
 	evt, err := r.Queries.CreateFeedEvent(ctx, sqlc.CreateFeedEventParams{
 		ID:        persist.GenerateID(),
 		OwnerID:   event.OwnerID,
