@@ -35,6 +35,7 @@ type TokenRepository struct {
 	upsertStmt                              *sql.Stmt
 	deleteBalanceZeroStmt                   *sql.Stmt
 	deleteStmt                              *sql.Stmt
+	deleteByIDStmt                          *sql.Stmt
 }
 
 // NewTokenRepository creates a new TokenRepository
@@ -102,6 +103,9 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
 	checkNoErr(err)
 
+	deleteByIDStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE ID = $1;`)
+	checkNoErr(err)
+
 	return &TokenRepository{
 		db:                                      db,
 		createStmt:                              createStmt,
@@ -124,6 +128,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		deleteStmt:                              deleteStmt,
 		getByTokenIDStmt:                        getByTokenIDStmt,
 		getByTokenIDPaginateStmt:                getByTokenIDPaginateStmt,
+		deleteByIDStmt:                          deleteByIDStmt,
 	}
 
 }
@@ -331,25 +336,24 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		return nil
 	}
 
-	owners := map[string]bool{}
+	pTokens = t.dedupTokens(pTokens)
+
+	erc1155Tokens := make([]persist.Token, 0, len(pTokens))
+	erc721Tokens := make([]persist.Token, 0, len(pTokens))
+
 	for _, token := range pTokens {
-		owners[token.OwnerAddress.String()] = true
-		if token.TokenType != persist.TokenTypeERC721 {
-			continue
-		}
-		for _, ownership := range token.OwnershipHistory {
-			if !owners[ownership.Address.String()] {
-				logger.For(pCtx).Debugf("Deleting ownership history for %s for token %s", ownership.Address.String(), persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
-				if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, ownership.Address); err != nil {
-					return err
-				}
-				owners[ownership.Address.String()] = true
-			}
+		switch token.TokenType {
+		case persist.TokenTypeERC721:
+			erc721Tokens = append(erc721Tokens, token)
+		case persist.TokenTypeERC1155:
+			erc1155Tokens = append(erc1155Tokens, token)
+		default:
+			return fmt.Errorf("unknown token type: %s", token.TokenType)
 		}
 	}
 
 	logger.For(pCtx).Infof("Checking 0 quantities for tokens...")
-	for i, token := range pTokens {
+	for i, token := range erc1155Tokens {
 		if token.Quantity == "" || token.Quantity == "0" {
 			logger.For(pCtx).Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
@@ -363,10 +367,28 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 	}
 
-	if len(pTokens) == 0 {
-		return nil
+	errChan := make(chan error)
+	go func() {
+		if err := t.upsertERC1155Tokens(pCtx, erc1155Tokens); err != nil {
+			logger.For(pCtx).Errorf("Error upserting ERC1155 tokens: %s", err)
+		}
+	}()
+	go func() {
+		if err := t.upsertERC721Tokens(pCtx, erc721Tokens); err != nil {
+			logger.For(pCtx).Errorf("Error upserting ERC721 tokens: %s", err)
+		}
+	}()
+	for i := 0; i < 2; i++ {
+		if err := <-errChan; err != nil {
+			return err
+		}
 	}
 
+	return nil
+
+}
+
+func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []persist.Token) error {
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
@@ -377,13 +399,11 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		logger.For(pCtx).Debugf("Chunking %d tokens recursively into %d queries", len(pTokens), len(pTokens)/rowsPerQuery)
 		next := pTokens[rowsPerQuery:]
 		current := pTokens[:rowsPerQuery]
-		if err := t.BulkUpsert(pCtx, next); err != nil {
+		if err := t.upsertERC1155Tokens(pCtx, next); err != nil {
 			return err
 		}
 		pTokens = current
 	}
-
-	pTokens = t.dedupTokens(pTokens)
 
 	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
 	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
@@ -394,16 +414,50 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER`
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) WHERE TOKEN_TYPE = 'ERC-721' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER;`
 
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		logger.For(pCtx).Debugf("SQL: %s", sqlStr)
 		return fmt.Errorf("failed to upsert tokens: %w", err)
 	}
-
 	return nil
+}
 
+func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []persist.Token) error {
+	// Postgres only allows 65535 parameters at a time.
+	// TODO: Consider trying this implementation at some point instead of chunking:
+	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
+	paramsPerRow := 18
+	rowsPerQuery := 65535 / paramsPerRow
+
+	if len(pTokens) > rowsPerQuery {
+		logger.For(pCtx).Debugf("Chunking %d tokens recursively into %d queries", len(pTokens), len(pTokens)/rowsPerQuery)
+		next := pTokens[rowsPerQuery:]
+		current := pTokens[:rowsPerQuery]
+		if err := t.upsertERC1155Tokens(pCtx, next); err != nil {
+			return err
+		}
+		pTokens = current
+	}
+
+	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES `
+	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
+	for i, token := range pTokens {
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
+		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated)
+	}
+
+	sqlStr = sqlStr[:len(sqlStr)-1]
+
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER;`
+
+	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
+	if err != nil {
+		logger.For(pCtx).Debugf("SQL: %s", sqlStr)
+		return fmt.Errorf("failed to upsert tokens: %w", err)
+	}
+	return nil
 }
 
 // Upsert upserts a token by its token ID and contract address and if its token type is ERC-1155 it also upserts using the owner address
@@ -490,6 +544,11 @@ func (t *TokenRepository) Count(pCtx context.Context, pTokenType persist.TokenCo
 		return 0, err
 	}
 	return count, nil
+}
+
+func (t *TokenRepository) DeleteByID(pCtx context.Context, pID persist.DBID) error {
+	_, err := t.deleteByIDStmt.ExecContext(pCtx, pID)
+	return err
 }
 
 func (t *TokenRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.EthereumAddress) error {

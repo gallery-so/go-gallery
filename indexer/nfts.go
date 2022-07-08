@@ -16,7 +16,9 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -476,12 +478,11 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 		}
 		token := tokens[0]
 
-		owner, balance, block, err := getOwnershipUpdate(c, token, ethClient, input.OwnerAddress)
+		newOwner, newQuantity, newBlock, err := getOwnershipUpdate(c, token, ethClient)
 		if err != nil {
 			return err
 		}
-
-		err = updateOwnershipStatus(c, tokenRepository, token.ID, token.TokenType, owner, token.OwnerAddress, balance, token.Quantity, block)
+		err = updateOwnershipStatus(c, tokenRepository, token.ID, token.TokenType, newOwner, token.OwnerAddress, newQuantity, token.Quantity, newBlock)
 		if err != nil {
 			return err
 		}
@@ -538,8 +539,15 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 		case update := <-tokenUpdateChan:
 			if err := tokenRepository.UpdateByID(c, update.TokenDBID, update.Update); err != nil {
 				logrus.WithError(err).Error("failed to update token in database")
+				if perr, ok := err.(*pq.Error); ok {
+					// if the error is a violation of unique constraint we should delete the token
+					if perr.Code == "23505" {
+						return tokenRepository.DeleteByID(c, update.TokenDBID)
+					}
+				}
 				return err
 			}
+
 		case err := <-errChan:
 			if err != nil {
 				logrus.WithError(err).Error("failed to update media for token")
@@ -555,18 +563,30 @@ func updateOwnershipStatus(ctx context.Context, tokenRepository persist.TokenRep
 		if strings.EqualFold(curBalance.String(), supposedBalance.String()) {
 			return nil
 		}
+		logger.For(ctx).Infof("balance status for token %s is incorrect: real %s -  before %s", tokenDBID, curBalance, supposedBalance)
 		return tokenRepository.UpdateByID(ctx, tokenDBID, persist.TokenUpdateBalanceInput{Quantity: curBalance, BlockNumber: block})
 	case persist.TokenTypeERC721:
 		if strings.EqualFold(curOwner.String(), supposedOwner.String()) {
 			return nil
 		}
-		return tokenRepository.UpdateByID(ctx, tokenDBID, persist.TokenUpdateOwnerInput{OwnerAddress: curOwner, BlockNumber: block})
+		logger.For(ctx).Infof("ownership status for token %s is incorrect: real %s -  before %s", tokenDBID, curOwner, supposedOwner)
+		err := tokenRepository.UpdateByID(ctx, tokenDBID, persist.TokenUpdateOwnerInput{OwnerAddress: curOwner, BlockNumber: block})
+		if err != nil {
+			if perr, ok := err.(*pq.Error); ok {
+				// if the error is a violation of unique constraint we should delete the token
+				if perr.Code == "23505" {
+					return tokenRepository.DeleteByID(ctx, tokenDBID)
+				}
+			}
+			return err
+		}
+		return nil
 	default:
 		return fmt.Errorf("unsupported token type: %s", tokenType)
 	}
 }
 
-func getOwnershipUpdate(ctx context.Context, token persist.Token, ethClient *ethclient.Client, ownerAddress persist.EthereumAddress) (persist.EthereumAddress, persist.HexString, persist.BlockNumber, error) {
+func getOwnershipUpdate(ctx context.Context, token persist.Token, ethClient *ethclient.Client) (persist.EthereumAddress, persist.HexString, persist.BlockNumber, error) {
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		return "", "", 0, err
@@ -581,25 +601,24 @@ func getOwnershipUpdate(ctx context.Context, token persist.Token, ethClient *eth
 		if err != nil {
 			return "", "", 0, err
 		}
-		if strings.EqualFold(owner.String(), ownerAddress.String()) {
-			return persist.EthereumAddress(owner.String()), token.Quantity, persist.BlockNumber(block), nil
-		}
+
+		return persist.EthereumAddress(owner.String()), token.Quantity, persist.BlockNumber(block), nil
 	case persist.TokenTypeERC1155:
+		if token.OwnerAddress == "" {
+			return token.OwnerAddress, token.Quantity, persist.BlockNumber(block), nil
+		}
 		erc1155, err := contracts.NewIERC1155Caller(token.ContractAddress.Address(), ethClient)
 		if err != nil {
 			return "", "", 0, err
 		}
-		bal, err := erc1155.BalanceOf(&bind.CallOpts{Context: ctx}, ownerAddress.Address(), token.TokenID.BigInt())
+		bal, err := erc1155.BalanceOf(&bind.CallOpts{Context: ctx}, token.OwnerAddress.Address(), token.TokenID.BigInt())
 		if err != nil {
 			return "", "", 0, err
 		}
-		if bal.Cmp(big.NewInt(0)) > 0 {
-			return token.OwnerAddress, "0", persist.BlockNumber(block), nil
-		}
+		return token.OwnerAddress, persist.HexString(bal.Text(16)), persist.BlockNumber(block), nil
 	default:
 		return "", "", 0, fmt.Errorf("unsupported token type %s", token.TokenType)
 	}
-	return ownerAddress, token.Quantity, persist.BlockNumber(block), nil
 }
 
 // updateMediaForTokens will return two channels that will collectively receive the length of the tokens passed in
@@ -633,7 +652,7 @@ func updateOwnershipForTokens(c context.Context, tokenUpdateChan chan<- tokenUpd
 		token := t
 		wp.Submit(func() {
 
-			owner, balance, block, err := getOwnershipUpdate(c, token, ethClient, token.OwnerAddress)
+			owner, balance, block, err := getOwnershipUpdate(c, token, ethClient)
 			if err != nil {
 				errChan <- err
 				return
@@ -641,11 +660,19 @@ func updateOwnershipForTokens(c context.Context, tokenUpdateChan chan<- tokenUpd
 
 			switch token.TokenType {
 			case persist.TokenTypeERC1155:
+				if strings.EqualFold(token.Quantity.String(), balance.String()) {
+					errChan <- nil
+					return
+				}
 				updateChan <- tokenUpdate{TokenDBID: token.ID, Update: persist.TokenUpdateBalanceInput{
 					Quantity:    balance,
 					BlockNumber: block,
 				}}
 			case persist.TokenTypeERC721:
+				if strings.EqualFold(token.OwnerAddress.String(), owner.String()) {
+					errChan <- nil
+					return
+				}
 				updateChan <- tokenUpdate{TokenDBID: token.ID, Update: persist.TokenUpdateOwnerInput{
 					OwnerAddress: owner,
 					BlockNumber:  block,
