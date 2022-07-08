@@ -105,11 +105,45 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 
 	if debugtools.Enabled {
 		if viper.GetString("ENV") == "local" && m.Debug != nil {
-			userID := persist.DBID("")
-			if m.Debug.UserID != nil {
-				userID = *m.Debug.UserID
+
+			if m.Debug.AsUsername == nil {
+				if m.Debug.ChainAddresses == nil {
+					return nil, fmt.Errorf("debug auth failed: either asUsername or chainAddresses must be specified")
+				}
+
+				userID := persist.DBID("")
+				if m.Debug.UserID != nil {
+					userID = *m.Debug.UserID
+				}
+
+				return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(m.Debug.ChainAddresses)), nil
 			}
-			return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(m.Debug.ChainAddresses)), nil
+
+			if m.Debug.UserID != nil || m.Debug.ChainAddresses != nil {
+				return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be used in conjunction with userId or chainAddresses parameters")
+			}
+
+			username := *m.Debug.AsUsername
+			if username == "" {
+				return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be empty")
+			}
+
+			user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+			if err != nil {
+				return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
+			}
+
+			wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, user.ID)
+			if err != nil {
+				return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
+			}
+
+			var addresses []persist.ChainAddress
+			for _, wallet := range wallets {
+				addresses = append(addresses, persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)))
+			}
+
+			return debugtools.NewDebugAuthenticator(user.ID, addresses), nil
 		}
 	}
 

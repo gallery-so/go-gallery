@@ -732,11 +732,23 @@ input EoaAuth {
     signature: String! @scrub
 }
 
-# DebugAuth always succeeds and returns the supplied userId and addresses.
-# Only available for local development.
+# DebugAuth is a local-only authentication mechanism for testing and debugging.
+# It creates an authenticator that will return the supplied userId and chainAddresses as if they had been
+# successfully authenticated. For existing users, the asUsername parameter may be supplied as a convenience
+# method to look up and return their userId and chainAddresses.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
+    # Convenience method to authenticate as an existing user.
+    # Cannot be used in conjunction with the userId and chainAddresses parameters.
+    asUsername: String
+
+    # The userId that will be returned from the resulting authenticator.
+    # May be omitted or blank to indicate that there is no user associated with the supplied chainAddresses.
+    # Cannot be used in conjunction with the asUsername parameter.
     userId: DBID
-    chainAddresses:[ChainAddressInput!]!
+
+    # The chainAddresses that will be returned from the resulting authenticator.
+    # Cannot be used in conjunction with the asUsername parameter.
+    chainAddresses:[ChainAddressInput!]
 }
 
 input GnosisSafeAuth {
