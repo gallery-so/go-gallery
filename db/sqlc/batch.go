@@ -1177,7 +1177,8 @@ WITH cursors AS (
         ELSE 0 END pos
     FROM edges
 )
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges)
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+    WHERE id = ANY(SELECT id FROM edges)
     ORDER BY event_time ASC
     LIMIT $2 OFFSET (SELECT pos FROM offsets)
 `
