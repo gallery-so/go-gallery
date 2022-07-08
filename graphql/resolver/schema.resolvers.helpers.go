@@ -99,6 +99,10 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 }
 
 func createDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
+	if !debugtools.Enabled || viper.GetString("ENV") != "local" {
+		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
+	}
+
 	if debugParams.AsUsername == nil {
 		if debugParams.ChainAddresses == nil {
 			return nil, fmt.Errorf("debug auth failed: either asUsername or chainAddresses must be specified")
