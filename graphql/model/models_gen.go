@@ -382,6 +382,7 @@ func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsRefreshTokenPayloadOrError()             {}
 func (ErrInvalidInput) IsRefreshContractPayloadOrError()          {}
 func (ErrInvalidInput) IsError()                                  {}
+func (ErrInvalidInput) IsCreateUserPayloadOrError()               {}
 func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
 func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
 
@@ -447,9 +448,8 @@ type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserAlreadyExists) IsUpdateUserInfoPayloadOrError() {}
-func (ErrUserAlreadyExists) IsError()                        {}
-func (ErrUserAlreadyExists) IsCreateUserPayloadOrError()     {}
+func (ErrUserAlreadyExists) IsError()                    {}
+func (ErrUserAlreadyExists) IsCreateUserPayloadOrError() {}
 
 type ErrUserNotFound struct {
 	Message string `json:"message"`
@@ -461,6 +461,14 @@ func (ErrUserNotFound) IsError()                      {}
 func (ErrUserNotFound) IsLoginPayloadOrError()        {}
 func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
 func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
+
+type ErrUsernameNotAvailable struct {
+	Message string `json:"message"`
+}
+
+func (ErrUsernameNotAvailable) IsUpdateUserInfoPayloadOrError() {}
+func (ErrUsernameNotAvailable) IsError()                        {}
+func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
 
 type FeedConnection struct {
 	HelperFeedConnectionData

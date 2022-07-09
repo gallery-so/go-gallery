@@ -44,7 +44,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, WALLETS) VALUES ($1, $2) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, WALLETS) VALUES ($1, $2, $3, $4) RETURNING ID;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
@@ -133,7 +133,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 			}
 		} else {
 			if aUser.ID != "" && aUser.ID != pID {
-				return persist.ErrUserAlreadyExists{Username: update.Username.String()}
+				return persist.ErrUsernameNotAvailable{Username: update.Username.String()}
 			}
 		}
 
@@ -161,7 +161,18 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	var walletID persist.DBID
 	var id persist.DBID
 
-	_, err := u.createWalletStmt.ExecContext(pCtx, persist.GenerateID(), pUser.ChainAddress.Address(), pUser.ChainAddress.Chain(), pUser.WalletType)
+	// TODO: Wrap all of this in a transaction
+	_, err := u.GetByUsername(pCtx, pUser.Username)
+	if err == nil {
+		return "", persist.ErrUsernameNotAvailable{Username: pUser.Username}
+	}
+
+	var notFoundErr persist.ErrUserNotFound
+	if !errors.As(err, &notFoundErr) {
+		return "", err
+	}
+
+	_, err = u.createWalletStmt.ExecContext(pCtx, persist.GenerateID(), pUser.ChainAddress.Address(), pUser.ChainAddress.Chain(), pUser.WalletType)
 	if err != nil {
 		return "", fmt.Errorf("failed to create wallet: %w", err)
 	}
@@ -170,7 +181,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		return "", err
 	}
 
-	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), []persist.DBID{walletID}).Scan(&id)
+	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), []persist.DBID{walletID}).Scan(&id)
 	if err != nil {
 		return "", err
 	}

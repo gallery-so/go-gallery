@@ -407,13 +407,13 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persis
 	return output, nil
 }
 
-func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error) {
+func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string) (model.CreateUserPayloadOrError, error) {
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
 
-	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator)
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, username)
 	if err != nil {
 		return nil, err
 	}

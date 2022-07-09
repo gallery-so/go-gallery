@@ -235,6 +235,10 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrUsernameNotAvailable struct {
+		Message func(childComplexity int) int
+	}
+
 	FeedConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
@@ -337,7 +341,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddUserWallet            func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
-		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism) int
+		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism, username string) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
 		FollowUser               func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce             func(childComplexity int, chainAddress persist.ChainAddress) int
@@ -601,7 +605,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
-	CreateUser(ctx context.Context, authMechanism model.AuthMechanism) (model.CreateUserPayloadOrError, error)
+	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
@@ -1218,6 +1222,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrUserNotFound.Message(childComplexity), true
 
+	case "ErrUsernameNotAvailable.message":
+		if e.complexity.ErrUsernameNotAvailable.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrUsernameNotAvailable.Message(childComplexity), true
+
 	case "FeedConnection.edges":
 		if e.complexity.FeedConnection.Edges == nil {
 			break
@@ -1630,7 +1641,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism)), true
+		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["username"].(string)), true
 
 	case "Mutation.deleteCollection":
 		if e.complexity.Mutation.DeleteCollection == nil {
@@ -3283,8 +3294,8 @@ input UpdateUserInfoInput {
 union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
     | ErrNotAuthorized
+    | ErrUsernameNotAvailable
     | ErrInvalidInput
-    | ErrUserAlreadyExists
 
 type UpdateUserInfoPayload {
     viewer: Viewer
@@ -3329,6 +3340,10 @@ type ErrAuthenticationFailed implements Error {
 }
 
 type ErrUserAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrUsernameNotAvailable implements Error {
     message: String!
 }
 
@@ -3418,9 +3433,11 @@ type LogoutPayload {
 
 union CreateUserPayloadOrError =
     CreateUserPayload
-    | ErrUserAlreadyExists
     | ErrAuthenticationFailed
     | ErrDoesNotOwnRequiredToken
+    | ErrUserAlreadyExists
+    | ErrUsernameNotAvailable
+    | ErrInvalidInput
 
 type CreateUserPayload {
     userId: DBID
@@ -3476,7 +3493,7 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
@@ -3557,6 +3574,15 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 		}
 	}
 	args["authMechanism"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["username"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["username"] = arg1
 	return args, nil
 }
 
@@ -6596,6 +6622,41 @@ func (ec *executionContext) _ErrUserNotFound_message(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ErrUsernameNotAvailable_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrUsernameNotAvailable) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrUsernameNotAvailable",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _FeedConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedConnection) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -9138,7 +9199,7 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism))
+		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism), args["username"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -14759,13 +14820,6 @@ func (ec *executionContext) _CreateUserPayloadOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._CreateUserPayload(ctx, sel, obj)
-	case model.ErrUserAlreadyExists:
-		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
-	case *model.ErrUserAlreadyExists:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrUserAlreadyExists(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -14780,6 +14834,27 @@ func (ec *executionContext) _CreateUserPayloadOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
+	case model.ErrUserAlreadyExists:
+		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
+	case *model.ErrUserAlreadyExists:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserAlreadyExists(ctx, sel, obj)
+	case model.ErrUsernameNotAvailable:
+		return ec._ErrUsernameNotAvailable(ctx, sel, &obj)
+	case *model.ErrUsernameNotAvailable:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUsernameNotAvailable(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -14868,6 +14943,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrUserAlreadyExists(ctx, sel, obj)
+	case model.ErrUsernameNotAvailable:
+		return ec._ErrUsernameNotAvailable(ctx, sel, &obj)
+	case *model.ErrUsernameNotAvailable:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUsernameNotAvailable(ctx, sel, obj)
 	case model.ErrAddressOwnedByUser:
 		return ec._ErrAddressOwnedByUser(ctx, sel, &obj)
 	case *model.ErrAddressOwnedByUser:
@@ -15759,6 +15841,13 @@ func (ec *executionContext) _UpdateUserInfoPayloadOrError(ctx context.Context, s
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrUsernameNotAvailable:
+		return ec._ErrUsernameNotAvailable(ctx, sel, &obj)
+	case *model.ErrUsernameNotAvailable:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUsernameNotAvailable(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -15766,13 +15855,6 @@ func (ec *executionContext) _UpdateUserInfoPayloadOrError(ctx context.Context, s
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
-	case model.ErrUserAlreadyExists:
-		return ec._ErrUserAlreadyExists(ctx, sel, &obj)
-	case *model.ErrUserAlreadyExists:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrUserAlreadyExists(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -16887,7 +16969,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshContractPayloadOrError", "Error", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -17134,7 +17216,7 @@ func (ec *executionContext) _ErrUnknownAction(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "UpdateUserInfoPayloadOrError", "Error", "CreateUserPayloadOrError"}
+var errUserAlreadyExistsImplementors = []string{"ErrUserAlreadyExists", "Error", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserAlreadyExists) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserAlreadyExistsImplementors)
@@ -17178,6 +17260,37 @@ func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.Select
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrUserNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errUsernameNotAvailableImplementors = []string{"ErrUsernameNotAvailable", "UpdateUserInfoPayloadOrError", "Error", "CreateUserPayloadOrError"}
+
+func (ec *executionContext) _ErrUsernameNotAvailable(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUsernameNotAvailable) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errUsernameNotAvailableImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrUsernameNotAvailable")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrUsernameNotAvailable_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
