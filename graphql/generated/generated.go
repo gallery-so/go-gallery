@@ -3388,11 +3388,23 @@ input EoaAuth {
     signature: String! @scrub
 }
 
-# DebugAuth always succeeds and returns the supplied userId and addresses.
-# Only available for local development.
+# DebugAuth is a local-only authentication mechanism for testing and debugging.
+# It creates an authenticator that will return the supplied userId and chainAddresses as if they had been
+# successfully authenticated. For existing users, the asUsername parameter may be supplied as a convenience
+# method to look up and return their userId and chainAddresses.
 input DebugAuth @restrictEnvironment(allowed: ["local"]){
+    # Convenience method to authenticate as an existing user.
+    # Cannot be used in conjunction with the userId and chainAddresses parameters.
+    asUsername: String
+
+    # The userId that will be returned from the resulting authenticator.
+    # May be omitted or blank to indicate that there is no user associated with the supplied chainAddresses.
+    # Cannot be used in conjunction with the asUsername parameter.
     userId: DBID
-    chainAddresses:[ChainAddressInput!]!
+
+    # The chainAddresses that will be returned from the resulting authenticator.
+    # Cannot be used in conjunction with the asUsername parameter.
+    chainAddresses:[ChainAddressInput!]
 }
 
 input GnosisSafeAuth {
@@ -14211,6 +14223,34 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 
 	for k, v := range asMap {
 		switch k {
+		case "asUsername":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("asUsername"))
+			directive0 := func(ctx context.Context) (interface{}, error) { return ec.unmarshalOString2ᚖstring(ctx, v) }
+			directive1 := func(ctx context.Context) (interface{}, error) {
+				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
+				if err != nil {
+					return nil, err
+				}
+				if ec.directives.RestrictEnvironment == nil {
+					return nil, errors.New("directive restrictEnvironment is not implemented")
+				}
+				return ec.directives.RestrictEnvironment(ctx, obj, directive0, allowed)
+			}
+
+			tmp, err := directive1(ctx)
+			if err != nil {
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
+			if data, ok := tmp.(*string); ok {
+				it.AsUsername = data
+			} else if tmp == nil {
+				it.AsUsername = nil
+			} else {
+				err := fmt.Errorf(`unexpected type %T from directive, should be *string`, tmp)
+				return it, graphql.ErrorOnPath(ctx, err)
+			}
 		case "userId":
 			var err error
 
@@ -14246,7 +14286,7 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddresses"))
 			directive0 := func(ctx context.Context) (interface{}, error) {
-				return ec.unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, v)
+				return ec.unmarshalOChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx, v)
 			}
 			directive1 := func(ctx context.Context) (interface{}, error) {
 				allowed, err := ec.unmarshalNString2ᚕstringᚄ(ctx, []interface{}{"local"})
@@ -20353,23 +20393,6 @@ func (ec *executionContext) unmarshalNChainAddressInput2githubᚗcomᚋmikeydub�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx context.Context, v interface{}) ([]*persist.ChainAddress, error) {
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]*persist.ChainAddress, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
 func (ec *executionContext) unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, v interface{}) (*persist.ChainAddress, error) {
 	res, err := ec.unmarshalInputChainAddressInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
@@ -20989,6 +21012,26 @@ func (ec *executionContext) marshalOChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgo
 		return graphql.Null
 	}
 	return ec._ChainAddress(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOChainAddressInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddressᚄ(ctx context.Context, v interface{}) ([]*persist.ChainAddress, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.ChainAddress, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v []*model.Collection) graphql.Marshaler {
