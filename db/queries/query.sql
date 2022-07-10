@@ -173,8 +173,8 @@ WITH RECURSIVE activity AS (
     SELECT * FROM events WHERE events.id = $1 AND deleted = false
     UNION
     SELECT e.* FROM events e, activity a
-    WHERE e.subject_id = a.subject_id
-        AND e.action = a.action
+    WHERE e.action = a.action
+        AND e.subject_id = a.subject_id
         AND e.created_at < a.created_at
         AND e.created_at >= a.created_at - make_interval(secs => $2)
         AND e.deleted = false

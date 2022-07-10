@@ -383,7 +383,6 @@ type FollowInfo {
 
 interface FeedEventData {
     eventTime: Time
-    owner: GalleryUser
     action: Action
 }
 
@@ -408,7 +407,6 @@ type UserFollowedUsersFeedEventData implements FeedEventData {
 
 type UserFollowedByUsersFeedEventData implements FeedEventData {
     eventTime: Time
-    owner: GalleryUser  # always null for this event
     userFollowed: GalleryUser @goField(forceResolver: true)
     action: Action
     followedBy: [FollowInfo]

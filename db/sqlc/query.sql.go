@@ -351,8 +351,8 @@ WITH RECURSIVE activity AS (
     SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE events.id = $1 AND deleted = false
     UNION
     SELECT e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at FROM events e, activity a
-    WHERE e.subject_id = a.subject_id
-        AND e.action = a.action
+    WHERE e.action = a.action
+        AND e.subject_id = a.subject_id
         AND e.created_at < a.created_at
         AND e.created_at >= a.created_at - make_interval(secs => $2)
         AND e.deleted = false

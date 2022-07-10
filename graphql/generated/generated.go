@@ -505,7 +505,6 @@ type ComplexityRoot struct {
 		Action       func(childComplexity int) int
 		EventTime    func(childComplexity int) int
 		FollowedBy   func(childComplexity int) int
-		Owner        func(childComplexity int) int
 		UserFollowed func(childComplexity int) int
 	}
 
@@ -2464,13 +2463,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserFollowedByUsersFeedEventData.FollowedBy(childComplexity), true
 
-	case "UserFollowedByUsersFeedEventData.owner":
-		if e.complexity.UserFollowedByUsersFeedEventData.Owner == nil {
-			break
-		}
-
-		return e.complexity.UserFollowedByUsersFeedEventData.Owner(childComplexity), true
-
 	case "UserFollowedByUsersFeedEventData.userFollowed":
 		if e.complexity.UserFollowedByUsersFeedEventData.UserFollowed == nil {
 			break
@@ -3086,7 +3078,6 @@ type FollowInfo {
 
 interface FeedEventData {
     eventTime: Time
-    owner: GalleryUser
     action: Action
 }
 
@@ -3111,7 +3102,6 @@ type UserFollowedUsersFeedEventData implements FeedEventData {
 
 type UserFollowedByUsersFeedEventData implements FeedEventData {
     eventTime: Time
-    owner: GalleryUser
     userFollowed: GalleryUser @goField(forceResolver: true)
     action: Action
     followedBy: [FollowInfo]
@@ -12202,38 +12192,6 @@ func (ec *executionContext) _UserFollowedByUsersFeedEventData_eventTime(ctx cont
 	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserFollowedByUsersFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedByUsersFeedEventData) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "UserFollowedByUsersFeedEventData",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Owner, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.GalleryUser)
-	fc.Result = res
-	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _UserFollowedByUsersFeedEventData_userFollowed(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedByUsersFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19758,13 +19716,6 @@ func (ec *executionContext) _UserFollowedByUsersFeedEventData(ctx context.Contex
 		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UserFollowedByUsersFeedEventData_eventTime(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "owner":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserFollowedByUsersFeedEventData_owner(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
