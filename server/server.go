@@ -92,7 +92,7 @@ func setDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("JWT_SECRET", "Test-Secret")
-	viper.SetDefault("JWT_TTL", 60*60*24*7)
+	viper.SetDefault("JWT_TTL", 60*60*24*14)
 	viper.SetDefault("PORT", 4000)
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
