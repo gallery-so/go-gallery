@@ -207,6 +207,8 @@ WITH cursors AS (
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
     AND deleted = false
+    -- Remove when frontend can support this type
+    AND action != 'UserFollowedByUsers'
 ), offsets AS (
     SELECT
         CASE WHEN NOT @from_first::bool AND count(id) - $1::int > 0
@@ -227,6 +229,8 @@ SELECT
         FROM feed_events
         WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
         AND deleted = false
+        -- Remove when frontend can support this type
+        AND action != 'UserFollowedByUsers'
         LIMIT 1
     )
     ELSE EXISTS(
@@ -234,6 +238,8 @@ SELECT
         FROM feed_events
         WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
         AND deleted = false
+        -- Remove when frontend can support this type
+        AND action != 'UserFollowedByUsers'
         LIMIT 1)
     END::bool;
 
@@ -248,12 +254,8 @@ WITH cursors AS (
     AND event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
     AND fe.deleted = false AND fl.deleted = false
-    UNION ALL
-    SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_after FROM cursors)
-    AND event_time < (SELECT cur_before FROM cursors)
-    AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
-    AND deleted = false
+    -- Remove when frontend can support this type
+    AND fe.action != 'UserFollowedByUsers'
 ), offsets AS (
     SELECT
         CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
@@ -270,34 +272,24 @@ SELECT * FROM feed_events
 SELECT
     CASE WHEN @from_first::bool
     THEN EXISTS(
-        (SELECT 1
+        SELECT 1
         FROM feed_events fe
         INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
         WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1)
-        UNION ALL
-        (SELECT 1
-        FROM feed_events
-        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
-        AND deleted = false
-        LIMIT 1)
+        -- Remove when frontend can support this type
+        AND action != 'UserFollowedByUsers'
+        LIMIT 1
     )
     ELSE EXISTS(
-        (SELECT 1
+        SELECT 1
         FROM feed_events fe
         INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
         WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
         AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1)
-        UNION ALL
-        (SELECT 1
-        FROM feed_events
-        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
-        AND deleted = false
-        LIMIT 1)
+        -- Remove when frontend can support this type
+        AND action != 'UserFollowedByUsers'
+        LIMIT 1
     )
     END::bool;
 

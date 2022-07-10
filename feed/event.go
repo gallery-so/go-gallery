@@ -45,6 +45,10 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	case persist.ActionUserCreated:
 		return b.createUserCreatedEvent(ctx, event)
 	case persist.ActionUserFollowedUsers:
+		// Store both event types for now until the frontend supports UserFollowedByUsers
+		if _, err := b.createUserFollowedUsersEvent(ctx, event); err != nil {
+			return nil, err
+		}
 		return b.createrUserFollowedByUsersEvent(ctx, event)
 	case persist.ActionCollectorsNoteAddedToToken:
 		return b.createCollectorsNoteAddedToTokenEvent(ctx, event)

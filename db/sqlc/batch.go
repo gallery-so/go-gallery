@@ -570,6 +570,8 @@ WITH cursors AS (
     WHERE event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
     AND deleted = false
+    -- Remove when frontend can support this type
+    AND action != 'UserFollowedByUsers'
 ), offsets AS (
     SELECT
         CASE WHEN NOT $4::bool AND count(id) - $1::int > 0
@@ -1164,12 +1166,8 @@ WITH cursors AS (
     AND event_time > (SELECT cur_after FROM cursors)
     AND event_time < (SELECT cur_before FROM cursors)
     AND fe.deleted = false AND fl.deleted = false
-    UNION ALL
-    SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_after FROM cursors)
-    AND event_time < (SELECT cur_before FROM cursors)
-    AND action = 'UserFollowedByUsers' AND (data -> 'user_follower_ids') ?| array(SELECT followee FROM follows WHERE deleted = false AND follower = $1)
-    AND deleted = false
+    -- Remove when frontend can support this type
+    AND fe.action != 'UserFollowedByUsers'
 ), offsets AS (
     SELECT
         CASE WHEN NOT $5::bool AND count(id) - $2::int > 0
