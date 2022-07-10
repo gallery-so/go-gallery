@@ -346,12 +346,12 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 	return i, err
 }
 
-const getEventsInWindowForActor = `-- name: GetEventsInWindowForActor :many
+const getEventsInWindowForActionSubject = `-- name: GetEventsInWindowForActionSubject :many
 WITH RECURSIVE activity AS (
     SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE events.id = $1 AND deleted = false
     UNION
     SELECT e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at FROM events e, activity a
-    WHERE e.actor_id = a.actor_id
+    WHERE e.subject_id = a.subject_id
         AND e.action = a.action
         AND e.created_at < a.created_at
         AND e.created_at >= a.created_at - make_interval(secs => $2)
@@ -360,13 +360,13 @@ WITH RECURSIVE activity AS (
 SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC
 `
 
-type GetEventsInWindowForActorParams struct {
+type GetEventsInWindowForActionSubjectParams struct {
 	ID   persist.DBID
 	Secs float64
 }
 
-func (q *Queries) GetEventsInWindowForActor(ctx context.Context, arg GetEventsInWindowForActorParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, getEventsInWindowForActor, arg.ID, arg.Secs)
+func (q *Queries) GetEventsInWindowForActionSubject(ctx context.Context, arg GetEventsInWindowForActionSubjectParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, getEventsInWindowForActionSubject, arg.ID, arg.Secs)
 	if err != nil {
 		return nil, err
 	}
@@ -399,12 +399,12 @@ func (q *Queries) GetEventsInWindowForActor(ctx context.Context, arg GetEventsIn
 	return items, nil
 }
 
-const getEventsInWindowForSubject = `-- name: GetEventsInWindowForSubject :many
+const getEventsInWindowForActorAction = `-- name: GetEventsInWindowForActorAction :many
 WITH RECURSIVE activity AS (
     SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE events.id = $1 AND deleted = false
     UNION
     SELECT e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at FROM events e, activity a
-    WHERE e.subject_id = a.subject_id
+    WHERE e.actor_id = a.actor_id
         AND e.action = a.action
         AND e.created_at < a.created_at
         AND e.created_at >= a.created_at - make_interval(secs => $2)
@@ -413,13 +413,13 @@ WITH RECURSIVE activity AS (
 SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC
 `
 
-type GetEventsInWindowForSubjectParams struct {
+type GetEventsInWindowForActorActionParams struct {
 	ID   persist.DBID
 	Secs float64
 }
 
-func (q *Queries) GetEventsInWindowForSubject(ctx context.Context, arg GetEventsInWindowForSubjectParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, getEventsInWindowForSubject, arg.ID, arg.Secs)
+func (q *Queries) GetEventsInWindowForActorAction(ctx context.Context, arg GetEventsInWindowForActorActionParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, getEventsInWindowForActorAction, arg.ID, arg.Secs)
 	if err != nil {
 		return nil, err
 	}
@@ -983,7 +983,35 @@ func (q *Queries) GlobalFeedHasMoreEvents(ctx context.Context, arg GlobalFeedHas
 	return column_1, err
 }
 
-const isWindowActive = `-- name: IsWindowActive :one
+const isWindowActiveForActionSubject = `-- name: IsWindowActiveForActionSubject :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE action = $1 AND subject_id = $2 AND deleted = false
+    AND created_at > $3 AND created_at <= $4
+    LIMIT 1
+)
+`
+
+type IsWindowActiveForActionSubjectParams struct {
+	Action      persist.Action
+	SubjectID   persist.DBID
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+func (q *Queries) IsWindowActiveForActionSubject(ctx context.Context, arg IsWindowActiveForActionSubjectParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isWindowActiveForActionSubject,
+		arg.Action,
+		arg.SubjectID,
+		arg.WindowStart,
+		arg.WindowEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const isWindowActiveForActorAction = `-- name: IsWindowActiveForActorAction :one
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND deleted = false
@@ -992,15 +1020,15 @@ SELECT EXISTS(
 )
 `
 
-type IsWindowActiveParams struct {
+type IsWindowActiveForActorActionParams struct {
 	ActorID     persist.DBID
 	Action      persist.Action
 	WindowStart time.Time
 	WindowEnd   time.Time
 }
 
-func (q *Queries) IsWindowActive(ctx context.Context, arg IsWindowActiveParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isWindowActive,
+func (q *Queries) IsWindowActiveForActorAction(ctx context.Context, arg IsWindowActiveForActorActionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isWindowActiveForActorAction,
 		arg.ActorID,
 		arg.Action,
 		arg.WindowStart,
@@ -1011,7 +1039,7 @@ func (q *Queries) IsWindowActive(ctx context.Context, arg IsWindowActiveParams) 
 	return exists, err
 }
 
-const isWindowActiveWithSubject = `-- name: IsWindowActiveWithSubject :one
+const isWindowActiveForActorActionSubject = `-- name: IsWindowActiveForActorActionSubject :one
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
@@ -1020,7 +1048,7 @@ SELECT EXISTS(
 )
 `
 
-type IsWindowActiveWithSubjectParams struct {
+type IsWindowActiveForActorActionSubjectParams struct {
 	ActorID     persist.DBID
 	Action      persist.Action
 	SubjectID   persist.DBID
@@ -1028,8 +1056,8 @@ type IsWindowActiveWithSubjectParams struct {
 	WindowEnd   time.Time
 }
 
-func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowActiveWithSubjectParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isWindowActiveWithSubject,
+func (q *Queries) IsWindowActiveForActorActionSubject(ctx context.Context, arg IsWindowActiveForActorActionSubjectParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isWindowActiveForActorActionSubject,
 		arg.ActorID,
 		arg.Action,
 		arg.SubjectID,

@@ -155,7 +155,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
 
--- name: GetEventsInWindowForActor :many
+-- name: GetEventsInWindowForActorAction :many
 WITH RECURSIVE activity AS (
     SELECT * FROM events WHERE events.id = $1 AND deleted = false
     UNION
@@ -168,7 +168,7 @@ WITH RECURSIVE activity AS (
 )
 SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC;
 
--- name: GetEventsInWindowForSubject :many
+-- name: GetEventsInWindowForActionSubject :many
 WITH RECURSIVE activity AS (
     SELECT * FROM events WHERE events.id = $1 AND deleted = false
     UNION
@@ -181,7 +181,7 @@ WITH RECURSIVE activity AS (
 )
 SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC;
 
--- name: IsWindowActive :one
+-- name: IsWindowActiveForActorAction :one
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND deleted = false
@@ -189,10 +189,18 @@ SELECT EXISTS(
     LIMIT 1
 );
 
--- name: IsWindowActiveWithSubject :one
+-- name: IsWindowActiveForActorActionSubject :one
 SELECT EXISTS(
     SELECT 1 FROM events
     WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
+    AND created_at > @window_start AND created_at <= @window_end
+    LIMIT 1
+);
+
+-- name: IsWindowActiveForActionSubject :one
+SELECT EXISTS(
+    SELECT 1 FROM events
+    WHERE action = $1 AND subject_id = $2 AND deleted = false
     AND created_at > @window_start AND created_at <= @window_end
     LIMIT 1
 );
@@ -263,8 +271,7 @@ WITH cursors AS (
         ELSE 0 END pos
     FROM edges
 )
-SELECT * FROM feed_events
-    WHERE id = ANY(SELECT id FROM edges)
+SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
     ORDER BY event_time ASC
     LIMIT $2 OFFSET (SELECT pos FROM offsets);
 

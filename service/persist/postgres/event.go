@@ -66,9 +66,9 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Eve
 	return &event, err
 }
 
-// WindowActiveForActor checks if there are more recent events with the same actor and action as the provided event.
-func (r *EventRepository) WindowActiveForActor(ctx context.Context, event sqlc.Event) (bool, error) {
-	return r.Queries.IsWindowActive(ctx, sqlc.IsWindowActiveParams{
+// WindowActiveForActorAction checks if there are more recent events with the same actor and action as the provided event.
+func (r *EventRepository) WindowActiveForActorAction(ctx context.Context, event sqlc.Event) (bool, error) {
+	return r.Queries.IsWindowActiveForActorAction(ctx, sqlc.IsWindowActiveForActorActionParams{
 		ActorID:     event.ActorID,
 		Action:      event.Action,
 		WindowStart: event.CreatedAt,
@@ -76,10 +76,10 @@ func (r *EventRepository) WindowActiveForActor(ctx context.Context, event sqlc.E
 	})
 }
 
-// WindowActiveForActorAndSubject checks if there are more recent events with the same actor and action applied to a specific subject such as
+// WindowActiveForActorActionSubject checks if there are more recent events with the same actor and action applied to a specific subject such as
 // for a particular collection or token.
-func (r *EventRepository) WindowActiveForActorAndSubject(ctx context.Context, event sqlc.Event) (bool, error) {
-	return r.Queries.IsWindowActiveWithSubject(ctx, sqlc.IsWindowActiveWithSubjectParams{
+func (r *EventRepository) WindowActiveForActorActionSubject(ctx context.Context, event sqlc.Event) (bool, error) {
+	return r.Queries.IsWindowActiveForActorActionSubject(ctx, sqlc.IsWindowActiveForActorActionSubjectParams{
 		ActorID:     event.ActorID,
 		Action:      event.Action,
 		SubjectID:   event.SubjectID,
@@ -88,18 +88,28 @@ func (r *EventRepository) WindowActiveForActorAndSubject(ctx context.Context, ev
 	})
 }
 
-// EventsInWindowForActor returns events with the same actor and action that belong to the same window of activity as the given eventID.
-func (r *EventRepository) EventsInWindowForActor(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
-	return r.Queries.GetEventsInWindowForActor(ctx, sqlc.GetEventsInWindowForActorParams{
+// WindowActiveForActionSubject checks if there are more recent events with the same action and subject as the provided event.
+func (r *EventRepository) WindowActiveForActionSubject(ctx context.Context, event sqlc.Event) (bool, error) {
+	return r.Queries.IsWindowActiveForActionSubject(ctx, sqlc.IsWindowActiveForActionSubjectParams{
+		Action:      event.Action,
+		SubjectID:   event.SubjectID,
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second),
+	})
+}
+
+// EventsInWindowForActorAction returns events with the same actor and action that belong to the same window of activity as the given eventID.
+func (r *EventRepository) EventsInWindowForActorAction(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
+	return r.Queries.GetEventsInWindowForActorAction(ctx, sqlc.GetEventsInWindowForActorActionParams{
 		ID:   eventID,
 		Secs: float64(windowSeconds),
 	})
 }
 
-// EventsInWindowForSubject returns events with the same subject and action that belong to the same window of activity as the given eventID
+// EventsInWindowForActionSubject returns events with the same subject and action that belong to the same window of activity as the given eventID
 // regardless of the actor.
-func (r *EventRepository) EventsInWindowForSubject(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
-	return r.Queries.GetEventsInWindowForSubject(ctx, sqlc.GetEventsInWindowForSubjectParams{
+func (r *EventRepository) EventsInWindowForActionSubject(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
+	return r.Queries.GetEventsInWindowForActionSubject(ctx, sqlc.GetEventsInWindowForActionSubjectParams{
 		ID:   eventID,
 		Secs: float64(windowSeconds),
 	})
