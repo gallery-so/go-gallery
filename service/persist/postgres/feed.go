@@ -15,17 +15,6 @@ type FeedRepository struct {
 }
 
 func (r *FeedRepository) Add(ctx context.Context, event sqlc.FeedEvent) (*sqlc.FeedEvent, error) {
-	if event.OwnerID == "" {
-		evt, err := r.Queries.CreateFeedEventNoOwner(ctx, sqlc.CreateFeedEventNoOwnerParams{
-			ID:        persist.GenerateID(),
-			Action:    event.Action,
-			Data:      event.Data,
-			EventTime: event.EventTime,
-			EventIds:  event.EventIds,
-		})
-		return &evt, err
-	}
-
 	evt, err := r.Queries.CreateFeedEvent(ctx, sqlc.CreateFeedEventParams{
 		ID:        persist.GenerateID(),
 		OwnerID:   event.OwnerID,
@@ -41,7 +30,7 @@ func (r *FeedRepository) Add(ctx context.Context, event sqlc.FeedEvent) (*sqlc.F
 // LastEventFrom returns the most recent event which occurred before `event`.
 func (r *FeedRepository) LastEventFrom(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEvent(ctx, sqlc.GetLastFeedEventParams{
-		OwnerID:   event.ActorID,
+		OwnerID:   persist.DBIDToNullString(&event.ActorID),
 		Action:    event.Action,
 		EventTime: event.CreatedAt,
 	})
@@ -56,7 +45,7 @@ func (r *FeedRepository) LastEventFrom(ctx context.Context, event sqlc.Event) (*
 // LastTokenEventFromEvent returns the most recent token event which occured before `event`.
 func (r *FeedRepository) LastTokenEventFromEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEventForToken(ctx, sqlc.GetLastFeedEventForTokenParams{
-		OwnerID:   event.ActorID,
+		OwnerID:   persist.DBIDToNullString(&event.ActorID),
 		Action:    event.Action,
 		TokenID:   string(event.SubjectID),
 		EventTime: event.CreatedAt,
@@ -77,7 +66,7 @@ func (r *FeedRepository) LastCollectionEventFromEvent(ctx context.Context, event
 // LastCollectionEvent returns the most recent collection event for the given owner, action, and collection that occurred before time `since`.
 func (r *FeedRepository) LastCollectionEvent(ctx context.Context, ownerID persist.DBID, action persist.Action, collectionID persist.DBID, since time.Time) (*sqlc.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEventForCollection(ctx, sqlc.GetLastFeedEventForCollectionParams{
-		OwnerID:      ownerID,
+		OwnerID:      persist.DBIDToNullString(&ownerID),
 		Action:       action,
 		CollectionID: string(collectionID),
 		EventTime:    since,

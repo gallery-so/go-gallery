@@ -76,8 +76,6 @@ overrides:
     go_type: "int"
 
   # Feed Events
-  - column: "feed_events.owner_id"
-    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
   - column: "feed_events.action"
     go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
   - column: "feed_events.event_ids"

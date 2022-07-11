@@ -570,7 +570,7 @@ func feedEventToDataModel(event *sqlc.FeedEvent) (model.FeedEventData, error) {
 func eventToUserCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
 	return model.UserCreatedFeedEventData{
 		EventTime: &event.EventTime,
-		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
+		Owner:     &model.GalleryUser{Dbid: persist.DBID(event.OwnerID.String)}, // remaining fields handled by dedicated resolver
 		Action:    &event.Action,
 	}
 }
@@ -587,7 +587,7 @@ func eventToUserFollowedUsersFeedEventData(event *sqlc.FeedEvent) model.FeedEven
 
 	return model.UserFollowedUsersFeedEventData{
 		EventTime: &event.EventTime,
-		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
+		Owner:     &model.GalleryUser{Dbid: persist.DBID(event.OwnerID.String)}, // remaining fields handled by dedicated resolver
 		Action:    &event.Action,
 		Followed:  followed,
 	}
@@ -614,7 +614,7 @@ func eventToUserFollowedByUsersFeedEventData(event *sqlc.FeedEvent) model.FeedEv
 func eventToCollectorsNoteAddedToTokenFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
 	return model.CollectorsNoteAddedToTokenFeedEventData{
 		EventTime: &event.EventTime,
-		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
+		Owner:     &model.GalleryUser{Dbid: persist.DBID(event.OwnerID.String)}, // remaining fields handled by dedicated resolver
 		Token: &model.CollectionToken{
 			Token:      &model.Token{Dbid: event.Data.TokenID},                // remaining fields handled by dedicated resolver
 			Collection: &model.Collection{Dbid: event.Data.TokenCollectionID}, // remaining fields handled by dedicated resolver
@@ -627,8 +627,8 @@ func eventToCollectorsNoteAddedToTokenFeedEventData(event *sqlc.FeedEvent) model
 func eventToCollectionCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
 	return model.CollectionCreatedFeedEventData{
 		EventTime:  &event.EventTime,
-		Owner:      &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
-		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
+		Owner:      &model.GalleryUser{Dbid: persist.DBID(event.OwnerID.String)}, // remaining fields handled by dedicated resolver
+		Collection: &model.Collection{Dbid: event.Data.CollectionID},             // remaining fields handled by dedicated resolver
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
 		HelperCollectionCreatedFeedEventDataData: model.HelperCollectionCreatedFeedEventDataData{
@@ -640,8 +640,8 @@ func eventToCollectionCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEven
 func eventToCollectorsNoteAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
 	return model.CollectorsNoteAddedToCollectionFeedEventData{
 		EventTime:         &event.EventTime,
-		Owner:             &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
-		Collection:        &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
+		Owner:             &model.GalleryUser{Dbid: persist.DBID(event.OwnerID.String)}, // remaining fields handled by dedicated resolver
+		Collection:        &model.Collection{Dbid: event.Data.CollectionID},             // remaining fields handled by dedicated resolver
 		Action:            &event.Action,
 		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
 	}
@@ -650,8 +650,8 @@ func eventToCollectorsNoteAddedToCollectionFeedEventData(event *sqlc.FeedEvent) 
 func eventToTokensAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
 	return model.TokensAddedToCollectionFeedEventData{
 		EventTime:  &event.EventTime,
-		Owner:      &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
-		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
+		Owner:      &model.GalleryUser{Dbid: persist.DBID(event.OwnerID.String)}, // remaining fields handled by dedicated resolver
+		Collection: &model.Collection{Dbid: event.Data.CollectionID},             // remaining fields handled by dedicated resolver
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
 		IsPreFeed:  util.BoolToPointer(event.Data.CollectionIsPreFeed),

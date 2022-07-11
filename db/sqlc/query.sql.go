@@ -60,7 +60,7 @@ INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALU
 
 type CreateFeedEventParams struct {
 	ID        persist.DBID
-	OwnerID   persist.DBID
+	OwnerID   sql.NullString
 	Action    persist.Action
 	Data      persist.FeedEventData
 	EventTime time.Time
@@ -71,42 +71,6 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 	row := q.db.QueryRow(ctx, createFeedEvent,
 		arg.ID,
 		arg.OwnerID,
-		arg.Action,
-		arg.Data,
-		arg.EventTime,
-		arg.EventIds,
-	)
-	var i FeedEvent
-	err := row.Scan(
-		&i.ID,
-		&i.Version,
-		&i.OwnerID,
-		&i.Action,
-		&i.Data,
-		&i.EventTime,
-		&i.EventIds,
-		&i.Deleted,
-		&i.LastUpdated,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const createFeedEventNoOwner = `-- name: CreateFeedEventNoOwner :one
-INSERT INTO feed_events (id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at
-`
-
-type CreateFeedEventNoOwnerParams struct {
-	ID        persist.DBID
-	Action    persist.Action
-	Data      persist.FeedEventData
-	EventTime time.Time
-	EventIds  persist.DBIDList
-}
-
-func (q *Queries) CreateFeedEventNoOwner(ctx context.Context, arg CreateFeedEventNoOwnerParams) (FeedEvent, error) {
-	row := q.db.QueryRow(ctx, createFeedEventNoOwner,
-		arg.ID,
 		arg.Action,
 		arg.Data,
 		arg.EventTime,
@@ -530,7 +494,7 @@ SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last
 `
 
 type GetLastFeedEventParams struct {
-	OwnerID   persist.DBID
+	OwnerID   sql.NullString
 	Action    persist.Action
 	EventTime time.Time
 }
@@ -561,7 +525,7 @@ SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last
 `
 
 type GetLastFeedEventForCollectionParams struct {
-	OwnerID      persist.DBID
+	OwnerID      sql.NullString
 	Action       persist.Action
 	EventTime    time.Time
 	CollectionID string
@@ -598,7 +562,7 @@ SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last
 `
 
 type GetLastFeedEventForTokenParams struct {
-	OwnerID   persist.DBID
+	OwnerID   sql.NullString
 	Action    persist.Action
 	EventTime time.Time
 	TokenID   string

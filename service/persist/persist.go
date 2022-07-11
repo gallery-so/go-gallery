@@ -1,6 +1,7 @@
 package persist
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -326,4 +327,12 @@ func ContainsDBID(pSrc []DBID, pID DBID) bool {
 		}
 	}
 	return false
+}
+
+// DBIDToNullString converts a DBID to a sql.NullString
+func DBIDToNullString(v *DBID) sql.NullString {
+	if v == nil {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: v.String(), Valid: true}
 }

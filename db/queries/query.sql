@@ -306,9 +306,6 @@ SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 -- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 
--- name: CreateFeedEventNoOwner :one
-INSERT INTO feed_events (id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
-
 -- name: GetLastFeedEvent :one
 SELECT * FROM feed_events
     WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false

@@ -99,7 +99,7 @@ type Feature struct {
 type FeedEvent struct {
 	ID          persist.DBID
 	Version     int32
-	OwnerID     persist.DBID
+	OwnerID     sql.NullString
 	Action      persist.Action
 	Data        persist.FeedEventData
 	EventTime   time.Time

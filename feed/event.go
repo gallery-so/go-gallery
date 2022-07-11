@@ -83,7 +83,7 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Ev
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
 		ID:        persist.GenerateID(),
-		OwnerID:   event.ActorID,
+		OwnerID:   persist.DBIDToNullString(&event.ActorID),
 		Action:    event.Action,
 		EventTime: event.CreatedAt,
 		Data:      persist.FeedEventData{UserBio: event.Data.UserBio},
@@ -124,7 +124,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.DBIDToNullString(&event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			UserFollowedIDs:  followedIDs,
@@ -209,7 +209,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.DBIDToNullString(&event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			TokenID:                event.SubjectID,
@@ -236,7 +236,7 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event s
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.DBIDToNullString(&event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:                event.SubjectID,
@@ -274,7 +274,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.DBIDToNullString(&event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:                event.SubjectID,
@@ -332,7 +332,7 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 
 	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.DBIDToNullString(&event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:          event.SubjectID,
