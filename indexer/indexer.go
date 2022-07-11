@@ -449,62 +449,36 @@ func (i *indexer) subscribeNewLogs(transfersChan chan<- []transfersAtBlock, subs
 
 	wp := workerpool.New(10)
 	for j := i.lastSyncedBlock; j <= mostRecentBlock; j += blocksPerLogsCall {
+		curBlock := j
 		wp.Submit(
 			func() {
-				curBlock := j
 				nextBlock := curBlock + blocksPerLogsCall
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 				defer cancel()
 
-				var logsTo []types.Log
-				reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
-				if err == nil {
-					defer reader.Close()
-					err = json.NewDecoder(reader).Decode(&logsTo)
-					if err != nil {
-						panic(err)
-					}
-				}
-				if len(logsTo) > 0 {
-					lastLog := logsTo[len(logsTo)-1]
-					if nextBlock-lastLog.BlockNumber > (blocksPerLogsCall / 5) {
-						logsTo = []types.Log{}
-					}
-				}
-				if len(logsTo) == 0 {
-
-					logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
-						FromBlock: persist.BlockNumber(j).BigInt(),
-						ToBlock:   persist.BlockNumber(j + blocksPerLogsCall).BigInt(),
-						Topics:    topics,
-					})
-					if err != nil {
-						ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-						defer cancel()
-						storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-%d-%d", i.lastSyncedBlock, mostRecentBlock)).NewWriter(ctx)
-						defer storageWriter.Close()
-						errData := map[string]interface{}{
-							"from": curBlock,
-							"to":   nextBlock,
-							"err":  err.Error(),
-						}
-						logrus.Error(errData)
-						err = json.NewEncoder(storageWriter).Encode(errData)
-						if err != nil {
-							panic(err)
-						}
-						return
-					}
-
-					obj := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock))
-					obj.Delete(ctx)
-					storageWriter := obj.NewWriter(ctx)
+				logsTo, err := i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+					FromBlock: persist.BlockNumber(curBlock).BigInt(),
+					ToBlock:   persist.BlockNumber(nextBlock).BigInt(),
+					Topics:    topics,
+				})
+				if err != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+					defer cancel()
+					storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-%d-%d", i.lastSyncedBlock, mostRecentBlock)).NewWriter(ctx)
 					defer storageWriter.Close()
-
-					if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
+					errData := map[string]interface{}{
+						"from": curBlock,
+						"to":   nextBlock,
+						"err":  err.Error(),
+					}
+					logrus.Error(errData)
+					err = json.NewEncoder(storageWriter).Encode(errData)
+					if err != nil {
 						panic(err)
 					}
+					return
 				}
+
 				logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock)
 
 				transfers := logsToTransfers(logsTo, i.ethClient)
@@ -856,8 +830,8 @@ func createTokens(i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]own
 
 	logrus.Info("Created tokens to insert into database...")
 
-	timeout := (time.Minute * time.Duration(len(tokens)/100)) + (time.Minute)
-	logrus.Info("Upserting tokens and contracts with a timeout of ", timeout)
+	timeout := (time.Minute * 3)
+	logrus.Infof("Upserting %d tokens and contracts with a timeout of %s", len(tokens), timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.tokenDBMu, i.contractDBMu)
@@ -879,6 +853,7 @@ func createTokens(i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]own
 		panic(fmt.Sprintf("error upserting tokens and contracts: %s - error key: %s", err, randKey))
 	}
 
+	logrus.Info("Done upserting tokens and contracts")
 }
 
 func receiveURIs(wg *sync.WaitGroup, uris <-chan tokenURI, uriMap map[persist.EthereumTokenIdentifiers]tokenURI) {
@@ -1072,33 +1047,43 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 		return err
 	}
 
-	contracts := make(map[persist.EthereumAddress]bool)
+	contractsChan := make(chan persist.Contract)
+	go func() {
+		defer close(contractsChan)
+		contracts := make(map[persist.EthereumAddress]bool)
 
-	nextNow := time.Now()
+		wp := workerpool.New(10)
 
-	toUpsert := make([]persist.Contract, 0, len(t))
-	for _, token := range t {
-		if contracts[token.ContractAddress] {
-			continue
+		for _, token := range t {
+			to := token
+			if contracts[to.ContractAddress] {
+				continue
+			}
+			wp.Submit(func() {
+				contract := fillContractFields(ethClient, to.ContractAddress, to.BlockNumber)
+				logrus.Debugf("Processing contract %s", contract.Address)
+				contractsChan <- contract
+			})
+
+			contracts[to.ContractAddress] = true
 		}
-		contract := fillContractFields(ethClient, token.ContractAddress, token.BlockNumber)
-		logrus.Debugf("Processing contract %s", contract.Address)
-		toUpsert = append(toUpsert, contract)
-
-		contracts[token.ContractAddress] = true
-	}
-
-	logrus.Debugf("Processed %d contracts in %v time", len(toUpsert), time.Since(nextNow))
+		wp.StopWait()
+	}()
 
 	finalNow := time.Now()
 	return func() error {
 		contractMu.Lock()
 		defer contractMu.Unlock()
-		err = contractRepo.BulkUpsert(ctx, toUpsert)
+		allContracts := make([]persist.Contract, 0, len(t))
+		for contract := range contractsChan {
+			allContracts = append(allContracts, contract)
+		}
+		logrus.Debugf("Upserting %d contracts", len(allContracts))
+		err = contractRepo.BulkUpsert(ctx, allContracts)
 		if err != nil {
 			return fmt.Errorf("err upserting contracts: %s", err.Error())
 		}
-		logrus.Debugf("Upserted %d contracts in %v time", len(toUpsert), time.Since(finalNow))
+		logrus.Debugf("Upserted %d contracts in %v time", len(allContracts), time.Since(finalNow))
 		return nil
 	}()
 }

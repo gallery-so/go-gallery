@@ -1,12 +1,14 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"sort"
 	"sync"
 
 	"github.com/gammazero/workerpool"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -21,61 +23,64 @@ type tid struct {
 func main() {
 	setDefaults()
 
-	p := postgres.NewClient()
+	p := postgres.NewPgxClient()
+
+	fmt.Println("Starting...")
 
 	for {
-		rows, err := p.Query(`SELECT
-    token_id, contract_address
-FROM
-    tokens
-WHERE TOKEN_TYPE = 'ERC-721' AND DELETED = false
-GROUP BY
-    contract_address, token_id
-HAVING 
-    COUNT(*) > 1 LIMIT 1000;`)
-		if err != nil {
-			panic(err)
-		}
-		defer rows.Close()
+		done := false
 
-		wg := &sync.WaitGroup{}
-		wg.Add(1)
-		receivedTokenIdentifiers := make(chan tid)
+		func() {
 
-		go func() {
-			defer wg.Done()
-			wp := workerpool.New(50)
-			for t := range receivedTokenIdentifiers {
-				token := t
-				wp.Submit(func() {
-					fmt.Printf("%s %s\n", token.tokenID, token.contractAddress)
+			fmt.Println("Starting batch...")
+			receivedTokenIdentifiers := make(chan tid)
 
-					findAndMergeInaccurateDupes(p, token.tokenID, token.contractAddress)
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
 
-					fmt.Printf("done %s %s\n", token.tokenID, token.contractAddress)
-				})
-			}
-			wp.StopWait()
-		}()
+			go func() {
+				defer wg.Done()
+				wp := workerpool.New(50)
+				for t := range receivedTokenIdentifiers {
+					token := t
+					wp.Submit(func() {
+						fmt.Printf("%s %s\n", token.tokenID, token.contractAddress)
 
-		i := 0
-		for ; rows.Next(); i++ {
+						findAndMergeInaccurateDupes(p, token.tokenID, token.contractAddress)
+
+						fmt.Printf("done %s %s\n", token.tokenID, token.contractAddress)
+					})
+				}
+				wp.StopWait()
+			}()
+
+			i := 0
 			var tokenID, contractAddress string
-
-			err := rows.Scan(&tokenID, &contractAddress)
+			_, err := p.QueryFunc(context.Background(), `SELECT token_id, contract_address 
+			FROM tokens 
+			WHERE TOKEN_TYPE = 'ERC-721'
+			GROUP BY contract_address, token_id 
+			HAVING COUNT(*) > 1 
+			LIMIT 200000;`, []interface{}{}, []interface{}{&tokenID, &contractAddress}, func(qfr pgx.QueryFuncRow) error {
+				i++
+				receivedTokenIdentifiers <- tid{tokenID, contractAddress}
+				return nil
+			})
 			if err != nil {
 				panic(err)
 			}
-			receivedTokenIdentifiers <- tid{tokenID, contractAddress}
-		}
 
-		if i == 0 {
+			if i == 0 {
+				done = true
+			}
+
+			close(receivedTokenIdentifiers)
+
+			wg.Wait()
+		}()
+		if done {
 			break
 		}
-
-		close(receivedTokenIdentifiers)
-
-		wg.Wait()
 	}
 
 	fmt.Println("done")
@@ -87,8 +92,8 @@ type mergeData struct {
 	block              uint64
 }
 
-func findAndMergeInaccurateDupes(p *sql.DB, tokenID, contractAddress string) {
-	rows, err := p.Query(`SELECT ID,OWNERSHIP_HISTORY,BLOCK_NUMBER FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2;`, tokenID, contractAddress)
+func findAndMergeInaccurateDupes(p *pgxpool.Pool, tokenID, contractAddress string) {
+	rows, err := p.Query(context.Background(), `SELECT ID,OWNERSHIP_HISTORY,BLOCK_NUMBER FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2;`, tokenID, contractAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -121,14 +126,14 @@ func findAndMergeInaccurateDupes(p *sql.DB, tokenID, contractAddress string) {
 	}
 
 	// update ownership history for the real one
-	_, err = p.Exec(`UPDATE tokens SET OWNERSHIP_HISTORY = $1 WHERE ID = $2;`, theRealOneOG.ownershipHistories, theRealOneOG.dbid)
+	_, err = p.Exec(context.Background(), `UPDATE tokens SET OWNERSHIP_HISTORY = $1 WHERE ID = $2;`, theRealOneOG.ownershipHistories, theRealOneOG.dbid)
 	if err != nil {
 		panic(err)
 	}
 
 	// delete the bad ones
 	for _, d := range data[1:] {
-		_, err = p.Exec(`DELETE FROM tokens WHERE ID = $1`, d.dbid)
+		_, err = p.Exec(context.Background(), `DELETE FROM tokens WHERE ID = $1`, d.dbid)
 		if err != nil {
 			panic(err)
 		}

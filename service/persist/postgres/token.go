@@ -336,11 +336,16 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		return nil
 	}
 
+	logger.For(pCtx).Infof("Deduping %d tokens", len(pTokens))
+
 	pTokens = t.dedupTokens(pTokens)
+
+	logger.For(pCtx).Infof("Deduped down to %d tokens", len(pTokens))
 
 	erc1155Tokens := make([]persist.Token, 0, len(pTokens))
 	erc721Tokens := make([]persist.Token, 0, len(pTokens))
 
+	logger.For(pCtx).Infof("Separating %d tokens into ERC1155 and ERC721", len(pTokens))
 	for _, token := range pTokens {
 		switch token.TokenType {
 		case persist.TokenTypeERC721:
@@ -367,21 +372,20 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 		}
 	}
 
+	logger.For(pCtx).Infof("Starting upsert...")
+
 	errChan := make(chan error)
 	go func() {
-		if err := t.upsertERC1155Tokens(pCtx, erc1155Tokens); err != nil {
-			logger.For(pCtx).Errorf("Error upserting ERC1155 tokens: %s", err)
-		}
+		errChan <- t.upsertERC1155Tokens(pCtx, erc1155Tokens)
 	}()
 	go func() {
-		if err := t.upsertERC721Tokens(pCtx, erc721Tokens); err != nil {
-			logger.For(pCtx).Errorf("Error upserting ERC721 tokens: %s", err)
-		}
+		errChan <- t.upsertERC721Tokens(pCtx, erc721Tokens)
 	}()
 	for i := 0; i < 2; i++ {
 		if err := <-errChan; err != nil {
 			return err
 		}
+		logger.For(pCtx).Infof("finished half of upsert")
 	}
 
 	return nil
@@ -399,8 +403,8 @@ func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []per
 		logger.For(pCtx).Debugf("Chunking %d tokens recursively into %d queries", len(pTokens), len(pTokens)/rowsPerQuery)
 		next := pTokens[rowsPerQuery:]
 		current := pTokens[:rowsPerQuery]
-		if err := t.upsertERC1155Tokens(pCtx, next); err != nil {
-			return err
+		if err := t.upsertERC721Tokens(pCtx, next); err != nil {
+			return fmt.Errorf("error with erc721 upsert: %w", err)
 		}
 		pTokens = current
 	}
@@ -419,7 +423,7 @@ func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []per
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		logger.For(pCtx).Debugf("SQL: %s", sqlStr)
-		return fmt.Errorf("failed to upsert tokens: %w", err)
+		return fmt.Errorf("failed to upsert erc721 tokens: %w", err)
 	}
 	return nil
 }
@@ -436,7 +440,7 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 		next := pTokens[rowsPerQuery:]
 		current := pTokens[:rowsPerQuery]
 		if err := t.upsertERC1155Tokens(pCtx, next); err != nil {
-			return err
+			return fmt.Errorf("error with erc1155 upsert: %w", err)
 		}
 		pTokens = current
 	}
@@ -450,12 +454,12 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER;`
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`
 
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		logger.For(pCtx).Debugf("SQL: %s", sqlStr)
-		return fmt.Errorf("failed to upsert tokens: %w", err)
+		return fmt.Errorf("failed to upsert erc1155 tokens: %w", err)
 	}
 	return nil
 }
