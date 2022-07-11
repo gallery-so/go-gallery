@@ -28,6 +28,7 @@ type UserUpdateInfoInput struct {
 
 type CreateUserInput struct {
 	Username     string
+	Bio          string
 	ChainAddress ChainAddress
 	WalletType   WalletType
 }

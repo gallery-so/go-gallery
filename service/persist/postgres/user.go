@@ -44,7 +44,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, WALLETS) VALUES ($1, $2, $3, $4) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS) VALUES ($1, $2, $3, $4, $5) RETURNING ID;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
@@ -181,7 +181,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 		return "", err
 	}
 
-	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), []persist.DBID{walletID}).Scan(&id)
+	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Bio, []persist.DBID{walletID}).Scan(&id)
 	if err != nil {
 		return "", err
 	}

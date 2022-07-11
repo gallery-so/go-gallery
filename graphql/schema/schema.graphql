@@ -826,7 +826,7 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!, bio:String): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 

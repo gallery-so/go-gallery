@@ -341,7 +341,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddUserWallet            func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
-		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism, username string) int
+		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
 		FollowUser               func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce             func(childComplexity int, chainAddress persist.ChainAddress) int
@@ -605,7 +605,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
-	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string) (model.CreateUserPayloadOrError, error)
+	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
@@ -1641,7 +1641,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["username"].(string)), true
+		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string)), true
 
 	case "Mutation.deleteCollection":
 		if e.complexity.Mutation.DeleteCollection == nil {
@@ -3493,7 +3493,7 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!, bio:String): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
@@ -3583,6 +3583,15 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 		}
 	}
 	args["username"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["bio"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bio"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["bio"] = arg2
 	return args, nil
 }
 
@@ -9199,7 +9208,7 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism), args["username"].(string))
+		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
