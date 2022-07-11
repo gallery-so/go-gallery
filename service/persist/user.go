@@ -27,6 +27,8 @@ type UserUpdateInfoInput struct {
 }
 
 type CreateUserInput struct {
+	Username     string
+	Bio          string
 	ChainAddress ChainAddress
 	WalletType   WalletType
 }
@@ -69,6 +71,14 @@ type ErrUserAlreadyExists struct {
 
 func (e ErrUserAlreadyExists) Error() string {
 	return fmt.Sprintf("user already exists: username: %s, address: %s, authenticator: %s", e.Username, e.ChainAddress, e.Authenticator)
+}
+
+type ErrUsernameNotAvailable struct {
+	Username string
+}
+
+func (e ErrUsernameNotAvailable) Error() string {
+	return fmt.Sprintf("username not available: %s", e.Username)
 }
 
 type ErrAddressOwnedByUser struct {

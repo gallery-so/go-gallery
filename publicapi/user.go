@@ -118,9 +118,16 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	return nil
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator) (userID persist.DBID, galleryID persist.DBID, err error) {
-	// Nothing to validate
-	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryRepository)
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, bio string) (userID persist.DBID, galleryID persist.DBID, err error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"username": {username, "required,username"},
+		"bio":      {bio, "bio"},
+	}); err != nil {
+		return "", "", err
+	}
+
+	return user.CreateUser(ctx, authenticator, username, bio, api.repos.UserRepository, api.repos.GalleryRepository)
 }
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {

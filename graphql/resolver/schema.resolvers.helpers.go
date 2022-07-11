@@ -70,6 +70,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case persist.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
+	case persist.ErrUsernameNotAvailable:
+		mappedErr = model.ErrUsernameNotAvailable{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrTokenNotFoundByID:

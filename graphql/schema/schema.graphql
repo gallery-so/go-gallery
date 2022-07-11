@@ -627,8 +627,8 @@ input UpdateUserInfoInput {
 union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
     | ErrNotAuthorized
+    | ErrUsernameNotAvailable
     | ErrInvalidInput
-    | ErrUserAlreadyExists
 
 type UpdateUserInfoPayload {
     viewer: Viewer
@@ -673,6 +673,10 @@ type ErrAuthenticationFailed implements Error {
 }
 
 type ErrUserAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrUsernameNotAvailable implements Error {
     message: String!
 }
 
@@ -774,9 +778,11 @@ type LogoutPayload {
 
 union CreateUserPayloadOrError =
     CreateUserPayload
-    | ErrUserAlreadyExists
     | ErrAuthenticationFailed
     | ErrDoesNotOwnRequiredToken
+    | ErrUserAlreadyExists
+    | ErrUsernameNotAvailable
+    | ErrInvalidInput
 
 type CreateUserPayload {
     userId: DBID
@@ -832,7 +838,7 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!, bio:String): CreateUserPayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
