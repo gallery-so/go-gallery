@@ -40,6 +40,7 @@ type Config struct {
 type ResolverRoot interface {
 	Collection() CollectionResolver
 	CollectionCreatedFeedEventData() CollectionCreatedFeedEventDataResolver
+	CollectionToken() CollectionTokenResolver
 	CollectorsNoteAddedToCollectionFeedEventData() CollectorsNoteAddedToCollectionFeedEventDataResolver
 	CollectorsNoteAddedToTokenFeedEventData() CollectorsNoteAddedToTokenFeedEventDataResolver
 	FeedConnection() FeedConnectionResolver
@@ -115,9 +116,14 @@ type ComplexityRoot struct {
 	}
 
 	CollectionToken struct {
-		Collection func(childComplexity int) int
-		ID         func(childComplexity int) int
-		Token      func(childComplexity int) int
+		Collection    func(childComplexity int) int
+		ID            func(childComplexity int) int
+		Token         func(childComplexity int) int
+		TokenSettings func(childComplexity int) int
+	}
+
+	CollectionTokenSettings struct {
+		RenderLive func(childComplexity int) int
 	}
 
 	CollectorsNoteAddedToCollectionFeedEventData struct {
@@ -556,6 +562,9 @@ type CollectionCreatedFeedEventDataResolver interface {
 	Collection(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.Collection, error)
 	NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error)
 }
+type CollectionTokenResolver interface {
+	TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error)
+}
 type CollectorsNoteAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error)
 
@@ -878,6 +887,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionToken.Token(childComplexity), true
+
+	case "CollectionToken.tokenSettings":
+		if e.complexity.CollectionToken.TokenSettings == nil {
+			break
+		}
+
+		return e.complexity.CollectionToken.TokenSettings(childComplexity), true
+
+	case "CollectionTokenSettings.renderLive":
+		if e.complexity.CollectionTokenSettings.RenderLive == nil {
+			break
+		}
+
+		return e.complexity.CollectionTokenSettings.RenderLive(childComplexity), true
 
 	case "CollectorsNoteAddedToCollectionFeedEventData.action":
 		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Action == nil {
@@ -2929,11 +2952,16 @@ type CollectionToken implements Node
     id: ID!
     token: Token
     collection: Collection
+    tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
 }
 
 type CollectionLayout {
     columns: Int
     whitespace: [Int]
+}
+
+type CollectionTokenSettings {
+    renderLive: Boolean
 }
 
 type Collection implements Node {
@@ -3163,12 +3191,18 @@ input CollectionLayoutInput {
     whitespace: [Int!]!
 }
 
+input CollectionTokenSettingsInput {
+    tokenId: DBID!
+    renderLive: Boolean!
+}
+
 input CreateCollectionInput {
     galleryId: DBID!
     name: String!
     collectorsNote: String!
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
+    tokenSettings: [CollectionTokenSettingsInput!]!
 }
 
 union CreateCollectionPayloadOrError =
@@ -3209,6 +3243,7 @@ input UpdateCollectionTokensInput {
     collectionId: DBID!
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
+    tokenSettings: [CollectionTokenSettingsInput!]!
 }
 
 union UpdateCollectionTokensPayloadOrError =
@@ -5010,6 +5045,70 @@ func (ec *executionContext) _CollectionToken_collection(ctx context.Context, fie
 	res := resTmp.(*model.Collection)
 	fc.Result = res
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionToken_tokenSettings(ctx context.Context, field graphql.CollectedField, obj *model.CollectionToken) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionToken",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CollectionToken().TokenSettings(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CollectionTokenSettings)
+	fc.Result = res
+	return ec.marshalOCollectionTokenSettings2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettings(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionTokenSettings_renderLive(ctx context.Context, field graphql.CollectedField, obj *model.CollectionTokenSettings) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionTokenSettings",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RenderLive, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
@@ -14229,6 +14328,37 @@ func (ec *executionContext) unmarshalInputCollectionLayoutInput(ctx context.Cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCollectionTokenSettingsInput(ctx context.Context, obj interface{}) (model.CollectionTokenSettingsInput, error) {
+	var it model.CollectionTokenSettingsInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "tokenId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenId"))
+			it.TokenID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "renderLive":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("renderLive"))
+			it.RenderLive, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Context, obj interface{}) (model.CreateCollectionInput, error) {
 	var it model.CreateCollectionInput
 	asMap := map[string]interface{}{}
@@ -14275,6 +14405,14 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("layout"))
 			it.Layout, err = ec.unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "tokenSettings":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenSettings"))
+			it.TokenSettings, err = ec.unmarshalNCollectionTokenSettingsInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInputᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -14557,6 +14695,14 @@ func (ec *executionContext) unmarshalInputUpdateCollectionTokensInput(ctx contex
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("layout"))
 			it.Layout, err = ec.unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "tokenSettings":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenSettings"))
+			it.TokenSettings, err = ec.unmarshalNCollectionTokenSettingsInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInputᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -16392,7 +16538,7 @@ func (ec *executionContext) _CollectionToken(ctx context.Context, sel ast.Select
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "token":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -16404,6 +16550,51 @@ func (ec *executionContext) _CollectionToken(ctx context.Context, sel ast.Select
 		case "collection":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._CollectionToken_collection(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokenSettings":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionToken_tokenSettings(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionTokenSettingsImplementors = []string{"CollectionTokenSettings"}
+
+func (ec *executionContext) _CollectionTokenSettings(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionTokenSettings) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionTokenSettingsImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionTokenSettings")
+		case "renderLive":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionTokenSettings_renderLive(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -20525,6 +20716,28 @@ func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmi
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInputᚄ(ctx context.Context, v interface{}) ([]*model.CollectionTokenSettingsInput, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*model.CollectionTokenSettingsInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNCollectionTokenSettingsInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInput(ctx context.Context, v interface{}) (*model.CollectionTokenSettingsInput, error) {
+	res, err := ec.unmarshalInputCollectionTokenSettingsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateCollectionInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInput(ctx context.Context, v interface{}) (model.CreateCollectionInput, error) {
 	res, err := ec.unmarshalInputCreateCollectionInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -21271,6 +21484,13 @@ func (ec *executionContext) marshalOCollectionTokenByIdOrError2githubᚗcomᚋmi
 		return graphql.Null
 	}
 	return ec._CollectionTokenByIdOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCollectionTokenSettings2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettings(ctx context.Context, sel ast.SelectionSet, v *model.CollectionTokenSettings) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionTokenSettings(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByAddressOrError(ctx context.Context, sel ast.SelectionSet, v model.CommunityByAddressOrError) graphql.Marshaler {

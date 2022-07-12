@@ -217,12 +217,22 @@ type CollectionLayoutInput struct {
 
 type CollectionToken struct {
 	HelperCollectionTokenData
-	Token      *Token      `json:"token"`
-	Collection *Collection `json:"collection"`
+	Token         *Token                   `json:"token"`
+	Collection    *Collection              `json:"collection"`
+	TokenSettings *CollectionTokenSettings `json:"tokenSettings"`
 }
 
 func (CollectionToken) IsNode()                       {}
 func (CollectionToken) IsCollectionTokenByIDOrError() {}
+
+type CollectionTokenSettings struct {
+	RenderLive *bool `json:"renderLive"`
+}
+
+type CollectionTokenSettingsInput struct {
+	TokenID    persist.DBID `json:"tokenId"`
+	RenderLive bool         `json:"renderLive"`
+}
 
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`
@@ -270,11 +280,12 @@ type Contract struct {
 func (Contract) IsNode() {}
 
 type CreateCollectionInput struct {
-	GalleryID      persist.DBID           `json:"galleryId"`
-	Name           string                 `json:"name"`
-	CollectorsNote string                 `json:"collectorsNote"`
-	Tokens         []persist.DBID         `json:"tokens"`
-	Layout         *CollectionLayoutInput `json:"layout"`
+	GalleryID      persist.DBID                    `json:"galleryId"`
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	Tokens         []persist.DBID                  `json:"tokens"`
+	Layout         *CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
 }
 
 type CreateCollectionPayload struct {
@@ -749,9 +760,10 @@ type UpdateCollectionInfoPayload struct {
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
 type UpdateCollectionTokensInput struct {
-	CollectionID persist.DBID           `json:"collectionId"`
-	Tokens       []persist.DBID         `json:"tokens"`
-	Layout       *CollectionLayoutInput `json:"layout"`
+	CollectionID  persist.DBID                    `json:"collectionId"`
+	Tokens        []persist.DBID                  `json:"tokens"`
+	Layout        *CollectionLayoutInput          `json:"layout"`
+	TokenSettings []*CollectionTokenSettingsInput `json:"tokenSettings"`
 }
 
 type UpdateCollectionTokensPayload struct {

@@ -19,21 +19,18 @@ const (
 // between collections and tokens
 // This struct will only be used when updating or querying the database
 type CollectionDB struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
-
-	Layout TokenLayout `json:"layout"`
-
-	Name           NullString `json:"name"`
-	CollectorsNote NullString `json:"collectors_note"`
-	OwnerUserID    DBID       `json:"owner_user_id"`
-	Tokens         []DBID     `json:"tokens"`
-
-	// collections can be hidden from public-viewing
-	Hidden NullBool `json:"hidden"`
+	Version        NullInt32                        `json:"version"` // schema version for this model
+	ID             DBID                             `json:"id" binding:"required"`
+	CreationTime   CreationTime                     `json:"created_at"`
+	Deleted        NullBool                         `json:"-"`
+	LastUpdated    LastUpdatedTime                  `json:"last_updated"`
+	Layout         TokenLayout                      `json:"layout"`
+	Name           NullString                       `json:"name"`
+	CollectorsNote NullString                       `json:"collectors_note"`
+	OwnerUserID    DBID                             `json:"owner_user_id"`
+	Tokens         []DBID                           `json:"tokens"`
+	Hidden         NullBool                         `json:"hidden"` // collections can be hidden from public-viewing
+	TokenSettings  map[DBID]CollectionTokenSettings `json:"token_settings"`
 }
 
 // Collection represents a collection of NFTs in the application. Collection will contain
@@ -41,21 +38,18 @@ type CollectionDB struct {
 // This struct will always be decoded from a get database operation and will be used throughout
 // the application where CollectionDB does not apply
 type Collection struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
-
-	Layout TokenLayout `json:"layout"`
-
-	Name           NullString          `json:"name"`
-	CollectorsNote NullString          `json:"collectors_note"`
-	OwnerUserID    DBID                `json:"owner_user_id"`
-	NFTs           []TokenInCollection `json:"nfts"`
-
-	// collections can be hidden from public-viewing
-	Hidden NullBool `json:"hidden"`
+	Version        NullInt32                        `json:"version"` // schema version for this model
+	ID             DBID                             `json:"id" binding:"required"`
+	CreationTime   CreationTime                     `json:"created_at"`
+	Deleted        NullBool                         `json:"-"`
+	LastUpdated    LastUpdatedTime                  `json:"last_updated"`
+	Layout         TokenLayout                      `json:"layout"`
+	Name           NullString                       `json:"name"`
+	CollectorsNote NullString                       `json:"collectors_note"`
+	OwnerUserID    DBID                             `json:"owner_user_id"`
+	NFTs           []TokenInCollection              `json:"nfts"`
+	Hidden         NullBool                         `json:"hidden"` // collections can be hidden from public-viewing
+	TokenSettings  map[DBID]CollectionTokenSettings `json:"token_settings"`
 }
 
 // TokenLayout defines the layout of a collection of tokens
@@ -77,8 +71,9 @@ type CollectionUpdateInfoInput struct {
 type CollectionUpdateTokensInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	Tokens []DBID      `json:"tokens"`
-	Layout TokenLayout `json:"layout"`
+	Tokens        []DBID                           `json:"tokens"`
+	Layout        TokenLayout                      `json:"layout"`
+	TokenSettings map[DBID]CollectionTokenSettings `json:"token_settings"`
 }
 
 // CollectionUpdateHiddenInput represents the data that will be changed when updating a collection's hidden status
@@ -93,6 +88,11 @@ type CollectionUpdateDeletedInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
 	Deleted NullBool `json:"-"`
+}
+
+// CollectionTokenSettings represents configurable token display options per collection
+type CollectionTokenSettings struct {
+	RenderLive bool `json:"render_live"`
 }
 
 // CollectionRepository represents the interface for interacting with the collection persistence layer
@@ -174,4 +174,19 @@ func (l *TokenLayout) Scan(value interface{}) error {
 		return nil
 	}
 	return json.Unmarshal(value.([]uint8), l)
+}
+
+// Value implements the driver.Valuer interface for the CollectionTokenSettings type
+func (s CollectionTokenSettings) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+// Scan implements the Scanner interface for the CollectionTokenSettings type
+func (s *CollectionTokenSettings) Scan(value interface{}) error {
+	if value == nil {
+		*s = CollectionTokenSettings{}
+		return nil
+	}
+
+	return json.Unmarshal(value.([]byte), s)
 }

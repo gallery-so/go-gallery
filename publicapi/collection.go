@@ -54,13 +54,20 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout) (*sqlc.Collection, error) {
+func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings) (*sqlc.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
 		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
+		Tokens:        tokens,
+		TokenSettings: tokenSettings,
 	}); err != nil {
 		return nil, err
 	}
@@ -85,6 +92,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		Layout:         layout,
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
+		TokenSettings:  tokenSettings,
 	}
 
 	collectionID, err := api.repos.CollectionRepository.Create(ctx, collection)
@@ -187,11 +195,18 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	return nil
 }
 
-func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout) error {
+func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
 		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
+	}); err != nil {
+		return err
+	}
+
+	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
+		Tokens:        tokens,
+		TokenSettings: tokenSettings,
 	}); err != nil {
 		return err
 	}
@@ -206,7 +221,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return err
 	}
 
-	update := persist.CollectionUpdateTokensInput{Tokens: tokens, Layout: layout}
+	update := persist.CollectionUpdateTokensInput{Tokens: tokens, Layout: layout, TokenSettings: tokenSettings}
 
 	err = api.repos.CollectionRepository.UpdateTokens(ctx, collectionID, userID, update)
 	if err != nil {

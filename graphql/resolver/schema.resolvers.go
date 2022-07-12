@@ -38,8 +38,9 @@ func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection) 
 				TokenId:      token.ID,
 				CollectionId: obj.Dbid,
 			},
-			Token:      tokenToModel(ctx, token),
-			Collection: obj,
+			Token:         tokenToModel(ctx, token),
+			Collection:    obj,
+			TokenSettings: nil, // handled by dedicated resolver
 		}
 	}
 
@@ -56,6 +57,10 @@ func (r *collectionCreatedFeedEventDataResolver) Collection(ctx context.Context,
 
 func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error) {
 	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
+}
+
+func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error) {
+	return resolveTokenSettingsByIDs(ctx, obj.TokenId, obj.CollectionId)
 }
 
 func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
@@ -202,7 +207,12 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		Whitespace: input.Layout.Whitespace,
 	}
 
-	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout)
+	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
+	for _, tokenSetting := range input.TokenSettings {
+		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
+	}
+
+	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout, settings)
 
 	if err != nil {
 		return nil, err
@@ -273,7 +283,12 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 		Whitespace: input.Layout.Whitespace,
 	}
 
-	err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout)
+	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
+	for _, tokenSetting := range input.TokenSettings {
+		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
+	}
+
+	err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -697,6 +712,11 @@ func (r *Resolver) CollectionCreatedFeedEventData() generated.CollectionCreatedF
 	return &collectionCreatedFeedEventDataResolver{r}
 }
 
+// CollectionToken returns generated.CollectionTokenResolver implementation.
+func (r *Resolver) CollectionToken() generated.CollectionTokenResolver {
+	return &collectionTokenResolver{r}
+}
+
 // CollectorsNoteAddedToCollectionFeedEventData returns generated.CollectorsNoteAddedToCollectionFeedEventDataResolver implementation.
 func (r *Resolver) CollectorsNoteAddedToCollectionFeedEventData() generated.CollectorsNoteAddedToCollectionFeedEventDataResolver {
 	return &collectorsNoteAddedToCollectionFeedEventDataResolver{r}
@@ -777,6 +797,7 @@ func (r *Resolver) ChainAddressInput() generated.ChainAddressInputResolver {
 
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
+type collectionTokenResolver struct{ *Resolver }
 type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type feedConnectionResolver struct{ *Resolver }
