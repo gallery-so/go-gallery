@@ -116,13 +116,13 @@ func ConnectionPaginationParamsValidator(sl validator.StructLevel) {
 	}
 }
 
-// CollectionTokenSettingsParams are args passed to collection create and update functions that should be validated together
+// CollectionTokenSettingsParams are args passed to collection create and update functions that are meant to be validated together
 type CollectionTokenSettingsParams struct {
 	Tokens        []persist.DBID                                   `json:"tokens"`
 	TokenSettings map[persist.DBID]persist.CollectionTokenSettings `json:"token_settings"`
 }
 
-// CollectionTokenSettingsParamsValidator checks that the input CollectionTokenSettingsParams is valid
+// CollectionTokenSettingsParamsValidator checks that the input CollectionTokenSettingsParams struct is valid
 func CollectionTokenSettingsParamsValidator(sl validator.StructLevel) {
 	settings := sl.Current().Interface().(CollectionTokenSettingsParams)
 
