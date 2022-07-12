@@ -342,10 +342,16 @@ func ens(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenI
 
 	canvas.End()
 
+	// cut off everything before the svg tag in the buffer
+	svgStart := bytes.Index(buf.Bytes(), []byte("<svg"))
+	if svgStart == -1 {
+		return turi, nil, fmt.Errorf("no svg tag found in response")
+	}
+
 	return persist.TokenURI(result), persist.TokenMetadata{
 		"name":        fmt.Sprintf("ENS: %s", result),
 		"description": "ENS names are used to resolve domain names to Ethereum addresses.",
-		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
+		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
 	}, nil
 
 }

@@ -888,7 +888,7 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 	}
 
 	switch med.MediaType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF:
+	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
 		return getImageMedia(ctx, med)
 	case persist.MediaTypeVideo:
 		return getVideoMedia(ctx, med)
@@ -900,7 +900,7 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 		return getGltfMedia(ctx, med)
 	case persist.MediaTypeJSON:
 		return getJsonMedia(ctx, med)
-	case persist.MediaTypeSVG, persist.MediaTypeText, persist.MediaTypeBase64Text:
+	case persist.MediaTypeText, persist.MediaTypeBase64Text:
 		return getTextMedia(ctx, med)
 	default:
 		return getUnknownMedia(ctx, med)
@@ -910,7 +910,7 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 
 func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLSet {
 	url := media.ThumbnailURL.String()
-	if media.MediaType == persist.MediaTypeImage && url == "" {
+	if media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG && url == "" {
 		url = media.MediaURL.String()
 	}
 	preview := remapLargeImageUrls(url)

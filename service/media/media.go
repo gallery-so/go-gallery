@@ -259,6 +259,21 @@ func cacheRawMedia(ctx context.Context, img []byte, bucket, fileName string, cli
 	if err := sw.Close(); err != nil {
 		return err
 	}
+
+	if strings.HasPrefix(fileName, "svg-") {
+
+		logrus.Infof("adding svg to attrs for %s", fileName)
+		o := client.Bucket(bucket).Object(fileName)
+
+		// Update the object to set the metadata.
+		objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
+			ContentType: "image/svg+xml",
+		}
+		if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
+			return err
+		}
+
+	}
 	return nil
 }
 

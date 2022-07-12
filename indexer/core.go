@@ -116,6 +116,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
+	viper.SetDefault("REDIS_URL", "localhost:6379")
 
 	viper.AutomaticEnv()
 }

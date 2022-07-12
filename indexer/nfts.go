@@ -703,10 +703,11 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 	newURI := uri
 
 	u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
-	if err != nil {
-		return tokenUpdate{}, fmt.Errorf("failed to get token URI: %v", err)
+	if err == nil {
+		newURI = u.ReplaceID(tokenID)
+	} else {
+		logger.For(pCtx).Errorf("error getting token URI: %s", err)
 	}
-	newURI = u.ReplaceID(tokenID)
 
 	if handler, ok := uniqueHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
 		logrus.Infof("Using %v metadata handler for %s", handler, contractAddress)
