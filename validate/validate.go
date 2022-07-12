@@ -74,6 +74,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 
 	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
 	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
+	v.RegisterStructValidation(CollectionTokenSettingsParamsValidator, CollectionTokenSettingsParams{})
 }
 
 func ChainAddressValidator(sl validator.StructLevel) {
@@ -112,6 +113,47 @@ func ConnectionPaginationParamsValidator(sl validator.StructLevel) {
 	if pageArgs.First != nil && pageArgs.Last != nil {
 		sl.ReportError(pageArgs.First, "First", "First", "excluded_with", "firstandlast")
 		sl.ReportError(pageArgs.Last, "Last", "Last", "excluded_with", "firstandlast")
+	}
+}
+
+// CollectionTokenSettingsParams are args passed to collection create and update functions that should be validated together
+type CollectionTokenSettingsParams struct {
+	Tokens        []persist.DBID                                   `json:"tokens"`
+	TokenSettings map[persist.DBID]persist.CollectionTokenSettings `json:"token_settings"`
+}
+
+// CollectionTokenSettingsParamsValidator checks that the input CollectionTokenSettingsParams is valid
+func CollectionTokenSettingsParamsValidator(sl validator.StructLevel) {
+	settings := sl.Current().Interface().(CollectionTokenSettingsParams)
+
+	if len(settings.Tokens) != len(settings.TokenSettings) {
+		sl.ReportError(settings.TokenSettings, "TokenSettings", "token_settings", "len", "")
+	}
+
+	tokensMap := make(map[persist.DBID]int)
+	settingsMap := make(map[persist.DBID]struct{})
+	var exists = struct{}{}
+
+	for i, tokenID := range settings.Tokens {
+		tokensMap[tokenID] = i
+	}
+
+	for tokenID := range settings.TokenSettings {
+		settingsMap[tokenID] = exists
+	}
+
+	// Validate tokenIDs in collection has settings
+	for tokenID := range tokensMap {
+		if _, ok := settingsMap[tokenID]; !ok {
+			sl.ReportError(tokenID, fmt.Sprintf("Tokens[%d]", tokensMap[tokenID]), "tokens", "required", "")
+		}
+	}
+
+	// Validate no extra tokenIDs are specified
+	for tokenID := range settingsMap {
+		if _, ok := tokensMap[tokenID]; !ok {
+			sl.ReportError(tokenID, fmt.Sprintf("TokenSettings[%s]", tokenID), "token_settings", "exclude", "")
+		}
 	}
 }
 

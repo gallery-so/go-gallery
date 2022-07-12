@@ -61,7 +61,13 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
 		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
-		"tokenSettings":  {tokenSettings, fmt.Sprintf("required,len=%d", len(tokens))},
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
+		Tokens:        tokens,
+		TokenSettings: tokenSettings,
 	}); err != nil {
 		return nil, err
 	}
@@ -192,9 +198,15 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"collectionID":  {collectionID, "required"},
-		"tokens":        {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
-		"tokenSettings": {tokenSettings, fmt.Sprintf("required,len=%d", len(tokens))},
+		"collectionID": {collectionID, "required"},
+		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
+	}); err != nil {
+		return err
+	}
+
+	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
+		Tokens:        tokens,
+		TokenSettings: tokenSettings,
 	}); err != nil {
 		return err
 	}
