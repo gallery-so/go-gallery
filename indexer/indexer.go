@@ -227,16 +227,14 @@ func (i *indexer) startPipeline(start persist.BlockNumber, topics [][]common.Has
 func (i *indexer) startNewBlocksPipeline(topics [][]common.Hash) {
 	i.isListening = true
 	uris := make(chan tokenURI)
-	metadatas := make(chan tokenMetadata)
 	balances := make(chan tokenBalances)
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
-	medias := make(chan tokenMedia)
 	transfers := make(chan []transfersAtBlock)
 	subscriptions := make(chan types.Log)
 	go i.subscribeNewLogs(transfers, subscriptions, topics)
-	go i.processNewTransfers(transfers, uris, metadatas, owners, previousOwners, balances, medias)
-	i.processNewTokens(uris, metadatas, owners, previousOwners, balances, medias)
+	go i.processTransfers(transfers, uris, owners, previousOwners, balances)
+	i.processTokens(uris, owners, previousOwners, balances)
 }
 
 func (i *indexer) listenForNewBlocks() {
@@ -505,8 +503,8 @@ func (i *indexer) subscribeNewLogs(transfersChan chan<- []transfersAtBlock, subs
 	}
 	wp.StopWait()
 	logrus.Infof("Processed logs from %d to %d.", i.lastSyncedBlock, mostRecentBlock)
-	// to ensure the most recent block is always an increment of blocksPerLogsCall, set lastSyncedBlock to the most recent increment of 50 less than curBlock
-	i.lastSyncedBlock = mostRecentBlock - (mostRecentBlock % blocksPerLogsCall) - blocksPerLogsCall
+
+	i.lastSyncedBlock = mostRecentBlock - 1
 }
 
 // TRANSFERS FUNCS -------------------------------------------------------------

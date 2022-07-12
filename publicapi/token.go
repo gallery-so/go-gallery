@@ -123,14 +123,8 @@ func (api TokenAPI) SyncTokens(ctx context.Context) error {
 		return err
 	}
 
-	if locked, err := api.throttler.IsLocked(ctx, userID.String()); err != nil {
-		return err
-	} else if locked {
-		return ErrTokenRefreshFailed{Message: "Token refresh is currently locked for this user."}
-	}
-
 	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
-		return err
+		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 	defer api.throttler.Unlock(ctx, userID.String())
 

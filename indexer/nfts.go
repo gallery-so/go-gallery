@@ -130,55 +130,49 @@ func getTokens(nftRepository persist.TokenRepository, contractRepository persist
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		isLocked, err := throttler.IsLocked(c, string(key))
+
+		err = throttler.Lock(c, string(key))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		if !isLocked {
-			err = throttler.Lock(c, string(key))
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
+		newCtx := c.Copy()
+		go func() {
+			defer throttler.Unlock(newCtx, string(key))
+			tokensWithoutMedia := make([]persist.Token, 0, len(tokens))
+			contractsWithoutMedia := make([]persist.Contract, 0, len(contracts))
+			for _, token := range tokens {
+				if token.Media.MediaURL == "" || token.Media.MediaType == "" || token.Media.MediaType == persist.MediaTypeUnknown {
+					tokensWithoutMedia = append(tokensWithoutMedia, token)
+				}
 			}
-			newCtx := c.Copy()
-			go func() {
-				defer throttler.Unlock(newCtx, string(key))
-				tokensWithoutMedia := make([]persist.Token, 0, len(tokens))
-				contractsWithoutMedia := make([]persist.Contract, 0, len(contracts))
-				for _, token := range tokens {
-					if token.Media.MediaURL == "" || token.Media.MediaType == "" || token.Media.MediaType == persist.MediaTypeUnknown {
-						tokensWithoutMedia = append(tokensWithoutMedia, token)
-					}
+			for _, contract := range contracts {
+				if contract.Name == "" {
+					contractsWithoutMedia = append(contractsWithoutMedia, contract)
 				}
-				for _, contract := range contracts {
-					if contract.Name == "" {
-						contractsWithoutMedia = append(contractsWithoutMedia, contract)
-					}
-				}
+			}
 
-				wp := workerpool.New(10)
-				for _, token := range tokensWithoutMedia {
-					t := token
-					wp.Submit(func() {
-						err := refreshToken(newCtx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
-						if err != nil {
-							logrus.Errorf("failed to update token media: %s", err)
-						}
-					})
-				}
-				for _, contract := range contractsWithoutMedia {
-					c := contract
-					wp.Submit(func() {
-						err := updateMediaForContract(newCtx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
-						if err != nil {
-							logrus.Errorf("failed to update contract media: %s", err)
-						}
-					})
-				}
-				wp.StopWait()
-			}()
-		}
+			wp := workerpool.New(10)
+			for _, token := range tokensWithoutMedia {
+				t := token
+				wp.Submit(func() {
+					err := refreshToken(newCtx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
+					if err != nil {
+						logrus.Errorf("failed to update token media: %s", err)
+					}
+				})
+			}
+			for _, contract := range contractsWithoutMedia {
+				c := contract
+				wp.Submit(func() {
+					err := updateMediaForContract(newCtx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
+					if err != nil {
+						logrus.Errorf("failed to update contract media: %s", err)
+					}
+				})
+			}
+			wp.StopWait()
+		}()
 
 		c.JSON(http.StatusOK, GetTokensOutput{NFTs: tokens, Contracts: contracts})
 	}
