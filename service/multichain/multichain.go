@@ -92,6 +92,11 @@ type tokenIdentifiers struct {
 	contract persist.DBID
 }
 
+type errWithPriority struct {
+	err      error
+	priority int
+}
+
 // ChainProvider is an interface for retrieving data from a chain
 type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
@@ -170,7 +175,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 						defer subWg.Done()
 						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr)
 						if err != nil {
-							errChan <- err
+							errChan <- errWithPriority{err: err, priority: priority}
 							return
 						}
 
@@ -204,7 +209,13 @@ outer:
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-errChan:
-			return err
+			if err, ok := err.(errWithPriority); ok {
+				if err.priority == 0 {
+					return err.err
+				}
+			} else {
+				return err
+			}
 		}
 	}
 	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
@@ -416,4 +427,8 @@ func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnost
 
 func (e ErrChainNotFound) Error() string {
 	return fmt.Sprintf("chain provider not found for chain: %d", e.Chain)
+}
+
+func (e errWithPriority) Error() string {
+	return e.err.Error()
 }
