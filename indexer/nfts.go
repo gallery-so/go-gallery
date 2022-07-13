@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -87,7 +88,7 @@ type ValidateUsersNFTsOutput struct {
 	Message string `json:"message,omitempty"`
 }
 
-func getTokens(nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client, throttler *throttle.Locker) gin.HandlerFunc {
+func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensInput{}
 
@@ -131,51 +132,77 @@ func getTokens(nftRepository persist.TokenRepository, contractRepository persist
 			return
 		}
 
-		err = throttler.Lock(c, string(key))
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		newCtx := c.Copy()
 		go func() {
-			defer throttler.Unlock(newCtx, string(key))
-			tokensWithoutMedia := make([]persist.Token, 0, len(tokens))
-			contractsWithoutMedia := make([]persist.Contract, 0, len(contracts))
-			for _, token := range tokens {
-				if token.Media.MediaURL == "" || token.Media.MediaType == "" || token.Media.MediaType == persist.MediaTypeUnknown {
-					tokensWithoutMedia = append(tokensWithoutMedia, token)
-				}
+			queueChan <- processTokensInput{
+				key:       string(key),
+				tokens:    tokens,
+				contracts: contracts,
 			}
-			for _, contract := range contracts {
-				if contract.Name == "" {
-					contractsWithoutMedia = append(contractsWithoutMedia, contract)
-				}
-			}
-
-			wp := workerpool.New(10)
-			for _, token := range tokensWithoutMedia {
-				t := token
-				wp.Submit(func() {
-					err := refreshToken(newCtx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
-					if err != nil {
-						logrus.Errorf("failed to update token media: %s", err)
-					}
-				})
-			}
-			for _, contract := range contractsWithoutMedia {
-				c := contract
-				wp.Submit(func() {
-					err := updateMediaForContract(newCtx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
-					if err != nil {
-						logrus.Errorf("failed to update contract media: %s", err)
-					}
-				})
-			}
-			wp.StopWait()
 		}()
 
 		c.JSON(http.StatusOK, GetTokensOutput{NFTs: tokens, Contracts: contracts})
 	}
+}
+
+type processTokensInput struct {
+	key       string
+	tokens    []persist.Token
+	contracts []persist.Contract
+}
+
+func processMedialessTokens(inputs <-chan processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client, throttler *throttle.Locker) {
+	wp := workerpool.New(10)
+	for input := range inputs {
+		i := input
+		c, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		func() {
+			defer cancel()
+			err := throttler.Lock(c, i.key)
+			if err == nil {
+				wp.Submit(func() {
+					ctx, cancel := context.WithTimeout(context.Background(), time.Minute*30)
+					defer cancel()
+					defer throttler.Unlock(ctx, i.key)
+					tokensWithoutMedia := make([]persist.Token, 0, len(i.tokens))
+					contractsWithoutMedia := make([]persist.Contract, 0, len(i.contracts))
+					for _, token := range i.tokens {
+						if token.Media.MediaURL == "" || token.Media.MediaType == "" || token.Media.MediaType == persist.MediaTypeUnknown {
+							tokensWithoutMedia = append(tokensWithoutMedia, token)
+						}
+					}
+					for _, contract := range i.contracts {
+						if contract.Name == "" {
+							contractsWithoutMedia = append(contractsWithoutMedia, contract)
+						}
+					}
+
+					nwp := workerpool.New(10)
+					for _, token := range tokensWithoutMedia {
+						t := token
+						nwp.Submit(func() {
+							err := refreshToken(ctx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient)
+							if err != nil {
+								logrus.Errorf("failed to update token media: %s", err)
+							}
+						})
+					}
+					for _, contract := range contractsWithoutMedia {
+						c := contract
+						nwp.Submit(func() {
+							err := updateMediaForContract(ctx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
+							if err != nil {
+								logrus.Errorf("failed to update contract media: %s", err)
+							}
+						})
+					}
+					nwp.StopWait()
+				})
+			} else {
+				logrus.Errorf("failed to acquire lock: %s", err)
+			}
+		}()
+	}
+	wp.StopWait()
 }
 
 func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) (persist.Token, persist.Contract, error) {

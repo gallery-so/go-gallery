@@ -97,7 +97,13 @@ func coreInitServer() *gin.Engine {
 	}
 
 	logrus.Info("Registering handlers...")
-	return handlersInitServer(router, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, newThrottler())
+
+	queueChan := make(chan processTokensInput)
+
+	t := newThrottler()
+
+	go processMedialessTokens(queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, t)
+	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
 func setDefaults() {
@@ -109,7 +115,7 @@ func setDefaults() {
 	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "eth-token-logs")
-	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
+	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "prod-token-content")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5433)
 	viper.SetDefault("POSTGRES_USER", "postgres")

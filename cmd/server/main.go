@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/server"

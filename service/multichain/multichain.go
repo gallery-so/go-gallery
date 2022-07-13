@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
 )
@@ -213,6 +214,7 @@ outer:
 				if err.priority == 0 {
 					return err.err
 				}
+				logger.For(ctx).Errorf("error updating fallback media for user %s: %s", user.Username, err.err)
 			} else {
 				return err
 			}

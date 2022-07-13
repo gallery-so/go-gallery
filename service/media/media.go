@@ -116,7 +116,9 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML, persist.MediaTypeGIF, persist.MediaTypeText:
+	case persist.MediaTypeGIF:
+		res = getGIFMedia(pCtx, name, storageClient, vURL, imgURL)
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML, persist.MediaTypeText:
 		res = getAuxilaryMedia(pCtx, name, storageClient, vURL, imgURL, mediaType)
 	case persist.MediaTypeSVG:
 		res = getSvgMedia(pCtx, name, storageClient, vURL, imgURL)
@@ -171,6 +173,39 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 	} else if imageURL != "" {
 		logger.For(pCtx).Infof("using imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
+		res.MediaURL = persist.NullString(imgURL)
+	}
+	return res
+}
+
+func getGIFMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
+	res := persist.Media{
+		MediaType: persist.MediaTypeGIF,
+	}
+	videoURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
+	if err == nil {
+		vURL = videoURL
+	}
+
+	thumbURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	if err == nil {
+		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, thumbURL)
+		res.ThumbnailURL = persist.NullString(thumbURL)
+	} else {
+		logger.For(pCtx).WithError(err).Error("could not get image serving URL")
+	}
+
+	if vURL != "" {
+		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
+		res.MediaURL = persist.NullString(vURL)
+		if imgURL != "" && thumbURL == "" {
+			res.ThumbnailURL = persist.NullString(imgURL)
+		}
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("using imageURL for %s: %s", name, imgURL)
+		res.MediaURL = persist.NullString(imgURL)
 	} else if imgURL != "" {
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
