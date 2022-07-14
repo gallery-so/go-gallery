@@ -183,6 +183,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		path := strings.ReplaceAll(asString, "ipfs://", "")
 		path = strings.ReplaceAll(path, "ipfs/", "")
 		path = strings.Split(path, "?")[0]
+		path = strings.TrimSuffix(path, "/")
 
 		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {

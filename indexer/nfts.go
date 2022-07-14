@@ -519,15 +519,6 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 		}
 		token := tokens[0]
 
-		newOwner, newQuantity, newBlock, err := getOwnershipUpdate(c, token, ethClient)
-		if err != nil {
-			return err
-		}
-		err = updateOwnershipStatus(c, tokenRepository, token.ID, token.TokenType, newOwner, token.OwnerAddress, newQuantity, token.Quantity, newBlock)
-		if err != nil {
-			return err
-		}
-
 		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			return err
@@ -572,10 +563,8 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 	errChan := make(chan error)
 	// iterate over len tokens
 	updateMediaForTokens(c, tokenUpdateChan, errChan, tokens, ethClient, ipfsClient, arweaveClient, storageClient)
-	// iterate again also len tokens
-	updateOwnershipForTokens(c, tokenUpdateChan, errChan, tokens, ethClient)
 	// == len(tokens) * 2
-	for i := 0; i < len(tokens)*2; i++ {
+	for i := 0; i < len(tokens); i++ {
 		select {
 		case update := <-tokenUpdateChan:
 			if err := tokenRepository.UpdateByID(c, update.TokenDBID, update.Update); err != nil {
@@ -598,70 +587,6 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 	return nil
 }
 
-func updateOwnershipStatus(ctx context.Context, tokenRepository persist.TokenRepository, tokenDBID persist.DBID, tokenType persist.TokenType, curOwner, supposedOwner persist.EthereumAddress, curBalance, supposedBalance persist.HexString, block persist.BlockNumber) error {
-	switch tokenType {
-	case persist.TokenTypeERC1155:
-		if strings.EqualFold(curBalance.String(), supposedBalance.String()) {
-			return nil
-		}
-		logger.For(ctx).Infof("balance status for token %s is incorrect: real %s -  before %s", tokenDBID, curBalance, supposedBalance)
-		return tokenRepository.UpdateByID(ctx, tokenDBID, persist.TokenUpdateBalanceInput{Quantity: curBalance, BlockNumber: block})
-	case persist.TokenTypeERC721:
-		if strings.EqualFold(curOwner.String(), supposedOwner.String()) {
-			return nil
-		}
-		logger.For(ctx).Infof("ownership status for token %s is incorrect: real %s -  before %s", tokenDBID, curOwner, supposedOwner)
-		err := tokenRepository.UpdateByID(ctx, tokenDBID, persist.TokenUpdateOwnerInput{OwnerAddress: curOwner, BlockNumber: block})
-		if err != nil {
-			if perr, ok := err.(*pq.Error); ok {
-				// if the error is a violation of unique constraint we should delete the token
-				if perr.Code == "23505" {
-					return tokenRepository.DeleteByID(ctx, tokenDBID)
-				}
-			}
-			return err
-		}
-		return nil
-	default:
-		return fmt.Errorf("unsupported token type: %s", tokenType)
-	}
-}
-
-func getOwnershipUpdate(ctx context.Context, token persist.Token, ethClient *ethclient.Client) (persist.EthereumAddress, persist.HexString, persist.BlockNumber, error) {
-	block, err := ethClient.BlockNumber(ctx)
-	if err != nil {
-		return "", "", 0, err
-	}
-	switch token.TokenType {
-	case persist.TokenTypeERC721:
-		erc721, err := contracts.NewIERC721Caller(token.ContractAddress.Address(), ethClient)
-		if err != nil {
-			return "", "", 0, err
-		}
-		owner, err := erc721.OwnerOf(&bind.CallOpts{Context: ctx}, token.TokenID.BigInt())
-		if err != nil {
-			return "", "", 0, err
-		}
-
-		return persist.EthereumAddress(owner.String()), token.Quantity, persist.BlockNumber(block), nil
-	case persist.TokenTypeERC1155:
-		if token.OwnerAddress == "" {
-			return token.OwnerAddress, token.Quantity, persist.BlockNumber(block), nil
-		}
-		erc1155, err := contracts.NewIERC1155Caller(token.ContractAddress.Address(), ethClient)
-		if err != nil {
-			return "", "", 0, err
-		}
-		bal, err := erc1155.BalanceOf(&bind.CallOpts{Context: ctx}, token.OwnerAddress.Address(), token.TokenID.BigInt())
-		if err != nil {
-			return "", "", 0, err
-		}
-		return token.OwnerAddress, persist.HexString(bal.Text(16)), persist.BlockNumber(block), nil
-	default:
-		return "", "", 0, fmt.Errorf("unsupported token type %s", token.TokenType)
-	}
-}
-
 // updateMediaForTokens will return two channels that will collectively receive the length of the tokens passed in
 func updateMediaForTokens(pCtx context.Context, updateChan chan<- tokenUpdate, errChan chan<- error, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) {
 
@@ -670,6 +595,11 @@ func updateMediaForTokens(pCtx context.Context, updateChan chan<- tokenUpdate, e
 	for _, t := range tokens {
 		token := t
 		wp.Submit(func() {
+
+			if t.TokenURI.Type() == persist.URITypeInvalid {
+				errChan <- fmt.Errorf("invalid token uri: %s", t.TokenURI)
+				return
+			}
 
 			up, err := getUpdateForToken(pCtx, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient)
 			if err != nil {
@@ -681,46 +611,6 @@ func updateMediaForTokens(pCtx context.Context, updateChan chan<- tokenUpdate, e
 
 			updateChan <- up
 
-		})
-	}
-}
-
-func updateOwnershipForTokens(c context.Context, tokenUpdateChan chan<- tokenUpdate, errChan chan error, tokens []persist.Token, ethClient *ethclient.Client) {
-	updateChan := make(chan tokenUpdate)
-	wp := workerpool.New(10)
-
-	for _, t := range tokens {
-		token := t
-		wp.Submit(func() {
-
-			owner, balance, block, err := getOwnershipUpdate(c, token, ethClient)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			switch token.TokenType {
-			case persist.TokenTypeERC1155:
-				if strings.EqualFold(token.Quantity.String(), balance.String()) {
-					errChan <- nil
-					return
-				}
-				updateChan <- tokenUpdate{TokenDBID: token.ID, Update: persist.TokenUpdateBalanceInput{
-					Quantity:    balance,
-					BlockNumber: block,
-				}}
-			case persist.TokenTypeERC721:
-				if strings.EqualFold(token.OwnerAddress.String(), owner.String()) {
-					errChan <- nil
-					return
-				}
-				updateChan <- tokenUpdate{TokenDBID: token.ID, Update: persist.TokenUpdateOwnerInput{
-					OwnerAddress: owner,
-					BlockNumber:  block,
-				}}
-			default:
-				errChan <- fmt.Errorf("unsupported token type %s", token.TokenType)
-			}
 		})
 	}
 }

@@ -55,6 +55,7 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 	".webm": persist.MediaTypeVideo,
 	".glb":  persist.MediaTypeAnimation,
 	".gltf": persist.MediaTypeAnimation,
+	".svg":  persist.MediaTypeSVG,
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
@@ -162,7 +163,7 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 			logger.For(pCtx).WithError(err).Error("could not get image serving URL")
 		}
 	}
-	if vURL != "" {
+	if vURL != "" && mediaType != persist.MediaTypeHTML {
 		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
 		if imageURL != "" {

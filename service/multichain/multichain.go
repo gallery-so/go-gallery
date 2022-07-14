@@ -290,9 +290,40 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	if !ok {
 		return ErrChainNotFound{Chain: ti.Chain}
 	}
-	for _, provider := range providers {
-		if err := provider.RefreshToken(ctx, ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}); err != nil {
+	for i, provider := range providers {
+		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+		if err := provider.RefreshToken(ctx, id); err != nil {
 			return err
+		}
+
+		tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
+		if err != nil {
+			return err
+		}
+		if i == 0 {
+			for _, token := range tokens {
+				if err := d.TokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
+					Media:       token.Media,
+					Metadata:    token.TokenMetadata,
+					Name:        persist.NullString(token.Name),
+					LastUpdated: persist.LastUpdatedTime{},
+					TokenURI:    token.TokenURI,
+					Description: persist.NullString(token.Description),
+				}); err != nil {
+					return err
+				}
+			}
+			for _, contract := range contracts {
+				if err := d.ContractRepo.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+					Chain:          ti.Chain,
+					Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
+					Symbol:         persist.NullString(contract.Symbol),
+					Name:           persist.NullString(contract.Name),
+					CreatorAddress: contract.CreatorAddress,
+				}); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
