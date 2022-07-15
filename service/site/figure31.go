@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/lib/pq"
-	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -88,23 +87,48 @@ func (i *Figure31Integration) Start(ctx context.Context) {
 	}
 	defer subscription.Unsubscribe()
 
+	go i.Schedule(ctx) // Run sync at fixed intervals
+
 	for {
 		<-i.logs
-		<-time.After(1 * time.Minute) // Give providers a chance to catch up to the head of the chain
+		<-time.After(2 * time.Minute) // Give providers a chance to catch up
 
-		logger.For(ctx).Info("syncing collection")
-		err := i.SyncCollection(ctx)
-
+		err = i.SyncCollection(ctx)
 		if err != nil {
 			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
-		} else {
-			logger.For(ctx).Info("synced collection")
+		}
+
+		err := i.AddToEarlyAccess(ctx)
+		if err != nil {
+			logger.For(ctx).Error(err)
+			sentryutil.ReportError(ctx, err)
 		}
 	}
 }
 
-// SyncCollection syncs the user's wallet, updates the collection and adds purchasers to the early access list.
+// Schedule runs the sync routine at fixed intervals so that the wallet is kept up to date. The indexers
+// are often a few blocks behind the latest block, meaning the latest transfer isn't accounted for yet.
+func (i *Figure31Integration) Schedule(ctx context.Context) {
+	for {
+		<-time.After(5 * time.Minute)
+
+		err := i.SyncCollection(ctx)
+		if err != nil {
+			logger.For(ctx).Error(err)
+			sentryutil.ReportError(ctx, err)
+		}
+
+		err = i.AddToEarlyAccess(ctx)
+		if err != nil {
+			logger.For(ctx).Error(err)
+			sentryutil.ReportError(ctx, err)
+		}
+	}
+
+}
+
+// SyncCollection syncs the user's wallet, and updates the collection.
 func (i *Figure31Integration) SyncCollection(ctx context.Context) error {
 	err := i.p.SyncTokens(ctx, i.UserID)
 	if err != nil {
@@ -116,23 +140,12 @@ func (i *Figure31Integration) SyncCollection(ctx context.Context) error {
 		return err
 	}
 
-	err = i.updateCollection(ctx, tokens)
-	if err != nil {
-		return err
-	}
-
-	return i.addToEarlyAccess(ctx)
-}
-
-func (i *Figure31Integration) updateCollection(ctx context.Context, tokens []sqlc.Token) error {
 	tokenMap := make([]persist.DBID, i.CollectionSize)
-
 	for _, token := range tokens {
 		mintID, err := strconv.ParseInt(token.TokenID.String, 16, 32)
 		if err != nil {
 			return err
 		}
-
 		tokenMap[mintID-1] = token.ID
 	}
 
@@ -140,19 +153,13 @@ func (i *Figure31Integration) updateCollection(ctx context.Context, tokens []sql
 	whitespace := make([]int, 0)
 	transferPtr := 0
 
-	for i, tokenID := range tokenMap {
+	for _, tokenID := range tokenMap {
 		switch tokenID {
-		// token has been transferred
 		case "":
-			if i != 0 && tokenMap[i-1] == "" {
-				whitespace = append(whitespace, transferPtr)
-			} else {
-				transferPtr = i
-				whitespace = append(whitespace, transferPtr)
-			}
-		// still owns the token
+			whitespace = append(whitespace, transferPtr)
 		default:
 			collectionTokens = append(collectionTokens, tokenID)
+			transferPtr++
 		}
 	}
 
@@ -163,9 +170,9 @@ func (i *Figure31Integration) updateCollection(ctx context.Context, tokens []sql
 	})
 }
 
-// addToEarlyAccess adds addresses that received tokens transferred from the artist's wallet.
-// Every wallet is added each time in case an event was missed.
-func (i *Figure31Integration) addToEarlyAccess(ctx context.Context) error {
+// AddToEarlyAccess only adds addresses that received tokens transferred from the artist's wallet.
+// Every wallet is added each time in case an event was missed when the server wasn't available.
+func (i *Figure31Integration) AddToEarlyAccess(ctx context.Context) error {
 	query := ethereum.FilterQuery{Addresses: []common.Address{i.ContractAddr}, Topics: [][]common.Hash{
 		{common.HexToHash(transferHash)}, {i.ArtistAddr.Hash()}},
 	}

@@ -29,8 +29,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// var openseaURL, _ = url.Parse("https://api.opensea.io/api/v1/assets")
-var openseaURL, _ = url.Parse("https://testnets-api.opensea.io/api/v1/assets")
+var openseaURL, _ = url.Parse("https://api.opensea.io/api/v1/assets")
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
