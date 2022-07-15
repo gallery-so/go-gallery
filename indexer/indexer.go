@@ -200,11 +200,10 @@ func (i *indexer) Start() {
 	logrus.Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
 	for {
-		timeAfterWait := <-time.After(time.Minute * 2)
+		timeAfterWait := <-time.After(time.Minute * 3)
 		i.startNewBlocksPipeline(topics)
 		logrus.Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
 	}
-
 }
 
 func (i *indexer) startPipeline(start persist.BlockNumber, topics [][]common.Hash) {
@@ -239,13 +238,13 @@ func (i *indexer) startNewBlocksPipeline(topics [][]common.Hash) {
 
 func (i *indexer) listenForNewBlocks() {
 	for {
+		<-time.After(time.Minute * 2)
 		finalBlockUint, err := i.ethClient.BlockNumber(context.Background())
 		if err != nil {
 			panic(fmt.Sprintf("error getting block number: %s", err))
 		}
 		atomic.StoreUint64(&i.mostRecentBlock, finalBlockUint)
 		logrus.Debugf("final block number: %v", finalBlockUint)
-		time.Sleep(time.Minute)
 	}
 }
 
@@ -265,15 +264,20 @@ func (i *indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 	var logsTo []types.Log
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String())).NewReader(ctx)
 	if err == nil {
-		defer reader.Close()
-		err = json.NewDecoder(reader).Decode(&logsTo)
-		if err != nil {
-			panic(err)
-		}
+		func() {
+			defer reader.Close()
+			err = json.NewDecoder(reader).Decode(&logsTo)
+			if err != nil {
+				panic(err)
+			}
+		}()
+	} else {
+		logrus.Errorf("error getting logs from GCP: %s", err)
 	}
 	if len(logsTo) > 0 {
 		lastLog := logsTo[len(logsTo)-1]
 		if nextBlock.Uint64()-lastLog.BlockNumber > (blocksPerLogsCall / 5) {
+			logrus.Warnf("Last log is %d blocks old, skipping", nextBlock.Uint64()-lastLog.BlockNumber)
 			logsTo = []types.Log{}
 		}
 	}
@@ -309,6 +313,8 @@ func (i *indexer) processLogs(transfersChan chan<- []transfersAtBlock, startingB
 		if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
 			panic(err)
 		}
+	} else {
+		logrus.Info("Found logs in cache...")
 	}
 
 	logrus.Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
@@ -630,31 +636,30 @@ func findFields(i *indexer, transfer rpc.Transfer, key persist.EthereumTokenIden
 	}
 
 	var uri persist.TokenURI
-	var metadata persist.TokenMetadata
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	// defer cancel()
 
-	ct, tid, err := key.GetParts()
-	if err != nil {
-		logrus.WithError(err).Errorf("error getting parts of %s", key)
-		storeErr(err, "ERR-PARTS", from, key, transfer.BlockNumber, i.storageClient)
-		panic(err)
-	}
-	ts, _ := i.tokenRepo.GetByTokenIdentifiers(ctx, tid, ct, 1, 0)
-	if ts != nil && len(ts) > 0 {
-		first := ts[0]
-		if first.TokenURI != "" {
-			uri = persist.TokenURI(first.TokenURI)
-		}
-		if first.TokenMetadata != nil && len(first.TokenMetadata) > 0 {
-			metadata = persist.TokenMetadata(first.TokenMetadata)
-		}
-	}
+	// ct, tid, err := key.GetParts()
+	// if err != nil {
+	// 	logrus.WithError(err).Errorf("error getting parts of %s", key)
+	// 	storeErr(err, "ERR-PARTS", from, key, transfer.BlockNumber, i.storageClient)
+	// 	panic(err)
+	// }
+	// ts, _ := i.tokenRepo.GetByTokenIdentifiers(ctx, tid, ct, 1, 0)
+	// if ts != nil && len(ts) > 0 {
+	// 	first := ts[0]
+	// 	if first.TokenURI != "" {
+	// 		uri = persist.TokenURI(first.TokenURI)
+	// 	}
+	// 	if first.TokenMetadata != nil && len(first.TokenMetadata) > 0 {
+	// 		metadata = persist.TokenMetadata(first.TokenMetadata)
+	// 	}
+	// }
 
-	if uri == "" {
-		uri = getURI(contractAddress, tokenID, transfer.TokenType, i.ethClient)
-	}
+	// if uri == "" {
+	uri = getURI(contractAddress, tokenID, transfer.TokenType, i.ethClient)
+	// }
 
 	go func() {
 		defer wg.Done()
@@ -662,6 +667,7 @@ func findFields(i *indexer, transfer rpc.Transfer, key persist.EthereumTokenIden
 	}()
 
 	if optionalFields {
+		var metadata persist.TokenMetadata
 		if metadata == nil {
 			metadata, uri = getMetadata(contractAddress, uri, tokenID, i.uniqueMetadatas, i.ipfsClient, i.arweaveClient)
 		}
@@ -828,7 +834,7 @@ func createTokens(i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]own
 
 	logrus.Info("Created tokens to insert into database...")
 
-	timeout := (time.Minute * 3)
+	timeout := (time.Minute * time.Duration((len(tokens) / 100)))
 	logrus.Infof("Upserting %d tokens and contracts with a timeout of %s", len(tokens), timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1050,7 +1056,7 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 		defer close(contractsChan)
 		contracts := make(map[persist.EthereumAddress]bool)
 
-		wp := workerpool.New(10)
+		wp := workerpool.New(3)
 
 		for _, token := range t {
 			to := token
@@ -1069,21 +1075,20 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 	}()
 
 	finalNow := time.Now()
-	return func() error {
-		contractMu.Lock()
-		defer contractMu.Unlock()
-		allContracts := make([]persist.Contract, 0, len(t))
-		for contract := range contractsChan {
-			allContracts = append(allContracts, contract)
-		}
-		logrus.Debugf("Upserting %d contracts", len(allContracts))
-		err = contractRepo.BulkUpsert(ctx, allContracts)
-		if err != nil {
-			return fmt.Errorf("err upserting contracts: %s", err.Error())
-		}
-		logrus.Debugf("Upserted %d contracts in %v time", len(allContracts), time.Since(finalNow))
-		return nil
-	}()
+
+	allContracts := make([]persist.Contract, 0, len(t)/2)
+	for contract := range contractsChan {
+		allContracts = append(allContracts, contract)
+	}
+	contractMu.Lock()
+	defer contractMu.Unlock()
+	logrus.Debugf("Upserting %d contracts", len(allContracts))
+	err = contractRepo.BulkUpsert(ctx, allContracts)
+	if err != nil {
+		return fmt.Errorf("err upserting contracts: %s", err.Error())
+	}
+	logrus.Debugf("Upserted %d contracts in %v time", len(allContracts), time.Since(finalNow))
+	return nil
 }
 
 func fillContractFields(ethClient *ethclient.Client, contractAddress persist.EthereumAddress, lastSyncedBlock persist.BlockNumber) persist.Contract {

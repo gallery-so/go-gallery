@@ -420,7 +420,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
 	case persist.TokenTypeERC1155:
 
-		instance, err := contracts.NewIERC1155MetadataURI(contract, ethClient)
+		instance, err := contracts.NewIERC1155MetadataURICaller(contract, ethClient)
 		if err != nil {
 			return "", err
 		}

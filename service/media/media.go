@@ -163,7 +163,7 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 			logger.For(pCtx).WithError(err).Error("could not get image serving URL")
 		}
 	}
-	if vURL != "" && mediaType != persist.MediaTypeHTML {
+	if vURL != "" {
 		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
 		if imageURL != "" {

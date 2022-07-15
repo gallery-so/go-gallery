@@ -342,8 +342,8 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 
 	logger.For(pCtx).Infof("Deduped down to %d tokens", len(pTokens))
 
-	erc1155Tokens := make([]persist.Token, 0, len(pTokens))
-	erc721Tokens := make([]persist.Token, 0, len(pTokens))
+	erc1155Tokens := make([]persist.Token, 0, len(pTokens)/2)
+	erc721Tokens := make([]persist.Token, 0, len(pTokens)/2)
 
 	logger.For(pCtx).Infof("Separating %d tokens into ERC1155 and ERC721", len(pTokens))
 	for _, token := range pTokens {
@@ -354,21 +354,6 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 			erc1155Tokens = append(erc1155Tokens, token)
 		default:
 			return fmt.Errorf("unknown token type: %s", token.TokenType)
-		}
-	}
-
-	logger.For(pCtx).Infof("Checking 0 quantities for tokens...")
-	for i, token := range erc1155Tokens {
-		if token.Quantity == "" || token.Quantity == "0" {
-			logger.For(pCtx).Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
-			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
-				return err
-			}
-			if len(pTokens) < i+1 {
-				pTokens = pTokens[:i]
-			} else {
-				pTokens = append(pTokens[:i], pTokens[i+1:]...)
-			}
 		}
 	}
 
@@ -386,6 +371,15 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 			return err
 		}
 		logger.For(pCtx).Infof("finished half of upsert")
+	}
+
+	for _, token := range erc1155Tokens {
+		if token.Quantity == "" || token.Quantity == "0" {
+			logger.For(pCtx).Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
+			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
