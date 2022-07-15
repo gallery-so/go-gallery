@@ -13,15 +13,17 @@ import (
 )
 
 type EventBuilder struct {
-	eventRepo *postgres.EventRepository
-	feedRepo  *postgres.FeedRepository
+	eventRepo         *postgres.EventRepository
+	feedRepo          *postgres.FeedRepository
+	feedBlocklistRepo *postgres.FeedBlocklistRepository
 }
 
 func NewEventBuilder(pgx *pgxpool.Pool) *EventBuilder {
 	queries := sqlc.New(pgx)
 	return &EventBuilder{
-		eventRepo: &postgres.EventRepository{Queries: queries},
-		feedRepo:  &postgres.FeedRepository{Queries: queries},
+		eventRepo:         &postgres.EventRepository{Queries: queries},
+		feedRepo:          &postgres.FeedRepository{Queries: queries},
+		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
 	}
 }
 
@@ -30,9 +32,16 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	defer tracing.FinishSpan(span)
 
 	event, err := b.eventRepo.Get(ctx, message.ID)
-
 	if err != nil {
 		return nil, err
+	}
+
+	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, event.ActorID, event.Action)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, nil
 	}
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{

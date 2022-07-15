@@ -289,3 +289,6 @@ SELECT * FROM feed_events
     WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = @collection_id::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1;
+
+-- name: IsFeedUserActionBlocked :one
+SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
