@@ -87,6 +87,12 @@ overrides:
   - column: "feed_events.data"
     go_type: "github.com/mikeydub/go-gallery/service/persist.FeedEventData"
 
+  # Feed Blocklist
+  - column: "feed_blocklist.user_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "feed_blocklist.action"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
+
   # Wildcards
   # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
   - column: "*.id"

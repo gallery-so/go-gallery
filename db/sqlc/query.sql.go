@@ -892,6 +892,22 @@ func (q *Queries) GlobalFeedHasMoreEvents(ctx context.Context, arg GlobalFeedHas
 	return column_1, err
 }
 
+const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
+SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false)
+`
+
+type IsFeedUserActionBlockedParams struct {
+	UserID persist.DBID
+	Action persist.Action
+}
+
+func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserActionBlockedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isFeedUserActionBlocked, arg.UserID, arg.Action)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const isWindowActive = `-- name: IsWindowActive :one
 SELECT EXISTS(
     SELECT 1 FROM events

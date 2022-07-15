@@ -109,6 +109,15 @@ type Feature struct {
 	ForceEnabledUserIds []string
 }
 
+type FeedBlocklist struct {
+	ID          persist.DBID
+	UserID      persist.DBID
+	Action      persist.Action
+	LastUpdated time.Time
+	CreatedAt   time.Time
+	Deleted     bool
+}
+
 type FeedEvent struct {
 	ID          persist.DBID
 	Version     int32
