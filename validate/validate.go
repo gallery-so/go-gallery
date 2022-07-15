@@ -126,33 +126,18 @@ type CollectionTokenSettingsParams struct {
 func CollectionTokenSettingsParamsValidator(sl validator.StructLevel) {
 	settings := sl.Current().Interface().(CollectionTokenSettingsParams)
 
-	if len(settings.Tokens) != len(settings.TokenSettings) {
-		sl.ReportError(settings.TokenSettings, "TokenSettings", "token_settings", "len", "")
-	}
+	for settingTokenID := range settings.TokenSettings {
+		var exists bool
 
-	tokensMap := make(map[persist.DBID]int)
-	settingsMap := make(map[persist.DBID]struct{})
-	var exists = struct{}{}
-
-	for i, tokenID := range settings.Tokens {
-		tokensMap[tokenID] = i
-	}
-
-	for tokenID := range settings.TokenSettings {
-		settingsMap[tokenID] = exists
-	}
-
-	// Validate tokenIDs in collection has settings
-	for tokenID := range tokensMap {
-		if _, ok := settingsMap[tokenID]; !ok {
-			sl.ReportError(tokenID, fmt.Sprintf("Tokens[%d]", tokensMap[tokenID]), "tokens", "required", "")
+		for _, tokenID := range settings.Tokens {
+			if settingTokenID == tokenID {
+				exists = true
+				break
+			}
 		}
-	}
 
-	// Validate no extra tokenIDs are specified
-	for tokenID := range settingsMap {
-		if _, ok := tokensMap[tokenID]; !ok {
-			sl.ReportError(tokenID, fmt.Sprintf("TokenSettings[%s]", tokenID), "token_settings", "exclude", "")
+		if !exists {
+			sl.ReportError(settingTokenID, fmt.Sprintf("TokenSettings[%s]", settingTokenID), "token_settings", "exclude", "")
 		}
 	}
 }
