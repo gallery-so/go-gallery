@@ -9,7 +9,7 @@ import (
 
 const (
 	MIN_COLUMNS     = 0
-	MAX_COLUMNS     = 6
+	MAX_COLUMNS     = 10
 	DEFAULT_COLUMNS = 3
 	MAX_WHITESPACE  = 1000
 )
