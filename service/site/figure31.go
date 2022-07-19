@@ -77,41 +77,8 @@ func NewFigure31Integration(loaders *dataloader.Loaders, provider *multichain.Pr
 func (i *Figure31Integration) Start(ctx context.Context) {
 	logger.For(ctx).Info("starting Figure31 integration")
 
-	query := ethereum.FilterQuery{Addresses: []common.Address{i.ContractAddr}, Topics: [][]common.Hash{
-		{common.HexToHash(transferHash)}},
-	}
-
-	subscription, err := i.e.SubscribeFilterLogs(ctx, query, i.logs)
-	if err != nil {
-		panic(err)
-	}
-	defer subscription.Unsubscribe()
-
-	go i.Schedule(ctx) // Run sync at fixed intervals
-
 	for {
-		<-i.logs
-		<-time.After(2 * time.Minute) // Give providers a chance to catch up
-
-		err = i.SyncCollection(ctx)
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-
-		err := i.AddToEarlyAccess(ctx)
-		if err != nil {
-			logger.For(ctx).Error(err)
-			sentryutil.ReportError(ctx, err)
-		}
-	}
-}
-
-// Schedule runs the sync routine at fixed intervals so that the wallet is kept up to date. The indexers
-// are often a few blocks behind the latest block, meaning the latest transfer isn't accounted for yet.
-func (i *Figure31Integration) Schedule(ctx context.Context) {
-	for {
-		<-time.After(5 * time.Minute)
+		<-time.After(5 * time.Minute) // Give providers a chance to catch up
 
 		err := i.SyncCollection(ctx)
 		if err != nil {
@@ -125,7 +92,6 @@ func (i *Figure31Integration) Schedule(ctx context.Context) {
 			sentryutil.ReportError(ctx, err)
 		}
 	}
-
 }
 
 // SyncCollection syncs the user's wallet, and updates the collection.
