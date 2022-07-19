@@ -74,6 +74,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 
 	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
 	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
+	v.RegisterStructValidation(CollectionTokenSettingsParamsValidator, CollectionTokenSettingsParams{})
 }
 
 func ChainAddressValidator(sl validator.StructLevel) {
@@ -112,6 +113,32 @@ func ConnectionPaginationParamsValidator(sl validator.StructLevel) {
 	if pageArgs.First != nil && pageArgs.Last != nil {
 		sl.ReportError(pageArgs.First, "First", "First", "excluded_with", "firstandlast")
 		sl.ReportError(pageArgs.Last, "Last", "Last", "excluded_with", "firstandlast")
+	}
+}
+
+// CollectionTokenSettingsParams are args passed to collection create and update functions that are meant to be validated together
+type CollectionTokenSettingsParams struct {
+	Tokens        []persist.DBID                                   `json:"tokens"`
+	TokenSettings map[persist.DBID]persist.CollectionTokenSettings `json:"token_settings"`
+}
+
+// CollectionTokenSettingsParamsValidator checks that the input CollectionTokenSettingsParams struct is valid
+func CollectionTokenSettingsParamsValidator(sl validator.StructLevel) {
+	settings := sl.Current().Interface().(CollectionTokenSettingsParams)
+
+	for settingTokenID := range settings.TokenSettings {
+		var exists bool
+
+		for _, tokenID := range settings.Tokens {
+			if settingTokenID == tokenID {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			sl.ReportError(settingTokenID, fmt.Sprintf("TokenSettings[%s]", settingTokenID), "token_settings", "exclude", "")
+		}
 	}
 }
 

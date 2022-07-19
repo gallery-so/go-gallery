@@ -49,6 +49,8 @@ var nodeFetcher = model.NodeFetcher{
 	},
 }
 
+var defaultTokenSettings = persist.CollectionTokenSettings{}
+
 func init() {
 	nodeFetcher.ValidateHandlers()
 }
@@ -70,6 +72,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUserNotFound{Message: message}
 	case persist.ErrUserAlreadyExists:
 		mappedErr = model.ErrUserAlreadyExists{Message: message}
+	case persist.ErrUsernameNotAvailable:
+		mappedErr = model.ErrUsernameNotAvailable{Message: message}
 	case persist.ErrCollectionNotFoundByID:
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrTokenNotFoundByID:
@@ -98,6 +102,51 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	return nil, false
 }
 
+func createDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
+	if !debugtools.Enabled || viper.GetString("ENV") != "local" {
+		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
+	}
+
+	if debugParams.AsUsername == nil {
+		if debugParams.ChainAddresses == nil {
+			return nil, fmt.Errorf("debug auth failed: either asUsername or chainAddresses must be specified")
+		}
+
+		userID := persist.DBID("")
+		if debugParams.UserID != nil {
+			userID = *debugParams.UserID
+		}
+
+		return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
+	}
+
+	if debugParams.UserID != nil || debugParams.ChainAddresses != nil {
+		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be used in conjunction with userId or chainAddresses parameters")
+	}
+
+	username := *debugParams.AsUsername
+	if username == "" {
+		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be empty")
+	}
+
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
+	}
+
+	wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
+	}
+
+	var addresses []persist.ChainAddress
+	for _, wallet := range wallets {
+		addresses = append(addresses, persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)))
+	}
+
+	return debugtools.NewDebugAuthenticator(user.ID, addresses), nil
+}
+
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.AuthMechanism) (auth.Authenticator, error) {
 
@@ -105,11 +154,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 
 	if debugtools.Enabled {
 		if viper.GetString("ENV") == "local" && m.Debug != nil {
-			userID := persist.DBID("")
-			if m.Debug.UserID != nil {
-				userID = *m.Debug.UserID
-			}
-			return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(m.Debug.ChainAddresses)), nil
+			return createDebugAuthenticator(ctx, *m.Debug)
 		}
 	}
 
@@ -229,8 +274,9 @@ func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, coll
 			TokenId:      tokenID,
 			CollectionId: collectionID,
 		},
-		Token:      token,
-		Collection: collection,
+		Token:         token,
+		Collection:    collection,
+		TokenSettings: nil, // handled by dedicated resolver
 	}
 
 	return collectionToken, nil
@@ -509,6 +555,20 @@ func resolveNewTokensByEventID(ctx context.Context, eventID persist.DBID) ([]*mo
 	return newTokens, nil
 }
 
+func resolveTokenSettingsByIDs(ctx context.Context, tokenID, collectionID persist.DBID) (*model.CollectionTokenSettings, error) {
+	collection, err := publicapi.For(ctx).Collection.GetCollectionById(ctx, collectionID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if settings, ok := collection.TokenSettings[tokenID]; ok {
+		return &model.CollectionTokenSettings{RenderLive: &settings.RenderLive}, nil
+	}
+
+	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive}, nil
+}
+
 func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*model.PageInfo, error) {
 	pageInfo := model.PageInfo{Size: len(feedConn.Edges)}
 
@@ -596,8 +656,9 @@ func eventToCollectorsNoteAddedToTokenFeedEventData(event *sqlc.FeedEvent) model
 		EventTime: &event.EventTime,
 		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
 		Token: &model.CollectionToken{
-			Token:      &model.Token{Dbid: event.Data.TokenID},                // remaining fields handled by dedicated resolver
-			Collection: &model.Collection{Dbid: event.Data.TokenCollectionID}, // remaining fields handled by dedicated resolver
+			Token:         &model.Token{Dbid: event.Data.TokenID},                // remaining fields handled by dedicated resolver
+			Collection:    &model.Collection{Dbid: event.Data.TokenCollectionID}, // remaining fields handled by dedicated resolver
+			TokenSettings: nil,                                                   // handled by dedicated resolver
 		},
 		Action:            &event.Action,
 		NewCollectorsNote: util.StringToPointer(event.Data.TokenNewCollectorsNote),

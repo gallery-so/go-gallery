@@ -217,12 +217,22 @@ type CollectionLayoutInput struct {
 
 type CollectionToken struct {
 	HelperCollectionTokenData
-	Token      *Token      `json:"token"`
-	Collection *Collection `json:"collection"`
+	Token         *Token                   `json:"token"`
+	Collection    *Collection              `json:"collection"`
+	TokenSettings *CollectionTokenSettings `json:"tokenSettings"`
 }
 
 func (CollectionToken) IsNode()                       {}
 func (CollectionToken) IsCollectionTokenByIDOrError() {}
+
+type CollectionTokenSettings struct {
+	RenderLive *bool `json:"renderLive"`
+}
+
+type CollectionTokenSettingsInput struct {
+	TokenID    persist.DBID `json:"tokenId"`
+	RenderLive bool         `json:"renderLive"`
+}
 
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`
@@ -270,11 +280,12 @@ type Contract struct {
 func (Contract) IsNode() {}
 
 type CreateCollectionInput struct {
-	GalleryID      persist.DBID           `json:"galleryId"`
-	Name           string                 `json:"name"`
-	CollectorsNote string                 `json:"collectorsNote"`
-	Tokens         []persist.DBID         `json:"tokens"`
-	Layout         *CollectionLayoutInput `json:"layout"`
+	GalleryID      persist.DBID                    `json:"galleryId"`
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	Tokens         []persist.DBID                  `json:"tokens"`
+	Layout         *CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
 }
 
 type CreateCollectionPayload struct {
@@ -292,6 +303,7 @@ type CreateUserPayload struct {
 func (CreateUserPayload) IsCreateUserPayloadOrError() {}
 
 type DebugAuth struct {
+	AsUsername     *string                 `json:"asUsername"`
 	UserID         *persist.DBID           `json:"userId"`
 	ChainAddresses []*persist.ChainAddress `json:"chainAddresses"`
 }
@@ -382,6 +394,7 @@ func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsRefreshTokenPayloadOrError()             {}
 func (ErrInvalidInput) IsRefreshContractPayloadOrError()          {}
 func (ErrInvalidInput) IsError()                                  {}
+func (ErrInvalidInput) IsCreateUserPayloadOrError()               {}
 func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
 func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
 
@@ -447,9 +460,8 @@ type ErrUserAlreadyExists struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserAlreadyExists) IsUpdateUserInfoPayloadOrError() {}
-func (ErrUserAlreadyExists) IsError()                        {}
-func (ErrUserAlreadyExists) IsCreateUserPayloadOrError()     {}
+func (ErrUserAlreadyExists) IsError()                    {}
+func (ErrUserAlreadyExists) IsCreateUserPayloadOrError() {}
 
 type ErrUserNotFound struct {
 	Message string `json:"message"`
@@ -461,6 +473,14 @@ func (ErrUserNotFound) IsError()                      {}
 func (ErrUserNotFound) IsLoginPayloadOrError()        {}
 func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
 func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
+
+type ErrUsernameNotAvailable struct {
+	Message string `json:"message"`
+}
+
+func (ErrUsernameNotAvailable) IsUpdateUserInfoPayloadOrError() {}
+func (ErrUsernameNotAvailable) IsError()                        {}
+func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
 
 type FeedConnection struct {
 	HelperFeedConnectionData
@@ -740,9 +760,10 @@ type UpdateCollectionInfoPayload struct {
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
 type UpdateCollectionTokensInput struct {
-	CollectionID persist.DBID           `json:"collectionId"`
-	Tokens       []persist.DBID         `json:"tokens"`
-	Layout       *CollectionLayoutInput `json:"layout"`
+	CollectionID  persist.DBID                    `json:"collectionId"`
+	Tokens        []persist.DBID                  `json:"tokens"`
+	Layout        *CollectionLayoutInput          `json:"layout"`
+	TokenSettings []*CollectionTokenSettingsInput `json:"tokenSettings"`
 }
 
 type UpdateCollectionTokensPayload struct {

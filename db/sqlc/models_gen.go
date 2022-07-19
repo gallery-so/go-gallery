@@ -46,6 +46,7 @@ type Collection struct {
 	CollectorsNote sql.NullString
 	Name           sql.NullString
 	Layout         TokenLayout
+	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings
 }
 
 type CollectionEvent struct {
@@ -106,6 +107,15 @@ type Feature struct {
 	IsEnabled           sql.NullBool
 	AdminOnly           sql.NullBool
 	ForceEnabledUserIds []string
+}
+
+type FeedBlocklist struct {
+	ID          persist.DBID
+	UserID      persist.DBID
+	Action      persist.Action
+	LastUpdated time.Time
+	CreatedAt   time.Time
+	Deleted     bool
 }
 
 type FeedEvent struct {

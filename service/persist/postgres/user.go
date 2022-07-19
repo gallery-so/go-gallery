@@ -44,7 +44,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, WALLETS) VALUES ($1, $2) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS) VALUES ($1, $2, $3, $4, $5) RETURNING ID;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
@@ -133,7 +133,7 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 			}
 		} else {
 			if aUser.ID != "" && aUser.ID != pID {
-				return persist.ErrUserAlreadyExists{Username: update.Username.String()}
+				return persist.ErrUsernameNotAvailable{Username: update.Username.String()}
 			}
 		}
 
@@ -156,22 +156,73 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 
 }
 
+func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, chainAddress persist.ChainAddress, walletType persist.WalletType) (persist.DBID, error) {
+	// Do we already have a wallet with this ChainAddress?
+	var walletID persist.DBID
+	if err := tx.StmtContext(ctx, u.getWalletIDStmt).QueryRowContext(ctx, chainAddress.Address(), chainAddress.Chain()).Scan(&walletID); err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+
+	if walletID != "" {
+		// If we do have a wallet with this ChainAddress, does it belong to a user?
+		var user persist.User
+		err := tx.StmtContext(ctx, u.getByWalletIDStmt).QueryRowContext(ctx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+		if err != nil && err != sql.ErrNoRows {
+			return "", err
+		}
+
+		// If the wallet belongs to a user, its address can't be used to create a new wallet. Return an error.
+		if user.ID != "" {
+			return "", persist.ErrAddressOwnedByUser{ChainAddress: chainAddress, OwnerID: user.ID}
+		}
+
+		// If the wallet exists but doesn't belong to anyone, it should be deleted.
+		if _, err := tx.StmtContext(ctx, u.deleteWalletStmt).ExecContext(ctx, walletID); err != nil {
+			return "", err
+		}
+	}
+
+	newWalletID := persist.GenerateID()
+	// At this point, we know there's no existing wallet in the database with this ChainAddress, so let's make a new one!
+	if _, err := tx.StmtContext(ctx, u.createWalletStmt).ExecContext(ctx, newWalletID, chainAddress.Address(), chainAddress.Chain(), walletType); err != nil {
+		return "", err
+	}
+
+	return newWalletID, nil
+}
+
 // Create creates a new user
 func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserInput) (persist.DBID, error) {
-	var walletID persist.DBID
-	var id persist.DBID
-
-	_, err := u.createWalletStmt.ExecContext(pCtx, persist.GenerateID(), pUser.ChainAddress.Address(), pUser.ChainAddress.Chain(), pUser.WalletType)
-	if err != nil {
-		return "", fmt.Errorf("failed to create wallet: %w", err)
-	}
-	err = u.getWalletIDStmt.QueryRowContext(pCtx, pUser.ChainAddress.Address(), pUser.ChainAddress.Chain()).Scan(&walletID)
+	tx, err := u.db.BeginTx(pCtx, nil)
 	if err != nil {
 		return "", err
 	}
 
-	err = u.createStmt.QueryRowContext(pCtx, persist.GenerateID(), []persist.DBID{walletID}).Scan(&id)
+	defer tx.Rollback()
+
+	var user persist.User
+	err = tx.StmtContext(pCtx, u.getByUsernameStmt).QueryRowContext(pCtx, strings.ToLower(pUser.Username)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.CreationTime, &user.LastUpdated)
+	if err == nil {
+		return "", persist.ErrUsernameNotAvailable{Username: pUser.Username}
+	}
+
+	// If there are no rows returned, the username isn't taken yet
+	if err != sql.ErrNoRows {
+		return "", err
+	}
+
+	walletID, err := u.createWalletWithTx(pCtx, tx, pUser.ChainAddress, pUser.WalletType)
 	if err != nil {
+		return "", err
+	}
+
+	var id persist.DBID
+	err = tx.StmtContext(pCtx, u.createStmt).QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Bio, []persist.DBID{walletID}).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return "", err
 	}
 
@@ -260,39 +311,13 @@ func (u *UserRepository) AddWallet(pCtx context.Context, pUserID persist.DBID, p
 
 	defer tx.Rollback()
 
-	// Do we already have a wallet with this ChainAddress?
-	var walletID persist.DBID
-	if err := tx.StmtContext(pCtx, u.getWalletIDStmt).QueryRowContext(pCtx, pChainAddress.Address(), pChainAddress.Chain()).Scan(&walletID); err != nil && err != sql.ErrNoRows {
-		return err
-	}
-
-	if walletID != "" {
-		// If we do have a wallet with this ChainAddress, does it belong to a user?
-		var user persist.User
-		err := tx.StmtContext(pCtx, u.getByWalletIDStmt).QueryRowContext(pCtx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
-		if err != nil && err != sql.ErrNoRows {
-			return err
-		}
-
-		// If the wallet belongs to a user, its address can't be used to create a new wallet. Return an error.
-		if user.ID != "" {
-			return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: user.ID}
-		}
-
-		// If the wallet exists but doesn't belong to anyone, it should be deleted.
-		if _, err := tx.StmtContext(pCtx, u.deleteWalletStmt).ExecContext(pCtx, walletID); err != nil {
-			return err
-		}
-	}
-
-	newWalletID := persist.GenerateID()
-	// At this point, we know there's no existing wallet in the database with this ChainAddress, so let's make a new one!
-	if _, err := tx.StmtContext(pCtx, u.createWalletStmt).ExecContext(pCtx, newWalletID, pChainAddress.Address(), pChainAddress.Chain(), pWalletType); err != nil {
+	walletID, err := u.createWalletWithTx(pCtx, tx, pChainAddress, pWalletType)
+	if err != nil {
 		return err
 	}
 
 	// Add the new wallet to the user
-	if _, err := tx.StmtContext(pCtx, u.addWalletStmt).ExecContext(pCtx, newWalletID, pUserID); err != nil {
+	if _, err := tx.StmtContext(pCtx, u.addWalletStmt).ExecContext(pCtx, walletID, pUserID); err != nil {
 		return err
 	}
 

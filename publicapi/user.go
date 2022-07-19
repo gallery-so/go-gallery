@@ -118,9 +118,28 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	return nil
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator) (userID persist.DBID, galleryID persist.DBID, err error) {
-	// Nothing to validate
-	return user.CreateUser(ctx, authenticator, api.repos.UserRepository, api.repos.GalleryRepository)
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, bio string) (userID persist.DBID, galleryID persist.DBID, err error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"username": {username, "required,username"},
+		"bio":      {bio, "bio"},
+	}); err != nil {
+		return "", "", err
+	}
+
+	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, bio, api.repos.UserRepository, api.repos.GalleryRepository)
+
+	// Send event
+	dispatchEventToFeed(ctx, sqlc.Event{
+		ActorID:        userID,
+		Action:         persist.ActionUserCreated,
+		ResourceTypeID: persist.ResourceTypeUser,
+		UserID:         userID,
+		SubjectID:      userID,
+		Data:           persist.EventData{UserBio: bio},
+	})
+
+	return userID, galleryID, err
 }
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
@@ -146,16 +165,6 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	}
 
 	api.loaders.ClearAllCaches()
-
-	// Send event
-	dispatchEventToFeed(ctx, sqlc.Event{
-		ActorID:        userID,
-		Action:         persist.ActionUserCreated,
-		ResourceTypeID: persist.ResourceTypeUser,
-		UserID:         userID,
-		SubjectID:      userID,
-		Data:           persist.EventData{UserBio: bio},
-	})
 
 	return nil
 }
