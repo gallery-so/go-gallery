@@ -196,6 +196,7 @@ func processMedialessTokens(inputs <-chan processTokensInput, nftRepository pers
 						})
 					}
 					nwp.StopWait()
+					logrus.Infof("Successfully processed %d tokens and %d contracts", len(tokensWithoutMedia), len(contractsWithoutMedia))
 				})
 			} else {
 				logrus.Errorf("failed to acquire lock: %s", err)

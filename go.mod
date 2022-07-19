@@ -27,7 +27,7 @@ require (
 	github.com/go-playground/validator/v10 v10.10.1
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/golang-migrate/migrate/v4 v4.15.1
-	github.com/gorilla/websocket v1.5.0
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hamba/avro v1.6.6 // indirect
 	github.com/imgix/imgix-go/v2 v2.0.3
 	github.com/ipfs/go-cid v0.1.0 // indirect
@@ -46,7 +46,6 @@ require (
 	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.5.0 // indirect
 	github.com/multiformats/go-multihash v0.1.0 // indirect
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/prometheus/tsdb v0.10.0 // indirect
