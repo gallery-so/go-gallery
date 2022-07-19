@@ -54,6 +54,9 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 	if searchDepth == 0 {
 		return nil
 	}
+	if _, ok := m[key]; ok {
+		return m[key]
+	}
 	for k, v := range m {
 		if k == key {
 			return v
@@ -82,6 +85,9 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int) interface{} {
 	if searchDepth == 0 {
 		return nil
+	}
+	if _, ok := m[key]; ok {
+		return m[key]
 	}
 	for k, v := range m {
 

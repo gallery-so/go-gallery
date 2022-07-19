@@ -74,9 +74,9 @@ type GetTokensOutput struct {
 	Contracts []persist.Contract `json:"contracts"`
 }
 
-// ValidateUsersNFTsInput is the input for the validate users NFTs endpoint that will return
+// ValidateWalletNFTsInput is the input for the validate users NFTs endpoint that will return
 // whether what opensea has on a user is the same as what we have in our database
-type ValidateUsersNFTsInput struct {
+type ValidateWalletNFTsInput struct {
 	Wallet persist.EthereumAddress `json:"wallet,omitempty" binding:"required"`
 	All    bool                    `json:"all"`
 }
@@ -268,23 +268,23 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 
 func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input ValidateUsersNFTsInput
+		var input ValidateWalletNFTsInput
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
-		// TODO do we need to validate at the indexer level? probably multichain level.
-		// output, err := ValidateNFTs(c, input, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg)
-		// if err != nil {
-		// 	util.ErrResponse(c, http.StatusInternalServerError, err)
-		// }
-		// c.JSON(http.StatusOK, output)
+
+		output, err := validateNFTs(c, input, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+		}
+		c.JSON(http.StatusOK, output)
 
 	}
 }
 
 // validateNFTs will validate the NFTs for the wallet passed in when being compared with opensea
-func validateNFTs(c context.Context, input ValidateUsersNFTsInput, userRepository persist.UserRepository, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (ValidateUsersNFTsOutput, error) {
+func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (ValidateUsersNFTsOutput, error) {
 
 	currentNFTs, _, err := tokenRepository.GetByWallet(c, input.Wallet, -1, 0)
 	if err != nil {
@@ -341,7 +341,7 @@ func validateNFTs(c context.Context, input ValidateUsersNFTsInput, userRepositor
 			allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
 		}
 
-		if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, input.Wallet, tokenRepository, contractRepository, userRepository, ethcl, ipfsClient, arweaveClient, stg); err != nil {
+		if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, input.Wallet, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg); err != nil {
 			logrus.WithError(err).Error("failed to process unaccounted for NFTs")
 			return ValidateUsersNFTsOutput{}, err
 		}
@@ -392,7 +392,7 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 	}
 	return msgToAdd, nil
 }
-func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, address persist.EthereumAddress, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, userRepository persist.UserRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
+func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, address persist.EthereumAddress, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 	allTokens := make([]persist.Token, 0, len(assets))
 	cntracts := make([]persist.Contract, 0, len(assets))
 	block, err := ethcl.BlockNumber(ctx)

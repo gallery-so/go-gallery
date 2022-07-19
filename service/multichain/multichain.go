@@ -364,8 +364,14 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
 			if it, ok := seenTokens[ti]; ok {
-				if it.Media.MediaURL != "" && it.Name != "" {
-					continue
+				if !(it.Media.MediaType == persist.MediaTypeVideo && it.Media.ThumbnailURL == "") {
+					if it.Media.MediaURL != "" && it.Name != "" {
+						continue
+					}
+				} else {
+					if it.Media.MediaURL != "" {
+						token.Media.MediaURL = it.Media.MediaURL
+					}
 				}
 				logrus.Debugf("updating token %s because current version is invalid", ti)
 			} else {

@@ -251,7 +251,7 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 
 // ValidateTokensForWallet validates tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.Address, all bool) error {
-	input := indexer.ValidateUsersNFTsInput{Wallet: persist.EthereumAddress(wallet.String()), All: all}
+	input := indexer.ValidateWalletNFTsInput{Wallet: persist.EthereumAddress(wallet.String()), All: all}
 
 	asJSON, err := json.Marshal(input)
 	if err != nil {
