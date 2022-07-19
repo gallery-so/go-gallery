@@ -75,9 +75,11 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	arweaveClient := rpc.NewArweaveClient()
 
 	// Figure31 routine
-	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub().Clone())
-	figure31Integration := newFigure31Integration(ctx, repos, ethClient, httpClient, pgx)
-	go figure31Integration.Start(ctx)
+	if viper.GetString("ENV") == "production" {
+		ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub().Clone())
+		figure31Integration := newFigure31Integration(ctx, repos, ethClient, httpClient, pgx)
+		go figure31Integration.Start(ctx)
+	}
 
 	return handlersInit(router, repos, sqlc.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, ethClient, httpClient))
 }
