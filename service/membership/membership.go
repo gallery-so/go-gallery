@@ -149,7 +149,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.EthereumAddress, tokenI
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 429 {
 			if pRetry > 3 {
-				return nil, fmt.Errorf("timed out fetching membership cards %d at url: %s", tokenID.Base10Int(), urlStr)
+				return nil, fmt.Errorf("timed out fetching membership cards %d at url: %s", tokenID.ToInt(), urlStr)
 			}
 
 			logger.For(nil).Warnf("Opensea API rate limit exceeded, retrying in 5 seconds")

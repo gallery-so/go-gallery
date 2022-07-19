@@ -291,6 +291,7 @@ type TokenRepository interface {
 	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
+	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)
 	GetByID(context.Context, DBID) (Token, error)
 	DeleteByID(context.Context, DBID) error
@@ -569,8 +570,8 @@ func (id TokenID) Base10String() string {
 	return id.BigInt().String()
 }
 
-// Base10Int returns the token ID as a base 10 integer
-func (id TokenID) Base10Int() int64 {
+// ToInt returns the token ID as a base 10 integer
+func (id TokenID) ToInt() int64 {
 	return id.BigInt().Int64()
 }
 

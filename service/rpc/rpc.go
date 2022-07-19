@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
 	goartypes "github.com/everFinance/goar/types"
-	"github.com/gorilla/websocket"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -73,9 +72,7 @@ func NewEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	dialer := *websocket.DefaultDialer
-	dialer.ReadBufferSize = 1024 * 20
-	rpcClient, err := rpc.DialWebsocketWithDialer(ctx, viper.GetString("RPC_URL"), "", dialer)
+	rpcClient, err := rpc.DialContext(ctx, viper.GetString("RPC_URL"))
 	if err != nil {
 		panic(err)
 	}

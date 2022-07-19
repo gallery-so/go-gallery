@@ -3,10 +3,12 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/util"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -24,6 +26,7 @@ type TokenRepository struct {
 	getByTokenIDPaginateStmt                *sql.Stmt
 	getByTokenIdentifiersStmt               *sql.Stmt
 	getByTokenIdentifiersPaginateStmt       *sql.Stmt
+	getMetadataByTokenIdentifiersStmt       *sql.Stmt
 	getByIDStmt                             *sql.Stmt
 	updateMediaStmt                         *sql.Stmt
 	updateMediaUnsafeStmt                   *sql.Stmt
@@ -68,6 +71,9 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	checkNoErr(err)
 
 	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
+	checkNoErr(err)
+
+	getMetadataByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI,TOKEN_METADATA,MEDIA FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE ID = $1;`)
@@ -115,6 +121,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		getByContractPaginateStmt:               getByContractPaginateStmt,
 		getByTokenIdentifiersStmt:               getByTokenIdentifiersStmt,
 		getByTokenIdentifiersPaginateStmt:       getByTokenIdentifiersPaginateStmt,
+		getMetadataByTokenIdentifiersStmt:       getMetadataByTokenIdentifiersStmt,
 		getByIDStmt:                             getByIDStmt,
 		updateMediaUnsafeStmt:                   updateMediaUnsafeStmt,
 		updateMediaStmt:                         updateMediaStmt,
@@ -286,6 +293,24 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 	return tokens, nil
 }
 
+// GetMetadataByTokenIdentifiers gets the token URI, token metadata, and media for a token
+func (t *TokenRepository) GetMetadataByTokenIdentifiers(ctx context.Context, tokenID persist.TokenID, contractAddress persist.EthereumAddress) (uri persist.TokenURI, metadata persist.TokenMetadata, med persist.Media, err error) {
+	err = t.getMetadataByTokenIdentifiersStmt.QueryRowContext(ctx, tokenID, contractAddress).Scan(&uri, &metadata, &med)
+	if err == nil {
+		if len(uri) > util.KB {
+			logger.For(ctx).Debugf("Token URI size for %s-%s: %s", tokenID, contractAddress, util.InByteSizeFormat(uint64(len(uri))))
+		}
+		if len(metadata) > util.KB {
+			logger.For(ctx).Debugf("Token metadata size for %s-%s: %s", tokenID, contractAddress, util.InByteSizeFormat(uint64(len(metadata))))
+		}
+		asJSON, _ := json.Marshal(med)
+		if len(asJSON) > util.KB {
+			logger.For(ctx).Debugf("Token media size for %s-%s: %s", tokenID, contractAddress, util.InByteSizeFormat(uint64(len(asJSON))))
+		}
+	}
+	return
+}
+
 // GetByTokenID retrieves all tokens associated with a contract
 func (t *TokenRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID, limit int64, page int64) ([]persist.Token, error) {
 	var rows *sql.Rows
@@ -387,6 +412,9 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 }
 
 func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []persist.Token) error {
+	if len(pTokens) == 0 {
+		return nil
+	}
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
@@ -416,13 +444,16 @@ func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []per
 
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
-		logger.For(pCtx).Debugf("SQL: %s", sqlStr)
+		logger.For(pCtx).Errorf("SQL: %s", sqlStr)
 		return fmt.Errorf("failed to upsert erc721 tokens: %w", err)
 	}
 	return nil
 }
 
 func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []persist.Token) error {
+	if len(pTokens) == 0 {
+		return nil
+	}
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
@@ -452,7 +483,7 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
-		logger.For(pCtx).Debugf("SQL: %s", sqlStr)
+		logger.For(pCtx).Errorf("SQL: %s", sqlStr)
 		return fmt.Errorf("failed to upsert erc1155 tokens: %w", err)
 	}
 	return nil

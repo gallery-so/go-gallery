@@ -628,7 +628,7 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 
 	if handler, ok := uniqueHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
 		logrus.Infof("Using %v metadata handler for %s", handler, contractAddress)
-		u, md, err := handler(newURI, persist.EthereumAddress(contractAddress.String()), tokenID)
+		u, md, err := handler(pCtx, newURI, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient, ipfsClient, arweaveClient)
 		if err != nil {
 			return tokenUpdate{}, fmt.Errorf("failed to get unique metadata for token %s: %s", uri, err)
 		}

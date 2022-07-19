@@ -12,16 +12,23 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	svg "github.com/ajstarks/svgo"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
+	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 var white = color.RGBA{255, 255, 255, 255}
 var black = color.RGBA{2, 4, 8, 0}
 
-type uniqueMetadataHandler func(persist.TokenURI, persist.EthereumAddress, persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error)
+const cryptoPunksImageContractAddress = "0x16f5a35647d6f03d5d3da7b35409d65ba03af3b2"
+
+type uniqueMetadataHandler func(context.Context, persist.TokenURI, persist.EthereumAddress, persist.TokenID, *ethclient.Client, *shell.Shell, *goar.Client) (persist.TokenURI, persist.TokenMetadata, error)
 
 type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
 
@@ -39,7 +46,7 @@ type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
  *   #  Fill in the cell completely.
  *
  */
-func autoglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
 
 	start := strings.Index(turi.String(), ",") + 1
 	if start == -1 {
@@ -152,7 +159,7 @@ func autoglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist
 * scheme 9 = greenest address color on reddest address color
 * scheme 10 = reddest address color, yellowest address color, bluest address color, lightest address color, and black on white
  */
-func colorglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
 	spl := strings.Split(string(turi), " ")
 	if len(spl) != 3 {
 		panic("invalid colorglyphs tokenURI")
@@ -318,10 +325,8 @@ type graphResponse struct {
 	Data ensDomains `json:"data"`
 }
 
-func ens(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	gql := fmt.Sprintf(`
 	{
 	  domains(first:1, where:{labelhash:"%s"}){
@@ -384,6 +389,28 @@ func ens(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenI
 		"name":        fmt.Sprintf("ENS: %s", result),
 		"description": "ENS names are used to resolve domain names to Ethereum addresses.",
 		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
+	}, nil
+
+}
+
+func cryptopunks(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
+	dataContract, err := contracts.NewCryptopunksDataCaller(common.HexToAddress(cryptoPunksImageContractAddress), ethCl)
+	if err != nil {
+		return turi, nil, err
+	}
+
+	punkSVG, err := dataContract.PunkImageSvg(&bind.CallOpts{Context: ctx}, uint16(tid.ToInt()))
+	if err != nil {
+		return turi, nil, err
+	}
+
+	removedPrefix := strings.TrimPrefix(punkSVG, "data:image/svg+xml;utf8,")
+	asBase64 := base64.RawStdEncoding.EncodeToString([]byte(removedPrefix))
+	withBase64Prefix := fmt.Sprintf("data:image/svg+xml;base64,%s", asBase64)
+	return persist.TokenURI(withBase64Prefix), persist.TokenMetadata{
+		"name":        fmt.Sprintf("Cryptopunks: %s", tid.Base10String()),
+		"description": "CryptoPunks launched as a fixed set of 10,000 items in mid-2017 and became one of the inspirations for the ERC-721 standard. They have been featured in places like The New York Times, Christie’s of London, Art|Basel Miami, and The PBS NewsHour.",
+		"image":       withBase64Prefix,
 	}, nil
 
 }
