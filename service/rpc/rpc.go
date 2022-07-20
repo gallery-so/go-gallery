@@ -158,10 +158,8 @@ func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *
 func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) ([]byte, error) {
 
 	d, _ := ctx.Deadline()
-	logger.For(ctx).Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
+	logger.For(ctx).Infof("Getting data from URI: %s -timeout: %s -type: %s", turi.String(), time.Until(d), turi.Type())
 	asString := turi.String()
-
-	logger.For(ctx).Debugf("Getting data from %s with type %s", asString, turi.Type())
 
 	switch turi.Type() {
 	case persist.URITypeBase64JSON, persist.URITypeBase64SVG:
@@ -196,7 +194,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 		return removeBOM(bs), nil
-	case persist.URITypeHTTP:
+	case persist.URITypeHTTP, persist.URITypeIPFSGateway:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 		if err != nil {
@@ -287,7 +285,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 			return err
 		}
 		return json.Unmarshal(result, into)
-	case persist.URITypeHTTP:
+	case persist.URITypeHTTP, persist.URITypeIPFSGateway:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 		if err != nil {
