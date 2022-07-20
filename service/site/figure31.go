@@ -51,7 +51,7 @@ type Figure31IntegrationInput struct {
 
 // NewFigure31Integration returns a new Figure31 site integration
 func NewFigure31Integration(loaders *dataloader.Loaders, provider *multichain.Provider, repos *persist.Repositories, pgx *pgxpool.Pool, input Figure31IntegrationInput) *Figure31Integration {
-	ethClient, err := ethclient.Dial(viper.GetString("RPC_URL"))
+	ethClient, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
 
 	if err != nil {
 		panic(err)
