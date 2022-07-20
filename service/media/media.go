@@ -317,6 +317,7 @@ func cacheRawAnimationMedia(ctx context.Context, animation []byte, bucket, fileN
 	client.Bucket(bucket).Object(fileName).Delete(ctx)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
+	defer sw.Close()
 
 	writer := gzip.NewWriter(sw)
 	defer writer.Close()
@@ -415,7 +416,7 @@ outer:
 	case persist.MediaTypeGIF:
 		if asURI.Type() == persist.URITypeIPFS || asURI.Type() == persist.URITypeArweave {
 			logger.For(pCtx).Infof("IPFS LINK: caching raw media for %s", url)
-			err = cacheRawSvgMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
+			err = cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 			if err != nil {
 				return mediaType, err
 			}
@@ -432,7 +433,7 @@ outer:
 
 		return persist.MediaTypeGIF, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 	case persist.MediaTypeSVG:
-		return persist.MediaTypeSVG, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
+		return persist.MediaTypeSVG, cacheRawSvgMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
 	case persist.MediaTypeUnknown:
 		mediaType = GuessMediaType(bs)
 		fallthrough
