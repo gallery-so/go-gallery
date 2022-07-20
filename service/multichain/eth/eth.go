@@ -33,7 +33,7 @@ type Provider struct {
 	ethClient      *ethclient.Client
 }
 
-// NewProvider creates a new DataRetriever
+// NewProvider creates a new ethereum Provider
 func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client) *Provider {
 	return &Provider{
 		indexerBaseURL: indexerBaseURL,

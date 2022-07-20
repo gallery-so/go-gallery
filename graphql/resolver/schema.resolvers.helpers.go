@@ -83,7 +83,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
 	case publicapi.ErrTokenRefreshFailed:
-		mappedErr = model.ErrOpenSeaRefreshFailed{Message: message}
+		mappedErr = model.ErrSyncFailed{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
@@ -971,7 +971,7 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 
 func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLSet {
 	url := media.ThumbnailURL.String()
-	if media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG && url == "" {
+	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG) && url == "" {
 		url = media.MediaURL.String()
 	}
 	preview := remapLargeImageUrls(url)

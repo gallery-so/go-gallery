@@ -232,7 +232,7 @@ func (i *indexer) startNewBlocksPipeline(topics [][]common.Hash) {
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []transfersAtBlock)
 	subscriptions := make(chan types.Log)
-	go i.subscribeNewLogs(transfers, subscriptions, topics)
+	go i.pollNewLogs(transfers, subscriptions, topics)
 	go i.processTransfers(transfers, uris, owners, previousOwners, balances)
 	i.processTokens(uris, owners, previousOwners, balances)
 }
@@ -438,7 +438,7 @@ func logsToTransfers(pLogs []types.Log, ethClient *ethclient.Client) []rpc.Trans
 	return result
 }
 
-func (i *indexer) subscribeNewLogs(transfersChan chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
+func (i *indexer) pollNewLogs(transfersChan chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
 
 	defer close(transfersChan)
 

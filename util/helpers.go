@@ -58,7 +58,7 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 		return m[key]
 	}
 	for k, v := range m {
-		if k == key {
+		if strings.EqualFold(k, key) {
 			return v
 		}
 
@@ -91,7 +91,7 @@ func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int
 	}
 	for k, v := range m {
 
-		if strings.Contains(strings.ToLower(k), strings.ToLower(key)) || strings.EqualFold(k, key) {
+		if strings.Contains(strings.ToLower(k), strings.ToLower(key)) {
 			return v
 		}
 

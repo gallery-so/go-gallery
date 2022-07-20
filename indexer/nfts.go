@@ -18,7 +18,6 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -50,22 +49,15 @@ type tokenUpdate struct {
 	TokenDBID       persist.DBID
 	TokenID         persist.TokenID
 	ContractAddress persist.EthereumAddress
-	Update          interface{}
+	Update          persist.TokenUpdateMediaInput
 }
 
 type getTokensInput struct {
-	ID              persist.DBID            `form:"id"`
 	WalletAddress   persist.EthereumAddress `form:"address"`
 	ContractAddress persist.EthereumAddress `form:"contract_address"`
 	TokenID         persist.TokenID         `form:"token_id"`
 	Page            int64                   `form:"page"`
 	Limit           int64                   `form:"limit"`
-}
-
-// GetTokenOutput is the response of the get token handler
-type GetTokenOutput struct {
-	NFT      persist.Token    `json:"nft"`
-	Contract persist.Contract `json:"contract"`
 }
 
 // GetTokensOutput is the response of the get tokens handler
@@ -97,25 +89,11 @@ func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenR
 			return
 		}
 
-		if input.ID == "" && input.WalletAddress == "" && input.ContractAddress == "" && input.TokenID == "" {
+		if input.WalletAddress == "" && input.ContractAddress == "" && input.TokenID == "" {
 			util.ErrResponse(c, http.StatusBadRequest, util.ErrInvalidInput{Reason: "must specify at least one of id, address, contract_address, token_id"})
 			return
 		}
 
-		token, contract, err := getTokenFromDB(c, input, nftRepository, contractRepository)
-		if err != nil {
-			status := http.StatusInternalServerError
-			if _, ok := err.(persist.ErrTokenNotFoundByID); ok {
-				status = http.StatusNotFound
-			}
-			util.ErrResponse(c, status, err)
-			return
-		}
-
-		if token.ID != "" {
-			c.JSON(http.StatusOK, GetTokenOutput{NFT: token, Contract: contract})
-			return
-		}
 		tokens, contracts, err := getTokensFromDB(c, input, nftRepository, contractRepository)
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -206,33 +184,8 @@ func processMedialessTokens(inputs <-chan processTokensInput, nftRepository pers
 	wp.StopWait()
 }
 
-func getTokenFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) (persist.Token, persist.Contract, error) {
-	switch {
-	case input.ID != "":
-		token, err := tokenRepo.GetByID(pCtx, input.ID)
-		if err != nil {
-			return persist.Token{}, persist.Contract{}, nil
-		}
-		contract, err := contractRepo.GetByAddress(pCtx, token.ContractAddress)
-		if err != nil {
-			return persist.Token{}, persist.Contract{}, nil
-		}
-		return token, contract, nil
-	}
-	return persist.Token{}, persist.Contract{}, nil
-}
 func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) ([]persist.Token, []persist.Contract, error) {
 	switch {
-	case input.ID != "":
-		token, err := tokenRepo.GetByID(pCtx, input.ID)
-		if err != nil {
-			return nil, nil, err
-		}
-		contract, err := contractRepo.GetByAddress(pCtx, token.ContractAddress)
-		if err != nil {
-			return nil, nil, err
-		}
-		return []persist.Token{token}, []persist.Contract{contract}, nil
 	case input.WalletAddress != "":
 		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
 	case input.TokenID != "" && input.ContractAddress != "":
@@ -570,12 +523,6 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 		case update := <-tokenUpdateChan:
 			if err := tokenRepository.UpdateByID(c, update.TokenDBID, update.Update); err != nil {
 				logrus.WithError(err).Error("failed to update token in database")
-				if perr, ok := err.(*pq.Error); ok {
-					// if the error is a violation of unique constraint we should delete the token
-					if perr.Code == "23505" {
-						return tokenRepository.DeleteByID(c, update.TokenDBID)
-					}
-				}
 				return err
 			}
 

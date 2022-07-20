@@ -649,7 +649,7 @@ type UpdateUserInfoPayload {
 union SyncTokensPayloadOrError =
     SyncTokensPayload
     | ErrNotAuthorized
-    | ErrOpenSeaRefreshFailed
+    | ErrSyncFailed
 
 type SyncTokensPayload {
     viewer: Viewer
@@ -658,7 +658,7 @@ type SyncTokensPayload {
 union RefreshTokenPayloadOrError =
     RefreshTokenPayload
   | ErrInvalidInput
-  | ErrOpenSeaRefreshFailed
+  | ErrSyncFailed
 
 type RefreshTokenPayload {
     token: Token
@@ -667,7 +667,7 @@ type RefreshTokenPayload {
 union RefreshContractPayloadOrError =
     RefreshContractPayload
   | ErrInvalidInput
-  | ErrOpenSeaRefreshFailed
+  | ErrSyncFailed
 
 type RefreshContractPayload {
     contract: Contract
@@ -732,7 +732,7 @@ type ErrDoesNotOwnRequiredToken implements Error {
     message: String!
 }
 
-type ErrOpenSeaRefreshFailed implements Error {
+type ErrSyncFailed implements Error {
     message: String!
 }
 

@@ -14,7 +14,7 @@ import (
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
 	db                                      *sql.DB
-	galleryRepo                             *GalleryTokenRepository
+	galleryRepo                             *GalleryRepository
 	createStmt                              *sql.Stmt
 	getByUserIDStmt                         *sql.Stmt
 	getByUserIDPaginateStmt                 *sql.Stmt
@@ -42,7 +42,7 @@ type TokenGalleryRepository struct {
 
 // NewTokenGalleryRepository creates a new TokenRepository
 // TODO joins on addresses
-func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenGalleryRepository {
+func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *TokenGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
