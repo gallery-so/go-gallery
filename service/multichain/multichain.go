@@ -9,7 +9,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // Provider is an interface for retrieving data from multiple chains
@@ -156,7 +155,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 	}
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logrus.Infof("updating media for user %s wallets %s", user.Username, a)
+		logger.For(ctx).Infof("updating media for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
 		wg.Add(len(addresses))
@@ -185,7 +184,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 					}(p, i)
 				}
 				subWg.Wait()
-				logrus.Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
+				logger.For(ctx).Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
 			}(addr, chain)
 		}
 	}
@@ -373,7 +372,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 						token.Media.MediaURL = it.Media.MediaURL
 					}
 				}
-				logrus.Debugf("updating token %s because current version is invalid", ti)
+				logger.For(ctx).Debugf("updating token %s because current version is invalid", ti)
 			} else {
 				if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
 					seenWallets[ti] = append(seenWallets[ti], w)

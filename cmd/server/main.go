@@ -2,25 +2,16 @@ package main
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/server"
 	"google.golang.org/appengine"
 )
 
 func main() {
-	defer func() {
-		if err := recover(); err != nil {
-			sentry.CurrentHub().Recover(err)
-			sentry.Flush(2 * time.Second)
-
-			// Re-raise error
-			panic(err)
-		}
-	}()
+	defer sentryutil.RecoverAndRaise(nil)
 
 	server.Init()
 

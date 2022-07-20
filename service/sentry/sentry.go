@@ -3,10 +3,13 @@ package sentryutil
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/sirupsen/logrus"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
@@ -17,10 +20,24 @@ import (
 )
 
 const (
-	authContextName  = "auth context"
-	errorContextName = "error context"
-	eventContextName = "event context"
+	authContextName   = "auth context"
+	errorContextName  = "error context"
+	eventContextName  = "event context"
+	loggerContextName = "logger context"
 )
+
+// SentryLoggerHook forwards log entries to Sentry.
+var SentryLoggerHook = &sentryLoggerHook{crumbTrailLimit: sentryTrailLimit, reportLevels: logrus.AllLevels}
+var logToSentryLevel = map[logrus.Level]sentry.Level{
+	logrus.PanicLevel: sentry.LevelFatal,
+	logrus.FatalLevel: sentry.LevelFatal,
+	logrus.ErrorLevel: sentry.LevelError,
+	logrus.WarnLevel:  sentry.LevelWarning,
+	logrus.InfoLevel:  sentry.LevelInfo,
+	logrus.DebugLevel: sentry.LevelDebug,
+	logrus.TraceLevel: sentry.LevelDebug,
+}
+var sentryTrailLimit = 8
 
 type authContext struct {
 	UserID        string
@@ -117,6 +134,23 @@ func UpdateErrorFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentr
 	return event
 }
 
+// UpdateLogErrorEvent updates the outgoing event with data from the logged error.
+func UpdateLogErrorEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if wrapped, ok := hint.OriginalException.(logger.LoggedError); ok {
+		if wrapped.Err != nil {
+			event.Fingerprint = []string{"{{ default }}", wrapped.Err.Error()}
+			mostRecent := len(event.Exception) - 1
+			event.Exception[mostRecent].Type = reflect.TypeOf(wrapped.Err).String()
+
+			// This really only works for errors created via the github.com/pkg/errors module.
+			if newStack := sentry.ExtractStacktrace(wrapped.Err); newStack != nil {
+				event.Exception[mostRecent].Stacktrace = newStack
+			}
+		}
+	}
+	return event
+}
+
 func SetAuthContext(scope *sentry.Scope, gc *gin.Context) {
 	var authCtx authContext
 	var userCtx sentry.User
@@ -153,6 +187,8 @@ func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, actio
 	scope.SetContext(eventContextName, eventCtx)
 }
 
+// NewSentryHubGinContext returns a new Gin context with a cloned hub of the original context's hub.
+// The hub is added to the context's request so that the sentrygin middleware is able to find it.
 func NewSentryHubGinContext(ctx context.Context) *gin.Context {
 	cpy := util.GinContextFromContext(ctx).Copy()
 
@@ -161,6 +197,16 @@ func NewSentryHubGinContext(ctx context.Context) *gin.Context {
 	}
 
 	return cpy
+}
+
+// NewSentryHubContext returns a copy of the parent context with an instance of its hub attached.
+// If no hub exists, the default hub stored in the global namespace is used. This
+// is useful for separating sentry-related data when starting new goroutines.
+func NewSentryHubContext(ctx context.Context) context.Context {
+	if hub := SentryHubFromContext(ctx); hub != nil {
+		return sentry.SetHubOnContext(ctx, hub.Clone())
+	}
+	return sentry.SetHubOnContext(ctx, sentry.CurrentHub().Clone())
 }
 
 // SentryHubFromContext gets a Hub from the supplied context, or from an underlying
@@ -181,4 +227,101 @@ func SentryHubFromContext(ctx context.Context) *sentry.Hub {
 	}
 
 	return nil
+}
+
+// sentryLoggerHook reports messages to Sentry.
+type sentryLoggerHook struct {
+	crumbTrailLimit int
+	reportLevels    []logrus.Level
+}
+
+// SetSentryHookOptions configures the Sentry hook in the global namespace.
+func SetSentryHookOptions(optionsFunc func(hook *sentryLoggerHook)) {
+	optionsFunc(SentryLoggerHook)
+}
+
+// Levels returns the logging levels that the hook will fire on.
+func (h sentryLoggerHook) Levels() []logrus.Level {
+	return h.reportLevels
+}
+
+// Fire reports the log entry to Sentry.
+func (h sentryLoggerHook) Fire(entry *logrus.Entry) error {
+	if entry.Context == nil {
+		return nil
+	}
+	if hub := SentryHubFromContext(entry.Context); hub != nil {
+		switch isErr := entry.Level <= logrus.ErrorLevel; isErr {
+		// Send as an error
+		case true:
+			if scope := hub.Scope(); scope == nil {
+				hub.PushScope()
+			}
+			defer hub.PopScope()
+
+			// Add logger fields as a context
+			hub.Scope().SetContext(loggerContextName, entry.Data)
+
+			if err, ok := entry.Data[logrus.ErrorKey].(error); ok {
+				ReportError(entry.Context, logger.LoggedError{
+					Message: entry.Message,
+					Caller:  entry.Caller,
+					Err:     err,
+				})
+			} else {
+				ReportError(entry.Context, logger.LoggedError{
+					Message: entry.Message,
+					Caller:  entry.Caller,
+				})
+			}
+		// Add to trail
+		default:
+			level := sentry.LevelDebug
+			if sentryLevel, ok := logToSentryLevel[entry.Level]; !ok {
+				level = sentryLevel
+			}
+
+			var category string
+			if entry.Caller != nil {
+				category = entry.Caller.Function
+			}
+
+			if scope := hub.Scope(); scope == nil {
+				hub.PushScope()
+			}
+
+			hub.Scope().AddBreadcrumb(&sentry.Breadcrumb{
+				Type:      "default",
+				Category:  category,
+				Level:     level,
+				Message:   entry.Message,
+				Data:      entry.Data,
+				Timestamp: entry.Time,
+			}, h.crumbTrailLimit)
+		}
+	}
+	return nil
+}
+
+// RecoverAndRaise reports the panic to Sentry then re-raises it.
+func RecoverAndRaise(ctx context.Context) {
+	if err := recover(); err != nil {
+		var hub *sentry.Hub
+
+		if ctx != nil {
+			hub = sentry.GetHubFromContext(ctx)
+		}
+
+		if hub == nil {
+			hub = sentry.CurrentHub()
+		}
+
+		if hub == nil {
+			panic(err)
+		}
+
+		defer sentry.Flush(2 * time.Second)
+		hub.Recover(err)
+		panic(err)
+	}
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -21,11 +20,11 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -226,7 +225,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumA
 
 	dir := "desc"
 
-	logrus.Debugf("Fetching assets for wallet %s with cursor %s, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, pCursor, retry, dir, len(alreadyReceived))
+	logger.For(pCtx).Debugf("Fetching assets for wallet %s with cursor %s, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, pCursor, retry, dir, len(alreadyReceived))
 
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?owner=%s&order_direction=%s&limit=%d", pWalletAddress, dir, 50)
 	if pCursor != "" {
@@ -270,7 +269,7 @@ func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumA
 	doneReceiving := false
 	for _, asset := range response.Assets {
 		if it, ok := alreadyReceived[asset.ID]; ok {
-			logrus.Debugf("response already received asset: %s", it)
+			logger.For(pCtx).Debugf("response already received asset: %s", it)
 			doneReceiving = true
 			continue
 		}
@@ -364,7 +363,7 @@ func FetchAssets(pCtx context.Context, assetsChan chan<- assetsReceieved, pWalle
 	doneReceiving := false
 	for _, asset := range response.Assets {
 		if it, ok := alreadyReceived[asset.ID]; ok {
-			logrus.Debugf("response already received asset: %s", it)
+			logger.For(pCtx).Debugf("response already received asset: %s", it)
 			doneReceiving = true
 			continue
 		}
@@ -390,7 +389,7 @@ func FetchAssets(pCtx context.Context, assetsChan chan<- assetsReceieved, pWalle
 // FetchContractByAddress fetches a contract by address
 func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress, retry int) (Contract, error) {
 
-	logrus.Debugf("Fetching contract for address %s", pContract)
+	logger.For(pCtx).Debugf("Fetching contract for address %s", pContract)
 
 	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/asset_contract/%s", pContract)
 
@@ -453,7 +452,7 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 			}
 			for _, n := range assetsReceived.assets {
 				nft := n
-				logrus.Info(n.Name)
+				logger.For(ctx).Info(n.Name)
 				wp.Submit(func() {
 					innerCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 					defer cancel()
@@ -499,7 +498,7 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 					}
 
 					if err != nil {
-						logrus.Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
+						logger.For(ctx).Errorf("failed to predict media type for %s: %s", nft.ImageThumbnailURL, err)
 					}
 
 					contract, ok := seenContracts.LoadOrStore(nft.Contract.ContractAddress.String(), multichain.ChainAgnosticContract{
@@ -658,8 +657,8 @@ func verifySignature(pSignatureStr string,
 		}
 
 		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
-		log.Println("pAddress:", pAddress)
+		logger.For(nil).Infof("pubkeyAddressHexStr: %s", pubkeyAddressHexStr)
+		logger.For(nil).Infof("pAddress: %s", pAddress)
 		if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
 			return false, auth.ErrAddressSignatureMismatch
 		}
@@ -684,7 +683,7 @@ func verifySignature(pSignatureStr string,
 
 		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
 		if err != nil {
-			logrus.WithError(err).Error("IsValidSignature")
+			logger.For(nil).WithError(err).Error("IsValidSignature")
 			return false, nil
 		}
 
