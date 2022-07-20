@@ -78,7 +78,7 @@ func (i *Figure31Integration) Start(ctx context.Context) {
 	logger.For(ctx).Info("starting Figure31 integration")
 
 	for {
-		<-time.After(5 * time.Minute) // Give providers a chance to catch up
+		<-time.After(3 * time.Minute)
 
 		err := i.SyncCollection(ctx)
 		if err != nil {
