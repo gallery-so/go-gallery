@@ -611,6 +611,8 @@ func (i *Figure31Integration) SyncCollection(ctx context.Context) error {
 		return err
 	}
 
+	i.l.TokensByCollectionID.Clear(i.CollectionID)
+
 	tokenMap := make([]persist.DBID, i.CollectionSize)
 	for _, token := range tokens {
 		mintID, err := strconv.ParseInt(token.TokenID.String, 16, 32)
