@@ -36,6 +36,9 @@ var defaultStartingBlock persist.BlockNumber = 13768584
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
+var animationKeywords = []string{"animation", "video"}
+var imageKeywords = []string{"image"}
+
 var uniqueMetadataHandlers = uniqueMetadatas{
 	persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
 	persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
@@ -672,7 +675,7 @@ func findOptionalFields(i *indexer, key persist.EthereumTokenIdentifiers, to, fr
 		return
 	}
 
-	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress.String(), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient, i.tokenBucket)
+	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress.String(), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient, i.tokenBucket, imageKeywords, animationKeywords)
 	if err != nil {
 		logrus.WithError(err).Errorf("error making previews for %s", key)
 		return

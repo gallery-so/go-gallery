@@ -215,6 +215,133 @@ func (p *Provider) ValidateTokensForWallet(context.Context, persist.Address, boo
 	return nil
 }
 
+// RefreshToken refreshes the metadata for a given token.
+func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers) error {
+	return nil
+}
+
+// RefreshContract refreshses the metadata for a contract
+func (p *Provider) RefreshContract(context.Context, persist.Address) error {
+	return nil
+}
+
+// VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
+func (p *Provider) VerifySignature(pCtx context.Context,
+	pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+
+	nonce := auth.NewNoncePrepend + pNonce
+	// personal_sign
+	validBool, err := verifySignature(pSignatureStr,
+		nonce,
+		pAddressStr.String(), pWalletType,
+		true, p.ethClient)
+
+	if !validBool || err != nil {
+		// eth_sign
+		validBool, err = verifySignature(pSignatureStr,
+			nonce,
+			pAddressStr.String(), pWalletType,
+			false, p.ethClient)
+		if err != nil || !validBool {
+			nonce = auth.NoncePrepend + pNonce
+			validBool, err = verifySignature(pSignatureStr,
+				nonce,
+				pAddressStr.String(), pWalletType,
+				true, p.ethClient)
+			if err != nil || !validBool {
+				validBool, err = verifySignature(pSignatureStr,
+					nonce,
+					pAddressStr.String(), pWalletType,
+					false, p.ethClient)
+			}
+		}
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return validBool, nil
+}
+
+func verifySignature(pSignatureStr string,
+	pData string,
+	pAddress string, pWalletType persist.WalletType,
+	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
+
+	// eth_sign:
+	// - https://goethereumbook.org/signature-verify/
+	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
+	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
+
+	var data string
+	if pUseDataHeaderBool {
+		data = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(pData), pData)
+	} else {
+		data = pData
+	}
+
+	switch pWalletType {
+	case persist.WalletTypeEOA:
+		dataHash := crypto.Keccak256Hash([]byte(data))
+
+		sig, err := hexutil.Decode(pSignatureStr)
+		if err != nil {
+			return false, err
+		}
+		// Ledger-produced signatures have v = 0 or 1
+		if sig[64] == 0 || sig[64] == 1 {
+			sig[64] += 27
+		}
+		v := sig[64]
+		if v != 27 && v != 28 {
+			return false, errors.New("invalid signature (V is not 27 or 28)")
+		}
+		sig[64] -= 27
+
+		sigPublicKeyECDSA, err := crypto.SigToPub(dataHash.Bytes(), sig)
+		if err != nil {
+			return false, err
+		}
+
+		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
+		log.Println("pAddress:", pAddress)
+		if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
+			return false, auth.ErrAddressSignatureMismatch
+		}
+
+		publicKeyBytes := crypto.CompressPubkey(sigPublicKeyECDSA)
+
+		signatureNoRecoverID := sig[:len(sig)-1]
+
+		return crypto.VerifySignature(publicKeyBytes, dataHash.Bytes(), signatureNoRecoverID), nil
+	case persist.WalletTypeGnosis:
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		sigValidator, err := contracts.NewISignatureValidator(common.HexToAddress(pAddress), ec)
+		if err != nil {
+			return false, err
+		}
+
+		hashedData := crypto.Keccak256([]byte(data))
+		var input [32]byte
+		copy(input[:], hashedData)
+
+		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
+		if err != nil {
+			logrus.WithError(err).Error("IsValidSignature")
+			return false, nil
+		}
+
+		return result == eip1271MagicValue, nil
+	default:
+		return false, errors.New("wallet type not supported")
+	}
+
+}
+
 // FetchAssetsForWallet recursively fetches all assets for a wallet
 func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumAddress, pCursor string, retry int, alreadyReceived map[int]string) ([]Asset, error) {
 
@@ -566,133 +693,6 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 		CreatorAddress: persist.Address(openseaContract.Collection.PayoutAddress),
 		LatestBlock:    persist.BlockNumber(block),
 	}, nil
-}
-
-// RefreshToken refreshes the metadata for a given token.
-func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers) error {
-	return nil
-}
-
-// RefreshContract refreshses the metadata for a contract
-func (p *Provider) RefreshContract(context.Context, persist.Address) error {
-	return nil
-}
-
-// VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
-func (p *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
-
-	nonce := auth.NewNoncePrepend + pNonce
-	// personal_sign
-	validBool, err := verifySignature(pSignatureStr,
-		nonce,
-		pAddressStr.String(), pWalletType,
-		true, p.ethClient)
-
-	if !validBool || err != nil {
-		// eth_sign
-		validBool, err = verifySignature(pSignatureStr,
-			nonce,
-			pAddressStr.String(), pWalletType,
-			false, p.ethClient)
-		if err != nil || !validBool {
-			nonce = auth.NoncePrepend + pNonce
-			validBool, err = verifySignature(pSignatureStr,
-				nonce,
-				pAddressStr.String(), pWalletType,
-				true, p.ethClient)
-			if err != nil || !validBool {
-				validBool, err = verifySignature(pSignatureStr,
-					nonce,
-					pAddressStr.String(), pWalletType,
-					false, p.ethClient)
-			}
-		}
-	}
-
-	if err != nil {
-		return false, err
-	}
-
-	return validBool, nil
-}
-
-func verifySignature(pSignatureStr string,
-	pData string,
-	pAddress string, pWalletType persist.WalletType,
-	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
-
-	// eth_sign:
-	// - https://goethereumbook.org/signature-verify/
-	// - http://man.hubwiz.com/docset/Ethereum.docset/Contents/Resources/Documents/eth_sign.html
-	// - sign(keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)))
-
-	var data string
-	if pUseDataHeaderBool {
-		data = fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(pData), pData)
-	} else {
-		data = pData
-	}
-
-	switch pWalletType {
-	case persist.WalletTypeEOA:
-		dataHash := crypto.Keccak256Hash([]byte(data))
-
-		sig, err := hexutil.Decode(pSignatureStr)
-		if err != nil {
-			return false, err
-		}
-		// Ledger-produced signatures have v = 0 or 1
-		if sig[64] == 0 || sig[64] == 1 {
-			sig[64] += 27
-		}
-		v := sig[64]
-		if v != 27 && v != 28 {
-			return false, errors.New("invalid signature (V is not 27 or 28)")
-		}
-		sig[64] -= 27
-
-		sigPublicKeyECDSA, err := crypto.SigToPub(dataHash.Bytes(), sig)
-		if err != nil {
-			return false, err
-		}
-
-		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
-		log.Println("pAddress:", pAddress)
-		if !strings.EqualFold(pubkeyAddressHexStr, pAddress) {
-			return false, auth.ErrAddressSignatureMismatch
-		}
-
-		publicKeyBytes := crypto.CompressPubkey(sigPublicKeyECDSA)
-
-		signatureNoRecoverID := sig[:len(sig)-1]
-
-		return crypto.VerifySignature(publicKeyBytes, dataHash.Bytes(), signatureNoRecoverID), nil
-	case persist.WalletTypeGnosis:
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		sigValidator, err := contracts.NewISignatureValidator(common.HexToAddress(pAddress), ec)
-		if err != nil {
-			return false, err
-		}
-
-		hashedData := crypto.Keccak256([]byte(data))
-		var input [32]byte
-		copy(input[:], hashedData)
-
-		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
-		if err != nil {
-			logrus.WithError(err).Error("IsValidSignature")
-			return false, nil
-		}
-
-		return result == eip1271MagicValue, nil
-	default:
-		return false, errors.New("wallet type not supported")
-	}
-
 }
 
 func (e errNoSingleNFTForOpenseaID) Error() string {
