@@ -14,7 +14,7 @@ import (
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
 	db                                      *sql.DB
-	galleryRepo                             *GalleryTokenRepository
+	galleryRepo                             *GalleryRepository
 	createStmt                              *sql.Stmt
 	getByUserIDStmt                         *sql.Stmt
 	getByUserIDPaginateStmt                 *sql.Stmt
@@ -37,11 +37,12 @@ type TokenGalleryRepository struct {
 	upsertStmt                              *sql.Stmt
 	deleteByIdentifiersStmt                 *sql.Stmt
 	deleteByIDStmt                          *sql.Stmt
+	getContractByAddressStmt                *sql.Stmt
 }
 
 // NewTokenGalleryRepository creates a new TokenRepository
 // TODO joins on addresses
-func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *TokenGalleryRepository {
+func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *TokenGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -111,6 +112,9 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) 
 	deleteByIDStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE ID = $1;`)
 	checkNoErr(err)
 
+	getContractByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
+	checkNoErr(err)
+
 	return &TokenGalleryRepository{
 		db:                                      db,
 		galleryRepo:                             galleryRepo,
@@ -136,6 +140,7 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) 
 		getByTokenIDStmt:                        getByTokenIDStmt,
 		getByTokenIDPaginateStmt:                getByTokenIDPaginateStmt,
 		deleteByIDStmt:                          deleteByIDStmt,
+		getContractByAddressStmt:                getContractByAddressStmt,
 	}
 
 }
@@ -459,15 +464,21 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 
 // UpdateByTokenIdentifiersUnsafe updates a token by its token identifiers without checking if it is owned by any given user
 func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pChain persist.Chain, pUpdate interface{}) error {
+
+	var contractID persist.DBID
+	if err := t.getContractByAddressStmt.QueryRowContext(pCtx, pContractAddress, pChain).Scan(&contractID); err != nil {
+		return err
+	}
+
 	var res sql.Result
 	var err error
 	switch pUpdate.(type) {
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
-		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, pContractAddress, pChain)
+		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
-		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pTokenID, pContractAddress, pChain)
+		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pTokenID, contractID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}

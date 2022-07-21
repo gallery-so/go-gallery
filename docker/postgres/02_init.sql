@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS collections (
     HIDDEN boolean NOT NULL DEFAULT false,
     COLLECTORS_NOTE varchar,
     NAME varchar(255),
-    LAYOUT jsonb
+    LAYOUT jsonb,
+    TOKEN_SETTINGS jsonb
 );
 
 CREATE TABLE IF NOT EXISTS collections_v2 (

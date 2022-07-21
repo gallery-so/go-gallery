@@ -16,7 +16,7 @@ var errNotOwnedByUser = errors.New("not all nfts are owned by the user")
 // CollectionTokenRepository is the repository for interacting with collections in a postgres database
 type CollectionTokenRepository struct {
 	db                      *sql.DB
-	galleryRepo             *GalleryTokenRepository
+	galleryRepo             *GalleryRepository
 	createStmt              *sql.Stmt
 	getByUserIDOwnerStmt    *sql.Stmt
 	getByUserIDOwnerRawStmt *sql.Stmt
@@ -41,7 +41,7 @@ type CollectionTokenRepository struct {
 
 // NewCollectionTokenRepository creates a new CollectionTokenRepository
 // TODO another join for addresses
-func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryTokenRepository) *CollectionTokenRepository {
+func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryRepository) *CollectionTokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

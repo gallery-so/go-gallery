@@ -17,6 +17,21 @@ import (
 const DefaultSearchDepth = 5
 const GinContextKey string = "GinContextKey"
 
+const (
+	// KB is the number of bytes in a kilobyte
+	KB = 1024
+	// MB is the number of bytes in a megabyte
+	MB = 1024 * KB
+	// GB is the number of bytes in a gigabyte
+	GB = 1024 * MB
+	// TB is the number of bytes in a terabyte
+	TB = 1024 * GB
+	// PB is the number of bytes in a petabyte
+	PB = 1024 * TB
+	// EB is the number of bytes in an exabyte
+	EB = 1024 * PB
+)
+
 // Contains checks whether an item exists in a slice
 func Contains(s []string, str string) bool {
 	for _, v := range s {
@@ -39,8 +54,11 @@ func GetValueFromMap(m map[string]interface{}, key string, searchDepth int) inte
 	if searchDepth == 0 {
 		return nil
 	}
+	if _, ok := m[key]; ok {
+		return m[key]
+	}
 	for k, v := range m {
-		if k == key {
+		if strings.EqualFold(k, key) {
 			return v
 		}
 
@@ -68,8 +86,12 @@ func GetValueFromMapUnsafe(m map[string]interface{}, key string, searchDepth int
 	if searchDepth == 0 {
 		return nil
 	}
+	if _, ok := m[key]; ok {
+		return m[key]
+	}
 	for k, v := range m {
-		if strings.Contains(k, key) {
+
+		if strings.Contains(strings.ToLower(k), strings.ToLower(key)) {
 			return v
 		}
 
@@ -164,4 +186,35 @@ func FindFile(f string, searchDepth int) (string, error) {
 	}
 
 	return "", fmt.Errorf("could not find file '%s' in path", f)
+}
+
+// InByteSizeFormat converts a number of bytes to a human-readable string
+// using SI units (kB, MB, GB, TB, PB, EB, ZB, YB)
+func InByteSizeFormat(bytes uint64) string {
+	unit := ""
+	value := float64(bytes)
+
+	if bytes >= EB {
+		unit = "EB"
+		value = value / EB
+	} else if bytes >= PB {
+		unit = "PB"
+		value = value / PB
+	} else if bytes >= TB {
+		unit = "TB"
+		value = value / TB
+	} else if bytes >= GB {
+		unit = "GB"
+		value = value / GB
+	} else if bytes >= MB {
+		unit = "MB"
+		value = value / MB
+	} else if bytes >= KB {
+		unit = "KB"
+		value = value / KB
+	} else {
+		unit = "B"
+	}
+
+	return fmt.Sprintf("%.2f %s", value, unit)
 }

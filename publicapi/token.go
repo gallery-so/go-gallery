@@ -5,6 +5,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -20,6 +21,7 @@ type TokenAPI struct {
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
+	throttler          *throttle.Locker
 }
 
 // ErrTokenRefreshFailed is a generic error that wraps all other OpenSea sync failures.
@@ -120,6 +122,11 @@ func (api TokenAPI) SyncTokens(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+	defer api.throttler.Unlock(ctx, userID.String())
 
 	err = api.multichainProvider.SyncTokens(ctx, userID)
 	if err != nil {

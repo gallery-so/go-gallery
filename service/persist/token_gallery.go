@@ -133,8 +133,8 @@ type ErrTokenGalleryNotFoundByIdentifiers struct {
 // NewTokenIdentifiers creates a new token identifiers
 func NewTokenIdentifiers(pContractAddress Address, pTokenID TokenID, pChain Chain) TokenIdentifiers {
 	return TokenIdentifiers{
-		TokenID:         pTokenID,
-		ContractAddress: pContractAddress,
+		TokenID:         TokenID(pTokenID.BigInt().Text(16)),
+		ContractAddress: Address(pChain.NormalizeAddress(pContractAddress)),
 		Chain:           pChain,
 	}
 }

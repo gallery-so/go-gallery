@@ -221,7 +221,7 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
-	ErrOpenSeaRefreshFailed struct {
+	ErrSyncFailed struct {
 		Message func(childComplexity int) int
 	}
 
@@ -1210,12 +1210,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrNotAuthorized.Message(childComplexity), true
 
-	case "ErrOpenSeaRefreshFailed.message":
-		if e.complexity.ErrOpenSeaRefreshFailed.Message == nil {
+	case "ErrSyncFailed.message":
+		if e.complexity.ErrSyncFailed.Message == nil {
 			break
 		}
 
-		return e.complexity.ErrOpenSeaRefreshFailed.Message(childComplexity), true
+		return e.complexity.ErrSyncFailed.Message(childComplexity), true
 
 	case "ErrTokenNotFound.message":
 		if e.complexity.ErrTokenNotFound.Message == nil {
@@ -3339,7 +3339,7 @@ type UpdateUserInfoPayload {
 union SyncTokensPayloadOrError =
     SyncTokensPayload
     | ErrNotAuthorized
-    | ErrOpenSeaRefreshFailed
+    | ErrSyncFailed
 
 type SyncTokensPayload {
     viewer: Viewer
@@ -3348,7 +3348,7 @@ type SyncTokensPayload {
 union RefreshTokenPayloadOrError =
     RefreshTokenPayload
   | ErrInvalidInput
-  | ErrOpenSeaRefreshFailed
+  | ErrSyncFailed
 
 type RefreshTokenPayload {
     token: Token
@@ -3357,7 +3357,7 @@ type RefreshTokenPayload {
 union RefreshContractPayloadOrError =
     RefreshContractPayload
   | ErrInvalidInput
-  | ErrOpenSeaRefreshFailed
+  | ErrSyncFailed
 
 type RefreshContractPayload {
     contract: Contract
@@ -3422,7 +3422,7 @@ type ErrDoesNotOwnRequiredToken implements Error {
     message: String!
 }
 
-type ErrOpenSeaRefreshFailed implements Error {
+type ErrSyncFailed implements Error {
     message: String!
 }
 
@@ -6567,7 +6567,7 @@ func (ec *executionContext) _ErrNotAuthorized_cause(ctx context.Context, field g
 	return ec.marshalNAuthorizationError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthorizationError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _ErrOpenSeaRefreshFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrOpenSeaRefreshFailed) (ret graphql.Marshaler) {
+func (ec *executionContext) _ErrSyncFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrSyncFailed) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6575,7 +6575,7 @@ func (ec *executionContext) _ErrOpenSeaRefreshFailed_message(ctx context.Context
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "ErrOpenSeaRefreshFailed",
+		Object:     "ErrSyncFailed",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -15201,13 +15201,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, obj)
-	case model.ErrOpenSeaRefreshFailed:
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
-	case *model.ErrOpenSeaRefreshFailed:
+	case model.ErrSyncFailed:
+		return ec._ErrSyncFailed(ctx, sel, &obj)
+	case *model.ErrSyncFailed:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
+		return ec._ErrSyncFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -15706,13 +15706,13 @@ func (ec *executionContext) _RefreshContractPayloadOrError(ctx context.Context, 
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
-	case model.ErrOpenSeaRefreshFailed:
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
-	case *model.ErrOpenSeaRefreshFailed:
+	case model.ErrSyncFailed:
+		return ec._ErrSyncFailed(ctx, sel, &obj)
+	case *model.ErrSyncFailed:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
+		return ec._ErrSyncFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -15736,13 +15736,13 @@ func (ec *executionContext) _RefreshTokenPayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
-	case model.ErrOpenSeaRefreshFailed:
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
-	case *model.ErrOpenSeaRefreshFailed:
+	case model.ErrSyncFailed:
+		return ec._ErrSyncFailed(ctx, sel, &obj)
+	case *model.ErrSyncFailed:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
+		return ec._ErrSyncFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -15796,13 +15796,13 @@ func (ec *executionContext) _SyncTokensPayloadOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrOpenSeaRefreshFailed:
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, &obj)
-	case *model.ErrOpenSeaRefreshFailed:
+	case model.ErrSyncFailed:
+		return ec._ErrSyncFailed(ctx, sel, &obj)
+	case *model.ErrSyncFailed:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrOpenSeaRefreshFailed(ctx, sel, obj)
+		return ec._ErrSyncFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -17363,19 +17363,19 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var errOpenSeaRefreshFailedImplementors = []string{"ErrOpenSeaRefreshFailed", "SyncTokensPayloadOrError", "RefreshTokenPayloadOrError", "RefreshContractPayloadOrError", "Error"}
+var errSyncFailedImplementors = []string{"ErrSyncFailed", "SyncTokensPayloadOrError", "RefreshTokenPayloadOrError", "RefreshContractPayloadOrError", "Error"}
 
-func (ec *executionContext) _ErrOpenSeaRefreshFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrOpenSeaRefreshFailed) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errOpenSeaRefreshFailedImplementors)
+func (ec *executionContext) _ErrSyncFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrSyncFailed) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errSyncFailedImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrOpenSeaRefreshFailed")
+			out.Values[i] = graphql.MarshalString("ErrSyncFailed")
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrOpenSeaRefreshFailed_message(ctx, field, obj)
+				return ec._ErrSyncFailed_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

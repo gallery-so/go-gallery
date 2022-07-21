@@ -12,13 +12,23 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	svg "github.com/ajstarks/svgo"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/everFinance/goar"
+	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type uniqueMetadataHandler func(persist.TokenURI, persist.EthereumAddress, persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error)
+var white = color.RGBA{255, 255, 255, 255}
+var black = color.RGBA{2, 4, 8, 0}
+
+const cryptoPunksImageContractAddress = "0x16f5a35647d6f03d5d3da7b35409d65ba03af3b2"
+
+type uniqueMetadataHandler func(context.Context, persist.TokenURI, persist.EthereumAddress, persist.TokenID, *ethclient.Client, *shell.Shell, *goar.Client) (persist.TokenURI, persist.TokenMetadata, error)
 
 type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
 
@@ -36,42 +46,59 @@ type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
  *   #  Fill in the cell completely.
  *
  */
-func autoglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
-	width := 80
-	height := 80
+func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
+
+	start := strings.Index(turi.String(), ",") + 1
+	if start == -1 {
+		return turi, nil, fmt.Errorf("invalid colorglyphs tokenURI")
+	}
+	glyph := turi.String()[start:]
+
+	glyph = strings.ReplaceAll(glyph, "\n", "")
+	glyph = strings.ReplaceAll(glyph, "%0A", "")
+
+	width := 240
+	height := 240
 	buf := &bytes.Buffer{}
 	canvas := svg.New(buf)
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
-	for i, c := range turi {
-		y := int(math.Floor(float64(i)/float64(64))) + 8
-		x := (i % 64) + 8
+	for i, c := range glyph {
+
+		y := int(math.Floor(float64(i)/float64(64))*3) + 21
+		x := ((i % 64) * 3) + 21
 		switch c {
 		case 'O':
-			canvas.Circle(x, y, 1, canvas.RGB(0, 0, 0))
+			canvas.Circle(x+1, y+1, 1, canvas.RGB(0, 0, 0))
 		case '+':
-			canvas.Line(x, y, x+1, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y, x, (y + 1), `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y, x+1, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-1, x, (y + 1), `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case 'X':
-			canvas.Line(x, y, x+1, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y, x+1, y-1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y-1, x+1, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y+1, x+1, y-1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '|':
-			canvas.Line(x, y, x, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-1, x, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '-':
-			canvas.Line(x, y, x+1, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y, x+1, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '\\':
-			canvas.Line(x, y, x+1, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y+1, x+1, y-1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '/':
-			canvas.Line(x, y, x+1, y-1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y-1, x+1, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '#':
 			canvas.Rect(x, y, 1, 1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		}
 	}
 	canvas.End()
+
+	// cut off everything before the svg tag in the buffer
+	svgStart := bytes.Index(buf.Bytes(), []byte("<svg"))
+	if svgStart == -1 {
+		return turi, nil, fmt.Errorf("no svg tag found in response")
+	}
 	return turi, persist.TokenMetadata{
 		"name":        fmt.Sprintf("Autoglyph #%s", tid.Base10String()),
 		"description": "Autoglyphs are the first “on-chain” generative art on the Ethereum blockchain. A completely self-contained mechanism for the creation and ownership of an artwork.",
-		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
+		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
 	}, nil
 }
 
@@ -132,11 +159,20 @@ func autoglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist
 * scheme 9 = greenest address color on reddest address color
 * scheme 10 = reddest address color, yellowest address color, bluest address color, lightest address color, and black on white
  */
-func colorglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
 	spl := strings.Split(string(turi), " ")
 	if len(spl) != 3 {
 		panic("invalid colorglyphs tokenURI")
 	}
+
+	// find the index of the first character after data:text/plain;charset=utf-8, in spl[0]
+	start := strings.Index(spl[0], ",") + 1
+	if start == -1 {
+		return turi, nil, fmt.Errorf("invalid colorglyphs tokenURI")
+	}
+	spl[0] = strings.ReplaceAll(spl[0], "\n", "")
+	spl[0] = strings.ReplaceAll(spl[0], "%0A", "")
+	spl[0] = spl[0][start:]
 
 	allColors := make([]color.RGBA, 35)
 	for i := 0; i < 35; i++ {
@@ -179,9 +215,6 @@ func colorglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persis
 	})
 	bluestColor := allColors[0]
 
-	white := color.RGBA{255, 255, 255, 255}
-	black := color.RGBA{2, 4, 8, 0}
-
 	var schemeColors []color.RGBA
 	var backgroundColor color.RGBA
 	switch spl[1] {
@@ -217,43 +250,49 @@ func colorglyphs(turi persist.TokenURI, addr persist.EthereumAddress, tid persis
 		backgroundColor = white
 	}
 
-	width := 80
-	height := 80
+	width := 240
+	height := 240
 	buf := &bytes.Buffer{}
 	canvas := svg.New(buf)
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(int(backgroundColor.R), int(backgroundColor.G), int(backgroundColor.B)))
 	for i, c := range spl[0] {
-		y := int(math.Floor(float64(i)/float64(64))) + 8
-		x := (i % 64) + 8
+		y := int(math.Floor(float64(i)/float64(64))*3) + 21
+		x := ((i % 64) * 3) + 21
 		col := schemeColors[int(math.Floor(float64(int(c))/float64(len(schemeColors))))%len(schemeColors)]
 		stroke := fmt.Sprintf(`stroke="rgb(%d,%d,%d)"`, col.R, col.G, col.B)
 		switch c {
 		case 'O':
-			canvas.Circle(x, y, 1, stroke, `stroke-width="0.1"`, `stroke-linecap="butt"`, `fill="none"`)
+			canvas.Circle(x+1, y+1, 1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`, `fill="none"`)
 		case '+':
-			canvas.Line(x, y, x+1, y, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y, x, (y + 1), stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y, x+1, y, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-1, x, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case 'X':
-			canvas.Line(x, y, x+1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y, x+1, y-1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y-1, x+1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x+1, y-1, x-1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '|':
-			canvas.Line(x, y, x, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-1, x, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '-':
-			canvas.Line(x, y, x+1, y, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y, x+1, y, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '\\':
-			canvas.Line(x, y, x+1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y+1, x+1, y-1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '/':
-			canvas.Line(x, y, x+1, y-1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-1, y-1, x+1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		case '#':
 			canvas.Rect(x, y, 1, 1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 		}
 	}
 	canvas.End()
+
+	// cut off everything before the svg tag in the buffer
+	svgStart := bytes.Index(buf.Bytes(), []byte("<svg"))
+	if svgStart == -1 {
+		return turi, nil, fmt.Errorf("no svg tag found in response")
+	}
 	return turi, persist.TokenMetadata{
 		"name":        fmt.Sprintf("Colorglyph #%s", tid.Base10String()),
 		"description": fmt.Sprintf("A Colorglyph with color scheme %s. Created by %s.", spl[1], spl[2]),
-		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
+		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
 	}, nil
 }
 
@@ -286,10 +325,8 @@ type graphResponse struct {
 	Data ensDomains `json:"data"`
 }
 
-func ens(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID) (persist.TokenURI, persist.TokenMetadata, error) {
+func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	gql := fmt.Sprintf(`
 	{
 	  domains(first:1, where:{labelhash:"%s"}){
@@ -342,10 +379,38 @@ func ens(turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenI
 
 	canvas.End()
 
+	// cut off everything before the svg tag in the buffer
+	svgStart := bytes.Index(buf.Bytes(), []byte("<svg"))
+	if svgStart == -1 {
+		return turi, nil, fmt.Errorf("no svg tag found in response")
+	}
+
 	return persist.TokenURI(result), persist.TokenMetadata{
 		"name":        fmt.Sprintf("ENS: %s", result),
 		"description": "ENS names are used to resolve domain names to Ethereum addresses.",
-		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes())),
+		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
+	}, nil
+
+}
+
+func cryptopunks(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
+	dataContract, err := contracts.NewCryptopunksDataCaller(common.HexToAddress(cryptoPunksImageContractAddress), ethCl)
+	if err != nil {
+		return turi, nil, err
+	}
+
+	punkSVG, err := dataContract.PunkImageSvg(&bind.CallOpts{Context: ctx}, uint16(tid.ToInt()))
+	if err != nil {
+		return turi, nil, err
+	}
+
+	removedPrefix := strings.TrimPrefix(punkSVG, "data:image/svg+xml;utf8,")
+	asBase64 := base64.RawStdEncoding.EncodeToString([]byte(removedPrefix))
+	withBase64Prefix := fmt.Sprintf("data:image/svg+xml;base64,%s", asBase64)
+	return persist.TokenURI(withBase64Prefix), persist.TokenMetadata{
+		"name":        fmt.Sprintf("Cryptopunks: %s", tid.Base10String()),
+		"description": "CryptoPunks launched as a fixed set of 10,000 items in mid-2017 and became one of the inspirations for the ERC-721 standard. They have been featured in places like The New York Times, Christie’s of London, Art|Basel Miami, and The PBS NewsHour.",
+		"image":       withBase64Prefix,
 	}, nil
 
 }

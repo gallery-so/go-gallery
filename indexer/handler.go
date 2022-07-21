@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/spf13/viper"
 )
 
 func handlersInit(router *gin.Engine, i *indexer, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
@@ -15,12 +16,12 @@ func handlersInit(router *gin.Engine, i *indexer, tokenRepository persist.TokenR
 	return router
 }
 
-func handlersInitServer(router *gin.Engine, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
+func handlersInitServer(router *gin.Engine, queueChan chan processTokensInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) *gin.Engine {
 
 	nftsGroup := router.Group("/nfts")
-	nftsGroup.POST("/refresh", updateTokenMedia(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient))
+	nftsGroup.POST("/refresh", updateTokens(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")))
 	nftsGroup.POST("/validate", validateWalletsNFTs(tokenRepository, contractRepository, ethClient, ipfsClient, arweaveClient, storageClient))
-	nftsGroup.GET("/get", getTokens(tokenRepository, ipfsClient, ethClient))
+	nftsGroup.GET("/get", getTokens(queueChan, tokenRepository, contractRepository, ipfsClient, ethClient, arweaveClient, storageClient))
 
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.GET("/get", getContract(contractRepository))

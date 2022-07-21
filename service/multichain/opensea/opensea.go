@@ -188,7 +188,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID), "", 0, nil)
+		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
 	}()
 	// TODO: Fill in this address or change something else
 	return assetsToTokens(ctx, "", assetsChan, p.ethClient)

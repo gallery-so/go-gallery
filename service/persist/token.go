@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"math/big"
@@ -35,10 +36,6 @@ const (
 	MediaTypeGIF MediaType = "gif"
 	// MediaTypeSVG represents an SVG
 	MediaTypeSVG MediaType = "svg"
-	// MediaTypeBase64JSON represents a base64 encoded JSON document
-	MediaTypeBase64JSON MediaType = "base64json"
-	// MediaTypeBase64SVG represents a base64 encoded SVG
-	MediaTypeBase64SVG MediaType = "base64svg"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
 	// MediaTypeHTML represents html
@@ -81,6 +78,8 @@ const (
 	URITypeHTTP URIType = "http"
 	// URITypeIPFSAPI represents an IPFS API URI
 	URITypeIPFSAPI URIType = "ipfs-api"
+	// URITypeIPFSGateway represents an IPFS Gateway URI
+	URITypeIPFSGateway URIType = "ipfs-gateway"
 	// URITypeBase64JSON represents a base64 encoded JSON document
 	URITypeBase64JSON URIType = "base64json"
 	// URITypeJSON represents a JSON document
@@ -278,15 +277,27 @@ type ContractCollectionNFT struct {
 	ContractImage NullString `json:"image_url"`
 }
 
+type TokenUpdateOwnerInput struct {
+	OwnerAddress EthereumAddress `json:"owner_address"`
+	BlockNumber  BlockNumber     `json:"block_number"`
+}
+
+type TokenUpdateBalanceInput struct {
+	Quantity    HexString   `json:"quantity"`
+	BlockNumber BlockNumber `json:"block_number"`
+}
+
 // TokenRepository represents a repository for interacting with persisted tokens
 type TokenRepository interface {
 	CreateBulk(context.Context, []Token) ([]DBID, error)
 	Create(context.Context, Token) (DBID, error)
-	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, error)
+	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
+	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)
 	GetByID(context.Context, DBID) (Token, error)
+	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error
 	UpdateByID(context.Context, DBID, interface{}) error
@@ -314,8 +325,17 @@ type ErrTokensNotFoundByContract struct {
 	ContractAddress EthereumAddress
 }
 
+type svgXML struct {
+	XMLName xml.Name `xml:"svg"`
+}
+
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
+
+	var asXML svgXML
+	if err := xml.Unmarshal(buf, &asXML); err == nil {
+		return MediaTypeSVG
+	}
 
 	contentType := http.DetectContentType(buf)
 	return MediaFromContentType(contentType)
@@ -497,6 +517,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64SVG
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
+	case strings.Contains(asString, "/ipfs/"):
+		return URITypeIPFSGateway
 	case strings.HasPrefix(asString, "http"), strings.HasPrefix(asString, "https"):
 		return URITypeHTTP
 	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json"), strings.HasPrefix(asString, "data:text/plain,{"):
@@ -558,8 +580,8 @@ func (id TokenID) Base10String() string {
 	return id.BigInt().String()
 }
 
-// Base10Int returns the token ID as a base 10 integer
-func (id TokenID) Base10Int() int64 {
+// ToInt returns the token ID as a base 10 integer
+func (id TokenID) ToInt() int64 {
 	return id.BigInt().Int64()
 }
 

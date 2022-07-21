@@ -10,7 +10,9 @@ import (
 	sentry "github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/option"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -29,9 +31,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/site"
-	"github.com/mikeydub/go-gallery/validate"
+	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 // Init initializes the server
@@ -73,8 +74,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-
-	return handlersInit(router, repos, sqlc.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, ethClient, httpClient))
+	return handlersInit(router, repos, sqlc.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, ethClient, httpClient), newThrottler())
 }
 
 func newStorageClient() *storage.Client {
@@ -102,7 +102,7 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("IPFS_URL", "https://ipfs.io")
+	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
@@ -115,7 +115,7 @@ func setDefaults() {
 	viper.SetDefault("ADD_ADDRESS_TOPIC", "user-add-address")
 	viper.SetDefault("OPENSEA_API_KEY", "")
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
-	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")
+	viper.SetDefault("INDEXER_HOST", "http://localhost:6000")
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
 	viper.SetDefault("SENTRY_DSN", "")
@@ -153,7 +153,7 @@ func setDefaults() {
 
 func newRepos(db *sql.DB) *persist.Repositories {
 	galleriesCacheToken := redis.NewCache(1)
-	galleryTokenRepo := postgres.NewGalleryTokenRepository(db, galleriesCacheToken)
+	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
 
 	return &persist.Repositories{
 		UserRepository:        postgres.NewUserRepository(db),
@@ -223,6 +223,10 @@ func initSentry() {
 
 func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client) *multichain.Provider {
 	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, opensea.NewProvider(ethClient, httpClient))
+}
+
+func newThrottler() *throttle.Locker {
+	return throttle.NewThrottleLocker(redis.NewCache(redis.RefreshNFTsThrottleDB), time.Minute*5)
 }
 
 func newFigure31Integration(ctx context.Context, repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client, pgx *pgxpool.Pool) *site.Figure31Integration {

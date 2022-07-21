@@ -57,39 +57,42 @@ func updateContractMedia(contractsRepo persist.ContractRepository, ethClient *et
 			return
 		}
 
-		newMetadata, err := rpc.GetTokenContractMetadata(c, input.Address, ethClient)
+		err := updateMediaForContract(c, input, ethClient, contractsRepo)
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		latestBlock, err := ethClient.BlockNumber(c)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		up := persist.ContractUpdateInput{
-			Name:        persist.NullString(newMetadata.Name),
-			Symbol:      persist.NullString(newMetadata.Symbol),
-			LatestBlock: persist.BlockNumber(latestBlock),
-		}
-
-		timedContext, cancel := context.WithTimeout(c, time.Second*10)
-		defer cancel()
-
-		creator, err := rpc.GetContractCreator(timedContext, input.Address, ethClient)
-		if err != nil {
-			logger.For(c).Errorf("error finding creator address: %v", err)
-		} else {
-			up.CreatorAddress = creator
-		}
-
-		if err := contractsRepo.UpdateByAddress(c, input.Address, up); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+func updateMediaForContract(c context.Context, input UpdateContractMediaInput, ethClient *ethclient.Client, contractsRepo persist.ContractRepository) error {
+	newMetadata, err := rpc.GetTokenContractMetadata(c, input.Address, ethClient)
+	if err != nil {
+		return err
+	}
+
+	latestBlock, err := ethClient.BlockNumber(c)
+	if err != nil {
+		return err
+	}
+
+	up := persist.ContractUpdateInput{
+		Name:        persist.NullString(newMetadata.Name),
+		Symbol:      persist.NullString(newMetadata.Symbol),
+		LatestBlock: persist.BlockNumber(latestBlock),
+	}
+
+	timedContext, cancel := context.WithTimeout(c, time.Second*10)
+	defer cancel()
+
+	creator, err := rpc.GetContractCreator(timedContext, input.Address, ethClient)
+	if err != nil {
+		logger.For(c).Errorf("error finding creator address: %v", err)
+	} else {
+		up.CreatorAddress = creator
+	}
+
+	return contractsRepo.UpdateByAddress(c, input.Address, up)
 }

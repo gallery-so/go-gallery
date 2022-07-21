@@ -431,14 +431,14 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
 func (ErrNotAuthorized) IsError()                                  {}
 
-type ErrOpenSeaRefreshFailed struct {
+type ErrSyncFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrOpenSeaRefreshFailed) IsSyncTokensPayloadOrError()      {}
-func (ErrOpenSeaRefreshFailed) IsRefreshTokenPayloadOrError()    {}
-func (ErrOpenSeaRefreshFailed) IsRefreshContractPayloadOrError() {}
-func (ErrOpenSeaRefreshFailed) IsError()                         {}
+func (ErrSyncFailed) IsSyncTokensPayloadOrError()      {}
+func (ErrSyncFailed) IsRefreshTokenPayloadOrError()    {}
+func (ErrSyncFailed) IsRefreshContractPayloadOrError() {}
+func (ErrSyncFailed) IsError()                         {}
 
 type ErrTokenNotFound struct {
 	Message string `json:"message"`

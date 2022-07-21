@@ -3,8 +3,11 @@ package multichain
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
 )
@@ -14,7 +17,7 @@ type Provider struct {
 	TokenRepo    persist.TokenGalleryRepository
 	ContractRepo persist.ContractGalleryRepository
 	UserRepo     persist.UserRepository
-	Chains       map[persist.Chain]ChainProvider
+	Chains       map[persist.Chain][]ChainProvider
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -73,11 +76,13 @@ type ErrChainNotFound struct {
 }
 
 type chainTokens struct {
-	chain  persist.Chain
-	tokens []ChainAgnosticToken
+	priority int
+	chain    persist.Chain
+	tokens   []ChainAgnosticToken
 }
 
 type chainContracts struct {
+	priority  int
 	chain     persist.Chain
 	contracts []ChainAgnosticContract
 }
@@ -86,6 +91,11 @@ type tokenIdentifiers struct {
 	chain    persist.Chain
 	tokenID  persist.TokenID
 	contract persist.DBID
+}
+
+type errWithPriority struct {
+	err      error
+	priority int
 }
 
 // ChainProvider is an interface for retrieving data from a chain
@@ -108,16 +118,13 @@ type ChainProvider interface {
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
 func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo persist.UserRepository, chains ...ChainProvider) *Provider {
-	c := map[persist.Chain]ChainProvider{}
+	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
 		if err != nil {
 			panic(err)
 		}
-		if _, ok := c[info.Chain]; ok {
-			panic("chain provider already exists for chain " + fmt.Sprint(info.Chain))
-		}
-		c[info.Chain] = chain
+		c[info.Chain] = append(c[info.Chain], chain)
 	}
 	return &Provider{
 		TokenRepo:    tokenRepo,
@@ -147,46 +154,73 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 			chainsToAddresses[wallet.Chain] = []persist.Address{wallet.Address}
 		}
 	}
+	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
 		logrus.Infof("updating media for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
+		wg.Add(len(addresses))
 		for _, addr := range addresses {
 			go func(addr persist.Address, chain persist.Chain) {
+				defer wg.Done()
 				start := time.Now()
-				provider, ok := d.Chains[chain]
+				providers, ok := d.Chains[chain]
 				if !ok {
 					errChan <- ErrChainNotFound{Chain: chain}
 					return
 				}
-				tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr)
-				if err != nil {
-					errChan <- err
-					return
-				}
+				subWg := &sync.WaitGroup{}
+				subWg.Add(len(providers))
+				for i, p := range providers {
+					go func(provider ChainProvider, priority int) {
+						defer subWg.Done()
+						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr)
+						if err != nil {
+							errChan <- errWithPriority{err: err, priority: priority}
+							return
+						}
 
-				incomingTokens <- chainTokens{chain: chain, tokens: tokens}
-				incomingContracts <- chainContracts{chain: chain, contracts: contracts}
-				logrus.Debugf("updated media for user %s wallet %s in %s: tokens %d", user.Username, addr, time.Since(start), len(tokens))
+						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
+						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
+					}(p, i)
+				}
+				subWg.Wait()
+				logrus.Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
 			}(addr, chain)
 		}
 	}
+	go func() {
+		defer close(incomingTokens)
+		defer close(incomingContracts)
+		wg.Wait()
+	}()
 	allTokens := make([]chainTokens, 0, len(user.Wallets))
 	allContracts := make([]chainContracts, 0, len(user.Wallets))
 	// ensure all tokens have been upserted
-	for i := 0; i < (len(user.Wallets) * 2); i++ {
+outer:
+	for {
 		select {
 		case incomingTokens := <-incomingTokens:
 			allTokens = append(allTokens, incomingTokens)
-		case incomingContracts := <-incomingContracts:
+		case incomingContracts, ok := <-incomingContracts:
+			if !ok {
+				break outer
+			}
 			allContracts = append(allContracts, incomingContracts)
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-errChan:
-			return err
+			if err, ok := err.(errWithPriority); ok {
+				if err.priority == 0 {
+					return err.err
+				}
+				logger.For(ctx).Errorf("error updating fallback media for user %s: %s", user.Username, err.err)
+			} else {
+				return err
+			}
 		}
 	}
-	newContracts, err := contractsToContracts(ctx, allContracts)
+	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
 	if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
 		return fmt.Errorf("error upserting contracts: %s", err)
 	}
@@ -209,7 +243,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 		}
 	}
 
-	newTokens, err := tokensToTokens(ctx, allTokens, addressesToContracts, user)
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
 	if err := d.TokenRepo.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
@@ -238,33 +272,79 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 
 // VerifySignature verifies a signature for a wallet address
 func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainAddress, pWalletType persist.WalletType) (bool, error) {
-	provider, ok := d.Chains[pChainAddress.Chain()]
+	providers, ok := d.Chains[pChainAddress.Chain()]
 	if !ok {
 		return false, ErrChainNotFound{Chain: pChainAddress.Chain()}
 	}
-	return provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig)
+	for _, provider := range providers {
+		if valid, err := provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig); err != nil || !valid {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 // RefreshToken refreshes a token on the given chain using the chain provider for that chain
 func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
-	provider, ok := d.Chains[ti.Chain]
+	providers, ok := d.Chains[ti.Chain]
 	if !ok {
 		return ErrChainNotFound{Chain: ti.Chain}
 	}
-	return provider.RefreshToken(ctx, ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID})
+	for i, provider := range providers {
+		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
+		if err := provider.RefreshToken(ctx, id); err != nil {
+			return err
+		}
+
+		tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
+		if err != nil {
+			return err
+		}
+		if i == 0 {
+			for _, token := range tokens {
+				if err := d.TokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
+					Media:       token.Media,
+					Metadata:    token.TokenMetadata,
+					Name:        persist.NullString(token.Name),
+					LastUpdated: persist.LastUpdatedTime{},
+					TokenURI:    token.TokenURI,
+					Description: persist.NullString(token.Description),
+				}); err != nil {
+					return err
+				}
+			}
+			for _, contract := range contracts {
+				if err := d.ContractRepo.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+					Chain:          ti.Chain,
+					Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
+					Symbol:         persist.NullString(contract.Symbol),
+					Name:           persist.NullString(contract.Name),
+					CreatorAddress: contract.CreatorAddress,
+				}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
 func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
-	provider, ok := d.Chains[ci.Chain]
+	providers, ok := d.Chains[ci.Chain]
 	if !ok {
 		return ErrChainNotFound{Chain: ci.Chain}
 	}
-	return provider.RefreshContract(ctx, ci.ContractAddress)
+	for _, provider := range providers {
+		if err := provider.RefreshContract(ctx, ci.ContractAddress); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
-	res := make([]persist.TokenGallery, 0, len(chaintokens))
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
+	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
@@ -273,26 +353,44 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 		normalizedAddress := wallet.Chain.NormalizeAddress(wallet.Address)
 		addressToWallets[normalizedAddress] = wallet
 	}
-	for _, chainToken := range chaintokens {
+
+	sort.SliceStable(tokens, func(i int, j int) bool {
+		return tokens[i].priority < tokens[j].priority
+	})
+
+	for _, chainToken := range tokens {
 		for _, token := range chainToken.tokens {
+
+			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
+
+			if it, ok := seenTokens[ti]; ok {
+				if !(it.Media.MediaType == persist.MediaTypeVideo && it.Media.ThumbnailURL == "") {
+					if it.Media.MediaURL != "" && it.Name != "" {
+						continue
+					}
+				} else {
+					if it.Media.MediaURL != "" {
+						token.Media.MediaURL = it.Media.MediaURL
+					}
+				}
+				logrus.Debugf("updating token %s because current version is invalid", ti)
+			} else {
+				if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
+					seenWallets[ti] = append(seenWallets[ti], w)
+				}
+				if q, ok := seenQuantities[ti]; ok {
+					seenQuantities[ti] = q.Add(token.Quantity)
+				} else {
+					seenQuantities[ti] = token.Quantity
+				}
+			}
+
 			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
 			}
 
-			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
-
-			if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
-				seenWallets[ti] = append(seenWallets[ti], w)
-			}
-
-			if q, ok := seenQuantities[ti]; ok {
-				seenQuantities[ti] = q.Add(token.Quantity)
-			} else {
-				seenQuantities[ti] = token.Quantity
-			}
-
-			res = append(res, persist.TokenGallery{
+			t := persist.TokenGallery{
 				Media:            token.Media,
 				TokenType:        token.TokenType,
 				Chain:            chainToken.chain,
@@ -308,30 +406,47 @@ func tokensToTokens(ctx context.Context, chaintokens []chainTokens, contractAddr
 				Contract:         contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
 				ExternalURL:      persist.NullString(token.ExternalURL),
 				BlockNumber:      token.BlockNumber,
-			})
+			}
+			seenTokens[ti] = t
 		}
+	}
+
+	res := make([]persist.TokenGallery, 0, len(seenTokens))
+	for _, t := range seenTokens {
+		res = append(res, t)
 	}
 	return res, nil
 
 }
 
-func contractsToContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
-	res := make([]persist.ContractGallery, 0, len(contracts))
-	seen := make(map[persist.ChainAddress]bool)
+func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
+	seen := make(map[persist.ChainAddress]persist.ContractGallery)
+
+	sort.SliceStable(contracts, func(i, j int) bool {
+		return contracts[i].priority < contracts[j].priority
+	})
+
 	for _, chainContract := range contracts {
 		for _, contract := range chainContract.contracts {
-			if _, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; !ok {
-				res = append(res, persist.ContractGallery{
-					Chain:          chainContract.chain,
-					Address:        contract.Address,
-					Symbol:         persist.NullString(contract.Symbol),
-					Name:           persist.NullString(contract.Name),
-					CreatorAddress: contract.CreatorAddress,
-				})
-				seen[persist.NewChainAddress(contract.Address, chainContract.chain)] = true
+			if it, ok := seen[persist.NewChainAddress(contract.Address, chainContract.chain)]; ok {
+				if it.Name != "" {
+					continue
+				}
 			}
+			c := persist.ContractGallery{
+				Chain:          chainContract.chain,
+				Address:        contract.Address,
+				Symbol:         persist.NullString(contract.Symbol),
+				Name:           persist.NullString(contract.Name),
+				CreatorAddress: contract.CreatorAddress,
+			}
+			seen[persist.NewChainAddress(contract.Address, chainContract.chain)] = c
 		}
+	}
 
+	res := make([]persist.ContractGallery, 0, len(seen))
+	for _, c := range seen {
+		res = append(res, c)
 	}
 	return res, nil
 
@@ -351,4 +466,8 @@ func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnost
 
 func (e ErrChainNotFound) Error() string {
 	return fmt.Sprintf("chain provider not found for chain: %d", e.Chain)
+}
+
+func (e errWithPriority) Error() string {
+	return e.err.Error()
 }

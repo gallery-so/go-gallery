@@ -83,7 +83,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
 	case publicapi.ErrTokenRefreshFailed:
-		mappedErr = model.ErrOpenSeaRefreshFailed{Message: message}
+		mappedErr = model.ErrSyncFailed{Message: message}
 	case publicapi.ErrInvalidInput:
 		validationErr, _ := err.(publicapi.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
@@ -949,7 +949,7 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 	}
 
 	switch med.MediaType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF:
+	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
 		return getImageMedia(ctx, med)
 	case persist.MediaTypeVideo:
 		return getVideoMedia(ctx, med)
@@ -959,9 +959,9 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 		return getHtmlMedia(ctx, med)
 	case persist.MediaTypeAnimation:
 		return getGltfMedia(ctx, med)
-	case persist.MediaTypeJSON, persist.MediaTypeBase64JSON:
+	case persist.MediaTypeJSON:
 		return getJsonMedia(ctx, med)
-	case persist.MediaTypeSVG, persist.MediaTypeText, persist.MediaTypeBase64SVG, persist.MediaTypeBase64Text:
+	case persist.MediaTypeText, persist.MediaTypeBase64Text:
 		return getTextMedia(ctx, med)
 	default:
 		return getUnknownMedia(ctx, med)
@@ -970,7 +970,11 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 }
 
 func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLSet {
-	preview := remapLargeImageUrls(media.ThumbnailURL.String())
+	url := media.ThumbnailURL.String()
+	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG || media.MediaType == persist.MediaTypeGIF) && url == "" {
+		url = media.MediaURL.String()
+	}
+	preview := remapLargeImageUrls(url)
 	mm := mediamapper.For(ctx)
 
 	return &model.PreviewURLSet{
