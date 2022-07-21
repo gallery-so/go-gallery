@@ -120,6 +120,8 @@ type indexer struct {
 	contractDBMu  *sync.Mutex
 	tokenDBMu     *sync.Mutex
 
+	tokenBucket string
+
 	chain persist.Chain
 
 	eventHashes []eventHash
@@ -149,6 +151,8 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		contractRepo:  contractRepo,
 		contractDBMu:  &sync.Mutex{},
 		tokenDBMu:     &sync.Mutex{},
+
+		tokenBucket: viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
 		chain: pChain,
 
@@ -668,7 +672,7 @@ func findOptionalFields(i *indexer, key persist.EthereumTokenIdentifiers, to, fr
 		return
 	}
 
-	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress.String(), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient)
+	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress.String(), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient, i.tokenBucket)
 	if err != nil {
 		logrus.WithError(err).Errorf("error making previews for %s", key)
 		return
@@ -784,7 +788,7 @@ func createTokens(i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]own
 
 	logrus.Info("Created tokens to insert into database...")
 
-	timeout := (time.Minute * time.Duration((len(tokens) / 100)))
+	timeout := (time.Minute * time.Duration((len(tokens) / 100))) + time.Minute
 	logrus.Infof("Upserting %d tokens and contracts with a timeout of %s", len(tokens), timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

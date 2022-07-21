@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"math/big"
@@ -324,10 +325,15 @@ type ErrTokensNotFoundByContract struct {
 	ContractAddress EthereumAddress
 }
 
+type svgXML struct {
+	XMLName xml.Name `xml:"svg"`
+}
+
 // SniffMediaType will attempt to detect the media type for a given array of bytes
 func SniffMediaType(buf []byte) MediaType {
 
-	if strings.HasPrefix(strings.TrimSpace(strings.TrimPrefix(string(buf), `<?xml version="1.0" encoding="UTF-8"?>`)), "<svg") {
+	var asXML svgXML
+	if err := xml.Unmarshal(buf, &asXML); err == nil {
 		return MediaTypeSVG
 	}
 

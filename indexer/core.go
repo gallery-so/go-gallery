@@ -102,7 +102,7 @@ func coreInitServer() *gin.Engine {
 
 	t := newThrottler()
 
-	go processMedialessTokens(queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, t)
+	go processMedialessTokens(queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 

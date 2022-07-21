@@ -971,7 +971,7 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 
 func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLSet {
 	url := media.ThumbnailURL.String()
-	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG) && url == "" {
+	if (media.MediaType == persist.MediaTypeImage || media.MediaType == persist.MediaTypeSVG || media.MediaType == persist.MediaTypeGIF) && url == "" {
 		url = media.MediaURL.String()
 	}
 	preview := remapLargeImageUrls(url)

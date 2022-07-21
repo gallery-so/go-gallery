@@ -61,7 +61,7 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
-func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.Media, error) {
+func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) (persist.Media, error) {
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
@@ -118,13 +118,13 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	switch mediaType {
 	case persist.MediaTypeImage:
-		res = getImageMedia(pCtx, name, storageClient, vURL, imgURL)
+		res = getImageMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	case persist.MediaTypeGIF:
-		res = getGIFMedia(pCtx, name, storageClient, vURL, imgURL)
+		res = getGIFMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML, persist.MediaTypeText, persist.MediaTypeAnimation:
-		res = getAuxilaryMedia(pCtx, name, storageClient, vURL, imgURL, mediaType)
+		res = getAuxilaryMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL, mediaType)
 	case persist.MediaTypeSVG:
-		res = getSvgMedia(pCtx, name, storageClient, vURL, imgURL)
+		res = getSvgMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	default:
 		res.MediaType = mediaType
 		if vURL != "" {
@@ -144,20 +144,20 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	return res, nil
 }
 
-func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL string, imgURL string, mediaType persist.MediaType) persist.Media {
+func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL string, imgURL string, mediaType persist.MediaType) persist.Media {
 	res := persist.Media{
 		MediaType: mediaType,
 	}
-	videoURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
+	videoURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
 	if err == nil {
 		vURL = videoURL
 	}
-	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
 	if err == nil {
 		logger.For(pCtx).Infof("found imageURL for %s: %s", name, imageURL)
 		res.ThumbnailURL = persist.NullString(imageURL)
 	} else {
-		imageURL, err = getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+		imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 		if err == nil {
 			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
 			res.ThumbnailURL = persist.NullString(imageURL)
@@ -183,16 +183,16 @@ func getAuxilaryMedia(pCtx context.Context, name string, storageClient *storage.
 	return res
 }
 
-func getGIFMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
+func getGIFMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
 	res := persist.Media{
 		MediaType: persist.MediaTypeGIF,
 	}
-	videoURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
+	videoURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
 	if err == nil {
 		vURL = videoURL
 	}
 
-	thumbURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	thumbURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 	if err == nil {
 		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, thumbURL)
 		res.ThumbnailURL = persist.NullString(thumbURL)
@@ -207,20 +207,17 @@ func getGIFMedia(pCtx context.Context, name string, storageClient *storage.Clien
 			res.ThumbnailURL = persist.NullString(imgURL)
 		}
 	} else if imgURL != "" {
-		logger.For(pCtx).Infof("using imageURL for %s: %s", name, imgURL)
-		res.MediaURL = persist.NullString(imgURL)
-	} else if imgURL != "" {
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
 	return res
 }
 
-func getSvgMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
+func getSvgMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
 	res := persist.Media{
 		MediaType: persist.MediaTypeSVG,
 	}
-	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
+	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient)
 	if err == nil {
 		logger.For(pCtx).Infof("found svgURL for svg %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
@@ -239,11 +236,11 @@ func getSvgMedia(pCtx context.Context, name string, storageClient *storage.Clien
 	return res
 }
 
-func getImageMedia(pCtx context.Context, name string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
+func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
 	res := persist.Media{
 		MediaType: persist.MediaTypeImage,
 	}
-	imageURL, err := getMediaServingURL(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
+	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
 	if err == nil {
 		logger.For(pCtx).Infof("found imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
