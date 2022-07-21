@@ -121,10 +121,14 @@ type Provider struct {
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(indexerBaseURL string, httpClient *http.Client) *Provider {
+func NewProvider(indexerBaseURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveCleint *goar.Client, storageClient *storage.Client, tokenBucket string) *Provider {
 	return &Provider{
-		apiURL:     indexerBaseURL,
-		httpClient: httpClient,
+		apiURL:        indexerBaseURL,
+		httpClient:    httpClient,
+		ipfsClient:    ipfsClient,
+		arweaveClient: arweaveCleint,
+		storageClient: storageClient,
+		tokenBucket:   tokenBucket,
 	}
 }
 
