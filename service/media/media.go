@@ -61,11 +61,11 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
-func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) (persist.Media, error) {
+func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords []string) (persist.Media, error) {
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
-	imgURL, vURL := findInitialURLs(metadata, name, turi)
+	imgURL, vURL := findInitialURLs(metadata, name, turi, imageKeywords, animationKeywords)
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
@@ -259,19 +259,20 @@ func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient
 	return res
 }
 
-func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (imgURL string, vURL string) {
+func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI, imageKeywords, animationKeywords []string) (imgURL string, vURL string) {
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
-		logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
-		vURL = it
-	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
-		logger.For(nil).Infof("found initial video url for %s: %s", name, it)
-		vURL = it
+	for _, keyword := range animationKeywords {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok {
+			logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
+			vURL = it
+		}
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
-		logger.For(nil).Infof("found initial image url for %s: %s", name, it)
-		imgURL = it
+	for _, keyword := range imageKeywords {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok {
+			logger.For(nil).Infof("found initial image url for %s: %s", name, it)
+			imgURL = it
+		}
 	}
 
 	if imgURL == "" {

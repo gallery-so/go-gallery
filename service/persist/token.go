@@ -63,10 +63,12 @@ const (
 	ChainPolygon
 	// ChainOptimism represents the Optimism blockchain
 	ChainOptimism
+	// ChainTezos represents the Tezos blockchain
+	ChainTezos
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to
 	// point to the most recently added chain type.
-	MaxChainValue = ChainOptimism
+	MaxChainValue = ChainTezos
 )
 
 const (
@@ -148,7 +150,7 @@ type TokenCountType string
 // Chain represents which blockchain a token is on
 type Chain int
 
-// TokenID represents the ID of an Ethereum token
+// TokenID represents the ID of a token
 type TokenID string
 
 // TokenURI represents the URI for an Ethereum token

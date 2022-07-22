@@ -599,7 +599,7 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		description = ""
 	}
 
-	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, contractAddress.String(), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient, tokenBucket)
+	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, contractAddress.String(), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient, tokenBucket, imageKeywords, animationKeywords)
 	if err != nil {
 		return tokenUpdate{}, fmt.Errorf("failed to make media for token %s-%s: %v", contractAddress, tokenID, err)
 	}
