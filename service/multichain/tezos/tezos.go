@@ -2,20 +2,24 @@ package tezos
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
 	"sync"
 
+	"blockwatch.cc/tzgo/tezos"
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"golang.org/x/crypto/blake2b"
 )
 
 type tokenStandard string
@@ -24,6 +28,8 @@ const (
 	tokenStandardFa12 tokenStandard = "fa1.2"
 	tokenStandardFa2  tokenStandard = "fa2"
 )
+
+const tezosNoncePrepend = "Tezos Signed Message: "
 
 type tzMetadata struct {
 	Date    string   `json:"date"`
@@ -259,9 +265,32 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 }
 
-// VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
+// VerifySignature will verify a signature using the ed25519 algorithm
+// the address provided must be the tezos private key, not the hashed address
 func (d *Provider) VerifySignature(pCtx context.Context, pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
-	return false, fmt.Errorf("not implemented")
+	key, err := tezos.ParseKey(pAddressStr.String())
+	if err != nil {
+		return false, err
+	}
+	sig, err := tezos.ParseSignature(pSignatureStr)
+	if err != nil {
+		return false, err
+	}
+	nonce := tezosNoncePrepend + auth.NewNoncePrepend + pNonce
+	asBytes := []byte(nonce)
+	asHex := hex.EncodeToString(asBytes)
+	lenHexBytes := []byte(fmt.Sprintf("%d", len(asHex)))
+
+	asBytes = append(lenHexBytes, asBytes...)
+	asBytes = append([]byte{0x05, 0x01, 0x00}, asBytes...)
+
+	hash, err := blake2b.New256(nil)
+	if err != nil {
+		panic(err)
+	}
+	hash.Write(asBytes)
+
+	return key.Verify(hash.Sum(nil), sig) == nil, nil
 }
 
 func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzktBalanceToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
