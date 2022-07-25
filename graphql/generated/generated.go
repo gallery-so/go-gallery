@@ -2904,6 +2904,7 @@ enum Chain {
     Arbitrum
     Polygon
     Optimism
+    Tezos
 }
 enum WalletType {
     EOA

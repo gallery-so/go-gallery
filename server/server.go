@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/everFinance/goar"
 	sentry "github.com/getsentry/sentry-go"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -26,6 +28,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
+	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -74,7 +77,8 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-	return handlersInit(router, repos, sqlc.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, ethClient, httpClient), newThrottler())
+	storage := newStorageClient()
+	return handlersInit(router, repos, sqlc.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")), newThrottler())
 }
 
 func newStorageClient() *storage.Client {
@@ -103,6 +107,9 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
+	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
+	viper.SetDefault("IPFS_PROJECT_ID", "")
+	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
@@ -222,15 +229,15 @@ func initSentry() {
 	}
 }
 
-func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client) *multichain.Provider {
-	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, opensea.NewProvider(ethClient, httpClient))
+func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *multichain.Provider {
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket))
 }
 
 func newThrottler() *throttle.Locker {
 	return throttle.NewThrottleLocker(redis.NewCache(redis.RefreshNFTsThrottleDB), time.Minute*5)
 }
 
-func newFigure31Integration(ctx context.Context, repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client, pgx *pgxpool.Pool) *site.Figure31Integration {
+func newFigure31Integration(ctx context.Context, repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client, pgx *pgxpool.Pool, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *site.Figure31Integration {
 	if viper.GetString("FIGURE31_USER_ID") == "" {
 		panic("FIGURE31_USER_ID is not set")
 	}
@@ -257,7 +264,7 @@ func newFigure31Integration(ctx context.Context, repos *persist.Repositories, et
 
 	return site.NewFigure31Integration(
 		dataloader.NewLoaders(ctx, sqlc.New(pgx)),
-		newMultichainProvider(repos, ethClient, httpClient),
+		newMultichainProvider(repos, ethClient, httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket),
 		repos,
 		pgx,
 		site.Figure31IntegrationInput{

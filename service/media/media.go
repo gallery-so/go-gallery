@@ -262,16 +262,18 @@ func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient
 func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI, imageKeywords, animationKeywords []string) (imgURL string, vURL string) {
 
 	for _, keyword := range animationKeywords {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok {
-			logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
+			logger.For(nil).Infof("found initial animation url for %s with keyword %s: %s", name, keyword, it)
 			vURL = it
+			break
 		}
 	}
 
 	for _, keyword := range imageKeywords {
-		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok {
-			logger.For(nil).Infof("found initial image url for %s: %s", name, it)
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
+			logger.For(nil).Infof("found initial image url for %s with keyword %s: %s", name, keyword, it)
 			imgURL = it
+			break
 		}
 	}
 

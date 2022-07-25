@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
 	"sync"
 
 	"blockwatch.cc/tzgo/tezos"
@@ -68,6 +69,12 @@ type tzMetadata struct {
 	ShouldPreferSymbol bool   `json:"shouldPreferSymbol"`
 }
 
+type tzAccount struct {
+	Address string `json:"address"`
+	Alias   string `json:"alias"`
+	Public  string `json:"publicKey"`
+}
+
 type tokenID string
 type balance string
 
@@ -85,7 +92,7 @@ type tzktToken struct {
 }
 
 type tzktBalanceToken struct {
-	ID      string `json:"id"`
+	ID      uint64 `json:"id"`
 	Account struct {
 		Alias   string          `json:"alias"`
 		Address persist.Address `json:"address"`
@@ -148,7 +155,11 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s", d.apiURL, addr.String()), nil)
+	tzAddr, err := toTzAddress(addr)
+	if err != nil {
+		return nil, nil, err
+	}
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s", d.apiURL, tzAddr.String()), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -201,7 +212,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s", d.apiURL, tokenIdentifiers.TokenID, tokenIdentifiers.ContractAddress), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -286,9 +297,12 @@ func (d *Provider) VerifySignature(pCtx context.Context, pAddressStr persist.Add
 
 	hash, err := blake2b.New256(nil)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
-	hash.Write(asBytes)
+	_, err = hash.Write(asBytes)
+	if err != nil {
+		return false, err
+	}
 
 	return key.Verify(hash.Sum(nil), sig) == nil, nil
 }
@@ -320,7 +334,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			med, err := media.MakePreviewsForMetadata(ctx, agnosticMetadata, normalizedContractAddress, tid, "", persist.ChainTezos, d.ipfsClient, d.arweaveClient, d.storageClient, d.tokenBucket, []string{"image", "displayUri", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"})
+			med, err := media.MakePreviewsForMetadata(ctx, agnosticMetadata, normalizedContractAddress, tid, "", persist.ChainTezos, d.ipfsClient, d.arweaveClient, d.storageClient, d.tokenBucket, []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"})
 			if err != nil {
 				logger.For(ctx).Errorf("Failed to make previews for tezos token %s: %s", tid, err)
 			}
@@ -360,6 +374,11 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				}
 
 			}
+			publicKey, err := d.getPublicKeyFromAddress(ctx, tzToken.Account.Address.String())
+			if err != nil {
+				errChan <- err
+				return
+			}
 			agnostic := multichain.ChainAgnosticToken{
 				Media:           med,
 				TokenType:       tokenType,
@@ -369,7 +388,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				ContractAddress: tzToken.Token.Contract.Address,
 				Quantity:        persist.HexString(tzToken.Balance.toBase16String()),
 				TokenMetadata:   agnosticMetadata,
-				OwnerAddress:    tzToken.Account.Address,
+				OwnerAddress:    publicKey,
 				BlockNumber:     persist.BlockNumber(tzToken.LastLevel),
 			}
 			tokenChan <- agnostic
@@ -415,6 +434,26 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 	}
 }
 
+func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address string) (persist.Address, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/accounts/%s", d.apiURL, address), nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", getErrFromResp(resp)
+	}
+	var account tzAccount
+	if err := json.NewDecoder(resp.Body).Decode(&account); err != nil {
+		return "", err
+	}
+	return persist.Address(account.Public), nil
+}
+
 func (d *Provider) tzContractToContract(ctx context.Context, tzContract tzktContract) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
 		Address:        persist.Address(tzContract.Address),
@@ -422,6 +461,17 @@ func (d *Provider) tzContractToContract(ctx context.Context, tzContract tzktCont
 		LatestBlock:    persist.BlockNumber(tzContract.LastActivity),
 		Name:           tzContract.Alias,
 	}
+}
+
+func toTzAddress(address persist.Address) (persist.Address, error) {
+	if strings.HasPrefix(address.String(), "tz") {
+		return address, nil
+	}
+	key, err := tezos.ParseKey(address.String())
+	if err != nil {
+		return "", err
+	}
+	return persist.Address(key.Address().String()), nil
 }
 
 func getErrFromResp(res *http.Response) error {

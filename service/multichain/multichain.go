@@ -147,12 +147,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := make(map[persist.Chain][]persist.Address)
 	for _, wallet := range user.Wallets {
-		if it, ok := chainsToAddresses[wallet.Chain]; ok {
-			it = append(it, wallet.Address)
-			chainsToAddresses[wallet.Chain] = it
-		} else {
-			chainsToAddresses[wallet.Chain] = []persist.Address{wallet.Address}
-		}
+		chainsToAddresses[wallet.Chain] = append(chainsToAddresses[wallet.Chain], wallet.Address)
 	}
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
