@@ -181,7 +181,9 @@ func ErrLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		if len(c.Errors) > 0 {
-			logger.For(c).Errorf("%s %s %s %s %s", c.Request.Method, c.Request.URL, c.ClientIP(), c.Request.Header.Get("User-Agent"), c.Errors.JSON())
+			err := logger.GinErrorLoggerErr{Context: c.Copy()}
+			err.Context.Errors = c.Errors // Error stack doesn't get copied over
+			logger.For(c).WithError(err).Error(err.Error())
 		}
 	}
 }

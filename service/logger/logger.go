@@ -62,3 +62,12 @@ func (e LoggedError) Error() string {
 
 	return msg
 }
+
+// GinErrorLoggerErr is an error reported by the ErrLogger middleware.
+type GinErrorLoggerErr struct {
+	Context *gin.Context
+}
+
+func (e GinErrorLoggerErr) Error() string {
+	return fmt.Sprintf("%s %s %s %s %s", e.Context.Request.Method, e.Context.Request.URL, e.Context.ClientIP(), e.Context.Request.Header.Get("User-Agent"), e.Context.Errors.JSON())
+}
