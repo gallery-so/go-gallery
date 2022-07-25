@@ -178,7 +178,6 @@ func initSentry() {
 func initLogger() {
 	logger.SetLoggerOptions(func(l *logrus.Logger) {
 		l.SetReportCaller(true)
-		l.AddHook(sentryutil.SentryLoggerHook)
 
 		if viper.GetString("ENV") != "production" {
 			l.SetLevel(logrus.DebugLevel)

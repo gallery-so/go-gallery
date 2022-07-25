@@ -2,7 +2,6 @@ package sentryutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -257,23 +256,18 @@ func (h sentryLoggerHook) Fire(entry *logrus.Entry) error {
 		case true:
 			if scope := hub.Scope(); scope == nil {
 				hub.PushScope()
+				defer hub.PopScope()
 			}
-			defer hub.PopScope()
 
 			// Add logger fields as a context
 			hub.Scope().SetContext(loggerContextName, entry.Data)
 
 			if err, ok := entry.Data[logrus.ErrorKey].(error); ok {
-				// The Gin ErrLogger middleware also logs an error message. They get excluded
-				// so that the error isn't reported twice to Sentry.
-				var ginLogErr logger.GinErrorLoggerErr
-				if !errors.As(err, &ginLogErr) {
-					ReportError(entry.Context, logger.LoggedError{
-						Message: entry.Message,
-						Caller:  entry.Caller,
-						Err:     err,
-					})
-				}
+				ReportError(entry.Context, logger.LoggedError{
+					Message: entry.Message,
+					Caller:  entry.Caller,
+					Err:     err,
+				})
 			} else {
 				ReportError(entry.Context, logger.LoggedError{
 					Message: entry.Message,

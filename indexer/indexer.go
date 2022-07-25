@@ -169,7 +169,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 
 // Start begins indexing events from the blockchain
 func (i *indexer) Start() {
-	rootCtx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
+	rootCtx := configureRootContext()
 
 	ctx, cancel := context.WithTimeout(rootCtx, time.Minute)
 	defer cancel()
@@ -217,6 +217,14 @@ func (i *indexer) Start() {
 		i.startNewBlocksPipeline(rootCtx, topics)
 		logger.For(rootCtx).Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
 	}
+}
+
+// configureRootContext configures the main context from which other contexts are derived.
+func configureRootContext() context.Context {
+	ctx := logger.NewContextWithFields(context.Background(), logrus.Fields{})
+	logger.For(ctx).Logger.SetReportCaller(true)
+	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
+	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())
 }
 
 func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, topics [][]common.Hash) {

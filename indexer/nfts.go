@@ -480,11 +480,9 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 
 // refreshToken will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
 func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) error {
+	c = logger.NewContextWithFields(c, logrus.Fields{"tokenID": input.TokenID, "contractAddress": input.ContractAddress})
 	if input.TokenID != "" && input.ContractAddress != "" {
-		logger.For(c).WithFields(logrus.Fields{
-			"tokenID":         input.TokenID,
-			"contractAddress": input.ContractAddress,
-		}).Infof("updating media for token %s-%s", input.TokenID, input.ContractAddress)
+		logger.For(c).Infof("updating media for token %s-%s", input.TokenID, input.ContractAddress)
 		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
 		if err != nil {
 			return err
