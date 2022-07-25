@@ -45,7 +45,7 @@ type Collection struct {
 	Hidden         bool
 	CollectorsNote sql.NullString
 	Name           sql.NullString
-	Layout         TokenLayout
+	Layout         persist.TokenLayout
 	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings
 }
 

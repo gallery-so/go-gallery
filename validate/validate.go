@@ -3,6 +3,7 @@ package validate
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -65,6 +66,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("signature", SignatureValidator)
 	v.RegisterValidation("username", UsernameValidator)
 	v.RegisterValidation("max_string_length", MaxStringLengthValidator)
+	v.RegisterValidation("sorted_asc", SortedAscValidator)
 	v.RegisterAlias("medium", "max_string_length=600")
 	v.RegisterAlias("collectors_note", "max_string_length=1200")
 	v.RegisterAlias("collection_name", "max_string_length=200")
@@ -120,6 +122,7 @@ func ConnectionPaginationParamsValidator(sl validator.StructLevel) {
 type CollectionTokenSettingsParams struct {
 	Tokens        []persist.DBID                                   `json:"tokens"`
 	TokenSettings map[persist.DBID]persist.CollectionTokenSettings `json:"token_settings"`
+	Sections      []int                                            `json:"sections"`
 }
 
 // CollectionTokenSettingsParamsValidator checks that the input CollectionTokenSettingsParams struct is valid
@@ -193,6 +196,14 @@ var UsernameValidator validator.Func = func(fl validator.FieldLevel) bool {
 	return len(s) >= 2 && len(s) <= 50 &&
 		alphanumericUnderscoresPeriodsRegex.MatchString(s) &&
 		!consecutivePeriodsOrUnderscores(s)
+}
+
+// SortedAscValidator validates that the array is sorted in ascending order
+var SortedAscValidator validator.Func = func(fl validator.FieldLevel) bool {
+	if s, ok := fl.Field().Interface().([]int); ok {
+		return sort.IntsAreSorted(s)
+	}
+	return false
 }
 
 func consecutivePeriodsOrUnderscores(s string) bool {

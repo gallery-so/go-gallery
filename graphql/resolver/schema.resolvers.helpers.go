@@ -735,16 +735,18 @@ func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
 	}
 }
 
-func layoutToModel(ctx context.Context, layout sqlc.TokenLayout) *model.CollectionLayout {
-	whitespace := make([]*int, len(layout.Whitespace))
-	for i, w := range layout.Whitespace {
-		w := w
-		whitespace[i] = &w
+func layoutToModel(ctx context.Context, layout persist.TokenLayout) *model.CollectionLayout {
+	layouts := make([]*model.CollectionSectionLayout, len(layout.SectionLayout))
+	for i, l := range layout.SectionLayout {
+		layouts[i] = &model.CollectionSectionLayout{
+			Columns:    util.IntToPointer(l.Columns.Int()),
+			Whitespace: util.IntToPointerSlice(l.Whitespace),
+		}
 	}
 
 	return &model.CollectionLayout{
-		Columns:    &layout.Columns,
-		Whitespace: whitespace,
+		Sections:      util.IntToPointerSlice(layout.Sections),
+		SectionLayout: layouts,
 	}
 }
 

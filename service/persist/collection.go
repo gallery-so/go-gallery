@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	MIN_COLUMNS     = 0
-	MAX_COLUMNS     = 10
-	DEFAULT_COLUMNS = 3
-	MAX_WHITESPACE  = 1000
+	minColumns     = 0
+	maxColumns     = 10
+	defaultColumns = 3
+	maxWhitespace  = 1000
 )
 
 // CollectionDB is the struct that represents a collection of tokens in the database
@@ -54,9 +54,15 @@ type Collection struct {
 
 // TokenLayout defines the layout of a collection of tokens
 type TokenLayout struct {
+	Sections      []int                     `json:"sections"`
+	SectionLayout []CollectionSectionLayout `json:"section_layout"`
+	// Padding         int   `bson:"padding" json:"padding"`
+}
+
+// CollectionSectionLayout defines the layout of a section in a collection
+type CollectionSectionLayout struct {
 	Columns    NullInt32 `json:"columns"`
 	Whitespace []int     `json:"whitespace"`
-	// Padding         int   `bson:"padding" json:"padding"`
 }
 
 // CollectionUpdateInfoInput represents the data that will be changed when updating a collection's metadata
@@ -119,7 +125,7 @@ type ErrCollectionNotFoundByID struct {
 
 // ErrInvalidLayout is returned when a layout is invalid
 type ErrInvalidLayout struct {
-	Layout TokenLayout
+	Layout CollectionSectionLayout
 	Reason string
 }
 
@@ -132,27 +138,66 @@ func (e ErrInvalidLayout) Error() string {
 }
 
 // ValidateLayout ensures a layout is within constraints and if has unset properties, sets their defaults
-func ValidateLayout(layout TokenLayout, nfts []DBID) (TokenLayout, error) {
-	if layout.Columns < MIN_COLUMNS || layout.Columns > MAX_COLUMNS {
-		return TokenLayout{}, ErrInvalidLayout{
-			Layout: layout,
-			Reason: fmt.Sprintf("columns must be between %d-%d", MIN_COLUMNS, MAX_COLUMNS),
+func ValidateLayout(layout TokenLayout, tokens []DBID) (TokenLayout, error) {
+	layout.Sections = standardizeSections(layout.Sections)
+	for i, section := range layout.SectionLayout {
+		var tokenCount int
+		if layout.Sections[i]+1 > len(layout.Sections) {
+			tokenCount = len(layout.Sections[layout.Sections[i]:])
+		} else {
+			tokenCount = layout.Sections[i+1] - layout.Sections[i] + 1
 		}
-	}
-	if layout.Columns == 0 {
-		layout.Columns = DEFAULT_COLUMNS
+		validated, err := validateSectionLayout(section, tokenCount)
+		if err != nil {
+			return TokenLayout{}, err
+		}
+		layout.SectionLayout[i] = validated
 	}
 
-	if ws := len(layout.Whitespace); ws > MAX_WHITESPACE {
-		return TokenLayout{}, ErrInvalidLayout{
+	return layout, nil
+}
+
+// standardizeSections formats the input sections to make it more convenient to parse.
+func standardizeSections(sections []int) []int {
+	if len(sections) == 0 {
+		return []int{0}
+	}
+	if sections[0] != 0 {
+		return append([]int{0}, sections...)
+	}
+	return sections
+}
+
+// tokensInSection returns the number of tokens in a section
+func tokensInSection(sectionPos int, sections []int) int {
+	if sections[sectionPos] > len(sections) {
+		return len(sections[sections[sectionPos]:])
+	}
+	return sections[sectionPos+1] - sections[sectionPos] + 1
+}
+
+func validateSectionLayout(layout CollectionSectionLayout, sectionTokenCount int) (CollectionSectionLayout, error) {
+	if layout.Columns < minColumns || layout.Columns > maxColumns {
+		return CollectionSectionLayout{}, ErrInvalidLayout{
 			Layout: layout,
-			Reason: fmt.Sprintf("up to %d whitespace blocks permitted", MAX_WHITESPACE),
+			Reason: fmt.Sprintf("columns must be between %d-%d", minColumns, maxColumns),
+		}
+	}
+
+	if layout.Columns == 0 {
+		layout.Columns = defaultColumns
+	}
+
+	if ws := len(layout.Whitespace); ws > maxWhitespace {
+		return CollectionSectionLayout{}, ErrInvalidLayout{
+			Layout: layout,
+			Reason: fmt.Sprintf("up to %d whitespace blocks permitted", maxWhitespace),
 		}
 	}
 
 	for i, idx := range layout.Whitespace {
-		if idx > len(nfts) {
-			return TokenLayout{}, ErrInvalidLayout{
+		if idx > sectionTokenCount {
+			return CollectionSectionLayout{}, ErrInvalidLayout{
 				Layout: layout,
 				Reason: fmt.Sprintf("position of whitespace at %d is invalid: %d", i, idx),
 			}

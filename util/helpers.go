@@ -218,3 +218,11 @@ func InByteSizeFormat(bytes uint64) string {
 
 	return fmt.Sprintf("%.2f %s", value, unit)
 }
+
+// IntToPointerSlice returns a slice to pointers of integer values.
+func IntToPointerSlice(s []int) (ret []*int) {
+	for idx, it := range s {
+		ret[idx] = IntToPointer(it)
+	}
+	return ret
+}

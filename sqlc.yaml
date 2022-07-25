@@ -24,7 +24,7 @@ overrides:
   - column: "collections.nfts"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
   - column: "collections.layout"
-    go_type: { "type": "TokenLayout" } # Required format when the type is in the same package as the generated code
+    go_type: "github.com/mikeydub/go-gallery/service/persist.TokenLayout"
   - column: "collections.token_settings"
     go_type: { "type": "map[persist.DBID]persist.CollectionTokenSettings" }
 

@@ -206,11 +206,21 @@ type CollectionCreatedFeedEventData struct {
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}
 
 type CollectionLayout struct {
+	Sections      []*int                     `json:"sections"`
+	SectionLayout []*CollectionSectionLayout `json:"sectionLayout"`
+}
+
+type CollectionLayoutInput struct {
+	Sections      []int                           `json:"sections"`
+	SectionLayout []*CollectionSectionLayoutInput `json:"sectionLayout"`
+}
+
+type CollectionSectionLayout struct {
 	Columns    *int   `json:"columns"`
 	Whitespace []*int `json:"whitespace"`
 }
 
-type CollectionLayoutInput struct {
+type CollectionSectionLayoutInput struct {
 	Columns    int   `json:"columns"`
 	Whitespace []int `json:"whitespace"`
 }

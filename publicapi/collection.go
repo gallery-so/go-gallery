@@ -61,6 +61,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
 		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
+		"sections":       {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,dive,gte=0,lte=%d", len(tokens), len(tokens)-1)},
 	}); err != nil {
 		return nil, err
 	}
