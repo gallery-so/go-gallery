@@ -57,35 +57,37 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 	glyph = strings.ReplaceAll(glyph, "\n", "")
 	glyph = strings.ReplaceAll(glyph, "%0A", "")
 
-	width := 240
-	height := 240
+	width := 368
+	height := 368
+	add := 3
 	buf := &bytes.Buffer{}
+
 	canvas := svg.New(buf)
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
 	for i, c := range glyph {
 
-		y := int(math.Floor(float64(i)/float64(64))*3) + 21
-		x := ((i % 64) * 3) + 21
+		y := int(math.Floor(float64(i)/float64(64))*5) + 28
+		x := ((i % 64) * 5) + 28
 		switch c {
 		case 'O':
-			canvas.Circle(x+1, y+1, 1, canvas.RGB(0, 0, 0))
+			canvas.Circle(x+add, y+add, add, canvas.RGB(0, 0, 0))
 		case '+':
-			canvas.Line(x-1, y, x+1, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y-1, x, (y + 1), `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-add, x, (y + add), `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case 'X':
-			canvas.Line(x-1, y-1, x+1, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x-1, y+1, x+1, y-1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '|':
-			canvas.Line(x, y-1, x, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-add, x, y+add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '-':
-			canvas.Line(x-1, y, x+1, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '\\':
-			canvas.Line(x-1, y+1, x+1, y-1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '/':
-			canvas.Line(x-1, y-1, x+1, y+1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '#':
-			canvas.Rect(x, y, 1, 1, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Rect(x, y, add, add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		}
 	}
 	canvas.End()
@@ -184,8 +186,8 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	}
 
 	// sort colors by value
-	sort.Slice(allColors, func(i, j int) bool {
-		return allColors[i].R+allColors[i].G+allColors[i].B < allColors[j].R+allColors[j].G+allColors[j].B
+	sort.SliceStable(allColors, func(i, j int) bool {
+		return getLuminosityOfRGB(allColors[i]) > getLuminosityOfRGB(allColors[j])
 	})
 	lightestColor := allColors[0]
 	secondLightestColor := allColors[1]
@@ -194,23 +196,23 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	fifthLightestColor := allColors[4]
 	darkestColor := allColors[34]
 
-	sort.Slice(allColors, func(i, j int) bool {
+	sort.SliceStable(allColors, func(i, j int) bool {
 		return allColors[i].R-allColors[i].G-allColors[i].B < allColors[j].R-allColors[j].G-allColors[j].B
 	})
 	reddestColor := allColors[0]
-	sort.Slice(allColors, func(i, j int) bool {
+	sort.SliceStable(allColors, func(i, j int) bool {
 		return allColors[i].R-allColors[i].B > allColors[j].R-allColors[j].B
 	})
 	orangestColor := allColors[0]
-	sort.Slice(allColors, func(i, j int) bool {
+	sort.SliceStable(allColors, func(i, j int) bool {
 		return allColors[i].R+allColors[i].G-allColors[i].B > allColors[j].R+allColors[j].G-allColors[j].B
 	})
 	yellowestColor := allColors[0]
-	sort.Slice(allColors, func(i, j int) bool {
+	sort.SliceStable(allColors, func(i, j int) bool {
 		return allColors[i].G-allColors[i].R-allColors[i].B > allColors[j].G-allColors[j].R-allColors[j].B
 	})
 	greenestColor := allColors[0]
-	sort.Slice(allColors, func(i, j int) bool {
+	sort.SliceStable(allColors, func(i, j int) bool {
 		return allColors[i].B-allColors[i].G-allColors[i].R > allColors[j].B-allColors[j].G-allColors[j].R
 	})
 	bluestColor := allColors[0]
@@ -250,36 +252,37 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 		backgroundColor = white
 	}
 
-	width := 240
-	height := 240
+	width := 368
+	height := 368
+	add := 3
 	buf := &bytes.Buffer{}
 	canvas := svg.New(buf)
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(int(backgroundColor.R), int(backgroundColor.G), int(backgroundColor.B)))
 	for i, c := range spl[0] {
-		y := int(math.Floor(float64(i)/float64(64))*3) + 21
-		x := ((i % 64) * 3) + 21
+		y := int(math.Floor(float64(i)/float64(64))*5) + 28
+		x := ((i % 64) * 5) + 28
 		col := schemeColors[int(math.Floor(float64(int(c))/float64(len(schemeColors))))%len(schemeColors)]
 		stroke := fmt.Sprintf(`stroke="rgb(%d,%d,%d)"`, col.R, col.G, col.B)
 		switch c {
 		case 'O':
-			canvas.Circle(x+1, y+1, 1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`, `fill="none"`)
+			canvas.Circle(x+add, y+add, add, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`, `fill="none"`)
 		case '+':
-			canvas.Line(x-1, y, x+1, y, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y-1, x, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case 'X':
-			canvas.Line(x-1, y-1, x+1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x+1, y-1, x-1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x+add, y-add, x-add, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '|':
-			canvas.Line(x, y-1, x, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '-':
-			canvas.Line(x-1, y, x+1, y, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '\\':
-			canvas.Line(x-1, y+1, x+1, y-1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y+add, x+add, y-add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '/':
-			canvas.Line(x-1, y-1, x+1, y+1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case '#':
-			canvas.Rect(x, y, 1, 1, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`)
+			canvas.Rect(x, y, add, add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		}
 	}
 	canvas.End()
@@ -294,6 +297,10 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 		"description": fmt.Sprintf("A Colorglyph with color scheme %s. Created by %s.", spl[1], spl[2]),
 		"image":       fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString(buf.Bytes()[svgStart:])),
 	}, nil
+}
+
+func getLuminosityOfRGB(c color.RGBA) float64 {
+	return math.Sqrt(.241*float64(c.R) + .691*float64(c.G) + .068*float64(c.B))
 }
 
 func parseHexColor(s string) (c color.RGBA, err error) {
