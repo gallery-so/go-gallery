@@ -22,10 +22,10 @@ func (r *CollectionToken) ID() GqlID {
 	// (b) the field exists but is not a string type
 	//-----------------------------------------------------------------------------------------------
 	// Please create binding methods on the CollectionToken type with the following signatures:
-	// func (r *CollectionToken) GetGqlIDField_TokenID() string
 	// func (r *CollectionToken) GetGqlIDField_CollectionID() string
+	// func (r *CollectionToken) GetGqlIDField_TokenID() string
 	//-----------------------------------------------------------------------------------------------
-	return GqlID(fmt.Sprintf("CollectionToken:%s:%s", r.GetGqlIDField_TokenID(), r.GetGqlIDField_CollectionID()))
+	return GqlID(fmt.Sprintf("CollectionToken:%s:%s", r.GetGqlIDField_CollectionID(), r.GetGqlIDField_TokenID()))
 }
 
 func (r *Community) ID() GqlID {
@@ -72,7 +72,7 @@ func (r *Wallet) ID() GqlID {
 
 type NodeFetcher struct {
 	OnCollection      func(ctx context.Context, dbid persist.DBID) (*Collection, error)
-	OnCollectionToken func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
+	OnCollectionToken func(ctx context.Context, collectionId string, tokenId string) (*CollectionToken, error)
 	OnCommunity       func(ctx context.Context, contractAddress string, chain string) (*Community, error)
 	OnContract        func(ctx context.Context, dbid persist.DBID) (*Contract, error)
 	OnFeedEvent       func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
