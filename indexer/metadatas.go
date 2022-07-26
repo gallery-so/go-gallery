@@ -73,7 +73,7 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 		case 'O':
 			canvas.Circle(x+add, y+add, add, canvas.RGB(0, 0, 0))
 		case '+':
-			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
 			canvas.Line(x, y-add, x, (y + add), `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 		case 'X':
 			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
@@ -266,7 +266,7 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 		stroke := fmt.Sprintf(`stroke="rgb(%d,%d,%d)"`, col.R, col.G, col.B)
 		switch c {
 		case 'O':
-			canvas.Circle(x+add, y+add, add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`, `fill="none"`)
+			canvas.Circle(x+add, y+add, add, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`, `fill="none"`)
 		case '+':
 			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
 			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
