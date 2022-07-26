@@ -2948,7 +2948,7 @@ type OwnerAtBlock {
 
 type CollectionToken implements Node
 @goEmbedHelper
-@goGqlId(fields: ["collectionId", "tokenId"]) {
+@goGqlId(fields: ["tokenId", "collectionId"]) {
     id: ID!
     token: Token
     collection: Collection
