@@ -384,18 +384,12 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 
 	logger.For(pCtx).Infof("Starting upsert...")
 
-	errChan := make(chan error)
-	go func() {
-		errChan <- t.upsertERC1155Tokens(pCtx, erc1155Tokens)
-	}()
-	go func() {
-		errChan <- t.upsertERC721Tokens(pCtx, erc721Tokens)
-	}()
-	for i := 0; i < 2; i++ {
-		if err := <-errChan; err != nil {
-			return err
-		}
-		logger.For(pCtx).Infof("finished half of upsert")
+	if err := t.upsertERC1155Tokens(pCtx, erc1155Tokens); err != nil {
+		return err
+	}
+
+	if err := t.upsertERC721Tokens(pCtx, erc721Tokens); err != nil {
+		return err
 	}
 
 	for _, token := range erc1155Tokens {
