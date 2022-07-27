@@ -288,7 +288,7 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 			}
 		}()
 	} else {
-		logger.For(ctx).WithError(err).Errorf("error getting logs from GCP")
+		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
 	}
 	if len(logsTo) > 0 {
 		lastLog := logsTo[len(logsTo)-1]
