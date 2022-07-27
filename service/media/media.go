@@ -389,7 +389,7 @@ func downloadAndCache(pCtx context.Context, url, name, ipfsPrefix string, ipfsCl
 
 	logger.For(pCtx).Infof("predicted media type for %s: %s", url, mediaType)
 
-	if asURI.Type() == persist.URITypeIPFSGateway {
+	if mediaType != persist.MediaTypeHTML && asURI.Type() == persist.URITypeIPFSGateway {
 		indexAfterGateway := strings.Index(asURI.String(), "/ipfs/")
 		path := asURI.String()[indexAfterGateway+len("/ipfs/"):]
 		asURI = persist.TokenURI(fmt.Sprintf("ipfs://%s", path))

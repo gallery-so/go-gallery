@@ -363,7 +363,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 
 	logger.For(pCtx).Infof("Deduping %d tokens", len(pTokens))
 
-	pTokens = t.dedupTokens(pTokens)
+	pTokens = t.dedupeTokens(pTokens)
 
 	logger.For(pCtx).Infof("Deduped down to %d tokens", len(pTokens))
 
@@ -590,15 +590,20 @@ type blockWithIndex struct {
 	index int
 }
 
-func (t *TokenRepository) dedupTokens(pTokens []persist.Token) []persist.Token {
+func (t *TokenRepository) dedupeTokens(pTokens []persist.Token) []persist.Token {
 	seen := map[string]persist.Token{}
 	for _, token := range pTokens {
-		key := token.ContractAddress.String() + "-" + token.TokenID.String() + "-" + token.OwnerAddress.String()
+		var key string
+		if token.TokenType == persist.TokenTypeERC1155 {
+			key = token.ContractAddress.String() + "-" + token.TokenID.String() + "-" + token.OwnerAddress.String()
+		} else {
+			key = token.ContractAddress.String() + "-" + token.TokenID.String()
+		}
+
 		if seenToken, ok := seen[key]; ok {
 			if seenToken.BlockNumber.Uint64() > token.BlockNumber.Uint64() {
 				continue
 			}
-			seen[key] = token
 		}
 		seen[key] = token
 	}

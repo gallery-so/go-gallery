@@ -647,6 +647,11 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 }
 
 func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client) (t persist.Token, err error) {
+
+	t.TokenID = tokenID
+	t.ContractAddress = contractAddress
+	t.OwnerAddress = ownerAddress
+
 	var e721 *contracts.IERC721Caller
 	var e1155 *contracts.IERC1155Caller
 
@@ -658,19 +663,18 @@ func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractA
 	if err != nil {
 		return
 	}
-	t.TokenType = persist.TokenTypeERC721
 	owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
 	isERC721 := err == nil
 	if isERC721 {
+		t.TokenType = persist.TokenTypeERC721
 		t.OwnerAddress = persist.EthereumAddress(owner.String())
 	} else {
-		t.OwnerAddress = ownerAddress
 		bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
 		if err != nil {
 			return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
 		}
 		t.TokenType = persist.TokenTypeERC1155
-		t.TokenID = persist.TokenID(bal.Text(16))
+		t.Quantity = persist.HexString(bal.Text(16))
 	}
 
 	return t, nil
