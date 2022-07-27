@@ -25,7 +25,7 @@ import (
 func Init() {
 	router, i := coreInit()
 	logger.For(nil).Info("Starting indexer...")
-	go i.Start()
+	go i.Start(configureRootContext())
 	http.Handle("/", router)
 }
 
@@ -110,7 +110,7 @@ func coreInitServer() *gin.Engine {
 
 	t := newThrottler()
 
-	go processMedialessTokens(sentryutil.NewSentryHubContext(ctx), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	go processMedialessTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
@@ -191,4 +191,12 @@ func initLogger() {
 		}
 
 	})
+}
+
+// configureRootContext configures the main context from which other contexts are derived.
+func configureRootContext() context.Context {
+	ctx := logger.NewContextWithFields(context.Background(), logrus.Fields{})
+	logger.For(ctx).Logger.SetReportCaller(true)
+	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
+	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())
 }

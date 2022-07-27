@@ -324,10 +324,13 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 			token.TokenURI = uri.ReplaceID(token.TokenID)
 			needsUpdate = true
 		} else {
-			logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+			logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+				"tokenType":       token.TokenType,
 				"tokenID":         token.TokenID,
 				"contractAddress": token.ContractAddress,
-			}).Errorf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err)
+				"rpcCall":         "eth_call",
+			})
+			logEthCallRPCError(logEntry, err, fmt.Sprintf("failed to get token URI for token %s-%s: %v", token.ContractAddress, token.TokenID, err))
 			msgToAdd += fmt.Sprintf("failed to get token URI for token %s-%s: %v\n", token.ContractAddress, token.TokenID, err)
 			continue
 		}
@@ -587,11 +590,13 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 	if err == nil {
 		newURI = u.ReplaceID(tokenID)
 	} else {
-		logger.For(pCtx).WithError(err).WithFields(logrus.Fields{
+		logEntry := logger.For(pCtx).WithError(err).WithFields(logrus.Fields{
 			"tokenType":       tokenType,
 			"tokenID":         tokenID,
 			"contractAddress": contractAddress,
-		}).Errorf("error getting token URI: %s", err)
+			"rpcCall":         "eth_call",
+		})
+		logEthCallRPCError(logEntry, err, fmt.Sprintf("error getting token URI"))
 	}
 
 	if handler, ok := uniqueHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
