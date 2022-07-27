@@ -202,7 +202,7 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input m
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	sectionLayout := make([]persist.CollectionSectionLayout, len(input.Layout.Sections))
+	sectionLayout := make([]persist.CollectionSectionLayout, len(input.Layout.SectionLayout))
 	for i, layout := range input.Layout.SectionLayout {
 		sectionLayout[i] = persist.CollectionSectionLayout{
 			Columns:    persist.NullInt32(layout.Columns),
@@ -211,7 +211,7 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 	}
 
 	layout := persist.TokenLayout{
-		Sections:      input.Layout.Sections,
+		Sections:      persist.StandardizeCollectionSections(input.Layout.Sections),
 		SectionLayout: sectionLayout,
 	}
 
@@ -286,7 +286,7 @@ func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model
 func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input model.UpdateCollectionTokensInput) (model.UpdateCollectionTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	sectionLayout := make([]persist.CollectionSectionLayout, len(input.Layout.Sections))
+	sectionLayout := make([]persist.CollectionSectionLayout, len(input.Layout.SectionLayout))
 	for i, layout := range input.Layout.SectionLayout {
 		sectionLayout[i] = persist.CollectionSectionLayout{
 			Columns:    persist.NullInt32(layout.Columns),
@@ -295,7 +295,7 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 	}
 
 	layout := persist.TokenLayout{
-		Sections:      input.Layout.Sections,
+		Sections:      persist.StandardizeCollectionSections(input.Layout.Sections),
 		SectionLayout: sectionLayout,
 	}
 

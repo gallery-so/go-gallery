@@ -80,7 +80,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryRepository) *C
 	updateHiddenUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections SET HIDDEN = $1, LAST_UPDATED = $2 WHERE ID = $3;`)
 	checkNoErr(err)
 
-	updateNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3, TOKEN_SETTINGS = $4 WHERE ID = $5 AND OWNER_USER_ID = $6;`)
+	updateNFTsStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3, TOKEN_SETTINGS = $4, VERSION = $5 WHERE ID = $6 AND OWNER_USER_ID = $7;`)
 	checkNoErr(err)
 
 	updateNFTsUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE collections SET NFTS = $1, LAYOUT = $2, LAST_UPDATED = $3, TOKEN_SETTINGS = $4 WHERE ID = $5;`)
@@ -277,7 +277,7 @@ func (c *CollectionTokenRepository) UpdateTokens(pCtx context.Context, pID persi
 	if err != nil {
 		return err
 	}
-	res, err := c.updateNFTsStmt.ExecContext(pCtx, pq.Array(pUpdate.Tokens), pUpdate.Layout, time.Now(), pUpdate.TokenSettings, pID, pUserID)
+	res, err := c.updateNFTsStmt.ExecContext(pCtx, pq.Array(pUpdate.Tokens), pUpdate.Layout, time.Now(), pUpdate.TokenSettings, pUpdate.Version, pID, pUserID)
 	if err != nil {
 		return err
 	}

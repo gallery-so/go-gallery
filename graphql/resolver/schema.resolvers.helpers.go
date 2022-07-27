@@ -735,13 +735,26 @@ func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
 	}
 }
 
-func layoutToModel(ctx context.Context, layout persist.TokenLayout) *model.CollectionLayout {
-	layouts := make([]*model.CollectionSectionLayout, len(layout.SectionLayout))
-	for i, l := range layout.SectionLayout {
-		layouts[i] = &model.CollectionSectionLayout{
+func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int) *model.CollectionLayout {
+	if version == 0 {
+		// Treat the original collection as a single section.
+		return &model.CollectionLayout{
+			Sections: []*int{util.IntToPointer(0)},
+			SectionLayout: []*model.CollectionSectionLayout{
+				{
+					Columns:    util.IntToPointer(layout.Columns),
+					Whitespace: util.IntToPointerSlice(layout.Whitespace),
+				},
+			},
+		}
+	}
+
+	layouts := make([]*model.CollectionSectionLayout, 0)
+	for _, l := range layout.SectionLayout {
+		layouts = append(layouts, &model.CollectionSectionLayout{
 			Columns:    util.IntToPointer(l.Columns.Int()),
 			Whitespace: util.IntToPointerSlice(l.Whitespace),
-		}
+		})
 	}
 
 	return &model.CollectionLayout{
@@ -824,7 +837,7 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.C
 		Name:           &collection.Name.String,
 		CollectorsNote: &collection.CollectorsNote.String,
 		Gallery:        nil, // handled by dedicated resolver
-		Layout:         layoutToModel(ctx, collection.Layout),
+		Layout:         layoutToModel(ctx, collection.Layout, version),
 		Hidden:         &collection.Hidden,
 		Tokens:         nil, // handled by dedicated resolver
 	}

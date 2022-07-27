@@ -220,7 +220,8 @@ func InByteSizeFormat(bytes uint64) string {
 }
 
 // IntToPointerSlice returns a slice to pointers of integer values.
-func IntToPointerSlice(s []int) (ret []*int) {
+func IntToPointerSlice(s []int) []*int {
+	ret := make([]*int, len(s))
 	for idx, it := range s {
 		ret[idx] = IntToPointer(it)
 	}

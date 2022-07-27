@@ -122,7 +122,6 @@ func ConnectionPaginationParamsValidator(sl validator.StructLevel) {
 type CollectionTokenSettingsParams struct {
 	Tokens        []persist.DBID                                   `json:"tokens"`
 	TokenSettings map[persist.DBID]persist.CollectionTokenSettings `json:"token_settings"`
-	Sections      []int                                            `json:"sections"`
 }
 
 // CollectionTokenSettingsParamsValidator checks that the input CollectionTokenSettingsParams struct is valid
@@ -198,7 +197,7 @@ var UsernameValidator validator.Func = func(fl validator.FieldLevel) bool {
 		!consecutivePeriodsOrUnderscores(s)
 }
 
-// SortedAscValidator validates that the array is sorted in ascending order
+// SortedAscValidator validates that the array is sorted in ascending order.
 var SortedAscValidator validator.Func = func(fl validator.FieldLevel) bool {
 	if s, ok := fl.Field().Interface().([]int); ok {
 		return sort.IntsAreSorted(s)
