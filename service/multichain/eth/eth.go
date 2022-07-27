@@ -156,9 +156,10 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 }
 
 // RefreshToken refreshes the metadata for a given token.
-func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) error {
+func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) error {
 
 	input := indexer.UpdateTokenMediaInput{
+		OwnerAddress:    persist.EthereumAddress(ownerAddress.String()),
 		TokenID:         ti.TokenID,
 		ContractAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(ti.ContractAddress)),
 		UpdateAll:       true,

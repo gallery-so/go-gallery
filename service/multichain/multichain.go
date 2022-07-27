@@ -104,7 +104,7 @@ type ChainProvider interface {
 	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
-	RefreshToken(context.Context, ChainAgnosticIdentifiers) error
+	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
 	RefreshContract(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
 	UpdateMediaForWallet(context.Context, persist.Address, bool) error
@@ -284,15 +284,17 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 }
 
 // RefreshToken refreshes a token on the given chain using the chain provider for that chain
-func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
+func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers, ownerAddresses []persist.Address) error {
 	providers, ok := d.Chains[ti.Chain]
 	if !ok {
 		return ErrChainNotFound{Chain: ti.Chain}
 	}
 	for i, provider := range providers {
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
-		if err := provider.RefreshToken(ctx, id); err != nil {
-			return err
+		for _, ownerAddress := range ownerAddresses {
+			if err := provider.RefreshToken(ctx, id, ownerAddress); err != nil {
+				return err
+			}
 		}
 
 		tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)

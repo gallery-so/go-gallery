@@ -300,7 +300,8 @@ func cacheRawSvgMedia(ctx context.Context, img []byte, bucket, fileName string, 
 
 	// Update the object to set the metadata.
 	objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
-		ContentType: "image/svg+xml",
+		ContentType:  "image/svg+xml",
+		CacheControl: "no-store",
 	}
 	if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
 		return err
@@ -314,14 +315,30 @@ func cacheRawAnimationMedia(ctx context.Context, animation []byte, bucket, fileN
 	client.Bucket(bucket).Object(fileName).Delete(ctx)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	defer sw.Close()
 
 	writer := gzip.NewWriter(sw)
-	defer writer.Close()
 
 	_, err := io.Copy(writer, bytes.NewBuffer(animation))
 	if err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return err
+	}
+
+	if err := sw.Close(); err != nil {
+		return err
+	}
+
+	o := client.Bucket(bucket).Object(fileName)
+
+	// Update the object to set the metadata.
+	objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
+		CacheControl: "no-store",
+	}
+	if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
+		return err
 	}
 
 	return nil
@@ -337,7 +354,21 @@ func cacheRawMedia(ctx context.Context, img []byte, bucket, fileName string, cli
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
 
-	return sw.Close()
+	if err := sw.Close(); err != nil {
+		return err
+	}
+
+	o := client.Bucket(bucket).Object(fileName)
+
+	// Update the object to set the metadata.
+	objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
+		CacheControl: "no-store",
+	}
+	if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client *storage.Client) (string, error) {
