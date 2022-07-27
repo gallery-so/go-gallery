@@ -344,6 +344,10 @@ func cacheRawAnimationMedia(ctx context.Context, animation []byte, bucket, fileN
 	return nil
 }
 
+func deleteMedia(ctx context.Context, bucket, fileName string, client *storage.Client) {
+	client.Bucket(bucket).Object(fileName).Delete(ctx)
+}
+
 func cacheRawMedia(ctx context.Context, img []byte, bucket, fileName string, client *storage.Client) error {
 
 	client.Bucket(bucket).Object(fileName).Delete(ctx)
@@ -469,6 +473,7 @@ outer:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
 			if mediaType == persist.MediaTypeHTML && strings.HasPrefix(url, "https://") {
+				deleteMedias(pCtx, name, storageClient)
 				return mediaType, nil
 			}
 			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(len(buf.Bytes()))/1024/1024, mediaType, url, ipfsPrefix, name)
@@ -477,9 +482,17 @@ outer:
 			}
 			return mediaType, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 		default:
+			deleteMedias(pCtx, name, storageClient)
 			return mediaType, nil
 		}
 	}
+}
+
+func deleteMedias(pCtx context.Context, name string, storageClient *storage.Client) {
+	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
+	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
+	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 }
 
 // PredictMediaType guesses the media type of the given URL.

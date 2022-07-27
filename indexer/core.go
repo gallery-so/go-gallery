@@ -62,7 +62,7 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	router := gin.Default()
 
-	router.Use(middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -97,7 +97,7 @@ func coreInitServer() *gin.Engine {
 
 	router := gin.Default()
 
-	router.Use(middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
