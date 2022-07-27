@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,9 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
-	"github.com/getsentry/sentry-go"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -168,9 +169,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 // INITIALIZATION FUNCS ---------------------------------------------------------
 
 // Start begins indexing events from the blockchain
-func (i *indexer) Start() {
-	rootCtx := configureRootContext()
-
+func (i *indexer) Start(rootCtx context.Context) {
 	ctx, cancel := context.WithTimeout(rootCtx, time.Minute)
 	defer cancel()
 
@@ -217,14 +216,6 @@ func (i *indexer) Start() {
 		i.startNewBlocksPipeline(rootCtx, topics)
 		logger.For(rootCtx).Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
 	}
-}
-
-// configureRootContext configures the main context from which other contexts are derived.
-func configureRootContext() context.Context {
-	ctx := logger.NewContextWithFields(context.Background(), logrus.Fields{})
-	logger.For(ctx).Logger.SetReportCaller(true)
-	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
-	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())
 }
 
 func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, topics [][]common.Hash) {
@@ -322,11 +313,16 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 				"to":   nextBlock.String(),
 				"err":  err.Error(),
 			}
-			logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+			logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 				"fromBlock": curBlock.String(),
 				"toBlock":   nextBlock.String(),
-				"rpcCall":   "getLogs",
-			}).Error("failed to fetch logs")
+				"rpcCall":   "eth_getFilterLogs",
+			})
+			if rpcErr, ok := err.(gethrpc.Error); ok {
+				logEntry = logEntry.WithFields(logrus.Fields{"rpcErrorCode": strconv.Itoa(rpcErr.ErrorCode())})
+			}
+			logEntry.Error("failed to fetch logs")
+
 			err = json.NewEncoder(storageWriter).Encode(errData)
 			if err != nil {
 				panic(err)
@@ -764,11 +760,14 @@ func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenI
 	defer cancel()
 	u, err := rpc.GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
 	if err != nil {
-		logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+		logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 			"tokenType":       tokenType,
 			"tokenID":         tokenID,
 			"contractAddress": contractAddress,
-		}).Error("error getting URI for token")
+			"rpcCall":         "eth_call",
+		})
+		logEthCallRPCError(logEntry, err, "error getting URI for token")
+
 		if strings.Contains(err.Error(), "execution reverted") {
 			u = persist.InvalidTokenURI
 		}
@@ -1118,8 +1117,11 @@ func fillContractFields(ctx context.Context, ethClient *ethclient.Client, contra
 	defer cancel()
 	cMetadata, err := rpc.GetTokenContractMetadata(ctx, contractAddress, ethClient)
 	if err != nil {
-		// TODO figure out what type of error this is
-		logger.For(ctx).WithError(err).WithField("address", contractAddress).Error("error getting contract metadata")
+		logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+			"contractAddress": contractAddress,
+			"rpcCall":         "eth_call",
+		})
+		logEthCallRPCError(logEntry, err, "error getting contract metadata")
 	} else {
 		c.Name = persist.NullString(cMetadata.Name)
 		c.Symbol = persist.NullString(cMetadata.Symbol)
@@ -1180,5 +1182,17 @@ func storeErr(ctx context.Context, err error, prefix string, from persist.Ethere
 	err = json.NewEncoder(storageWriter).Encode(errData)
 	if err != nil {
 		panic(err)
+	}
+}
+
+func logEthCallRPCError(entry *logrus.Entry, err error, message string) {
+	if rpcErr, ok := err.(gethrpc.Error); ok {
+		entry = entry.WithFields(logrus.Fields{"rpcErrorCode": strconv.Itoa(rpcErr.ErrorCode())})
+		// If the contract is missing a method then we only want to Warn rather than Error on it.
+		if rpcErr.ErrorCode() == -32000 && rpcErr.Error() == "execution reverted" {
+			entry.Warn(message)
+		}
+	} else {
+		entry.Error(message)
 	}
 }
