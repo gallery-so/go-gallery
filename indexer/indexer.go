@@ -1081,7 +1081,7 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 			if err != nil {
 				if strings.Contains(err.Error(), "deadlock detected (SQLSTATE 40P01)") {
 					logger.For(ctx).Errorf("Deadlock detected, retrying upsert")
-					time.Sleep(time.Second)
+					time.Sleep(5 * time.Second)
 					if err := tokenRepo.BulkUpsert(ctx, t[i:end]); err != nil {
 						return err
 					}
