@@ -62,7 +62,7 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	router := gin.Default()
 
-	router.Use(middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -97,7 +97,7 @@ func coreInitServer() *gin.Engine {
 
 	router := gin.Default()
 
-	router.Use(middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
+	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -132,6 +132,7 @@ func setDefaults() {
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
+	viper.SetDefault("IMGIX_API_KEY", "")
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")

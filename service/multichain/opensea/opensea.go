@@ -568,7 +568,7 @@ func contractToContract(ctx context.Context, openseaContract Contract, ethClient
 }
 
 // RefreshToken refreshes the metadata for a given token.
-func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers) error {
+func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) error {
 	return nil
 }
 

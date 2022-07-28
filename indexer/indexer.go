@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,8 +36,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// var defaultStartingBlock persist.BlockNumber = 5000000
-var defaultStartingBlock persist.BlockNumber = 13768584
+var defaultStartingBlock persist.BlockNumber = 5000000
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
@@ -49,7 +49,7 @@ var uniqueMetadataHandlers = uniqueMetadatas{
 
 const defaultWorkerPoolSize = 4
 
-const defaultWorkerPoolWaitSize = 25
+const defaultWorkerPoolWaitSize = 10
 
 const blocksPerLogsCall = 50
 
@@ -121,14 +121,16 @@ type indexer struct {
 	storageClient *storage.Client
 	tokenRepo     persist.TokenRepository
 	contractRepo  persist.ContractRepository
-	contractDBMu  *sync.Mutex
-	tokenDBMu     *sync.Mutex
+	dbMu          *sync.Mutex
 
 	tokenBucket string
 
 	chain persist.Chain
 
 	eventHashes []eventHash
+
+	polledLogs   []types.Log
+	lastSavedLog uint64
 
 	mostRecentBlock uint64
 	lastSyncedBlock uint64
@@ -153,12 +155,13 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		storageClient: storageClient,
 		tokenRepo:     tokenRepo,
 		contractRepo:  contractRepo,
-		contractDBMu:  &sync.Mutex{},
-		tokenDBMu:     &sync.Mutex{},
+		dbMu:          &sync.Mutex{},
 
 		tokenBucket: viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
 		chain: pChain,
+
+		polledLogs: []types.Log{},
 
 		eventHashes:     pEvents,
 		mostRecentBlock: mostRecentBlockUint64,
@@ -198,6 +201,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 		input := lastSyncedBlock
 		toQueue := func() {
 			workerCtx := sentryutil.NewSentryHubContext(rootCtx)
+			defer recoverAndWait(workerCtx)
 			defer sentryutil.RecoverAndRaise(workerCtx)
 
 			i.startPipeline(workerCtx, input, topics)
@@ -211,6 +215,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 	wp.StopWait()
 	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
+	i.lastSavedLog = uint64(lastSyncedBlock)
 	for {
 		timeAfterWait := <-time.After(time.Minute * 3)
 		i.startNewBlocksPipeline(rootCtx, topics)
@@ -219,6 +224,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 }
 
 func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, topics [][]common.Hash) {
+
 	startTime := time.Now()
 	i.isListening = false
 	uris := make(chan tokenURI)
@@ -267,6 +273,7 @@ func (i *indexer) listenForNewBlocks(ctx context.Context) {
 
 func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, startingBlock persist.BlockNumber, topics [][]common.Hash) {
 	defer close(transfersChan)
+	defer recoverAndWait(ctx)
 	defer sentryutil.RecoverAndRaise(ctx)
 
 	curBlock := startingBlock.BigInt()
@@ -330,14 +337,7 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 			return
 		}
 
-		obj := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock.String(), nextBlock.String()))
-		obj.Delete(ctx)
-		storageWriter := obj.NewWriter(ctx)
-		defer storageWriter.Close()
-
-		if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
-			panic(err)
-		}
+		saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
 	} else {
 		logger.For(ctx).Info("Found logs in cache...")
 	}
@@ -469,6 +469,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, subscriptions chan types.Log, topics [][]common.Hash) {
 
 	defer close(transfersChan)
+	defer recoverAndWait(ctx)
 	defer sentryutil.RecoverAndRaise(ctx)
 
 	mostRecentBlock, err := i.ethClient.BlockNumber(ctx)
@@ -513,6 +514,25 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 					return
 				}
 
+				if mostRecentBlock-i.lastSavedLog >= blocksPerLogsCall {
+					blockLimit := i.lastSavedLog + blocksPerLogsCall
+					sort.SliceStable(logsTo, func(i, j int) bool {
+						return logsTo[i].BlockNumber < logsTo[j].BlockNumber
+					})
+					var indexToCut int
+					for indexToCut = 0; indexToCut < len(logsTo); indexToCut++ {
+						if logsTo[indexToCut].BlockNumber >= blockLimit {
+							break
+						}
+					}
+					i.polledLogs = append(i.polledLogs, logsTo[:indexToCut]...)
+					saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
+					i.lastSavedLog = blockLimit
+					i.polledLogs = logsTo[indexToCut:]
+				} else {
+					i.polledLogs = append(i.polledLogs, logsTo...)
+				}
+
 				logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock)
 
 				transfers := logsToTransfers(ctx, logsTo, i.ethClient)
@@ -540,7 +560,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 	wp.StopWait()
 	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedBlock, mostRecentBlock)
 
-	i.lastSyncedBlock = mostRecentBlock - 1
+	i.lastSyncedBlock = mostRecentBlock
 }
 
 // TRANSFERS FUNCS -------------------------------------------------------------
@@ -834,6 +854,8 @@ func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owner
 }
 
 func createTokens(ctx context.Context, i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata, urisMap map[persist.EthereumTokenIdentifiers]tokenURI, mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia) {
+	defer recoverAndWait(ctx)
+
 	tokens := i.fieldMapsToTokens(ctx, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, mediasMap)
 	if tokens == nil || len(tokens) == 0 {
 		logger.For(ctx).Info("No tokens to process")
@@ -846,7 +868,7 @@ func createTokens(ctx context.Context, i *indexer, ownersMap map[persist.Ethereu
 	logger.For(ctx).Infof("Upserting %d tokens and contracts with a timeout of %s", len(tokens), timeout)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.tokenDBMu, i.contractDBMu)
+	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu)
 	if err != nil {
 		logger.For(ctx).WithError(err).Error("error upserting tokens and contracts")
 		randKey := util.RandStringBytes(24)
@@ -1042,11 +1064,11 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context, owners map[persist.Ethe
 	return result
 }
 
-func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, tokenMu *sync.Mutex, contractMu *sync.Mutex) error {
+func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, dbMu *sync.Mutex) error {
 
 	err := func() error {
-		tokenMu.Lock()
-		defer tokenMu.Unlock()
+		dbMu.Lock()
+		defer dbMu.Unlock()
 		now := time.Now()
 		logger.For(ctx).Debugf("Upserting %d tokens", len(t))
 		// upsert tokens in batches of 500
@@ -1057,7 +1079,15 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 			}
 			err := tokenRepo.BulkUpsert(ctx, t[i:end])
 			if err != nil {
-				return err
+				if strings.Contains(err.Error(), "deadlock detected (SQLSTATE 40P01)") {
+					logger.For(ctx).Errorf("Deadlock detected, retrying upsert")
+					time.Sleep(5 * time.Second)
+					if err := tokenRepo.BulkUpsert(ctx, t[i:end]); err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
 			}
 		}
 		logger.For(ctx).Debugf("Upserted %d tokens in %v time", len(t), time.Since(now))
@@ -1097,12 +1127,20 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 	for contract := range contractsChan {
 		allContracts = append(allContracts, contract)
 	}
-	contractMu.Lock()
-	defer contractMu.Unlock()
+	dbMu.Lock()
+	defer dbMu.Unlock()
 	logger.For(ctx).Debugf("Upserting %d contracts", len(allContracts))
 	err = contractRepo.BulkUpsert(ctx, allContracts)
 	if err != nil {
-		return fmt.Errorf("err upserting contracts: %s", err.Error())
+		if strings.Contains(err.Error(), "deadlock detected (SQLSTATE 40P01)") {
+			logger.For(ctx).Errorf("Deadlock detected, retrying upserting contracts")
+			time.Sleep(time.Second * 3)
+			if err = contractRepo.BulkUpsert(ctx, allContracts); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("err upserting contracts: %s", err.Error())
+		}
 	}
 	logger.For(ctx).Debugf("Upserted %d contracts in %v time", len(allContracts), time.Since(finalNow))
 	return nil
@@ -1185,6 +1223,26 @@ func storeErr(ctx context.Context, err error, prefix string, from persist.Ethere
 	}
 }
 
+func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) {
+	logger.For(ctx).Info("Saving logs in block range %s-%s", curBlock, nextBlock)
+	obj := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
+	obj.Delete(ctx)
+	storageWriter := obj.NewWriter(ctx)
+
+	if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
+		panic(err)
+	}
+	if err := storageWriter.Close(); err != nil {
+		panic(err)
+	}
+}
+
+func recoverAndWait(ctx context.Context) {
+	if err := recover(); err != nil {
+		logger.For(ctx).Errorf("Error in indexer: %v", err)
+		time.Sleep(time.Second * 10)
+	}
+}
 func logEthCallRPCError(entry *logrus.Entry, err error, message string) {
 	if rpcErr, ok := err.(gethrpc.Error); ok {
 		entry = entry.WithFields(logrus.Fields{"rpcErrorCode": strconv.Itoa(rpcErr.ErrorCode())})

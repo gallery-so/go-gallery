@@ -526,14 +526,24 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 
 // refreshToken will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
 func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) error {
+	c = sentryutil.NewSentryHubContext(c)
 	c = logger.NewContextWithFields(c, logrus.Fields{"tokenID": input.TokenID, "contractAddress": input.ContractAddress})
 	if input.TokenID != "" && input.ContractAddress != "" {
 		logger.For(c).Infof("updating media for token %s-%s", input.TokenID, input.ContractAddress)
+		var token persist.Token
 		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
 		if err != nil {
-			return err
+			if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
+				token, err = manuallyIndexToken(c, input.TokenID, input.ContractAddress, input.OwnerAddress, ethClient)
+				if err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			token = tokens[0]
 		}
-		token := tokens[0]
 
 		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 		if err != nil {
@@ -695,4 +705,39 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		},
 	}
 	return up, nil
+}
+
+func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client) (t persist.Token, err error) {
+
+	t.TokenID = tokenID
+	t.ContractAddress = contractAddress
+	t.OwnerAddress = ownerAddress
+
+	var e721 *contracts.IERC721Caller
+	var e1155 *contracts.IERC1155Caller
+
+	e721, err = contracts.NewIERC721Caller(contractAddress.Address(), ec)
+	if err != nil {
+		return
+	}
+	e1155, err = contracts.NewIERC1155Caller(contractAddress.Address(), ec)
+	if err != nil {
+		return
+	}
+	owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
+	isERC721 := err == nil
+	if isERC721 {
+		t.TokenType = persist.TokenTypeERC721
+		t.OwnerAddress = persist.EthereumAddress(owner.String())
+	} else {
+		bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
+		if err != nil {
+			return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
+		}
+		t.TokenType = persist.TokenTypeERC1155
+		t.Quantity = persist.HexString(bal.Text(16))
+	}
+
+	return t, nil
+
 }
