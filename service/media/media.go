@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/sirupsen/logrus"
 
 	"cloud.google.com/go/storage"
@@ -290,7 +291,7 @@ func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.T
 
 func cacheRawSvgMedia(ctx context.Context, img []byte, bucket, fileName string, client *storage.Client) error {
 
-	client.Bucket(bucket).Object(fileName).Delete(ctx)
+	deleteMedia(ctx, bucket, fileName, client)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	_, err := sw.Write(img)
@@ -314,12 +315,11 @@ func cacheRawSvgMedia(ctx context.Context, img []byte, bucket, fileName string, 
 		return err
 	}
 
-	return nil
+	return mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
 }
 
 func cacheRawAnimationMedia(ctx context.Context, animation []byte, bucket, fileName string, client *storage.Client) error {
-
-	client.Bucket(bucket).Object(fileName).Delete(ctx)
+	deleteMedia(ctx, bucket, fileName, client)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 
@@ -348,17 +348,13 @@ func cacheRawAnimationMedia(ctx context.Context, animation []byte, bucket, fileN
 		return err
 	}
 
-	return nil
-}
-
-func deleteMedia(ctx context.Context, bucket, fileName string, client *storage.Client) {
-	client.Bucket(bucket).Object(fileName).Delete(ctx)
+	return mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
 }
 
 func cacheRawMedia(ctx context.Context, img []byte, bucket, fileName string, client *storage.Client) error {
 	logger.For(ctx).Infof("caching raw media for %s", fileName)
 
-	client.Bucket(bucket).Object(fileName).Delete(ctx)
+	deleteMedia(ctx, bucket, fileName, client)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	_, err := sw.Write(img)
@@ -380,7 +376,11 @@ func cacheRawMedia(ctx context.Context, img []byte, bucket, fileName string, cli
 		return err
 	}
 
-	return nil
+	return mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
+}
+
+func deleteMedia(ctx context.Context, bucket, fileName string, client *storage.Client) {
+	client.Bucket(bucket).Object(fileName).Delete(ctx)
 }
 
 func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client *storage.Client) (string, error) {
