@@ -132,7 +132,7 @@ func setDefaults() {
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("IMGIX_SECRET", "")
+	viper.SetDefault("IMGIX_API_KEY", "")
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")

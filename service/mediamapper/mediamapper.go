@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -153,7 +154,7 @@ func PurgeImage(ctx context.Context, u string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/vnd.api+json")
-	req.Header.Set("Authorization", "Bearer "+viper.GetString("IMGIX_SECRET"))
+	req.Header.Set("Authorization", "Bearer "+viper.GetString("IMGIX_API_KEY"))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -162,7 +163,11 @@ func PurgeImage(ctx context.Context, u string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("unexpected response status code: %d", resp.StatusCode)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("unexpected response status code: %d - %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	return nil
