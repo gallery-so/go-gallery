@@ -162,7 +162,7 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
 			res.ThumbnailURL = persist.NullString(imageURL)
 		} else {
-			logger.For(pCtx).WithError(err).Error("could not get image serving URL")
+			logger.For(pCtx).WithError(err).Warn("could not get image serving URL")
 		}
 	}
 	if vURL != "" {

@@ -81,6 +81,41 @@ type ValidateUsersNFTsOutput struct {
 	Message string `json:"message,omitempty"`
 }
 
+// UniqueMetadataUpdateErr is returned when an update for an address with a custom handler
+// i.e. CryptoPunks, Autoglyphs, etc. fails to update a token.
+type UniqueMetadataUpdateErr struct {
+	contractAddress persist.Address
+	tokenID         persist.TokenID
+	err             error
+}
+
+func (e UniqueMetadataUpdateErr) Error() string {
+	return fmt.Sprintf("failed to get unique metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
+}
+
+// MetadataUpdateErr is returned when an update for an address with a "standard" metadata URI
+// i.e. JSON, SVG, IPFS, HTTP, etc. fails to update.
+type MetadataUpdateErr struct {
+	contractAddress persist.Address
+	tokenID         persist.TokenID
+	err             error
+}
+
+func (e MetadataUpdateErr) Error() string {
+	return fmt.Sprintf("failed to get metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
+}
+
+// MetadataPreviewUpdateErr is returned when preview creation failed for a token.
+type MetadataPreviewUpdateErr struct {
+	contractAddress persist.Address
+	tokenID         persist.TokenID
+	err             error
+}
+
+func (e MetadataPreviewUpdateErr) Error() string {
+	return fmt.Sprintf("failed to make media for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
+}
+
 func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensInput{}
@@ -163,10 +198,19 @@ func processMedialessTokens(ctx context.Context, inputs <-chan processTokensInpu
 							ctx := sentryutil.NewSentryHubContext(ctx)
 							err := refreshToken(ctx, UpdateTokenMediaInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 							if err != nil {
-								logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+								logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 									"tokenID":         t.TokenID,
 									"contractAddress": t.ContractAddress,
-								}).Error("failed to update token media")
+								})
+
+								// Don't report errors for tokens with generic handlers because they fail frequently
+								// because of the nature of those URIs.
+								var updateErr MetadataUpdateErr
+								if errors.As(err, &updateErr) {
+									logEntry.Warn("failed to update token media")
+								} else {
+									logEntry.Error("failed to update token media")
+								}
 							}
 						})
 					}
@@ -176,9 +220,8 @@ func processMedialessTokens(ctx context.Context, inputs <-chan processTokensInpu
 							ctx := sentryutil.NewSentryHubContext(ctx)
 							err := updateMediaForContract(ctx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
 							if err != nil {
-								logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-									"contractAddress": c.Address,
-								}).Error("failed to update contract media")
+								logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{"contractAddress": c.Address})
+								logEthCallRPCError(logEntry, err, "failed to update contract media")
 							}
 						})
 					}
@@ -603,14 +646,22 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		logger.For(pCtx).Infof("Using %v metadata handler for %s", handler, contractAddress)
 		u, md, err := handler(pCtx, newURI, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient, ipfsClient, arweaveClient)
 		if err != nil {
-			return tokenUpdate{}, fmt.Errorf("failed to get unique metadata for token %s: %s", uri, err)
+			return tokenUpdate{}, UniqueMetadataUpdateErr{
+				contractAddress: persist.Address(contractAddress),
+				tokenID:         tokenID,
+				err:             err,
+			}
 		}
 		newMetadata = md
 		newURI = u
 	} else {
 		md, err := rpc.GetMetadataFromURI(pCtx, newURI, ipfsClient, arweaveClient)
 		if err != nil {
-			return tokenUpdate{}, fmt.Errorf("failed to get metadata for token %s: %v", tokenID, err)
+			return tokenUpdate{}, MetadataUpdateErr{
+				contractAddress: persist.Address(contractAddress),
+				tokenID:         tokenID,
+				err:             err,
+			}
 		}
 		newMetadata = md
 	}
@@ -626,7 +677,11 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 
 	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, contractAddress.String(), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient, tokenBucket)
 	if err != nil {
-		return tokenUpdate{}, fmt.Errorf("failed to make media for token %s-%s: %v", contractAddress, tokenID, err)
+		return tokenUpdate{}, MetadataPreviewUpdateErr{
+			contractAddress: persist.Address(contractAddress),
+			tokenID:         tokenID,
+			err:             err,
+		}
 	}
 	up := tokenUpdate{
 		TokenID:         tokenID,
