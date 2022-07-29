@@ -121,8 +121,10 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeHTML, persist.MediaTypeText, persist.MediaTypeAnimation, persist.MediaTypeGIF:
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeAnimation, persist.MediaTypeGIF:
 		res = getAuxilaryMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL, mediaType)
+	case persist.MediaTypeHTML:
+		res = getHTMLMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	case persist.MediaTypeSVG:
 		res = getSvgMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	default:
@@ -230,6 +232,34 @@ func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient
 		} else if imgURL != "" {
 			logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 			res.MediaURL = persist.NullString(imgURL)
+		}
+	}
+	return res
+}
+
+func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
+	res := persist.Media{
+		MediaType: persist.MediaTypeHTML,
+	}
+	if vURL != "" {
+		logger.For(pCtx).Infof("using vURL for %s: %s", name, vURL)
+		res.MediaURL = persist.NullString(vURL)
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
+		res.MediaURL = persist.NullString(imgURL)
+	}
+	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+	if err == nil {
+		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, imageURL)
+		res.ThumbnailURL = persist.NullString(imageURL)
+	} else {
+		imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
+		if err == nil {
+			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
+			res.ThumbnailURL = persist.NullString(imageURL)
+		} else if imgURL != "" {
+			logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
+			res.ThumbnailURL = persist.NullString(imgURL)
 		}
 	}
 	return res
@@ -398,7 +428,7 @@ outer:
 			logger.For(pCtx).Infof("uri for %s is of type %s: trying to cache", name, asURI.Type())
 			break outer
 		default:
-			deleteMedias(pCtx, name, storageClient)
+			deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 			return mediaType, nil
 		}
 	}
@@ -451,7 +481,6 @@ outer:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
 			if mediaType == persist.MediaTypeHTML && strings.HasPrefix(url, "https://") {
-				deleteMedias(pCtx, name, storageClient)
 				return mediaType, nil
 			}
 			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(len(buf.Bytes()))/1024/1024, mediaType, url, ipfsPrefix, name)
@@ -460,17 +489,9 @@ outer:
 			}
 			return mediaType, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 		default:
-			deleteMedias(pCtx, name, storageClient)
 			return mediaType, nil
 		}
 	}
-}
-
-func deleteMedias(pCtx context.Context, name string, storageClient *storage.Client) {
-	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
-	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
-	deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 }
 
 // PredictMediaType guesses the media type of the given URL.
