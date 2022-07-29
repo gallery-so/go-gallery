@@ -14,8 +14,18 @@ const loggerContextKey = "logger.logger"
 var defaultLogger = logrus.New()
 var defaultEntry = logrus.NewEntry(defaultLogger)
 
+// NewContextWithFields returns a new context with a log entry derived from the default logger.
 func NewContextWithFields(parent context.Context, fields logrus.Fields) context.Context {
 	return context.WithValue(parent, loggerContextKey, For(parent).WithFields(fields))
+}
+
+// NewContextWithLogger returns a new context with a log entry derived from the input logger. This is useful
+// when needing to configure the logger with options that differ from the default logger.
+func NewContextWithLogger(parent context.Context, fields logrus.Fields, logger *logrus.Logger) context.Context {
+	if logger == nil {
+		return NewContextWithFields(parent, fields)
+	}
+	return context.WithValue(parent, loggerContextKey, logger.WithFields(fields))
 }
 
 func SetLoggerOptions(optionsFunc func(logger *logrus.Logger)) {
