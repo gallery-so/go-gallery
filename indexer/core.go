@@ -196,7 +196,7 @@ func initLogger() {
 
 // configureRootContext configures the main context from which other contexts are derived.
 func configureRootContext() context.Context {
-	ctx := logger.NewContextWithFields(context.Background(), logrus.Fields{})
+	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
 	logger.For(ctx).Logger.SetReportCaller(true)
 	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
 	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())
