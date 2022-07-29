@@ -229,7 +229,7 @@ func processMedialessTokens(ctx context.Context, inputs <-chan processTokensInpu
 					logger.For(ctx).Infof("Successfully processed %d tokens and %d contracts", len(tokensWithoutMedia), len(contractsWithoutMedia))
 				})
 			} else {
-				logger.For(ctx).WithError(err).Error("failed to acquire lock")
+				logger.For(ctx).WithError(err).Warn("failed to acquire lock")
 			}
 		}()
 	}
