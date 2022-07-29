@@ -262,7 +262,7 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	for i, c := range spl[0] {
 		y := int(math.Floor(float64(i)/float64(64))*5) + 28
 		x := ((i % 64) * 5) + 28
-		col := schemeColors[int(math.Floor(float64(int(c))/float64(len(schemeColors))))%len(schemeColors)]
+		col := schemeColors[int(math.Floor(float64(int(c)+i)/float64(len(schemeColors))))%len(schemeColors)]
 		stroke := fmt.Sprintf(`stroke="rgb(%d,%d,%d)"`, col.R, col.G, col.B)
 		switch c {
 		case 'O':
