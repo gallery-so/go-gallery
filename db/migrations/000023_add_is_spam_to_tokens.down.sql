@@ -1,0 +1,1 @@
+ALTER TABLE tokens DROP COLUMN IF EXISTS is_spam;
