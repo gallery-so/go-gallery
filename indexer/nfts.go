@@ -533,8 +533,9 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 		var token persist.Token
 		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
 		if err != nil {
-			if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
-				token, err = manuallyIndexToken(c, input.TokenID, input.ContractAddress, input.OwnerAddress, ethClient)
+			if idErr, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
+				logger.For(c).Infof("token not found: %+v", idErr)
+				token, err = manuallyIndexToken(c, idErr.TokenID, idErr.ContractAddress, input.OwnerAddress, ethClient, tokenRepository)
 				if err != nil {
 					return err
 				}
@@ -707,7 +708,7 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 	return up, nil
 }
 
-func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client) (t persist.Token, err error) {
+func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client, tokenRepo persist.TokenRepository) (t persist.Token, err error) {
 
 	t.TokenID = tokenID
 	t.ContractAddress = contractAddress
@@ -736,6 +737,9 @@ func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractA
 		}
 		t.TokenType = persist.TokenTypeERC1155
 		t.Quantity = persist.HexString(bal.Text(16))
+	}
+	if err := tokenRepo.Upsert(pCtx, t); err != nil {
+		return persist.Token{}, fmt.Errorf("failed to upsert token %s-%s: %s", contractAddress, tokenID, err)
 	}
 
 	return t, nil
