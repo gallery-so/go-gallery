@@ -142,7 +142,7 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
 func GetMetadataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, error) {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*2)
 	defer cancel()
 	var meta persist.TokenMetadata
 	err := DecodeMetadataFromURI(ctx, turi, &meta, ipfsClient, arweaveClient)

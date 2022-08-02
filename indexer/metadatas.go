@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -19,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
+	colorful "github.com/lucasb-eyer/go-colorful"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -71,23 +71,23 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 		x := ((i % 64) * 5) + 28
 		switch c {
 		case 'O':
-			canvas.Circle(x+add, y+add, add, canvas.RGB(0, 0, 0))
+			canvas.Circle(x, y, add-1, `stroke="black"`, `stroke-width="0.6"`, `stroke-linecap="butt"`, `fill="none"`)
 		case '+':
-			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.2"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y-add, x, (y + add), `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
+			canvas.Line(x, y-add, x, (y + add), `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case 'X':
-			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
-			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
+			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '|':
-			canvas.Line(x, y-add, x, y+add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-add, x, y+add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '-':
-			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '\\':
-			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '/':
-			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '#':
-			canvas.Rect(x, y, add, add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Rect(x, y, add, add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		}
 	}
 	canvas.End()
@@ -187,7 +187,7 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 
 	// sort colors by value
 	sort.SliceStable(allColors, func(i, j int) bool {
-		return getLuminosityOfRGB(allColors[i]) > getLuminosityOfRGB(allColors[j])
+		return getLightness(allColors[i]) > getLightness(allColors[j])
 	})
 	lightestColor := allColors[0]
 	secondLightestColor := allColors[1]
@@ -262,27 +262,27 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	for i, c := range spl[0] {
 		y := int(math.Floor(float64(i)/float64(64))*5) + 28
 		x := ((i % 64) * 5) + 28
-		col := schemeColors[int(math.Floor(float64(int(c))/float64(len(schemeColors))))%len(schemeColors)]
+		col := schemeColors[int(math.Floor(float64(int(c)+i)/float64(len(schemeColors))))%len(schemeColors)]
 		stroke := fmt.Sprintf(`stroke="rgb(%d,%d,%d)"`, col.R, col.G, col.B)
 		switch c {
 		case 'O':
-			canvas.Circle(x+add, y+add, add, stroke, `stroke-width="0.2"`, `stroke-linecap="butt"`, `fill="none"`)
+			canvas.Circle(x, y, add-1, stroke, `stroke-width="0.7"`, `stroke-linecap="butt"`, `fill="none"`, "stroke-opacity: 1.0")
 		case '+':
-			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
-			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case 'X':
-			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
-			canvas.Line(x+add, y-add, x-add, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x+add, y-add, x-add, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '|':
-			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '-':
-			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '\\':
-			canvas.Line(x-add, y+add, x+add, y-add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y+add, x+add, y-add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '/':
-			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '#':
-			canvas.Rect(x, y, add, add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`)
+			canvas.Rect(x, y, add, add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		}
 	}
 	canvas.End()
@@ -299,24 +299,22 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	}, nil
 }
 
-func getLuminosityOfRGB(c color.RGBA) float64 {
-	return math.Sqrt(.241*float64(c.R) + .691*float64(c.G) + .068*float64(c.B))
+func getLightness(c color.RGBA) float64 {
+	newColor, _ := colorful.MakeColor(c)
+	_, _, l := newColor.Hsl()
+	return l
 }
 
 func parseHexColor(s string) (c color.RGBA, err error) {
 
-	asBytes, err := hex.DecodeString(s)
+	h, err := colorful.Hex(fmt.Sprintf("#%s", s))
 	if err != nil {
-		return
+		return c, err
 	}
 
-	fmt.Printf("Hex: %s Bytes: %+v\n", s, asBytes)
+	r, g, b, a := h.RGBA()
+	return color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}, nil
 
-	c.R = asBytes[0]
-	c.G = asBytes[1]
-	c.B = asBytes[2]
-
-	return
 }
 
 const ensGraph = "https://api.thegraph.com/subgraphs/name/ensdomains/ens"

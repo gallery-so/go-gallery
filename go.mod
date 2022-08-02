@@ -39,6 +39,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.11 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/libp2p/go-libp2p-core v0.14.0 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/matryer/moq v0.2.5 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.18
