@@ -87,6 +87,12 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 	checkOwnTokensStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) = $1 FROM tokens WHERE OWNER_USER_ID = $2 AND ID = ANY($3);`)
 	checkNoErr(err)
 
+	setTokensAsUserMarkedSpamStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET is_user_marked_spam = $1, LAST_UPDATED = now() WHERE OWNER_USER_ID = $2 AND ID = ANY($3) AND DELETED = false;`)
+	checkNoErr(err)
+
+	checkOwnTokensStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) = $1 FROM tokens WHERE OWNER_USER_ID = $2 AND ID = ANY($3);`)
+	checkNoErr(err)
+
 	return &TokenGalleryRepository{
 		db:                                      db,
 		galleryRepo:                             galleryRepo,
@@ -335,6 +341,28 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 func (t *TokenGalleryRepository) DeleteByID(ctx context.Context, id persist.DBID) error {
 	_, err := t.deleteByIDStmt.ExecContext(ctx, id)
 	return err
+}
+
+// FlagTokensAsUserMarkedSpam marks tokens as spam by the user.
+func (t *TokenGalleryRepository) FlagTokensAsUserMarkedSpam(ctx context.Context, ownerUserID persist.DBID, tokens []persist.DBID, isSpam bool) error {
+	_, err := t.setTokensAsUserMarkedSpamStmt.ExecContext(ctx, isSpam, ownerUserID, tokens)
+	return err
+}
+
+// TokensAreOwnedByUser checks if all tokens are owned by the provided user.
+func (t *TokenGalleryRepository) TokensAreOwnedByUser(ctx context.Context, userID persist.DBID, tokens []persist.DBID) error {
+	var owned bool
+
+	err := t.checkOwnTokensStmt.QueryRowContext(ctx, len(tokens), userID, tokens).Scan(&owned)
+	if err != nil {
+		return err
+	}
+
+	if !owned {
+		return errTokensNotOwnedByUser
+	}
+
+	return nil
 }
 
 // FlagTokensAsUserMarkedSpam marks tokens as spam by the user.
