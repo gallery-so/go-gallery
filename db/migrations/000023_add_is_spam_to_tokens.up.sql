@@ -1,1 +1,2 @@
-ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_spam bool DEFAULT NULL;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_user_marked_spam bool;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_provider_marked_spam bool;

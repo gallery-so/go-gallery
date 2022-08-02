@@ -121,6 +121,9 @@ type EthereumAddress string
 // EthereumAddressList is a slice of Addresses, used to implement scanner/valuer interfaces
 type EthereumAddressList []EthereumAddress
 
+// EthereumTxHash is the hash of the transaction represented in hexadecimal, prefixed with 0x.
+type EthereumTxHash string
+
 func (l EthereumAddressList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
 }
@@ -171,21 +174,16 @@ type EthereumTokenIdentifiers string
 
 // Token represents an individual Token token
 type Token struct {
-	Version      NullInt32       `json:"version"` // schema version for this model
-	ID           DBID            `json:"id" binding:"required"`
-	CreationTime CreationTime    `json:"created_at"`
-	Deleted      NullBool        `json:"-"`
-	LastUpdated  LastUpdatedTime `json:"last_updated"`
-
-	Media Media `json:"media"`
-
-	TokenType TokenType `json:"token_type"`
-
-	Chain Chain `json:"chain"`
-
-	Name        NullString `json:"name"`
-	Description NullString `json:"description"`
-
+	Version          NullInt32                `json:"version"` // schema version for this model
+	ID               DBID                     `json:"id" binding:"required"`
+	CreationTime     CreationTime             `json:"created_at"`
+	Deleted          NullBool                 `json:"-"`
+	LastUpdated      LastUpdatedTime          `json:"last_updated"`
+	Media            Media                    `json:"media"`
+	TokenType        TokenType                `json:"token_type"`
+	Chain            Chain                    `json:"chain"`
+	Name             NullString               `json:"name"`
+	Description      NullString               `json:"description"`
 	TokenURI         TokenURI                 `json:"token_uri"`
 	TokenID          TokenID                  `json:"token_id"`
 	Quantity         HexString                `json:"quantity"`
@@ -193,10 +191,9 @@ type Token struct {
 	OwnershipHistory []EthereumAddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata            `json:"metadata"`
 	ContractAddress  EthereumAddress          `json:"contract_address"`
-
-	ExternalURL NullString `json:"external_url"`
-
-	BlockNumber BlockNumber `json:"block_number"`
+	ExternalURL      NullString               `json:"external_url"`
+	BlockNumber      BlockNumber              `json:"block_number"`
+	IsSpam           bool                     `json:"is_spam"`
 }
 
 // Media represents a token's media content with processed images from metadata
@@ -289,22 +286,16 @@ type TokenUpdateBalanceInput struct {
 
 // TokenRepository represents a repository for interacting with persisted tokens
 type TokenRepository interface {
-	CreateBulk(context.Context, []Token) ([]DBID, error)
-	Create(context.Context, Token) (DBID, error)
 	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
 	GetByIdentifiers(context.Context, TokenID, EthereumAddress, EthereumAddress) (Token, error)
 	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)
-	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)
-	GetByID(context.Context, DBID) (Token, error)
 	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
-	Upsert(context.Context, Token) error
 	UpdateByID(context.Context, DBID, interface{}) error
 	UpdateByTokenIdentifiers(context.Context, TokenID, EthereumAddress, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
-	Count(context.Context, TokenCountType) (int64, error)
 }
 
 // ErrTokenNotFoundByTokenIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)

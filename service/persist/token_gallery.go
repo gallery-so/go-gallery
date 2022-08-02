@@ -117,6 +117,8 @@ type TokenGalleryRepository interface {
 	MostRecentBlock(context.Context) (BlockNumber, error)
 	Count(context.Context, TokenCountType) (int64, error)
 	DeleteByID(context.Context, DBID) error
+	FlagTokensAsUserMarkedSpam(ctx context.Context, ownerUserID DBID, tokens []DBID, isSpam bool) error
+	TokensAreOwnedByUser(ctx context.Context, userID DBID, tokens []DBID) error
 }
 
 type ErrTokensGalleryNotFoundByContract struct {

@@ -52,6 +52,7 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	OwnerAtBlock() OwnerAtBlockResolver
 	Query() QueryResolver
+	SetSpamPreferencePayload() SetSpamPreferencePayloadResolver
 	Token() TokenResolver
 	TokenHolder() TokenHolderResolver
 	TokensAddedToCollectionFeedEventData() TokensAddedToCollectionFeedEventDataResolver
@@ -362,6 +363,7 @@ type ComplexityRoot struct {
 		RefreshContract          func(childComplexity int, contractID persist.DBID) int
 		RefreshToken             func(childComplexity int, tokenID persist.DBID) int
 		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
+		SetSpamPreference        func(childComplexity int, input model.SetSpamPreferenceInput) int
 		SyncTokens               func(childComplexity int) int
 		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
@@ -426,6 +428,10 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
+	SetSpamPreferencePayload struct {
+		Tokens func(childComplexity int) int
+	}
+
 	SyncTokensPayload struct {
 		Viewer func(childComplexity int) int
 	}
@@ -448,6 +454,8 @@ type ComplexityRoot struct {
 		Description           func(childComplexity int) int
 		ExternalURL           func(childComplexity int) int
 		ID                    func(childComplexity int) int
+		IsSpamByProvider      func(childComplexity int) int
+		IsSpamByUser          func(childComplexity int) int
 		LastUpdated           func(childComplexity int) int
 		Media                 func(childComplexity int) int
 		Name                  func(childComplexity int) int
@@ -620,6 +628,7 @@ type MutationResolver interface {
 	UpdateCollectionTokens(ctx context.Context, input model.UpdateCollectionTokensInput) (model.UpdateCollectionTokensPayloadOrError, error)
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
+	SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error)
 	SyncTokens(ctx context.Context) (model.SyncTokensPayloadOrError, error)
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
@@ -648,6 +657,9 @@ type QueryResolver interface {
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
+}
+type SetSpamPreferencePayloadResolver interface {
+	Tokens(ctx context.Context, obj *model.SetSpamPreferencePayload) ([]*model.Token, error)
 }
 type TokenResolver interface {
 	Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error)
@@ -1794,6 +1806,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RemoveUserWallets(childComplexity, args["walletIds"].([]persist.DBID)), true
 
+	case "Mutation.setSpamPreference":
+		if e.complexity.Mutation.SetSpamPreference == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setSpamPreference_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetSpamPreference(childComplexity, args["input"].(model.SetSpamPreferenceInput)), true
+
 	case "Mutation.syncTokens":
 		if e.complexity.Mutation.SyncTokens == nil {
 			break
@@ -2145,6 +2169,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RemoveUserWalletsPayload.Viewer(childComplexity), true
 
+	case "SetSpamPreferencePayload.tokens":
+		if e.complexity.SetSpamPreferencePayload.Tokens == nil {
+			break
+		}
+
+		return e.complexity.SetSpamPreferencePayload.Tokens(childComplexity), true
+
 	case "SyncTokensPayload.viewer":
 		if e.complexity.SyncTokensPayload.Viewer == nil {
 			break
@@ -2249,6 +2280,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Token.ID(childComplexity), true
+
+	case "Token.isSpamByProvider":
+		if e.complexity.Token.IsSpamByProvider == nil {
+			break
+		}
+
+		return e.complexity.Token.IsSpamByProvider(childComplexity), true
+
+	case "Token.isSpamByUser":
+		if e.complexity.Token.IsSpamByUser == nil {
+			break
+		}
+
+		return e.complexity.Token.IsSpamByUser(childComplexity), true
 
 	case "Token.lastUpdated":
 		if e.complexity.Token.LastUpdated == nil {
@@ -2975,6 +3020,8 @@ type Token implements Node {
     contract: Contract @goField(forceResolver: true)
     externalUrl: String
     blockNumber: String # source is uint64
+    isSpamByUser: Boolean
+    isSpamByProvider: Boolean
     # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
     # struct and may ultimately end up elsewhere
     creatorAddress: ChainAddress
@@ -3355,6 +3402,19 @@ type UpdateTokenInfoPayload {
     token: Token
 }
 
+input SetSpamPreferenceInput {
+    tokens: [DBID!]!
+    isSpam: Boolean!
+}
+
+type SetSpamPreferencePayload {
+    tokens: [Token] @goField(forceResolver: true)
+}
+
+union SetSpamPreferencePayloadOrError =
+    SetSpamPreferencePayload
+    | ErrNotAuthorized
+
 union AddUserWalletPayloadOrError =
     AddUserWalletPayload
     | ErrAuthenticationFailed
@@ -3596,6 +3656,7 @@ type Mutation {
 
     # Token Mutations
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
+    setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
     syncTokens: SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
@@ -3823,6 +3884,21 @@ func (ec *executionContext) field_Mutation_removeUserWallets_args(ctx context.Co
 		}
 	}
 	args["walletIds"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setSpamPreference_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.SetSpamPreferenceInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNSetSpamPreferenceInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferenceInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -9268,6 +9344,65 @@ func (ec *executionContext) _Mutation_updateTokenInfo(ctx context.Context, field
 	return ec.marshalOUpdateTokenInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_setSpamPreference(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_setSpamPreference_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SetSpamPreference(rctx, args["input"].(model.SetSpamPreferenceInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.SetSpamPreferencePayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SetSpamPreferencePayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.SetSpamPreferencePayloadOrError)
+	fc.Result = res
+	return ec.marshalOSetSpamPreferencePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferencePayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_syncTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -10840,6 +10975,38 @@ func (ec *executionContext) _RemoveUserWalletsPayload_viewer(ctx context.Context
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _SetSpamPreferencePayload_tokens(ctx context.Context, field graphql.CollectedField, obj *model.SetSpamPreferencePayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "SetSpamPreferencePayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SetSpamPreferencePayload().Tokens(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _SyncTokensPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.SyncTokensPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -11644,6 +11811,70 @@ func (ec *executionContext) _Token_blockNumber(ctx context.Context, field graphq
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_isSpamByUser(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsSpamByUser, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Token_isSpamByProvider(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Token",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsSpamByProvider, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Token_creatorAddress(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
@@ -14840,6 +15071,37 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputSetSpamPreferenceInput(ctx context.Context, obj interface{}) (model.SetSpamPreferenceInput, error) {
+	var it model.SetSpamPreferenceInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "tokens":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokens"))
+			it.Tokens, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "isSpam":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isSpam"))
+			it.IsSpam, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateCollectionHiddenInput(ctx context.Context, obj interface{}) (model.UpdateCollectionHiddenInput, error) {
 	var it model.UpdateCollectionHiddenInput
 	asMap := map[string]interface{}{}
@@ -16048,6 +16310,29 @@ func (ec *executionContext) _RemoveUserWalletsPayloadOrError(ctx context.Context
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _SetSpamPreferencePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetSpamPreferencePayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SetSpamPreferencePayload:
+		return ec._SetSpamPreferencePayload(ctx, sel, &obj)
+	case *model.SetSpamPreferencePayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SetSpamPreferencePayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -17632,7 +17917,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -18781,6 +19066,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "setSpamPreference":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setSpamPreference(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "syncTokens":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_syncTokens(ctx, field)
@@ -19457,6 +19749,44 @@ func (ec *executionContext) _RemoveUserWalletsPayload(ctx context.Context, sel a
 	return out
 }
 
+var setSpamPreferencePayloadImplementors = []string{"SetSpamPreferencePayload", "SetSpamPreferencePayloadOrError"}
+
+func (ec *executionContext) _SetSpamPreferencePayload(ctx context.Context, sel ast.SelectionSet, obj *model.SetSpamPreferencePayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, setSpamPreferencePayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SetSpamPreferencePayload")
+		case "tokens":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SetSpamPreferencePayload_tokens(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var syncTokensPayloadImplementors = []string{"SyncTokensPayload", "SyncTokensPayloadOrError"}
 
 func (ec *executionContext) _SyncTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.SyncTokensPayload) graphql.Marshaler {
@@ -19716,6 +20046,20 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 		case "blockNumber":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Token_blockNumber(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "isSpamByUser":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_isSpamByUser(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "isSpamByProvider":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Token_isSpamByProvider(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -21245,6 +21589,11 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 	return ec._PageInfo(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNSetSpamPreferenceInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferenceInput(ctx context.Context, v interface{}) (model.SetSpamPreferenceInput, error) {
+	res, err := ec.unmarshalInputSetSpamPreferenceInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -22477,6 +22826,13 @@ func (ec *executionContext) marshalORemoveUserWalletsPayloadOrError2githubᚗcom
 		return graphql.Null
 	}
 	return ec._RemoveUserWalletsPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOSetSpamPreferencePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferencePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetSpamPreferencePayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SetSpamPreferencePayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕᚖstring(ctx context.Context, v interface{}) ([]*string, error) {

@@ -385,6 +385,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC721,
+				TxHash:          persist.EthereumTxHash(pLog.TxHash.Hex()),
 			})
 
 			logger.For(ctx).Debugf("Processed transfer event in %s", time.Since(initial))
@@ -418,6 +419,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC1155,
+				TxHash:          persist.EthereumTxHash(pLog.TxHash.Hex()),
 			})
 			logger.For(ctx).Debugf("Processed single transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
@@ -452,6 +454,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 					ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 					TokenType:       persist.TokenTypeERC1155,
 					BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
+					TxHash:          persist.EthereumTxHash(pLog.TxHash.Hex()),
 				})
 			}
 			logger.For(ctx).Debugf("Processed batch event in %s", time.Since(initial))
@@ -832,31 +835,41 @@ func getMetadata(ctx context.Context, contractAddress persist.EthereumAddress, u
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
+func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances, spams <-chan persist.EthereumTokenIdentifiers) {
 
 	wg := &sync.WaitGroup{}
-	wg.Add(4)
+	wg.Add(5)
 	ownersMap := map[persist.EthereumTokenIdentifiers]ownerAtBlock{}
 	previousOwnersMap := map[persist.EthereumTokenIdentifiers][]ownerAtBlock{}
 	balancesMap := map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock{}
 	metadatasMap := map[persist.EthereumTokenIdentifiers]tokenMetadata{}
 	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
+	spamMap := map[persist.EthereumTokenIdentifiers]bool{}
 
 	go receiveBalances(sentryutil.NewSentryHubContext(ctx), wg, balances, balancesMap, i.tokenRepo)
 	go receiveOwners(sentryutil.NewSentryHubContext(ctx), wg, owners, ownersMap, i.tokenRepo)
 	go receiveURIs(sentryutil.NewSentryHubContext(ctx), wg, uris, urisMap)
 	go receivePreviousOwners(sentryutil.NewSentryHubContext(ctx), wg, previousOwners, previousOwnersMap, i.tokenRepo)
+	go receiveSpam(sentryutil.NewSentryHubContext(ctx), wg, spams, spamMap)
 	wg.Wait()
 
 	logger.For(ctx).Info("Done recieving field data, converting fields into tokens...")
 
-	createTokens(ctx, i, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
+	createTokens(ctx, i, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{}, spamMap)
 }
 
-func createTokens(ctx context.Context, i *indexer, ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata, urisMap map[persist.EthereumTokenIdentifiers]tokenURI, mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia) {
+func createTokens(ctx context.Context, i *indexer,
+	ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock,
+	previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
+	balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
+	metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata,
+	urisMap map[persist.EthereumTokenIdentifiers]tokenURI,
+	mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia,
+	spamMap map[persist.EthereumTokenIdentifiers]bool,
+) {
 	defer recoverAndWait(ctx)
 
-	tokens := i.fieldMapsToTokens(ctx, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, mediasMap)
+	tokens := i.fieldMapsToTokens(ctx, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, mediasMap, spamMap)
 	if tokens == nil || len(tokens) == 0 {
 		logger.For(ctx).Info("No tokens to process")
 		return
@@ -955,6 +968,13 @@ func receiveBalances(ctx context.Context, wg *sync.WaitGroup, balanceChan <-chan
 	}
 }
 
+func receiveSpam(ctx context.Context, wg *sync.WaitGroup, spamChan <-chan persist.EthereumTokenIdentifiers, spamMap map[persist.EthereumTokenIdentifiers]bool) {
+	defer wg.Done()
+	for spam := range spamChan {
+		spamMap[spam] = true
+	}
+}
+
 func receiveOwners(ctx context.Context, wg *sync.WaitGroup, ownersChan <-chan ownerAtBlock, owners map[persist.EthereumTokenIdentifiers]ownerAtBlock, tokenRepo persist.TokenRepository) {
 	defer wg.Done()
 	for owner := range ownersChan {
@@ -962,7 +982,15 @@ func receiveOwners(ctx context.Context, wg *sync.WaitGroup, ownersChan <-chan ow
 	}
 }
 
-func (i *indexer) fieldMapsToTokens(ctx context.Context, owners map[persist.EthereumTokenIdentifiers]ownerAtBlock, previousOwners map[persist.EthereumTokenIdentifiers][]ownerAtBlock, balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata, uris map[persist.EthereumTokenIdentifiers]tokenURI, medias map[persist.EthereumTokenIdentifiers]tokenMedia) []persist.Token {
+func (i *indexer) fieldMapsToTokens(ctx context.Context,
+	owners map[persist.EthereumTokenIdentifiers]ownerAtBlock,
+	previousOwners map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
+	balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
+	metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata,
+	uris map[persist.EthereumTokenIdentifiers]tokenURI,
+	medias map[persist.EthereumTokenIdentifiers]tokenMedia,
+	spams map[persist.EthereumTokenIdentifiers]bool,
+) []persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
 		totalBalances += len(v)
@@ -1243,6 +1271,7 @@ func recoverAndWait(ctx context.Context) {
 		time.Sleep(time.Second * 10)
 	}
 }
+
 func logEthCallRPCError(entry *logrus.Entry, err error, message string) {
 	if rpcErr, ok := err.(gethrpc.Error); ok {
 		entry = entry.WithFields(logrus.Fields{"rpcErrorCode": strconv.Itoa(rpcErr.ErrorCode())})

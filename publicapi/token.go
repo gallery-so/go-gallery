@@ -34,6 +34,7 @@ type ErrTokenRefreshFailed struct {
 func (e ErrTokenRefreshFailed) Error() string {
 	return e.Message
 }
+
 func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*sqlc.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -64,6 +65,10 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	}
 
 	return tokens, nil
+}
+
+func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]sqlc.Token, []error) {
+	return api.loaders.TokenByTokenID.LoadAll(tokenIDs)
 }
 
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
@@ -274,4 +279,25 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	})
 
 	return nil
+}
+
+func (api TokenAPI) SetTokensSpamFlag(ctx context.Context, tokens []persist.DBID, isSpam bool) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"tokens": {tokens, "required,unique"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
+	if err != nil {
+		return err
+	}
+
+	return api.repos.TokenRepository.FlagTokensAsUserMarkedSpam(ctx, userID, tokens, isSpam)
 }

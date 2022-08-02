@@ -53,6 +53,7 @@ type Transfer struct {
 	TokenType       persist.TokenType
 	Amount          uint64
 	ContractAddress persist.EthereumAddress
+	TxHash          persist.EthereumTxHash
 }
 
 // TokenContractMetadata represents a token contract's metadata

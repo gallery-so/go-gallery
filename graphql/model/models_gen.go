@@ -107,6 +107,10 @@ type RemoveUserWalletsPayloadOrError interface {
 	IsRemoveUserWalletsPayloadOrError()
 }
 
+type SetSpamPreferencePayloadOrError interface {
+	IsSetSpamPreferencePayloadOrError()
+}
+
 type SyncTokensPayloadOrError interface {
 	IsSyncTokensPayloadOrError()
 }
@@ -440,6 +444,7 @@ func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()          {}
+func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()        {}
 func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()            {}
 func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
@@ -678,6 +683,17 @@ type RemoveUserWalletsPayload struct {
 
 func (RemoveUserWalletsPayload) IsRemoveUserWalletsPayloadOrError() {}
 
+type SetSpamPreferenceInput struct {
+	Tokens []persist.DBID `json:"tokens"`
+	IsSpam bool           `json:"isSpam"`
+}
+
+type SetSpamPreferencePayload struct {
+	Tokens []*Token `json:"tokens"`
+}
+
+func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
+
 type SyncTokensPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -714,6 +730,8 @@ type Token struct {
 	Contract              *Contract             `json:"contract"`
 	ExternalURL           *string               `json:"externalUrl"`
 	BlockNumber           *string               `json:"blockNumber"`
+	IsSpamByUser          *bool                 `json:"isSpamByUser"`
+	IsSpamByProvider      *bool                 `json:"isSpamByProvider"`
 	CreatorAddress        *persist.ChainAddress `json:"creatorAddress"`
 	OpenseaCollectionName *string               `json:"openseaCollectionName"`
 	OpenseaID             *int                  `json:"openseaId"`

@@ -241,6 +241,8 @@ type Token implements Node {
     contract: Contract @goField(forceResolver: true)
     externalUrl: String
     blockNumber: String # source is uint64
+    isSpamByUser: Boolean
+    isSpamByProvider: Boolean
     # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
     # struct and may ultimately end up elsewhere
     creatorAddress: ChainAddress
@@ -621,6 +623,19 @@ type UpdateTokenInfoPayload {
     token: Token
 }
 
+input SetSpamPreferenceInput {
+    tokens: [DBID!]!
+    isSpam: Boolean!
+}
+
+type SetSpamPreferencePayload {
+    tokens: [Token] @goField(forceResolver: true)
+}
+
+union SetSpamPreferencePayloadOrError =
+    SetSpamPreferencePayload
+    | ErrNotAuthorized
+
 union AddUserWalletPayloadOrError =
     AddUserWalletPayload
     | ErrAuthenticationFailed
@@ -862,6 +877,7 @@ type Mutation {
 
     # Token Mutations
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
+    setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
     syncTokens: SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
