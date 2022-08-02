@@ -181,10 +181,10 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 		} else if imgURL != "" {
 			res.ThumbnailURL = persist.NullString(imgURL)
 		}
-	} else if imageURL != "" {
+	} else if imageURL != "" && res.ThumbnailURL.String() != imageURL {
 		logger.For(pCtx).Infof("using imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
-	} else if imgURL != "" {
+	} else if imgURL != "" && res.ThumbnailURL.String() != imgURL {
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
@@ -428,7 +428,9 @@ outer:
 			logger.For(pCtx).Infof("uri for %s is of type %s: trying to cache", name, asURI.Type())
 			break outer
 		default:
+			// delete medias that are stored because the current media should be reflected directly in the metadata, not in GCP
 			deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
+			deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 			return mediaType, nil
 		}
 	}
@@ -454,6 +456,11 @@ outer:
 
 	logger.For(pCtx).Infof("sniffed media type for %s: %s", claspString(url, 50), mediaType)
 
+	if mediaType != persist.MediaTypeVideo {
+		// only videos get thumbnails, if the NFT was previously a video however, it might still have a thumbnail
+		deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+	}
+
 	switch mediaType {
 	case persist.MediaTypeVideo:
 		err := cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), storageClient)
@@ -471,7 +478,6 @@ outer:
 		buf = bytes.NewBuffer(jp)
 		logger.For(pCtx).Infof("generated thumbnail for %s - file size %s", url, util.InByteSizeFormat(uint64(buf.Len())))
 		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-
 	case persist.MediaTypeSVG:
 		return persist.MediaTypeSVG, cacheRawSvgMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
 	case persist.MediaTypeUnknown:

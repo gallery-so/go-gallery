@@ -71,23 +71,23 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 		x := ((i % 64) * 5) + 28
 		switch c {
 		case 'O':
-			canvas.Circle(x+add, y+add, add, `stroke="black"`, `stroke-width="0.4"`, `stroke-linecap="butt"`, `fill="none"`)
+			canvas.Circle(x, y, add-1, `stroke="black"`, `stroke-width="0.6"`, `stroke-linecap="butt"`, `fill="none"`)
 		case '+':
-			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
-			canvas.Line(x, y-add, x, (y + add), `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
+			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
+			canvas.Line(x, y-add, x, (y + add), `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case 'X':
-			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
-			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
+			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
+			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '|':
-			canvas.Line(x, y-add, x, y+add, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
+			canvas.Line(x, y-add, x, y+add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '-':
-			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
+			canvas.Line(x-add, y, x+add, y, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '\\':
-			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
+			canvas.Line(x-add, y+add, x+add, y-add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '/':
-			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
+			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '#':
-			canvas.Rect(x, y, add, add, `stroke="black"`, `stroke-width="0.75"`, `stroke-linecap="square"`)
+			canvas.Rect(x, y, add, add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		}
 	}
 	canvas.End()
@@ -266,23 +266,23 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 		stroke := fmt.Sprintf(`stroke="rgb(%d,%d,%d)"`, col.R, col.G, col.B)
 		switch c {
 		case 'O':
-			canvas.Circle(x+add, y+add, add, stroke, `stroke-width="0.4"`, `stroke-linecap="butt"`, `fill="none"`, "stroke-opacity: 1.0")
+			canvas.Circle(x, y, add-1, stroke, `stroke-width="0.7"`, `stroke-linecap="butt"`, `fill="none"`, "stroke-opacity: 1.0")
 		case '+':
-			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
-			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case 'X':
-			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
-			canvas.Line(x+add, y-add, x-add, y+add, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x+add, y-add, x-add, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '|':
-			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x, y-add, x, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '-':
-			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x-add, y, x+add, y, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '\\':
-			canvas.Line(x-add, y+add, x+add, y-add, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x-add, y+add, x+add, y-add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '/':
-			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '#':
-			canvas.Rect(x, y, add, add, stroke, `stroke-width="0.75"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Rect(x, y, add, add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		}
 	}
 	canvas.End()
