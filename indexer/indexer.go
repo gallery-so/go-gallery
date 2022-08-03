@@ -112,6 +112,11 @@ type tokenMedia struct {
 	media persist.Media
 }
 
+type spamEvaluation struct {
+	ti     persist.EthereumTokenIdentifiers
+	isSpam *bool
+}
+
 // indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type indexer struct {
@@ -232,10 +237,11 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	owners := make(chan ownerAtBlock)
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []transfersAtBlock)
+	spam := make(chan spamEvaluation)
 
 	go i.processLogs(sentryutil.NewSentryHubContext(ctx), transfers, start, topics)
-	go i.processTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances)
-	i.processTokens(ctx, uris, owners, previousOwners, balances)
+	go i.processTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances, spam)
+	i.processTokens(ctx, uris, owners, previousOwners, balances, spam)
 	if i.lastSyncedBlock < start.Uint64() {
 		i.lastSyncedBlock = start.Uint64()
 	}
@@ -250,9 +256,10 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	previousOwners := make(chan ownerAtBlock)
 	transfers := make(chan []transfersAtBlock)
 	subscriptions := make(chan types.Log)
+	spam := make(chan spamEvaluation)
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, subscriptions, topics)
-	go i.processTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances)
-	i.processTokens(ctx, uris, owners, previousOwners, balances)
+	go i.processTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances, spam)
+	i.processTokens(ctx, uris, owners, previousOwners, balances, spam)
 }
 
 func (i *indexer) listenForNewBlocks(ctx context.Context) {
@@ -385,7 +392,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC721,
-				TxHash:          persist.EthereumTxHash(pLog.TxHash.Hex()),
+				TxHash:          pLog.TxHash,
 			})
 
 			logger.For(ctx).Debugf("Processed transfer event in %s", time.Since(initial))
@@ -419,7 +426,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 				BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC1155,
-				TxHash:          persist.EthereumTxHash(pLog.TxHash.Hex()),
+				TxHash:          pLog.TxHash,
 			})
 			logger.For(ctx).Debugf("Processed single transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
@@ -454,7 +461,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 					ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 					TokenType:       persist.TokenTypeERC1155,
 					BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
-					TxHash:          persist.EthereumTxHash(pLog.TxHash.Hex()),
+					TxHash:          pLog.TxHash,
 				})
 			}
 			logger.For(ctx).Debugf("Processed batch event in %s", time.Since(initial))
@@ -568,7 +575,14 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 // TRANSFERS FUNCS -------------------------------------------------------------
 
-func (i *indexer) processTransfers(ctx context.Context, incomingTransfers <-chan []transfersAtBlock, uris chan<- tokenURI, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances) {
+func (i *indexer) processTransfers(ctx context.Context,
+	incomingTransfers <-chan []transfersAtBlock,
+	uris chan<- tokenURI,
+	owners chan<- ownerAtBlock,
+	previousOwners chan<- ownerAtBlock,
+	balances chan<- tokenBalances,
+	spam chan<- spamEvaluation,
+) {
 	defer close(uris)
 	defer close(owners)
 	defer close(previousOwners)
@@ -588,7 +602,7 @@ func (i *indexer) processTransfers(ctx context.Context, incomingTransfers <-chan
 			ctx := sentryutil.NewSentryHubContext(ctx)
 			timeStart := time.Now()
 			logger.For(ctx).Infof("Processing %d transfers", len(submit))
-			processTransfers(ctx, i, submit, uris, nil, owners, previousOwners, balances, nil, false)
+			processTransfers(ctx, i, submit, uris, nil, owners, previousOwners, balances, nil, spam, false)
 			logger.For(ctx).Infof("Processed %d transfers in %s", len(submit), time.Since(timeStart))
 		})
 	}
@@ -597,7 +611,16 @@ func (i *indexer) processTransfers(ctx context.Context, incomingTransfers <-chan
 	logger.For(ctx).Info("Closing field channels...")
 }
 
-func processTransfers(ctx context.Context, i *indexer, transfers []transfersAtBlock, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, balances chan<- tokenBalances, medias chan<- tokenMedia, optionalFields bool) {
+func processTransfers(ctx context.Context, i *indexer, transfers []transfersAtBlock,
+	uris chan<- tokenURI,
+	metadatas chan<- tokenMetadata,
+	owners chan<- ownerAtBlock,
+	previousOwners chan<- ownerAtBlock,
+	balances chan<- tokenBalances,
+	medias chan<- tokenMedia,
+	spam chan<- spamEvaluation,
+	optionalFields bool,
+) {
 
 	for _, transferAtBlock := range transfers {
 		for _, transfer := range transferAtBlock.transfers {
@@ -610,7 +633,7 @@ func processTransfers(ctx context.Context, i *indexer, transfers []transfersAtBl
 			key := persist.NewEthereumTokenIdentifiers(contractAddress, tokenID)
 			// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-			findFields(ctx, i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, optionalFields)
+			findFields(ctx, i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, spam, optionalFields)
 
 			logger.For(ctx).WithFields(logrus.Fields{
 				"tokenID":         tokenID,
@@ -625,7 +648,16 @@ func processTransfers(ctx context.Context, i *indexer, transfers []transfersAtBl
 
 }
 
-func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, to persist.EthereumAddress, from persist.EthereumAddress, contractAddress persist.EthereumAddress, tokenID persist.TokenID, balances chan<- tokenBalances, uris chan<- tokenURI, metadatas chan<- tokenMetadata, owners chan<- ownerAtBlock, previousOwners chan<- ownerAtBlock, medias chan<- tokenMedia, optionalFields bool) {
+func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, to persist.EthereumAddress, from persist.EthereumAddress, contractAddress persist.EthereumAddress, tokenID persist.TokenID,
+	balances chan<- tokenBalances,
+	uris chan<- tokenURI,
+	metadatas chan<- tokenMetadata,
+	owners chan<- ownerAtBlock,
+	previousOwners chan<- ownerAtBlock,
+	medias chan<- tokenMedia,
+	spam chan<- spamEvaluation,
+	optionalFields bool,
+) {
 	defer sentryutil.RecoverAndRaise(ctx)
 
 	wg := &sync.WaitGroup{}
@@ -634,6 +666,36 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 	if optionalFields {
 		wg.Add(2)
 	}
+
+	// Spam handler
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		// Only transfers that are a result of minting are considered as potential spam.
+		if from != persist.ZeroAddress {
+			spam <- spamEvaluation{ti: key, isSpam: util.BoolToPointer(false)}
+			return
+		}
+
+		tx, _, err := i.ethClient.TransactionByHash(ctx, transfer.TxHash)
+		if err != nil {
+			logger.For(ctx).WithError(err).WithFields(logrus.Fields{"txHash": transfer.TxHash, "rpcCall": "eth_getTransactionByHash"}).Error("failed to get tx")
+			return
+		}
+
+		// Get the sender of the transaction. This should skip the RPC call because the sender is cached from the earlier call.
+		sender, err := i.ethClient.TransactionSender(ctx, tx, common.HexToHash(transfer.BlockNumber.Hex()), 0)
+		if err != nil {
+			logger.For(ctx).WithError(err).WithFields(logrus.Fields{"txHash": transfer.TxHash, "rpcCall": "eth_getTransactionByBlockHashAndIndex"}).Error("failed to get tx sender")
+			return
+		}
+
+		if persist.EthereumAddress(sender.Hex()) != to {
+			spam <- spamEvaluation{ti: key, isSpam: util.BoolToPointer(true)}
+		}
+	}()
+
 	switch persist.TokenType(transfer.TokenType) {
 	case persist.TokenTypeERC721:
 
@@ -664,7 +726,7 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 					"fromAddress":     from,
 					"tokenIdentifier": key,
 					"block":           transfer.BlockNumber,
-				}).WithError(err).Errorf("error getting balance of %s for %s", from, key)
+				}).Errorf("error getting balance of %s for %s", from, key)
 				storeErr(ctx, err, "ERR-BALANCE", from, key, transfer.BlockNumber, i.storageClient)
 			}
 
@@ -688,7 +750,7 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 				"fromAddress": from,
 				"tokenKey":    key,
 				"block":       transfer.BlockNumber,
-			}).WithError(err).Errorf("error getting parts of %s", key)
+			}).Errorf("error getting parts of %s", key)
 			storeErr(ctx, err, "ERR-PARTS", from, key, transfer.BlockNumber, i.storageClient)
 			panic(err)
 		}
@@ -835,7 +897,7 @@ func getMetadata(ctx context.Context, contractAddress persist.EthereumAddress, u
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances, spams <-chan persist.EthereumTokenIdentifiers) {
+func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances, spam <-chan spamEvaluation) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(5)
@@ -844,13 +906,13 @@ func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owner
 	balancesMap := map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock{}
 	metadatasMap := map[persist.EthereumTokenIdentifiers]tokenMetadata{}
 	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
-	spamMap := map[persist.EthereumTokenIdentifiers]bool{}
+	spamMap := map[persist.EthereumTokenIdentifiers]*bool{}
 
 	go receiveBalances(sentryutil.NewSentryHubContext(ctx), wg, balances, balancesMap, i.tokenRepo)
 	go receiveOwners(sentryutil.NewSentryHubContext(ctx), wg, owners, ownersMap, i.tokenRepo)
 	go receiveURIs(sentryutil.NewSentryHubContext(ctx), wg, uris, urisMap)
 	go receivePreviousOwners(sentryutil.NewSentryHubContext(ctx), wg, previousOwners, previousOwnersMap, i.tokenRepo)
-	go receiveSpam(sentryutil.NewSentryHubContext(ctx), wg, spams, spamMap)
+	go receiveSpam(sentryutil.NewSentryHubContext(ctx), wg, spam, spamMap)
 	wg.Wait()
 
 	logger.For(ctx).Info("Done recieving field data, converting fields into tokens...")
@@ -865,7 +927,7 @@ func createTokens(ctx context.Context, i *indexer,
 	metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata,
 	urisMap map[persist.EthereumTokenIdentifiers]tokenURI,
 	mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia,
-	spamMap map[persist.EthereumTokenIdentifiers]bool,
+	spamMap map[persist.EthereumTokenIdentifiers]*bool,
 ) {
 	defer recoverAndWait(ctx)
 
@@ -968,10 +1030,10 @@ func receiveBalances(ctx context.Context, wg *sync.WaitGroup, balanceChan <-chan
 	}
 }
 
-func receiveSpam(ctx context.Context, wg *sync.WaitGroup, spamChan <-chan persist.EthereumTokenIdentifiers, spamMap map[persist.EthereumTokenIdentifiers]bool) {
+func receiveSpam(ctx context.Context, wg *sync.WaitGroup, spamChan <-chan spamEvaluation, spamMap map[persist.EthereumTokenIdentifiers]*bool) {
 	defer wg.Done()
-	for spam := range spamChan {
-		spamMap[spam] = true
+	for result := range spamChan {
+		spamMap[result.ti] = result.isSpam
 	}
 }
 
@@ -989,7 +1051,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 	metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata,
 	uris map[persist.EthereumTokenIdentifiers]tokenURI,
 	medias map[persist.EthereumTokenIdentifiers]tokenMedia,
-	spams map[persist.EthereumTokenIdentifiers]bool,
+	spamResult map[persist.EthereumTokenIdentifiers]*bool,
 ) []persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
@@ -1025,6 +1087,9 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 		media := medias[k]
 		delete(medias, k)
 
+		isSpam := spamResult[k]
+		delete(spamResult, k)
+
 		t := persist.Token{
 			TokenID:          tokenID,
 			ContractAddress:  contractAddress,
@@ -1039,6 +1104,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 			Chain:            i.chain,
 			BlockNumber:      v.block,
 			Media:            media.media,
+			IsSpam:           isSpam,
 		}
 
 		result = append(result, t)
@@ -1068,6 +1134,9 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 		media := medias[k]
 		delete(medias, k)
 
+		isSpam := spamResult[k]
+		delete(spamResult, k)
+
 		for addr, balance := range v {
 
 			t := persist.Token{
@@ -1083,6 +1152,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 				Chain:           i.chain,
 				BlockNumber:     balance.block,
 				Media:           media.media,
+				IsSpam:          isSpam,
 			}
 			result = append(result, t)
 			delete(balances, k)

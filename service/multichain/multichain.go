@@ -45,6 +45,7 @@ type ChainAgnosticToken struct {
 	ExternalURL string `json:"external_url"`
 
 	BlockNumber persist.BlockNumber `json:"block_number"`
+	IsSpam      *bool               `json:"is_spam"`
 }
 
 // ChainAgnosticAddressAtBlock is an address at a block

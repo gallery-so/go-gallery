@@ -38,7 +38,9 @@ type TokenGallery struct {
 
 	ExternalURL NullString `json:"external_url"`
 
-	BlockNumber BlockNumber `json:"block_number"`
+	BlockNumber          BlockNumber `json:"block_number"`
+	IsUserMarkedSpam     NullBool    `json:"is_user_marked_spam"`
+	IsProviderMarkedSpam NullBool    `json:"is_provider_marked_spam"`
 }
 
 // AddressAtBlock represents an address at a specific block
@@ -102,20 +104,12 @@ type TokenUpdateMediaInput struct {
 
 // TokenGalleryRepository represents a repository for interacting with persisted tokens
 type TokenGalleryRepository interface {
-	CreateBulk(context.Context, []TokenGallery) ([]DBID, error)
-	Create(context.Context, TokenGallery) (DBID, error)
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
-	GetByContract(context.Context, Address, Chain, int64, int64) ([]TokenGallery, error)
 	GetByTokenIdentifiers(context.Context, TokenID, Address, Chain, int64, int64) ([]TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
-	GetByID(context.Context, DBID) (TokenGallery, error)
 	BulkUpsert(context.Context, []TokenGallery) error
-	Upsert(context.Context, TokenGallery) error
-	UpdateByIDUnsafe(context.Context, DBID, interface{}) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, Chain, interface{}) error
-	MostRecentBlock(context.Context) (BlockNumber, error)
-	Count(context.Context, TokenCountType) (int64, error)
 	DeleteByID(context.Context, DBID) error
 	FlagTokensAsUserMarkedSpam(ctx context.Context, ownerUserID DBID, tokens []DBID, isSpam bool) error
 	TokensAreOwnedByUser(ctx context.Context, userID DBID, tokens []DBID) error

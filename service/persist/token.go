@@ -121,9 +121,6 @@ type EthereumAddress string
 // EthereumAddressList is a slice of Addresses, used to implement scanner/valuer interfaces
 type EthereumAddressList []EthereumAddress
 
-// EthereumTxHash is the hash of the transaction represented in hexadecimal, prefixed with 0x.
-type EthereumTxHash string
-
 func (l EthereumAddressList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
 }
@@ -174,16 +171,21 @@ type EthereumTokenIdentifiers string
 
 // Token represents an individual Token token
 type Token struct {
-	Version          NullInt32                `json:"version"` // schema version for this model
-	ID               DBID                     `json:"id" binding:"required"`
-	CreationTime     CreationTime             `json:"created_at"`
-	Deleted          NullBool                 `json:"-"`
-	LastUpdated      LastUpdatedTime          `json:"last_updated"`
-	Media            Media                    `json:"media"`
-	TokenType        TokenType                `json:"token_type"`
-	Chain            Chain                    `json:"chain"`
-	Name             NullString               `json:"name"`
-	Description      NullString               `json:"description"`
+	Version      NullInt32       `json:"version"` // schema version for this model
+	ID           DBID            `json:"id" binding:"required"`
+	CreationTime CreationTime    `json:"created_at"`
+	Deleted      NullBool        `json:"-"`
+	LastUpdated  LastUpdatedTime `json:"last_updated"`
+
+	Media Media `json:"media"`
+
+	TokenType TokenType `json:"token_type"`
+
+	Chain Chain `json:"chain"`
+
+	Name        NullString `json:"name"`
+	Description NullString `json:"description"`
+
 	TokenURI         TokenURI                 `json:"token_uri"`
 	TokenID          TokenID                  `json:"token_id"`
 	Quantity         HexString                `json:"quantity"`
@@ -191,9 +193,11 @@ type Token struct {
 	OwnershipHistory []EthereumAddressAtBlock `json:"previous_owners"`
 	TokenMetadata    TokenMetadata            `json:"metadata"`
 	ContractAddress  EthereumAddress          `json:"contract_address"`
-	ExternalURL      NullString               `json:"external_url"`
-	BlockNumber      BlockNumber              `json:"block_number"`
-	IsSpam           bool                     `json:"is_spam"`
+
+	ExternalURL NullString `json:"external_url"`
+
+	BlockNumber BlockNumber `json:"block_number"`
+	IsSpam      *bool       `json:"is_spam"`
 }
 
 // Media represents a token's media content with processed images from metadata
