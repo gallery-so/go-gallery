@@ -26,6 +26,7 @@ type TokenRepository struct {
 	getByTokenIDPaginateStmt                *sql.Stmt
 	getByTokenIdentifiersStmt               *sql.Stmt
 	getByTokenIdentifiersPaginateStmt       *sql.Stmt
+	getByIdentifiersStmt                    *sql.Stmt
 	getMetadataByTokenIdentifiersStmt       *sql.Stmt
 	getByIDStmt                             *sql.Stmt
 	updateMediaStmt                         *sql.Stmt
@@ -72,6 +73,9 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	checkNoErr(err)
 
 	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
+	checkNoErr(err)
+
+	getByIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
 	checkNoErr(err)
 
 	getMetadataByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI,TOKEN_METADATA,MEDIA FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
@@ -141,6 +145,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		getByTokenIDStmt:                        getByTokenIDStmt,
 		getByTokenIDPaginateStmt:                getByTokenIDPaginateStmt,
 		deleteByIDStmt:                          deleteByIDStmt,
+		getByIdentifiersStmt:                    getByIdentifiersStmt,
 	}
 
 }
@@ -292,10 +297,23 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 	}
 
 	if len(tokens) == 0 {
-		return nil, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
+		return nil, persist.ErrTokenNotFoundByTokenIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
 	}
 
 	return tokens, nil
+}
+
+// GetByIdentifiers gets a token by its token ID and contract address and owner address
+func (t *TokenRepository) GetByIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.EthereumAddress) (persist.Token, error) {
+	var token persist.Token
+	err := t.getByIdentifiersStmt.QueryRowContext(pCtx, pTokenID, pContractAddress, pOwnerAddress).Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return token, persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress, OwnerAddress: pOwnerAddress}
+		}
+		return persist.Token{}, err
+	}
+	return token, nil
 }
 
 // GetMetadataByTokenIdentifiers gets the token URI, token metadata, and media for a token
@@ -549,7 +567,7 @@ func (t *TokenRepository) UpdateByTokenIdentifiers(pCtx context.Context, pTokenI
 		return err
 	}
 	if rowsAffected == 0 {
-		return persist.ErrTokenNotFoundByIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
+		return persist.ErrTokenNotFoundByTokenIdentifiers{TokenID: pTokenID, ContractAddress: pContractAddress}
 	}
 	return nil
 }

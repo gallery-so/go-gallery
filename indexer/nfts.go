@@ -133,7 +133,7 @@ func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenR
 		tokens, contracts, err := getTokensFromDB(c, input, nftRepository, contractRepository)
 		if err != nil {
 			status := http.StatusInternalServerError
-			if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
+			if _, ok := err.(persist.ErrTokenNotFoundByTokenIdentifiers); ok {
 				status = http.StatusNotFound
 			}
 			util.ErrResponse(c, status, err)
@@ -531,19 +531,36 @@ func refreshToken(c context.Context, input UpdateTokenMediaInput, tokenRepositor
 	if input.TokenID != "" && input.ContractAddress != "" {
 		logger.For(c).Infof("updating media for token %s-%s", input.TokenID, input.ContractAddress)
 		var token persist.Token
-		tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
-		if err != nil {
-			if idErr, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
-				logger.For(c).Infof("token not found: %+v", idErr)
-				token, err = manuallyIndexToken(c, idErr.TokenID, idErr.ContractAddress, input.OwnerAddress, ethClient, tokenRepository)
-				if err != nil {
+
+		if input.OwnerAddress != "" {
+			var err error
+			token, err = tokenRepository.GetByIdentifiers(c, input.TokenID, input.ContractAddress, input.OwnerAddress)
+			if err != nil {
+				if idErr, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
+					logger.For(c).Infof("token not found: %+v", idErr)
+					token, err = manuallyIndexToken(c, idErr.TokenID, idErr.ContractAddress, idErr.OwnerAddress, ethClient, tokenRepository)
+					if err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
+			}
+		} else {
+			tokens, err := tokenRepository.GetByTokenIdentifiers(c, input.TokenID, input.ContractAddress, 1, 0)
+			if err != nil {
+				if idErr, ok := err.(persist.ErrTokenNotFoundByTokenIdentifiers); ok {
+					logger.For(c).Infof("token not found: %+v", idErr)
+					token, err = manuallyIndexToken(c, idErr.TokenID, idErr.ContractAddress, input.OwnerAddress, ethClient, tokenRepository)
+					if err != nil {
+						return err
+					}
+				} else {
 					return err
 				}
 			} else {
-				return err
+				token = tokens[0]
 			}
-		} else {
-			token = tokens[0]
 		}
 
 		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)

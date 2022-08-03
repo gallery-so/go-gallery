@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -47,6 +48,21 @@ type errUnsupportedMediaType struct {
 type errGeneratingThumbnail struct {
 	err error
 	url string
+}
+
+/*
+				"media": {
+                    "dimensions": "1920x1080",
+                    "mimeType": "video/mp4",
+                    "size": "22071578",
+                    "uri": "https://ipfs.pixura.io/ipfs/QmVxCz5KyDvgSkiqAStvoF4N6maLj9AJtATLscigGwtNuC/6502_0009.mp4"
+                },
+*/
+
+type metadataMedia struct {
+	mimeTime string           `json:"mimeTime"`
+	size     uint64           `json:"size"`
+	uri      persist.TokenURI `json:"uri"`
 }
 
 var postfixesToMediaTypes = map[string]persist.MediaType{
@@ -121,10 +137,12 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeAnimation, persist.MediaTypeGIF:
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeAnimation:
 		res = getAuxilaryMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL, mediaType)
 	case persist.MediaTypeHTML:
 		res = getHTMLMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
+	case persist.MediaTypeGIF:
+		res = getGIFMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	case persist.MediaTypeSVG:
 		res = getSvgMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	default:
@@ -188,6 +206,38 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
+	return res
+}
+
+func getGIFMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL string, imgURL string) persist.Media {
+	res := persist.Media{
+		MediaType: persist.MediaTypeGIF,
+	}
+	videoURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+	if err == nil {
+		vURL = videoURL
+	}
+	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+	if err == nil {
+		logger.For(pCtx).Infof("found imageURL for %s: %s", name, imageURL)
+		res.MediaURL = persist.NullString(imageURL)
+	} else {
+		res.MediaURL = persist.NullString(imgURL)
+		imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
+		if err == nil {
+			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
+			res.ThumbnailURL = persist.NullString(imageURL)
+		} else {
+			imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient)
+			if err == nil {
+				logger.For(pCtx).Infof("found svgURL for %s: %s", name, imageURL)
+				res.ThumbnailURL = persist.NullString(imageURL)
+			} else {
+				logger.For(pCtx).Infof("no imageURL for %s", name)
+			}
+		}
+	}
+
 	return res
 }
 
@@ -266,6 +316,23 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 }
 
 func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (imgURL string, vURL string) {
+
+	if metaMedia, ok := metadata["media"]; ok {
+		var med metadataMedia
+		bs, err := json.Marshal(metaMedia)
+		if err == nil {
+			err = json.Unmarshal(bs, &med)
+			if err == nil {
+				mtype := persist.MediaFromContentType(med.mimeTime)
+				switch mtype {
+				case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
+					imgURL = med.uri.String()
+				default:
+					vURL = med.uri.String()
+				}
+			}
+		}
+	}
 
 	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
 		logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
