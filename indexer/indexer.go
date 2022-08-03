@@ -895,7 +895,6 @@ func getMetadata(ctx context.Context, contractAddress persist.EthereumAddress, u
 // TOKENS FUNCS ---------------------------------------------------------------
 
 func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owners <-chan ownerAtBlock, previousOwners <-chan ownerAtBlock, balances <-chan tokenBalances) {
-
 	wg := &sync.WaitGroup{}
 	wg.Add(4)
 	ownersMap := map[persist.EthereumTokenIdentifiers]ownerAtBlock{}
