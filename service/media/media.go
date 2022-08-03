@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -48,21 +47,6 @@ type errUnsupportedMediaType struct {
 type errGeneratingThumbnail struct {
 	err error
 	url string
-}
-
-/*
-				"media": {
-                    "dimensions": "1920x1080",
-                    "mimeType": "video/mp4",
-                    "size": "22071578",
-                    "uri": "https://ipfs.pixura.io/ipfs/QmVxCz5KyDvgSkiqAStvoF4N6maLj9AJtATLscigGwtNuC/6502_0009.mp4"
-                },
-*/
-
-type metadataMedia struct {
-	mimeTime string           `json:"mimeTime"`
-	size     uint64           `json:"size"`
-	uri      persist.TokenURI `json:"uri"`
 }
 
 var postfixesToMediaTypes = map[string]persist.MediaType{
@@ -317,32 +301,32 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 
 func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (imgURL string, vURL string) {
 
-	if metaMedia, ok := metadata["media"]; ok {
-		var med metadataMedia
-		bs, err := json.Marshal(metaMedia)
-		if err == nil {
-			err = json.Unmarshal(bs, &med)
-			if err == nil {
-				mtype := persist.MediaFromContentType(med.mimeTime)
-				switch mtype {
-				case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
-					imgURL = med.uri.String()
-				default:
-					vURL = med.uri.String()
-				}
+	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
+		logger.For(nil).Infof("found media metadata for %s: %s", name, metaMedia)
+		var mediaType persist.MediaType
+
+		if mime, ok := metaMedia["mimeType"].(string); ok {
+			mediaType = persist.MediaFromContentType(mime)
+		}
+		if uri, ok := metaMedia["uri"].(string); ok {
+			switch mediaType {
+			case persist.MediaTypeImage, persist.MediaTypeSVG, persist.MediaTypeGIF:
+				imgURL = uri
+			default:
+				vURL = uri
 			}
 		}
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok && it != "" {
 		logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
 		vURL = it
-	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
+	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok && it != "" {
 		logger.For(nil).Infof("found initial video url for %s: %s", name, it)
 		vURL = it
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok && it != "" {
 		logger.For(nil).Infof("found initial image url for %s: %s", name, it)
 		imgURL = it
 	}
