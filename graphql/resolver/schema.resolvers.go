@@ -367,7 +367,7 @@ func (r *mutationResolver) UpdateTokenInfo(ctx context.Context, input model.Upda
 }
 
 func (r *mutationResolver) SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error) {
-	err := publicapi.For(ctx).Token.SetTokensSpamFlag(ctx, input.Tokens, input.IsSpam)
+	err := publicapi.For(ctx).Token.SetSpamPreference(ctx, input.Tokens, input.IsSpam)
 	if err != nil {
 		return nil, err
 	}

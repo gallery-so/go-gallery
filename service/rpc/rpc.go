@@ -53,7 +53,9 @@ type Transfer struct {
 	TokenType       persist.TokenType
 	Amount          uint64
 	ContractAddress persist.EthereumAddress
-	TxHash          common.Hash
+	// These are geth types which are useful for getting more details about a transaction.
+	TxHash    common.Hash
+	BlockHash common.Hash
 }
 
 // TokenContractMetadata represents a token contract's metadata

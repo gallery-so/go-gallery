@@ -393,6 +393,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC721,
 				TxHash:          pLog.TxHash,
+				BlockHash:       pLog.BlockHash,
 			})
 
 			logger.For(ctx).Debugf("Processed transfer event in %s", time.Since(initial))
@@ -427,6 +428,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 				ContractAddress: persist.EthereumAddress(pLog.Address.Hex()),
 				TokenType:       persist.TokenTypeERC1155,
 				TxHash:          pLog.TxHash,
+				BlockHash:       pLog.BlockHash,
 			})
 			logger.For(ctx).Debugf("Processed single transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
@@ -462,6 +464,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log, ethClient *ethclien
 					TokenType:       persist.TokenTypeERC1155,
 					BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 					TxHash:          pLog.TxHash,
+					BlockHash:       pLog.BlockHash,
 				})
 			}
 			logger.For(ctx).Debugf("Processed batch event in %s", time.Since(initial))
@@ -587,6 +590,7 @@ func (i *indexer) processTransfers(ctx context.Context,
 	defer close(owners)
 	defer close(previousOwners)
 	defer close(balances)
+	defer close(spam)
 	defer sentryutil.RecoverAndRaise(ctx)
 
 	wp := workerpool.New(5)
@@ -671,28 +675,17 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		ctx := sentryutil.NewSentryHubContext(ctx)
 
-		// Only transfers that are a result of minting are considered as potential spam.
-		if from != persist.ZeroAddress {
-			spam <- spamEvaluation{ti: key, isSpam: util.BoolToPointer(false)}
-			return
-		}
-
-		tx, _, err := i.ethClient.TransactionByHash(ctx, transfer.TxHash)
+		isSpam, err := SpamCheck(ctx, i.ethClient, transfer)
 		if err != nil {
-			logger.For(ctx).WithError(err).WithFields(logrus.Fields{"txHash": transfer.TxHash, "rpcCall": "eth_getTransactionByHash"}).Error("failed to get tx")
+			logger.For(ctx).WithError(err).Error("failed to evaluate spam")
 			return
 		}
 
-		// Get the sender of the transaction. This should skip the RPC call because the sender is cached from the earlier call.
-		sender, err := i.ethClient.TransactionSender(ctx, tx, common.HexToHash(transfer.BlockNumber.Hex()), 0)
-		if err != nil {
-			logger.For(ctx).WithError(err).WithFields(logrus.Fields{"txHash": transfer.TxHash, "rpcCall": "eth_getTransactionByBlockHashAndIndex"}).Error("failed to get tx sender")
-			return
-		}
-
-		if persist.EthereumAddress(sender.Hex()) != to {
-			spam <- spamEvaluation{ti: key, isSpam: util.BoolToPointer(true)}
+		spam <- spamEvaluation{
+			ti:     key,
+			isSpam: isSpam,
 		}
 	}()
 
@@ -1322,7 +1315,7 @@ func storeErr(ctx context.Context, err error, prefix string, from persist.Ethere
 }
 
 func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) {
-	logger.For(ctx).Info("Saving logs in block range %s-%s", curBlock, nextBlock)
+	logger.For(ctx).Infof("Saving logs in block range %d to %d", curBlock, nextBlock)
 	obj := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
 	obj.Delete(ctx)
 	storageWriter := obj.NewWriter(ctx)
@@ -1352,4 +1345,32 @@ func logEthCallRPCError(entry *logrus.Entry, err error, message string) {
 	} else {
 		entry.Error(message)
 	}
+}
+
+// SpamCheck determines if a transfer is spam.
+func SpamCheck(ctx context.Context, ethClient *ethclient.Client, transfer rpc.Transfer) (*bool, error) {
+	notSpam := util.BoolToPointer(false)
+	isSpam := util.BoolToPointer(true)
+
+	// Only transfers that are a result of minting is considered as potential spam.
+	if common.HexToAddress(string(transfer.From)) != common.HexToAddress("") {
+		return notSpam, nil
+	}
+
+	// Get the sender of the transaction. This requires only one RPC call because the sender gets cached on the first call.
+	tx, _, err := ethClient.TransactionByHash(ctx, transfer.TxHash)
+	if err != nil {
+		return nil, err
+	}
+	sender, err := ethClient.TransactionSender(ctx, tx, transfer.BlockHash, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the token is minted to someone other than the caller, then it's probably spam.
+	if common.HexToAddress(string(transfer.To)) != sender {
+		return isSpam, nil
+	}
+
+	return notSpam, nil
 }

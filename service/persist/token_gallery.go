@@ -39,8 +39,8 @@ type TokenGallery struct {
 	ExternalURL NullString `json:"external_url"`
 
 	BlockNumber          BlockNumber `json:"block_number"`
-	IsUserMarkedSpam     NullBool    `json:"is_user_marked_spam"`
-	IsProviderMarkedSpam NullBool    `json:"is_provider_marked_spam"`
+	IsUserMarkedSpam     *bool       `json:"is_user_marked_spam"`
+	IsProviderMarkedSpam *bool       `json:"is_provider_marked_spam"`
 }
 
 // AddressAtBlock represents an address at a specific block
