@@ -319,11 +319,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	return nil
 }
 
-<<<<<<< HEAD
 func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID, isSpam bool) error {
-=======
-func (api TokenAPI) SetTokensSpamFlag(ctx context.Context, tokens []persist.DBID, isSpam bool) error {
->>>>>>> ef25202 (Add user marked spam)
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"tokens": {tokens, "required,unique"},

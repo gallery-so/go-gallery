@@ -313,6 +313,7 @@ type TokenRepository interface {
 	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)
 	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
+	Upsert(context.Context, Token) error
 	UpdateByID(context.Context, DBID, interface{}) error
 	UpdateByTokenIdentifiers(context.Context, TokenID, EthereumAddress, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
