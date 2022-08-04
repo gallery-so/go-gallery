@@ -91,6 +91,10 @@ type Node interface {
 	IsNode()
 }
 
+type RefreshCollectionPayloadOrError interface {
+	IsRefreshCollectionPayloadOrError()
+}
+
 type RefreshContractPayloadOrError interface {
 	IsRefreshContractPayloadOrError()
 }
@@ -392,6 +396,7 @@ func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
 func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsRefreshTokenPayloadOrError()             {}
+func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()        {}
 func (ErrInvalidInput) IsRefreshContractPayloadOrError()          {}
 func (ErrInvalidInput) IsError()                                  {}
 func (ErrInvalidInput) IsCreateUserPayloadOrError()               {}
@@ -435,10 +440,11 @@ type ErrSyncFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrSyncFailed) IsSyncTokensPayloadOrError()      {}
-func (ErrSyncFailed) IsRefreshTokenPayloadOrError()    {}
-func (ErrSyncFailed) IsRefreshContractPayloadOrError() {}
-func (ErrSyncFailed) IsError()                         {}
+func (ErrSyncFailed) IsSyncTokensPayloadOrError()        {}
+func (ErrSyncFailed) IsRefreshTokenPayloadOrError()      {}
+func (ErrSyncFailed) IsRefreshCollectionPayloadOrError() {}
+func (ErrSyncFailed) IsRefreshContractPayloadOrError()   {}
+func (ErrSyncFailed) IsError()                           {}
 
 type ErrTokenNotFound struct {
 	Message string `json:"message"`
@@ -637,6 +643,12 @@ type PreviewURLSet struct {
 	Large     *string `json:"large"`
 	SrcSet    *string `json:"srcSet"`
 }
+
+type RefreshCollectionPayload struct {
+	Collection *Collection `json:"collection"`
+}
+
+func (RefreshCollectionPayload) IsRefreshCollectionPayloadOrError() {}
 
 type RefreshContractPayload struct {
 	Contract *Contract `json:"contract"`

@@ -664,6 +664,15 @@ type RefreshTokenPayload {
     token: Token
 }
 
+union RefreshCollectionPayloadOrError =
+    RefreshCollectionPayload
+  | ErrInvalidInput
+  | ErrSyncFailed
+
+type RefreshCollectionPayload {
+    collection: Collection
+}
+
 union RefreshContractPayloadOrError =
     RefreshContractPayload
   | ErrInvalidInput
@@ -846,6 +855,7 @@ type Mutation {
 
     syncTokens: SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
+    refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError

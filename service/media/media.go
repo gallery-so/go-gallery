@@ -160,24 +160,18 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 	if err == nil {
 		vURL = videoURL
 	}
-	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
-	if err == nil {
-		logger.For(pCtx).Infof("found imageURL for %s: %s", name, imageURL)
+	var imageURL string
+	if imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, imageURL)
 		res.ThumbnailURL = persist.NullString(imageURL)
-	} else {
-		imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
-		if err == nil {
-			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL)
-		} else {
-			imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient)
-			if err == nil {
-				logger.For(pCtx).Infof("found svgURL for %s: %s", name, imageURL)
-				res.ThumbnailURL = persist.NullString(imageURL)
-			} else {
-				logger.For(pCtx).Infof("no imageURL for %s", name)
-			}
-		}
+	} else if imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
+		res.ThumbnailURL = persist.NullString(imageURL)
+	} else if imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, imageURL)
+		res.ThumbnailURL = persist.NullString(imageURL)
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("no thumbnail found forc %s: %s", name, imgURL)
 	}
 	if vURL != "" {
 		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
@@ -286,19 +280,18 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
-	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
-	if err == nil {
+	if imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
 		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, imageURL)
 		res.ThumbnailURL = persist.NullString(imageURL)
-	} else {
-		imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
-		if err == nil {
-			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL)
-		} else if imgURL != "" {
-			logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
-			res.ThumbnailURL = persist.NullString(imgURL)
-		}
+	} else if imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
+		res.ThumbnailURL = persist.NullString(imageURL)
+	} else if imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, imageURL)
+		res.ThumbnailURL = persist.NullString(imageURL)
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
+		res.ThumbnailURL = persist.NullString(imgURL)
 	}
 	return res
 }

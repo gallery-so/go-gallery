@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -167,6 +168,63 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+
+	api.loaders.ClearAllCaches()
+
+	return nil
+}
+
+func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persist.DBID) error {
+	if err := validateFields(api.validator, validationMap{
+		"collectionID": {collectionDBID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	collection, err := api.loaders.CollectionByCollectionId.Load(collectionDBID)
+	if err != nil {
+		return err
+	}
+	wp := workerpool.New(10)
+	errChan := make(chan error)
+	for _, t := range collection.Nfts {
+		tokenID := t
+		wp.Submit(func() {
+			token, err := api.loaders.TokenByTokenID.Load(tokenID)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			contract, err := api.loaders.ContractByContractId.Load(token.Contract)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			addresses := []persist.Address{}
+			for _, walletID := range token.OwnedByWallets {
+				wa, err := api.loaders.WalletByWalletId.Load(walletID)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				addresses = append(addresses, wa.Address)
+			}
+
+			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
+			if err != nil {
+				errChan <- ErrTokenRefreshFailed{Message: err.Error()}
+				return
+			}
+		})
+	}
+	go func() {
+		wp.StopWait()
+		errChan <- nil
+	}()
+	if err := <-errChan; err != nil {
+		return err
 	}
 
 	api.loaders.ClearAllCaches()
