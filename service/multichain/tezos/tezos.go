@@ -339,41 +339,6 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				logger.For(ctx).Errorf("Failed to make previews for tezos token %s: %s", tid, err)
 			}
 
-			tokenType := persist.TokenTypeERC721
-			if tzToken.Balance.ToBigInt().Cmp(big.NewInt(1)) > 0 {
-				tokenType = persist.TokenTypeERC1155
-			} else {
-				err := func() error {
-					req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances/count?id=%d", d.apiURL, tzToken.Token.ID), nil)
-					if err != nil {
-						return err
-					}
-					resp, err := d.httpClient.Do(req)
-					if err != nil {
-						return err
-					}
-					defer resp.Body.Close()
-					if resp.StatusCode != http.StatusOK {
-						return getErrFromResp(resp)
-					}
-					// body will just be an integer so decode it onto an integer
-					var count int
-					if err := json.NewDecoder(resp.Body).Decode(&count); err != nil {
-						return err
-					}
-
-					if count > 1 {
-						tokenType = persist.TokenTypeERC1155
-					}
-
-					return nil
-				}()
-				if err != nil {
-					errChan <- err
-					return
-				}
-
-			}
 			publicKey, err := d.getPublicKeyFromAddress(ctx, tzToken.Account.Address.String())
 			if err != nil {
 				errChan <- err
@@ -381,7 +346,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 			}
 			agnostic := multichain.ChainAgnosticToken{
 				Media:           med,
-				TokenType:       tokenType,
+				TokenType:       persist.TokenTypeERC1155,
 				Description:     tzToken.Token.Metadata.Description,
 				Name:            tzToken.Token.Metadata.Name,
 				TokenID:         tid,
