@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -19,9 +18,9 @@ import (
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
@@ -157,9 +156,10 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 }
 
 // RefreshToken refreshes the metadata for a given token.
-func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) error {
+func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) error {
 
 	input := indexer.UpdateTokenMediaInput{
+		OwnerAddress:    persist.EthereumAddress(ownerAddress.String()),
 		TokenID:         ti.TokenID,
 		ContractAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(ti.ContractAddress)),
 		UpdateAll:       true,
@@ -358,8 +358,8 @@ func verifySignature(pSignatureStr string,
 		}
 
 		pubkeyAddressHexStr := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
-		log.Println("pubkeyAddressHexStr:", pubkeyAddressHexStr)
-		log.Println("pAddress:", pAddress)
+		logger.For(nil).Infof("pubkeyAddressHexStr: %s", pubkeyAddressHexStr)
+		logger.For(nil).Infof("pAddress: %s", pAddress)
 		if !strings.EqualFold(pubkeyAddressHexStr, pAddress.String()) {
 			return false, auth.ErrAddressSignatureMismatch
 		}
@@ -384,7 +384,7 @@ func verifySignature(pSignatureStr string,
 
 		result, err := sigValidator.IsValidSignature(&bind.CallOpts{Context: ctx}, input, []byte{})
 		if err != nil {
-			logrus.WithError(err).Error("IsValidSignature")
+			logger.For(nil).WithError(err).Error("IsValidSignature")
 			return false, nil
 		}
 

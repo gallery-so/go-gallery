@@ -1,15 +1,21 @@
 package mediamapper
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/imgix/imgix-go/v2"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
-	"strconv"
-	"strings"
 )
 
 const contextKey = "mediamapper.instance"
@@ -126,4 +132,43 @@ func (u *MediaMapper) GetLargeImageUrl(sourceUrl string) string {
 
 func (u *MediaMapper) GetSrcSet(sourceUrl string) string {
 	return u.urlBuilder.CreateSrcset(sourceUrl, u.srcSetParams)
+}
+
+func PurgeImage(ctx context.Context, u string) error {
+	// '{ "data": { "attributes": { "url": "<url-to-purge>" }, "type": "purges" } }'
+	body := map[string]interface{}{
+		"data": map[string]interface{}{
+			"attributes": map[string]interface{}{
+				"url": fmt.Sprintf("https://%s/%s", assetDomain, url.QueryEscape(u)),
+			},
+			"type": "purges",
+		},
+	}
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.imgix.com/api/v1/purge", bytes.NewBuffer(bodyJSON))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/vnd.api+json")
+	req.Header.Set("Authorization", "Bearer "+viper.GetString("IMGIX_API_KEY"))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("unexpected response status code: %d - %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
 }

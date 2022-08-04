@@ -89,7 +89,7 @@ func updateMediaForContract(c context.Context, input UpdateContractMediaInput, e
 
 	creator, err := rpc.GetContractCreator(timedContext, input.Address, ethClient)
 	if err != nil {
-		logger.For(c).Errorf("error finding creator address: %v", err)
+		logger.For(c).WithError(err).Errorf("error finding creator address")
 	} else {
 		up.CreatorAddress = creator
 	}

@@ -9,7 +9,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // Provider is an interface for retrieving data from multiple chains
@@ -105,7 +104,7 @@ type ChainProvider interface {
 	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
-	RefreshToken(context.Context, ChainAgnosticIdentifiers) error
+	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
 	RefreshContract(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
 	UpdateMediaForWallet(context.Context, persist.Address, bool) error
@@ -151,7 +150,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 	}
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
-		logrus.Infof("updating media for user %s wallets %s", user.Username, a)
+		logger.For(ctx).Infof("updating media for user %s wallets %s", user.Username, a)
 		chain := c
 		addresses := a
 		wg.Add(len(addresses))
@@ -180,7 +179,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 					}(p, i)
 				}
 				subWg.Wait()
-				logrus.Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
+				logger.For(ctx).Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
 			}(addr, chain)
 		}
 	}
@@ -280,15 +279,17 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 }
 
 // RefreshToken refreshes a token on the given chain using the chain provider for that chain
-func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers) error {
+func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers, ownerAddresses []persist.Address) error {
 	providers, ok := d.Chains[ti.Chain]
 	if !ok {
 		return ErrChainNotFound{Chain: ti.Chain}
 	}
 	for i, provider := range providers {
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
-		if err := provider.RefreshToken(ctx, id); err != nil {
-			return err
+		for _, ownerAddress := range ownerAddresses {
+			if err := provider.RefreshToken(ctx, id, ownerAddress); err != nil {
+				return err
+			}
 		}
 
 		tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
@@ -368,7 +369,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 						token.Media.MediaURL = it.Media.MediaURL
 					}
 				}
-				logrus.Debugf("updating token %s because current version is invalid", ti)
+				logger.For(ctx).Debugf("updating token %s because current version is invalid", ti)
 			} else {
 				if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
 					seenWallets[ti] = append(seenWallets[ti], w)

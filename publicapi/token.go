@@ -155,7 +155,16 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		return err
 	}
 
-	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)))
+	addresses := []persist.Address{}
+	for _, walletID := range token.OwnedByWallets {
+		wa, err := api.loaders.WalletByWalletId.Load(walletID)
+		if err != nil {
+			return err
+		}
+		addresses = append(addresses, wa.Address)
+	}
+
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}

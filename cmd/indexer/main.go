@@ -5,10 +5,13 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/mikeydub/go-gallery/indexer"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"google.golang.org/appengine"
 )
 
 func main() {
+	defer sentryutil.RecoverAndRaise(nil)
+
 	indexer.Init()
 	if appengine.IsAppEngine() {
 		appengine.Main()

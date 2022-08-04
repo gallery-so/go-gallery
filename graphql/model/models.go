@@ -13,11 +13,11 @@ type GqlID string
 var Cursor connCursor
 
 func (r *CollectionToken) GetGqlIDField_TokenID() string {
-	return r.TokenId.String()
+	return r.HelperCollectionTokenData.TokenId.String()
 }
 
 func (r *CollectionToken) GetGqlIDField_CollectionID() string {
-	return r.TokenId.String()
+	return r.HelperCollectionTokenData.CollectionId.String()
 }
 
 func (r *Community) GetGqlIDField_Chain() string {
