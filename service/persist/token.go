@@ -313,7 +313,7 @@ type ErrTokenNotFoundByTokenIdentifiers struct {
 	ContractAddress EthereumAddress
 }
 
-// ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
+// ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address and owner address)
 type ErrTokenNotFoundByIdentifiers struct {
 	TokenID         TokenID
 	ContractAddress EthereumAddress

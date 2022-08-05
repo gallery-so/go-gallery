@@ -393,13 +393,13 @@ func (r *mutationResolver) RefreshCollection(ctx context.Context, collectionID p
 		return nil, err
 	}
 
-	token, err := resolveCollectionByCollectionID(ctx, collectionID)
+	collection, err := resolveCollectionByCollectionID(ctx, collectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.RefreshCollectionPayload{
-		Collection: token,
+		Collection: collection,
 	}
 
 	return output, nil
