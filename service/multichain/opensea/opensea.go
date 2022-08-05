@@ -217,7 +217,7 @@ func (p *Provider) ValidateTokensForWallet(context.Context, persist.Address, boo
 }
 
 // RefreshToken refreshes the metadata for a given token.
-func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers) error {
+func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) error {
 	return nil
 }
 

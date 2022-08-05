@@ -17,7 +17,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"golang.org/x/crypto/blake2b"
@@ -229,6 +228,8 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		return nil, nil, err
 	}
 
+	logger.For(ctx).Info("tzktBalances: ", len(tzktBalances))
+
 	return d.tzBalanceTokensToTokens(ctx, tzktBalances)
 }
 
@@ -256,7 +257,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 }
 
 // RefreshToken refreshes the metadata for a given token.
-func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) error {
+func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
 	return nil
 }
 
@@ -312,6 +313,8 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 	contractsLock := &sync.Mutex{}
 	tokenChan := make(chan multichain.ChainAgnosticToken)
 	contractChan := make(chan multichain.ChainAgnosticContract)
+	mu := &sync.Mutex{}
+	processedMedias := make(map[persist.TokenIdentifiers]bool)
 	errChan := make(chan error)
 	ctx, cancel := context.WithCancel(pCtx)
 	wp := workerpool.New(10)
@@ -334,10 +337,14 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			med, err := media.MakePreviewsForMetadata(ctx, agnosticMetadata, normalizedContractAddress, tid, "", persist.ChainTezos, d.ipfsClient, d.arweaveClient, d.storageClient, d.tokenBucket, []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"})
-			if err != nil {
-				logger.For(ctx).Errorf("Failed to make previews for tezos token %s: %s", tid, err)
-			}
+			func() {
+				mu.Lock()
+				defer mu.Unlock()
+				if _, ok := processedMedias[persist.NewTokenIdentifiers(persist.Address(normalizedContractAddress), tid, persist.ChainTezos)]; ok {
+					return
+				}
+				// TODO call tezos media API
+			}()
 
 			publicKey, err := d.getPublicKeyFromAddress(ctx, tzToken.Account.Address.String())
 			if err != nil {
@@ -345,7 +352,6 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			agnostic := multichain.ChainAgnosticToken{
-				Media:           med,
 				TokenType:       persist.TokenTypeERC1155,
 				Description:     tzToken.Token.Metadata.Description,
 				Name:            tzToken.Token.Metadata.Name,
