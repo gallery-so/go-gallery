@@ -61,7 +61,6 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 	height := 368
 	add := 3
 	buf := &bytes.Buffer{}
-
 	canvas := svg.New(buf)
 	canvas.Start(width, height)
 	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
@@ -87,7 +86,7 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 		case '/':
 			canvas.Line(x-add, y-add, x+add, y+add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		case '#':
-			canvas.Rect(x, y, add, add, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
+			canvas.Rect(x-int(math.Ceil(float64(add)/2.0)), y-add, add+1, add+1, `stroke="black"`, `stroke-width="0.8"`, `stroke-linecap="square"`)
 		}
 	}
 	canvas.End()
@@ -282,7 +281,7 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 		case '/':
 			canvas.Line(x-add, y-add, x+add, y+add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		case '#':
-			canvas.Rect(x, y, add, add, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
+			canvas.Rect(x-int(math.Ceil(float64(add)/2.0)), y-add, add+1, add+1, stroke, `stroke-width="0.8"`, `stroke-linecap="square"`, "stroke-opacity: 1.0")
 		}
 	}
 	canvas.End()

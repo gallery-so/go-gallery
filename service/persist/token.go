@@ -294,6 +294,7 @@ type TokenRepository interface {
 	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
+	GetByIdentifiers(context.Context, TokenID, EthereumAddress, EthereumAddress) (Token, error)
 	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]Token, error)
 	GetByID(context.Context, DBID) (Token, error)
@@ -306,10 +307,17 @@ type TokenRepository interface {
 	Count(context.Context, TokenCountType) (int64, error)
 }
 
-// ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
+// ErrTokenNotFoundByTokenIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
+type ErrTokenNotFoundByTokenIdentifiers struct {
+	TokenID         TokenID
+	ContractAddress EthereumAddress
+}
+
+// ErrTokenNotFoundByIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address and owner address)
 type ErrTokenNotFoundByIdentifiers struct {
 	TokenID         TokenID
 	ContractAddress EthereumAddress
+	OwnerAddress    EthereumAddress
 }
 
 // ErrTokenNotFoundByID is an error that is returned when a token is not found by its ID
@@ -388,8 +396,12 @@ func (e ErrTokensNotFoundByContract) Error() string {
 	return fmt.Sprintf("tokens not found by contract: %s", e.ContractAddress)
 }
 
+func (e ErrTokenNotFoundByTokenIdentifiers) Error() string {
+	return fmt.Sprintf("token not found with contract address %s and token ID %s", e.ContractAddress, e.TokenID)
+}
+
 func (e ErrTokenNotFoundByIdentifiers) Error() string {
-	return fmt.Sprintf("token not found with contract address %v and token ID %v", e.ContractAddress, e.TokenID)
+	return fmt.Sprintf("token not found with contract address %s and token ID %s and owner address %s", e.ContractAddress, e.TokenID, e.OwnerAddress)
 }
 
 // NormalizeAddress normalizes an address for the given chain

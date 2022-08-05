@@ -75,27 +75,31 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 50), "vURL": claspString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata initial")
 
 	var res persist.Media
-
-	mediaType, err := downloadAndCache(pCtx, imgURL, name, "image", ipfsClient, arweaveClient, storageClient)
-	if err != nil {
-		switch err.(type) {
-		case rpc.ErrHTTP:
-			if err.(rpc.ErrHTTP).Status == http.StatusNotFound {
+	var mediaType persist.MediaType
+	if imgURL != "" {
+		var err error
+		mediaType, err = downloadAndCache(pCtx, imgURL, name, "image", ipfsClient, arweaveClient, storageClient)
+		if err != nil {
+			switch err.(type) {
+			case rpc.ErrHTTP:
+				if err.(rpc.ErrHTTP).Status == http.StatusNotFound {
+					mediaType = persist.MediaTypeInvalid
+				} else {
+					return persist.Media{}, fmt.Errorf("HTTP error downloading img %s for %s: %s", imgAsURI, name, err)
+				}
+			case *net.DNSError:
 				mediaType = persist.MediaTypeInvalid
-			} else {
-				return persist.Media{}, fmt.Errorf("HTTP error downloading img %s for %s: %s", imgAsURI, name, err)
+				logger.For(pCtx).WithError(err).Warnf("DNS error downloading img %s for %s: %s", imgAsURI, name, err)
+			case errGeneratingThumbnail:
+				break
+			default:
+				return persist.Media{}, fmt.Errorf("error downloading img %s of type %s for %s: %s", imgAsURI, imgAsURI.Type(), name, err)
 			}
-		case *net.DNSError:
-			mediaType = persist.MediaTypeInvalid
-			logger.For(pCtx).WithError(err).Warnf("DNS error downloading img %s for %s: %s", imgAsURI, name, err)
-		case errGeneratingThumbnail:
-			break
-		default:
-			return persist.Media{}, fmt.Errorf("error downloading img %s of type %s for %s: %s", imgAsURI, imgAsURI.Type(), name, err)
 		}
 	}
 	if vURL != "" {
 		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 50), "vURL": claspString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
+		var err error
 		mediaType, err = downloadAndCache(pCtx, vURL, name, "video", ipfsClient, arweaveClient, storageClient)
 		if err != nil {
 			switch err.(type) {
@@ -121,10 +125,12 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeAnimation, persist.MediaTypeGIF:
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeAnimation:
 		res = getAuxilaryMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL, mediaType)
 	case persist.MediaTypeHTML:
 		res = getHTMLMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
+	case persist.MediaTypeGIF:
+		res = getGIFMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	case persist.MediaTypeSVG:
 		res = getSvgMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	default:
@@ -154,40 +160,45 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 	if err == nil {
 		vURL = videoURL
 	}
-	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
-	if err == nil {
-		logger.For(pCtx).Infof("found imageURL for %s: %s", name, imageURL)
+	imageURL := getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient)
+	if vURL != "" {
 		res.ThumbnailURL = persist.NullString(imageURL)
-	} else {
-		imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
-		if err == nil {
-			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL)
-		} else {
-			imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient)
-			if err == nil {
-				logger.For(pCtx).Infof("found svgURL for %s: %s", name, imageURL)
-				res.ThumbnailURL = persist.NullString(imageURL)
-			} else {
-				logger.For(pCtx).Infof("no imageURL for %s", name)
-			}
-		}
 	}
 	if vURL != "" {
 		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
-		if imageURL != "" {
-			res.ThumbnailURL = persist.NullString(imageURL)
-		} else if imgURL != "" {
-			res.ThumbnailURL = persist.NullString(imgURL)
-		}
 	} else if imageURL != "" && res.ThumbnailURL.String() != imageURL {
 		logger.For(pCtx).Infof("using imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
-	} else if imgURL != "" && res.ThumbnailURL.String() != imgURL {
+	}
+	return res
+}
+
+func getGIFMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL string, imgURL string) persist.Media {
+	res := persist.Media{
+		MediaType: persist.MediaTypeGIF,
+	}
+	videoURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+	if err == nil {
+		vURL = videoURL
+	}
+	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
+	if err == nil {
+		logger.For(pCtx).Infof("found imageURL for %s: %s", name, imageURL)
+		imgURL = imageURL
+	}
+	res.ThumbnailURL = persist.NullString(getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient))
+	if vURL != "" {
+		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
+		res.MediaURL = persist.NullString(vURL)
+		if imgURL != "" && res.ThumbnailURL.String() == "" {
+			res.ThumbnailURL = persist.NullString(imgURL)
+		}
+	} else if imgURL != "" {
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
+
 	return res
 }
 
@@ -248,39 +259,60 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
-	imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
-	if err == nil {
-		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, imageURL)
-		res.ThumbnailURL = persist.NullString(imageURL)
-	} else {
-		imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
-		if err == nil {
-			logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
-			res.ThumbnailURL = persist.NullString(imageURL)
-		} else if imgURL != "" {
-			logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
-			res.ThumbnailURL = persist.NullString(imgURL)
-		}
-	}
+	res.ThumbnailURL = persist.NullString(getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient))
 	return res
+}
+
+func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
+	if imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, imageURL)
+		return imageURL
+	} else if imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
+		return imageURL
+	} else if imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, imageURL)
+		return imageURL
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
+		return imageURL
+	}
+	return ""
 }
 
 func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (imgURL string, vURL string) {
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok {
+	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
+		logger.For(nil).Infof("found media metadata for %s: %s", name, metaMedia)
+		var mediaType persist.MediaType
+
+		if mime, ok := metaMedia["mimeType"].(string); ok {
+			mediaType = persist.MediaFromContentType(mime)
+		}
+		if uri, ok := metaMedia["uri"].(string); ok {
+			switch mediaType {
+			case persist.MediaTypeImage, persist.MediaTypeSVG, persist.MediaTypeGIF:
+				imgURL = uri
+			default:
+				vURL = uri
+			}
+		}
+	}
+
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok && it != "" {
 		logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
 		vURL = it
-	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok {
+	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok && it != "" {
 		logger.For(nil).Infof("found initial video url for %s: %s", name, it)
 		vURL = it
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok {
+	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok && it != "" {
 		logger.For(nil).Infof("found initial image url for %s: %s", name, it)
 		imgURL = it
 	}
 
-	if imgURL == "" {
+	if imgURL == "" && vURL == "" {
 		logger.For(nil).Infof("no image url found for %s - using token URI %s", name, turi)
 		imgURL = turi.String()
 	}
