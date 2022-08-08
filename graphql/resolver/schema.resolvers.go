@@ -385,6 +385,26 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, tokenID persist.DBI
 	return output, nil
 }
 
+func (r *mutationResolver) RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Token.RefreshCollection(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	collection, err := resolveCollectionByCollectionID(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RefreshCollectionPayload{
+		Collection: collection,
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error) {
 	api := publicapi.For(ctx)
 

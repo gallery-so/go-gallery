@@ -581,7 +581,6 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 			}
 			for _, n := range assetsReceived.assets {
 				nft := n
-				logger.For(ctx).Info(n.Name)
 				wp.Submit(func() {
 					innerCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 					defer cancel()
