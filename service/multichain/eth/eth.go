@@ -21,6 +21,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
@@ -62,7 +63,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, nil, getErrFromResp(res)
+		return nil, nil, util.GetErrFromResp(res)
 	}
 
 	var tokens indexer.GetTokensOutput
@@ -88,7 +89,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, multichain.ChainAgnosticContract{}, getErrFromResp(res)
+		return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(res)
 	}
 
 	var tokens indexer.GetTokensOutput
@@ -118,7 +119,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 
 	if res.StatusCode != 200 {
 
-		return nil, nil, getErrFromResp(res)
+		return nil, nil, util.GetErrFromResp(res)
 	}
 
 	var tokens indexer.GetTokensOutput
@@ -143,7 +144,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return multichain.ChainAgnosticContract{}, getErrFromResp(res)
+		return multichain.ChainAgnosticContract{}, util.GetErrFromResp(res)
 	}
 	var contract indexer.GetContractOutput
 	err = json.NewDecoder(res.Body).Decode(&contract)
@@ -181,7 +182,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 
 	if res.StatusCode != 200 {
 
-		return getErrFromResp(res)
+		return util.GetErrFromResp(res)
 	}
 
 	return nil
@@ -213,7 +214,7 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return getErrFromResp(res)
+		return util.GetErrFromResp(res)
 	}
 
 	return nil
@@ -243,7 +244,7 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return getErrFromResp(res)
+		return util.GetErrFromResp(res)
 	}
 
 	return nil
@@ -271,7 +272,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return getErrFromResp(res)
+		return util.GetErrFromResp(res)
 	}
 
 	return nil
@@ -443,10 +444,4 @@ func ethereumAddressAtBlockToChainAgnostic(addrs []persist.EthereumAddressAtBloc
 		}
 	}
 	return res
-}
-
-func getErrFromResp(res *http.Response) error {
-	errResp := map[string]interface{}{}
-	json.NewDecoder(res.Body).Decode(&errResp)
-	return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
 }

@@ -67,7 +67,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
-	imgURL, vURL := findInitialURLs(metadata, name, turi, imageKeywords, animationKeywords)
+	imgURL, vURL := FindImageAndAnimationURLs(metadata, turi, imageKeywords, animationKeywords, name)
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
@@ -265,7 +265,7 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 	return res
 }
 
-func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI, animationKeywords, imageKeywords []string) (imgURL string, vURL string) {
+func FindImageAndAnimationURLs(metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords []string, name string) (imgURL string, vURL string) {
 
 	for _, keyword := range animationKeywords {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {

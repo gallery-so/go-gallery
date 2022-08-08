@@ -1,7 +1,9 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,4 +31,10 @@ func (e ErrInvalidInput) Error() string {
 func ErrResponse(c *gin.Context, code int, err error) {
 	c.Error(err)
 	c.JSON(code, ErrorResponse{Error: err.Error()})
+}
+
+func GetErrFromResp(res *http.Response) error {
+	errResp := map[string]interface{}{}
+	json.NewDecoder(res.Body).Decode(&errResp)
+	return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
 }

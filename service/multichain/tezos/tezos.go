@@ -1,6 +1,7 @@
 package tezos
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -15,14 +16,22 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/mediaprocessing"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"golang.org/x/crypto/blake2b"
 )
 
 type tokenStandard string
+
+var (
+	tezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
+	tezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
+)
 
 const (
 	tokenStandardFa12 tokenStandard = "fa1.2"
@@ -124,23 +133,27 @@ type tzktContract struct {
 
 // Provider is an the struct for retrieving data from the Ethereum blockchain
 type Provider struct {
-	apiURL        string
-	httpClient    *http.Client
-	ipfsClient    *shell.Shell
-	arweaveClient *goar.Client
-	storageClient *storage.Client
-	tokenBucket   string
+	apiURL         string
+	mediaURL       string
+	ipfsGatewayURL string
+	httpClient     *http.Client
+	ipfsClient     *shell.Shell
+	arweaveClient  *goar.Client
+	storageClient  *storage.Client
+	tokenBucket    string
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(indexerBaseURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveCleint *goar.Client, storageClient *storage.Client, tokenBucket string) *Provider {
+func NewProvider(indexerBaseURL, mediaURL, ipfsGatewayURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveCleint *goar.Client, storageClient *storage.Client, tokenBucket string) *Provider {
 	return &Provider{
-		apiURL:        indexerBaseURL,
-		httpClient:    httpClient,
-		ipfsClient:    ipfsClient,
-		arweaveClient: arweaveCleint,
-		storageClient: storageClient,
-		tokenBucket:   tokenBucket,
+		apiURL:         indexerBaseURL,
+		mediaURL:       mediaURL,
+		ipfsGatewayURL: ipfsGatewayURL,
+		httpClient:     httpClient,
+		ipfsClient:     ipfsClient,
+		arweaveClient:  arweaveCleint,
+		storageClient:  storageClient,
+		tokenBucket:    tokenBucket,
 	}
 }
 
@@ -168,14 +181,14 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, getErrFromResp(resp)
+		return nil, nil, util.GetErrFromResp(resp)
 	}
 	var tzktBalances []tzktBalanceToken
 	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
 		return nil, nil, err
 	}
 
-	return d.tzBalanceTokensToTokens(ctx, tzktBalances)
+	return d.tzBalanceTokensToTokens(ctx, tzktBalances, addr.String())
 
 }
 
@@ -191,14 +204,14 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, multichain.ChainAgnosticContract{}, getErrFromResp(resp)
+		return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
 	}
 	var tzktBalances []tzktBalanceToken
 	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances)
+	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, contractAddress.String())
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -221,7 +234,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, getErrFromResp(resp)
+		return nil, nil, util.GetErrFromResp(resp)
 	}
 	var tzktBalances []tzktBalanceToken
 	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
@@ -230,7 +243,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 
 	logger.For(ctx).Info("tzktBalances: ", len(tzktBalances))
 
-	return d.tzBalanceTokensToTokens(ctx, tzktBalances)
+	return d.tzBalanceTokensToTokens(ctx, tzktBalances, tokenIdentifiers.String())
 }
 
 // GetContractByAddress retrieves an ethereum contract by address
@@ -245,7 +258,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return multichain.ChainAgnosticContract{}, getErrFromResp(resp)
+		return multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
 	}
 	var tzktContract tzktContract
 	if err := json.NewDecoder(resp.Body).Decode(&tzktContract); err != nil {
@@ -308,13 +321,13 @@ func (d *Provider) VerifySignature(pCtx context.Context, pAddressStr persist.Add
 	return key.Verify(hash.Sum(nil), sig) == nil, nil
 }
 
-func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzktBalanceToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzktBalanceToken, mediaKey string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	tzTokens = dedupeBalances(tzTokens)
 	seenContracts := map[string]bool{}
 	contractsLock := &sync.Mutex{}
 	tokenChan := make(chan multichain.ChainAgnosticToken)
 	contractChan := make(chan multichain.ChainAgnosticContract)
-	mu := &sync.Mutex{}
-	processedMedias := make(map[persist.TokenIdentifiers]bool)
+
 	errChan := make(chan error)
 	ctx, cancel := context.WithCancel(pCtx)
 	wp := workerpool.New(10)
@@ -337,31 +350,26 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			func() {
-				mu.Lock()
-				defer mu.Unlock()
-				if _, ok := processedMedias[persist.NewTokenIdentifiers(persist.Address(normalizedContractAddress), tid, persist.ChainTezos)]; ok {
-					return
-				}
-				// TODO call tezos media API
-			}()
-
 			publicKey, err := d.getPublicKeyFromAddress(ctx, tzToken.Account.Address.String())
 			if err != nil {
 				errChan <- err
 				return
 			}
+			med := d.makeTempMedia(agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
+
 			agnostic := multichain.ChainAgnosticToken{
 				TokenType:       persist.TokenTypeERC1155,
 				Description:     tzToken.Token.Metadata.Description,
 				Name:            tzToken.Token.Metadata.Name,
 				TokenID:         tid,
+				Media:           med,
 				ContractAddress: tzToken.Token.Contract.Address,
 				Quantity:        persist.HexString(tzToken.Balance.toBase16String()),
 				TokenMetadata:   agnosticMetadata,
 				OwnerAddress:    publicKey,
 				BlockNumber:     persist.BlockNumber(tzToken.LastLevel),
 			}
+
 			tokenChan <- agnostic
 			contractsLock.Lock()
 			if !seenContracts[normalizedContractAddress] {
@@ -390,6 +398,30 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.Canceled {
+				processMediaInput := mediaprocessing.ProcessMediaInput{
+					Key:               mediaKey,
+					Chain:             persist.ChainTezos,
+					Tokens:            resultTokens,
+					ImageKeyworkds:    tezImageKeywords,
+					AnimationKeywords: tezAnimationKeywords,
+				}
+				asJSON, err := json.Marshal(processMediaInput)
+				if err != nil {
+					return nil, nil, err
+				}
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/process", d.mediaURL), bytes.NewBuffer(asJSON))
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to create media request: %w", err)
+				}
+				resp, err := d.httpClient.Do(req)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to send media request: %w", err)
+				}
+				defer resp.Body.Close()
+				if resp.StatusCode != http.StatusOK {
+					return nil, nil, fmt.Errorf("media request failed: %w", util.GetErrFromResp(resp))
+				}
+
 				return resultTokens, resultContracts, nil
 			}
 			return nil, nil, ctx.Err()
@@ -405,6 +437,48 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 	}
 }
 
+func (d *Provider) makeTempMedia(agnosticMetadata persist.TokenMetadata, name string) persist.Media {
+	med := persist.Media{}
+	img, anim := media.FindImageAndAnimationURLs(agnosticMetadata, "", tezAnimationKeywords, tezImageKeywords, name)
+	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
+		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
+		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
+		anim = fmt.Sprintf("%s/ipfs/%s", d.ipfsGatewayURL, removedIPFS)
+	}
+	if persist.TokenURI(img).Type() == persist.URITypeIPFS {
+		removedIPFS := strings.Replace(img, "ipfs://", "", 1)
+		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
+		img = fmt.Sprintf("%s/ipfs/%s", d.ipfsGatewayURL, removedIPFS)
+	}
+	if anim != "" {
+		if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
+			removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
+			removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
+			anim = fmt.Sprintf("%s/ipfs/%s", d.ipfsGatewayURL, removedIPFS)
+		}
+		med.MediaURL = persist.NullString(anim)
+		if img != "" {
+			med.ThumbnailURL = persist.NullString(img)
+		}
+	} else if img != "" {
+		med.MediaURL = persist.NullString(img)
+	}
+	return med
+}
+
+func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {
+	seen := map[string]tzktBalanceToken{}
+	result := make([]tzktBalanceToken, 0, len(tzTokens))
+	for _, t := range tzTokens {
+		id := multichain.ChainAgnosticIdentifiers{ContractAddress: t.Token.Contract.Address, TokenID: persist.TokenID(t.Token.TokenID)}
+		seen[id.String()] = t
+	}
+	for _, t := range seen {
+		result = append(result, t)
+	}
+	return result
+}
+
 func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address string) (persist.Address, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/accounts/%s", d.apiURL, address), nil)
 	if err != nil {
@@ -416,7 +490,7 @@ func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address string) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", getErrFromResp(resp)
+		return "", util.GetErrFromResp(resp)
 	}
 	var account tzAccount
 	if err := json.NewDecoder(resp.Body).Decode(&account); err != nil {
@@ -443,12 +517,6 @@ func toTzAddress(address persist.Address) (persist.Address, error) {
 		return "", err
 	}
 	return persist.Address(key.Address().String()), nil
-}
-
-func getErrFromResp(res *http.Response) error {
-	errResp := map[string]interface{}{}
-	json.NewDecoder(res.Body).Decode(&errResp)
-	return fmt.Errorf("unexpected status: %s | err: %v ", res.Status, errResp)
 }
 
 func (t tokenID) String() string {

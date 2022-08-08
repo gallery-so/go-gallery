@@ -130,6 +130,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
+	viper.SetDefault("MEDIA_PROCESSING_URL", "localhost:7000")
 	viper.SetDefault("TEZOS_API_URL", "https://api.ghostnet.tzkt.io")
 
 	viper.AutomaticEnv()
@@ -231,7 +232,7 @@ func initSentry() {
 }
 
 func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *multichain.Provider {
-	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket))
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos.TokenRepository, repos.ContractRepository, repos.UserRepository, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket))
 }
 
 func newThrottler() *throttle.Locker {

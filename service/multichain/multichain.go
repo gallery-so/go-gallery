@@ -460,6 +460,10 @@ func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnost
 	return res, nil
 }
 
+func (t ChainAgnosticIdentifiers) String() string {
+	return fmt.Sprintf("%s-%s", t.ContractAddress, t.TokenID)
+}
+
 func (e ErrChainNotFound) Error() string {
 	return fmt.Sprintf("chain provider not found for chain: %d", e.Chain)
 }
