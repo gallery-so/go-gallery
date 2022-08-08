@@ -242,6 +242,10 @@ type ComplexityRoot struct {
 		Viewer    func(childComplexity int) int
 	}
 
+	DeepRefreshPayload struct {
+		Refreshed func(childComplexity int) int
+	}
+
 	DeleteCollectionPayload struct {
 		Gallery func(childComplexity int) int
 	}
@@ -259,6 +263,10 @@ type ComplexityRoot struct {
 	}
 
 	ErrCommunityNotFound struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrDeepRefreshFailed struct {
 		Message func(childComplexity int) int
 	}
 
@@ -423,6 +431,7 @@ type ComplexityRoot struct {
 		CommentOnFeedEvent       func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
 		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
 		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string) int
+		DeepRefresh              func(childComplexity int, input model.DeepRefreshInput) int
 		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
 		FollowUser               func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce             func(childComplexity int, chainAddress persist.ChainAddress) int
@@ -746,6 +755,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
+	DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string) (model.CreateUserPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
@@ -1508,6 +1518,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CreateUserPayload.Viewer(childComplexity), true
 
+	case "DeepRefreshPayload.refreshed":
+		if e.complexity.DeepRefreshPayload.Refreshed == nil {
+			break
+		}
+
+		return e.complexity.DeepRefreshPayload.Refreshed(childComplexity), true
+
 	case "DeleteCollectionPayload.gallery":
 		if e.complexity.DeleteCollectionPayload.Gallery == nil {
 			break
@@ -1542,6 +1559,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrCommunityNotFound.Message(childComplexity), true
+
+	case "ErrDeepRefreshFailed.message":
+		if e.complexity.ErrDeepRefreshFailed.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrDeepRefreshFailed.Message(childComplexity), true
 
 	case "ErrDoesNotOwnRequiredToken.message":
 		if e.complexity.ErrDoesNotOwnRequiredToken.Message == nil {
@@ -2125,6 +2149,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string)), true
+
+	case "Mutation.deepRefresh":
+		if e.complexity.Mutation.DeepRefresh == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deepRefresh_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeepRefresh(childComplexity, args["input"].(model.DeepRefreshInput)), true
 
 	case "Mutation.deleteCollection":
 		if e.complexity.Mutation.DeleteCollection == nil {
@@ -4183,6 +4219,23 @@ input GnosisSafeAuth {
     nonce: String!
 }
 
+input DeepRefreshInput {
+    chains: [Chain!]!
+}
+
+type DeepRefreshPayload {
+    refreshed: Boolean
+}
+
+type ErrDeepRefreshFailed implements Error {
+    message: String!
+}
+
+union DeepRefreshPayloadOrError =
+    DeepRefreshPayload
+    | ErrNotAuthorized
+    | ErrDeepRefreshFailed
+
 union LoginPayloadOrError =
     LoginPayload
     | ErrUserNotFound
@@ -4307,6 +4360,7 @@ type Mutation {
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
+    deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
@@ -4476,6 +4530,21 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 		}
 	}
 	args["bio"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deepRefresh_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.DeepRefreshInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNDeepRefreshInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -8163,6 +8232,38 @@ func (ec *executionContext) _CreateUserPayload_viewer(ctx context.Context, field
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _DeepRefreshPayload_refreshed(ctx context.Context, field graphql.CollectedField, obj *model.DeepRefreshPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "DeepRefreshPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Refreshed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.DeleteCollectionPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -8309,6 +8410,41 @@ func (ec *executionContext) _ErrCommunityNotFound_message(ctx context.Context, f
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ErrCommunityNotFound",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrDeepRefreshFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrDeepRefreshFailed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrDeepRefreshFailed",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -11608,6 +11744,65 @@ func (ec *executionContext) _Mutation_refreshContract(ctx context.Context, field
 	res := resTmp.(model.RefreshContractPayloadOrError)
 	fc.Result = res
 	return ec.marshalORefreshContractPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshContractPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_deepRefresh(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_deepRefresh_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeepRefresh(rctx, args["input"].(model.DeepRefreshInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.DeepRefreshPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.DeepRefreshPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.DeepRefreshPayloadOrError)
+	fc.Result = res
+	return ec.marshalODeepRefreshPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -17639,6 +17834,29 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputDeepRefreshInput(ctx context.Context, obj interface{}) (model.DeepRefreshInput, error) {
+	var it model.DeepRefreshInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "chains":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
+			it.Chains, err = ec.unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj interface{}) (model.EoaAuth, error) {
 	var it model.EoaAuth
 	asMap := map[string]interface{}{}
@@ -18274,6 +18492,36 @@ func (ec *executionContext) _CreateUserPayloadOrError(ctx context.Context, sel a
 	}
 }
 
+func (ec *executionContext) _DeepRefreshPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.DeepRefreshPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.DeepRefreshPayload:
+		return ec._DeepRefreshPayload(ctx, sel, &obj)
+	case *model.DeepRefreshPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._DeepRefreshPayload(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrDeepRefreshFailed:
+		return ec._ErrDeepRefreshFailed(ctx, sel, &obj)
+	case *model.ErrDeepRefreshFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrDeepRefreshFailed(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _DeleteCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.DeleteCollectionPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -18427,6 +18675,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrSyncFailed(ctx, sel, obj)
+	case model.ErrDeepRefreshFailed:
+		return ec._ErrDeepRefreshFailed(ctx, sel, &obj)
+	case *model.ErrDeepRefreshFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrDeepRefreshFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -20890,6 +21145,34 @@ func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.Sele
 	return out
 }
 
+var deepRefreshPayloadImplementors = []string{"DeepRefreshPayload", "DeepRefreshPayloadOrError"}
+
+func (ec *executionContext) _DeepRefreshPayload(ctx context.Context, sel ast.SelectionSet, obj *model.DeepRefreshPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deepRefreshPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeepRefreshPayload")
+		case "refreshed":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._DeepRefreshPayload_refreshed(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var deleteCollectionPayloadImplementors = []string{"DeleteCollectionPayload", "DeleteCollectionPayloadOrError"}
 
 func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel ast.SelectionSet, obj *model.DeleteCollectionPayload) graphql.Marshaler {
@@ -21024,6 +21307,37 @@ func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.S
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrCommunityNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errDeepRefreshFailedImplementors = []string{"ErrDeepRefreshFailed", "Error", "DeepRefreshPayloadOrError"}
+
+func (ec *executionContext) _ErrDeepRefreshFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDeepRefreshFailed) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errDeepRefreshFailedImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrDeepRefreshFailed")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrDeepRefreshFailed_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -21217,7 +21531,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -22472,6 +22786,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "refreshContract":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_refreshContract(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "deepRefresh":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deepRefresh(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -24959,6 +25280,67 @@ func (ec *executionContext) marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgallery
 	return v
 }
 
+func (ec *executionContext) unmarshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, v interface{}) ([]persist.Chain, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]persist.Chain, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Chain) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) marshalNChainAddress2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx context.Context, sel ast.SelectionSet, v *persist.ChainAddress) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -25094,6 +25476,11 @@ func (ec *executionContext) marshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalle
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNDeepRefreshInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshInput(ctx context.Context, v interface{}) (model.DeepRefreshInput, error) {
+	res, err := ec.unmarshalInputDeepRefreshInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v *model.GalleryUser) graphql.Marshaler {
@@ -26162,6 +26549,13 @@ func (ec *executionContext) unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgo�
 	}
 	res, err := ec.unmarshalInputDebugAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalODeepRefreshPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeepRefreshPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeepRefreshPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DeepRefreshPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeleteCollectionPayloadOrError) graphql.Marshaler {

@@ -877,6 +877,23 @@ input GnosisSafeAuth {
     nonce: String!
 }
 
+input DeepRefreshInput {
+    chains: [Chain!]!
+}
+
+type DeepRefreshPayload {
+    refreshed: Boolean
+}
+
+type ErrDeepRefreshFailed implements Error {
+    message: String!
+}
+
+union DeepRefreshPayloadOrError =
+    DeepRefreshPayload
+    | ErrNotAuthorized
+    | ErrDeepRefreshFailed
+
 union LoginPayloadOrError =
     LoginPayload
     | ErrUserNotFound
@@ -1001,6 +1018,7 @@ type Mutation {
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
+    deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 

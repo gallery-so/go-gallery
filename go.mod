@@ -73,6 +73,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
 	google.golang.org/api v0.72.0
 	google.golang.org/appengine v1.6.7

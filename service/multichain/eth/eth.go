@@ -231,6 +231,38 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	return nil
 }
 
+// DeepRefresh re-indexes a wallet address.
+func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address) error {
+	input := indexer.UpdateTokenMediaInput{
+		OwnerAddress: persist.EthereumAddress(ownerAddress.String()),
+		DeepRefresh:  true,
+	}
+
+	m, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(m)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", d.indexerBaseURL), buf)
+	if err != nil {
+		return err
+	}
+
+	res, err := d.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return util.GetErrFromResp(res)
+	}
+
+	return nil
+}
+
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain
 func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 

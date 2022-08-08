@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -338,4 +339,19 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 	}
 
 	return api.repos.TokenRepository.FlagTokensAsUserMarkedSpam(ctx, userID, tokens, isSpam)
+}
+
+func (api TokenAPI) DeepRefresh(ctx context.Context, chains []persist.Chain) error {
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("fullrefresh:%s", userID)
+	if err := api.throttler.Lock(ctx, key); err != nil {
+		return err
+	}
+	defer api.throttler.Unlock(ctx, key)
+
+	return api.multichainProvider.DeepRefresh(ctx, userID, chains)
 }

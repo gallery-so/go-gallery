@@ -67,6 +67,7 @@ type UpdateTokenMediaInput struct {
 	TokenID         persist.TokenID         `json:"token_id,omitempty"`
 	ContractAddress persist.EthereumAddress `json:"contract_address,omitempty"`
 	UpdateAll       bool                    `json:"update_all"`
+	DeepRefresh     bool                    `json:"deep_refresh"`
 }
 
 type tokenUpdate struct {
@@ -536,7 +537,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	return nil
 }
 
-func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) gin.HandlerFunc {
+func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := UpdateTokenMediaInput{}
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -544,13 +545,87 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 			return
 		}
 
-		err := refreshToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+		// A deep refresh processes a token completely as if being indexed for the first time.
+		var err error
+		if input.DeepRefresh {
+			err = deepRefresh(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, contractRepository, chain)
+		} else {
+			err = refreshToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+		}
+
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
+}
+
+func deepRefresh(ctx context.Context, input UpdateTokenMediaInput, tokenRepo persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, contractRepo persist.ContractRepository, chain persist.Chain) error {
+	transferEvents := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
+	indexer := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepo, contractRepo, chain, transferEvents)
+	plugins := NewTransferPlugins(ctx, indexer.ethClient, indexer.tokenRepo, indexer.storageClient)
+	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.prevOwners.in}
+	transferCh := make(chan []transfersAtBlock)
+
+	events := make([]common.Hash, len(indexer.eventHashes))
+	for i, event := range indexer.eventHashes {
+		events[i] = common.HexToHash(string(event))
+	}
+
+	// Don't refresh past where the indexer actually is
+	recentDBBlock, err := indexer.tokenRepo.MostRecentBlock(ctx)
+	if err != nil {
+		return err
+	}
+
+	wp := workerpool.New(defaultWorkerPoolSize)
+	for block := defaultStartingBlock; block <= recentDBBlock; block++ {
+		wp.Submit(func() {
+			ctx := sentryutil.NewSentryHubContext(ctx)
+			// Logs should be cached from past indexer runs.
+			logs := indexer.fetchLogs(ctx, block, [][]common.Hash{events})
+			transfers := logsToTransfers(ctx, logs)
+			transfers = filterTransfers(ctx, input, transfers)
+			transfersAtBlock := transfersToTransfersAtBlock(transfers)
+			batchTransfers(ctx, transferCh, transfersAtBlock)
+			go indexer.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
+			indexer.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.prevOwners.out, plugins.balances.out)
+		})
+	}
+	wp.StopWait()
+
+	return nil
+}
+
+func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers []rpc.Transfer) []rpc.Transfer {
+	result := make([]rpc.Transfer, 0)
+	var transferMatches func(transfer rpc.Transfer) bool
+
+	switch {
+	case input.OwnerAddress != "" && input.TokenID != "" && input.ContractAddress != "":
+		transferMatches = func(transfer rpc.Transfer) bool {
+			return (transfer.To == input.OwnerAddress || transfer.From == input.OwnerAddress) && transfer.TokenID == input.TokenID && transfer.ContractAddress == input.ContractAddress
+		}
+	case input.OwnerAddress != "" && input.ContractAddress != "":
+		transferMatches = func(transfer rpc.Transfer) bool {
+			return (transfer.To == input.OwnerAddress || transfer.From == input.OwnerAddress) && transfer.ContractAddress == input.ContractAddress
+		}
+	case input.OwnerAddress != "":
+		transferMatches = func(transfer rpc.Transfer) bool {
+			return transfer.To == input.OwnerAddress || transfer.From == input.OwnerAddress
+		}
+	default:
+		return result
+	}
+
+	for _, transfer := range transfers {
+		if transferMatches(transfer) {
+			result = append(result, transfer)
+		}
+	}
+
+	return result
 }
 
 // refreshToken will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket

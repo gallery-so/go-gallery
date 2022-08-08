@@ -12,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model.GalleryUser, error) {
@@ -528,6 +529,14 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 	}
 
 	return output, nil
+}
+
+func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error) {
+	err := publicapi.For(ctx).Token.DeepRefresh(ctx, input.Chains)
+	if err != nil {
+		return nil, err
+	}
+	return model.DeepRefreshPayload{Refreshed: util.BoolToPointer(true)}, nil
 }
 
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {

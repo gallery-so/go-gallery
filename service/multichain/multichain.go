@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"golang.org/x/sync/errgroup"
 )
 
 const staleCommunityTime = time.Hour * 2
@@ -128,6 +129,7 @@ type ChainProvider interface {
 	GetCommunityOwners(context.Context, persist.Address) ([]ChainAgnosticCommunityOwner, error)
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
 	RefreshContract(context.Context, persist.Address) error
+	DeepRefresh(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
 	UpdateMediaForWallet(context.Context, persist.Address, bool) error
 	// do we want to return the tokens we validate?
@@ -398,6 +400,44 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 		return nil, err
 	}
 	return holders, nil
+}
+
+// DeepRefresh re-indexes a user's wallets.
+func (d *Provider) DeepRefresh(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+	user, err := d.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	validChainsLookup := make(map[persist.Chain]bool)
+	for _, chain := range chains {
+		validChainsLookup[chain] = true
+	}
+
+	chainsToAddresses := make(map[persist.Chain][]persist.Address)
+	for _, wallet := range user.Wallets {
+		if validChainsLookup[wallet.Chain] {
+			chainsToAddresses[wallet.Chain] = append(chainsToAddresses[wallet.Chain], wallet.Address)
+		}
+	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+
+	for _, chain := range chains {
+		if _, ok := d.Chains[chain]; !ok {
+			continue
+		}
+		for _, provider := range d.Chains[chain] {
+			for _, wallet := range chainsToAddresses[chain] {
+				w := wallet
+				eg.Go(func() error {
+					return provider.DeepRefresh(ctx, w)
+				})
+			}
+		}
+	}
+
+	return eg.Wait()
 }
 
 // VerifySignature verifies a signature for a wallet address
