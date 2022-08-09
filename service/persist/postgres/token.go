@@ -512,7 +512,11 @@ func (t *TokenRepository) Upsert(pCtx context.Context, pToken persist.Token) err
 	if pToken.Quantity == "0" {
 		_, err = t.deleteStmt.ExecContext(pCtx, pToken.TokenID, pToken.ContractAddress, pToken.OwnerAddress)
 	} else {
-		_, err = t.upsert1155Stmt.ExecContext(pCtx, persist.GenerateID(), pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
+		if pToken.TokenType == persist.TokenTypeERC1155 {
+			_, err = t.upsert1155Stmt.ExecContext(pCtx, persist.GenerateID(), pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
+		} else if pToken.TokenType == persist.TokenTypeERC721 {
+			_, err = t.upsert721Stmt.ExecContext(pCtx, persist.GenerateID(), pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
+		}
 	}
 	return err
 }
