@@ -266,6 +266,11 @@ type CollectionToken implements Node
 }
 
 type CollectionLayout {
+    sections: [Int]
+    sectionLayout: [CollectionSectionLayout]
+}
+
+type CollectionSectionLayout {
     columns: Int
     whitespace: [Int]
 }
@@ -497,6 +502,11 @@ type Query {
 }
 
 input CollectionLayoutInput {
+    sections: [Int!]!
+    sectionLayout: [CollectionSectionLayoutInput!]!
+}
+
+input CollectionSectionLayoutInput {
     columns: Int!
     whitespace: [Int!]!
 }

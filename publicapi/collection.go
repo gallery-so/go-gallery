@@ -12,7 +12,11 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-const maxTokensPerCollection = 1000
+const (
+	maxTokensPerCollection         = 1000
+	maxSectionsPerCollection       = 100
+	currentCollectionSchemaVersion = 1
+)
 
 type CollectionAPI struct {
 	repos     *persist.Repositories
@@ -61,6 +65,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
 		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
+		"sections":       {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
 	}); err != nil {
 		return nil, err
 	}
@@ -93,6 +98,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
 		TokenSettings:  tokenSettings,
+		Version:        currentCollectionSchemaVersion,
 	}
 
 	collectionID, err := api.repos.CollectionRepository.Create(ctx, collection)
@@ -200,6 +206,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
 		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
+		"sections":     {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
 	}); err != nil {
 		return err
 	}
@@ -221,7 +228,12 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return err
 	}
 
-	update := persist.CollectionUpdateTokensInput{Tokens: tokens, Layout: layout, TokenSettings: tokenSettings}
+	update := persist.CollectionUpdateTokensInput{
+		Tokens:        tokens,
+		Layout:        layout,
+		TokenSettings: tokenSettings,
+		Version:       currentCollectionSchemaVersion,
+	}
 
 	err = api.repos.CollectionRepository.UpdateTokens(ctx, collectionID, userID, update)
 	if err != nil {

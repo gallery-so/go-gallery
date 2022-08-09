@@ -8,7 +8,6 @@ import (
 	"time"
 
 	sentry "github.com/getsentry/sentry-go"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
@@ -31,7 +30,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/site"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/spf13/viper"
 )
@@ -228,45 +226,4 @@ func newMultichainProvider(repos *persist.Repositories, ethClient *ethclient.Cli
 
 func newThrottler() *throttle.Locker {
 	return throttle.NewThrottleLocker(redis.NewCache(redis.RefreshNFTsThrottleDB), time.Minute*5)
-}
-
-func newFigure31Integration(ctx context.Context, repos *persist.Repositories, ethClient *ethclient.Client, httpClient *http.Client, pgx *pgxpool.Pool) *site.Figure31Integration {
-	if viper.GetString("FIGURE31_USER_ID") == "" {
-		panic("FIGURE31_USER_ID is not set")
-	}
-
-	if viper.GetString("FIGURE31_COLLECTION_ID") == "" {
-		panic("FIGURE31_COLLECTION_ID is not set")
-	}
-
-	if viper.GetString("FIGURE31_CONTRACT_ADDRESS") == "" {
-		panic("FIGURE31_CONTRACT_ADDRESS is not set")
-	}
-
-	if viper.GetString("FIGURE31_ADDRESS") == "" {
-		panic("FIGURE31_ADDRESS is not set")
-	}
-
-	if viper.GetInt("FIGURE31_COLUMN_COUNT") == 0 {
-		panic("FIGURE31_COLUMN_COUNT is not set")
-	}
-
-	if viper.GetInt("FIGURE31_COLLECTION_SIZE") == 0 {
-		panic("FIGURE31_COLLECTION_SIZE is not set")
-	}
-
-	return site.NewFigure31Integration(
-		dataloader.NewLoaders(ctx, sqlc.New(pgx)),
-		newMultichainProvider(repos, ethClient, httpClient),
-		repos,
-		pgx,
-		site.Figure31IntegrationInput{
-			UserID:         persist.DBID(viper.GetString("FIGURE31_USER_ID")),
-			CollectionID:   persist.DBID(viper.GetString("FIGURE31_COLLECTION_ID")),
-			ContractAddr:   viper.GetString("FIGURE31_CONTRACT_ADDRESS"),
-			ArtistAddr:     viper.GetString("FIGURE31_ADDRESS"),
-			ColumnCount:    viper.GetInt("FIGURE31_COLUMN_COUNT"),
-			CollectionSize: viper.GetInt("FIGURE31_COLLECTION_SIZE"),
-		},
-	)
 }

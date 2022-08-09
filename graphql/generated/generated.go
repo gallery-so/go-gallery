@@ -111,6 +111,11 @@ type ComplexityRoot struct {
 	}
 
 	CollectionLayout struct {
+		SectionLayout func(childComplexity int) int
+		Sections      func(childComplexity int) int
+	}
+
+	CollectionSectionLayout struct {
 		Columns    func(childComplexity int) int
 		Whitespace func(childComplexity int) int
 	}
@@ -859,19 +864,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CollectionCreatedFeedEventData.Owner(childComplexity), true
 
-	case "CollectionLayout.columns":
-		if e.complexity.CollectionLayout.Columns == nil {
+	case "CollectionLayout.sectionLayout":
+		if e.complexity.CollectionLayout.SectionLayout == nil {
 			break
 		}
 
-		return e.complexity.CollectionLayout.Columns(childComplexity), true
+		return e.complexity.CollectionLayout.SectionLayout(childComplexity), true
 
-	case "CollectionLayout.whitespace":
-		if e.complexity.CollectionLayout.Whitespace == nil {
+	case "CollectionLayout.sections":
+		if e.complexity.CollectionLayout.Sections == nil {
 			break
 		}
 
-		return e.complexity.CollectionLayout.Whitespace(childComplexity), true
+		return e.complexity.CollectionLayout.Sections(childComplexity), true
+
+	case "CollectionSectionLayout.columns":
+		if e.complexity.CollectionSectionLayout.Columns == nil {
+			break
+		}
+
+		return e.complexity.CollectionSectionLayout.Columns(childComplexity), true
+
+	case "CollectionSectionLayout.whitespace":
+		if e.complexity.CollectionSectionLayout.Whitespace == nil {
+			break
+		}
+
+		return e.complexity.CollectionSectionLayout.Whitespace(childComplexity), true
 
 	case "CollectionToken.collection":
 		if e.complexity.CollectionToken.Collection == nil {
@@ -2981,6 +3000,11 @@ type CollectionToken implements Node
 }
 
 type CollectionLayout {
+    sections: [Int]
+    sectionLayout: [CollectionSectionLayout]
+}
+
+type CollectionSectionLayout {
     columns: Int
     whitespace: [Int]
 }
@@ -3212,6 +3236,11 @@ type Query {
 }
 
 input CollectionLayoutInput {
+    sections: [Int!]!
+    sectionLayout: [CollectionSectionLayoutInput!]!
+}
+
+input CollectionSectionLayoutInput {
     columns: Int!
     whitespace: [Int!]!
 }
@@ -4934,7 +4963,7 @@ func (ec *executionContext) _CollectionCreatedFeedEventData_newTokens(ctx contex
 	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionLayout_columns(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionLayout_sections(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4943,6 +4972,70 @@ func (ec *executionContext) _CollectionLayout_columns(ctx context.Context, field
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "CollectionLayout",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Sections, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚕᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionLayout_sectionLayout(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionLayout",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SectionLayout, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CollectionSectionLayout)
+	fc.Result = res
+	return ec.marshalOCollectionSectionLayout2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayout(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionSectionLayout_columns(ctx context.Context, field graphql.CollectedField, obj *model.CollectionSectionLayout) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionSectionLayout",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -4966,7 +5059,7 @@ func (ec *executionContext) _CollectionLayout_columns(ctx context.Context, field
 	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _CollectionLayout_whitespace(ctx context.Context, field graphql.CollectedField, obj *model.CollectionLayout) (ret graphql.Marshaler) {
+func (ec *executionContext) _CollectionSectionLayout_whitespace(ctx context.Context, field graphql.CollectedField, obj *model.CollectionSectionLayout) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -4974,7 +5067,7 @@ func (ec *executionContext) _CollectionLayout_whitespace(ctx context.Context, fi
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "CollectionLayout",
+		Object:     "CollectionSectionLayout",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -14427,6 +14520,37 @@ func (ec *executionContext) unmarshalInputCollectionLayoutInput(ctx context.Cont
 
 	for k, v := range asMap {
 		switch k {
+		case "sections":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sections"))
+			it.Sections, err = ec.unmarshalNInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "sectionLayout":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sectionLayout"))
+			it.SectionLayout, err = ec.unmarshalNCollectionSectionLayoutInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayoutInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputCollectionSectionLayoutInput(ctx context.Context, obj interface{}) (model.CollectionSectionLayoutInput, error) {
+	var it model.CollectionSectionLayoutInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
 		case "columns":
 			var err error
 
@@ -16646,16 +16770,51 @@ func (ec *executionContext) _CollectionLayout(ctx context.Context, sel ast.Selec
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("CollectionLayout")
+		case "sections":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionLayout_sections(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "sectionLayout":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionLayout_sectionLayout(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionSectionLayoutImplementors = []string{"CollectionSectionLayout"}
+
+func (ec *executionContext) _CollectionSectionLayout(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionSectionLayout) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionSectionLayoutImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionSectionLayout")
 		case "columns":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionLayout_columns(ctx, field, obj)
+				return ec._CollectionSectionLayout_columns(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
 		case "whitespace":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionLayout_whitespace(ctx, field, obj)
+				return ec._CollectionSectionLayout_whitespace(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -20902,6 +21061,28 @@ func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmi
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCollectionSectionLayoutInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayoutInputᚄ(ctx context.Context, v interface{}) ([]*model.CollectionSectionLayoutInput, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*model.CollectionSectionLayoutInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNCollectionSectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayoutInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNCollectionSectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionSectionLayoutInput, error) {
+	res, err := ec.unmarshalInputCollectionSectionLayoutInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInputᚄ(ctx context.Context, v interface{}) ([]*model.CollectionTokenSettingsInput, error) {
 	var vSlice []interface{}
 	if v != nil {
@@ -21615,6 +21796,54 @@ func (ec *executionContext) marshalOCollectionLayout2ᚖgithubᚗcomᚋmikeydub�
 		return graphql.Null
 	}
 	return ec._CollectionLayout(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCollectionSectionLayout2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayout(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionSectionLayout) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOCollectionSectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayout(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOCollectionSectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionSectionLayout(ctx context.Context, sel ast.SelectionSet, v *model.CollectionSectionLayout) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CollectionSectionLayout(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionToken) graphql.Marshaler {
