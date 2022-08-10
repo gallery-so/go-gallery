@@ -2,7 +2,9 @@ package multichain
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"sort"
 	"sync"
 	"time"
@@ -242,6 +244,8 @@ outer:
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
 
+	logger.For(ctx).Warn("preparing to delete old tokens")
+
 	// ensure all old tokens are deleted
 	ownedTokens := make(map[tokenIdentifiers]bool)
 	for _, t := range newTokens {
@@ -254,6 +258,7 @@ outer:
 	}
 	for _, nft := range allUsersNFTs {
 		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
+			logger.For(ctx).Warnf("deleting nft %s-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
 			err := d.TokenRepo.DeleteByID(ctx, nft.ID)
 			if err != nil {
 				return err
@@ -357,6 +362,11 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 	for _, chainToken := range tokens {
 		for _, token := range chainToken.tokens {
 
+			if token.Quantity.BigInt().Cmp(big.NewInt(0)) == 0 {
+				logger.For(ctx).Warnf("skipping token %s with quantity 0", token.Name)
+				continue
+			}
+
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
 			if it, ok := seenTokens[ti]; ok {
@@ -375,8 +385,16 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 					seenWallets[ti] = append(seenWallets[ti], w)
 				}
 				if q, ok := seenQuantities[ti]; ok {
+					if token.Name == "aspiring chad" {
+						asJSON, _ := json.MarshalIndent(token, "", "  ")
+						logger.For(ctx).Warnf("t quantity again %s | %s", token.Quantity, string(asJSON))
+					}
 					seenQuantities[ti] = q.Add(token.Quantity)
 				} else {
+					if token.Name == "aspiring chad" {
+						asJSON, _ := json.MarshalIndent(token, "", "  ")
+						logger.For(ctx).Warnf("t quantity %s | %s", token.Quantity, string(asJSON))
+					}
 					seenQuantities[ti] = token.Quantity
 				}
 			}

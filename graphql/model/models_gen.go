@@ -91,6 +91,10 @@ type Node interface {
 	IsNode()
 }
 
+type RefreshCollectionPayloadOrError interface {
+	IsRefreshCollectionPayloadOrError()
+}
+
 type RefreshContractPayloadOrError interface {
 	IsRefreshContractPayloadOrError()
 }
@@ -206,11 +210,21 @@ type CollectionCreatedFeedEventData struct {
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}
 
 type CollectionLayout struct {
+	Sections      []*int                     `json:"sections"`
+	SectionLayout []*CollectionSectionLayout `json:"sectionLayout"`
+}
+
+type CollectionLayoutInput struct {
+	Sections      []int                           `json:"sections"`
+	SectionLayout []*CollectionSectionLayoutInput `json:"sectionLayout"`
+}
+
+type CollectionSectionLayout struct {
 	Columns    *int   `json:"columns"`
 	Whitespace []*int `json:"whitespace"`
 }
 
-type CollectionLayoutInput struct {
+type CollectionSectionLayoutInput struct {
 	Columns    int   `json:"columns"`
 	Whitespace []int `json:"whitespace"`
 }
@@ -392,6 +406,7 @@ func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
 func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrInvalidInput) IsRefreshTokenPayloadOrError()             {}
+func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()        {}
 func (ErrInvalidInput) IsRefreshContractPayloadOrError()          {}
 func (ErrInvalidInput) IsError()                                  {}
 func (ErrInvalidInput) IsCreateUserPayloadOrError()               {}
@@ -435,10 +450,11 @@ type ErrSyncFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrSyncFailed) IsSyncTokensPayloadOrError()      {}
-func (ErrSyncFailed) IsRefreshTokenPayloadOrError()    {}
-func (ErrSyncFailed) IsRefreshContractPayloadOrError() {}
-func (ErrSyncFailed) IsError()                         {}
+func (ErrSyncFailed) IsSyncTokensPayloadOrError()        {}
+func (ErrSyncFailed) IsRefreshTokenPayloadOrError()      {}
+func (ErrSyncFailed) IsRefreshCollectionPayloadOrError() {}
+func (ErrSyncFailed) IsRefreshContractPayloadOrError()   {}
+func (ErrSyncFailed) IsError()                           {}
 
 type ErrTokenNotFound struct {
 	Message string `json:"message"`
@@ -637,6 +653,12 @@ type PreviewURLSet struct {
 	Large     *string `json:"large"`
 	SrcSet    *string `json:"srcSet"`
 }
+
+type RefreshCollectionPayload struct {
+	Collection *Collection `json:"collection"`
+}
+
+func (RefreshCollectionPayload) IsRefreshCollectionPayloadOrError() {}
 
 type RefreshContractPayload struct {
 	Contract *Contract `json:"contract"`

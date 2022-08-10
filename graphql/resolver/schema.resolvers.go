@@ -202,9 +202,17 @@ func (r *mutationResolver) UpdateGalleryCollections(ctx context.Context, input m
 func (r *mutationResolver) CreateCollection(ctx context.Context, input model.CreateCollectionInput) (model.CreateCollectionPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
+	sectionLayout := make([]persist.CollectionSectionLayout, len(input.Layout.SectionLayout))
+	for i, layout := range input.Layout.SectionLayout {
+		sectionLayout[i] = persist.CollectionSectionLayout{
+			Columns:    persist.NullInt32(layout.Columns),
+			Whitespace: layout.Whitespace,
+		}
+	}
+
 	layout := persist.TokenLayout{
-		Columns:    persist.NullInt32(input.Layout.Columns),
-		Whitespace: input.Layout.Whitespace,
+		Sections:      persist.StandardizeCollectionSections(input.Layout.Sections),
+		SectionLayout: sectionLayout,
 	}
 
 	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
@@ -278,9 +286,17 @@ func (r *mutationResolver) UpdateCollectionInfo(ctx context.Context, input model
 func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input model.UpdateCollectionTokensInput) (model.UpdateCollectionTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
+	sectionLayout := make([]persist.CollectionSectionLayout, len(input.Layout.SectionLayout))
+	for i, layout := range input.Layout.SectionLayout {
+		sectionLayout[i] = persist.CollectionSectionLayout{
+			Columns:    persist.NullInt32(layout.Columns),
+			Whitespace: layout.Whitespace,
+		}
+	}
+
 	layout := persist.TokenLayout{
-		Columns:    persist.NullInt32(input.Layout.Columns),
-		Whitespace: input.Layout.Whitespace,
+		Sections:      persist.StandardizeCollectionSections(input.Layout.Sections),
+		SectionLayout: sectionLayout,
 	}
 
 	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
@@ -380,6 +396,26 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, tokenID persist.DBI
 
 	output := &model.RefreshTokenPayload{
 		Token: token,
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	err := api.Token.RefreshCollection(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	collection, err := resolveCollectionByCollectionID(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RefreshCollectionPayload{
+		Collection: collection,
 	}
 
 	return output, nil

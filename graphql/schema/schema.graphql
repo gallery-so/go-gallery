@@ -267,6 +267,11 @@ type CollectionToken implements Node
 }
 
 type CollectionLayout {
+    sections: [Int]
+    sectionLayout: [CollectionSectionLayout]
+}
+
+type CollectionSectionLayout {
     columns: Int
     whitespace: [Int]
 }
@@ -498,6 +503,11 @@ type Query {
 }
 
 input CollectionLayoutInput {
+    sections: [Int!]!
+    sectionLayout: [CollectionSectionLayoutInput!]!
+}
+
+input CollectionSectionLayoutInput {
     columns: Int!
     whitespace: [Int!]!
 }
@@ -663,6 +673,15 @@ union RefreshTokenPayloadOrError =
 
 type RefreshTokenPayload {
     token: Token
+}
+
+union RefreshCollectionPayloadOrError =
+    RefreshCollectionPayload
+  | ErrInvalidInput
+  | ErrSyncFailed
+
+type RefreshCollectionPayload {
+    collection: Collection
 }
 
 union RefreshContractPayloadOrError =
@@ -847,6 +866,7 @@ type Mutation {
 
     syncTokens: SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
+    refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
