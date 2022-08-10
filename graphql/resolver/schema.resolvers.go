@@ -366,10 +366,14 @@ func (r *mutationResolver) UpdateTokenInfo(ctx context.Context, input model.Upda
 	return output, nil
 }
 
-func (r *mutationResolver) SyncTokens(ctx context.Context) (model.SyncTokensPayloadOrError, error) {
+func (r *mutationResolver) SyncTokens(ctx context.Context, chains []*persist.Chain) (model.SyncTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.Token.SyncTokens(ctx)
+	newChains := make([]persist.Chain, len(chains))
+	for i, chain := range chains {
+		newChains[i] = *chain
+	}
+	err := api.Token.SyncTokens(ctx, newChains)
 	if err != nil {
 		return nil, err
 	}

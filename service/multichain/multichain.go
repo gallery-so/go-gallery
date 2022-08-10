@@ -138,17 +138,24 @@ func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGall
 
 // SyncTokens updates the media for all tokens for a user
 // TODO consider updating contracts as well
-func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
+func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 	user, err := d.UserRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err
+	}
+	validChains := make(map[persist.Chain]bool)
+	for _, chain := range chains {
+		validChains[chain] = true
 	}
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := make(map[persist.Chain][]persist.Address)
 	for _, wallet := range user.Wallets {
-		chainsToAddresses[wallet.Chain] = append(chainsToAddresses[wallet.Chain], wallet.Address)
+
+		if validChains[wallet.Chain] {
+			chainsToAddresses[wallet.Chain] = append(chainsToAddresses[wallet.Chain], wallet.Address)
+		}
 	}
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
@@ -257,6 +264,9 @@ outer:
 		return err
 	}
 	for _, nft := range allUsersNFTs {
+		if !validChains[nft.Chain] {
+			continue
+		}
 		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
 			logger.For(ctx).Warnf("deleting nft %s-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
 			err := d.TokenRepo.DeleteByID(ctx, nft.ID)

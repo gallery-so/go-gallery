@@ -864,7 +864,7 @@ type Mutation {
     # Token Mutations
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
-    syncTokens: SyncTokensPayloadOrError @authRequired
+    syncTokens(chains: [Chain]): SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError

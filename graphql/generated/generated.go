@@ -362,7 +362,7 @@ type ComplexityRoot struct {
 		RefreshContract          func(childComplexity int, contractID persist.DBID) int
 		RefreshToken             func(childComplexity int, tokenID persist.DBID) int
 		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
-		SyncTokens               func(childComplexity int) int
+		SyncTokens               func(childComplexity int, chains []*persist.Chain) int
 		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
@@ -620,7 +620,7 @@ type MutationResolver interface {
 	UpdateCollectionTokens(ctx context.Context, input model.UpdateCollectionTokensInput) (model.UpdateCollectionTokensPayloadOrError, error)
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
-	SyncTokens(ctx context.Context) (model.SyncTokensPayloadOrError, error)
+	SyncTokens(ctx context.Context, chains []*persist.Chain) (model.SyncTokensPayloadOrError, error)
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
@@ -1799,7 +1799,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Mutation.SyncTokens(childComplexity), true
+		args, err := ec.field_Mutation_syncTokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]*persist.Chain)), true
 
 	case "Mutation.unfollowUser":
 		if e.complexity.Mutation.UnfollowUser == nil {
@@ -3598,7 +3603,7 @@ type Mutation {
     # Token Mutations
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
 
-    syncTokens: SyncTokensPayloadOrError @authRequired
+    syncTokens(chains: [Chain]): SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -3824,6 +3829,21 @@ func (ec *executionContext) field_Mutation_removeUserWallets_args(ctx context.Co
 		}
 	}
 	args["walletIds"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_syncTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []*persist.Chain
+	if tmp, ok := rawArgs["chains"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
+		arg0, err = ec.unmarshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chains"] = arg0
 	return args, nil
 }
 
@@ -9285,10 +9305,17 @@ func (ec *executionContext) _Mutation_syncTokens(ctx context.Context, field grap
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_syncTokens_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().SyncTokens(rctx)
+			return ec.resolvers.Mutation().SyncTokens(rctx, args["chains"].([]*persist.Chain))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -21645,6 +21672,67 @@ func (ec *executionContext) unmarshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgalle
 
 func (ec *executionContext) marshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v persist.Chain) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) unmarshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) ([]*persist.Chain, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*persist.Chain, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v []*persist.Chain) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) (*persist.Chain, error) {

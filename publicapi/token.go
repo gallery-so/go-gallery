@@ -117,7 +117,7 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	return tokens, nil
 }
 
-func (api TokenAPI) SyncTokens(ctx context.Context) error {
+func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) error {
 	// No validation to do
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
@@ -129,7 +129,11 @@ func (api TokenAPI) SyncTokens(ctx context.Context) error {
 	}
 	defer api.throttler.Unlock(ctx, userID.String())
 
-	err = api.multichainProvider.SyncTokens(ctx, userID)
+	if len(chains) == 0 {
+		chains = []persist.Chain{persist.ChainETH}
+	}
+
+	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
 	if err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
 		return ErrTokenRefreshFailed{Message: err.Error()}
