@@ -259,23 +259,24 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
-	res.ThumbnailURL = persist.NullString(getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient))
+	thumb := getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient)
+	res.ThumbnailURL = persist.NullString(thumb)
 	return res
 }
 
 func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
-	if imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, imageURL)
-		return imageURL
-	} else if imageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, imageURL)
-		return imageURL
-	} else if imageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, imageURL)
-		return imageURL
+	if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, storageImageURL)
+		return storageImageURL
+	} else if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, storageImageURL)
+		return storageImageURL
+	} else if storageImageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, storageImageURL)
+		return storageImageURL
 	} else if imgURL != "" {
 		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
-		return imageURL
+		return imgURL
 	}
 	return ""
 }
