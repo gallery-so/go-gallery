@@ -123,6 +123,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"SetSpamPreferencePayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SetSpamPreferencePayloadOrError)
+		return obj, ok
+	},
+
 	"SyncTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SyncTokensPayloadOrError)
 		return obj, ok

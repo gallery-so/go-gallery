@@ -202,27 +202,29 @@ type Nonce struct {
 }
 
 type Token struct {
-	ID               persist.DBID
-	Deleted          bool
-	Version          sql.NullInt32
-	CreatedAt        time.Time
-	LastUpdated      time.Time
-	Name             sql.NullString
-	Description      sql.NullString
-	CollectorsNote   sql.NullString
-	Media            pgtype.JSONB
-	TokenUri         sql.NullString
-	TokenType        sql.NullString
-	TokenID          sql.NullString
-	Quantity         sql.NullString
-	OwnershipHistory []pgtype.JSONB
-	TokenMetadata    pgtype.JSONB
-	ExternalUrl      sql.NullString
-	BlockNumber      sql.NullInt64
-	OwnerUserID      persist.DBID
-	OwnedByWallets   persist.DBIDList
-	Chain            sql.NullInt32
-	Contract         persist.DBID
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	CreatedAt            time.Time
+	LastUpdated          time.Time
+	Name                 sql.NullString
+	Description          sql.NullString
+	CollectorsNote       sql.NullString
+	Media                pgtype.JSONB
+	TokenUri             sql.NullString
+	TokenType            sql.NullString
+	TokenID              sql.NullString
+	Quantity             sql.NullString
+	OwnershipHistory     []pgtype.JSONB
+	TokenMetadata        pgtype.JSONB
+	ExternalUrl          sql.NullString
+	BlockNumber          sql.NullInt64
+	OwnerUserID          persist.DBID
+	OwnedByWallets       persist.DBIDList
+	Chain                sql.NullInt32
+	Contract             persist.DBID
+	IsUserMarkedSpam     sql.NullBool
+	IsProviderMarkedSpam sql.NullBool
 }
 
 type User struct {

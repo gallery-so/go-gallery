@@ -91,6 +91,11 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, err
 	}
 
+	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
+	if err != nil {
+		return nil, err
+	}
+
 	collection := persist.CollectionDB{
 		OwnerUserID:    userID,
 		Tokens:         tokens,
@@ -224,6 +229,11 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	}
 
 	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
 	if err != nil {
 		return err
 	}

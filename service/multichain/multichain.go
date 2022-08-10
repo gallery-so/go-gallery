@@ -47,6 +47,7 @@ type ChainAgnosticToken struct {
 	ExternalURL string `json:"external_url"`
 
 	BlockNumber persist.BlockNumber `json:"block_number"`
+	IsSpam      *bool               `json:"is_spam"`
 }
 
 // ChainAgnosticAddressAtBlock is an address at a block
@@ -410,21 +411,22 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			}
 
 			t := persist.TokenGallery{
-				Media:            token.Media,
-				TokenType:        token.TokenType,
-				Chain:            chainToken.chain,
-				Name:             persist.NullString(token.Name),
-				Description:      persist.NullString(token.Description),
-				TokenURI:         token.TokenURI,
-				TokenID:          token.TokenID,
-				Quantity:         seenQuantities[ti],
-				OwnerUserID:      ownerUser.ID,
-				OwnedByWallets:   seenWallets[ti],
-				OwnershipHistory: ownership,
-				TokenMetadata:    token.TokenMetadata,
-				Contract:         contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
-				ExternalURL:      persist.NullString(token.ExternalURL),
-				BlockNumber:      token.BlockNumber,
+				Media:                token.Media,
+				TokenType:            token.TokenType,
+				Chain:                chainToken.chain,
+				Name:                 persist.NullString(token.Name),
+				Description:          persist.NullString(token.Description),
+				TokenURI:             token.TokenURI,
+				TokenID:              token.TokenID,
+				Quantity:             seenQuantities[ti],
+				OwnerUserID:          ownerUser.ID,
+				OwnedByWallets:       seenWallets[ti],
+				OwnershipHistory:     ownership,
+				TokenMetadata:        token.TokenMetadata,
+				Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
+				ExternalURL:          persist.NullString(token.ExternalURL),
+				BlockNumber:          token.BlockNumber,
+				IsProviderMarkedSpam: token.IsSpam,
 			}
 			seenTokens[ti] = t
 		}
