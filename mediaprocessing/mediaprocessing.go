@@ -24,7 +24,7 @@ import (
 // InitServer initializes the indexer server
 func InitServer() {
 	router := coreInitServer()
-	logger.For(nil).Info("Starting indexer server...")
+	logger.For(nil).Info("Starting mediaprocessing server...")
 	http.Handle("/", router)
 }
 

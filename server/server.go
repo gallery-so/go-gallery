@@ -128,7 +128,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
-	viper.SetDefault("MEDIA_PROCESSING_URL", "localhost:7000")
+	viper.SetDefault("MEDIA_PROCESSING_URL", "localhost:6500")
 	viper.SetDefault("TEZOS_API_URL", "https://api.ghostnet.tzkt.io")
 
 	viper.AutomaticEnv()
