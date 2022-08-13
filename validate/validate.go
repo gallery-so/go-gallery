@@ -53,6 +53,9 @@ var bannedUsernames = map[string]bool{
 	"careers":       true,
 	"maintenance":   true,
 	"home":          true,
+	"shop":          true,
+	"chain":         true,
+	"profile":       true,
 }
 
 var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile("^[\\w.]*$")
