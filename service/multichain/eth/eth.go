@@ -413,6 +413,7 @@ func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticTok
 			TokenMetadata:    token.TokenMetadata,
 			ExternalURL:      token.ExternalURL.String(),
 			BlockNumber:      token.BlockNumber,
+			IsSpam:           token.IsSpam,
 		}
 	}
 	return res

@@ -197,6 +197,9 @@ func initLogger() {
 // configureRootContext configures the main context from which other contexts are derived.
 func configureRootContext() context.Context {
 	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
+	if viper.GetString("ENV") != "production" {
+		logger.For(ctx).Logger.SetLevel((logrus.DebugLevel))
+	}
 	logger.For(ctx).Logger.SetReportCaller(true)
 	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
 	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())

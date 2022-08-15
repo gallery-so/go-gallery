@@ -17,28 +17,21 @@ import (
 // TokenRepository represents a postgres repository for tokens
 type TokenRepository struct {
 	db                                      *sql.DB
-	createStmt                              *sql.Stmt
 	getByWalletStmt                         *sql.Stmt
 	getByWalletPaginateStmt                 *sql.Stmt
 	getByContractStmt                       *sql.Stmt
 	getByContractPaginateStmt               *sql.Stmt
-	getByTokenIDStmt                        *sql.Stmt
-	getByTokenIDPaginateStmt                *sql.Stmt
 	getByTokenIdentifiersStmt               *sql.Stmt
 	getByTokenIdentifiersPaginateStmt       *sql.Stmt
 	getByIdentifiersStmt                    *sql.Stmt
 	getMetadataByTokenIdentifiersStmt       *sql.Stmt
-	getByIDStmt                             *sql.Stmt
-	updateMediaStmt                         *sql.Stmt
 	updateMediaUnsafeStmt                   *sql.Stmt
 	updateOwnerUnsafeStmt                   *sql.Stmt
 	updateBalanceUnsafeStmt                 *sql.Stmt
 	updateMediaByTokenIdentifiersUnsafeStmt *sql.Stmt
 	mostRecentBlockStmt                     *sql.Stmt
-	countTokensStmt                         *sql.Stmt
 	upsert721Stmt                           *sql.Stmt
 	upsert1155Stmt                          *sql.Stmt
-	deleteBalanceZeroStmt                   *sql.Stmt
 	deleteStmt                              *sql.Stmt
 	deleteByIDStmt                          *sql.Stmt
 }
@@ -48,31 +41,22 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,VERSION,MEDIA,TOKEN_METADATA,TOKEN_TYPE,TOKEN_ID,CHAIN,NAME,DESCRIPTION,EXTERNAL_URL,BLOCK_NUMBER,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,CONTRACT_ADDRESS) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING ID;`)
+	getByWalletStmt, err := db.PrepareContext(ctx, `SELECT t.ID,t.MEDIA,t.TOKEN_TYPE,t.CHAIN,t.NAME,t.DESCRIPTION,t.TOKEN_ID,t.TOKEN_URI,t.QUANTITY,t.OWNER_ADDRESS,t.OWNERSHIP_HISTORY,t.TOKEN_METADATA,t.CONTRACT_ADDRESS,t.EXTERNAL_URL,t.BLOCK_NUMBER,t.VERSION,t.CREATED_AT,t.LAST_UPDATED,t.IS_SPAM,c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM tokens t INNER JOIN contracts c ON c.ADDRESS = t.CONTRACT_ADDRESS WHERE t.OWNER_ADDRESS = $1 ORDER BY t.BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
-	getByWalletStmt, err := db.PrepareContext(ctx, `SELECT t.ID,t.MEDIA,t.TOKEN_TYPE,t.CHAIN,t.NAME,t.DESCRIPTION,t.TOKEN_ID,t.TOKEN_URI,t.QUANTITY,t.OWNER_ADDRESS,t.OWNERSHIP_HISTORY,t.TOKEN_METADATA,t.CONTRACT_ADDRESS,t.EXTERNAL_URL,t.BLOCK_NUMBER,t.VERSION,t.CREATED_AT,t.LAST_UPDATED,c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM tokens t INNER JOIN contracts c ON c.ADDRESS = t.CONTRACT_ADDRESS WHERE t.OWNER_ADDRESS = $1 ORDER BY t.BLOCK_NUMBER DESC;`)
+	getByWalletPaginateStmt, err := db.PrepareContext(ctx, `SELECT t.ID,t.MEDIA,t.TOKEN_TYPE,t.CHAIN,t.NAME,t.DESCRIPTION,t.TOKEN_ID,t.TOKEN_URI,t.QUANTITY,t.OWNER_ADDRESS,t.OWNERSHIP_HISTORY,t.TOKEN_METADATA,t.CONTRACT_ADDRESS,t.EXTERNAL_URL,t.BLOCK_NUMBER,t.VERSION,t.CREATED_AT,t.LAST_UPDATED,t.IS_SPAM,c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM tokens t INNER JOIN contracts c ON c.ADDRESS = t.CONTRACT_ADDRESS WHERE t.OWNER_ADDRESS = $1 ORDER BY t.BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
 	checkNoErr(err)
 
-	getByWalletPaginateStmt, err := db.PrepareContext(ctx, `SELECT t.ID,t.MEDIA,t.TOKEN_TYPE,t.CHAIN,t.NAME,t.DESCRIPTION,t.TOKEN_ID,t.TOKEN_URI,t.QUANTITY,t.OWNER_ADDRESS,t.OWNERSHIP_HISTORY,t.TOKEN_METADATA,t.CONTRACT_ADDRESS,t.EXTERNAL_URL,t.BLOCK_NUMBER,t.VERSION,t.CREATED_AT,t.LAST_UPDATED,c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM tokens t INNER JOIN contracts c ON c.ADDRESS = t.CONTRACT_ADDRESS WHERE t.OWNER_ADDRESS = $1 ORDER BY t.BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
+	getByContractStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
-	getByContractStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC;`)
+	getByContractPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
 	checkNoErr(err)
 
-	getByContractPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
+	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
-	getByTokenIDStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 ORDER BY BLOCK_NUMBER DESC;`)
-	checkNoErr(err)
-
-	getByTokenIDPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 ORDER BY BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
-	checkNoErr(err)
-
-	getByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC;`)
-	checkNoErr(err)
-
-	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
+	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
 	checkNoErr(err)
 
 	getByIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
@@ -81,13 +65,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	getMetadataByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI,TOKEN_METADATA,MEDIA FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
 	checkNoErr(err)
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE ID = $1;`)
-	checkNoErr(err)
-
 	updateMediaUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE ID = $7;`)
-	checkNoErr(err)
-
-	updateMediaStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE ID = $7 AND OWNER_ADDRESS = ANY($8);`)
 	checkNoErr(err)
 
 	updateOwnerUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET OWNER_ADDRESS = $1, OWNERSHIP_HISTORY = $2 || OWNERSHIP_HISTORY, BLOCK_NUMBER = $3, LAST_UPDATED = $4 WHERE ID = $5;`)
@@ -102,16 +80,10 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	mostRecentBlockStmt, err := db.PrepareContext(ctx, `SELECT MAX(BLOCK_NUMBER) FROM tokens;`)
 	checkNoErr(err)
 
-	countTokensStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) FROM tokens;`)
-	checkNoErr(err)
-
 	upsert721Stmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) WHERE TOKEN_TYPE = 'ERC-721' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
 	checkNoErr(err)
 
 	upsert1155Stmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
-	checkNoErr(err)
-
-	deleteBalanceZeroStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE QUANTITY = '0';`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
@@ -122,7 +94,6 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 
 	return &TokenRepository{
 		db:                                      db,
-		createStmt:                              createStmt,
 		getByWalletStmt:                         getByWalletStmt,
 		getByWalletPaginateStmt:                 getByWalletPaginateStmt,
 		getByContractStmt:                       getByContractStmt,
@@ -130,70 +101,18 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		getByTokenIdentifiersStmt:               getByTokenIdentifiersStmt,
 		getByTokenIdentifiersPaginateStmt:       getByTokenIdentifiersPaginateStmt,
 		getMetadataByTokenIdentifiersStmt:       getMetadataByTokenIdentifiersStmt,
-		getByIDStmt:                             getByIDStmt,
 		updateMediaUnsafeStmt:                   updateMediaUnsafeStmt,
-		updateMediaStmt:                         updateMediaStmt,
 		updateOwnerUnsafeStmt:                   updateOwnerUnsafeStmt,
 		updateBalanceUnsafeStmt:                 updateBalanceUnsafeStmt,
 		updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt,
 		mostRecentBlockStmt:                     mostRecentBlockStmt,
-		countTokensStmt:                         countTokensStmt,
 		upsert721Stmt:                           upsert721Stmt,
 		upsert1155Stmt:                          upsert1155Stmt,
-		deleteBalanceZeroStmt:                   deleteBalanceZeroStmt,
 		deleteStmt:                              deleteStmt,
-		getByTokenIDStmt:                        getByTokenIDStmt,
-		getByTokenIDPaginateStmt:                getByTokenIDPaginateStmt,
 		deleteByIDStmt:                          deleteByIDStmt,
 		getByIdentifiersStmt:                    getByIdentifiersStmt,
 	}
 
-}
-
-// CreateBulk creates many tokens in the database
-func (t *TokenRepository) CreateBulk(pCtx context.Context, pTokens []persist.Token) ([]persist.DBID, error) {
-	insertSQL := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION) VALUES `
-	vals := make([]interface{}, 0, len(pTokens)*15)
-	for i, token := range pTokens {
-		insertSQL += generateValuesPlaceholders(15, i*15) + ","
-		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version)
-	}
-	insertSQL = insertSQL[:len(insertSQL)-1]
-	insertSQL += " RETURNING ID"
-
-	rows, err := t.db.QueryContext(pCtx, insertSQL, vals...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	ids := make([]persist.DBID, 0, len(pTokens))
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, persist.DBID(id))
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return ids, nil
-
-}
-
-// Create creates a token in the database
-func (t *TokenRepository) Create(pCtx context.Context, pToken persist.Token) (persist.DBID, error) {
-
-	var id persist.DBID
-	err := t.createStmt.QueryRowContext(pCtx, persist.GenerateID(), pToken.Version, pToken.Media, pToken.TokenMetadata, pToken.TokenType, pToken.TokenID, pToken.Chain, pToken.Name, pToken.Description, pToken.ExternalURL, pToken.BlockNumber, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pq.Array(pToken.OwnershipHistory), pToken.ContractAddress).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-
-	return id, nil
 }
 
 // GetByWallet retrieves all tokens associated with a wallet
@@ -215,7 +134,7 @@ func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.Eth
 	for rows.Next() {
 		token := persist.Token{}
 		contract := persist.Contract{}
-		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress); err != nil {
+		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsSpam, &contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress); err != nil {
 			return nil, nil, err
 		}
 		tokens = append(tokens, token)
@@ -252,7 +171,7 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 	tokens := make([]persist.Token, 0, 10)
 	for rows.Next() {
 		token := persist.Token{}
-		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
+		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsSpam); err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, token)
@@ -286,7 +205,7 @@ func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID p
 	tokens := make([]persist.Token, 0, 10)
 	for rows.Next() {
 		token := persist.Token{}
-		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
+		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsSpam); err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, token)
@@ -334,50 +253,6 @@ func (t *TokenRepository) GetMetadataByTokenIdentifiers(ctx context.Context, tok
 	return
 }
 
-// GetByTokenID retrieves all tokens associated with a contract
-func (t *TokenRepository) GetByTokenID(pCtx context.Context, pTokenID persist.TokenID, limit int64, page int64) ([]persist.Token, error) {
-	var rows *sql.Rows
-	var err error
-	if limit > 0 {
-		rows, err = t.getByTokenIDPaginateStmt.QueryContext(pCtx, pTokenID, limit, page*limit)
-	} else {
-		rows, err = t.getByTokenIDStmt.QueryContext(pCtx, pTokenID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	tokens := make([]persist.Token, 0, 10)
-	for rows.Next() {
-		token := persist.Token{}
-		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated); err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, token)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(tokens) == 0 {
-		return nil, persist.ErrTokensNotFoundByTokenID{TokenID: pTokenID}
-	}
-
-	return tokens, nil
-}
-
-// GetByID gets a token by its ID
-func (t *TokenRepository) GetByID(pCtx context.Context, pID persist.DBID) (persist.Token, error) {
-	token := persist.Token{}
-	err := t.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated)
-	if err != nil {
-		return persist.Token{}, err
-	}
-	return token, nil
-}
-
 // BulkUpsert upserts multiple tokens
 func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Token) error {
 	if len(pTokens) == 0 {
@@ -416,7 +291,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	}
 
 	for _, token := range erc1155Tokens {
-		if token.Quantity == "" || token.Quantity == "0" {
+		if token.Quantity == "" || token.Quantity == "0" || token.Quantity == "<nil>" {
 			logger.For(pCtx).Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
 			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
 				return err
@@ -435,7 +310,7 @@ func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []per
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
-	paramsPerRow := 19
+	paramsPerRow := 20
 	rowsPerQuery := 65535 / paramsPerRow
 
 	if len(pTokens) > rowsPerQuery {
@@ -448,16 +323,16 @@ func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []per
 		pTokens = current
 	}
 
-	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED) VALUES `
+	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_SPAM) VALUES `
 	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
 	for i, token := range pTokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted)
+		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsSpam)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) WHERE TOKEN_TYPE = 'ERC-721' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED, DELETED = EXCLUDED.DELETED WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER;`
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS) WHERE TOKEN_TYPE = 'ERC-721' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED,DELETED = EXCLUDED.DELETED,IS_SPAM = EXCLUDED.IS_SPAM WHERE EXCLUDED.BLOCK_NUMBER > tokens.BLOCK_NUMBER;`
 
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
@@ -474,7 +349,7 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 	// Postgres only allows 65535 parameters at a time.
 	// TODO: Consider trying this implementation at some point instead of chunking:
 	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
-	paramsPerRow := 19
+	paramsPerRow := 20
 	rowsPerQuery := 65535 / paramsPerRow
 
 	if len(pTokens) > rowsPerQuery {
@@ -487,16 +362,16 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 		pTokens = current
 	}
 
-	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED) VALUES `
+	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_SPAM) VALUES `
 	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
 	for i, token := range pTokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted)
+		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsSpam)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATE, DELETED = EXCLUDED.DELETED;`
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED,DELETED = EXCLUDED.DELETED,IS_SPAM = EXCLUDED.IS_SPAM;`
 
 	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
@@ -584,16 +459,6 @@ func (t *TokenRepository) MostRecentBlock(pCtx context.Context) (persist.BlockNu
 		return 0, err
 	}
 	return blockNumber, nil
-}
-
-// Count returns the number of tokens in the database
-func (t *TokenRepository) Count(pCtx context.Context, pTokenType persist.TokenCountType) (int64, error) {
-	var count int64
-	err := t.countTokensStmt.QueryRowContext(pCtx).Scan(&count)
-	if err != nil {
-		return 0, err
-	}
-	return count, nil
 }
 
 func (t *TokenRepository) DeleteByID(pCtx context.Context, pID persist.DBID) error {

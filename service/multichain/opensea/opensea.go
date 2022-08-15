@@ -655,6 +655,7 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 						TokenMetadata:   metadata,
 						Media:           med,
 						Quantity:        "1",
+						IsSpam:          util.BoolToPointer(false), // OpenSea filters spam on their side
 					}
 				})
 			}

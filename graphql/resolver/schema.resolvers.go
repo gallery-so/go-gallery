@@ -366,6 +366,20 @@ func (r *mutationResolver) UpdateTokenInfo(ctx context.Context, input model.Upda
 	return output, nil
 }
 
+func (r *mutationResolver) SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error) {
+	err := publicapi.For(ctx).Token.SetSpamPreference(ctx, input.Tokens, input.IsSpam)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := make([]*model.Token, len(input.Tokens))
+	for i, tokenID := range input.Tokens {
+		tokens[i] = &model.Token{Dbid: tokenID} // Remaining fields handled by dedicated resolver
+	}
+
+	return model.SetSpamPreferencePayload{Tokens: tokens}, nil
+}
+
 func (r *mutationResolver) SyncTokens(ctx context.Context, chains []*persist.Chain) (model.SyncTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
@@ -640,6 +654,23 @@ func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (mod
 	return resolveFeedEventByEventID(ctx, id)
 }
 
+func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *model.SetSpamPreferencePayload) ([]*model.Token, error) {
+	tokenIDs := make([]persist.DBID, len(obj.Tokens))
+	for i, token := range obj.Tokens {
+		tokenIDs[i] = token.Dbid
+	}
+
+	tokens, errors := publicapi.For(ctx).Token.GetTokensByTokenIDs(ctx, tokenIDs)
+
+	for _, err := range errors {
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
 }
@@ -798,6 +829,11 @@ func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &owner
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// SetSpamPreferencePayload returns generated.SetSpamPreferencePayloadResolver implementation.
+func (r *Resolver) SetSpamPreferencePayload() generated.SetSpamPreferencePayloadResolver {
+	return &setSpamPreferencePayloadResolver{r}
+}
+
 // Token returns generated.TokenResolver implementation.
 func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 
@@ -849,6 +885,7 @@ type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type setSpamPreferencePayloadResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }

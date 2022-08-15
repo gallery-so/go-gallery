@@ -897,6 +897,17 @@ func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 	metadataString := string(metadata)
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
 	tokenType := model.TokenType(token.TokenType.String)
+
+	var isSpamByUser *bool
+	if token.IsUserMarkedSpam.Valid {
+		isSpamByUser = &token.IsUserMarkedSpam.Bool
+	}
+
+	var isSpamByProvider *bool
+	if token.IsProviderMarkedSpam.Valid {
+		isSpamByProvider = &token.IsProviderMarkedSpam.Bool
+	}
+
 	return &model.Token{
 		Dbid:             token.ID,
 		CreationTime:     &token.CreatedAt,
@@ -917,6 +928,8 @@ func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 		Contract:         nil, // handled by dedicated resolver
 		ExternalURL:      &token.ExternalUrl.String,
 		BlockNumber:      &blockNumber, // TODO: later
+		IsSpamByUser:     isSpamByUser,
+		IsSpamByProvider: isSpamByProvider,
 
 		// These are legacy mappings that will likely end up elsewhere when we pull data from the indexer
 		OpenseaCollectionName: nil, // TODO: later
