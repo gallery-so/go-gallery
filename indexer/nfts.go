@@ -742,36 +742,41 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client, tokenRepo persist.TokenRepository) (t persist.Token, err error) {
 
 	if handler, ok := customManualIndex[persist.EthereumAddress(contractAddress.String())]; ok {
-		return handler(pCtx, tokenID, ownerAddress, ec)
-	}
-
-	t.TokenID = tokenID
-	t.ContractAddress = contractAddress
-
-	var e721 *contracts.IERC721Caller
-	var e1155 *contracts.IERC1155Caller
-
-	e721, err = contracts.NewIERC721Caller(contractAddress.Address(), ec)
-	if err != nil {
-		return
-	}
-	e1155, err = contracts.NewIERC1155Caller(contractAddress.Address(), ec)
-	if err != nil {
-		return
-	}
-	owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
-	isERC721 := err == nil
-	if isERC721 {
-		t.TokenType = persist.TokenTypeERC721
-		t.OwnerAddress = persist.EthereumAddress(owner.String())
-	} else {
-		bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
+		handledToken, err := handler(pCtx, tokenID, ownerAddress, ec)
 		if err != nil {
-			return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
+			return t, err
 		}
-		t.TokenType = persist.TokenTypeERC1155
-		t.Quantity = persist.HexString(bal.Text(16))
-		t.OwnerAddress = ownerAddress
+		t = handledToken
+	} else {
+
+		t.TokenID = tokenID
+		t.ContractAddress = contractAddress
+
+		var e721 *contracts.IERC721Caller
+		var e1155 *contracts.IERC1155Caller
+
+		e721, err = contracts.NewIERC721Caller(contractAddress.Address(), ec)
+		if err != nil {
+			return
+		}
+		e1155, err = contracts.NewIERC1155Caller(contractAddress.Address(), ec)
+		if err != nil {
+			return
+		}
+		owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
+		isERC721 := err == nil
+		if isERC721 {
+			t.TokenType = persist.TokenTypeERC721
+			t.OwnerAddress = persist.EthereumAddress(owner.String())
+		} else {
+			bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
+			if err != nil {
+				return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
+			}
+			t.TokenType = persist.TokenTypeERC1155
+			t.Quantity = persist.HexString(bal.Text(16))
+			t.OwnerAddress = ownerAddress
+		}
 	}
 	if err := tokenRepo.Upsert(pCtx, t); err != nil {
 		return persist.Token{}, fmt.Errorf("failed to upsert token %s-%s: %s", contractAddress, tokenID, err)
