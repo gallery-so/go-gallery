@@ -227,3 +227,12 @@ func IntToPointerSlice(s []int) []*int {
 	}
 	return ret
 }
+
+// GetIPFSPath takes an IPFS URL in any form and returns just the path
+func GetIPFSPath(initial string) string {
+	path := strings.ReplaceAll(initial, "ipfs://", "")
+	path = strings.ReplaceAll(path, "ipfs/", "")
+	path = strings.Split(path, "?")[0]
+	path = strings.TrimSuffix(path, "/")
+	return path
+}
