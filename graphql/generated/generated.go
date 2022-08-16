@@ -364,7 +364,7 @@ type ComplexityRoot struct {
 		RefreshToken             func(childComplexity int, tokenID persist.DBID) int
 		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
 		SetSpamPreference        func(childComplexity int, input model.SetSpamPreferenceInput) int
-		SyncTokens               func(childComplexity int, chains []*persist.Chain) int
+		SyncTokens               func(childComplexity int, chains []persist.Chain) int
 		UnfollowUser             func(childComplexity int, userID persist.DBID) int
 		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
@@ -629,7 +629,7 @@ type MutationResolver interface {
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
 	SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error)
-	SyncTokens(ctx context.Context, chains []*persist.Chain) (model.SyncTokensPayloadOrError, error)
+	SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error)
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
@@ -1828,7 +1828,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]*persist.Chain)), true
+		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]persist.Chain)), true
 
 	case "Mutation.unfollowUser":
 		if e.complexity.Mutation.UnfollowUser == nil {
@@ -3664,7 +3664,7 @@ type Mutation {
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
     setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-    syncTokens(chains: [Chain]): SyncTokensPayloadOrError @authRequired
+    syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -3911,10 +3911,10 @@ func (ec *executionContext) field_Mutation_setSpamPreference_args(ctx context.Co
 func (ec *executionContext) field_Mutation_syncTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 []*persist.Chain
+	var arg0 []persist.Chain
 	if tmp, ok := rawArgs["chains"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chains"))
-		arg0, err = ec.unmarshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
+		arg0, err = ec.unmarshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -9450,7 +9450,7 @@ func (ec *executionContext) _Mutation_syncTokens(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().SyncTokens(rctx, args["chains"].([]*persist.Chain))
+			return ec.resolvers.Mutation().SyncTokens(rctx, args["chains"].([]persist.Chain))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -22023,7 +22023,7 @@ func (ec *executionContext) marshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgallery
 	return v
 }
 
-func (ec *executionContext) unmarshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, v interface{}) ([]*persist.Chain, error) {
+func (ec *executionContext) unmarshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, v interface{}) ([]persist.Chain, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -22032,10 +22032,10 @@ func (ec *executionContext) unmarshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgo�
 		vSlice = graphql.CoerceList(v)
 	}
 	var err error
-	res := make([]*persist.Chain, len(vSlice))
+	res := make([]persist.Chain, len(vSlice))
 	for i := range vSlice {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
+		res[i], err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, vSlice[i])
 		if err != nil {
 			return nil, err
 		}
@@ -22043,7 +22043,7 @@ func (ec *executionContext) unmarshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgo�
 	return res, nil
 }
 
-func (ec *executionContext) marshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx context.Context, sel ast.SelectionSet, v []*persist.Chain) graphql.Marshaler {
+func (ec *executionContext) marshalOChain2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainᚄ(ctx context.Context, sel ast.SelectionSet, v []persist.Chain) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -22070,7 +22070,7 @@ func (ec *executionContext) marshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
+			ret[i] = ec.marshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -22080,6 +22080,12 @@ func (ec *executionContext) marshalOChain2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 
 	}
 	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
 
 	return ret
 }

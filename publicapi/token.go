@@ -134,10 +134,6 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 	}
 	defer api.throttler.Unlock(ctx, userID.String())
 
-	if len(chains) == 0 {
-		chains = []persist.Chain{persist.ChainETH}
-	}
-
 	err = api.multichainProvider.SyncTokens(ctx, userID, chains)
 	if err != nil {
 		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type

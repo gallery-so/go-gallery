@@ -22,7 +22,7 @@ type ProcessMediaInput struct {
 	Key               string                          `json:"key,required"`
 	Chain             persist.Chain                   `json:"chain,required"`
 	Tokens            []multichain.ChainAgnosticToken `json:"tokens,required"`
-	ImageKeyworkds    []string                        `json:"image_keyworkds,required"`
+	ImageKeywords     []string                        `json:"image_keywords,required"`
 	AnimationKeywords []string                        `json:"animation_keywords,required"`
 }
 
@@ -62,7 +62,7 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 
 					logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%s", in.Key, t.ContractAddress, t.TokenID, in.Chain)
 
-					media, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress.String(), persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, in.ImageKeyworkds, in.AnimationKeywords)
+					media, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress.String(), persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, in.ImageKeywords, in.AnimationKeywords)
 					if err != nil {
 						logger.For(ctx).Errorf("error processing media for %s: %v", in.Key, err)
 						return

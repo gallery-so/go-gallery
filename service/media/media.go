@@ -72,7 +72,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
 
-	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 50), "vURL": claspString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata initial")
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 50), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata initial")
 
 	var res persist.Media
 	var mediaType persist.MediaType
@@ -98,7 +98,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		}
 	}
 	if vURL != "" {
-		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 50), "vURL": claspString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
+		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
 		var err error
 		mediaType, err = downloadAndCache(pCtx, vURL, name, "video", ipfsClient, arweaveClient, storageClient)
 		if err != nil {
@@ -120,7 +120,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		}
 	}
 
-	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 25), "vURL": claspString(vURL, 25), "mediaType": mediaType, "name": name}).Debug("MakePreviewsForMetadata mediaType")
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 25), "vURL": truncateString(vURL, 25), "mediaType": mediaType, "name": name}).Debug("MakePreviewsForMetadata mediaType")
 
 	switch mediaType {
 	case persist.MediaTypeImage:
@@ -161,7 +161,7 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 		vURL = videoURL
 	}
 	imageURL := getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient)
-	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(tokenBucket, 25), "imgURL": claspString(imgURL, 50), "vURL": claspString(vURL, 50), "name": name}).Debug("getAuxilaryMedia")
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(tokenBucket, 25), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("getAuxilaryMedia")
 	if vURL != "" {
 		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
@@ -444,7 +444,7 @@ func downloadAndCache(pCtx context.Context, url, name, ipfsPrefix string, ipfsCl
 
 	mediaType, _ := PredictMediaType(pCtx, url)
 
-	logger.For(pCtx).Infof("predicted media type for %s: %s", claspString(url, 50), mediaType)
+	logger.For(pCtx).Infof("predicted media type for %s: %s", truncateString(url, 50), mediaType)
 
 	if mediaType != persist.MediaTypeHTML && asURI.Type() == persist.URITypeIPFSGateway {
 		indexAfterGateway := strings.Index(asURI.String(), "/ipfs/")
@@ -480,7 +480,7 @@ outer:
 		return persist.MediaTypeUnknown, fmt.Errorf("could not download %s: %s", url, err)
 	}
 
-	logger.For(pCtx).Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, claspString(url, 50), name)
+	logger.For(pCtx).Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, truncateString(url, 50), name)
 
 	buf := bytes.NewBuffer(bs)
 
@@ -489,7 +489,7 @@ outer:
 		mediaType = sniffed
 	}
 
-	logger.For(pCtx).Infof("sniffed media type for %s: %s", claspString(url, 50), mediaType)
+	logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(url, 50), mediaType)
 
 	if mediaType != persist.MediaTypeVideo {
 		// only videos get thumbnails, if the NFT was previously a video however, it might still have a thumbnail
@@ -626,9 +626,10 @@ func thumbnailVideo(url string) ([]byte, error) {
 
 }
 
-func claspString(s string, i int) string {
-	if len(s) > i {
-		return s[:i]
+func truncateString(s string, i int) string {
+	asRunes := []rune(s)
+	if len(asRunes) > i {
+		return string(asRunes[:i])
 	}
 	return s
 }
