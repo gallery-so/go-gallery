@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"math/big"
 	"net"
@@ -14,6 +15,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"golang.org/x/image/bmp"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -178,10 +181,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return removeBOM(decoded), nil
 	case persist.URITypeIPFS:
-		path := strings.ReplaceAll(asString, "ipfs://", "")
-		path = strings.ReplaceAll(path, "ipfs/", "")
-		path = strings.Split(path, "?")[0]
-		path = strings.TrimSuffix(path, "/")
+		path := util.GetIPFSPath(asString)
 
 		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
@@ -231,12 +231,30 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return removeBOM(bs), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
-		idx := strings.IndexByte(asString, '{')
+		idx := strings.IndexByte(asString, ',')
 		if idx == -1 {
-			return []byte(asString), nil
+			return removeBOM([]byte(asString)), nil
 		}
-		return removeBOM([]byte(asString[idx:])), nil
-
+		return removeBOM([]byte(asString[idx+1:])), nil
+	case persist.URITypeBase64BMP:
+		b64data := asString[strings.IndexByte(asString, ',')+1:]
+		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
+		if err != nil {
+			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
+			if err != nil {
+				return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			}
+		}
+		img, err := bmp.Decode(bytes.NewReader(decoded))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
+		}
+		newImage := &bytes.Buffer{}
+		err = jpeg.Encode(newImage, img, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+		}
+		return removeBOM(newImage.Bytes()), nil
 	default:
 		return nil, fmt.Errorf("unknown token URI type: %s - %s", turi.Type(), turi)
 	}

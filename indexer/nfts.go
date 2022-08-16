@@ -13,6 +13,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
@@ -31,11 +32,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type manualIndexHandler func(context.Context, persist.TokenID, persist.EthereumAddress, *ethclient.Client) (persist.Token, error)
+
 var errInvalidUpdateMediaInput = errors.New("must provide either owner_address or token_id and contract_address")
 
 var mediaDownloadLock = &sync.Mutex{}
 
 var bigZero = big.NewInt(0)
+
+var customManualIndex = map[persist.EthereumAddress]manualIndexHandler{
+	"0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb": func(ctx context.Context, ti persist.TokenID, ea persist.EthereumAddress, c *ethclient.Client) (persist.Token, error) {
+		ct, err := contracts.NewCryptopunksCaller(common.HexToAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"), c)
+		if err != nil {
+			return persist.Token{}, err
+		}
+		owner, err := ct.PunkIndexToAddress(&bind.CallOpts{Context: ctx}, ti.BigInt())
+		if err != nil {
+			return persist.Token{}, err
+		}
+		return persist.Token{
+			TokenType:       persist.TokenTypeERC721,
+			OwnerAddress:    persist.EthereumAddress(owner.String()),
+			ContractAddress: persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"),
+			TokenID:         ti,
+		}, nil
+	},
+}
 
 // UpdateTokenMediaInput is the input for the update media endpoint that will find all of the media content
 // for an addresses NFTs and cache it in a storage bucket
@@ -719,33 +741,42 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 
 func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client, tokenRepo persist.TokenRepository) (t persist.Token, err error) {
 
-	t.TokenID = tokenID
-	t.ContractAddress = contractAddress
-
-	var e721 *contracts.IERC721Caller
-	var e1155 *contracts.IERC1155Caller
-
-	e721, err = contracts.NewIERC721Caller(contractAddress.Address(), ec)
-	if err != nil {
-		return
-	}
-	e1155, err = contracts.NewIERC1155Caller(contractAddress.Address(), ec)
-	if err != nil {
-		return
-	}
-	owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
-	isERC721 := err == nil
-	if isERC721 {
-		t.TokenType = persist.TokenTypeERC721
-		t.OwnerAddress = persist.EthereumAddress(owner.String())
-	} else {
-		bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
+	if handler, ok := customManualIndex[persist.EthereumAddress(contractAddress.String())]; ok {
+		handledToken, err := handler(pCtx, tokenID, ownerAddress, ec)
 		if err != nil {
-			return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
+			return t, err
 		}
-		t.TokenType = persist.TokenTypeERC1155
-		t.Quantity = persist.HexString(bal.Text(16))
-		t.OwnerAddress = ownerAddress
+		t = handledToken
+	} else {
+
+		t.TokenID = tokenID
+		t.ContractAddress = contractAddress
+
+		var e721 *contracts.IERC721Caller
+		var e1155 *contracts.IERC1155Caller
+
+		e721, err = contracts.NewIERC721Caller(contractAddress.Address(), ec)
+		if err != nil {
+			return
+		}
+		e1155, err = contracts.NewIERC1155Caller(contractAddress.Address(), ec)
+		if err != nil {
+			return
+		}
+		owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
+		isERC721 := err == nil
+		if isERC721 {
+			t.TokenType = persist.TokenTypeERC721
+			t.OwnerAddress = persist.EthereumAddress(owner.String())
+		} else {
+			bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
+			if err != nil {
+				return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
+			}
+			t.TokenType = persist.TokenTypeERC1155
+			t.Quantity = persist.HexString(bal.Text(16))
+			t.OwnerAddress = ownerAddress
+		}
 	}
 	if err := tokenRepo.Upsert(pCtx, t); err != nil {
 		return persist.Token{}, fmt.Errorf("failed to upsert token %s-%s: %s", contractAddress, tokenID, err)
