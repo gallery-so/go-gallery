@@ -36,6 +36,8 @@ const (
 	MediaTypeGIF MediaType = "gif"
 	// MediaTypeSVG represents an SVG
 	MediaTypeSVG MediaType = "svg"
+	// MediaTypeBase64Image represents a base64 encoded image
+	MediaTypeBase64BMP MediaType = "base64bmp"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
 	// MediaTypeHTML represents html
@@ -88,6 +90,8 @@ const (
 	URITypeJSON URIType = "json"
 	// URITypeBase64SVG represents a base64 encoded SVG
 	URITypeBase64SVG URIType = "base64svg"
+	//URITypeBase64BMP represents a base64 encoded BMP
+	URITypeBase64BMP URIType = "base64bmp"
 	// URITypeSVG represents an SVG
 	URITypeSVG URIType = "svg"
 	// URITypeENS represents an ENS domain
@@ -528,6 +532,8 @@ func (uri TokenURI) Type() URIType {
 		return URITypeBase64JSON
 	case strings.HasPrefix(asString, "data:image/svg+xml;base64,"), strings.HasPrefix(asString, "data:image/svg xml;base64,"):
 		return URITypeBase64SVG
+	case strings.HasPrefix(asString, "data:image/bmp;base64,"):
+		return URITypeBase64BMP
 	case strings.Contains(asString, "ipfs.io/api"):
 		return URITypeIPFSAPI
 	case strings.Contains(asString, "/ipfs/"):
@@ -536,7 +542,7 @@ func (uri TokenURI) Type() URIType {
 		return URITypeHTTP
 	case strings.HasPrefix(asString, "{"), strings.HasPrefix(asString, "["), strings.HasPrefix(asString, "data:application/json"), strings.HasPrefix(asString, "data:text/plain,{"):
 		return URITypeJSON
-	case strings.HasPrefix(asString, "<svg"), strings.HasPrefix(asString, "data:image/svg+xml"):
+	case strings.HasPrefix(asString, "<svg"), strings.HasPrefix(asString, "data:image/svg+xml;utf8,"):
 		return URITypeSVG
 	case strings.HasSuffix(asString, ".ens"):
 		return URITypeENS

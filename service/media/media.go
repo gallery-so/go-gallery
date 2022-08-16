@@ -149,7 +149,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	logger.For(pCtx).Infof("media for %s of type %s: %+v", name, mediaType, res)
 
-	return res, nil
+	return remapMedia(res), nil
 }
 
 func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL string, imgURL string, mediaType persist.MediaType) persist.Media {
@@ -261,6 +261,20 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 	thumb := getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient)
 	res.ThumbnailURL = persist.NullString(thumb)
 	return res
+}
+
+func remapIPFS(ipfs string) string {
+	if persist.TokenURI(ipfs).Type() != persist.URITypeIPFS {
+		return ipfs
+	}
+	path := util.GetIPFSPath(ipfs)
+	return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+}
+
+func remapMedia(media persist.Media) persist.Media {
+	media.MediaURL = persist.NullString(remapIPFS(media.MediaURL.String()))
+	media.ThumbnailURL = persist.NullString(remapIPFS(media.ThumbnailURL.String()))
+	return media
 }
 
 func FindImageAndAnimationURLs(metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords []string, name string) (imgURL string, vURL string) {
@@ -455,7 +469,7 @@ func downloadAndCache(pCtx context.Context, url, name, ipfsPrefix string, ipfsCl
 
 outer:
 	switch mediaType {
-	case persist.MediaTypeVideo, persist.MediaTypeUnknown, persist.MediaTypeSVG:
+	case persist.MediaTypeVideo, persist.MediaTypeUnknown, persist.MediaTypeSVG, persist.MediaTypeBase64BMP:
 		break outer
 	default:
 		switch asURI.Type() {
@@ -482,10 +496,14 @@ outer:
 
 	logger.For(pCtx).Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, truncateString(url, 50), name)
 
+	if mediaType == persist.MediaTypeUnknown {
+		mediaType = GuessMediaType(bs)
+	}
+
 	buf := bytes.NewBuffer(bs)
 
 	sniffed := persist.SniffMediaType(bs)
-	if sniffed != persist.MediaTypeUnknown && mediaType != persist.MediaTypeHTML {
+	if mediaType != persist.MediaTypeHTML && mediaType != persist.MediaTypeBase64BMP {
 		mediaType = sniffed
 	}
 
@@ -515,9 +533,8 @@ outer:
 		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
 	case persist.MediaTypeSVG:
 		return persist.MediaTypeSVG, cacheRawSvgMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
-	case persist.MediaTypeUnknown:
-		mediaType = GuessMediaType(bs)
-		fallthrough
+	case persist.MediaTypeBase64BMP:
+		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), storageClient)
 	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
@@ -550,10 +567,12 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, erro
 	uriType := asURI.Type()
 	logger.For(pCtx).Debugf("predicting media type for %s: %s", url, uriType)
 	switch uriType {
-	case persist.URITypeBase64JSON:
+	case persist.URITypeBase64JSON, persist.URITypeJSON:
 		return persist.MediaTypeJSON, nil
-	case persist.URITypeBase64SVG:
+	case persist.URITypeBase64SVG, persist.URITypeSVG:
 		return persist.MediaTypeSVG, nil
+	case persist.URITypeBase64BMP:
+		return persist.MediaTypeBase64BMP, nil
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
 		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 		if err != nil {

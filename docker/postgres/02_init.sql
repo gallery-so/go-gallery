@@ -86,7 +86,9 @@ CREATE TABLE IF NOT EXISTS tokens (
     OWNERSHIP_HISTORY jsonb [],
     TOKEN_METADATA jsonb,
     EXTERNAL_URL varchar,
-    BLOCK_NUMBER bigint
+    BLOCK_NUMBER bigint,
+    IS_USER_MARKED_SPAM bool,
+    IS_PROVIDER_MARKED_SPAM bool
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS token_id_contract_chain_owner_user_id_idx ON tokens (TOKEN_ID, CONTRACT, CHAIN, OWNER_USER_ID) WHERE DELETED = false;
