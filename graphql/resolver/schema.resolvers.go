@@ -121,6 +121,10 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Contracts(ctx context.Context, obj *model.GalleryUser) ([]*model.Contract, error) {
+	return resolveContractsByUserID(ctx, obj.Dbid)
+}
+
 func (r *galleryUserResolver) Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
 	return resolveFollowersByUserID(ctx, obj.Dbid)
 }

@@ -13,6 +13,7 @@
 //go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
+//go:generate go run github.com/vektah/dataloaden ContractsLoaderByUserID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
 //go:generate go run github.com/vektah/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
@@ -58,6 +59,7 @@ type Loaders struct {
 	TokensByUserID           TokensLoaderByID
 	NewTokensByFeedEventID   TokensLoaderByID
 	ContractByContractId     ContractLoaderByID
+	ContractsByUserID        ContractsLoaderByUserID
 	ContractByChainAddress   ContractLoaderByChainAddress
 	FollowersByUserId        UsersLoaderByID
 	FollowingByUserId        UsersLoaderByID
@@ -179,6 +181,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 
 	loaders.ContractByContractId = ContractLoaderByID{
 		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadContractByContractID(ctx, loaders, q),
+	}
+
+	loaders.ContractByContractId = ContractLoaderByID{
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadContractByContractID(ctx, loaders, q),
 	}
@@ -782,6 +790,30 @@ func loadContractByContractID(ctx context.Context, loaders *Loaders, q *sqlc.Que
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = persist.ErrContractNotFoundByID{ID: contractIDs[i]}
 			}
+		})
+
+		return contracts, errors
+	}
+}
+
+func loadContractsByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Contract, []error) {
+	return func(contractIDs []persist.DBID) ([][]sqlc.Contract, []error) {
+		contracts := make([][]sqlc.Contract, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetContractsByUserID(ctx, contractIDs)
+		defer b.Close()
+
+		b.Query(func(i int, c []sqlc.Contract, err error) {
+			contracts[i], errors[i] = c, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, contract := range contracts[i] {
+					loaders.ContractByContractId.Prime(contract.ID, contract)
+				}
+			}
+
 		})
 
 		return contracts, errors

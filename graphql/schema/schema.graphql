@@ -61,6 +61,7 @@ type GalleryUser implements Node {
 
     wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
+    contracts: [Contract] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
@@ -326,6 +327,9 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
     name: String
     description: String
     previewImage: String
+    profileImageURL: String
+    profileBannerURL: String
+    badgeURL: String
 
     owners: [TokenHolder]
 }
@@ -340,6 +344,9 @@ type Contract implements Node {
     creatorAddress: ChainAddress
     chain: Chain
     name: String
+    profileImageURL: String
+    profileBannerURL: String
+    badgeURL: String
 }
 
 # We have this extra type in case we need to stick authed data

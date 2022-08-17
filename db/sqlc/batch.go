@@ -130,7 +130,7 @@ func (b *GetCollectionsByGalleryIdBatchBatchResults) Close() error {
 }
 
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressBatchBatchResults struct {
@@ -171,6 +171,9 @@ func (b *GetContractByChainAddressBatchBatchResults) QueryRow(f func(int, Contra
 			&i.Address,
 			&i.CreatorAddress,
 			&i.Chain,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -187,7 +190,7 @@ func (b *GetContractByChainAddressBatchBatchResults) Close() error {
 }
 
 const getContractByIDBatch = `-- name: GetContractByIDBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url FROM contracts WHERE id = $1 AND deleted = false
 `
 
 type GetContractByIDBatchBatchResults struct {
@@ -222,6 +225,9 @@ func (b *GetContractByIDBatchBatchResults) QueryRow(f func(int, Contract, error)
 			&i.Address,
 			&i.CreatorAddress,
 			&i.Chain,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -234,6 +240,70 @@ func (b *GetContractByIDBatchBatchResults) QueryRow(f func(int, Contract, error)
 }
 
 func (b *GetContractByIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getContractsByUserID = `-- name: GetContractsByUserID :batchmany
+SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url FROM contracts, tokens
+    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
+    AND tokens.deleted = false AND contracts.deleted = false
+`
+
+type GetContractsByUserIDBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID []persist.DBID) *GetContractsByUserIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range ownerUserID {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getContractsByUserID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetContractsByUserIDBatchResults{br, 0}
+}
+
+func (b *GetContractsByUserIDBatchResults) Query(f func(int, []Contract, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Contract
+		for rows.Next() {
+			var i Contract
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.Version,
+				&i.CreatedAt,
+				&i.LastUpdated,
+				&i.Name,
+				&i.Symbol,
+				&i.Address,
+				&i.CreatorAddress,
+				&i.Chain,
+				&i.ProfileBannerUrl,
+				&i.ProfileImageUrl,
+				&i.BadgeUrl,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetContractsByUserIDBatchResults) Close() error {
 	return b.br.Close()
 }
 

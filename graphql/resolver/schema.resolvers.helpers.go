@@ -180,6 +180,21 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return userToModel(ctx, *user), nil
 }
 
+func resolveContractsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Contract, error) {
+	contracts, err := publicapi.For(ctx).Contract.GetContractByUserID(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*model.Contract
+	for _, contract := range contracts {
+		result = append(result, contractToModel(ctx, contract))
+	}
+
+	return result, nil
+}
+
 func resolveFollowersByUserID(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
 	followers, err := publicapi.For(ctx).User.GetFollowersByUserId(ctx, userID)
 
@@ -783,6 +798,8 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 		Galleries: nil,
 		Followers: nil,
 		Following: nil,
+		Tokens:    nil,
+		Contracts: nil,
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
@@ -819,12 +836,15 @@ func contractToModel(ctx context.Context, contract sqlc.Contract) *model.Contrac
 	creator := persist.NewChainAddress(contract.CreatorAddress, chain)
 
 	return &model.Contract{
-		Dbid:            contract.ID,
-		ContractAddress: &addr,
-		CreatorAddress:  &creator,
-		Chain:           &chain,
-		Name:            &contract.Name.String,
-		LastUpdated:     &contract.LastUpdated,
+		Dbid:             contract.ID,
+		ContractAddress:  &addr,
+		CreatorAddress:   &creator,
+		Chain:            &chain,
+		Name:             &contract.Name.String,
+		LastUpdated:      &contract.LastUpdated,
+		ProfileImageURL:  &contract.ProfileImageUrl.String,
+		ProfileBannerURL: &contract.ProfileBannerUrl.String,
+		BadgeURL:         &contract.BadgeUrl.String,
 	}
 }
 
@@ -955,13 +975,17 @@ func communityToModel(ctx context.Context, community persist.Community) *model.C
 	}
 
 	return &model.Community{
-		LastUpdated:     &lastUpdated,
-		ContractAddress: &contractAddress,
-		CreatorAddress:  &creatorAddress,
-		Name:            util.StringToPointer(community.Name.String()),
-		Description:     util.StringToPointer(community.Description.String()),
-		PreviewImage:    util.StringToPointer(community.PreviewImage.String()),
-		Owners:          owners,
+		LastUpdated:      &lastUpdated,
+		ContractAddress:  &contractAddress,
+		CreatorAddress:   &creatorAddress,
+		Name:             util.StringToPointer(community.Name.String()),
+		Description:      util.StringToPointer(community.Description.String()),
+		PreviewImage:     util.StringToPointer(community.PreviewImage.String()),
+		Chain:            &community.Chain,
+		ProfileImageURL:  util.StringToPointer(community.ProfileImageURL.String()),
+		ProfileBannerURL: util.StringToPointer(community.ProfileBannerURL.String()),
+		BadgeURL:         util.StringToPointer(community.BadgeURL.String()),
+		Owners:           owners,
 	}
 }
 

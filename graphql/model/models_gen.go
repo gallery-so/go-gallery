@@ -273,26 +273,32 @@ type CollectorsNoteAddedToTokenFeedEventData struct {
 func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}
 
 type Community struct {
-	LastUpdated     *time.Time            `json:"lastUpdated"`
-	ContractAddress *persist.ChainAddress `json:"contractAddress"`
-	CreatorAddress  *persist.ChainAddress `json:"creatorAddress"`
-	Chain           *persist.Chain        `json:"chain"`
-	Name            *string               `json:"name"`
-	Description     *string               `json:"description"`
-	PreviewImage    *string               `json:"previewImage"`
-	Owners          []*TokenHolder        `json:"owners"`
+	LastUpdated      *time.Time            `json:"lastUpdated"`
+	ContractAddress  *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress   *persist.ChainAddress `json:"creatorAddress"`
+	Chain            *persist.Chain        `json:"chain"`
+	Name             *string               `json:"name"`
+	Description      *string               `json:"description"`
+	PreviewImage     *string               `json:"previewImage"`
+	ProfileImageURL  *string               `json:"profileImageURL"`
+	ProfileBannerURL *string               `json:"profileBannerURL"`
+	BadgeURL         *string               `json:"badgeURL"`
+	Owners           []*TokenHolder        `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
 type Contract struct {
-	Dbid            persist.DBID          `json:"dbid"`
-	LastUpdated     *time.Time            `json:"lastUpdated"`
-	ContractAddress *persist.ChainAddress `json:"contractAddress"`
-	CreatorAddress  *persist.ChainAddress `json:"creatorAddress"`
-	Chain           *persist.Chain        `json:"chain"`
-	Name            *string               `json:"name"`
+	Dbid             persist.DBID          `json:"dbid"`
+	LastUpdated      *time.Time            `json:"lastUpdated"`
+	ContractAddress  *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress   *persist.ChainAddress `json:"creatorAddress"`
+	Chain            *persist.Chain        `json:"chain"`
+	Name             *string               `json:"name"`
+	ProfileImageURL  *string               `json:"profileImageURL"`
+	ProfileBannerURL *string               `json:"profileBannerURL"`
+	BadgeURL         *string               `json:"badgeURL"`
 }
 
 func (Contract) IsNode() {}
@@ -550,6 +556,7 @@ type GalleryUser struct {
 	Tokens              []*Token       `json:"tokens"`
 	Wallets             []*Wallet      `json:"wallets"`
 	Galleries           []*Gallery     `json:"galleries"`
+	Contracts           []*Contract    `json:"contracts"`
 	IsAuthenticatedUser *bool          `json:"isAuthenticatedUser"`
 	Followers           []*GalleryUser `json:"followers"`
 	Following           []*GalleryUser `json:"following"`

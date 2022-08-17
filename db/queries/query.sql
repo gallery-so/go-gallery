@@ -109,6 +109,11 @@ select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 -- name: GetContractByChainAddressBatch :batchone
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
+-- name: GetContractsByUserID :batchmany
+SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
+    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
+    AND tokens.deleted = false AND contracts.deleted = false;
+
 -- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.follower = u.id

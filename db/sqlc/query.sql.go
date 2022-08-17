@@ -239,7 +239,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 }
 
 const getContractByChainAddress = `-- name: GetContractByChainAddress :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressParams struct {
@@ -261,12 +261,15 @@ func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContract
 		&i.Address,
 		&i.CreatorAddress,
 		&i.Chain,
+		&i.ProfileBannerUrl,
+		&i.ProfileImageUrl,
+		&i.BadgeUrl,
 	)
 	return i, err
 }
 
 const getContractByID = `-- name: GetContractByID :one
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url FROM contracts WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contract, error) {
@@ -283,6 +286,9 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 		&i.Address,
 		&i.CreatorAddress,
 		&i.Chain,
+		&i.ProfileBannerUrl,
+		&i.ProfileImageUrl,
+		&i.BadgeUrl,
 	)
 	return i, err
 }

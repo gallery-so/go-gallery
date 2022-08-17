@@ -37,6 +37,22 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 	return &contract, nil
 }
 
+func (api ContractAPI) GetContractByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Contract, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	contracts, err := api.loaders.ContractsByUserID.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return contracts, nil
+}
+
 // RefreshContract refreshes the metadata for a given contract DBID
 func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.DBID) error {
 	// Validate

@@ -62,16 +62,19 @@ type CollectionEvent struct {
 }
 
 type Contract struct {
-	ID             persist.DBID
-	Deleted        bool
-	Version        sql.NullInt32
-	CreatedAt      time.Time
-	LastUpdated    time.Time
-	Name           sql.NullString
-	Symbol         sql.NullString
-	Address        persist.Address
-	CreatorAddress persist.Address
-	Chain          sql.NullInt32
+	ID               persist.DBID
+	Deleted          bool
+	Version          sql.NullInt32
+	CreatedAt        time.Time
+	LastUpdated      time.Time
+	Name             sql.NullString
+	Symbol           sql.NullString
+	Address          persist.Address
+	CreatorAddress   persist.Address
+	Chain            sql.NullInt32
+	ProfileBannerUrl sql.NullString
+	ProfileImageUrl  sql.NullString
+	BadgeUrl         sql.NullString
 }
 
 type EarlyAccess struct {

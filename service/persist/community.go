@@ -9,12 +9,15 @@ import (
 type Community struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
-	ContractAddress Address    `json:"contract_address"`
-	CreatorAddress  Address    `json:"creator_address"`
-	Chain           Chain      `json:"chain"`
-	Name            NullString `json:"name"`
-	Description     NullString `json:"description"`
-	PreviewImage    NullString `json:"preview_image"`
+	ContractAddress  Address    `json:"contract_address"`
+	CreatorAddress   Address    `json:"creator_address"`
+	Chain            Chain      `json:"chain"`
+	Name             NullString `json:"name"`
+	Description      NullString `json:"description"`
+	PreviewImage     NullString `json:"preview_image"`
+	ProfileImageURL  NullString `json:"profile_image_url"`
+	ProfileBannerURL NullString `json:"profile_banner_url"`
+	BadgeURL         NullString `json:"badge_url"`
 
 	Owners []TokenHolder `json:"owners"`
 }
