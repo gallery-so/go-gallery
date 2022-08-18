@@ -214,6 +214,7 @@ enum Chain {
     Arbitrum
     Polygon
     Optimism
+    Tezos
 }
 enum WalletType {
     EOA
@@ -879,7 +880,7 @@ type Mutation {
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
     setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-    syncTokens: SyncTokensPayloadOrError @authRequired
+    syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError

@@ -65,10 +65,12 @@ const (
 	ChainPolygon
 	// ChainOptimism represents the Optimism blockchain
 	ChainOptimism
+	// ChainTezos represents the Tezos blockchain
+	ChainTezos
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to
 	// point to the most recently added chain type.
-	MaxChainValue = ChainOptimism
+	MaxChainValue = ChainTezos
 )
 
 const (
@@ -152,7 +154,7 @@ type TokenCountType string
 // Chain represents which blockchain a token is on
 type Chain int
 
-// TokenID represents the ID of an Ethereum token
+// TokenID represents the ID of a token
 type TokenID string
 
 // TokenURI represents the URI for an Ethereum token
@@ -429,7 +431,7 @@ func (c *Chain) Scan(src interface{}) error {
 	return nil
 }
 
-// UnmarshalJSON will unmarshall the JSON data into the TokenMetadata struct
+// UnmarshalJSON will unmarshall the JSON data into the Chain type
 func (c *Chain) UnmarshalJSON(data []byte) error {
 	var s int
 	var asString string
@@ -441,13 +443,12 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 		switch strings.ToLower(asString) {
 		case "ethereum":
 			*c = ChainETH
+		case "tezos":
+			*c = ChainTezos
 		}
 		return nil
 	}
-	switch s {
-	case 0:
-		*c = ChainETH
-	}
+	*c = Chain(s)
 	return nil
 }
 
@@ -461,6 +462,8 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 	switch strings.ToLower(n) {
 	case "ethereum":
 		*c = ChainETH
+	case "tezos":
+		*c = ChainTezos
 	}
 	return nil
 }
@@ -470,6 +473,8 @@ func (c Chain) MarshalGQL(w io.Writer) {
 	switch c {
 	case ChainETH:
 		w.Write([]byte(`"Ethereum"`))
+	case ChainTezos:
+		w.Write([]byte(`"Tezos"`))
 	}
 }
 

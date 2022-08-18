@@ -139,23 +139,28 @@ func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGall
 
 // SyncTokens updates the media for all tokens for a user
 // TODO consider updating contracts as well
-func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
+func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
 	user, err := d.UserRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err
 	}
+
+	validChainsLookup := make(map[persist.Chain]bool)
+	for _, chain := range chains {
+		validChainsLookup[chain] = true
+	}
+
 	errChan := make(chan error)
 	incomingTokens := make(chan chainTokens)
 	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := make(map[persist.Chain][]persist.Address)
+
 	for _, wallet := range user.Wallets {
-		if it, ok := chainsToAddresses[wallet.Chain]; ok {
-			it = append(it, wallet.Address)
-			chainsToAddresses[wallet.Chain] = it
-		} else {
-			chainsToAddresses[wallet.Chain] = []persist.Address{wallet.Address}
+		if validChainsLookup[wallet.Chain] {
+			chainsToAddresses[wallet.Chain] = append(chainsToAddresses[wallet.Chain], wallet.Address)
 		}
 	}
+
 	wg := sync.WaitGroup{}
 	for c, a := range chainsToAddresses {
 		logger.For(ctx).Infof("updating media for user %s wallets %s", user.Username, a)
@@ -191,14 +196,16 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID) error {
 			}(addr, chain)
 		}
 	}
+
 	go func() {
 		defer close(incomingTokens)
 		defer close(incomingContracts)
 		wg.Wait()
 	}()
+
 	allTokens := make([]chainTokens, 0, len(user.Wallets))
 	allContracts := make([]chainContracts, 0, len(user.Wallets))
-	// ensure all tokens have been upserted
+
 outer:
 	for {
 		select {
@@ -222,6 +229,7 @@ outer:
 			}
 		}
 	}
+
 	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
 	if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
 		return fmt.Errorf("error upserting contracts: %s", err)
@@ -262,7 +270,11 @@ outer:
 	if err != nil {
 		return err
 	}
+
 	for _, nft := range allUsersNFTs {
+		if !validChainsLookup[nft.Chain] {
+			continue
+		}
 		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
 			logger.For(ctx).Warnf("deleting nft %s-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
 			err := d.TokenRepo.DeleteByID(ctx, nft.ID)
@@ -483,6 +495,10 @@ func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnost
 		}
 	}
 	return res, nil
+}
+
+func (t ChainAgnosticIdentifiers) String() string {
+	return fmt.Sprintf("%s-%s", t.ContractAddress, t.TokenID)
 }
 
 func (e ErrChainNotFound) Error() string {

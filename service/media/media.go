@@ -63,16 +63,16 @@ var postfixesToMediaTypes = map[string]persist.MediaType{
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
-func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) (persist.Media, error) {
+func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords []string) (persist.Media, error) {
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
-	imgURL, vURL := findInitialURLs(metadata, name, turi)
+	imgURL, vURL := FindImageAndAnimationURLs(metadata, turi, animationKeywords, imageKeywords, name)
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
 
-	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 50), "vURL": claspString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata initial")
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 50), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata initial")
 
 	var res persist.Media
 	var mediaType persist.MediaType
@@ -98,7 +98,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		}
 	}
 	if vURL != "" {
-		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 50), "vURL": claspString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
+		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
 		var err error
 		mediaType, err = downloadAndCache(pCtx, vURL, name, "video", ipfsClient, arweaveClient, storageClient)
 		if err != nil {
@@ -120,7 +120,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		}
 	}
 
-	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": claspString(turi.String(), 25), "imgURL": claspString(imgURL, 25), "vURL": claspString(vURL, 25), "mediaType": mediaType, "name": name}).Debug("MakePreviewsForMetadata mediaType")
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 25), "vURL": truncateString(vURL, 25), "mediaType": mediaType, "name": name}).Debug("MakePreviewsForMetadata mediaType")
 
 	switch mediaType {
 	case persist.MediaTypeImage:
@@ -161,13 +161,12 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 		vURL = videoURL
 	}
 	imageURL := getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient)
-	if vURL != "" {
-		res.ThumbnailURL = persist.NullString(imageURL)
-	}
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(tokenBucket, 25), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("getAuxilaryMedia")
 	if vURL != "" {
 		logger.For(pCtx).Infof("using vURL %s: %s", name, vURL)
 		res.MediaURL = persist.NullString(vURL)
-	} else if imageURL != "" && res.ThumbnailURL.String() != imageURL {
+		res.ThumbnailURL = persist.NullString(imageURL)
+	} else if imageURL != "" {
 		logger.For(pCtx).Infof("using imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
 	}
@@ -264,23 +263,6 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 	return res
 }
 
-func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
-	if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if storageImageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
-		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, storageImageURL)
-		return storageImageURL
-	} else if imgURL != "" {
-		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
-		return imgURL
-	}
-	return ""
-}
-
 func remapIPFS(ipfs string) string {
 	if persist.TokenURI(ipfs).Type() != persist.URITypeIPFS {
 		return ipfs
@@ -295,7 +277,7 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.TokenURI) (imgURL string, vURL string) {
+func FindImageAndAnimationURLs(metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords []string, name string) (imgURL string, vURL string) {
 
 	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
 		logger.For(nil).Infof("found media metadata for %s: %s", name, metaMedia)
@@ -314,17 +296,20 @@ func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.T
 		}
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "animation", util.DefaultSearchDepth).(string); ok && it != "" {
-		logger.For(nil).Infof("found initial animation url for %s: %s", name, it)
-		vURL = it
-	} else if it, ok := util.GetValueFromMapUnsafe(metadata, "video", util.DefaultSearchDepth).(string); ok && it != "" {
-		logger.For(nil).Infof("found initial video url for %s: %s", name, it)
-		vURL = it
+	for _, keyword := range animationKeywords {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
+			logger.For(nil).Infof("found initial animation url for %s with keyword %s: %s", name, keyword, it)
+			vURL = it
+			break
+		}
 	}
 
-	if it, ok := util.GetValueFromMapUnsafe(metadata, "image", util.DefaultSearchDepth).(string); ok && it != "" {
-		logger.For(nil).Infof("found initial image url for %s: %s", name, it)
-		imgURL = it
+	for _, keyword := range imageKeywords {
+		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
+			logger.For(nil).Infof("found initial image url for %s with keyword %s: %s", name, keyword, it)
+			imgURL = it
+			break
+		}
 	}
 
 	if imgURL == "" && vURL == "" {
@@ -332,6 +317,23 @@ func findInitialURLs(metadata persist.TokenMetadata, name string, turi persist.T
 		imgURL = turi.String()
 	}
 	return imgURL, vURL
+}
+
+func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
+	if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("image-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found imageURL for thumbnail %s: %s", name, storageImageURL)
+		return storageImageURL
+	} else if storageImageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, storageImageURL)
+		return storageImageURL
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
+		return imgURL
+	} else if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
+		logger.For(pCtx).Infof("found thumbnailURL for %s: %s", name, storageImageURL)
+		return storageImageURL
+	}
+	return ""
 }
 
 func cacheRawSvgMedia(ctx context.Context, img []byte, bucket, fileName string, client *storage.Client) error {
@@ -456,7 +458,7 @@ func downloadAndCache(pCtx context.Context, url, name, ipfsPrefix string, ipfsCl
 
 	mediaType, _ := PredictMediaType(pCtx, url)
 
-	logger.For(pCtx).Infof("predicted media type for %s: %s", claspString(url, 50), mediaType)
+	logger.For(pCtx).Infof("predicted media type for %s: %s", truncateString(url, 50), mediaType)
 
 	if mediaType != persist.MediaTypeHTML && asURI.Type() == persist.URITypeIPFSGateway {
 		indexAfterGateway := strings.Index(asURI.String(), "/ipfs/")
@@ -492,7 +494,7 @@ outer:
 		return persist.MediaTypeUnknown, fmt.Errorf("could not download %s: %s", url, err)
 	}
 
-	logger.For(pCtx).Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, claspString(url, 50), name)
+	logger.For(pCtx).Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, truncateString(url, 50), name)
 
 	if mediaType == persist.MediaTypeUnknown {
 		mediaType = GuessMediaType(bs)
@@ -505,7 +507,7 @@ outer:
 		mediaType = sniffed
 	}
 
-	logger.For(pCtx).Infof("sniffed media type for %s: %s", claspString(url, 50), mediaType)
+	logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(url, 50), mediaType)
 
 	if mediaType != persist.MediaTypeVideo {
 		// only videos get thumbnails, if the NFT was previously a video however, it might still have a thumbnail
@@ -643,9 +645,10 @@ func thumbnailVideo(url string) ([]byte, error) {
 
 }
 
-func claspString(s string, i int) string {
-	if len(s) > i {
-		return s[:i]
+func truncateString(s string, i int) string {
+	asRunes := []rune(s)
+	if len(asRunes) > i {
+		return string(asRunes[:i])
 	}
 	return s
 }

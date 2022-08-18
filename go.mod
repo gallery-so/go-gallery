@@ -3,6 +3,7 @@ module github.com/mikeydub/go-gallery
 go 1.16
 
 require (
+	blockwatch.cc/tzgo v1.13.2
 	cloud.google.com/go/cloudtasks v1.3.0
 	cloud.google.com/go/iam v0.3.0 // indirect
 	cloud.google.com/go/pubsub v1.19.0
