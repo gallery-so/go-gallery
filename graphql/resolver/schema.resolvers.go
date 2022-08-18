@@ -121,6 +121,10 @@ func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryU
 	return resolveGalleriesByUserID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error) {
+	return resolveBadgesByUserID(ctx, obj.Dbid)
+}
+
 func (r *galleryUserResolver) Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
 	return resolveFollowersByUserID(ctx, obj.Dbid)
 }

@@ -42,7 +42,7 @@ func NewCommunityTokenRepository(db *sql.DB, cache memstore.Cache) *CommunityTok
 	getUserByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,USERNAME FROM users WHERE WALLETS @> ARRAY[$1]:: varchar[] AND DELETED = false`)
 	checkNoErr(err)
 
-	getContractStmt, err := db.PrepareContext(ctx, `SELECT ID,NAME,CREATOR_ADDRESS FROM contracts WHERE ADDRESS = $1`)
+	getContractStmt, err := db.PrepareContext(ctx, `SELECT ID,NAME,CREATOR_ADDRESS,PROFILE_IMAGE_URL,PROFILE_BANNER_URL,BADGE_URL FROM contracts WHERE ADDRESS = $1`)
 	checkNoErr(err)
 
 	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNED_BY_WALLETS && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
@@ -78,7 +78,7 @@ func (c *CommunityTokenRepository) GetByAddress(ctx context.Context, pCommunityA
 	}
 
 	var contractID persist.DBID
-	err := c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address()).Scan(&contractID, &community.Name, &community.CreatorAddress)
+	err := c.getContractStmt.QueryRowContext(ctx, pCommunityAddress.Address()).Scan(&contractID, &community.Name, &community.CreatorAddress, &community.ProfileImageURL, &community.ProfileBannerURL, &community.BadgeURL)
 	if err != nil {
 		return persist.Community{}, fmt.Errorf("error getting community contract: %w", err)
 	}

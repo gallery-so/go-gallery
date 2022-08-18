@@ -12,11 +12,14 @@ type ContractGallery struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Chain          Chain      `json:"chain"`
-	Address        Address    `json:"address"`
-	Symbol         NullString `json:"symbol"`
-	Name           NullString `json:"name"`
-	CreatorAddress Address    `json:"creator_address"`
+	Chain            Chain      `json:"chain"`
+	Address          Address    `json:"address"`
+	Symbol           NullString `json:"symbol"`
+	Name             NullString `json:"name"`
+	CreatorAddress   Address    `json:"creator_address"`
+	ProfileImageURL  NullString `json:"profile_image_url"`
+	ProfileBannerURL NullString `json:"profile_banner_url"`
+	BadgeURL         NullString `json:"badge_url"`
 }
 
 // ContractGalleryRepository represents a repository for interacting with persisted contracts

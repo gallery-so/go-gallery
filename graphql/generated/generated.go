@@ -86,6 +86,12 @@ type ComplexityRoot struct {
 		UserExists func(childComplexity int) int
 	}
 
+	Badge struct {
+		ContractID func(childComplexity int) int
+		ImageURL   func(childComplexity int) int
+		Name       func(childComplexity int) int
+	}
+
 	ChainAddress struct {
 		Address func(childComplexity int) int
 		Chain   func(childComplexity int) int
@@ -149,25 +155,31 @@ type ComplexityRoot struct {
 	}
 
 	Community struct {
-		Chain           func(childComplexity int) int
-		ContractAddress func(childComplexity int) int
-		CreatorAddress  func(childComplexity int) int
-		Description     func(childComplexity int) int
-		ID              func(childComplexity int) int
-		LastUpdated     func(childComplexity int) int
-		Name            func(childComplexity int) int
-		Owners          func(childComplexity int) int
-		PreviewImage    func(childComplexity int) int
+		BadgeURL         func(childComplexity int) int
+		Chain            func(childComplexity int) int
+		ContractAddress  func(childComplexity int) int
+		CreatorAddress   func(childComplexity int) int
+		Description      func(childComplexity int) int
+		ID               func(childComplexity int) int
+		LastUpdated      func(childComplexity int) int
+		Name             func(childComplexity int) int
+		Owners           func(childComplexity int) int
+		PreviewImage     func(childComplexity int) int
+		ProfileBannerURL func(childComplexity int) int
+		ProfileImageURL  func(childComplexity int) int
 	}
 
 	Contract struct {
-		Chain           func(childComplexity int) int
-		ContractAddress func(childComplexity int) int
-		CreatorAddress  func(childComplexity int) int
-		Dbid            func(childComplexity int) int
-		ID              func(childComplexity int) int
-		LastUpdated     func(childComplexity int) int
-		Name            func(childComplexity int) int
+		BadgeURL         func(childComplexity int) int
+		Chain            func(childComplexity int) int
+		ContractAddress  func(childComplexity int) int
+		CreatorAddress   func(childComplexity int) int
+		Dbid             func(childComplexity int) int
+		ID               func(childComplexity int) int
+		LastUpdated      func(childComplexity int) int
+		Name             func(childComplexity int) int
+		ProfileBannerURL func(childComplexity int) int
+		ProfileImageURL  func(childComplexity int) int
 	}
 
 	CreateCollectionPayload struct {
@@ -285,6 +297,7 @@ type ComplexityRoot struct {
 	}
 
 	GalleryUser struct {
+		Badges              func(childComplexity int) int
 		Bio                 func(childComplexity int) int
 		Dbid                func(childComplexity int) int
 		Followers           func(childComplexity int) int
@@ -613,6 +626,7 @@ type GalleryUserResolver interface {
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
+	Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error)
 
 	Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
@@ -763,6 +777,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AuthNonce.UserExists(childComplexity), true
+
+	case "Badge.contractId":
+		if e.complexity.Badge.ContractID == nil {
+			break
+		}
+
+		return e.complexity.Badge.ContractID(childComplexity), true
+
+	case "Badge.imageURL":
+		if e.complexity.Badge.ImageURL == nil {
+			break
+		}
+
+		return e.complexity.Badge.ImageURL(childComplexity), true
+
+	case "Badge.name":
+		if e.complexity.Badge.Name == nil {
+			break
+		}
+
+		return e.complexity.Badge.Name(childComplexity), true
 
 	case "ChainAddress.address":
 		if e.complexity.ChainAddress.Address == nil {
@@ -1009,6 +1044,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CollectorsNoteAddedToTokenFeedEventData.Token(childComplexity), true
 
+	case "Community.badgeURL":
+		if e.complexity.Community.BadgeURL == nil {
+			break
+		}
+
+		return e.complexity.Community.BadgeURL(childComplexity), true
+
 	case "Community.chain":
 		if e.complexity.Community.Chain == nil {
 			break
@@ -1072,6 +1114,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.PreviewImage(childComplexity), true
 
+	case "Community.profileBannerURL":
+		if e.complexity.Community.ProfileBannerURL == nil {
+			break
+		}
+
+		return e.complexity.Community.ProfileBannerURL(childComplexity), true
+
+	case "Community.profileImageURL":
+		if e.complexity.Community.ProfileImageURL == nil {
+			break
+		}
+
+		return e.complexity.Community.ProfileImageURL(childComplexity), true
+
+	case "Contract.badgeURL":
+		if e.complexity.Contract.BadgeURL == nil {
+			break
+		}
+
+		return e.complexity.Contract.BadgeURL(childComplexity), true
+
 	case "Contract.chain":
 		if e.complexity.Contract.Chain == nil {
 			break
@@ -1120,6 +1183,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Contract.Name(childComplexity), true
+
+	case "Contract.profileBannerURL":
+		if e.complexity.Contract.ProfileBannerURL == nil {
+			break
+		}
+
+		return e.complexity.Contract.ProfileBannerURL(childComplexity), true
+
+	case "Contract.profileImageURL":
+		if e.complexity.Contract.ProfileImageURL == nil {
+			break
+		}
+
+		return e.complexity.Contract.ProfileImageURL(childComplexity), true
 
 	case "CreateCollectionPayload.collection":
 		if e.complexity.CreateCollectionPayload.Collection == nil {
@@ -1393,6 +1470,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Gallery.Owner(childComplexity), true
+
+	case "GalleryUser.badges":
+		if e.complexity.GalleryUser.Badges == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Badges(childComplexity), true
 
 	case "GalleryUser.bio":
 		if e.complexity.GalleryUser.Bio == nil {
@@ -2845,6 +2929,7 @@ type GalleryUser implements Node {
 
     wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
+    badges: [Badge] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
@@ -2867,6 +2952,12 @@ type ChainAddress {
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
+}
+
+type Badge {
+    name: String
+    imageURL: String!
+    contractId: DBID
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
@@ -3111,6 +3202,9 @@ type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
     name: String
     description: String
     previewImage: String
+    profileImageURL: String
+    profileBannerURL: String
+    badgeURL: String
 
     owners: [TokenHolder]
 }
@@ -3125,6 +3219,9 @@ type Contract implements Node {
     creatorAddress: ChainAddress
     chain: Chain
     name: String
+    profileImageURL: String
+    profileBannerURL: String
+    badgeURL: String
 }
 
 # We have this extra type in case we need to stick authed data
@@ -4542,6 +4639,105 @@ func (ec *executionContext) _AuthNonce_userExists(ctx context.Context, field gra
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Badge_name(ctx context.Context, field graphql.CollectedField, obj *model.Badge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Badge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Badge_imageURL(ctx context.Context, field graphql.CollectedField, obj *model.Badge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Badge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Badge_contractId(ctx context.Context, field graphql.CollectedField, obj *model.Badge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Badge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContractID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.DBID)
+	fc.Result = res
+	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _ChainAddress_address(ctx context.Context, field graphql.CollectedField, obj *persist.ChainAddress) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -5930,6 +6126,102 @@ func (ec *executionContext) _Community_previewImage(ctx context.Context, field g
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Community_profileImageURL(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Community_profileBannerURL(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileBannerURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Community_badgeURL(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BadgeURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Community_owners(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -6179,6 +6471,102 @@ func (ec *executionContext) _Contract_name(ctx context.Context, field graphql.Co
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_profileImageURL(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_profileBannerURL(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileBannerURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Contract_badgeURL(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Contract",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BadgeURL, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7743,6 +8131,38 @@ func (ec *executionContext) _GalleryUser_galleries(ctx context.Context, field gr
 	res := resTmp.([]*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_badges(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().Badges(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Badge)
+	fc.Result = res
+	return ec.marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_isAuthenticatedUser(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -16842,6 +17262,51 @@ func (ec *executionContext) _AuthNonce(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var badgeImplementors = []string{"Badge"}
+
+func (ec *executionContext) _Badge(ctx context.Context, sel ast.SelectionSet, obj *model.Badge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, badgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Badge")
+		case "name":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Badge_name(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "imageURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Badge_imageURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "contractId":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Badge_contractId(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var chainAddressImplementors = []string{"ChainAddress", "GalleryUserOrAddress"}
 
 func (ec *executionContext) _ChainAddress(ctx context.Context, sel ast.SelectionSet, obj *persist.ChainAddress) graphql.Marshaler {
@@ -17454,6 +17919,27 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "profileImageURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Community_profileImageURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "profileBannerURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Community_profileBannerURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "badgeURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Community_badgeURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		case "owners":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Community_owners(ctx, field, obj)
@@ -17533,6 +18019,27 @@ func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet,
 		case "name":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Contract_name(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "profileImageURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_profileImageURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "profileBannerURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_profileBannerURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "badgeURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Contract_badgeURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -18569,6 +19076,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._GalleryUser_galleries(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "badges":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_badges(ctx, field, obj)
 				return res
 			}
 
@@ -21985,6 +22509,54 @@ func (ec *executionContext) unmarshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgal
 func (ec *executionContext) marshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v persist.Address) graphql.Marshaler {
 	res := graphql.MarshalString(string(v))
 	return res
+}
+
+func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOBadge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOBadge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v *model.Badge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Badge(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
