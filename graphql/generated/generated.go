@@ -306,6 +306,7 @@ type ComplexityRoot struct {
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
 		Tokens              func(childComplexity int) int
+		Traits              func(childComplexity int) int
 		Username            func(childComplexity int) int
 		Wallets             func(childComplexity int) int
 	}
@@ -422,6 +423,7 @@ type ComplexityRoot struct {
 		TokenByID               func(childComplexity int, id persist.DBID) int
 		UserByID                func(childComplexity int, id persist.DBID) int
 		UserByUsername          func(childComplexity int, username string) int
+		UsersWithTrait          func(childComplexity int, trait string) int
 		Viewer                  func(childComplexity int) int
 	}
 
@@ -662,6 +664,7 @@ type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerOrError, error)
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error)
+	UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
@@ -1534,6 +1537,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Tokens(childComplexity), true
 
+	case "GalleryUser.traits":
+		if e.complexity.GalleryUser.Traits == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Traits(childComplexity), true
+
 	case "GalleryUser.username":
 		if e.complexity.GalleryUser.Username == nil {
 			break
@@ -2222,6 +2232,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.UserByUsername(childComplexity, args["username"].(string)), true
+
+	case "Query.usersWithTrait":
+		if e.complexity.Query.UsersWithTrait == nil {
+			break
+		}
+
+		args, err := ec.field_Query_usersWithTrait_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UsersWithTrait(childComplexity, args["trait"].(string)), true
 
 	case "Query.viewer":
 		if e.complexity.Query.Viewer == nil {
@@ -2921,6 +2943,7 @@ type GalleryUser implements Node {
     dbid: DBID!
     username: String
     bio: String
+    traits: String
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -3374,6 +3397,7 @@ type Query {
     viewer: ViewerOrError @authRequired
     userByUsername(username: String!): UserByUsernameOrError
     userById(id: DBID!): UserByIdOrError
+    usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
     tokenById(id: DBID!): TokenByIdOrError
@@ -4332,6 +4356,21 @@ func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context,
 		}
 	}
 	args["username"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_usersWithTrait_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["trait"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("trait"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["trait"] = arg0
 	return args, nil
 }
 
@@ -8037,6 +8076,38 @@ func (ec *executionContext) _GalleryUser_bio(ctx context.Context, field graphql.
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _GalleryUser_traits(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Traits, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -10885,6 +10956,45 @@ func (ec *executionContext) _Query_userById(ctx context.Context, field graphql.C
 	res := resTmp.(model.UserByIDOrError)
 	fc.Result = res
 	return ec.marshalOUserByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByIDOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_usersWithTrait(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_usersWithTrait_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().UsersWithTrait(rctx, args["trait"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_membershipTiers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -19032,6 +19142,13 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "traits":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GalleryUser_traits(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		case "tokens":
 			field := field
 
@@ -19974,6 +20091,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_userById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "usersWithTrait":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_usersWithTrait(ctx, field)
 				return res
 			}
 

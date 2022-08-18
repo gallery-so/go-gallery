@@ -240,6 +240,7 @@ type User struct {
 	UsernameIdempotent sql.NullString
 	Wallets            persist.WalletList
 	Bio                sql.NullString
+	Traits             pgtype.JSONB
 }
 
 type UserEvent struct {

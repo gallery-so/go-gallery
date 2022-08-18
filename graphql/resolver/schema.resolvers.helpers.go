@@ -180,6 +180,21 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return userToModel(ctx, *user), nil
 }
 
+func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error) {
+	users, err := publicapi.For(ctx).User.GetUsersWithTrait(ctx, trait)
+
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]*model.GalleryUser, len(users))
+	for i, user := range users {
+		models[i] = userToModel(ctx, user)
+	}
+
+	return models, nil
+}
+
 func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
 	contracts, err := publicapi.For(ctx).Contract.GetContractsByUserID(ctx, userID)
 

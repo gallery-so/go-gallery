@@ -2,8 +2,13 @@ package persist
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
+	"strings"
 )
+
+type Traits map[string]interface{}
 
 // User represents a user with all of their addresses
 type User struct {
@@ -16,6 +21,7 @@ type User struct {
 	UsernameIdempotent NullString      `json:"username_idempotent"`
 	Wallets            []Wallet        `json:"wallets"`
 	Bio                NullString      `json:"bio"`
+	Traits             Traits          `json:"traits"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
@@ -48,6 +54,25 @@ type UserRepository interface {
 	AddFollower(pCtx context.Context, follower DBID, followee DBID) (refollowed bool, err error)
 	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
 	UserFollowsUser(pCtx context.Context, userA DBID, userB DBID) (bool, error)
+}
+
+// Scan implements the database/sql Scanner interface for the Traits type
+func (m *Traits) Scan(src interface{}) error {
+	if src == nil {
+		*m = Traits{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), m)
+}
+
+// Value implements the database/sql/driver Valuer interface for the Traits type
+func (m Traits) Value() (driver.Value, error) {
+	val, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte(strings.ToValidUTF8(strings.ReplaceAll(string(val), "\\u0000", ""), "")), nil
 }
 
 // ErrUserNotFound is returned when a user is not found

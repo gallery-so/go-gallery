@@ -293,6 +293,46 @@ func (q *Queries) GetContractByID(ctx context.Context, id persist.DBID) (Contrac
 	return i, err
 }
 
+const getContractsByUserID = `-- name: GetContractsByUserID :many
+SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url FROM contracts, tokens
+    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
+    AND tokens.deleted = false AND contracts.deleted = false
+`
+
+func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Contract, error) {
+	rows, err := q.db.Query(ctx, getContractsByUserID, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Contract
+	for rows.Next() {
+		var i Contract
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Symbol,
+			&i.Address,
+			&i.CreatorAddress,
+			&i.Chain,
+			&i.ProfileBannerUrl,
+			&i.ProfileImageUrl,
+			&i.BadgeUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEvent = `-- name: GetEvent :one
 SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = $1 AND deleted = false
 `
@@ -756,7 +796,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -772,12 +812,13 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.UsernameIdempotent,
 		&i.Wallets,
 		&i.Bio,
+		&i.Traits,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -793,8 +834,44 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.UsernameIdempotent,
 		&i.Wallets,
 		&i.Bio,
+		&i.Traits,
 	)
 	return i, err
+}
+
+const getUsersWithTrait = `-- name: GetUsersWithTrait :many
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+`
+
+func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersWithTrait, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getWalletByChainAddress = `-- name: GetWalletByChainAddress :one

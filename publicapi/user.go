@@ -73,6 +73,22 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sql
 	return &user, nil
 }
 
+func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]sqlc.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"trait": {trait, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	users, err := api.loaders.UsersWithTrait.Load(trait)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
