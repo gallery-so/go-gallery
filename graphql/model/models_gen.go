@@ -188,6 +188,12 @@ type AuthNonce struct {
 
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
 
+type Badge struct {
+	Name       *string       `json:"name"`
+	ImageURL   string        `json:"imageURL"`
+	ContractID *persist.DBID `json:"contractId"`
+}
+
 type Collection struct {
 	Dbid           persist.DBID       `json:"dbid"`
 	Version        *int               `json:"version"`
@@ -556,7 +562,7 @@ type GalleryUser struct {
 	Tokens              []*Token       `json:"tokens"`
 	Wallets             []*Wallet      `json:"wallets"`
 	Galleries           []*Gallery     `json:"galleries"`
-	Contracts           []*Contract    `json:"contracts"`
+	Badges              []*Badge       `json:"badges"`
 	IsAuthenticatedUser *bool          `json:"isAuthenticatedUser"`
 	Followers           []*GalleryUser `json:"followers"`
 	Following           []*GalleryUser `json:"following"`

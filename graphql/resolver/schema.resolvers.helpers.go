@@ -180,16 +180,16 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return userToModel(ctx, *user), nil
 }
 
-func resolveContractsByUserID(ctx context.Context, userID persist.DBID) ([]*model.Contract, error) {
-	contracts, err := publicapi.For(ctx).Contract.GetContractByUserID(ctx, userID)
+func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
+	contracts, err := publicapi.For(ctx).Contract.GetContractsByUserID(ctx, userID)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var result []*model.Contract
+	var result []*model.Badge
 	for _, contract := range contracts {
-		result = append(result, contractToModel(ctx, contract))
+		result = append(result, contractToBadgeModel(ctx, contract))
 	}
 
 	return result, nil
@@ -799,7 +799,7 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 		Followers: nil,
 		Following: nil,
 		Tokens:    nil,
-		Contracts: nil,
+		Badges:    nil,
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
@@ -848,6 +848,14 @@ func contractToModel(ctx context.Context, contract sqlc.Contract) *model.Contrac
 	}
 }
 
+func contractToBadgeModel(ctx context.Context, contract sqlc.Contract) *model.Badge {
+
+	return &model.Badge{
+		ContractID: &contract.ID,
+		Name:       &contract.Name.String,
+		ImageURL:   contract.BadgeUrl.String,
+	}
+}
 func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.Collection {
 	version := int(collection.Version.Int32)
 

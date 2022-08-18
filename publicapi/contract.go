@@ -37,10 +37,10 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 	return &contract, nil
 }
 
-func (api ContractAPI) GetContractByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Contract, error) {
+func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Contract, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"contractID": {userID, "required"},
+		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
 	}

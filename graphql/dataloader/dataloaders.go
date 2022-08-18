@@ -9,11 +9,11 @@
 //go:generate go run github.com/vektah/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Membership
 //go:generate go run github.com/vektah/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Wallet
 //go:generate go run github.com/vektah/dataloaden WalletLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Wallet
-//go:generate go run github.com/vektah/dataloaden WalletsLoaderByUserID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Wallet
 //go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
-//go:generate go run github.com/vektah/dataloaden ContractsLoaderByUserID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Contract
+//go:generate go run github.com/vektah/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
 //go:generate go run github.com/vektah/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
@@ -59,7 +59,7 @@ type Loaders struct {
 	TokensByUserID           TokensLoaderByID
 	NewTokensByFeedEventID   TokensLoaderByID
 	ContractByContractId     ContractLoaderByID
-	ContractsByUserID        ContractsLoaderByUserID
+	ContractsByUserID        ContractsLoaderByID
 	ContractByChainAddress   ContractLoaderByChainAddress
 	FollowersByUserId        UsersLoaderByID
 	FollowingByUserId        UsersLoaderByID
@@ -185,10 +185,10 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadContractByContractID(ctx, loaders, q),
 	}
 
-	loaders.ContractByContractId = ContractLoaderByID{
+	loaders.ContractsByUserID = ContractsLoaderByID{
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
-		fetch:    loadContractByContractID(ctx, loaders, q),
+		fetch:    loadContractsByUserID(ctx, loaders, q),
 	}
 
 	loaders.EventByEventId = EventLoaderByID{
@@ -807,7 +807,7 @@ func loadContractsByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 		b.Query(func(i int, c []sqlc.Contract, err error) {
 			contracts[i], errors[i] = c, err
 
-			// Add results to the TokenByTokenID loader's cache
+			// Add results to the ContractByContractId loader's cache
 			if errors[i] == nil {
 				for _, contract := range contracts[i] {
 					loaders.ContractByContractId.Prime(contract.ID, contract)

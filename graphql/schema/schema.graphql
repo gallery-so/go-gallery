@@ -61,7 +61,7 @@ type GalleryUser implements Node {
 
     wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
-    contracts: [Contract] @goField(forceResolver: true)
+    badges: [Badge] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
@@ -84,6 +84,12 @@ type ChainAddress {
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
+}
+
+type Badge {
+    name: String
+    imageURL: String!
+    contractId: DBID
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
