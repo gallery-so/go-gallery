@@ -2,6 +2,7 @@
 //go:generate go run github.com/vektah/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.User
 //go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.User
 //go:generate go run github.com/vektah/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/sqlc.User
+//go:generate go run github.com/vektah/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/sqlc.User
 //go:generate go run github.com/vektah/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Gallery
 //go:generate go run github.com/vektah/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Gallery
 //go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Collection
@@ -44,6 +45,7 @@ type Loaders struct {
 
 	UserByUserId             UserLoaderByID
 	UserByUsername           UserLoaderByString
+	UsersWithTrait           UsersLoaderByString
 	GalleryByGalleryId       GalleryLoaderByID
 	GalleryByCollectionId    GalleryLoaderByID
 	GalleriesByUserId        GalleriesLoaderByID
@@ -81,6 +83,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadUserByUsername(ctx, loaders, q),
+	}
+
+	loaders.UsersWithTrait = UsersLoaderByString{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadUsersWithTrait(ctx, loaders, q),
 	}
 
 	loaders.GalleryByGalleryId = GalleryLoaderByID{
@@ -376,6 +384,31 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 			}
 
 			users[i], errors[i] = user, err
+		})
+
+		return users, errors
+	}
+}
+
+func loadUsersWithTrait(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]string) ([][]sqlc.User, []error) {
+	return func(trait []string) ([][]sqlc.User, []error) {
+		users := make([][]sqlc.User, len(trait))
+		errors := make([]error, len(trait))
+
+		b := q.GetUsersWithTraitBatch(ctx, trait)
+		defer b.Close()
+
+		b.Query(func(i int, user []sqlc.User, err error) {
+
+			users[i], errors[i] = user, err
+
+			// Add results to other loaders' caches
+			if err == nil {
+				for _, u := range user {
+					loaders.UserByUserId.Prime(u.ID, u)
+				}
+			}
+
 		})
 
 		return users, errors
@@ -801,7 +834,7 @@ func loadContractsByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 		contracts := make([][]sqlc.Contract, len(contractIDs))
 		errors := make([]error, len(contractIDs))
 
-		b := q.GetContractsByUserID(ctx, contractIDs)
+		b := q.GetContractsByUserIDBatch(ctx, contractIDs)
 		defer b.Close()
 
 		b.Query(func(i int, c []sqlc.Contract, err error) {

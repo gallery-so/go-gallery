@@ -10,6 +10,12 @@ SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND de
 -- name: GetUserByUsernameBatch :batchone
 SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 
+-- name: GetUsersWithTrait :many
+SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;
+
+-- name: GetUsersWithTraitBatch :batchmany
+SELECT * FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false;
+
 -- name: GetGalleryById :one
 SELECT * FROM galleries WHERE id = $1 AND deleted = false;
 
@@ -109,7 +115,12 @@ select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 -- name: GetContractByChainAddressBatch :batchone
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
 
--- name: GetContractsByUserID :batchmany
+-- name: GetContractsByUserID :many
+SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
+    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
+    AND tokens.deleted = false AND contracts.deleted = false;
+
+-- name: GetContractsByUserIDBatch :batchmany
 SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
     AND tokens.deleted = false AND contracts.deleted = false;

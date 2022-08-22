@@ -53,6 +53,7 @@ type GalleryUser implements Node {
     dbid: DBID!
     username: String
     bio: String
+    traits: String
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -506,6 +507,7 @@ type Query {
     viewer: ViewerOrError @authRequired
     userByUsername(username: String!): UserByUsernameOrError
     userById(id: DBID!): UserByIdOrError
+    usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
     tokenById(id: DBID!): TokenByIdOrError

@@ -33,6 +33,7 @@ type UserRepository struct {
 	addFollowerStmt          *sql.Stmt
 	removeFollowerStmt       *sql.Stmt
 	followsUserStmt          *sql.Stmt
+	userHasTrait             *sql.Stmt
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -47,13 +48,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS) VALUES ($1, $2, $3, $4, $5) RETURNING ID;`)
 	checkNoErr(err)
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(WALLETS) AND DELETED = false;`)
+	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(WALLETS) AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
+	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = TRUE WHERE ID = $1;`)
@@ -234,7 +235,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 
 	user := persist.User{}
 	walletIDs := []persist.DBID{}
-	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, pq.Array(&walletIDs), &user.CreationTime, &user.LastUpdated)
+	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{UserID: pID}
@@ -275,7 +276,7 @@ func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress p
 func (u *UserRepository) GetByWalletID(pCtx context.Context, pWalletID persist.DBID) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWalletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWalletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{WalletID: pWalletID}
@@ -291,7 +292,7 @@ func (u *UserRepository) GetByWalletID(pCtx context.Context, pWalletID persist.D
 func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{Username: pUsername}

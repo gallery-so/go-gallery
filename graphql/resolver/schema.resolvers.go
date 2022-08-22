@@ -586,6 +586,10 @@ func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.Us
 	return resolveGalleryUserByUserID(ctx, id)
 }
 
+func (r *queryResolver) UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error) {
+	return resolveGalleryUsersWithTrait(ctx, trait)
+}
+
 func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error) {
 	api := publicapi.For(ctx)
 

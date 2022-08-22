@@ -243,30 +243,30 @@ func (b *GetContractByIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getContractsByUserID = `-- name: GetContractsByUserID :batchmany
+const getContractsByUserIDBatch = `-- name: GetContractsByUserIDBatch :batchmany
 SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
     AND tokens.deleted = false AND contracts.deleted = false
 `
 
-type GetContractsByUserIDBatchResults struct {
+type GetContractsByUserIDBatchBatchResults struct {
 	br  pgx.BatchResults
 	ind int
 }
 
-func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID []persist.DBID) *GetContractsByUserIDBatchResults {
+func (q *Queries) GetContractsByUserIDBatch(ctx context.Context, ownerUserID []persist.DBID) *GetContractsByUserIDBatchBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range ownerUserID {
 		vals := []interface{}{
 			a,
 		}
-		batch.Queue(getContractsByUserID, vals...)
+		batch.Queue(getContractsByUserIDBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetContractsByUserIDBatchResults{br, 0}
+	return &GetContractsByUserIDBatchBatchResults{br, 0}
 }
 
-func (b *GetContractsByUserIDBatchResults) Query(f func(int, []Contract, error)) {
+func (b *GetContractsByUserIDBatchBatchResults) Query(f func(int, []Contract, error)) {
 	for {
 		rows, err := b.br.Query()
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
@@ -303,7 +303,7 @@ func (b *GetContractsByUserIDBatchResults) Query(f func(int, []Contract, error))
 	}
 }
 
-func (b *GetContractsByUserIDBatchResults) Close() error {
+func (b *GetContractsByUserIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
@@ -359,7 +359,7 @@ func (b *GetEventByIdBatchBatchResults) Close() error {
 }
 
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits FROM follows f
     INNER JOIN users u ON f.follower = u.id
     WHERE f.followee = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -402,6 +402,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.UsernameIdempotent,
 				&i.Wallets,
 				&i.Bio,
+				&i.Traits,
 			); err != nil {
 				break
 			}
@@ -420,7 +421,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Close() error {
 }
 
 const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -463,6 +464,7 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.UsernameIdempotent,
 				&i.Wallets,
 				&i.Bio,
+				&i.Traits,
 			); err != nil {
 				break
 			}
@@ -1136,7 +1138,7 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 }
 
 const getUserByIdBatch = `-- name: GetUserByIdBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE id = $1 AND deleted = false
 `
 
 type GetUserByIdBatchBatchResults struct {
@@ -1170,6 +1172,7 @@ func (b *GetUserByIdBatchBatchResults) QueryRow(f func(int, User, error)) {
 			&i.UsernameIdempotent,
 			&i.Wallets,
 			&i.Bio,
+			&i.Traits,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -1186,7 +1189,7 @@ func (b *GetUserByIdBatchBatchResults) Close() error {
 }
 
 const getUserByUsernameBatch = `-- name: GetUserByUsernameBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 type GetUserByUsernameBatchBatchResults struct {
@@ -1220,6 +1223,7 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.UsernameIdempotent,
 			&i.Wallets,
 			&i.Bio,
+			&i.Traits,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -1322,6 +1326,65 @@ func (b *GetUserFeedViewBatchBatchResults) Query(f func(int, []FeedEvent, error)
 }
 
 func (b *GetUserFeedViewBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+`
+
+type GetUsersWithTraitBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetUsersWithTraitBatch(ctx context.Context, dollar_1 []string) *GetUsersWithTraitBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range dollar_1 {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getUsersWithTraitBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUsersWithTraitBatchBatchResults{br, 0}
+}
+
+func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []User
+		for rows.Next() {
+			var i User
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.Version,
+				&i.LastUpdated,
+				&i.CreatedAt,
+				&i.Username,
+				&i.UsernameIdempotent,
+				&i.Wallets,
+				&i.Bio,
+				&i.Traits,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetUsersWithTraitBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
