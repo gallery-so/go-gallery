@@ -67,10 +67,12 @@ const (
 	ChainOptimism
 	// ChainTezos represents the Tezos blockchain
 	ChainTezos
+	// ChainPOAP represents a POAP
+	ChainPOAP
 
 	// MaxChainValue is the highest valid chain value, and should always be updated to
 	// point to the most recently added chain type.
-	MaxChainValue = ChainTezos
+	MaxChainValue = ChainPOAP
 )
 
 const (
