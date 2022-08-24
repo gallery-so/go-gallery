@@ -63,13 +63,15 @@ type poapToken struct {
 // Provider is an the struct for retrieving data from the Tezos blockchain
 type Provider struct {
 	apiURL     string
+	apiKey     string
 	httpClient *http.Client
 }
 
 // NewProvider creates a new Tezos Provider
-func NewProvider(httpClient *http.Client) *Provider {
+func NewProvider(httpClient *http.Client, apiKey string) *Provider {
 	return &Provider{
 		apiURL:     "https://api.poap.tech",
+		apiKey:     apiKey,
 		httpClient: httpClient,
 	}
 }
@@ -89,6 +91,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	if err != nil {
 		return nil, nil, err
 	}
+	req.Header.Set("X-API-KEY", d.apiKey)
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
 		return nil, nil, err
@@ -117,6 +120,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	if err != nil {
 		return nil, nil, err
 	}
+	req.Header.Set("X-API-KEY", d.apiKey)
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
 		return nil, nil, err
