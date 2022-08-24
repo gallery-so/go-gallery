@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -45,6 +46,8 @@ var errNoContracts = errors.New("only one contract exists for POAP and all token
     "created": "string"
   }
 */
+
+type tokenID string
 type poapToken struct {
 	Event struct {
 		ID          int    `json:"id"`
@@ -55,9 +58,9 @@ type poapToken struct {
 		Description string `json:"description"`
 		Supply      int    `json:"supply"`
 	} `json:"event"`
-	TokenID string `json:"tokenId"`
-	Owner   string `json:"owner"`
-	Chain   string `json:"chain"`
+	TokenID tokenID `json:"tokenId"`
+	Owner   string  `json:"owner"`
+	Chain   string  `json:"chain"`
 }
 
 // Provider is an the struct for retrieving data from the Tezos blockchain
@@ -179,8 +182,7 @@ func (d *Provider) poapsToTokens(pPoap []poapToken) []multichain.ChainAgnosticTo
 func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 
 	return multichain.ChainAgnosticToken{
-		// TODO is this the right base?
-		TokenID:         persist.TokenID(pPoap.TokenID),
+		TokenID:         persist.TokenID(pPoap.TokenID.toBase16()),
 		Name:            pPoap.Event.Name,
 		Description:     pPoap.Event.Description,
 		Quantity:        "1",
@@ -200,4 +202,12 @@ func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 			"chain":       pPoap.Chain,
 		},
 	}
+}
+
+func (t tokenID) toBigInt() *big.Int {
+	i, _ := big.NewInt(0).SetString(string(t), 10)
+	return i
+}
+func (t tokenID) toBase16() string {
+	return t.toBigInt().Text(16)
 }
