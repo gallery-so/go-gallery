@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/eth"
-	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -329,35 +328,36 @@ func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio 
 	return nil
 }
 
-// MergeUsers merges two users together
-func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepo persist.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
-	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
-	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
-	if nonce == "" {
-		return auth.ErrNonceNotFound{ChainAddress: chainAddress}
-	}
-	if id != pInput.SecondUserID {
-		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
-	}
+// Not in use
+// // MergeUsers merges two users together
+// func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepo persist.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
+// 	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
+// 	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
+// 	if nonce == "" {
+// 		return auth.ErrNonceNotFound{ChainAddress: chainAddress}
+// 	}
+// 	if id != pInput.SecondUserID {
+// 		return fmt.Errorf("wrong nonce: user %s is not the second user", pInput.SecondUserID)
+// 	}
 
-	if pInput.WalletType != persist.WalletTypeEOA {
-		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
-			return auth.ErrNonceMismatch
-		}
-	}
+// 	if pInput.WalletType != persist.WalletTypeEOA {
+// 		if auth.NewNoncePrepend+nonce != pInput.Nonce && auth.NoncePrepend+nonce != pInput.Nonce {
+// 			return auth.ErrNonceMismatch
+// 		}
+// 	}
 
-	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature, nonce, chainAddress, pInput.WalletType)
-	if err != nil {
-		return err
-	}
+// 	sigValidBool, err := multichainProvider.VerifySignature(pCtx, pInput.Signature, nonce, chainAddress, pInput.WalletType)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if !sigValidBool {
-		return fmt.Errorf("signature is invalid for address %s", pInput.Address)
-	}
+// 	if !sigValidBool {
+// 		return fmt.Errorf("signature is invalid for address %s", pInput.Address)
+// 	}
 
-	return userRepo.MergeUsers(pCtx, pUserID, pInput.SecondUserID)
+// 	return userRepo.MergeUsers(pCtx, pUserID, pInput.SecondUserID)
 
-}
+// }
 
 // TODO need interface for interacting with other chains for this
 func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo persist.UserRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {

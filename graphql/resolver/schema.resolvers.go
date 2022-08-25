@@ -782,6 +782,14 @@ func (r *chainAddressInputResolver) Chain(ctx context.Context, obj *persist.Chai
 	return obj.GQLSetChainFromResolver(data)
 }
 
+func (r *chainPubKeyInputResolver) PubKey(ctx context.Context, obj *persist.ChainPubKey, data persist.PubKey) error {
+	return obj.GQLSetPubKeyFromResolver(data)
+}
+
+func (r *chainPubKeyInputResolver) Chain(ctx context.Context, obj *persist.ChainPubKey, data persist.Chain) error {
+	return obj.GQLSetChainFromResolver(data)
+}
+
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
@@ -878,6 +886,11 @@ func (r *Resolver) ChainAddressInput() generated.ChainAddressInputResolver {
 	return &chainAddressInputResolver{r}
 }
 
+// ChainPubKeyInput returns generated.ChainPubKeyInputResolver implementation.
+func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
+	return &chainPubKeyInputResolver{r}
+}
+
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
@@ -902,3 +915,4 @@ type userFollowedUsersFeedEventDataResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
+type chainPubKeyInputResolver struct{ *Resolver }

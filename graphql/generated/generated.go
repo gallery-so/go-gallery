@@ -62,6 +62,7 @@ type ResolverRoot interface {
 	Viewer() ViewerResolver
 	Wallet() WalletResolver
 	ChainAddressInput() ChainAddressInputResolver
+	ChainPubKeyInput() ChainPubKeyInputResolver
 }
 
 type DirectiveRoot struct {
@@ -95,6 +96,11 @@ type ComplexityRoot struct {
 	ChainAddress struct {
 		Address func(childComplexity int) int
 		Chain   func(childComplexity int) int
+	}
+
+	ChainPubKey struct {
+		Chain  func(childComplexity int) int
+		PubKey func(childComplexity int) int
 	}
 
 	Collection struct {
@@ -716,6 +722,10 @@ type ChainAddressInputResolver interface {
 	Address(ctx context.Context, obj *persist.ChainAddress, data persist.Address) error
 	Chain(ctx context.Context, obj *persist.ChainAddress, data persist.Chain) error
 }
+type ChainPubKeyInputResolver interface {
+	PubKey(ctx context.Context, obj *persist.ChainPubKey, data persist.PubKey) error
+	Chain(ctx context.Context, obj *persist.ChainPubKey, data persist.Chain) error
+}
 
 type executableSchema struct {
 	resolvers  ResolverRoot
@@ -815,6 +825,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ChainAddress.Chain(childComplexity), true
+
+	case "ChainPubKey.chain":
+		if e.complexity.ChainPubKey.Chain == nil {
+			break
+		}
+
+		return e.complexity.ChainPubKey.Chain(childComplexity), true
+
+	case "ChainPubKey.pubKey":
+		if e.complexity.ChainPubKey.PubKey == nil {
+			break
+		}
+
+		return e.complexity.ChainPubKey.PubKey(childComplexity), true
 
 	case "Collection.collectorsNote":
 		if e.complexity.Collection.CollectorsNote == nil {
@@ -2928,6 +2952,7 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar Address
+scalar PubKey
 scalar DBID
 
 interface Node {
@@ -2972,8 +2997,20 @@ type ChainAddress {
     chain: Chain
 }
 
+
+type ChainPubKey {
+  pubKey: PubKey
+  chain: Chain
+}
+
+
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
+}
+
+input ChainPubKeyInput {
+    pubKey: PubKey! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
 }
 
@@ -3683,7 +3720,7 @@ input AuthMechanism {
 }
 
 input EoaAuth {
-    chainAddress: ChainAddressInput!
+    chainPubKey: ChainPubKeyInput!
     nonce: String!
     signature: String! @scrub
 }
@@ -4818,6 +4855,70 @@ func (ec *executionContext) _ChainAddress_chain(ctx context.Context, field graph
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ChainAddress",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainPubKey_pubKey(ctx context.Context, field graphql.CollectedField, obj *persist.ChainPubKey) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainPubKey",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PubKey(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(persist.PubKey)
+	fc.Result = res
+	return ec.marshalOPubKey2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPubKey(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainPubKey_chain(ctx context.Context, field graphql.CollectedField, obj *persist.ChainPubKey) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainPubKey",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -15300,6 +15401,43 @@ func (ec *executionContext) unmarshalInputChainAddressInput(ctx context.Context,
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputChainPubKeyInput(ctx context.Context, obj interface{}) (persist.ChainPubKey, error) {
+	var it persist.ChainPubKey
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "pubKey":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pubKey"))
+			data, err := ec.unmarshalNPubKey2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPubKey(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			if err = ec.resolvers.ChainPubKeyInput().PubKey(ctx, &it, data); err != nil {
+				return it, err
+			}
+		case "chain":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
+			data, err := ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			if err = ec.resolvers.ChainPubKeyInput().Chain(ctx, &it, data); err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCollectionLayoutInput(ctx context.Context, obj interface{}) (model.CollectionLayoutInput, error) {
 	var it model.CollectionLayoutInput
 	asMap := map[string]interface{}{}
@@ -15568,11 +15706,11 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 
 	for k, v := range asMap {
 		switch k {
-		case "chainAddress":
+		case "chainPubKey":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
-			it.ChainAddress, err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainPubKey"))
+			it.ChainPubKey, err = ec.unmarshalNChainPubKeyInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainPubKey(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -17437,6 +17575,41 @@ func (ec *executionContext) _ChainAddress(ctx context.Context, sel ast.Selection
 		case "chain":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ChainAddress_chain(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var chainPubKeyImplementors = []string{"ChainPubKey"}
+
+func (ec *executionContext) _ChainPubKey(ctx context.Context, sel ast.SelectionSet, obj *persist.ChainPubKey) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainPubKeyImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainPubKey")
+		case "pubKey":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainPubKey_pubKey(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainPubKey_chain(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -22089,6 +22262,11 @@ func (ec *executionContext) unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeyd
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNChainPubKeyInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainPubKey(ctx context.Context, v interface{}) (*persist.ChainPubKey, error) {
+	res, err := ec.unmarshalInputChainPubKeyInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCollectionLayoutInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayoutInput(ctx context.Context, v interface{}) (*model.CollectionLayoutInput, error) {
 	res, err := ec.unmarshalInputCollectionLayoutInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
@@ -22276,6 +22454,22 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._PageInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNPubKey2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPubKey(ctx context.Context, v interface{}) (persist.PubKey, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := persist.PubKey(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPubKey2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPubKey(ctx context.Context, sel ast.SelectionSet, v persist.PubKey) graphql.Marshaler {
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNSetSpamPreferenceInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferenceInput(ctx context.Context, v interface{}) (model.SetSpamPreferenceInput, error) {
@@ -23602,6 +23796,17 @@ func (ec *executionContext) marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._PreviewURLSet(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOPubKey2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPubKey(ctx context.Context, v interface{}) (persist.PubKey, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := persist.PubKey(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOPubKey2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐPubKey(ctx context.Context, sel ast.SelectionSet, v persist.PubKey) graphql.Marshaler {
+	res := graphql.MarshalString(string(v))
+	return res
 }
 
 func (ec *executionContext) marshalORefreshCollectionPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRefreshCollectionPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RefreshCollectionPayloadOrError) graphql.Marshaler {

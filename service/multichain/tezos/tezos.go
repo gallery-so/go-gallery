@@ -292,8 +292,8 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 // VerifySignature will verify a signature using the ed25519 algorithm
 // the address provided must be the tezos public key, not the hashed address
-func (d *Provider) VerifySignature(pCtx context.Context, pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
-	key, err := tezos.ParseKey(pAddressStr.String())
+func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	key, err := tezos.ParseKey(pPubKey.String())
 	if err != nil {
 		return false, err
 	}
@@ -352,11 +352,6 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			publicKey, err := d.getPublicKeyFromAddress(ctx, tzToken.Account.Address.String())
-			if err != nil {
-				errChan <- err
-				return
-			}
 			med := d.makeTempMedia(agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
 
 			agnostic := multichain.ChainAgnosticToken{
@@ -368,7 +363,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				ContractAddress: tzToken.Token.Contract.Address,
 				Quantity:        persist.HexString(tzToken.Balance.toBase16String()),
 				TokenMetadata:   agnosticMetadata,
-				OwnerAddress:    publicKey,
+				OwnerAddress:    tzToken.Account.Address,
 				BlockNumber:     persist.BlockNumber(tzToken.LastLevel),
 			}
 
@@ -481,7 +476,7 @@ func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {
 	return result
 }
 
-func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address string) (persist.Address, error) {
+func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address persist.Address) (persist.Address, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/accounts/%s", d.apiURL, address), nil)
 	if err != nil {
 		return "", err
@@ -502,7 +497,7 @@ func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address string) 
 	if err != nil {
 		return "", err
 	}
-	if !strings.EqualFold(string(key.Hash()), address) {
+	if !strings.EqualFold(string(key.Hash()), address.String()) {
 		return "", fmt.Errorf("public key hash %s does not match address %s", string(key.Hash()), address)
 	}
 	return persist.Address(account.Public), nil

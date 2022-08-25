@@ -38,6 +38,7 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar Address
+scalar PubKey
 scalar DBID
 
 interface Node {
@@ -82,8 +83,20 @@ type ChainAddress {
     chain: Chain
 }
 
+
+type ChainPubKey {
+  pubKey: PubKey
+  chain: Chain
+}
+
+
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
+}
+
+input ChainPubKeyInput {
+    pubKey: PubKey! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
 }
 
@@ -793,7 +806,7 @@ input AuthMechanism {
 }
 
 input EoaAuth {
-    chainAddress: ChainAddressInput!
+    chainPubKey: ChainPubKeyInput!
     nonce: String!
     signature: String! @scrub
 }

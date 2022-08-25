@@ -46,6 +46,9 @@ models:
   Address:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Address
+  PubKey:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.PubKey
   Chain:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Chain
@@ -55,6 +58,12 @@ models:
   ChainAddressInput:
     model:
       - github.com/mikeydub/go-gallery/service/persist.ChainAddress
+  ChainPubKey:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ChainPubKey
+  ChainPubKeyInput:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.ChainPubKey
   DBID:
     model:
       - github.com/mikeydub/go-gallery/service/persist.DBID

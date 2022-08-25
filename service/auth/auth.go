@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"math/rand"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
@@ -177,7 +178,7 @@ func GenerateNonce() string {
 }
 
 type NonceAuthenticator struct {
-	ChainAddress       persist.ChainAddress
+	ChainPubKey        persist.ChainPubKey
 	Nonce              string
 	Signature          string
 	WalletType         persist.WalletType
@@ -189,13 +190,14 @@ type NonceAuthenticator struct {
 }
 
 func (e NonceAuthenticator) GetDescription() string {
-	return fmt.Sprintf("NonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.ChainAddress, e.Nonce, e.Signature, e.WalletType)
+	return fmt.Sprintf("NonceAuthenticator(address: %s, nonce: %s, signature: %s, walletType: %v)", e.ChainPubKey, e.Nonce, e.Signature, e.WalletType)
 }
 
 func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
-	nonce, userID, _ := GetUserWithNonce(pCtx, e.ChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
+	asChainAddress := e.ChainPubKey.ToChainAddress()
+	nonce, userID, _ := GetUserWithNonce(pCtx, asChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
 	if nonce == "" {
-		return nil, ErrNonceNotFound{ChainAddress: e.ChainAddress}
+		return nil, ErrNonceNotFound{ChainAddress: asChainAddress}
 	}
 
 	if e.WalletType != persist.WalletTypeEOA {
@@ -204,7 +206,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		}
 	}
 
-	sigValid, err := e.MultichainProvider.VerifySignature(pCtx, e.Signature, nonce, e.ChainAddress, e.WalletType)
+	sigValid, err := e.MultichainProvider.VerifySignature(pCtx, e.Signature, nonce, e.ChainPubKey, e.WalletType)
 	if err != nil {
 		return nil, ErrSignatureVerificationFailed{err}
 	}
@@ -213,19 +215,19 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
 
-	err = NonceRotate(pCtx, e.ChainAddress, userID, e.NonceRepo)
+	err = NonceRotate(pCtx, asChainAddress, userID, e.NonceRepo)
 	if err != nil {
 		return nil, err
 	}
 
 	walletID := persist.DBID("")
-	wallet, err := e.WalletRepo.GetByChainAddress(pCtx, e.ChainAddress)
+	wallet, err := e.WalletRepo.GetByChainAddress(pCtx, asChainAddress)
 	if err != nil {
 		walletID = wallet.ID
 	}
 
 	authResult := AuthResult{
-		Addresses: []AuthenticatedAddress{{ChainAddress: e.ChainAddress, WalletType: e.WalletType, WalletID: walletID}},
+		Addresses: []AuthenticatedAddress{{ChainAddress: asChainAddress, WalletType: e.WalletType, WalletID: walletID}},
 		UserID:    userID,
 	}
 
