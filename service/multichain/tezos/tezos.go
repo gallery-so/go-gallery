@@ -356,11 +356,6 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			publicKey, err := d.getPublicKeyFromAddress(ctx, tzToken.Account.Address)
-			if err != nil {
-				errChan <- err
-				return
-			}
 			med := d.makeTempMedia(agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
 
 			agnostic := multichain.ChainAgnosticToken{
@@ -372,7 +367,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				ContractAddress: tzToken.Token.Contract.Address,
 				Quantity:        persist.HexString(tzToken.Balance.toBase16String()),
 				TokenMetadata:   agnosticMetadata,
-				OwnerAddress:    publicKey,
+				OwnerAddress:    tzToken.Account.Address,
 				BlockNumber:     persist.BlockNumber(tzToken.LastLevel),
 			}
 
