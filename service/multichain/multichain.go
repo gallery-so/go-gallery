@@ -159,7 +159,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	for _, chain := range chains {
 		for _, wallet := range user.Wallets {
-			if wallet.Chain == chain || d.ChainAddressOverrides[wallet.Chain] == chain {
+			if wallet.Chain == chain || d.ChainAddressOverrides[chain] == wallet.Chain {
 				chainsToAddresses[chain] = append(chainsToAddresses[chain], wallet.Address)
 			}
 		}
