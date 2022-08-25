@@ -22,9 +22,9 @@ type AuthAPI struct {
 	multiChainProvider *multichain.Provider
 }
 
-func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainAddress, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
+func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
 	authenticator := auth.NonceAuthenticator{
-		ChainAddress:       chainAddress,
+		ChainPubKey:        chainAddress,
 		Nonce:              nonce,
 		Signature:          signature,
 		WalletType:         walletType,

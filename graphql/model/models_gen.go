@@ -345,9 +345,9 @@ type DeleteCollectionPayload struct {
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
 type EoaAuth struct {
-	ChainAddress *persist.ChainAddress `json:"chainAddress"`
-	Nonce        string                `json:"nonce"`
-	Signature    string                `json:"signature"`
+	ChainPubKey *persist.ChainPubKey `json:"chainPubKey"`
+	Nonce       string               `json:"nonce"`
+	Signature   string               `json:"signature"`
 }
 
 type ErrAddressOwnedByUser struct {

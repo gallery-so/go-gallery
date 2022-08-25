@@ -292,12 +292,8 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 // VerifySignature will verify a signature using the ed25519 algorithm
 // the address provided must be the tezos public key, not the hashed address
-func (d *Provider) VerifySignature(pCtx context.Context, pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
-	public, err := d.getPublicKeyFromAddress(pCtx, pAddressStr)
-	if err != nil {
-		return false, err
-	}
-	key, err := tezos.ParseKey(public.String())
+func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	key, err := tezos.ParseKey(pPubKey.String())
 	if err != nil {
 		return false, err
 	}

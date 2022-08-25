@@ -281,7 +281,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (d *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	pAddressStr persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
 	// personal_sign
@@ -320,7 +320,7 @@ func (d *Provider) VerifySignature(pCtx context.Context,
 
 func verifySignature(pSignatureStr string,
 	pData string,
-	pAddress persist.Address, pWalletType persist.WalletType,
+	pAddress persist.PubKey, pWalletType persist.WalletType,
 	pUseDataHeaderBool bool, ec *ethclient.Client) (bool, error) {
 
 	// eth_sign:

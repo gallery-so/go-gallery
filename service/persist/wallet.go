@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"blockwatch.cc/tzgo/tezos"
 	"github.com/lib/pq"
 )
 
@@ -34,6 +35,9 @@ type WalletList []Wallet
 // Address represents the value of an address
 type Address string
 
+// PubKey represents the public key of a wallet
+type PubKey string
+
 //type ChainAddress struct {
 //	Address Address `json:"address"`
 //	Chain   Chain   `json:"chain"`
@@ -48,6 +52,13 @@ type ChainAddress struct {
 	chainSet   bool
 	address    Address
 	chain      Chain
+}
+
+type ChainPubKey struct {
+	pubKeySet bool
+	chainSet  bool
+	pubKey    PubKey
+	chain     Chain
 }
 
 // IsGalleryUserOrAddress is an empty function that satisfies the gqlgen IsGalleryUserOrAddress interface,
@@ -118,6 +129,86 @@ func (c *ChainAddress) GQLSetChainFromResolver(chain Chain) error {
 
 func (c ChainAddress) String() string {
 	return fmt.Sprintf("%d:%s", c.chain, c.address)
+}
+
+func NewChainPubKey(pubKey PubKey, chain Chain) ChainPubKey {
+	ca := ChainPubKey{
+		pubKeySet: true,
+		chainSet:  true,
+		pubKey:    pubKey,
+		chain:     chain,
+	}
+
+	ca.updateCasing()
+	return ca
+}
+
+func (c *ChainPubKey) PubKey() PubKey {
+	return c.pubKey
+}
+
+func (c *ChainPubKey) Chain() Chain {
+	return c.chain
+}
+
+func (c *ChainPubKey) updateCasing() {
+	switch c.chain {
+	// TODO: Add an IsCaseSensitive to the Chain type?
+	case ChainETH:
+		c.pubKey = PubKey(strings.ToLower(c.pubKey.String()))
+	}
+}
+
+// GQLSetAddressFromResolver will be called automatically from the required gqlgen resolver and should
+// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
+func (c *ChainPubKey) GQLSetAddressFromResolver(pubKey PubKey) error {
+	if c.pubKeySet {
+		return errors.New("ChainAddress.address may only be set once")
+	}
+
+	c.pubKey = pubKey
+	c.pubKeySet = true
+
+	if c.chainSet {
+		c.updateCasing()
+	}
+
+	return nil
+}
+
+// GQLSetChainFromResolver will be called automatically from the required gqlgen resolver and should
+// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
+func (c *ChainPubKey) GQLSetChainFromResolver(chain Chain) error {
+	if c.chainSet {
+		return errors.New("ChainAddress.chain may only be set once")
+	}
+
+	c.chain = chain
+	c.chainSet = true
+
+	if c.pubKeySet {
+		c.updateCasing()
+	}
+
+	return nil
+}
+
+func (c ChainPubKey) String() string {
+	return fmt.Sprintf("%d:%s", c.chain, c.pubKey)
+}
+
+// ToChainAddress converts a chain pub key to a chain address
+func (c ChainPubKey) ToChainAddress() ChainAddress {
+	switch c.chain {
+	case ChainTezos:
+		key, err := tezos.ParseKey(c.pubKey.String())
+		if err != nil {
+			panic(err)
+		}
+		return NewChainAddress(Address(key.Hash()), c.chain)
+	default:
+		return NewChainAddress(Address(c.pubKey), c.chain)
+	}
 }
 
 const (
@@ -208,6 +299,10 @@ func (n *Address) Scan(value interface{}) error {
 
 	*n = Address(asString)
 	return nil
+}
+
+func (p PubKey) String() string {
+	return string(p)
 }
 
 type ErrWalletAlreadyExists struct {
