@@ -159,9 +159,9 @@ func (c *ChainPubKey) updateCasing() {
 	}
 }
 
-// GQLSetAddressFromResolver will be called automatically from the required gqlgen resolver and should
-// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
-func (c *ChainPubKey) GQLSetAddressFromResolver(pubKey PubKey) error {
+// GQLSetPubKeyFromResolver will be called automatically from the required gqlgen resolver and should
+// never be called manually. To set a ChainPubKey's fields, use NewChainPubKey.
+func (c *ChainPubKey) GQLSetPubKeyFromResolver(pubKey PubKey) error {
 	if c.pubKeySet {
 		return errors.New("ChainAddress.address may only be set once")
 	}
@@ -177,7 +177,7 @@ func (c *ChainPubKey) GQLSetAddressFromResolver(pubKey PubKey) error {
 }
 
 // GQLSetChainFromResolver will be called automatically from the required gqlgen resolver and should
-// never be called manually. To set a ChainAddress's fields, use NewChainAddress.
+// never be called manually. To set a ChainPubKey's fields, use NewChainPubKey.
 func (c *ChainPubKey) GQLSetChainFromResolver(chain Chain) error {
 	if c.chainSet {
 		return errors.New("ChainAddress.chain may only be set once")

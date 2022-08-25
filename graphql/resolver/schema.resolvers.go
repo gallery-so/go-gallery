@@ -783,11 +783,11 @@ func (r *chainAddressInputResolver) Chain(ctx context.Context, obj *persist.Chai
 }
 
 func (r *chainPubKeyInputResolver) PubKey(ctx context.Context, obj *persist.ChainPubKey, data persist.PubKey) error {
-	panic(fmt.Errorf("not implemented"))
+	return obj.GQLSetPubKeyFromResolver(data)
 }
 
 func (r *chainPubKeyInputResolver) Chain(ctx context.Context, obj *persist.ChainPubKey, data persist.Chain) error {
-	panic(fmt.Errorf("not implemented"))
+	return obj.GQLSetChainFromResolver(data)
 }
 
 // Collection returns generated.CollectionResolver implementation.
