@@ -54,6 +54,9 @@ const (
 	MediaTypeInvalid MediaType = "invalid"
 	// MediaTypeUnknown represents an unknown media type
 	MediaTypeUnknown MediaType = "unknown"
+	// MediaTypeSyncing represents a syncing media
+	// This will be an empty string representing we do not know yet what media type this is.
+	MediaTypeSyncing MediaType = ""
 )
 
 const (

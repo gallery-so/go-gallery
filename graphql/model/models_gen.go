@@ -714,6 +714,16 @@ type SyncTokensPayload struct {
 
 func (SyncTokensPayload) IsSyncTokensPayloadOrError() {}
 
+type SyncingMedia struct {
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
+}
+
+func (SyncingMedia) IsMediaSubtype() {}
+func (SyncingMedia) IsMedia()        {}
+
 type TextMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
 	MediaURL         *string        `json:"mediaURL"`
