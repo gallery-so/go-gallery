@@ -400,7 +400,7 @@ func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticTok
 	res := make([]multichain.ChainAgnosticToken, len(tokens))
 	for i, token := range tokens {
 		if token.Quantity == "" {
-			token.Quantity = "0"
+			token.Quantity = "1"
 		}
 		res[i] = multichain.ChainAgnosticToken{
 			TokenID:          token.TokenID,
