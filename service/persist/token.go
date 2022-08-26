@@ -468,6 +468,8 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 		*c = ChainETH
 	case "tezos":
 		*c = ChainTezos
+	case "poap":
+		*c = ChainPOAP
 	}
 	return nil
 }
@@ -479,6 +481,8 @@ func (c Chain) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"Ethereum"`))
 	case ChainTezos:
 		w.Write([]byte(`"Tezos"`))
+	case ChainPOAP:
+		w.Write([]byte(`"POAP"`))
 	}
 }
 
