@@ -60,7 +60,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
+	events := []eventHash{TransferBatchEventHash, TransferEventHash, TransferSingleEventHash}
 	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events)
 
 	router := gin.Default()
@@ -69,7 +69,8 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		logrus.SetLevel(logrus.DebugLevel)
+		// XXX: logrus.SetLevel(logrus.DebugLevel)
+		logrus.SetLevel(logrus.InfoLevel)
 	}
 
 	logger.For(nil).Info("Registering handlers...")
@@ -110,7 +111,8 @@ func coreInitServer() *gin.Engine {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		logrus.SetLevel(logrus.DebugLevel)
+		// XXX: logrus.SetLevel(logrus.DebugLevel)
+		logrus.SetLevel(logrus.InfoLevel)
 	}
 
 	logger.For(ctx).Info("Registering handlers...")
@@ -205,7 +207,8 @@ func initLogger() {
 		l.SetReportCaller(true)
 
 		if viper.GetString("ENV") != "production" {
-			l.SetLevel(logrus.DebugLevel)
+			// XXX: l.SetLevel(logrus.DebugLevel)
+			l.SetLevel(logrus.InfoLevel)
 		}
 
 		if viper.GetString("ENV") == "local" {
@@ -222,7 +225,8 @@ func initLogger() {
 func configureRootContext() context.Context {
 	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
 	if viper.GetString("ENV") != "production" {
-		logger.For(ctx).Logger.SetLevel((logrus.DebugLevel))
+		// XXX: logger.For(ctx).Logger.SetLevel(logrus.DebugLevel)
+		logger.For(ctx).Logger.SetLevel(logrus.InfoLevel)
 	}
 	logger.For(ctx).Logger.SetReportCaller(true)
 	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)

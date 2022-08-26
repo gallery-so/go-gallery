@@ -30,6 +30,7 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 type manualIndexHandler func(context.Context, persist.TokenID, persist.EthereumAddress, *ethclient.Client) (persist.Token, error)
@@ -545,7 +546,7 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 			return
 		}
 
-		// A deep refresh processes a token completely as if being indexed for the first time.
+		// A deep refresh processes a token as if being indexed for the first time.
 		var err error
 		if input.DeepRefresh {
 			err = deepRefresh(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, contractRepository, chain)
@@ -562,11 +563,10 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 }
 
 func deepRefresh(ctx context.Context, input UpdateTokenMediaInput, tokenRepo persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, contractRepo persist.ContractRepository, chain persist.Chain) error {
-	transferEvents := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
+	start := time.Now()
+	transferEvents := []eventHash{TransferBatchEventHash, TransferEventHash, TransferSingleEventHash}
 	indexer := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepo, contractRepo, chain, transferEvents)
-	plugins := NewTransferPlugins(ctx, indexer.ethClient, indexer.tokenRepo, indexer.storageClient)
-	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.prevOwners.in}
-	transferCh := make(chan []transfersAtBlock)
+	bf := NewTransferFilter(viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
 
 	events := make([]common.Hash, len(indexer.eventHashes))
 	for i, event := range indexer.eventHashes {
@@ -574,27 +574,56 @@ func deepRefresh(ctx context.Context, input UpdateTokenMediaInput, tokenRepo per
 	}
 
 	// Don't refresh past where the indexer actually is
-	recentDBBlock, err := indexer.tokenRepo.MostRecentBlock(ctx)
-	if err != nil {
-		return err
-	}
+	var recentDBBlock persist.BlockNumber = 14100000
+	// XXX: recentDBBlock, err := indexer.tokenRepo.MostRecentBlock(ctx)
+	// XXX: if err != nil {
+	// XXX: 	return err
+	// XXX: }
+
+	// 10000000 is the earliest block that is stored in GCP.
+	var startingBlock persist.BlockNumber = 14000000
 
 	wp := workerpool.New(defaultWorkerPoolSize)
-	for block := defaultStartingBlock; block <= recentDBBlock; block++ {
-		wp.Submit(func() {
+	for block := startingBlock; block <= recentDBBlock; block += blocksPerLogsCall {
+		b := block
+
+		toQueue := func() {
 			ctx := sentryutil.NewSentryHubContext(ctx)
-			// Logs should be cached from past indexer runs.
-			logs := indexer.fetchLogs(ctx, block, [][]common.Hash{events})
-			transfers := logsToTransfers(ctx, logs)
-			transfers = filterTransfers(ctx, input, transfers)
-			transfersAtBlock := transfersToTransfersAtBlock(transfers)
-			batchTransfers(ctx, transferCh, transfersAtBlock)
-			go indexer.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
-			indexer.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.prevOwners.out, plugins.balances.out)
-		})
+
+			exists, err := bf.Exists(ctx, b, b+blocksPerLogsCall, input.OwnerAddress)
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("failed to use filter")
+			}
+
+			if exists || err != nil {
+				// Set up processing channel and plugins
+				transferCh := make(chan []transfersAtBlock)
+				plugins := NewTransferPlugins(ctx, indexer.ethClient, indexer.tokenRepo, indexer.storageClient)
+				enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.prevOwners.in}
+
+				go func() {
+					// Logs should be cached from past indexer runs.
+					logs := indexer.fetchLogs(ctx, b, [][]common.Hash{events})
+					transfers := LogsToTransfers(ctx, logs)
+					transfers = filterTransfers(ctx, input, transfers)
+					transfersAtBlock := transfersToTransfersAtBlock(transfers)
+					batchTransfers(ctx, transferCh, transfersAtBlock)
+					close(transferCh)
+				}()
+
+				go indexer.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
+				indexer.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.prevOwners.out, plugins.balances.out)
+			}
+		}
+
+		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
+			wp.SubmitWait(toQueue)
+		} else {
+			wp.Submit(toQueue)
+		}
 	}
 	wp.StopWait()
-
+	logger.For(ctx).Infof("refresh took %s seconds", time.Now().Sub(start).Seconds())
 	return nil
 }
 
@@ -605,15 +634,15 @@ func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers
 	switch {
 	case input.OwnerAddress != "" && input.TokenID != "" && input.ContractAddress != "":
 		transferMatches = func(transfer rpc.Transfer) bool {
-			return (transfer.To == input.OwnerAddress || transfer.From == input.OwnerAddress) && transfer.TokenID == input.TokenID && transfer.ContractAddress == input.ContractAddress
+			return (transfer.To.String() == input.OwnerAddress.String() || transfer.From.String() == input.OwnerAddress.String()) && transfer.TokenID.String() == input.TokenID.String() && transfer.ContractAddress.String() == input.ContractAddress.String()
 		}
 	case input.OwnerAddress != "" && input.ContractAddress != "":
 		transferMatches = func(transfer rpc.Transfer) bool {
-			return (transfer.To == input.OwnerAddress || transfer.From == input.OwnerAddress) && transfer.ContractAddress == input.ContractAddress
+			return (transfer.To.String() == input.OwnerAddress.String() || transfer.From.String() == input.OwnerAddress.String()) && transfer.ContractAddress.String() == input.ContractAddress.String()
 		}
 	case input.OwnerAddress != "":
 		transferMatches = func(transfer rpc.Transfer) bool {
-			return transfer.To == input.OwnerAddress || transfer.From == input.OwnerAddress
+			return transfer.To.String() == input.OwnerAddress.String() || transfer.From.String() == input.OwnerAddress.String()
 		}
 	default:
 		return result
