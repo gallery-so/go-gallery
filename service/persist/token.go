@@ -629,7 +629,10 @@ func (hex *HexString) Scan(src interface{}) error {
 func (hex HexString) BigInt() *big.Int {
 	it, ok := big.NewInt(0).SetString(hex.String(), 16)
 	if !ok {
-		it, _ = big.NewInt(0).SetString(hex.String(), 10)
+		it, ok = big.NewInt(0).SetString(hex.String(), 10)
+		if !ok {
+			return big.NewInt(0)
+		}
 	}
 	return it
 }

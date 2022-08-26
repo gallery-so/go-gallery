@@ -399,6 +399,9 @@ func verifySignature(pSignatureStr string,
 func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticToken {
 	res := make([]multichain.ChainAgnosticToken, len(tokens))
 	for i, token := range tokens {
+		if token.Quantity == "" {
+			token.Quantity = "0"
+		}
 		res[i] = multichain.ChainAgnosticToken{
 			TokenID:          token.TokenID,
 			ContractAddress:  persist.Address(token.ContractAddress.String()),
