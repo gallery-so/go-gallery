@@ -158,13 +158,13 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 		}
 	}
 
-	if m.Eoa != nil && m.Eoa.ChainAddress != nil {
-		return authApi.NewNonceAuthenticator(*m.Eoa.ChainAddress, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
+	if m.Eoa != nil && m.Eoa.ChainPubKey != nil {
+		return authApi.NewNonceAuthenticator(*m.Eoa.ChainPubKey, m.Eoa.Nonce, m.Eoa.Signature, persist.WalletTypeEOA), nil
 	}
 
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
-		return authApi.NewNonceAuthenticator(persist.NewChainAddress(m.GnosisSafe.Address, persist.ChainETH), m.GnosisSafe.Nonce, "0x", persist.WalletTypeGnosis), nil
+		return authApi.NewNonceAuthenticator(persist.NewChainPubKey(persist.PubKey(m.GnosisSafe.Address), persist.ChainETH), m.GnosisSafe.Nonce, "0x", persist.WalletTypeGnosis), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -1038,8 +1038,12 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 		return getJsonMedia(ctx, med)
 	case persist.MediaTypeText, persist.MediaTypeBase64Text:
 		return getTextMedia(ctx, med)
-	default:
+	case persist.MediaTypeUnknown:
 		return getUnknownMedia(ctx, med)
+	case persist.MediaTypeSyncing:
+		return getSyncingMedia(ctx, med)
+	default:
+		return getInvalidMedia(ctx, med)
 	}
 
 }
@@ -1147,6 +1151,15 @@ func getGltfMedia(ctx context.Context, media persist.Media) model.GltfMedia {
 
 func getUnknownMedia(ctx context.Context, media persist.Media) model.UnknownMedia {
 	return model.UnknownMedia{
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: (*string)(&media.MediaURL),
+	}
+}
+
+func getSyncingMedia(ctx context.Context, media persist.Media) model.SyncingMedia {
+	return model.SyncingMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),

@@ -345,9 +345,9 @@ type DeleteCollectionPayload struct {
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
 type EoaAuth struct {
-	ChainAddress *persist.ChainAddress `json:"chainAddress"`
-	Nonce        string                `json:"nonce"`
-	Signature    string                `json:"signature"`
+	ChainPubKey *persist.ChainPubKey `json:"chainPubKey"`
+	Nonce       string               `json:"nonce"`
+	Signature   string               `json:"signature"`
 }
 
 type ErrAddressOwnedByUser struct {
@@ -713,6 +713,16 @@ type SyncTokensPayload struct {
 }
 
 func (SyncTokensPayload) IsSyncTokensPayloadOrError() {}
+
+type SyncingMedia struct {
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
+}
+
+func (SyncingMedia) IsMediaSubtype() {}
+func (SyncingMedia) IsMedia()        {}
 
 type TextMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`

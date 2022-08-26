@@ -117,7 +117,7 @@ type ChainProvider interface {
 	// bool is whether or not to update all of the tokens regardless of whether we know they exist already
 	ValidateTokensForWallet(context.Context, persist.Address, bool) error
 	// ctx, address, chain, wallet type, nonce, sig
-	VerifySignature(context.Context, persist.Address, persist.WalletType, string, string) (bool, error)
+	VerifySignature(context.Context, persist.PubKey, persist.WalletType, string, string) (bool, error)
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
@@ -292,13 +292,13 @@ outer:
 }
 
 // VerifySignature verifies a signature for a wallet address
-func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainAddress, pWalletType persist.WalletType) (bool, error) {
+func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
 	providers, ok := d.Chains[pChainAddress.Chain()]
 	if !ok {
 		return false, ErrChainNotFound{Chain: pChainAddress.Chain()}
 	}
 	for _, provider := range providers {
-		if valid, err := provider.VerifySignature(ctx, pChainAddress.Address(), pWalletType, pNonce, pSig); err != nil || !valid {
+		if valid, err := provider.VerifySignature(ctx, pChainAddress.PubKey(), pWalletType, pNonce, pSig); err != nil || !valid {
 			return false, err
 		}
 	}

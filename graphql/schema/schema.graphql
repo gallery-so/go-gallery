@@ -38,6 +38,7 @@ directive @goEmbedHelper on OBJECT
 
 scalar Time
 scalar Address
+scalar PubKey
 scalar DBID
 
 interface Node {
@@ -82,8 +83,20 @@ type ChainAddress {
     chain: Chain
 }
 
+
+type ChainPubKey {
+  pubKey: PubKey
+  chain: Chain
+}
+
+
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
+    chain: Chain! @goField(forceResolver: true)
+}
+
+input ChainPubKeyInput {
+    pubKey: PubKey! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
 }
 
@@ -106,6 +119,7 @@ union MediaSubtype =
     | JsonMedia
     | GltfMedia
     | UnknownMedia
+    | SyncingMedia
     | InvalidMedia
 
 type PreviewURLSet {
@@ -201,6 +215,14 @@ type UnknownMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type SyncingMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type InvalidMedia implements Media {
@@ -793,7 +815,7 @@ input AuthMechanism {
 }
 
 input EoaAuth {
-    chainAddress: ChainAddressInput!
+    chainPubKey: ChainPubKeyInput!
     nonce: String!
     signature: String! @scrub
 }

@@ -228,7 +228,7 @@ func (p *Provider) RefreshContract(context.Context, persist.Address) error {
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (p *Provider) VerifySignature(pCtx context.Context,
-	pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+	pAddressStr persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 
 	nonce := auth.NewNoncePrepend + pNonce
 	// personal_sign
