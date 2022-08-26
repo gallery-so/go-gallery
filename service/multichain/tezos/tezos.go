@@ -435,7 +435,9 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 }
 
 func (d *Provider) makeTempMedia(agnosticMetadata persist.TokenMetadata, name string) persist.Media {
-	med := persist.Media{}
+	med := persist.Media{
+		MediaType: persist.MediaTypeSyncing,
+	}
 	img, anim := media.FindImageAndAnimationURLs(agnosticMetadata, "", tezAnimationKeywords, tezImageKeywords, name)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)

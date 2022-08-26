@@ -1038,8 +1038,12 @@ func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype 
 		return getJsonMedia(ctx, med)
 	case persist.MediaTypeText, persist.MediaTypeBase64Text:
 		return getTextMedia(ctx, med)
-	default:
+	case persist.MediaTypeUnknown:
 		return getUnknownMedia(ctx, med)
+	case persist.MediaTypeSyncing:
+		return getSyncingMedia(ctx, med)
+	default:
+		return getInvalidMedia(ctx, med)
 	}
 
 }
@@ -1147,6 +1151,15 @@ func getGltfMedia(ctx context.Context, media persist.Media) model.GltfMedia {
 
 func getUnknownMedia(ctx context.Context, media persist.Media) model.UnknownMedia {
 	return model.UnknownMedia{
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: (*string)(&media.MediaURL),
+	}
+}
+
+func getSyncingMedia(ctx context.Context, media persist.Media) model.SyncingMedia {
+	return model.SyncingMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),

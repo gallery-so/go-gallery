@@ -457,6 +457,13 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
+	SyncingMedia struct {
+		ContentRenderURL func(childComplexity int) int
+		MediaType        func(childComplexity int) int
+		MediaURL         func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
+	}
+
 	TextMedia struct {
 		ContentRenderURL func(childComplexity int) int
 		MediaType        func(childComplexity int) int
@@ -2318,6 +2325,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SyncTokensPayload.Viewer(childComplexity), true
 
+	case "SyncingMedia.contentRenderURL":
+		if e.complexity.SyncingMedia.ContentRenderURL == nil {
+			break
+		}
+
+		return e.complexity.SyncingMedia.ContentRenderURL(childComplexity), true
+
+	case "SyncingMedia.mediaType":
+		if e.complexity.SyncingMedia.MediaType == nil {
+			break
+		}
+
+		return e.complexity.SyncingMedia.MediaType(childComplexity), true
+
+	case "SyncingMedia.mediaURL":
+		if e.complexity.SyncingMedia.MediaURL == nil {
+			break
+		}
+
+		return e.complexity.SyncingMedia.MediaURL(childComplexity), true
+
+	case "SyncingMedia.previewURLs":
+		if e.complexity.SyncingMedia.PreviewURLs == nil {
+			break
+		}
+
+		return e.complexity.SyncingMedia.PreviewURLs(childComplexity), true
+
 	case "TextMedia.contentRenderURL":
 		if e.complexity.TextMedia.ContentRenderURL == nil {
 			break
@@ -3033,6 +3068,7 @@ union MediaSubtype =
     | JsonMedia
     | GltfMedia
     | UnknownMedia
+    | SyncingMedia
     | InvalidMedia
 
 type PreviewURLSet {
@@ -3128,6 +3164,14 @@ type UnknownMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type SyncingMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type InvalidMedia implements Media {
@@ -11698,6 +11742,134 @@ func (ec *executionContext) _SyncTokensPayload_viewer(ctx context.Context, field
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _SyncingMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.SyncingMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "SyncingMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PreviewURLs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _SyncingMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.SyncingMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "SyncingMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _SyncingMedia_mediaType(ctx context.Context, field graphql.CollectedField, obj *model.SyncingMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "SyncingMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _SyncingMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.SyncingMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "SyncingMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContentRenderURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _TextMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -16728,6 +16900,13 @@ func (ec *executionContext) _Media(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._UnknownMedia(ctx, sel, obj)
+	case model.SyncingMedia:
+		return ec._SyncingMedia(ctx, sel, &obj)
+	case *model.SyncingMedia:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SyncingMedia(ctx, sel, obj)
 	case model.InvalidMedia:
 		return ec._InvalidMedia(ctx, sel, &obj)
 	case *model.InvalidMedia:
@@ -16800,6 +16979,13 @@ func (ec *executionContext) _MediaSubtype(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._UnknownMedia(ctx, sel, obj)
+	case model.SyncingMedia:
+		return ec._SyncingMedia(ctx, sel, &obj)
+	case *model.SyncingMedia:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._SyncingMedia(ctx, sel, obj)
 	case model.InvalidMedia:
 		return ec._InvalidMedia(ctx, sel, &obj)
 	case *model.InvalidMedia:
@@ -20662,6 +20848,55 @@ func (ec *executionContext) _SyncTokensPayload(ctx context.Context, sel ast.Sele
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._SyncTokensPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var syncingMediaImplementors = []string{"SyncingMedia", "MediaSubtype", "Media"}
+
+func (ec *executionContext) _SyncingMedia(ctx context.Context, sel ast.SelectionSet, obj *model.SyncingMedia) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, syncingMediaImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SyncingMedia")
+		case "previewURLs":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._SyncingMedia_previewURLs(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "mediaURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._SyncingMedia_mediaURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "mediaType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._SyncingMedia_mediaType(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "contentRenderURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._SyncingMedia_contentRenderURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

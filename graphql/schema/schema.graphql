@@ -119,6 +119,7 @@ union MediaSubtype =
     | JsonMedia
     | GltfMedia
     | UnknownMedia
+    | SyncingMedia
     | InvalidMedia
 
 type PreviewURLSet {
@@ -214,6 +215,14 @@ type UnknownMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type SyncingMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type InvalidMedia implements Media {
