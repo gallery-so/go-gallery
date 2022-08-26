@@ -87,7 +87,7 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 	}, nil
 }
 
-// GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
+// GetTokensByWalletAddress retrieves tokens for a wallet address on the Poap Blockchain
 func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/actions/scan/%s", d.apiURL, addr.String()), nil)
@@ -111,12 +111,12 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	return d.poapsToTokens(tokens), []multichain.ChainAgnosticContract{poapContract}, nil
 }
 
-// GetTokensByContractAddress retrieves tokens for a contract address on the Tezos Blockchain
+// GetTokensByContractAddress retrieves tokens for a contract address on the Poap Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	return nil, multichain.ChainAgnosticContract{}, errNoContracts
 }
 
-// GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
+// GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Poap Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/tokens/%s", d.apiURL, tid), nil)
@@ -140,7 +140,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	return []multichain.ChainAgnosticToken{d.poapToToken(token)}, []multichain.ChainAgnosticContract{poapContract}, nil
 }
 
-// GetContractByAddress retrieves an Tezos contract by address
+// GetContractByAddress retrieves an Poap contract by address
 func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
 	return poapContract, nil
 }
@@ -150,7 +150,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	return nil
 }
 
-// UpdateMediaForWallet updates media for the tokens owned by a wallet on the Tezos Blockchain
+// UpdateMediaForWallet updates media for the tokens owned by a wallet on the Poap Blockchain
 func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 	return nil
 }
@@ -160,14 +160,13 @@ func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) er
 	return nil
 }
 
-// ValidateTokensForWallet validates tokens for a wallet address on the Tezos Blockchain
+// ValidateTokensForWallet validates tokens for a wallet address on the Poap Blockchain
 func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 	return nil
 
 }
 
-// VerifySignature will verify a signature using the ed25519 algorithm
-// the address provided must be the tezos public key, not the hashed address
+// VerifySignature does nothing because POAPs are not really on a blockchain with a wallet
 func (d *Provider) VerifySignature(pCtx context.Context, pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 	return true, nil
 }
