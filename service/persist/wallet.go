@@ -205,7 +205,7 @@ func (c ChainPubKey) ToChainAddress() ChainAddress {
 		if err != nil {
 			panic(err)
 		}
-		return NewChainAddress(Address(key.Hash()), c.chain)
+		return NewChainAddress(Address(key.Address().String()), c.chain)
 	default:
 		return NewChainAddress(Address(c.pubKey), c.chain)
 	}
