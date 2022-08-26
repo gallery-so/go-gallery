@@ -167,7 +167,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 }
 
 // VerifySignature does nothing because POAPs are not really on a blockchain with a wallet
-func (d *Provider) VerifySignature(pCtx context.Context, pAddressStr persist.Address, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 	return true, nil
 }
 
@@ -181,6 +181,7 @@ func (d *Provider) poapsToTokens(pPoap []poapToken) []multichain.ChainAgnosticTo
 func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 
 	return multichain.ChainAgnosticToken{
+		OwnerAddress:    persist.Address(pPoap.Owner),
 		TokenID:         persist.TokenID(pPoap.TokenID.toBase16()),
 		Name:            pPoap.Event.Name,
 		Description:     pPoap.Event.Description,
