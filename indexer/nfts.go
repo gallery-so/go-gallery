@@ -51,6 +51,7 @@ var customManualIndex = map[persist.EthereumAddress]manualIndexHandler{
 			return persist.Token{}, err
 		}
 		return persist.Token{
+			Quantity:        "1",
 			TokenType:       persist.TokenTypeERC721,
 			OwnerAddress:    persist.EthereumAddress(owner.String()),
 			ContractAddress: persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"),
