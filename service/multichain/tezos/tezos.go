@@ -497,7 +497,7 @@ func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address persist.
 	if err != nil {
 		return "", err
 	}
-	if !strings.EqualFold(string(key.Hash()), address.String()) {
+	if !strings.EqualFold(key.Address().String(), address.String()) {
 		return "", fmt.Errorf("public key hash %s does not match address %s", string(key.Hash()), address)
 	}
 	return persist.Address(account.Public), nil
