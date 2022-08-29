@@ -70,6 +70,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("username", UsernameValidator)
 	v.RegisterValidation("max_string_length", MaxStringLengthValidator)
 	v.RegisterValidation("sorted_asc", SortedAscValidator)
+	v.RegisterValidation("chain", ChainValidator)
 	v.RegisterAlias("medium", "max_string_length=600")
 	v.RegisterAlias("collectors_note", "max_string_length=1200")
 	v.RegisterAlias("collection_name", "max_string_length=200")
@@ -206,6 +207,12 @@ var SortedAscValidator validator.Func = func(fl validator.FieldLevel) bool {
 		return sort.IntsAreSorted(s)
 	}
 	return false
+}
+
+// ChainValidator ensures the specified Chain is one we support
+var ChainValidator validator.Func = func(fl validator.FieldLevel) bool {
+	chain := fl.Field().Int()
+	return chain >= 0 && chain <= int64(persist.MaxChainValue)
 }
 
 func consecutivePeriodsOrUnderscores(s string) bool {

@@ -60,6 +60,7 @@ type GalleryUser implements Node {
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
     # that appears in more than one of the user's wallets.
     tokens: [Token] @goField(forceResolver: true)
+    tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
     wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
@@ -87,6 +88,11 @@ type ChainAddress {
 type ChainPubKey {
   pubKey: PubKey
   chain: Chain
+}
+
+type ChainTokens {
+    chain: Chain
+    tokens: [Token]
 }
 
 

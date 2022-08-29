@@ -194,6 +194,11 @@ type Badge struct {
 	ContractID *persist.DBID `json:"contractId"`
 }
 
+type ChainTokens struct {
+	Chain  *persist.Chain `json:"chain"`
+	Tokens []*Token       `json:"tokens"`
+}
+
 type Collection struct {
 	Dbid           persist.DBID       `json:"dbid"`
 	Version        *int               `json:"version"`
@@ -561,6 +566,7 @@ type GalleryUser struct {
 	Bio                 *string        `json:"bio"`
 	Traits              *string        `json:"traits"`
 	Tokens              []*Token       `json:"tokens"`
+	TokensByChain       *ChainTokens   `json:"tokensByChain"`
 	Wallets             []*Wallet      `json:"wallets"`
 	Galleries           []*Gallery     `json:"galleries"`
 	Badges              []*Badge       `json:"badges"`

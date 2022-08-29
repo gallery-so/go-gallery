@@ -159,6 +159,22 @@ SELECT tokens.* FROM tokens, users
       AND tokens.deleted = false AND users.deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
+-- name: GetTokensByUserIdAndChain :many
+SELECT tokens.* FROM tokens, users
+WHERE tokens.owner_user_id = $1 AND users.id = $1
+  AND tokens.owned_by_wallets && users.wallets
+  AND tokens.deleted = false AND users.deleted = false
+  AND tokens.chain = $2
+ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByUserIdAndChainBatch :batchmany
+SELECT tokens.* FROM tokens, users
+WHERE tokens.owner_user_id = $1 AND users.id = $1
+  AND tokens.owned_by_wallets && users.wallets
+  AND tokens.deleted = false AND users.deleted = false
+  AND tokens.chain = $2
+ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
 -- name: CreateUserEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
 

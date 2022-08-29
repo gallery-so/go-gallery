@@ -13,6 +13,7 @@
 //go:generate go run github.com/vektah/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Wallet
 //go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Token
+//go:generate go run github.com/vektah/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/sqlc.Token
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Contract
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Contract
@@ -35,6 +36,11 @@ import (
 const defaultMaxBatchOne = 100 // Default for queries that return a single result
 const defaultMaxBatchMany = 10 // Default for queries that return many results
 const defaultWaitTime = 2 * time.Millisecond
+
+type IDAndChain struct {
+	ID    persist.DBID
+	Chain persist.Chain
+}
 
 // Loaders will cache and batch lookups. They are short-lived and should never persist beyond
 // a single request, nor should they be shared between requests (since the data returned is
@@ -59,6 +65,7 @@ type Loaders struct {
 	TokensByCollectionID     TokensLoaderByID
 	TokensByWalletID         TokensLoaderByID
 	TokensByUserID           TokensLoaderByID
+	TokensByUserIDAndChain   TokensLoaderByIDAndChain
 	NewTokensByFeedEventID   TokensLoaderByID
 	ContractByContractId     ContractLoaderByID
 	ContractsByUserID        ContractsLoaderByID
@@ -179,6 +186,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadTokensByUserID(ctx, loaders, q),
+	}
+
+	loaders.TokensByUserIDAndChain = TokensLoaderByIDAndChain{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByUserIDAndChain(ctx, loaders, q),
 	}
 
 	loaders.NewTokensByFeedEventID = TokensLoaderByID{
@@ -769,6 +782,37 @@ func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 		errors := make([]error, len(userIDs))
 
 		b := q.GetTokensByUserIdBatch(ctx, userIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []sqlc.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByUserIDAndChain(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]IDAndChain) ([][]sqlc.Token, []error) {
+	return func(userIDsAndChains []IDAndChain) ([][]sqlc.Token, []error) {
+		tokens := make([][]sqlc.Token, len(userIDsAndChains))
+		errors := make([]error, len(userIDsAndChains))
+
+		params := make([]sqlc.GetTokensByUserIdAndChainBatchParams, len(userIDsAndChains))
+		for i, userIDAndChain := range userIDsAndChains {
+			params[i] = sqlc.GetTokensByUserIdAndChainBatchParams{
+				OwnerUserID: userIDAndChain.ID,
+				Chain:       sql.NullInt32{Int32: int32(userIDAndChain.Chain), Valid: true},
+			}
+		}
+
+		b := q.GetTokensByUserIdAndChainBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, t []sqlc.Token, err error) {

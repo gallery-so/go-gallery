@@ -122,6 +122,23 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	return tokens, nil
 }
 
+func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]sqlc.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+		"chain":  {chain, "chain"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.TokensByUserIDAndChain.Load(dataloader.IDAndChain{ID: userID, Chain: chain})
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
 func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) error {
 	// No validation to do
 	userID, err := getAuthenticatedUser(ctx)
