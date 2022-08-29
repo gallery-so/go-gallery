@@ -407,7 +407,7 @@ type DeepRefreshInput struct {
 }
 
 type DeepRefreshPayload struct {
-	Refreshed *bool `json:"refreshed"`
+	Submitted *bool `json:"submitted"`
 }
 
 func (DeepRefreshPayload) IsDeepRefreshPayloadOrError() {}
@@ -461,13 +461,6 @@ type ErrCommunityNotFound struct {
 
 func (ErrCommunityNotFound) IsCommunityByAddressOrError() {}
 func (ErrCommunityNotFound) IsError()                     {}
-
-type ErrDeepRefreshFailed struct {
-	Message string `json:"message"`
-}
-
-func (ErrDeepRefreshFailed) IsError()                     {}
-func (ErrDeepRefreshFailed) IsDeepRefreshPayloadOrError() {}
 
 type ErrDoesNotOwnRequiredToken struct {
 	Message string `json:"message"`

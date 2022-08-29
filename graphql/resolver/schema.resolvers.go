@@ -536,7 +536,7 @@ func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefr
 	if err != nil {
 		return nil, err
 	}
-	return model.DeepRefreshPayload{Refreshed: util.BoolToPointer(true)}, nil
+	return model.DeepRefreshPayload{Submitted: util.BoolToPointer(true)}, nil
 }
 
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {

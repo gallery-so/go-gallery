@@ -260,8 +260,6 @@ func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address
 		return util.GetErrFromResp(res)
 	}
 
-	// XXX: Remove
-	fmt.Println(d.indexerBaseURL)
 	return nil
 }
 

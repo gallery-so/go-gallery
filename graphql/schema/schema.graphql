@@ -882,17 +882,12 @@ input DeepRefreshInput {
 }
 
 type DeepRefreshPayload {
-    refreshed: Boolean
-}
-
-type ErrDeepRefreshFailed implements Error {
-    message: String!
+    submitted: Boolean
 }
 
 union DeepRefreshPayloadOrError =
     DeepRefreshPayload
     | ErrNotAuthorized
-    | ErrDeepRefreshFailed
 
 union LoginPayloadOrError =
     LoginPayload

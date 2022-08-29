@@ -3,15 +3,21 @@ package indexer
 import (
 	"context"
 	"sync"
-	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/bits-and-blooms/bloom"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	bloomFilterSize   = 100000
+	falsePositiveRate = 0.1
 )
 
 // PluginMsg is used to communicate to a plugin.
@@ -23,22 +29,21 @@ type PluginMsg struct {
 
 // TransferPlugins are plugins that add contextual data to a transfer.
 type TransferPlugins struct {
-	uris       urisPlugin
-	balances   balancesPlugin
-	owners     ownersPlugin
-	prevOwners ownersPlugin
+	uris     urisPlugin
+	balances balancesPlugin
+	owners   ownersPlugin
+	refresh  refreshPlugin
 }
 
-// NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and `out` channel that are handles to the service.
-// The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin.
-// A plugin can be stopped by closing its `in` channel, which closes the plugin's `out` channel when finished to let receivers
-// know that there are no more results.
-func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, storageClient *storage.Client) TransferPlugins {
+// NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
+// The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
+// A plugin can be stopped by closing its `in` channel, which closes the plugin and lets receivers know that there are no more results.
+func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, blockFilterRepo postgres.BlockFilterRepository, storageClient *storage.Client) TransferPlugins {
 	return TransferPlugins{
-		uris:       newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
-		balances:   newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, storageClient),
-		owners:     newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
-		prevOwners: newPreviousOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
+		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
+		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, storageClient),
+		owners:   newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
+		refresh:  newRefreshPlugin(sentryutil.NewSentryHubContext(ctx), blockFilterRepo),
 	}
 }
 
@@ -71,9 +76,6 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 		for msg := range in {
 			defer msg.wg.Done()
 			var uri persist.TokenURI
-
-			ctx, cancel := context.WithTimeout(ctx, time.Second*3)
-			defer cancel()
 
 			ct, tid, err := msg.key.GetParts()
 			if err != nil {
@@ -149,13 +151,18 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, storage
 // ownersPlugin retrieves ownership information for a token.
 type ownersPlugin struct {
 	in  chan PluginMsg
-	out chan ownerAtBlock
+	out chan ownersPluginResult
 }
 
-// newOwnerPlugin returns a plugin that retrieves the current owner of a token.
+// ownersPluginResult is the result of running an ownersPlugin.
+type ownersPluginResult struct {
+	currentOwner  ownerAtBlock
+	previousOwner ownerAtBlock
+}
+
 func newOwnerPlugin(ctx context.Context) ownersPlugin {
 	in := make(chan PluginMsg)
-	out := make(chan ownerAtBlock)
+	out := make(chan ownersPluginResult)
 
 	go func() {
 		defer close(out)
@@ -163,10 +170,17 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 			defer msg.wg.Done()
 
 			if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
-				out <- ownerAtBlock{
-					ti:    msg.key,
-					owner: msg.transfer.To,
-					block: msg.transfer.BlockNumber,
+				out <- ownersPluginResult{
+					currentOwner: ownerAtBlock{
+						ti:    msg.key,
+						owner: msg.transfer.To,
+						block: msg.transfer.BlockNumber,
+					},
+					previousOwner: ownerAtBlock{
+						ti:    msg.key,
+						owner: msg.transfer.From,
+						block: msg.transfer.BlockNumber,
+					},
 				}
 			}
 		}
@@ -178,28 +192,40 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 	}
 }
 
-// newPreviousOwnerPlugin returns a plugin that retrieves the previous owner of a token.
-func newPreviousOwnerPlugin(ctx context.Context) ownersPlugin {
+// refreshPlugin stores additional data to enable deep refreshes.
+type refreshPlugin struct {
+	in chan PluginMsg
+}
+
+func newRefreshPlugin(ctx context.Context, blockFilterRepo postgres.BlockFilterRepository) refreshPlugin {
 	in := make(chan PluginMsg)
-	out := make(chan ownerAtBlock)
 
 	go func() {
-		defer close(out)
+		filters := make(map[persist.BlockNumber]*bloom.BloomFilter)
+
 		for msg := range in {
 			defer msg.wg.Done()
 
-			if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
-				out <- ownerAtBlock{
-					ti:    msg.key,
-					owner: msg.transfer.From,
-					block: msg.transfer.BlockNumber,
-				}
+			key := msg.transfer.BlockNumber - (msg.transfer.BlockNumber % blocksPerLogsCall)
+
+			if _, ok := filters[key]; !ok {
+				filters[key] = bloom.NewWithEstimates(bloomFilterSize, falsePositiveRate)
+			}
+
+			filters[key] = filters[key].AddString(msg.transfer.From.String())
+			filters[key] = filters[key].AddString(msg.transfer.To.String())
+		}
+
+		// TODO: Change to a single bulk insert
+		for key, filter := range filters {
+			err := blockFilterRepo.Add(ctx, key, key+blocksPerLogsCall, filter)
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("failed to save filter for block=%d to block=%d", key, key+blocksPerLogsCall)
 			}
 		}
 	}()
 
-	return ownersPlugin{
-		in:  in,
-		out: out,
+	return refreshPlugin{
+		in: in,
 	}
 }

@@ -30,11 +30,16 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
 <<<<<<< HEAD
+<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 =======
 >>>>>>> 1891b89 (With bloom filter)
+=======
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
+	"github.com/mikeydub/go-gallery/service/multichain/tezos"
+>>>>>>> 825263e (Fixups from testing)
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"

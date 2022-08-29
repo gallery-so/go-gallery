@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/db/sqlc"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
@@ -45,7 +46,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	initSentry()
 	initLogger()
 
-	tokenRepo, contractRepo := newRepos()
+	tokenRepo, contractRepo, blockFilterRepo := newRepos()
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -60,8 +61,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	events := []eventHash{TransferBatchEventHash, TransferEventHash, TransferSingleEventHash}
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, blockFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents)
 
 	router := gin.Default()
 
@@ -69,8 +69,7 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		// XXX: logrus.SetLevel(logrus.DebugLevel)
-		logrus.SetLevel(logrus.InfoLevel)
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	logger.For(nil).Info("Registering handlers...")
@@ -90,7 +89,9 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	tokenRepo, contractRepo := newRepos()
+	tokenRepo, contractRepo, blockFilterRepo := newRepos()
+	queries := sqlc.New(postgres.NewPgxClient())
+
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -111,8 +112,7 @@ func coreInitServer() *gin.Engine {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		// XXX: logrus.SetLevel(logrus.DebugLevel)
-		logrus.SetLevel(logrus.InfoLevel)
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	logger.For(ctx).Info("Registering handlers...")
@@ -122,7 +122,7 @@ func coreInitServer() *gin.Engine {
 	t := newThrottler()
 
 	go processMedialessTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, persist.Chain(viper.GetInt("CHAIN")))
+	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, persist.Chain(viper.GetInt("CHAIN")), blockFilterRepo, queries)
 }
 
 func setDefaults(envFilePath string) {
@@ -143,6 +143,7 @@ func setDefaults(envFilePath string) {
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
+	viper.SetDefault("SENTRY_TRACES_SAMPLE_RATE", 1.0)
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("GAE_VERSION", "")
 
@@ -167,9 +168,10 @@ func setDefaults(envFilePath string) {
 	}
 }
 
-func newRepos() (persist.TokenRepository, persist.ContractRepository) {
+func newRepos() (persist.TokenRepository, persist.ContractRepository, postgres.BlockFilterRepository) {
 	pgClient := postgres.NewClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
+	pgx := postgres.NewPgxClient()
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.BlockFilterRepository{Queries: sqlc.New(pgx)}
 }
 
 func newThrottler() *throttle.Locker {
@@ -207,8 +209,7 @@ func initLogger() {
 		l.SetReportCaller(true)
 
 		if viper.GetString("ENV") != "production" {
-			// XXX: l.SetLevel(logrus.DebugLevel)
-			l.SetLevel(logrus.InfoLevel)
+			l.SetLevel(logrus.DebugLevel)
 		}
 
 		if viper.GetString("ENV") == "local" {
@@ -225,8 +226,7 @@ func initLogger() {
 func configureRootContext() context.Context {
 	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
 	if viper.GetString("ENV") != "production" {
-		// XXX: logger.For(ctx).Logger.SetLevel(logrus.DebugLevel)
-		logger.For(ctx).Logger.SetLevel(logrus.InfoLevel)
+		logger.For(ctx).Logger.SetLevel(logrus.DebugLevel)
 	}
 	logger.For(ctx).Logger.SetReportCaller(true)
 	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)

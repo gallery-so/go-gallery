@@ -10,6 +10,7 @@ import (
 	"image/jpeg"
 	"io"
 	"math/big"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -46,6 +48,7 @@ var client = &http.Client{
 		MaxIdleConnsPerHost: 100,
 	}, true),
 }
+var rateLimited = "429 Too Many Requests"
 
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
@@ -71,6 +74,13 @@ type TokenContractMetadata struct {
 type ErrHTTP struct {
 	URL    string
 	Status int
+}
+
+// RetryInput configures retries for RPC calls.
+type RetryInput struct {
+	Base  int // min amount of time to sleep per iteration
+	Cap   int // max amount of time to sleep per iteration
+	Tries int // number of times to retry
 }
 
 // NewEthClient returns an ethclient.Client
@@ -121,6 +131,70 @@ func NewArweaveClient() *goar.Client {
 	return goar.NewClient("https://arweave.net")
 }
 
+// GetBlockNumber returns the current block height.
+func GetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, error) {
+	return ethClient.BlockNumber(ctx)
+}
+
+// RetryGetBlockNumber calls GetBlockNumber with backoff.
+func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client, retry RetryInput) (uint64, error) {
+	var height uint64
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		height, err = GetBlockNumber(ctx, ethClient)
+		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+			break
+		}
+		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
+		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+	return height, err
+}
+
+// GetLogs returns log events for the given block range and query.
+func GetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery) ([]types.Log, error) {
+	return ethClient.FilterLogs(ctx, query)
+}
+
+// RetryGetLogs calls GetLogs with backoff.
+func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery, retry RetryInput) ([]types.Log, error) {
+	logs := make([]types.Log, 0)
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		logs, err = GetLogs(ctx, ethClient, query)
+		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+			break
+		}
+		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
+		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+	return logs, err
+}
+
+// GetTransaction returns the transaction of the given hash.
+func GetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash) (*types.Transaction, bool, error) {
+	return ethClient.TransactionByHash(ctx, txHash)
+}
+
+// RetryGetTransaction calls GetTransaction with backoff.
+func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, retry RetryInput) (*types.Transaction, bool, error) {
+	var tx *types.Transaction
+	var pending bool
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		tx, pending, err = GetTransaction(ctx, ethClient, txHash)
+		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+			break
+		}
+		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
+		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+	return tx, pending, err
+}
+
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
 func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
 	contract := address.Address()
@@ -143,6 +217,22 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 	}
 
 	return &TokenContractMetadata{Name: name, Symbol: symbol}, nil
+}
+
+// RetryGetTokenContractMetaData calls GetTokenContractMetadata with backoff.
+func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client, retry RetryInput) (*TokenContractMetadata, error) {
+	var metadata *TokenContractMetadata
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		metadata, err = GetTokenContractMetadata(ctx, contractAddress, ethClient)
+		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+			break
+		}
+		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
+		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+	return metadata, err
 }
 
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
@@ -457,8 +547,24 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 	}
 }
 
+// RetryGetTokenURI calls GetTokenURI with backoff.
+func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.TokenID, ethClient *ethclient.Client, retry RetryInput) (persist.TokenURI, error) {
+	var u persist.TokenURI
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		u, err = GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
+		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+			break
+		}
+		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
+		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+	return u, err
+}
+
 // GetBalanceOfERC1155Token returns the balance of an ERC1155 token
-func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
+func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
 	contract := common.HexToAddress(string(pContractAddress))
 	owner := common.HexToAddress(string(pOwnerAddress))
 	instance, err := contracts.NewIERC1155(contract, ethClient)
@@ -466,8 +572,6 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAd
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 	bal, err := instance.BalanceOf(&bind.CallOpts{
 		Context: ctx,
 	}, owner, pTokenID.BigInt())
@@ -476,6 +580,22 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAd
 	}
 
 	return bal, nil
+}
+
+// RetryGetBalanceOfERC1155Token calls GetBalanceOfERC1155Token with backoff.
+func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client, retry RetryInput) (*big.Int, error) {
+	var balance *big.Int
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		balance, err = GetBalanceOfERC1155Token(ctx, pOwnerAddress, pContractAddress, pTokenID, ethClient)
+		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+			break
+		}
+		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
+		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+	return balance, err
 }
 
 // GetContractCreator returns the address of the contract creator

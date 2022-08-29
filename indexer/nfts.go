@@ -20,17 +20,28 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+)
+
+const (
+	deepRefreshPoolSize       = 4
+	deepRefreshAddressLockFmt = "deeprefresh:%s"
+	deepRefreshStartBlock     = 15000000
+	deepRefreshTimeoutHours   = 4
 )
 
 type manualIndexHandler func(context.Context, persist.TokenID, persist.EthereumAddress, *ethclient.Client) (persist.Token, error)
@@ -538,7 +549,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	return nil
 }
 
-func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain) gin.HandlerFunc {
+func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, blockFilterRepository postgres.BlockFilterRepository, queries *sqlc.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := UpdateTokenMediaInput{}
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -549,7 +560,8 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 		// A deep refresh processes a token as if being indexed for the first time.
 		var err error
 		if input.DeepRefresh {
-			err = deepRefresh(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, contractRepository, chain)
+			indexer := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, blockFilterRepository, chain, defaultTransferEvents)
+			err = submitDeepRefresh(c, input, indexer, queries)
 		} else {
 			err = refreshToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 		}
@@ -562,60 +574,77 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 	}
 }
 
-func deepRefresh(ctx context.Context, input UpdateTokenMediaInput, tokenRepo persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, contractRepo persist.ContractRepository, chain persist.Chain) error {
-	start := time.Now()
-	transferEvents := []eventHash{TransferBatchEventHash, TransferEventHash, TransferSingleEventHash}
-	indexer := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepo, contractRepo, chain, transferEvents)
-	bf := NewTransferFilter(viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
+func submitDeepRefresh(ctx context.Context, input UpdateTokenMediaInput, idxr *indexer, queries *sqlc.Queries) error {
+	throttler := throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleDB), time.Hour*deepRefreshTimeoutHours)
+	err := throttler.Lock(ctx, fmt.Sprintf(deepRefreshAddressLockFmt, input.OwnerAddress))
 
-	events := make([]common.Hash, len(indexer.eventHashes))
-	for i, event := range indexer.eventHashes {
+	if _, ok := err.(throttle.ErrThrottleLocked); ok {
+		logger.For(ctx).WithError(err).Warnf("address=%s already refreshing", input.OwnerAddress)
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	go deepRefresh(sentryutil.NewSentryHubContext(ctx), idxr, throttler, queries, input)
+	return nil
+}
+
+func deepRefresh(ctx context.Context, idxr *indexer, throttler *throttle.Locker, queries *sqlc.Queries, input UpdateTokenMediaInput) {
+	span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "deepRefresh")
+	defer span.Finish()
+
+	defer throttler.Unlock(ctx, fmt.Sprintf(deepRefreshAddressLockFmt, input.OwnerAddress))
+
+	fm := postgres.NewBlockFilterManager(dataloader.NewLoaders(ctx, queries), blocksPerLogsCall)
+	defer fm.Close()
+
+	events := make([]common.Hash, len(idxr.eventHashes))
+	for i, event := range idxr.eventHashes {
 		events[i] = common.HexToHash(string(event))
 	}
 
-	// Don't refresh past where the indexer actually is
-	var recentDBBlock persist.BlockNumber = 14100000
-	// XXX: recentDBBlock, err := indexer.tokenRepo.MostRecentBlock(ctx)
-	// XXX: if err != nil {
-	// XXX: 	return err
-	// XXX: }
+	indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
+	if err != nil {
+		logger.For(ctx).WithError(err).Error("failed to fetch latest indexer block")
+		return
+	}
 
-	// 10000000 is the earliest block that is stored in GCP.
-	var startingBlock persist.BlockNumber = 14000000
-
-	wp := workerpool.New(defaultWorkerPoolSize)
-	for block := startingBlock; block <= recentDBBlock; block += blocksPerLogsCall {
+	wp := workerpool.New(deepRefreshPoolSize)
+	for block := persist.BlockNumber(deepRefreshStartBlock); block < indexerBlock; block += persist.BlockNumber(blocksPerLogsCall) {
 		b := block
-
 		toQueue := func() {
 			ctx := sentryutil.NewSentryHubContext(ctx)
+			exists := true
 
-			exists, err := bf.Exists(ctx, b, b+blocksPerLogsCall, input.OwnerAddress)
+			bf, err := fm.Get(ctx, b, b+persist.BlockNumber(blocksPerLogsCall))
 			if err != nil {
-				logger.For(ctx).WithError(err).Error("failed to use filter")
+				logger.For(ctx).WithError(err).Warnf("failed to fetch filter")
+			}
+			if bf != nil {
+				exists = bf.TestString(input.OwnerAddress.String())
 			}
 
-			if exists || err != nil {
+			if exists {
 				// Set up processing channel and plugins
 				transferCh := make(chan []transfersAtBlock)
-				plugins := NewTransferPlugins(ctx, indexer.ethClient, indexer.tokenRepo, indexer.storageClient)
-				enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.prevOwners.in}
+				plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.blockFilterRepo, idxr.storageClient)
+				enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in}
 
 				go func() {
-					// Logs should be cached from past indexer runs.
-					logs := indexer.fetchLogs(ctx, b, [][]common.Hash{events})
-					transfers := LogsToTransfers(ctx, logs)
-					transfers = filterTransfers(ctx, input, transfers)
+					ctx := sentryutil.NewSentryHubContext(ctx)
+					logs := idxr.fetchLogs(ctx, b, [][]common.Hash{events})
+					transfers := filterTransfers(ctx, input, LogsToTransfers(ctx, logs))
 					transfersAtBlock := transfersToTransfersAtBlock(transfers)
 					batchTransfers(ctx, transferCh, transfersAtBlock)
 					close(transferCh)
 				}()
 
-				go indexer.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
-				indexer.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.prevOwners.out, plugins.balances.out)
+				go idxr.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
+				idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out)
 			}
 		}
-
 		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
 			wp.SubmitWait(toQueue)
 		} else {
@@ -623,8 +652,6 @@ func deepRefresh(ctx context.Context, input UpdateTokenMediaInput, tokenRepo per
 		}
 	}
 	wp.StopWait()
-	logger.For(ctx).Infof("refresh took %s seconds", time.Now().Sub(start).Seconds())
-	return nil
 }
 
 func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers []rpc.Transfer) []rpc.Transfer {

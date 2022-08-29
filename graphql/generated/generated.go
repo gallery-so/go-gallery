@@ -243,7 +243,7 @@ type ComplexityRoot struct {
 	}
 
 	DeepRefreshPayload struct {
-		Refreshed func(childComplexity int) int
+		Submitted func(childComplexity int) int
 	}
 
 	DeleteCollectionPayload struct {
@@ -263,10 +263,6 @@ type ComplexityRoot struct {
 	}
 
 	ErrCommunityNotFound struct {
-		Message func(childComplexity int) int
-	}
-
-	ErrDeepRefreshFailed struct {
 		Message func(childComplexity int) int
 	}
 
@@ -1518,12 +1514,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CreateUserPayload.Viewer(childComplexity), true
 
-	case "DeepRefreshPayload.refreshed":
-		if e.complexity.DeepRefreshPayload.Refreshed == nil {
+	case "DeepRefreshPayload.submitted":
+		if e.complexity.DeepRefreshPayload.Submitted == nil {
 			break
 		}
 
-		return e.complexity.DeepRefreshPayload.Refreshed(childComplexity), true
+		return e.complexity.DeepRefreshPayload.Submitted(childComplexity), true
 
 	case "DeleteCollectionPayload.gallery":
 		if e.complexity.DeleteCollectionPayload.Gallery == nil {
@@ -1559,13 +1555,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrCommunityNotFound.Message(childComplexity), true
-
-	case "ErrDeepRefreshFailed.message":
-		if e.complexity.ErrDeepRefreshFailed.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrDeepRefreshFailed.Message(childComplexity), true
 
 	case "ErrDoesNotOwnRequiredToken.message":
 		if e.complexity.ErrDoesNotOwnRequiredToken.Message == nil {
@@ -4224,17 +4213,12 @@ input DeepRefreshInput {
 }
 
 type DeepRefreshPayload {
-    refreshed: Boolean
-}
-
-type ErrDeepRefreshFailed implements Error {
-    message: String!
+    submitted: Boolean
 }
 
 union DeepRefreshPayloadOrError =
     DeepRefreshPayload
     | ErrNotAuthorized
-    | ErrDeepRefreshFailed
 
 union LoginPayloadOrError =
     LoginPayload
@@ -8232,7 +8216,7 @@ func (ec *executionContext) _CreateUserPayload_viewer(ctx context.Context, field
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _DeepRefreshPayload_refreshed(ctx context.Context, field graphql.CollectedField, obj *model.DeepRefreshPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _DeepRefreshPayload_submitted(ctx context.Context, field graphql.CollectedField, obj *model.DeepRefreshPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -8250,7 +8234,7 @@ func (ec *executionContext) _DeepRefreshPayload_refreshed(ctx context.Context, f
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Refreshed, nil
+		return obj.Submitted, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8410,41 +8394,6 @@ func (ec *executionContext) _ErrCommunityNotFound_message(ctx context.Context, f
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ErrCommunityNotFound",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _ErrDeepRefreshFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrDeepRefreshFailed) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "ErrDeepRefreshFailed",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -18510,13 +18459,6 @@ func (ec *executionContext) _DeepRefreshPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrDeepRefreshFailed:
-		return ec._ErrDeepRefreshFailed(ctx, sel, &obj)
-	case *model.ErrDeepRefreshFailed:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrDeepRefreshFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -18675,13 +18617,6 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrSyncFailed(ctx, sel, obj)
-	case model.ErrDeepRefreshFailed:
-		return ec._ErrDeepRefreshFailed(ctx, sel, &obj)
-	case *model.ErrDeepRefreshFailed:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrDeepRefreshFailed(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -21155,9 +21090,9 @@ func (ec *executionContext) _DeepRefreshPayload(ctx context.Context, sel ast.Sel
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("DeepRefreshPayload")
-		case "refreshed":
+		case "submitted":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._DeepRefreshPayload_refreshed(ctx, field, obj)
+				return ec._DeepRefreshPayload_submitted(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -21307,37 +21242,6 @@ func (ec *executionContext) _ErrCommunityNotFound(ctx context.Context, sel ast.S
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrCommunityNotFound_message(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var errDeepRefreshFailedImplementors = []string{"ErrDeepRefreshFailed", "Error", "DeepRefreshPayloadOrError"}
-
-func (ec *executionContext) _ErrDeepRefreshFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrDeepRefreshFailed) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errDeepRefreshFailedImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrDeepRefreshFailed")
-		case "message":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrDeepRefreshFailed_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
