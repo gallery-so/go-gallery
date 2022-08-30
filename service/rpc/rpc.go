@@ -256,7 +256,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 		return removeBOM(newImage.Bytes()), nil
 	default:
-		return nil, nil
+		return []byte(turi), nil
 	}
 
 }
