@@ -103,6 +103,11 @@ type ComplexityRoot struct {
 		PubKey func(childComplexity int) int
 	}
 
+	ChainTokens struct {
+		Chain  func(childComplexity int) int
+		Tokens func(childComplexity int) int
+	}
+
 	Collection struct {
 		CollectorsNote func(childComplexity int) int
 		Dbid           func(childComplexity int) int
@@ -312,6 +317,7 @@ type ComplexityRoot struct {
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
 		Tokens              func(childComplexity int) int
+		TokensByChain       func(childComplexity int, chain persist.Chain) int
 		Traits              func(childComplexity int) int
 		Username            func(childComplexity int) int
 		Wallets             func(childComplexity int) int
@@ -639,6 +645,7 @@ type GalleryResolver interface {
 }
 type GalleryUserResolver interface {
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
+	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
 	Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error)
@@ -846,6 +853,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ChainPubKey.PubKey(childComplexity), true
+
+	case "ChainTokens.chain":
+		if e.complexity.ChainTokens.Chain == nil {
+			break
+		}
+
+		return e.complexity.ChainTokens.Chain(childComplexity), true
+
+	case "ChainTokens.tokens":
+		if e.complexity.ChainTokens.Tokens == nil {
+			break
+		}
+
+		return e.complexity.ChainTokens.Tokens(childComplexity), true
 
 	case "Collection.collectorsNote":
 		if e.complexity.Collection.CollectorsNote == nil {
@@ -1567,6 +1588,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Tokens(childComplexity), true
+
+	case "GalleryUser.tokensByChain":
+		if e.complexity.GalleryUser.TokensByChain == nil {
+			break
+		}
+
+		args, err := ec.field_GalleryUser_tokensByChain_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.TokensByChain(childComplexity, args["chain"].(persist.Chain)), true
 
 	case "GalleryUser.traits":
 		if e.complexity.GalleryUser.Traits == nil {
@@ -3009,6 +3042,7 @@ type GalleryUser implements Node {
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
     # that appears in more than one of the user's wallets.
     tokens: [Token] @goField(forceResolver: true)
+    tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
     wallets: [Wallet] @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
@@ -3036,6 +3070,11 @@ type ChainAddress {
 type ChainPubKey {
   pubKey: PubKey
   chain: Chain
+}
+
+type ChainTokens {
+    chain: Chain
+    tokens: [Token]
 }
 
 
@@ -3901,6 +3940,21 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 		}
 	}
 	args["allowed"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_GalleryUser_tokensByChain_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.Chain
+	if tmp, ok := rawArgs["chain"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chain"))
+		arg0, err = ec.unmarshalNChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chain"] = arg0
 	return args, nil
 }
 
@@ -4985,6 +5039,70 @@ func (ec *executionContext) _ChainPubKey_chain(ctx context.Context, field graphq
 	res := resTmp.(persist.Chain)
 	fc.Result = res
 	return ec.marshalOChain2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainTokens_chain(ctx context.Context, field graphql.CollectedField, obj *model.ChainTokens) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainTokens",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Chain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Chain)
+	fc.Result = res
+	return ec.marshalOChain2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChain(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainTokens_tokens(ctx context.Context, field graphql.CollectedField, obj *model.ChainTokens) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainTokens",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Tokens, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Collection_id(ctx context.Context, field graphql.CollectedField, obj *model.Collection) (ret graphql.Marshaler) {
@@ -8284,6 +8402,45 @@ func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graph
 	res := resTmp.([]*model.Token)
 	fc.Result = res
 	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_tokensByChain(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_GalleryUser_tokensByChain_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().TokensByChain(rctx, obj, args["chain"].(persist.Chain))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ChainTokens)
+	fc.Result = res
+	return ec.marshalOChainTokens2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainTokens(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -17812,6 +17969,41 @@ func (ec *executionContext) _ChainPubKey(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var chainTokensImplementors = []string{"ChainTokens"}
+
+func (ec *executionContext) _ChainTokens(ctx context.Context, sel ast.SelectionSet, obj *model.ChainTokens) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainTokensImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainTokens")
+		case "chain":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainTokens_chain(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokens":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ChainTokens_tokens(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var collectionImplementors = []string{"Collection", "Node", "CollectionByIdOrError"}
 
 func (ec *executionContext) _Collection(ctx context.Context, sel ast.SelectionSet, obj *model.Collection) graphql.Marshaler {
@@ -19519,6 +19711,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._GalleryUser_tokens(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "tokensByChain":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_tokensByChain(ctx, field, obj)
 				return res
 			}
 
@@ -23317,6 +23526,13 @@ func (ec *executionContext) unmarshalOChainAddressInput2ᚕᚖgithubᚗcomᚋmik
 		}
 	}
 	return res, nil
+}
+
+func (ec *executionContext) marshalOChainTokens2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐChainTokens(ctx context.Context, sel ast.SelectionSet, v *model.ChainTokens) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ChainTokens(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v []*model.Collection) graphql.Marshaler {

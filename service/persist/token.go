@@ -466,6 +466,12 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 	switch strings.ToLower(n) {
 	case "ethereum":
 		*c = ChainETH
+	case "arbitrum":
+		*c = ChainArbitrum
+	case "polygon":
+		*c = ChainPolygon
+	case "optimism":
+		*c = ChainOptimism
 	case "tezos":
 		*c = ChainTezos
 	case "poap":
