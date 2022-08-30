@@ -458,7 +458,7 @@ func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, i
 	unescaped, _ := url.QueryUnescape(mediaURL)
 	asURI := persist.TokenURI(unescaped)
 
-	mediaType, _ := PredictMediaType(pCtx, mediaURL)
+	mediaType, _ := PredictMediaType(pCtx, asURI.String())
 
 	logger.For(pCtx).Infof("predicted media type for %s: %s", truncateString(mediaURL, 50), mediaType)
 
