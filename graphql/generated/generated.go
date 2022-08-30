@@ -38,11 +38,15 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Admire() AdmireResolver
+	AdmireFeedEventPayload() AdmireFeedEventPayloadResolver
 	Collection() CollectionResolver
 	CollectionCreatedFeedEventData() CollectionCreatedFeedEventDataResolver
 	CollectionToken() CollectionTokenResolver
 	CollectorsNoteAddedToCollectionFeedEventData() CollectorsNoteAddedToCollectionFeedEventDataResolver
 	CollectorsNoteAddedToTokenFeedEventData() CollectorsNoteAddedToTokenFeedEventDataResolver
+	Comment() CommentResolver
+	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
 	FeedConnection() FeedConnectionResolver
 	FeedEvent() FeedEventResolver
 	FollowInfo() FollowInfoResolver
@@ -52,10 +56,12 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	OwnerAtBlock() OwnerAtBlockResolver
 	Query() QueryResolver
+	RemoveCommentFromFeedEventPayload() RemoveCommentFromFeedEventPayloadResolver
 	SetSpamPreferencePayload() SetSpamPreferencePayloadResolver
 	Token() TokenResolver
 	TokenHolder() TokenHolderResolver
 	TokensAddedToCollectionFeedEventData() TokensAddedToCollectionFeedEventDataResolver
+	UnAdmireFeedEventPayload() UnAdmireFeedEventPayloadResolver
 	UnfollowUserPayload() UnfollowUserPayloadResolver
 	UserCreatedFeedEventData() UserCreatedFeedEventDataResolver
 	UserFollowedUsersFeedEventData() UserFollowedUsersFeedEventDataResolver
@@ -73,6 +79,20 @@ type DirectiveRoot struct {
 type ComplexityRoot struct {
 	AddUserWalletPayload struct {
 		Viewer func(childComplexity int) int
+	}
+
+	Admire struct {
+		Admirer      func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		LastUpdated  func(childComplexity int) int
+	}
+
+	AdmireFeedEventPayload struct {
+		Admire    func(childComplexity int) int
+		FeedEvent func(childComplexity int) int
+		Viewer    func(childComplexity int) int
 	}
 
 	AudioMedia struct {
@@ -163,6 +183,23 @@ type ComplexityRoot struct {
 		NewCollectorsNote func(childComplexity int) int
 		Owner             func(childComplexity int) int
 		Token             func(childComplexity int) int
+	}
+
+	Comment struct {
+		Comment      func(childComplexity int) int
+		Commenter    func(childComplexity int) int
+		CreationTime func(childComplexity int) int
+		Dbid         func(childComplexity int) int
+		ID           func(childComplexity int) int
+		LastUpdated  func(childComplexity int) int
+		ReplyTo      func(childComplexity int) int
+	}
+
+	CommentOnFeedEventPayload struct {
+		Comment        func(childComplexity int) int
+		FeedEvent      func(childComplexity int) int
+		ReplyToComment func(childComplexity int) int
+		Viewer         func(childComplexity int) int
 	}
 
 	Community struct {
@@ -285,6 +322,8 @@ type ComplexityRoot struct {
 	}
 
 	FeedEvent struct {
+		Admires   func(childComplexity int) int
+		Comments  func(childComplexity int) int
 		Dbid      func(childComplexity int) int
 		EventData func(childComplexity int) int
 		ID        func(childComplexity int) int
@@ -377,27 +416,31 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddUserWallet            func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
-		CreateCollection         func(childComplexity int, input model.CreateCollectionInput) int
-		CreateUser               func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string) int
-		DeleteCollection         func(childComplexity int, collectionID persist.DBID) int
-		FollowUser               func(childComplexity int, userID persist.DBID) int
-		GetAuthNonce             func(childComplexity int, chainAddress persist.ChainAddress) int
-		Login                    func(childComplexity int, authMechanism model.AuthMechanism) int
-		Logout                   func(childComplexity int) int
-		RefreshCollection        func(childComplexity int, collectionID persist.DBID) int
-		RefreshContract          func(childComplexity int, contractID persist.DBID) int
-		RefreshToken             func(childComplexity int, tokenID persist.DBID) int
-		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
-		SetSpamPreference        func(childComplexity int, input model.SetSpamPreferenceInput) int
-		SyncTokens               func(childComplexity int, chains []persist.Chain) int
-		UnfollowUser             func(childComplexity int, userID persist.DBID) int
-		UpdateCollectionHidden   func(childComplexity int, input model.UpdateCollectionHiddenInput) int
-		UpdateCollectionInfo     func(childComplexity int, input model.UpdateCollectionInfoInput) int
-		UpdateCollectionTokens   func(childComplexity int, input model.UpdateCollectionTokensInput) int
-		UpdateGalleryCollections func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
-		UpdateTokenInfo          func(childComplexity int, input model.UpdateTokenInfoInput) int
-		UpdateUserInfo           func(childComplexity int, input model.UpdateUserInfoInput) int
+		AddUserWallet              func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
+		AdmireFeedEvent            func(childComplexity int, feedEventID persist.DBID) int
+		CommentOnFeedEvent         func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
+		CreateCollection           func(childComplexity int, input model.CreateCollectionInput) int
+		CreateUser                 func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string) int
+		DeleteCollection           func(childComplexity int, collectionID persist.DBID) int
+		FollowUser                 func(childComplexity int, userID persist.DBID) int
+		GetAuthNonce               func(childComplexity int, chainAddress persist.ChainAddress) int
+		Login                      func(childComplexity int, authMechanism model.AuthMechanism) int
+		Logout                     func(childComplexity int) int
+		RefreshCollection          func(childComplexity int, collectionID persist.DBID) int
+		RefreshContract            func(childComplexity int, contractID persist.DBID) int
+		RefreshToken               func(childComplexity int, tokenID persist.DBID) int
+		RemoveCommentFromFeedEvent func(childComplexity int, commentID persist.DBID) int
+		RemoveUserWallets          func(childComplexity int, walletIds []persist.DBID) int
+		SetSpamPreference          func(childComplexity int, input model.SetSpamPreferenceInput) int
+		SyncTokens                 func(childComplexity int, chains []persist.Chain) int
+		UnadmireFeedEvent          func(childComplexity int, admireID persist.DBID) int
+		UnfollowUser               func(childComplexity int, userID persist.DBID) int
+		UpdateCollectionHidden     func(childComplexity int, input model.UpdateCollectionHiddenInput) int
+		UpdateCollectionInfo       func(childComplexity int, input model.UpdateCollectionInfoInput) int
+		UpdateCollectionTokens     func(childComplexity int, input model.UpdateCollectionTokensInput) int
+		UpdateGalleryCollections   func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
+		UpdateTokenInfo            func(childComplexity int, input model.UpdateTokenInfoInput) int
+		UpdateUserInfo             func(childComplexity int, input model.UpdateUserInfoInput) int
 	}
 
 	OwnerAtBlock struct {
@@ -449,6 +492,11 @@ type ComplexityRoot struct {
 
 	RefreshTokenPayload struct {
 		Token func(childComplexity int) int
+	}
+
+	RemoveCommentFromFeedEventPayload struct {
+		FeedEvent func(childComplexity int) int
+		Viewer    func(childComplexity int) int
 	}
 
 	RemoveUserWalletsPayload struct {
@@ -518,6 +566,11 @@ type ComplexityRoot struct {
 		IsPreFeed  func(childComplexity int) int
 		NewTokens  func(childComplexity int) int
 		Owner      func(childComplexity int) int
+	}
+
+	UnAdmireFeedEventPayload struct {
+		FeedEvent func(childComplexity int) int
+		Viewer    func(childComplexity int) int
 	}
 
 	UnfollowUserPayload struct {
@@ -603,6 +656,13 @@ type ComplexityRoot struct {
 	}
 }
 
+type AdmireResolver interface {
+	Admirer(ctx context.Context, obj *model.Admire) (*model.GalleryUser, error)
+}
+type AdmireFeedEventPayloadResolver interface {
+	Admire(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.Admire, error)
+	FeedEvent(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.FeedEvent, error)
+}
 type CollectionResolver interface {
 	Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error)
 
@@ -627,11 +687,22 @@ type CollectorsNoteAddedToTokenFeedEventDataResolver interface {
 
 	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error)
 }
+type CommentResolver interface {
+	ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error)
+	Commenter(ctx context.Context, obj *model.Comment) (*model.GalleryUser, error)
+}
+type CommentOnFeedEventPayloadResolver interface {
+	Comment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error)
+	ReplyToComment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error)
+	FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error)
+}
 type FeedConnectionResolver interface {
 	PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error)
 }
 type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
+	Admires(ctx context.Context, obj *model.FeedEvent) ([]*model.Admire, error)
+	Comments(ctx context.Context, obj *model.FeedEvent) ([]*model.Comment, error)
 }
 type FollowInfoResolver interface {
 	User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error)
@@ -675,6 +746,10 @@ type MutationResolver interface {
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
+	AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error)
+	UnadmireFeedEvent(ctx context.Context, admireID persist.DBID) (model.UnAdmireFeedEventPayloadOrError, error)
+	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error)
+	RemoveCommentFromFeedEvent(ctx context.Context, commentID persist.DBID) (model.RemoveCommentFromFeedEventPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -695,6 +770,9 @@ type QueryResolver interface {
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 }
+type RemoveCommentFromFeedEventPayloadResolver interface {
+	FeedEvent(ctx context.Context, obj *model.RemoveCommentFromFeedEventPayload) (*model.FeedEvent, error)
+}
 type SetSpamPreferencePayloadResolver interface {
 	Tokens(ctx context.Context, obj *model.SetSpamPreferencePayload) ([]*model.Token, error)
 }
@@ -713,6 +791,9 @@ type TokensAddedToCollectionFeedEventDataResolver interface {
 	Collection(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.Collection, error)
 
 	NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error)
+}
+type UnAdmireFeedEventPayloadResolver interface {
+	FeedEvent(ctx context.Context, obj *model.UnAdmireFeedEventPayload) (*model.FeedEvent, error)
 }
 type UnfollowUserPayloadResolver interface {
 	User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error)
@@ -762,6 +843,62 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AddUserWalletPayload.Viewer(childComplexity), true
+
+	case "Admire.admirer":
+		if e.complexity.Admire.Admirer == nil {
+			break
+		}
+
+		return e.complexity.Admire.Admirer(childComplexity), true
+
+	case "Admire.creationTime":
+		if e.complexity.Admire.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.Admire.CreationTime(childComplexity), true
+
+	case "Admire.dbid":
+		if e.complexity.Admire.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Admire.Dbid(childComplexity), true
+
+	case "Admire.id":
+		if e.complexity.Admire.ID == nil {
+			break
+		}
+
+		return e.complexity.Admire.ID(childComplexity), true
+
+	case "Admire.lastUpdated":
+		if e.complexity.Admire.LastUpdated == nil {
+			break
+		}
+
+		return e.complexity.Admire.LastUpdated(childComplexity), true
+
+	case "AdmireFeedEventPayload.admire":
+		if e.complexity.AdmireFeedEventPayload.Admire == nil {
+			break
+		}
+
+		return e.complexity.AdmireFeedEventPayload.Admire(childComplexity), true
+
+	case "AdmireFeedEventPayload.feedEvent":
+		if e.complexity.AdmireFeedEventPayload.FeedEvent == nil {
+			break
+		}
+
+		return e.complexity.AdmireFeedEventPayload.FeedEvent(childComplexity), true
+
+	case "AdmireFeedEventPayload.viewer":
+		if e.complexity.AdmireFeedEventPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.AdmireFeedEventPayload.Viewer(childComplexity), true
 
 	case "AudioMedia.contentRenderURL":
 		if e.complexity.AudioMedia.ContentRenderURL == nil {
@@ -1098,6 +1235,83 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectorsNoteAddedToTokenFeedEventData.Token(childComplexity), true
+
+	case "Comment.comment":
+		if e.complexity.Comment.Comment == nil {
+			break
+		}
+
+		return e.complexity.Comment.Comment(childComplexity), true
+
+	case "Comment.commenter":
+		if e.complexity.Comment.Commenter == nil {
+			break
+		}
+
+		return e.complexity.Comment.Commenter(childComplexity), true
+
+	case "Comment.creationTime":
+		if e.complexity.Comment.CreationTime == nil {
+			break
+		}
+
+		return e.complexity.Comment.CreationTime(childComplexity), true
+
+	case "Comment.dbid":
+		if e.complexity.Comment.Dbid == nil {
+			break
+		}
+
+		return e.complexity.Comment.Dbid(childComplexity), true
+
+	case "Comment.id":
+		if e.complexity.Comment.ID == nil {
+			break
+		}
+
+		return e.complexity.Comment.ID(childComplexity), true
+
+	case "Comment.lastUpdated":
+		if e.complexity.Comment.LastUpdated == nil {
+			break
+		}
+
+		return e.complexity.Comment.LastUpdated(childComplexity), true
+
+	case "Comment.replyTo":
+		if e.complexity.Comment.ReplyTo == nil {
+			break
+		}
+
+		return e.complexity.Comment.ReplyTo(childComplexity), true
+
+	case "CommentOnFeedEventPayload.comment":
+		if e.complexity.CommentOnFeedEventPayload.Comment == nil {
+			break
+		}
+
+		return e.complexity.CommentOnFeedEventPayload.Comment(childComplexity), true
+
+	case "CommentOnFeedEventPayload.feedEvent":
+		if e.complexity.CommentOnFeedEventPayload.FeedEvent == nil {
+			break
+		}
+
+		return e.complexity.CommentOnFeedEventPayload.FeedEvent(childComplexity), true
+
+	case "CommentOnFeedEventPayload.replyToComment":
+		if e.complexity.CommentOnFeedEventPayload.ReplyToComment == nil {
+			break
+		}
+
+		return e.complexity.CommentOnFeedEventPayload.ReplyToComment(childComplexity), true
+
+	case "CommentOnFeedEventPayload.viewer":
+		if e.complexity.CommentOnFeedEventPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.CommentOnFeedEventPayload.Viewer(childComplexity), true
 
 	case "Community.badgeURL":
 		if e.complexity.Community.BadgeURL == nil {
@@ -1448,6 +1662,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FeedEdge.Node(childComplexity), true
+
+	case "FeedEvent.admires":
+		if e.complexity.FeedEvent.Admires == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.Admires(childComplexity), true
+
+	case "FeedEvent.comments":
+		if e.complexity.FeedEvent.Comments == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.Comments(childComplexity), true
 
 	case "FeedEvent.dbid":
 		if e.complexity.FeedEvent.Dbid == nil {
@@ -1837,6 +2065,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.AddUserWallet(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
 
+	case "Mutation.admireFeedEvent":
+		if e.complexity.Mutation.AdmireFeedEvent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_admireFeedEvent_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AdmireFeedEvent(childComplexity, args["feedEventId"].(persist.DBID)), true
+
+	case "Mutation.commentOnFeedEvent":
+		if e.complexity.Mutation.CommentOnFeedEvent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_commentOnFeedEvent_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CommentOnFeedEvent(childComplexity, args["feedEventId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string)), true
+
 	case "Mutation.createCollection":
 		if e.complexity.Mutation.CreateCollection == nil {
 			break
@@ -1952,6 +2204,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RefreshToken(childComplexity, args["tokenId"].(persist.DBID)), true
 
+	case "Mutation.removeCommentFromFeedEvent":
+		if e.complexity.Mutation.RemoveCommentFromFeedEvent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_removeCommentFromFeedEvent_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RemoveCommentFromFeedEvent(childComplexity, args["commentId"].(persist.DBID)), true
+
 	case "Mutation.removeUserWallets":
 		if e.complexity.Mutation.RemoveUserWallets == nil {
 			break
@@ -1987,6 +2251,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]persist.Chain)), true
+
+	case "Mutation.unadmireFeedEvent":
+		if e.complexity.Mutation.UnadmireFeedEvent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unadmireFeedEvent_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnadmireFeedEvent(childComplexity, args["admireId"].(persist.DBID)), true
 
 	case "Mutation.unfollowUser":
 		if e.complexity.Mutation.UnfollowUser == nil {
@@ -2337,6 +2613,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RefreshTokenPayload.Token(childComplexity), true
 
+	case "RemoveCommentFromFeedEventPayload.feedEvent":
+		if e.complexity.RemoveCommentFromFeedEventPayload.FeedEvent == nil {
+			break
+		}
+
+		return e.complexity.RemoveCommentFromFeedEventPayload.FeedEvent(childComplexity), true
+
+	case "RemoveCommentFromFeedEventPayload.viewer":
+		if e.complexity.RemoveCommentFromFeedEventPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.RemoveCommentFromFeedEventPayload.Viewer(childComplexity), true
+
 	case "RemoveUserWalletsPayload.viewer":
 		if e.complexity.RemoveUserWalletsPayload.Viewer == nil {
 			break
@@ -2651,6 +2941,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokensAddedToCollectionFeedEventData.Owner(childComplexity), true
+
+	case "UnAdmireFeedEventPayload.feedEvent":
+		if e.complexity.UnAdmireFeedEventPayload.FeedEvent == nil {
+			break
+		}
+
+		return e.complexity.UnAdmireFeedEventPayload.FeedEvent(childComplexity), true
+
+	case "UnAdmireFeedEventPayload.viewer":
+		if e.complexity.UnAdmireFeedEventPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UnAdmireFeedEventPayload.Viewer(childComplexity), true
 
 	case "UnfollowUserPayload.user":
 		if e.complexity.UnfollowUserPayload.User == nil {
@@ -3404,6 +3708,26 @@ union CollectionTokenByIdOrError =
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
+type Admire {
+    id: ID!
+    dbid: DBID!
+    creationTime: Time
+    lastUpdated: Time
+    admirer: GalleryUser @goField(forceResolver: true)
+    # should we include the feed event here?
+}
+
+type Comment {
+    id: ID!
+    dbid: DBID!
+    creationTime: Time
+    lastUpdated: Time
+    replyTo: Comment @goField(forceResolver: true)
+    commenter: GalleryUser @goField(forceResolver: true)
+    comment: String
+    # should we include the feed event here?
+}
+
 # Actions a user can take on a resource
 enum Action {
     UserCreated
@@ -3429,6 +3753,8 @@ type FeedEvent implements Node {
     id: ID!
     dbid: DBID!
     eventData: FeedEventData @goField(forceResolver: true)
+    admires: [Admire!] @goField(forceResolver: true)
+    comments: [Comment!] @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -3886,6 +4212,53 @@ type UnfollowUserPayload {
     user: GalleryUser @goField(forceResolver: true)
 }
 
+union AdmireFeedEventPayloadOrError =
+    AdmireFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+union UnAdmireFeedEventPayloadOrError =
+    UnAdmireFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+union CommentOnFeedEventPayloadOrError =
+    CommentOnFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+union RemoveCommentFromFeedEventPayloadOrError =
+    RemoveCommentFromFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+type AdmireFeedEventPayload {
+    viewer: Viewer
+    admire: Admire @goField(forceResolver: true)
+    feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type UnAdmireFeedEventPayload {
+  viewer: Viewer
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type CommentOnFeedEventPayload {
+  viewer: Viewer
+  comment: Comment @goField(forceResolver: true)
+  replyToComment: Comment @goField(forceResolver: true)
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type RemoveCommentFromFeedEventPayload {
+  viewer: Viewer
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -3919,6 +4292,10 @@ type Mutation {
 
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
+    admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
+    unadmireFeedEvent(admireId: DBID!): UnAdmireFeedEventPayloadOrError @authRequired
+    commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
+    removeCommentFromFeedEvent(commentId: DBID!): RemoveCommentFromFeedEventPayloadOrError @authRequired
 }
 `, BuiltIn: false},
 }
@@ -3979,6 +4356,54 @@ func (ec *executionContext) field_Mutation_addUserWallet_args(ctx context.Contex
 		}
 	}
 	args["authMechanism"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_admireFeedEvent_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["feedEventId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feedEventId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["feedEventId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_commentOnFeedEvent_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["feedEventId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feedEventId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["feedEventId"] = arg0
+	var arg1 *persist.DBID
+	if tmp, ok := rawArgs["replyToID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("replyToID"))
+		arg1, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["replyToID"] = arg1
+	var arg2 string
+	if tmp, ok := rawArgs["comment"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("comment"))
+		arg2, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["comment"] = arg2
 	return args, nil
 }
 
@@ -4135,6 +4560,21 @@ func (ec *executionContext) field_Mutation_refreshToken_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_removeCommentFromFeedEvent_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["commentId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("commentId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["commentId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_removeUserWallets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -4177,6 +4617,21 @@ func (ec *executionContext) field_Mutation_syncTokens_args(ctx context.Context, 
 		}
 	}
 	args["chains"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unadmireFeedEvent_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["admireId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("admireId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["admireId"] = arg0
 	return args, nil
 }
 
@@ -4620,6 +5075,268 @@ func (ec *executionContext) _AddUserWalletPayload_viewer(ctx context.Context, fi
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Admire_id(ctx context.Context, field graphql.CollectedField, obj *model.Admire) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Admire",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Admire_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Admire) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Admire",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Admire_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.Admire) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Admire",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Admire_lastUpdated(ctx context.Context, field graphql.CollectedField, obj *model.Admire) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Admire",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LastUpdated, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Admire_admirer(ctx context.Context, field graphql.CollectedField, obj *model.Admire) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Admire",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Admire().Admirer(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AdmireFeedEventPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.AdmireFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AdmireFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AdmireFeedEventPayload_admire(ctx context.Context, field graphql.CollectedField, obj *model.AdmireFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AdmireFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.AdmireFeedEventPayload().Admire(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AdmireFeedEventPayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.AdmireFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AdmireFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.AdmireFeedEventPayload().FeedEvent(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedEvent)
+	fc.Result = res
+	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _AudioMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
@@ -6168,6 +6885,364 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_newCollecto
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_id(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_dbid(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_creationTime(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreationTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_lastUpdated(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LastUpdated, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_replyTo(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Comment().ReplyTo(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_commenter(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Comment().Commenter(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_comment(ctx context.Context, field graphql.CollectedField, obj *model.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Comment, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CommentOnFeedEventPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CommentOnFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CommentOnFeedEventPayload_comment(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CommentOnFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CommentOnFeedEventPayload().Comment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CommentOnFeedEventPayload_replyToComment(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CommentOnFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CommentOnFeedEventPayload().ReplyToComment(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CommentOnFeedEventPayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.CommentOnFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CommentOnFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CommentOnFeedEventPayload().FeedEvent(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedEvent)
+	fc.Result = res
+	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Community_id(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
@@ -7942,6 +9017,70 @@ func (ec *executionContext) _FeedEvent_eventData(ctx context.Context, field grap
 	res := resTmp.(model.FeedEventData)
 	fc.Result = res
 	return ec.marshalOFeedEventData2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventData(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_admires(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FeedEvent().Admires(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_comments(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FeedEvent().Comments(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Comment)
+	fc.Result = res
+	return ec.marshalOComment2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FollowInfo_user(ctx context.Context, field graphql.CollectedField, obj *model.FollowInfo) (ret graphql.Marshaler) {
@@ -10661,6 +11800,242 @@ func (ec *executionContext) _Mutation_unfollowUser(ctx context.Context, field gr
 	return ec.marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_admireFeedEvent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_admireFeedEvent_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AdmireFeedEvent(rctx, args["feedEventId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.AdmireFeedEventPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AdmireFeedEventPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.AdmireFeedEventPayloadOrError)
+	fc.Result = res
+	return ec.marshalOAdmireFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireFeedEventPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_unadmireFeedEvent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_unadmireFeedEvent_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UnadmireFeedEvent(rctx, args["admireId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UnAdmireFeedEventPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UnAdmireFeedEventPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UnAdmireFeedEventPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUnAdmireFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnAdmireFeedEventPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_commentOnFeedEvent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_commentOnFeedEvent_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().CommentOnFeedEvent(rctx, args["feedEventId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.CommentOnFeedEventPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.CommentOnFeedEventPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.CommentOnFeedEventPayloadOrError)
+	fc.Result = res
+	return ec.marshalOCommentOnFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentOnFeedEventPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_removeCommentFromFeedEvent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_removeCommentFromFeedEvent_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().RemoveCommentFromFeedEvent(rctx, args["commentId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.RemoveCommentFromFeedEventPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RemoveCommentFromFeedEventPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.RemoveCommentFromFeedEventPayloadOrError)
+	fc.Result = res
+	return ec.marshalORemoveCommentFromFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveCommentFromFeedEventPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _OwnerAtBlock_owner(ctx context.Context, field graphql.CollectedField, obj *model.OwnerAtBlock) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -11802,6 +13177,70 @@ func (ec *executionContext) _RefreshTokenPayload_token(ctx context.Context, fiel
 	res := resTmp.(*model.Token)
 	fc.Result = res
 	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _RemoveCommentFromFeedEventPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveCommentFromFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "RemoveCommentFromFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _RemoveCommentFromFeedEventPayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.RemoveCommentFromFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "RemoveCommentFromFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.RemoveCommentFromFeedEventPayload().FeedEvent(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedEvent)
+	fc.Result = res
+	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _RemoveUserWalletsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.RemoveUserWalletsPayload) (ret graphql.Marshaler) {
@@ -13248,6 +14687,70 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData_isPreFeed(ctx 
 	res := resTmp.(*bool)
 	fc.Result = res
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UnAdmireFeedEventPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnAdmireFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UnAdmireFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UnAdmireFeedEventPayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.UnAdmireFeedEventPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UnAdmireFeedEventPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.UnAdmireFeedEventPayload().FeedEvent(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedEvent)
+	fc.Result = res
+	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
@@ -16394,6 +17897,43 @@ func (ec *executionContext) _AddUserWalletPayloadOrError(ctx context.Context, se
 	}
 }
 
+func (ec *executionContext) _AdmireFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AdmireFeedEventPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.AdmireFeedEventPayload:
+		return ec._AdmireFeedEventPayload(ctx, sel, &obj)
+	case *model.AdmireFeedEventPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AdmireFeedEventPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _AuthorizationError(ctx context.Context, sel ast.SelectionSet, obj model.AuthorizationError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -16472,6 +18012,43 @@ func (ec *executionContext) _CollectionTokenByIdOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrTokenNotFound(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _CommentOnFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.CommentOnFeedEventPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.CommentOnFeedEventPayload:
+		return ec._CommentOnFeedEventPayload(ctx, sel, &obj)
+	case *model.CommentOnFeedEventPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CommentOnFeedEventPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -17325,6 +18902,43 @@ func (ec *executionContext) _RefreshTokenPayloadOrError(ctx context.Context, sel
 	}
 }
 
+func (ec *executionContext) _RemoveCommentFromFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RemoveCommentFromFeedEventPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.RemoveCommentFromFeedEventPayload:
+		return ec._RemoveCommentFromFeedEventPayload(ctx, sel, &obj)
+	case *model.RemoveCommentFromFeedEventPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._RemoveCommentFromFeedEventPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _RemoveUserWalletsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RemoveUserWalletsPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -17426,6 +19040,43 @@ func (ec *executionContext) _TokenByIdOrError(ctx context.Context, sel ast.Selec
 			return graphql.Null
 		}
 		return ec._ErrTokenNotFound(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UnAdmireFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UnAdmireFeedEventPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UnAdmireFeedEventPayload:
+		return ec._UnAdmireFeedEventPayload(ctx, sel, &obj)
+	case *model.UnAdmireFeedEventPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UnAdmireFeedEventPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrFeedEventNotFound:
+		return ec._ErrFeedEventNotFound(ctx, sel, &obj)
+	case *model.ErrFeedEventNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrFeedEventNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -17759,6 +19410,140 @@ func (ec *executionContext) _AddUserWalletPayload(ctx context.Context, sel ast.S
 
 			out.Values[i] = innerFunc(ctx)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var admireImplementors = []string{"Admire"}
+
+func (ec *executionContext) _Admire(ctx context.Context, sel ast.SelectionSet, obj *model.Admire) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, admireImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Admire")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Admire_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Admire_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "creationTime":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Admire_creationTime(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "lastUpdated":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Admire_lastUpdated(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "admirer":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Admire_admirer(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var admireFeedEventPayloadImplementors = []string{"AdmireFeedEventPayload", "AdmireFeedEventPayloadOrError"}
+
+func (ec *executionContext) _AdmireFeedEventPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AdmireFeedEventPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, admireFeedEventPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AdmireFeedEventPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._AdmireFeedEventPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "admire":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdmireFeedEventPayload_admire(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "feedEvent":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdmireFeedEventPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -18512,6 +20297,181 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData(ctx context
 	return out
 }
 
+var commentImplementors = []string{"Comment"}
+
+func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *model.Comment) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commentImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Comment")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Comment_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Comment_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "creationTime":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Comment_creationTime(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "lastUpdated":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Comment_lastUpdated(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "replyTo":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Comment_replyTo(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "commenter":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Comment_commenter(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "comment":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Comment_comment(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var commentOnFeedEventPayloadImplementors = []string{"CommentOnFeedEventPayload", "CommentOnFeedEventPayloadOrError"}
+
+func (ec *executionContext) _CommentOnFeedEventPayload(ctx context.Context, sel ast.SelectionSet, obj *model.CommentOnFeedEventPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commentOnFeedEventPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommentOnFeedEventPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CommentOnFeedEventPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "comment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CommentOnFeedEventPayload_comment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "replyToComment":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CommentOnFeedEventPayload_replyToComment(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "feedEvent":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CommentOnFeedEventPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var communityImplementors = []string{"Community", "Node", "CommunityByAddressOrError"}
 
 func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet, obj *model.Community) graphql.Marshaler {
@@ -18846,7 +20806,7 @@ func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.
 	return out
 }
 
-var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "UnAdmireFeedEventPayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentFromFeedEventPayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAuthenticationFailedImplementors)
@@ -18970,7 +20930,7 @@ func (ec *executionContext) _ErrDoesNotOwnRequiredToken(ctx context.Context, sel
 	return out
 }
 
-var errFeedEventNotFoundImplementors = []string{"ErrFeedEventNotFound", "Error", "FeedEventOrError", "FeedEventByIdOrError"}
+var errFeedEventNotFoundImplementors = []string{"ErrFeedEventNotFound", "Error", "FeedEventOrError", "FeedEventByIdOrError", "AdmireFeedEventPayloadOrError", "UnAdmireFeedEventPayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentFromFeedEventPayloadOrError"}
 
 func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrFeedEventNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errFeedEventNotFoundImplementors)
@@ -19001,7 +20961,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "UnAdmireFeedEventPayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentFromFeedEventPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -19467,6 +21427,40 @@ func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet
 					}
 				}()
 				res = ec._FeedEvent_eventData(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "admires":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedEvent_admires(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "comments":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedEvent_comments(ctx, field, obj)
 				return res
 			}
 
@@ -20381,6 +22375,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "admireFeedEvent":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_admireFeedEvent(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "unadmireFeedEvent":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unadmireFeedEvent(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "commentOnFeedEvent":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_commentOnFeedEvent(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "removeCommentFromFeedEvent":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_removeCommentFromFeedEvent(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -20979,6 +23001,51 @@ func (ec *executionContext) _RefreshTokenPayload(ctx context.Context, sel ast.Se
 	return out
 }
 
+var removeCommentFromFeedEventPayloadImplementors = []string{"RemoveCommentFromFeedEventPayload", "RemoveCommentFromFeedEventPayloadOrError"}
+
+func (ec *executionContext) _RemoveCommentFromFeedEventPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RemoveCommentFromFeedEventPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, removeCommentFromFeedEventPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RemoveCommentFromFeedEventPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._RemoveCommentFromFeedEventPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "feedEvent":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._RemoveCommentFromFeedEventPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var removeUserWalletsPayloadImplementors = []string{"RemoveUserWalletsPayload", "RemoveUserWalletsPayloadOrError"}
 
 func (ec *executionContext) _RemoveUserWalletsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.RemoveUserWalletsPayload) graphql.Marshaler {
@@ -21547,6 +23614,51 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData(ctx context.Co
 
 			out.Values[i] = innerFunc(ctx)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var unAdmireFeedEventPayloadImplementors = []string{"UnAdmireFeedEventPayload", "UnAdmireFeedEventPayloadOrError"}
+
+func (ec *executionContext) _UnAdmireFeedEventPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnAdmireFeedEventPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, unAdmireFeedEventPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UnAdmireFeedEventPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UnAdmireFeedEventPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "feedEvent":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._UnAdmireFeedEventPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -22647,6 +24759,16 @@ func (ec *executionContext) marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalle
 	return res
 }
 
+func (ec *executionContext) marshalNAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx context.Context, sel ast.SelectionSet, v *model.Admire) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Admire(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
 	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -22759,6 +24881,16 @@ func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚕᚖgithub�
 func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInput(ctx context.Context, v interface{}) (*model.CollectionTokenSettingsInput, error) {
 	res, err := ec.unmarshalInputCollectionTokenSettingsInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx context.Context, sel ast.SelectionSet, v *model.Comment) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Comment(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNCreateCollectionInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInput(ctx context.Context, v interface{}) (model.CreateCollectionInput, error) {
@@ -23287,6 +25419,67 @@ func (ec *executionContext) marshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalle
 	return res
 }
 
+func (ec *executionContext) marshalOAdmire2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Admire) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx context.Context, sel ast.SelectionSet, v *model.Admire) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Admire(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOAdmireFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmireFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AdmireFeedEventPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AdmireFeedEventPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOBadge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBadge(ctx context.Context, sel ast.SelectionSet, v []*model.Badge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -23707,6 +25900,67 @@ func (ec *executionContext) marshalOCollectionTokenSettings2ᚖgithubᚗcomᚋmi
 	return ec._CollectionTokenSettings(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOComment2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Comment) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalOComment2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐComment(ctx context.Context, sel ast.SelectionSet, v *model.Comment) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Comment(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommentOnFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommentOnFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CommentOnFeedEventPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommentOnFeedEventPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByAddressOrError(ctx context.Context, sel ast.SelectionSet, v model.CommunityByAddressOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -23828,6 +26082,13 @@ func (ec *executionContext) marshalOFeedEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 		return graphql.Null
 	}
 	return ec._FeedEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx context.Context, sel ast.SelectionSet, v *model.FeedEvent) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedEvent(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFeedEventByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.FeedEventByIDOrError) graphql.Marshaler {
@@ -24282,6 +26543,13 @@ func (ec *executionContext) marshalORefreshTokenPayloadOrError2githubᚗcomᚋmi
 	return ec._RefreshTokenPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalORemoveCommentFromFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveCommentFromFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveCommentFromFeedEventPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RemoveCommentFromFeedEventPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalORemoveUserWalletsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveUserWalletsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RemoveUserWalletsPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -24484,6 +26752,13 @@ func (ec *executionContext) marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOUnAdmireFeedEventPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnAdmireFeedEventPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnAdmireFeedEventPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UnAdmireFeedEventPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnfollowUserPayloadOrError) graphql.Marshaler {

@@ -422,6 +422,26 @@ union CollectionTokenByIdOrError =
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
+type Admire {
+    id: ID!
+    dbid: DBID!
+    creationTime: Time
+    lastUpdated: Time
+    admirer: GalleryUser @goField(forceResolver: true)
+    # should we include the feed event here?
+}
+
+type Comment {
+    id: ID!
+    dbid: DBID!
+    creationTime: Time
+    lastUpdated: Time
+    replyTo: Comment @goField(forceResolver: true)
+    commenter: GalleryUser @goField(forceResolver: true)
+    comment: String
+    # should we include the feed event here?
+}
+
 # Actions a user can take on a resource
 enum Action {
     UserCreated
@@ -447,6 +467,8 @@ type FeedEvent implements Node {
     id: ID!
     dbid: DBID!
     eventData: FeedEventData @goField(forceResolver: true)
+    admires: [Admire!] @goField(forceResolver: true)
+    comments: [Comment!] @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -904,6 +926,53 @@ type UnfollowUserPayload {
     user: GalleryUser @goField(forceResolver: true)
 }
 
+union AdmireFeedEventPayloadOrError =
+    AdmireFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+union UnAdmireFeedEventPayloadOrError =
+    UnAdmireFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+union CommentOnFeedEventPayloadOrError =
+    CommentOnFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+union RemoveCommentFromFeedEventPayloadOrError =
+    RemoveCommentFromFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
+
+type AdmireFeedEventPayload {
+    viewer: Viewer
+    admire: Admire @goField(forceResolver: true)
+    feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type UnAdmireFeedEventPayload {
+  viewer: Viewer
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type CommentOnFeedEventPayload {
+  viewer: Viewer
+  comment: Comment @goField(forceResolver: true)
+  replyToComment: Comment @goField(forceResolver: true)
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type RemoveCommentFromFeedEventPayload {
+  viewer: Viewer
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -937,4 +1006,8 @@ type Mutation {
 
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
+    admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
+    unadmireFeedEvent(admireId: DBID!): UnAdmireFeedEventPayloadOrError @authRequired
+    commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
+    removeCommentFromFeedEvent(commentId: DBID!): RemoveCommentFromFeedEventPayloadOrError @authRequired
 }

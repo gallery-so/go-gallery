@@ -316,3 +316,39 @@ SELECT * FROM feed_events
 
 -- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
+
+-- name: AdmireByAdmireID :one
+SELECT * FROM admires WHERE id = $1 AND deleted = false;
+
+-- name: GetAdmireByAdmireIDBatch :batchone
+SELECT * FROM admires WHERE id = $1 AND deleted = false;
+
+-- name: GetAdmiresByActorID :many
+SELECT * FROM admires WHERE actor_id = $1 AND deleted = false;
+
+-- name: GetAdmiresByActorIDBatch :batchmany
+SELECT * FROM admires WHERE actor_id = $1 AND deleted = false;
+
+-- name: GetAdmiresByFeedEventID :many
+SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false;
+
+-- name: GetAdmiresByFeedEventIDBatch :batchmany
+SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false;
+
+-- name: GetCommentByCommentID :one
+SELECT * FROM comments WHERE id = $1 AND deleted = false;
+
+-- name: GetCommentByCommentIDBatch :batchone
+SELECT * FROM comments WHERE id = $1 AND deleted = false;
+
+-- name: GetCommentsByActorID :many
+SELECT * FROM comments WHERE actor_id = $1 AND deleted = false;
+
+-- name: GetCommentsByActorIDBatch :batchmany
+SELECT * FROM comments WHERE actor_id = $1 AND deleted = false;
+
+-- name: GetCommentsByFeedEventID :many
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false;
+
+-- name: GetCommentsByFeedEventIDBatch :batchmany
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false;

@@ -857,6 +857,10 @@ func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenI
 	uriReplaced := u.ReplaceID(tokenID)
 	if (len(uriReplaced.String())) > util.KB {
 		logger.For(ctx).Infof("URI size for %s-%s: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(uriReplaced.String()))))
+		if (len(uriReplaced.String())) > util.KB*100 {
+			logger.For(ctx).Errorf("Skipping URI for %s-%s with size: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(uriReplaced.String()))))
+			return ""
+		}
 	}
 	return uriReplaced
 }

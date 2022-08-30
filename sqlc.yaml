@@ -77,6 +77,20 @@ overrides:
   - column: "events.feed_window_size"
     go_type: "int"
 
+  # Admires
+  - column: "admires.actor_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "admires.feed_event_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
+  # Comments
+  - column: "comments.actor_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "comments.feed_event_id"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+  - column: "comments.reply_to"
+    go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+
   # Feed Events
   - column: "feed_events.owner_id"
     go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
@@ -103,3 +117,7 @@ overrides:
     go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
   - column: "*.creator_address"
     go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+  # - column: "*.created_at"
+  #   go_type: "github.com/mikeydub/go-gallery/service/persist.CreationTime"
+  # - column: "*.last_updated"
+  #   go_type: "github.com/mikeydub/go-gallery/service/persist.LastUpdatedTime"

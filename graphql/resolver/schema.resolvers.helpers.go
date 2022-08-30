@@ -636,6 +636,26 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 	return &pageInfo, nil
 }
 
+func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
+	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, admireID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return admireToModel(ctx, *admire), nil
+}
+
+func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*model.Comment, error) {
+	comment, err := publicapi.For(ctx).Comment.GetCommentByID(ctx, commentID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return commentToModel(ctx, *comment), nil
+}
+
 func feedEventToDataModel(event *sqlc.FeedEvent) (model.FeedEventData, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
@@ -817,6 +837,29 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 		Badges:    nil,
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
+	}
+}
+
+// admireToModel converts a sqlc.Admire to a model.Admire
+func admireToModel(ctx context.Context, admire sqlc.Admire) *model.Admire {
+
+	return &model.Admire{
+		Dbid:         admire.ID,
+		CreationTime: &admire.CreatedAt,
+		LastUpdated:  &admire.LastUpdated,
+		Admirer:      nil, // handled by dedicated resolver
+	}
+}
+
+// commentToModel converts a sqlc.Admire to a model.Admire
+func commentToModel(ctx context.Context, comment sqlc.Comment) *model.Comment {
+
+	return &model.Comment{
+		Dbid:         comment.ID,
+		CreationTime: &comment.CreatedAt,
+		LastUpdated:  &comment.LastUpdated,
+		Comment:      &comment.Comment,
+		Commenter:    nil, // handled by dedicated resolver
 	}
 }
 

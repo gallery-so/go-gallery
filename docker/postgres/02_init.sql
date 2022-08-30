@@ -273,3 +273,62 @@ CREATE INDEX IF NOT EXISTS user_id_nft_id_event_code_last_updated ON nft_events 
 CREATE INDEX IF NOT EXISTS user_id_collection_id_event_code_last_updated ON collection_events (USER_ID, COLLECTION_ID, EVENT_CODE, LAST_UPDATED DESC);
 
 CREATE INDEX IF NOT EXISTS token_owned_by_wallets_idx ON tokens USING GIN (OWNED_BY_WALLETS);
+
+CREATE TABLE IF NOT EXISTS events (
+    ID varchar(255) PRIMARY KEY,
+    VERSION int NOT NULL DEFAULT 0,
+    ACTOR_ID varchar(255) NOT NULL REFERENCES users (id),
+    RESOURCE_TYPE_ID int NOT NULL,
+    SUBJECT_ID varchar(255) NOT NULL,
+    -- These columns are to maintain referential integrity with each of the resource entitites
+    USER_ID varchar(255) REFERENCES users (id),
+    TOKEN_ID varchar(255) REFERENCES tokens (id),
+    COLLECTION_ID varchar(255) REFERENCES collections (id),
+    ACTION varchar(255) NOT NULL,
+    DATA JSONB,
+    DELETED boolean NOT NULL DEFAULT false,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS events_actor_id_action_created_at_idx ON events (actor_id, action, created_at);
+
+CREATE TABLE IF NOT EXISTS feed_events (
+    ID varchar(255) PRIMARY KEY,
+    VERSION int NOT NULL DEFAULT 0,
+    OWNER_ID varchar(255) NOT NULL REFERENCES users (ID),
+    ACTION varchar(255) NOT NULL,
+    DATA JSONB,
+    EVENT_TIME timestamptz NOT NULL,
+    EVENT_IDS varchar(255)[],
+    DELETED boolean NOT NULL DEFAULT false,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS feeds_event_timestamp_idx ON feed_events (event_time);
+CREATE INDEX IF NOT EXISTS feeds_owner_id_action_event_timestamp_idx ON feed_events (owner_id, action, event_time);
+
+CREATE TABLE IF NOT EXISTS admires(
+    ID varchar(255) PRIMARY KEY,
+    VERSION int NOT NULL DEFAULT 0,
+    FEED_EVENT_ID varchar(255) NOT NULL REFERENCES feed_events (ID),
+    ACTOR_ID varchar(255) NOT NULL REFERENCES users (ID),
+    DELETED boolean NOT NULL DEFAULT false,
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS admire_actor_feed_event_idx ON admires (ACTOR_ID, FEED_EVENT_ID) WHERE DELETED = false;
+
+CREATE TABLE IF NOT EXISTS comments(
+    ID varchar(255) PRIMARY KEY,
+    VERSION int NOT NULL DEFAULT 0,
+    FEED_EVENT_ID varchar(255) NOT NULL REFERENCES feed_events (ID),
+    ACTOR_ID varchar(255) NOT NULL REFERENCES users (ID),
+	REPLY_TO varchar(255) REFERENCES comments (ID),
+	COMMENT varchar NOT NULL,
+    DELETED boolean NOT NULL DEFAULT false,
+    CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

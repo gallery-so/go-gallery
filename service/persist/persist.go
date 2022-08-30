@@ -67,6 +67,8 @@ type Repositories struct {
 	CommunityRepository   CommunityRepository
 	EarlyAccessRepository EarlyAccessRepository
 	WalletRepository      WalletRepository
+	AdmireRepository      AdmireRepository
+	CommentRepository     CommentRepository
 }
 
 // GenerateID generates a application-wide unique ID

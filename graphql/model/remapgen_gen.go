@@ -8,6 +8,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"AdmireFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdmireFeedEventPayloadOrError)
+		return obj, ok
+	},
+
 	"AuthorizationError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AuthorizationError)
 		return obj, ok
@@ -20,6 +25,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"CollectionTokenByIdOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CollectionTokenByIDOrError)
+		return obj, ok
+	},
+
+	"CommentOnFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CommentOnFeedEventPayloadOrError)
 		return obj, ok
 	},
 
@@ -118,6 +128,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"RemoveCommentFromFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RemoveCommentFromFeedEventPayloadOrError)
+		return obj, ok
+	},
+
 	"RemoveUserWalletsPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RemoveUserWalletsPayloadOrError)
 		return obj, ok
@@ -135,6 +150,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"TokenByIdOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(TokenByIDOrError)
+		return obj, ok
+	},
+
+	"UnAdmireFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UnAdmireFeedEventPayloadOrError)
 		return obj, ok
 	},
 

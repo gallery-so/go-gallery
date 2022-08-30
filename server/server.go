@@ -178,6 +178,8 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		CommunityRepository:   postgres.NewCommunityTokenRepository(db, redis.NewCache(redis.CommunitiesDB)),
 		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
 		WalletRepository:      postgres.NewWalletRepository(db),
+		AdmireRepository:      postgres.NewAdmireRepository(db),
+		CommentRepository:     postgres.NewCommentRepository(db),
 	}
 }
 
