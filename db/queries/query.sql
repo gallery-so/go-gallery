@@ -159,14 +159,6 @@ SELECT tokens.* FROM tokens, users
       AND tokens.deleted = false AND users.deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
--- name: GetTokensByUserIdAndChain :many
-SELECT tokens.* FROM tokens, users
-WHERE tokens.owner_user_id = $1 AND users.id = $1
-  AND tokens.owned_by_wallets && users.wallets
-  AND tokens.deleted = false AND users.deleted = false
-  AND tokens.chain = $2
-ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
-
 -- name: GetTokensByUserIdAndChainBatch :batchmany
 SELECT tokens.* FROM tokens, users
 WHERE tokens.owner_user_id = $1 AND users.id = $1
