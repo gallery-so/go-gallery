@@ -143,7 +143,6 @@ func setDefaults(envFilePath string) {
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("SENTRY_TRACES_SAMPLE_RATE", 1.0)
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("GAE_VERSION", "")
 
@@ -179,17 +178,18 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	if viper.GetString("ENV") == "local" {
-		logger.For(nil).Info("skipping sentry init")
-		return
-	}
+	// XXX: if viper.GetString("ENV") == "local" {
+	// XXX: 	logger.For(nil).Info("skipping sentry init")
+	// XXX: 	return
+	// XXX: }
 
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              viper.GetString("SENTRY_DSN"),
-		Environment:      viper.GetString("ENV"),
-		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Dsn:         viper.GetString("SENTRY_DSN"),
+		Environment: viper.GetString("ENV"),
+		// XXX: TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		TracesSampleRate: 1.0,
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)

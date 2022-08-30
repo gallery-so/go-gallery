@@ -878,10 +878,11 @@ input GnosisSafeAuth {
 }
 
 input DeepRefreshInput {
-    chains: [Chain!]!
+    chain: Chain!
 }
 
 type DeepRefreshPayload {
+    chain: Chain
     submitted: Boolean
 }
 

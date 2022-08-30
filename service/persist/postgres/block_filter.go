@@ -32,14 +32,36 @@ func (r *BlockFilterRepository) Add(ctx context.Context, from, to persist.BlockN
 	if err != nil {
 		return err
 	}
-
-	_, err = r.Queries.CreateBlockFilter(ctx, sqlc.CreateBlockFilterParams{
+	return r.Queries.CreateBlockFilter(ctx, sqlc.CreateBlockFilterParams{
 		ID:          persist.GenerateID(),
 		FromBlock:   from,
 		ToBlock:     to,
 		BloomFilter: data,
 	})
-	return err
+}
+
+func (r *BlockFilterRepository) BulkUpsert(ctx context.Context, filters map[[2]persist.BlockNumber]*bloom.BloomFilter) error {
+	ids := make([]string, len(filters))
+	fromBlocks := make([]int64, len(filters))
+	toBlocks := make([]int64, len(filters))
+	bfs := make([][]byte, len(filters))
+
+	var i int
+	for key, bf := range filters {
+		data, _ := bf.MarshalJSON()
+		fromBlock, toBlock := key[0], key[1]
+		ids[i] = persist.GenerateID().String()
+		fromBlocks[i] = fromBlock.BigInt().Int64()
+		toBlocks[i] = toBlock.BigInt().Int64()
+		bfs[i] = data
+	}
+
+	return r.Queries.BulkUpsertBlockFilter(ctx, sqlc.BulkUpsertBlockFilterParams{
+		ID:          ids,
+		FromBlock:   fromBlocks,
+		ToBlock:     toBlocks,
+		BloomFilter: bfs,
+	})
 }
 
 type BlockFilterManager struct {

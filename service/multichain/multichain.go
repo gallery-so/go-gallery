@@ -402,33 +402,29 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 }
 
 // DeepRefresh re-indexes a user's wallets.
-func (d *Provider) DeepRefresh(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, chain persist.Chain) error {
+	// No providers configured for the chain
+	if _, ok := d.Chains[chain]; !ok {
+		return nil
+	}
+
+	// User doesn't exist
 	user, err := d.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
 	}
 
-	validChainsLookup := make(map[persist.Chain]bool)
-	for _, chain := range chains {
-		validChainsLookup[chain] = true
-	}
-
-	chainsToAddresses := make(map[persist.Chain][]persist.Address)
+	addresses := make([]persist.Address, 0)
 	for _, wallet := range user.Wallets {
-		if validChainsLookup[wallet.Chain] {
-			chainsToAddresses[wallet.Chain] = append(chainsToAddresses[wallet.Chain], wallet.Address)
+		if wallet.Chain == chain {
+			addresses = append(addresses, wallet.Address)
 		}
 	}
 
-	for _, chain := range chains {
-		if _, ok := d.Chains[chain]; !ok {
-			continue
-		}
-		for _, provider := range d.Chains[chain] {
-			for _, wallet := range chainsToAddresses[chain] {
-				if err := provider.DeepRefresh(ctx, wallet); err != nil {
-					return err
-				}
+	for _, provider := range d.Chains[chain] {
+		for _, wallet := range addresses {
+			if err := provider.DeepRefresh(ctx, wallet); err != nil {
+				return err
 			}
 		}
 	}

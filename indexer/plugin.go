@@ -2,29 +2,29 @@ package indexer
 
 import (
 	"context"
-	"sync"
 
 	"cloud.google.com/go/storage"
 	"github.com/bits-and-blooms/bloom"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
 )
 
 const (
 	bloomFilterSize   = 100000
-	falsePositiveRate = 0.1
+	falsePositiveRate = 0.01
 )
 
 // PluginMsg is used to communicate to a plugin.
 type PluginMsg struct {
 	transfer rpc.Transfer
 	key      persist.EthereumTokenIdentifiers
-	wg       *sync.WaitGroup
 }
 
 // TransferPlugins are plugins that add contextual data to a transfer.
@@ -33,6 +33,10 @@ type TransferPlugins struct {
 	balances balancesPlugin
 	owners   ownersPlugin
 	refresh  refreshPlugin
+}
+
+func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Context) {
+	return tracing.StartSpan(ctx, "indexer.runPlugin", pluginName)
 }
 
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
@@ -49,12 +53,12 @@ func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenR
 
 // RunPlugins returns when all plugins have finished.
 func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, plugins []chan<- PluginMsg) {
-	var wg sync.WaitGroup
-	wg.Add(len(plugins))
+	span, _ := startSpan(ctx, "submitMessage")
+	defer tracing.FinishSpan(span)
+
 	msg := PluginMsg{
 		transfer: transfer,
 		key:      key,
-		wg:       &wg,
 	}
 	for _, plugin := range plugins {
 		plugin <- msg
@@ -73,8 +77,12 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 
 	go func() {
 		defer close(out)
+		span, ctx := startSpan(ctx, "uriPlugin")
+		defer tracing.FinishSpan(span)
+
 		for msg := range in {
-			defer msg.wg.Done()
+			child := span.StartChild("handleMessage")
+
 			var uri persist.TokenURI
 
 			ct, tid, err := msg.key.GetParts()
@@ -102,6 +110,8 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 				ti:  msg.key,
 				uri: uri,
 			}
+
+			tracing.FinishSpan(child)
 		}
 	}()
 
@@ -122,9 +132,12 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, storage
 	out := make(chan tokenBalances)
 
 	go func() {
+		span, ctx := startSpan(ctx, "balancePlugin")
+		defer tracing.FinishSpan(span)
 		defer close(out)
+
 		for msg := range in {
-			defer msg.wg.Done()
+			child := span.StartChild("handleMessage")
 
 			if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
 				bals, err := getBalances(ctx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
@@ -136,9 +149,10 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, storage
 					}).Errorf("error getting balance of %s for %s", msg.transfer.From, msg.key)
 					storeErr(ctx, err, "ERR-BALANCE", msg.transfer.From, msg.key, msg.transfer.BlockNumber, storageClient)
 				}
-
 				out <- bals
 			}
+
+			tracing.FinishSpan(child)
 		}
 	}()
 
@@ -165,9 +179,12 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 	out := make(chan ownersPluginResult)
 
 	go func() {
+		span, _ := startSpan(ctx, "ownerPlugin")
+		defer tracing.FinishSpan(span)
 		defer close(out)
+
 		for msg := range in {
-			defer msg.wg.Done()
+			child := span.StartChild("handleMessage")
 
 			if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
 				out <- ownersPluginResult{
@@ -183,6 +200,8 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 					},
 				}
 			}
+
+			tracing.FinishSpan(child)
 		}
 	}()
 
@@ -201,12 +220,17 @@ func newRefreshPlugin(ctx context.Context, blockFilterRepo postgres.BlockFilterR
 	in := make(chan PluginMsg)
 
 	go func() {
-		filters := make(map[persist.BlockNumber]*bloom.BloomFilter)
+		span, _ := startSpan(ctx, "refreshPlugin")
+		defer tracing.FinishSpan(span)
+
+		filters := make(map[[2]persist.BlockNumber]*bloom.BloomFilter)
 
 		for msg := range in {
-			defer msg.wg.Done()
+			child := span.StartChild("handleMessage")
 
-			key := msg.transfer.BlockNumber - (msg.transfer.BlockNumber % blocksPerLogsCall)
+			fromBlock := msg.transfer.BlockNumber - (msg.transfer.BlockNumber % blocksPerLogsCall)
+			toBlock := fromBlock + blocksPerLogsCall
+			key := [2]persist.BlockNumber{fromBlock, toBlock}
 
 			if _, ok := filters[key]; !ok {
 				filters[key] = bloom.NewWithEstimates(bloomFilterSize, falsePositiveRate)
@@ -214,14 +238,12 @@ func newRefreshPlugin(ctx context.Context, blockFilterRepo postgres.BlockFilterR
 
 			filters[key] = filters[key].AddString(msg.transfer.From.String())
 			filters[key] = filters[key].AddString(msg.transfer.To.String())
+
+			tracing.FinishSpan(child)
 		}
 
-		// TODO: Change to a single bulk insert
-		for key, filter := range filters {
-			err := blockFilterRepo.Add(ctx, key, key+blocksPerLogsCall, filter)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("failed to save filter for block=%d to block=%d", key, key+blocksPerLogsCall)
-			}
+		if err := blockFilterRepo.BulkUpsert(ctx, filters); err != nil {
+			logger.For(ctx).WithError(err).Error("failed to save block filters")
 		}
 	}()
 

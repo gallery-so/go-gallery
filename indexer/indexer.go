@@ -20,6 +20,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
+	"github.com/getsentry/sentry-go"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -27,13 +28,14 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
-var defaultStartingBlock persist.BlockNumber = 5000000
+var defaultStartingBlock persist.BlockNumber = 8000000
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
@@ -192,20 +194,21 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 
 // Start begins indexing events from the blockchain
 func (i *indexer) Start(rootCtx context.Context) {
-	ctx, cancel := context.WithTimeout(rootCtx, time.Minute)
-	defer cancel()
+	// XXX: ctx, cancel := context.WithTimeout(rootCtx, time.Minute)
+	// XXX: defer cancel()
 
 	lastSyncedBlock := defaultStartingBlock
-	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
-	if err == nil && recentDBBlock > defaultStartingBlock {
-		lastSyncedBlock = recentDBBlock
-	}
+	// XXX: recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
+	// XXX: if err == nil && recentDBBlock > defaultStartingBlock {
+	// XXX: 	lastSyncedBlock = recentDBBlock
+	// XXX: }
 
-	remainder := lastSyncedBlock % blocksPerLogsCall
-	lastSyncedBlock -= (remainder + (blocksPerLogsCall * defaultWorkerPoolWaitSize))
-	i.lastSyncedBlock = uint64(lastSyncedBlock)
+	// XXX: remainder := lastSyncedBlock % blocksPerLogsCall
+	// XXX: lastSyncedBlock -= (remainder + (blocksPerLogsCall * defaultWorkerPoolWaitSize))
+	// XXX: i.lastSyncedBlock = uint64(lastSyncedBlock)
 
-	wp := workerpool.New(defaultWorkerPoolSize)
+	// XXX: wp := workerpool.New(defaultWorkerPoolSize)
+	wp := workerpool.New(1)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -214,24 +217,39 @@ func (i *indexer) Start(rootCtx context.Context) {
 
 	topics := [][]common.Hash{events}
 
-	go i.listenForNewBlocks(sentryutil.NewSentryHubContext(rootCtx))
+	// XXX: go i.listenForNewBlocks(sentryutil.NewSentryHubContext(rootCtx))
 
-	for ; lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock); lastSyncedBlock += blocksPerLogsCall {
-		input := lastSyncedBlock
-		toQueue := func() {
-			workerCtx := sentryutil.NewSentryHubContext(rootCtx)
-			defer recoverAndWait(workerCtx)
-			defer sentryutil.RecoverAndRaise(workerCtx)
+	// XXX: for ; lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock); lastSyncedBlock += blocksPerLogsCall {
+	// XXX: 	input := lastSyncedBlock
+	// XXX: 	toQueue := func() {
+	// XXX: 		workerCtx := sentryutil.NewSentryHubContext(rootCtx)
+	// XXX: 		defer recoverAndWait(workerCtx)
+	// XXX: 		defer sentryutil.RecoverAndRaise(workerCtx)
 
-			i.startPipeline(workerCtx, input, topics)
-		}
-		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
-			wp.SubmitWait(toQueue)
-		} else {
-			wp.Submit(toQueue)
-		}
+	// XXX: 		i.startPipeline(workerCtx, input, topics)
+	// XXX: 	}
+	// XXX: 	if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
+	// XXX: 		wp.SubmitWait(toQueue)
+	// XXX: 	} else {
+	// XXX: 		wp.Submit(toQueue)
+	// XXX: 	}
+	// XXX: }
+	input := lastSyncedBlock
+	toQueue := func() {
+		workerCtx := sentryutil.NewSentryHubContext(rootCtx)
+		defer recoverAndWait(workerCtx)
+		defer sentryutil.RecoverAndRaise(workerCtx)
+
+		i.startPipeline(workerCtx, input, topics)
+	}
+	if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
+		wp.SubmitWait(toQueue)
+	} else {
+		wp.Submit(toQueue)
 	}
 	wp.StopWait()
+	logger.For(rootCtx).Info("done!")
+	return
 	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
 	i.lastSavedLog = uint64(lastSyncedBlock)
@@ -247,6 +265,10 @@ func (i *indexer) Start(rootCtx context.Context) {
 }
 
 func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, topics [][]common.Hash) {
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "startPipeline", sentry.TransactionName("indexer-main:startPipeline"))
+	tracing.AddEventDataToSpan(span, map[string]interface{}{"block": start})
+	defer tracing.FinishSpan(span)
+
 	startTime := time.Now()
 	i.isListening = false
 	transfers := make(chan []transfersAtBlock)
@@ -260,6 +282,9 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	go func() {
 		ctx := sentryutil.NewSentryHubContext(ctx)
+		span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processLogs")
+		defer tracing.FinishSpan(span)
+
 		logs := i.fetchLogs(ctx, start, topics)
 		if logs != nil {
 			i.processLogs(ctx, transfers, logs)
@@ -274,6 +299,9 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 }
 
 func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.Hash) {
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "startNewBlocksPipeline", sentry.TransactionName("indexer-main:startNewBlocksPipeline"))
+	defer tracing.FinishSpan(span)
+
 	i.isListening = true
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.blockFilterRepo, i.storageClient)
@@ -323,6 +351,9 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
+		logger.For(ctx).WithError(err).Warnf(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))
+		logger.For(ctx).WithError(err).Warnf(fmt.Sprintf("%d-%d", curBlock, nextBlock))
+		panic(err)
 	} else {
 		defer reader.Close()
 		err = json.NewDecoder(reader).Decode(&logsTo)
@@ -529,7 +560,8 @@ func LogsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 }
 
 func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, topics [][]common.Hash) {
-
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "pollNewLogs")
+	defer tracing.FinishSpan(span)
 	defer close(transfersChan)
 	defer recoverAndWait(ctx)
 	defer sentryutil.RecoverAndRaise(ctx)
@@ -644,6 +676,8 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 // TRANSFERS FUNCS -------------------------------------------------------------
 
 func (i *indexer) processAllTransfers(ctx context.Context, incomingTransfers <-chan []transfersAtBlock, plugins []chan<- PluginMsg) {
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processTransfers")
+	defer tracing.FinishSpan(span)
 	defer sentryutil.RecoverAndRaise(ctx)
 	for _, plugin := range plugins {
 		defer close(plugin)
@@ -759,6 +793,9 @@ func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenI
 // TOKENS FUNCS ---------------------------------------------------------------
 
 func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owners <-chan ownersPluginResult, balances <-chan tokenBalances) {
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processTokens")
+	defer tracing.FinishSpan(span)
+
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
 	ownersMap := map[persist.EthereumTokenIdentifiers]ownerAtBlock{}
@@ -1168,8 +1205,9 @@ func storeErr(ctx context.Context, err error, prefix string, from persist.Ethere
 
 func recoverAndWait(ctx context.Context) {
 	if err := recover(); err != nil {
-		logger.For(ctx).Errorf("Error in indexer: %v", err)
-		time.Sleep(time.Second * 10)
+		panic(err)
+		// XXX: logger.For(ctx).Errorf("Error in indexer: %v", err)
+		// XXX: time.Sleep(time.Second * 10)
 	}
 }
 

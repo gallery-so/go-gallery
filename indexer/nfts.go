@@ -605,11 +605,12 @@ func deepRefresh(ctx context.Context, idxr *indexer, throttler *throttle.Locker,
 		events[i] = common.HexToHash(string(event))
 	}
 
-	indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
-	if err != nil {
-		logger.For(ctx).WithError(err).Error("failed to fetch latest indexer block")
-		return
-	}
+	var indexerBlock persist.BlockNumber = 15100000
+	// XXX: indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
+	// XXX: if err != nil {
+	// XXX: 	logger.For(ctx).WithError(err).Error("failed to fetch latest indexer block")
+	// XXX: 	return
+	// XXX: }
 
 	wp := workerpool.New(deepRefreshPoolSize)
 	for block := persist.BlockNumber(deepRefreshStartBlock); block < indexerBlock; block += persist.BlockNumber(blocksPerLogsCall) {

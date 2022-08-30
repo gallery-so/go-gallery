@@ -403,11 +403,12 @@ type DebugAuth struct {
 }
 
 type DeepRefreshInput struct {
-	Chains []persist.Chain `json:"chains"`
+	Chain persist.Chain `json:"chain"`
 }
 
 type DeepRefreshPayload struct {
-	Submitted *bool `json:"submitted"`
+	Chain     *persist.Chain `json:"chain"`
+	Submitted *bool          `json:"submitted"`
 }
 
 func (DeepRefreshPayload) IsDeepRefreshPayloadOrError() {}

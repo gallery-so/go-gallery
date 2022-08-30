@@ -532,11 +532,14 @@ func (r *mutationResolver) RefreshContract(ctx context.Context, contractID persi
 }
 
 func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error) {
-	err := publicapi.For(ctx).Token.DeepRefresh(ctx, input.Chains)
+	err := publicapi.For(ctx).Token.DeepRefreshByChain(ctx, input.Chain)
 	if err != nil {
 		return nil, err
 	}
-	return model.DeepRefreshPayload{Submitted: util.BoolToPointer(true)}, nil
+	return model.DeepRefreshPayload{
+		Chain:     &input.Chain,
+		Submitted: util.BoolToPointer(true),
+	}, nil
 }
 
 func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error) {

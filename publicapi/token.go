@@ -340,11 +340,18 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 	return api.repos.TokenRepository.FlagTokensAsUserMarkedSpam(ctx, userID, tokens, isSpam)
 }
 
-func (api TokenAPI) DeepRefresh(ctx context.Context, chains []persist.Chain) error {
+func (api TokenAPI) DeepRefreshByChain(ctx context.Context, chain persist.Chain) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"chain": {chain, "chain"},
+	}); err != nil {
+		return err
+	}
+
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}
 
-	return api.multichainProvider.DeepRefresh(ctx, userID, chains)
+	return api.multichainProvider.DeepRefreshByChain(ctx, userID, chain)
 }
