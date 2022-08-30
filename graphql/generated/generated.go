@@ -3194,6 +3194,7 @@ enum Chain {
     Polygon
     Optimism
     Tezos
+    POAP
 }
 enum WalletType {
     EOA

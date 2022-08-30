@@ -19,6 +19,8 @@ type Provider struct {
 	ContractRepo persist.ContractGalleryRepository
 	UserRepo     persist.UserRepository
 	Chains       map[persist.Chain][]ChainProvider
+	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
+	ChainAddressOverrides map[persist.Chain]persist.Chain
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -119,7 +121,7 @@ type ChainProvider interface {
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo persist.UserRepository, chains ...ChainProvider) *Provider {
+func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo persist.UserRepository, chainOverrides map[persist.Chain]persist.Chain, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
@@ -155,9 +157,11 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 	incomingContracts := make(chan chainContracts)
 	chainsToAddresses := make(map[persist.Chain][]persist.Address)
 
-	for _, wallet := range user.Wallets {
-		if validChainsLookup[wallet.Chain] {
-			chainsToAddresses[wallet.Chain] = append(chainsToAddresses[wallet.Chain], wallet.Address)
+	for _, chain := range chains {
+		for _, wallet := range user.Wallets {
+			if wallet.Chain == chain || d.ChainAddressOverrides[chain] == wallet.Chain {
+				chainsToAddresses[chain] = append(chainsToAddresses[chain], wallet.Address)
+			}
 		}
 	}
 
