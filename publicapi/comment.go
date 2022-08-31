@@ -50,7 +50,7 @@ func (api CommentAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID 
 	return comments, nil
 }
 
-func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, actorID persist.DBID, replyToID persist.DBID, comment string) (persist.DBID, error) {
+func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, actorID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},

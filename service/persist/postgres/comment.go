@@ -33,7 +33,7 @@ func NewCommentRepository(db *sql.DB) *CommentRepository {
 	}
 }
 
-func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, actorID, replyToID persist.DBID, comment string) (persist.DBID, error) {
+func (a *CommentRepository) CreateComment(ctx context.Context, feedEventID, actorID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
 	var resultID persist.DBID
 	err := a.createStmt.QueryRowContext(ctx, persist.GenerateID(), feedEventID, actorID, replyToID, comment).Scan(&resultID)
 	if err != nil {

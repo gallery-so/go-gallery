@@ -18,7 +18,7 @@ type Comment struct {
 
 type CommentRepository interface {
 	// replyToID is optional
-	CreateComment(ctx context.Context, feedEventID DBID, actorID DBID, replyToID DBID, comment string) (DBID, error)
+	CreateComment(ctx context.Context, feedEventID DBID, actorID DBID, replyToID *DBID, comment string) (DBID, error)
 	RemoveComment(ctx context.Context, commentID DBID) error
 }
 

@@ -96,7 +96,7 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Cont
 }
 
 func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveCommentByCommentID(ctx, obj.ReplyTo.Dbid)
 }
 
 func (r *commentResolver) Commenter(ctx context.Context, obj *model.Comment) (*model.GalleryUser, error) {
@@ -124,11 +124,11 @@ func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent)
 }
 
 func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent) ([]*model.Admire, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveAdmiresByFeedEventID(ctx, obj.Dbid)
 }
 
 func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent) ([]*model.Comment, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveCommentsByFeedEventID(ctx, obj.Dbid)
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -623,8 +623,8 @@ func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID
 }
 
 func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error) {
-	viewer := resolveViewer(ctx)
-	id, err := publicapi.For(ctx).Admire.AdmireFeedEvent(ctx, feedEventID, viewer.User.Dbid)
+	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	id, err := publicapi.For(ctx).Admire.AdmireFeedEvent(ctx, feedEventID, user)
 	if err != nil {
 		return nil, err
 	}
@@ -638,7 +638,7 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 		return nil, err
 	}
 	output := &model.AdmireFeedEventPayload{
-		Viewer:    viewer,
+		Viewer:    resolveViewer(ctx),
 		Admire:    admire,
 		FeedEvent: feedEvent,
 	}
@@ -666,14 +666,8 @@ func (r *mutationResolver) UnadmireFeedEvent(ctx context.Context, admireID persi
 }
 
 func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error) {
-	viewer := resolveViewer(ctx)
-	var replyToIDOrNone persist.DBID
-	if replyToID != nil {
-		replyToIDOrNone = *replyToID
-	} else {
-		replyToIDOrNone = ""
-	}
-	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, viewer.User.Dbid, replyToIDOrNone, comment)
+	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, user, replyToID, comment)
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +682,7 @@ func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID p
 		return nil, err
 	}
 	output := &model.CommentOnFeedEventPayload{
-		Viewer:    viewer,
+		Viewer:    resolveViewer(ctx),
 		Comment:   commentDB,
 		FeedEvent: feedEvent,
 	}
