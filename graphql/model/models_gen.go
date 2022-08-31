@@ -111,8 +111,12 @@ type RefreshTokenPayloadOrError interface {
 	IsRefreshTokenPayloadOrError()
 }
 
-type RemoveCommentFromFeedEventPayloadOrError interface {
-	IsRemoveCommentFromFeedEventPayloadOrError()
+type RemoveAdmirePayloadOrError interface {
+	IsRemoveAdmirePayloadOrError()
+}
+
+type RemoveCommentPayloadOrError interface {
+	IsRemoveCommentPayloadOrError()
 }
 
 type RemoveUserWalletsPayloadOrError interface {
@@ -129,10 +133,6 @@ type SyncTokensPayloadOrError interface {
 
 type TokenByIDOrError interface {
 	IsTokenByIDOrError()
-}
-
-type UnAdmireFeedEventPayloadOrError interface {
-	IsUnAdmireFeedEventPayloadOrError()
 }
 
 type UnfollowUserPayloadOrError interface {
@@ -417,16 +417,16 @@ type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrAuthenticationFailed) IsAddUserWalletPayloadOrError()              {}
-func (ErrAuthenticationFailed) IsError()                                    {}
-func (ErrAuthenticationFailed) IsLoginPayloadOrError()                      {}
-func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()                 {}
-func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()                 {}
-func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()               {}
-func (ErrAuthenticationFailed) IsAdmireFeedEventPayloadOrError()            {}
-func (ErrAuthenticationFailed) IsUnAdmireFeedEventPayloadOrError()          {}
-func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError()         {}
-func (ErrAuthenticationFailed) IsRemoveCommentFromFeedEventPayloadOrError() {}
+func (ErrAuthenticationFailed) IsAddUserWalletPayloadOrError()      {}
+func (ErrAuthenticationFailed) IsError()                            {}
+func (ErrAuthenticationFailed) IsLoginPayloadOrError()              {}
+func (ErrAuthenticationFailed) IsCreateUserPayloadOrError()         {}
+func (ErrAuthenticationFailed) IsFollowUserPayloadOrError()         {}
+func (ErrAuthenticationFailed) IsUnfollowUserPayloadOrError()       {}
+func (ErrAuthenticationFailed) IsAdmireFeedEventPayloadOrError()    {}
+func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
+func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
+func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -458,13 +458,13 @@ type ErrFeedEventNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrFeedEventNotFound) IsError()                                    {}
-func (ErrFeedEventNotFound) IsFeedEventOrError()                         {}
-func (ErrFeedEventNotFound) IsFeedEventByIDOrError()                     {}
-func (ErrFeedEventNotFound) IsAdmireFeedEventPayloadOrError()            {}
-func (ErrFeedEventNotFound) IsUnAdmireFeedEventPayloadOrError()          {}
-func (ErrFeedEventNotFound) IsCommentOnFeedEventPayloadOrError()         {}
-func (ErrFeedEventNotFound) IsRemoveCommentFromFeedEventPayloadOrError() {}
+func (ErrFeedEventNotFound) IsError()                            {}
+func (ErrFeedEventNotFound) IsFeedEventOrError()                 {}
+func (ErrFeedEventNotFound) IsFeedEventByIDOrError()             {}
+func (ErrFeedEventNotFound) IsAdmireFeedEventPayloadOrError()    {}
+func (ErrFeedEventNotFound) IsRemoveAdmirePayloadOrError()       {}
+func (ErrFeedEventNotFound) IsCommentOnFeedEventPayloadOrError() {}
+func (ErrFeedEventNotFound) IsRemoveCommentPayloadOrError()      {}
 
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
@@ -472,30 +472,30 @@ type ErrInvalidInput struct {
 	Reasons    []string `json:"reasons"`
 }
 
-func (ErrInvalidInput) IsUserByUsernameOrError()                    {}
-func (ErrInvalidInput) IsUserByIDOrError()                          {}
-func (ErrInvalidInput) IsCommunityByAddressOrError()                {}
-func (ErrInvalidInput) IsCreateCollectionPayloadOrError()           {}
-func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()           {}
-func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()       {}
-func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()     {}
-func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()     {}
-func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError()   {}
-func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()            {}
-func (ErrInvalidInput) IsAddUserWalletPayloadOrError()              {}
-func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()          {}
-func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()             {}
-func (ErrInvalidInput) IsRefreshTokenPayloadOrError()               {}
-func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()          {}
-func (ErrInvalidInput) IsRefreshContractPayloadOrError()            {}
-func (ErrInvalidInput) IsError()                                    {}
-func (ErrInvalidInput) IsCreateUserPayloadOrError()                 {}
-func (ErrInvalidInput) IsFollowUserPayloadOrError()                 {}
-func (ErrInvalidInput) IsUnfollowUserPayloadOrError()               {}
-func (ErrInvalidInput) IsAdmireFeedEventPayloadOrError()            {}
-func (ErrInvalidInput) IsUnAdmireFeedEventPayloadOrError()          {}
-func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()         {}
-func (ErrInvalidInput) IsRemoveCommentFromFeedEventPayloadOrError() {}
+func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
+func (ErrInvalidInput) IsUserByIDOrError()                        {}
+func (ErrInvalidInput) IsCommunityByAddressOrError()              {}
+func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
+func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
+func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
+func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()   {}
+func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()   {}
+func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
+func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()          {}
+func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
+func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
+func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
+func (ErrInvalidInput) IsRefreshTokenPayloadOrError()             {}
+func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()        {}
+func (ErrInvalidInput) IsRefreshContractPayloadOrError()          {}
+func (ErrInvalidInput) IsError()                                  {}
+func (ErrInvalidInput) IsCreateUserPayloadOrError()               {}
+func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
+func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
+func (ErrInvalidInput) IsAdmireFeedEventPayloadOrError()          {}
+func (ErrInvalidInput) IsRemoveAdmirePayloadOrError()             {}
+func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()       {}
+func (ErrInvalidInput) IsRemoveCommentPayloadOrError()            {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -762,12 +762,19 @@ type RefreshTokenPayload struct {
 
 func (RefreshTokenPayload) IsRefreshTokenPayloadOrError() {}
 
-type RemoveCommentFromFeedEventPayload struct {
+type RemoveAdmirePayload struct {
 	Viewer    *Viewer    `json:"viewer"`
 	FeedEvent *FeedEvent `json:"feedEvent"`
 }
 
-func (RemoveCommentFromFeedEventPayload) IsRemoveCommentFromFeedEventPayloadOrError() {}
+func (RemoveAdmirePayload) IsRemoveAdmirePayloadOrError() {}
+
+type RemoveCommentPayload struct {
+	Viewer    *Viewer    `json:"viewer"`
+	FeedEvent *FeedEvent `json:"feedEvent"`
+}
+
+func (RemoveCommentPayload) IsRemoveCommentPayloadOrError() {}
 
 type RemoveUserWalletsPayload struct {
 	Viewer *Viewer `json:"viewer"`
@@ -860,13 +867,6 @@ type TokensAddedToCollectionFeedEventData struct {
 }
 
 func (TokensAddedToCollectionFeedEventData) IsFeedEventData() {}
-
-type UnAdmireFeedEventPayload struct {
-	Viewer    *Viewer    `json:"viewer"`
-	FeedEvent *FeedEvent `json:"feedEvent"`
-}
-
-func (UnAdmireFeedEventPayload) IsUnAdmireFeedEventPayloadOrError() {}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`

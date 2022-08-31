@@ -932,8 +932,8 @@ union AdmireFeedEventPayloadOrError =
   | ErrFeedEventNotFound
   | ErrInvalidInput
 
-union UnAdmireFeedEventPayloadOrError =
-    UnAdmireFeedEventPayload
+union RemoveAdmirePayloadOrError =
+    RemoveAdmirePayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
@@ -944,8 +944,8 @@ union CommentOnFeedEventPayloadOrError =
   | ErrFeedEventNotFound
   | ErrInvalidInput
 
-union RemoveCommentFromFeedEventPayloadOrError =
-    RemoveCommentFromFeedEventPayload
+union RemoveCommentPayloadOrError =
+    RemoveCommentPayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
@@ -956,7 +956,7 @@ type AdmireFeedEventPayload {
     feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
-type UnAdmireFeedEventPayload {
+type RemoveAdmirePayload {
   viewer: Viewer
   feedEvent: FeedEvent @goField(forceResolver: true)
 }
@@ -968,7 +968,7 @@ type CommentOnFeedEventPayload {
   feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
-type RemoveCommentFromFeedEventPayload {
+type RemoveCommentPayload {
   viewer: Viewer
   feedEvent: FeedEvent @goField(forceResolver: true)
 }
@@ -1007,7 +1007,7 @@ type Mutation {
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
     admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
-    unadmireFeedEvent(admireId: DBID!): UnAdmireFeedEventPayloadOrError @authRequired
+    removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
-    removeCommentFromFeedEvent(commentId: DBID!): RemoveCommentFromFeedEventPayloadOrError @authRequired
+    removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 }
