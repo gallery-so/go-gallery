@@ -177,7 +177,6 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		ContractRepository:    postgres.NewContractGalleryRepository(db),
 		BackupRepository:      postgres.NewBackupRepository(db),
 		MembershipRepository:  postgres.NewMembershipRepository(db),
-		CommunityRepository:   postgres.NewCommunityTokenRepository(db),
 		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
 		WalletRepository:      postgres.NewWalletRepository(db),
 	}

@@ -79,7 +79,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrTokenNotFoundByID:
 		mappedErr = model.ErrTokenNotFound{Message: message}
-	case persist.ErrCommunityNotFound:
+	case persist.ErrContractNotFoundByAddress:
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
@@ -425,13 +425,30 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 }
 
 func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, onlyGalleryUsers bool) (*model.Community, error) {
-	community, err := publicapi.For(ctx).Contract.GetCommunityByContractAddress(ctx, contractAddress, forceRefresh, onlyGalleryUsers)
+	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return multichainCommunityToModel(ctx, *community), nil
+	return communityToModel(ctx, *community, &forceRefresh, &onlyGalleryUsers), nil
+}
+
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, onlyGalleryUsers bool) ([]*model.TokenHolder, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+	owners, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, onlyGalleryUsers)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*model.TokenHolder, len(owners))
+	for i, owner := range owners {
+		result[i] = multichainTokenHolderToModel(ctx, owner)
+	}
+
+	return result, nil
 }
 
 func resolveGeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
@@ -1003,53 +1020,27 @@ func tokensToModel(ctx context.Context, token []sqlc.Token) []*model.Token {
 	return res
 }
 
-func communityToModel(ctx context.Context, community persist.Community) *model.Community {
-	lastUpdated := community.LastUpdated.Time()
-	contractAddress := persist.NewChainAddress(community.ContractAddress, community.Chain)
-	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
-
-	owners := make([]*model.TokenHolder, len(community.Owners))
-	for i, owner := range community.Owners {
-		owners[i] = tokenHolderToModel(ctx, owner)
-	}
-
+func communityToModel(ctx context.Context, community sqlc.Contract, forceRefresh *bool, onlyGalleryUsers *bool) *model.Community {
+	lastUpdated := community.LastUpdated
+	contractAddress := persist.NewChainAddress(community.Address, persist.Chain(community.Chain.Int32))
+	creatorAddress := persist.NewChainAddress(community.CreatorAddress, persist.Chain(community.Chain.Int32))
+	chain := persist.Chain(community.Chain.Int32)
 	return &model.Community{
-		LastUpdated:      &lastUpdated,
-		ContractAddress:  &contractAddress,
-		CreatorAddress:   &creatorAddress,
-		Name:             util.StringToPointer(community.Name.String()),
-		Description:      util.StringToPointer(community.Description.String()),
-		PreviewImage:     util.StringToPointer(community.PreviewImage.String()),
-		Chain:            &community.Chain,
-		ProfileImageURL:  util.StringToPointer(community.ProfileImageURL.String()),
-		ProfileBannerURL: util.StringToPointer(community.ProfileBannerURL.String()),
-		BadgeURL:         util.StringToPointer(community.BadgeURL.String()),
-		Owners:           owners,
-	}
-}
-
-func multichainCommunityToModel(ctx context.Context, community multichain.Community) *model.Community {
-	lastUpdated := community.LastUpdated.Time()
-	contractAddress := persist.NewChainAddress(community.ContractAddress, community.Chain)
-	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
-
-	owners := make([]*model.TokenHolder, len(community.Owners))
-	for i, owner := range community.Owners {
-		owners[i] = multichainTokenHolderToModel(ctx, owner)
-	}
-
-	return &model.Community{
-		LastUpdated:      &lastUpdated,
-		ContractAddress:  &contractAddress,
-		CreatorAddress:   &creatorAddress,
-		Name:             util.StringToPointer(community.Name),
-		Description:      util.StringToPointer(community.Description),
-		PreviewImage:     util.StringToPointer(community.PreviewImage),
-		Chain:            &community.Chain,
-		ProfileImageURL:  util.StringToPointer(community.ProfileImageURL),
-		ProfileBannerURL: util.StringToPointer(community.ProfileBannerURL),
-		BadgeURL:         util.StringToPointer(community.BadgeURL),
-		Owners:           owners,
+		HelperCommunityData: model.HelperCommunityData{
+			ForceRefresh:     forceRefresh,
+			OnlyGalleryUsers: onlyGalleryUsers,
+		},
+		LastUpdated:     &lastUpdated,
+		ContractAddress: &contractAddress,
+		CreatorAddress:  &creatorAddress,
+		Name:            util.StringToPointer(community.Name.String),
+		Description:     util.StringToPointer(community.Description.String),
+		// PreviewImage:     util.StringToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
+		Chain:            &chain,
+		ProfileImageURL:  util.StringToPointer(community.ProfileImageUrl.String),
+		ProfileBannerURL: util.StringToPointer(community.ProfileBannerUrl.String),
+		BadgeURL:         util.StringToPointer(community.BadgeUrl.String),
+		Owners:           nil, // handled by dedicated resolver
 	}
 }
 

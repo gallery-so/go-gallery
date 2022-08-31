@@ -16,6 +16,7 @@ type ContractGallery struct {
 	Address          Address    `json:"address"`
 	Symbol           NullString `json:"symbol"`
 	Name             NullString `json:"name"`
+	Description      NullString `json:"description"`
 	CreatorAddress   Address    `json:"creator_address"`
 	ProfileImageURL  NullString `json:"profile_image_url"`
 	ProfileBannerURL NullString `json:"profile_banner_url"`
@@ -28,4 +29,5 @@ type ContractGalleryRepository interface {
 	GetByAddresses(context.Context, []Address, Chain) ([]ContractGallery, error)
 	UpsertByAddress(context.Context, Address, Chain, ContractGallery) error
 	BulkUpsert(context.Context, []ContractGallery) error
+	GetOwnersByAddress(context.Context, Address, Chain) ([]TokenHolder, error)
 }

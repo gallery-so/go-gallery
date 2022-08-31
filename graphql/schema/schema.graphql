@@ -354,22 +354,25 @@ type MembershipTier implements Node {
     owners: [TokenHolder]
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
-    id: ID!
+type Community implements Node
+  @goGqlId(fields: ["contractAddress", "chain"])
+  @goEmbedHelper {
+  dbid: DBID!
+  id: ID!
 
-    lastUpdated: Time
+  lastUpdated: Time
 
-    contractAddress: ChainAddress
-    creatorAddress: ChainAddress
-    chain: Chain
-    name: String
-    description: String
-    previewImage: String
-    profileImageURL: String
-    profileBannerURL: String
-    badgeURL: String
+  contractAddress: ChainAddress
+  creatorAddress: ChainAddress
+  chain: Chain
+  name: String
+  description: String
+  previewImage: String
+  profileImageURL: String
+  profileBannerURL: String
+  badgeURL: String
 
-    owners: [TokenHolder]
+  owners: [TokenHolder] @goField(forceResolver: true)
 }
 
 type Contract implements Node {

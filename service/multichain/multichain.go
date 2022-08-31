@@ -65,6 +65,7 @@ type ChainAgnosticContract struct {
 	Address        persist.Address `json:"address"`
 	Symbol         string          `json:"symbol"`
 	Name           string          `json:"name"`
+	Description    string          `json:"description"`
 	CreatorAddress persist.Address `json:"creator_address"`
 
 	LatestBlock persist.BlockNumber `json:"latest_block"`
@@ -78,21 +79,6 @@ type ChainAgnosticIdentifiers struct {
 
 type ChainAgnosticCommunityOwner struct {
 	Address persist.Address `json:"address"`
-}
-
-type Community struct {
-	LastUpdated      persist.LastUpdatedTime
-	ContractAddress  persist.Address `json:"contract_address"`
-	CreatorAddress   persist.Address `json:"creator_address"`
-	Chain            persist.Chain   `json:"chain"`
-	Name             string          `json:"name"`
-	Description      string          `json:"description"`
-	PreviewImage     string          `json:"preview_image"`
-	ProfileImageURL  string          `json:"profile_image_url"`
-	ProfileBannerURL string          `json:"profile_banner_url"`
-	BadgeURL         string          `json:"badge_url"`
-
-	Owners []TokenHolder `json:"owners"`
 }
 
 type TokenHolder struct {
@@ -321,7 +307,7 @@ outer:
 	return nil
 }
 
-func (d *Provider) GetCommunity(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) (Community, error) {
+func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]TokenHolder, error) {
 
 	// in the future, the current persist.CommunityRepository will replace the current persist.ContractRepository
 	// except we will not store the owners of a token in the DB. this function will be renamed to GetCommunityOwners and will be
@@ -333,46 +319,25 @@ func (d *Provider) GetCommunity(ctx context.Context, communityIdentifiers persis
 	if !forceRefresh {
 		bs, err := d.Cache.Get(ctx, communityIdentifiers.String())
 		if err == nil && len(bs) > 0 {
-			var community Community
-			err = json.Unmarshal(bs, &community)
+			var owners []TokenHolder
+			err = json.Unmarshal(bs, &owners)
 			if err != nil {
-				return Community{}, err
+				return nil, err
 			}
-			return community, nil
+			return owners, nil
 		}
 	}
 	providers, ok := d.Chains[communityIdentifiers.Chain()]
 	if !ok {
-		return Community{}, ErrChainNotFound{Chain: communityIdentifiers.Chain()}
-	}
-	result := Community{
-		Chain:           communityIdentifiers.Chain(),
-		ContractAddress: communityIdentifiers.Address(),
-		LastUpdated:     persist.LastUpdatedTime(time.Now()),
+		return nil, ErrChainNotFound{Chain: communityIdentifiers.Chain()}
 	}
 
-	var holders []TokenHolder
-	galleryCommunityBase, err := d.Repos.CommunityRepository.GetByAddress(ctx, communityIdentifiers, false)
+	dbHolders, err := d.Repos.ContractRepository.GetOwnersByAddress(ctx, communityIdentifiers.Address(), communityIdentifiers.Chain())
 	if err != nil {
-		if _, ok := err.(persist.ErrCommunityNotFound); !ok {
-			return Community{}, err
-		}
-		// community was not found (no gallery users have any tokens from this community), use fallback
-		communityBase, err := providers[0].GetContractByAddress(ctx, communityIdentifiers.Address())
-		if err != nil {
-			return Community{}, err
-		}
-		result.Name = communityBase.Name
-	} else {
-		// community was found
-		result.Name = galleryCommunityBase.Name.String()
-		result.Description = galleryCommunityBase.Description.String()
-		result.BadgeURL = galleryCommunityBase.BadgeURL.String()
-		result.ProfileImageURL = galleryCommunityBase.ProfileImageURL.String()
-		result.ProfileBannerURL = galleryCommunityBase.ProfileBannerURL.String()
-		result.PreviewImage = galleryCommunityBase.PreviewImage.String()
-		holders, err = tokenHoldersToTokenHolders(ctx, galleryCommunityBase.Owners, d.Repos.UserRepository)
+		return nil, err
 	}
+
+	holders, err := tokenHoldersToTokenHolders(ctx, dbHolders, d.Repos.UserRepository)
 
 	if !onlyGalleryUsers {
 		// look for other holders from the provider directly
@@ -380,7 +345,7 @@ func (d *Provider) GetCommunity(ctx context.Context, communityIdentifiers persis
 		for _, p := range providers {
 			owners, err := p.GetCommunityOwners(ctx, communityIdentifiers.Address())
 			if err != nil {
-				return Community{}, err
+				return nil, err
 			}
 			nonGalleryOwners = append(nonGalleryOwners, owners...)
 		}
@@ -399,7 +364,7 @@ func (d *Provider) GetCommunity(ctx context.Context, communityIdentifiers persis
 
 				tokensForContract, _, err := providers[0].GetOwnedTokensByContract(ctx, communityIdentifiers.Address(), persist.Address(h.DisplayName))
 				if err != nil {
-					return Community{}, err
+					return nil, err
 				}
 				if len(tokensForContract) > 0 {
 					h.PreviewTokens = []string{tokensForContract[0].Media.MediaURL.String()}
@@ -408,17 +373,16 @@ func (d *Provider) GetCommunity(ctx context.Context, communityIdentifiers persis
 			}
 		}
 	}
-	result.Owners = holders
 
-	bs, err := json.Marshal(result)
+	bs, err := json.Marshal(holders)
 	if err != nil {
-		return Community{}, err
+		return nil, err
 	}
 	err = d.Cache.Set(ctx, communityIdentifiers.String(), bs, staleCommunityTime)
 	if err != nil {
-		return Community{}, err
+		return nil, err
 	}
-	return result, nil
+	return holders, nil
 }
 
 // VerifySignature verifies a signature for a wallet address

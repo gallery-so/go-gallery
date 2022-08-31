@@ -284,6 +284,8 @@ type CollectorsNoteAddedToTokenFeedEventData struct {
 func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}
 
 type Community struct {
+	HelperCommunityData
+	Dbid             persist.DBID          `json:"dbid"`
 	LastUpdated      *time.Time            `json:"lastUpdated"`
 	ContractAddress  *persist.ChainAddress `json:"contractAddress"`
 	CreatorAddress   *persist.ChainAddress `json:"creatorAddress"`
