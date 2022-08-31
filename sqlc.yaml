@@ -117,7 +117,3 @@ overrides:
     go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
   - column: "*.creator_address"
     go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
-  # - column: "*.created_at"
-  #   go_type: "github.com/mikeydub/go-gallery/service/persist.CreationTime"
-  # - column: "*.last_updated"
-  #   go_type: "github.com/mikeydub/go-gallery/service/persist.LastUpdatedTime"
