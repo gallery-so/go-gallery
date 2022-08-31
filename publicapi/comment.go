@@ -65,21 +65,21 @@ func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persis
 	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, actorID, replyToID, comment)
 }
 
-func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID, actorID persist.DBID) error {
+func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID, actorID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"commentID": {commentID, "required"},
 		"actorID":   {actorID, "required"},
 	}); err != nil {
-		return err
+		return "", err
 	}
 	comment, err := api.GetCommentByID(ctx, commentID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if comment.ActorID != actorID {
-		return ErrOnlyRemoveOwnComment
+		return "", ErrOnlyRemoveOwnComment
 	}
 
-	return api.repos.CommentRepository.RemoveComment(ctx, commentID)
+	return comment.FeedEventID, api.repos.CommentRepository.RemoveComment(ctx, commentID)
 }

@@ -65,23 +65,23 @@ func (api AdmireAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DB
 	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, actorID)
 }
 
-func (api AdmireAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID, actorID persist.DBID) error {
+func (api AdmireAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID, actorID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"admireID": {admireID, "required"},
 		"actorID":  {actorID, "required"},
 	}); err != nil {
-		return err
+		return "", err
 	}
 
 	// will also fail if admire does not exist
 	admire, err := api.GetAdmireByID(ctx, admireID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if admire.ActorID != actorID {
-		return ErrOnlyRemoveOwnAdmire
+		return "", ErrOnlyRemoveOwnAdmire
 	}
 
-	return api.repos.AdmireRepository.RemoveAdmire(ctx, admireID)
+	return admire.FeedEventID, api.repos.AdmireRepository.RemoveAdmire(ctx, admireID)
 }
