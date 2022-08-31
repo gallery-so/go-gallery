@@ -55,12 +55,19 @@ type poapToken struct {
 		Name        string `json:"name"`
 		EventURL    string `json:"event_url"`
 		ImageURL    string `json:"image_url"`
+		Country     string `json:"country"`
+		City        string `json:"city"`
 		Description string `json:"description"`
+		Year        int    `json:"year"`
+		StartDate   string `json:"start_date"`
+		EndDate     string `json:"end_date"`
+		ExpiryDate  string `json:"expiry_date"`
 		Supply      int    `json:"supply"`
 	} `json:"event"`
 	TokenID tokenID `json:"tokenId"`
 	Owner   string  `json:"owner"`
 	Chain   string  `json:"chain"`
+	Created string  `json:"created"`
 }
 
 // Provider is an the struct for retrieving data from the Tezos blockchain
@@ -197,9 +204,16 @@ func (d *Provider) poapToToken(pPoap poapToken) multichain.ChainAgnosticToken {
 			"supply":      pPoap.Event.Supply,
 			"event_url":   pPoap.Event.EventURL,
 			"image_url":   pPoap.Event.ImageURL,
+			"country":     pPoap.Event.Country,
+			"city":        pPoap.Event.City,
 			"description": pPoap.Event.Description,
+			"year":        pPoap.Event.Year,
+			"start_date":  pPoap.Event.StartDate,
+			"end_date":    pPoap.Event.EndDate,
+			"expiry_date": pPoap.Event.ExpiryDate,
 			"name":        pPoap.Event.Name,
 			"chain":       pPoap.Chain,
+			"created":     pPoap.Created,
 		},
 	}
 }
