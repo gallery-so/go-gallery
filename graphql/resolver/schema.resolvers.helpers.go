@@ -43,7 +43,7 @@ var nodeFetcher = model.NodeFetcher{
 
 	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
 		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), false, true)
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.BoolToPointer(false), util.BoolToPointer(true))
 		} else {
 			return nil, err
 		}
@@ -424,14 +424,14 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, onlyGalleryUsers bool) (*model.Community, error) {
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (*model.Community, error) {
 	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return communityToModel(ctx, *community, &forceRefresh, &onlyGalleryUsers), nil
+	return communityToModel(ctx, *community, forceRefresh, onlyGalleryUsers), nil
 }
 
 func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, onlyGalleryUsers bool) ([]*model.TokenHolder, error) {

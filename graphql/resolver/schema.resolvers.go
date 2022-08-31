@@ -648,16 +648,8 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 }
 
 func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error) {
-	refresh := false
-	if forceRefresh != nil {
-		refresh = *forceRefresh
-	}
-	onlyUsers := true
-	if onlyGalleryUsers != nil {
-		onlyUsers = *onlyGalleryUsers
-	}
 
-	return resolveCommunityByContractAddress(ctx, communityAddress, refresh, onlyUsers)
+	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh, onlyGalleryUsers)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
