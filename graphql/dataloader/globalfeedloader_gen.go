@@ -6,13 +6,21 @@ import (
 	"sync"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+=======
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+>>>>>>> 93a3a41 (Add indexer models)
 )
 
 // GlobalFeedLoaderConfig captures the config to create a new GlobalFeedLoader
 type GlobalFeedLoaderConfig struct {
 	// Fetch is a method that provides the data for the loader
+<<<<<<< HEAD
 	Fetch func(keys []coredb.GetGlobalFeedViewBatchParams) ([][]coredb.FeedEvent, []error)
+=======
+	Fetch func(keys []coregen.GetGlobalFeedViewBatchParams) ([][]coregen.FeedEvent, []error)
+>>>>>>> 93a3a41 (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +41,11 @@ func NewGlobalFeedLoader(config GlobalFeedLoaderConfig) *GlobalFeedLoader {
 // GlobalFeedLoader batches and caches requests
 type GlobalFeedLoader struct {
 	// this method provides the data for the loader
+<<<<<<< HEAD
 	fetch func(keys []coredb.GetGlobalFeedViewBatchParams) ([][]coredb.FeedEvent, []error)
+=======
+	fetch func(keys []coregen.GetGlobalFeedViewBatchParams) ([][]coregen.FeedEvent, []error)
+>>>>>>> 93a3a41 (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +56,11 @@ type GlobalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
+<<<<<<< HEAD
 	cache map[coredb.GetGlobalFeedViewBatchParams][]coredb.FeedEvent
+=======
+	cache map[coregen.GetGlobalFeedViewBatchParams][]coregen.FeedEvent
+>>>>>>> 93a3a41 (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -55,26 +71,43 @@ type GlobalFeedLoader struct {
 }
 
 type globalFeedLoaderBatch struct {
+<<<<<<< HEAD
 	keys    []coredb.GetGlobalFeedViewBatchParams
 	data    [][]coredb.FeedEvent
+=======
+	keys    []coregen.GetGlobalFeedViewBatchParams
+	data    [][]coregen.FeedEvent
+>>>>>>> 93a3a41 (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
+<<<<<<< HEAD
 func (l *GlobalFeedLoader) Load(key coredb.GetGlobalFeedViewBatchParams) ([]coredb.FeedEvent, error) {
+=======
+func (l *GlobalFeedLoader) Load(key coregen.GetGlobalFeedViewBatchParams) ([]coregen.FeedEvent, error) {
+>>>>>>> 93a3a41 (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 func (l *GlobalFeedLoader) LoadThunk(key coredb.GetGlobalFeedViewBatchParams) func() ([]coredb.FeedEvent, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() ([]coredb.FeedEvent, error) {
+=======
+func (l *GlobalFeedLoader) LoadThunk(key coregen.GetGlobalFeedViewBatchParams) func() ([]coregen.FeedEvent, error) {
+	l.mu.Lock()
+	if it, ok := l.cache[key]; ok {
+		l.mu.Unlock()
+		return func() ([]coregen.FeedEvent, error) {
+>>>>>>> 93a3a41 (Add indexer models)
 			return it, nil
 		}
 	}
@@ -85,10 +118,17 @@ func (l *GlobalFeedLoader) LoadThunk(key coredb.GetGlobalFeedViewBatchParams) fu
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
+<<<<<<< HEAD
 	return func() ([]coredb.FeedEvent, error) {
 		<-batch.done
 
 		var data []coredb.FeedEvent
+=======
+	return func() ([]coregen.FeedEvent, error) {
+		<-batch.done
+
+		var data []coregen.FeedEvent
+>>>>>>> 93a3a41 (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,14 +153,23 @@ func (l *GlobalFeedLoader) LoadThunk(key coredb.GetGlobalFeedViewBatchParams) fu
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
+<<<<<<< HEAD
 func (l *GlobalFeedLoader) LoadAll(keys []coredb.GetGlobalFeedViewBatchParams) ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
+=======
+func (l *GlobalFeedLoader) LoadAll(keys []coregen.GetGlobalFeedViewBatchParams) ([][]coregen.FeedEvent, []error) {
+	results := make([]func() ([]coregen.FeedEvent, error), len(keys))
+>>>>>>> 93a3a41 (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
+<<<<<<< HEAD
 	feedEvents := make([][]coredb.FeedEvent, len(keys))
+=======
+	feedEvents := make([][]coregen.FeedEvent, len(keys))
+>>>>>>> 93a3a41 (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		feedEvents[i], errors[i] = thunk()
@@ -131,6 +180,7 @@ func (l *GlobalFeedLoader) LoadAll(keys []coredb.GetGlobalFeedViewBatchParams) (
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.GetGlobalFeedViewBatchParams) func() ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 	for i, key := range keys {
@@ -138,6 +188,15 @@ func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.GetGlobalFeedViewBatchPara
 	}
 	return func() ([][]coredb.FeedEvent, []error) {
 		feedEvents := make([][]coredb.FeedEvent, len(keys))
+=======
+func (l *GlobalFeedLoader) LoadAllThunk(keys []coregen.GetGlobalFeedViewBatchParams) func() ([][]coregen.FeedEvent, []error) {
+	results := make([]func() ([]coregen.FeedEvent, error), len(keys))
+	for i, key := range keys {
+		results[i] = l.LoadThunk(key)
+	}
+	return func() ([][]coregen.FeedEvent, []error) {
+		feedEvents := make([][]coregen.FeedEvent, len(keys))
+>>>>>>> 93a3a41 (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			feedEvents[i], errors[i] = thunk()
@@ -149,13 +208,21 @@ func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.GetGlobalFeedViewBatchPara
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
+<<<<<<< HEAD
 func (l *GlobalFeedLoader) Prime(key coredb.GetGlobalFeedViewBatchParams, value []coredb.FeedEvent) bool {
+=======
+func (l *GlobalFeedLoader) Prime(key coregen.GetGlobalFeedViewBatchParams, value []coregen.FeedEvent) bool {
+>>>>>>> 93a3a41 (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
+<<<<<<< HEAD
 		cpy := make([]coredb.FeedEvent, len(value))
+=======
+		cpy := make([]coregen.FeedEvent, len(value))
+>>>>>>> 93a3a41 (Add indexer models)
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -164,22 +231,36 @@ func (l *GlobalFeedLoader) Prime(key coredb.GetGlobalFeedViewBatchParams, value 
 }
 
 // Clear the value at key from the cache, if it exists
+<<<<<<< HEAD
 func (l *GlobalFeedLoader) Clear(key coredb.GetGlobalFeedViewBatchParams) {
+=======
+func (l *GlobalFeedLoader) Clear(key coregen.GetGlobalFeedViewBatchParams) {
+>>>>>>> 93a3a41 (Add indexer models)
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
+<<<<<<< HEAD
 func (l *GlobalFeedLoader) unsafeSet(key coredb.GetGlobalFeedViewBatchParams, value []coredb.FeedEvent) {
 	if l.cache == nil {
 		l.cache = map[coredb.GetGlobalFeedViewBatchParams][]coredb.FeedEvent{}
+=======
+func (l *GlobalFeedLoader) unsafeSet(key coregen.GetGlobalFeedViewBatchParams, value []coregen.FeedEvent) {
+	if l.cache == nil {
+		l.cache = map[coregen.GetGlobalFeedViewBatchParams][]coregen.FeedEvent{}
+>>>>>>> 93a3a41 (Add indexer models)
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
+<<<<<<< HEAD
 func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coredb.GetGlobalFeedViewBatchParams) int {
+=======
+func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coregen.GetGlobalFeedViewBatchParams) int {
+>>>>>>> 93a3a41 (Add indexer models)
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i

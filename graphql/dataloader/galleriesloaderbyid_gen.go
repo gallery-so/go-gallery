@@ -6,14 +6,22 @@ import (
 	"sync"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+=======
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+>>>>>>> 93a3a41 (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // GalleriesLoaderByIDConfig captures the config to create a new GalleriesLoaderByID
 type GalleriesLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
+<<<<<<< HEAD
 	Fetch func(keys []persist.DBID) ([][]coredb.Gallery, []error)
+=======
+	Fetch func(keys []persist.DBID) ([][]coregen.Gallery, []error)
+>>>>>>> 93a3a41 (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +42,11 @@ func NewGalleriesLoaderByID(config GalleriesLoaderByIDConfig) *GalleriesLoaderBy
 // GalleriesLoaderByID batches and caches requests
 type GalleriesLoaderByID struct {
 	// this method provides the data for the loader
+<<<<<<< HEAD
 	fetch func(keys []persist.DBID) ([][]coredb.Gallery, []error)
+=======
+	fetch func(keys []persist.DBID) ([][]coregen.Gallery, []error)
+>>>>>>> 93a3a41 (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +57,11 @@ type GalleriesLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
+<<<<<<< HEAD
 	cache map[persist.DBID][]coredb.Gallery
+=======
+	cache map[persist.DBID][]coregen.Gallery
+>>>>>>> 93a3a41 (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +73,41 @@ type GalleriesLoaderByID struct {
 
 type galleriesLoaderByIDBatch struct {
 	keys    []persist.DBID
+<<<<<<< HEAD
 	data    [][]coredb.Gallery
+=======
+	data    [][]coregen.Gallery
+>>>>>>> 93a3a41 (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Gallery by key, batching and caching will be applied automatically
+<<<<<<< HEAD
 func (l *GalleriesLoaderByID) Load(key persist.DBID) ([]coredb.Gallery, error) {
+=======
+func (l *GalleriesLoaderByID) Load(key persist.DBID) ([]coregen.Gallery, error) {
+>>>>>>> 93a3a41 (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Gallery.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Gallery, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() ([]coredb.Gallery, error) {
+=======
+func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Gallery, error) {
+	l.mu.Lock()
+	if it, ok := l.cache[key]; ok {
+		l.mu.Unlock()
+		return func() ([]coregen.Gallery, error) {
+>>>>>>> 93a3a41 (Add indexer models)
 			return it, nil
 		}
 	}
@@ -86,10 +118,17 @@ func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Galle
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
+<<<<<<< HEAD
 	return func() ([]coredb.Gallery, error) {
 		<-batch.done
 
 		var data []coredb.Gallery
+=======
+	return func() ([]coregen.Gallery, error) {
+		<-batch.done
+
+		var data []coregen.Gallery
+>>>>>>> 93a3a41 (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +153,23 @@ func (l *GalleriesLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Galle
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
+<<<<<<< HEAD
 func (l *GalleriesLoaderByID) LoadAll(keys []persist.DBID) ([][]coredb.Gallery, []error) {
 	results := make([]func() ([]coredb.Gallery, error), len(keys))
+=======
+func (l *GalleriesLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.Gallery, []error) {
+	results := make([]func() ([]coregen.Gallery, error), len(keys))
+>>>>>>> 93a3a41 (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
+<<<<<<< HEAD
 	gallerys := make([][]coredb.Gallery, len(keys))
+=======
+	gallerys := make([][]coregen.Gallery, len(keys))
+>>>>>>> 93a3a41 (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		gallerys[i], errors[i] = thunk()
@@ -132,6 +180,7 @@ func (l *GalleriesLoaderByID) LoadAll(keys []persist.DBID) ([][]coredb.Gallery, 
 // LoadAllThunk returns a function that when called will block waiting for a Gallerys.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb.Gallery, []error) {
 	results := make([]func() ([]coredb.Gallery, error), len(keys))
 	for i, key := range keys {
@@ -139,6 +188,15 @@ func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]core
 	}
 	return func() ([][]coredb.Gallery, []error) {
 		gallerys := make([][]coredb.Gallery, len(keys))
+=======
+func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coregen.Gallery, []error) {
+	results := make([]func() ([]coregen.Gallery, error), len(keys))
+	for i, key := range keys {
+		results[i] = l.LoadThunk(key)
+	}
+	return func() ([][]coregen.Gallery, []error) {
+		gallerys := make([][]coregen.Gallery, len(keys))
+>>>>>>> 93a3a41 (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			gallerys[i], errors[i] = thunk()
@@ -150,13 +208,21 @@ func (l *GalleriesLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]core
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
+<<<<<<< HEAD
 func (l *GalleriesLoaderByID) Prime(key persist.DBID, value []coredb.Gallery) bool {
+=======
+func (l *GalleriesLoaderByID) Prime(key persist.DBID, value []coregen.Gallery) bool {
+>>>>>>> 93a3a41 (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
+<<<<<<< HEAD
 		cpy := make([]coredb.Gallery, len(value))
+=======
+		cpy := make([]coregen.Gallery, len(value))
+>>>>>>> 93a3a41 (Add indexer models)
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -171,9 +237,15 @@ func (l *GalleriesLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
+<<<<<<< HEAD
 func (l *GalleriesLoaderByID) unsafeSet(key persist.DBID, value []coredb.Gallery) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID][]coredb.Gallery{}
+=======
+func (l *GalleriesLoaderByID) unsafeSet(key persist.DBID, value []coregen.Gallery) {
+	if l.cache == nil {
+		l.cache = map[persist.DBID][]coregen.Gallery{}
+>>>>>>> 93a3a41 (Add indexer models)
 	}
 	l.cache[key] = value
 }
