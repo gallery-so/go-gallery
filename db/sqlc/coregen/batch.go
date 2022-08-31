@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.13.0
 // source: batch.go
-package sqlc
+package coregen
 
 import (
 	"context"

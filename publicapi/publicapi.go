@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
 	"github.com/mikeydub/go-gallery/event"
 
 	"cloud.google.com/go/storage"

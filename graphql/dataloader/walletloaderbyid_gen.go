@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // WalletLoaderByIdConfig captures the config to create a new WalletLoaderById
 type WalletLoaderByIdConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([]sqlc.Wallet, []error)
+	Fetch func(keys []persist.DBID) ([]coregen.Wallet, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewWalletLoaderById(config WalletLoaderByIdConfig) *WalletLoaderById {
 // WalletLoaderById batches and caches requests
 type WalletLoaderById struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([]sqlc.Wallet, []error)
+	fetch func(keys []persist.DBID) ([]coregen.Wallet, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type WalletLoaderById struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID]sqlc.Wallet
+	cache map[persist.DBID]coregen.Wallet
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type WalletLoaderById struct {
 
 type walletLoaderByIdBatch struct {
 	keys    []persist.DBID
-	data    []sqlc.Wallet
+	data    []coregen.Wallet
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Wallet by key, batching and caching will be applied automatically
-func (l *WalletLoaderById) Load(key persist.DBID) (sqlc.Wallet, error) {
+func (l *WalletLoaderById) Load(key persist.DBID) (coregen.Wallet, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Wallet.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (sqlc.Wallet, error) {
+func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (coregen.Wallet, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (sqlc.Wallet, error) {
+		return func() (coregen.Wallet, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (sqlc.Wallet, erro
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (sqlc.Wallet, error) {
+	return func() (coregen.Wallet, error) {
 		<-batch.done
 
-		var data sqlc.Wallet
+		var data coregen.Wallet
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (sqlc.Wallet, erro
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *WalletLoaderById) LoadAll(keys []persist.DBID) ([]sqlc.Wallet, []error) {
-	results := make([]func() (sqlc.Wallet, error), len(keys))
+func (l *WalletLoaderById) LoadAll(keys []persist.DBID) ([]coregen.Wallet, []error) {
+	results := make([]func() (coregen.Wallet, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	wallets := make([]sqlc.Wallet, len(keys))
+	wallets := make([]coregen.Wallet, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		wallets[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *WalletLoaderById) LoadAll(keys []persist.DBID) ([]sqlc.Wallet, []error)
 // LoadAllThunk returns a function that when called will block waiting for a Wallets.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *WalletLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]sqlc.Wallet, []error) {
-	results := make([]func() (sqlc.Wallet, error), len(keys))
+func (l *WalletLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Wallet, []error) {
+	results := make([]func() (coregen.Wallet, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]sqlc.Wallet, []error) {
-		wallets := make([]sqlc.Wallet, len(keys))
+	return func() ([]coregen.Wallet, []error) {
+		wallets := make([]coregen.Wallet, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			wallets[i], errors[i] = thunk()
@@ -150,7 +150,7 @@ func (l *WalletLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]sqlc.Wall
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *WalletLoaderById) Prime(key persist.DBID, value sqlc.Wallet) bool {
+func (l *WalletLoaderById) Prime(key persist.DBID, value coregen.Wallet) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -167,9 +167,9 @@ func (l *WalletLoaderById) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *WalletLoaderById) unsafeSet(key persist.DBID, value sqlc.Wallet) {
+func (l *WalletLoaderById) unsafeSet(key persist.DBID, value coregen.Wallet) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID]sqlc.Wallet{}
+		l.cache = map[persist.DBID]coregen.Wallet{}
 	}
 	l.cache[key] = value
 }

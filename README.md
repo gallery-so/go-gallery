@@ -78,21 +78,38 @@ brew install golang-migrate
 
 Create a new migration:
 ```bash
-migrate create -ext sql -dir db/migrations -seq <name of migration>
+# New migration for the backend db
+migrate create -ext sql -dir db/migrations/backend -seq <name of migration>
+
+# New migration for the indexer db
+migrate create -ext sql -dir db/migrations/indexer -seq <name of migration>
 ```
 
-Run a migration on dev:
+Run a migration on dev backend db:
 ```bash
-# Apply an up migration.
-migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" up
+# Apply an up migration to the backend db
+migrate -path db/migrations/backend -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" up
 
-# Undo the last migration.
-migrate -path db/migrations -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down 1
+# Undo the last migration to the backend db
+migrate -path db/migrations/backend -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" down 1
+```
+
+Run a migration on the indexer db:
+```bash
+# Apply an up migration to the indexer db
+migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db password here>@<indexer db ip>:5432/postgres" up
+
+# Undo the last migration to the indexer db
+migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db password here>@<indexer db ip>:5432/postgres" down 1
 ```
 
 Run a migration locally:
 ```bash
-migrate -path db/migrations -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
+# Run all migrations for the local backend db
+migrate -path db/migrations/backend -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
+
+# Run all migrations for the local indexer db
+migrate -path db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
 ```
 
 ### Healthcheck

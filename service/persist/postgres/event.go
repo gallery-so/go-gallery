@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )

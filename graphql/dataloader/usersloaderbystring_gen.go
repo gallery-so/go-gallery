@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
 )
 
 // UsersLoaderByStringConfig captures the config to create a new UsersLoaderByString
 type UsersLoaderByStringConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []string) ([][]sqlc.User, []error)
+	Fetch func(keys []string) ([][]coregen.User, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +33,7 @@ func NewUsersLoaderByString(config UsersLoaderByStringConfig) *UsersLoaderByStri
 // UsersLoaderByString batches and caches requests
 type UsersLoaderByString struct {
 	// this method provides the data for the loader
-	fetch func(keys []string) ([][]sqlc.User, []error)
+	fetch func(keys []string) ([][]coregen.User, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +44,7 @@ type UsersLoaderByString struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[string][]sqlc.User
+	cache map[string][]coregen.User
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -56,25 +56,25 @@ type UsersLoaderByString struct {
 
 type usersLoaderByStringBatch struct {
 	keys    []string
-	data    [][]sqlc.User
+	data    [][]coregen.User
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a User by key, batching and caching will be applied automatically
-func (l *UsersLoaderByString) Load(key string) ([]sqlc.User, error) {
+func (l *UsersLoaderByString) Load(key string) ([]coregen.User, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a User.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UsersLoaderByString) LoadThunk(key string) func() ([]sqlc.User, error) {
+func (l *UsersLoaderByString) LoadThunk(key string) func() ([]coregen.User, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]sqlc.User, error) {
+		return func() ([]coregen.User, error) {
 			return it, nil
 		}
 	}
@@ -85,10 +85,10 @@ func (l *UsersLoaderByString) LoadThunk(key string) func() ([]sqlc.User, error) 
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]sqlc.User, error) {
+	return func() ([]coregen.User, error) {
 		<-batch.done
 
-		var data []sqlc.User
+		var data []coregen.User
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,14 +113,14 @@ func (l *UsersLoaderByString) LoadThunk(key string) func() ([]sqlc.User, error) 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UsersLoaderByString) LoadAll(keys []string) ([][]sqlc.User, []error) {
-	results := make([]func() ([]sqlc.User, error), len(keys))
+func (l *UsersLoaderByString) LoadAll(keys []string) ([][]coregen.User, []error) {
+	results := make([]func() ([]coregen.User, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	users := make([][]sqlc.User, len(keys))
+	users := make([][]coregen.User, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		users[i], errors[i] = thunk()
@@ -131,13 +131,13 @@ func (l *UsersLoaderByString) LoadAll(keys []string) ([][]sqlc.User, []error) {
 // LoadAllThunk returns a function that when called will block waiting for a Users.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UsersLoaderByString) LoadAllThunk(keys []string) func() ([][]sqlc.User, []error) {
-	results := make([]func() ([]sqlc.User, error), len(keys))
+func (l *UsersLoaderByString) LoadAllThunk(keys []string) func() ([][]coregen.User, []error) {
+	results := make([]func() ([]coregen.User, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]sqlc.User, []error) {
-		users := make([][]sqlc.User, len(keys))
+	return func() ([][]coregen.User, []error) {
+		users := make([][]coregen.User, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			users[i], errors[i] = thunk()
@@ -149,13 +149,13 @@ func (l *UsersLoaderByString) LoadAllThunk(keys []string) func() ([][]sqlc.User,
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UsersLoaderByString) Prime(key string, value []sqlc.User) bool {
+func (l *UsersLoaderByString) Prime(key string, value []coregen.User) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]sqlc.User, len(value))
+		cpy := make([]coregen.User, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -170,9 +170,9 @@ func (l *UsersLoaderByString) Clear(key string) {
 	l.mu.Unlock()
 }
 
-func (l *UsersLoaderByString) unsafeSet(key string, value []sqlc.User) {
+func (l *UsersLoaderByString) unsafeSet(key string, value []coregen.User) {
 	if l.cache == nil {
-		l.cache = map[string][]sqlc.User{}
+		l.cache = map[string][]coregen.User{}
 	}
 	l.cache[key] = value
 }

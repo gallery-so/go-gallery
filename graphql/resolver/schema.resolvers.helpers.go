@@ -18,7 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"

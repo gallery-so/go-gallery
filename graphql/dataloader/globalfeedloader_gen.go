@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
 )
 
 // GlobalFeedLoaderConfig captures the config to create a new GlobalFeedLoader
 type GlobalFeedLoaderConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error)
+	Fetch func(keys []coregen.GetGlobalFeedViewBatchParams) ([][]coregen.FeedEvent, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +33,7 @@ func NewGlobalFeedLoader(config GlobalFeedLoaderConfig) *GlobalFeedLoader {
 // GlobalFeedLoader batches and caches requests
 type GlobalFeedLoader struct {
 	// this method provides the data for the loader
-	fetch func(keys []sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error)
+	fetch func(keys []coregen.GetGlobalFeedViewBatchParams) ([][]coregen.FeedEvent, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +44,7 @@ type GlobalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[sqlc.GetGlobalFeedViewBatchParams][]sqlc.FeedEvent
+	cache map[coregen.GetGlobalFeedViewBatchParams][]coregen.FeedEvent
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -55,26 +55,26 @@ type GlobalFeedLoader struct {
 }
 
 type globalFeedLoaderBatch struct {
-	keys    []sqlc.GetGlobalFeedViewBatchParams
-	data    [][]sqlc.FeedEvent
+	keys    []coregen.GetGlobalFeedViewBatchParams
+	data    [][]coregen.FeedEvent
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *GlobalFeedLoader) Load(key sqlc.GetGlobalFeedViewBatchParams) ([]sqlc.FeedEvent, error) {
+func (l *GlobalFeedLoader) Load(key coregen.GetGlobalFeedViewBatchParams) ([]coregen.FeedEvent, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadThunk(key sqlc.GetGlobalFeedViewBatchParams) func() ([]sqlc.FeedEvent, error) {
+func (l *GlobalFeedLoader) LoadThunk(key coregen.GetGlobalFeedViewBatchParams) func() ([]coregen.FeedEvent, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]sqlc.FeedEvent, error) {
+		return func() ([]coregen.FeedEvent, error) {
 			return it, nil
 		}
 	}
@@ -85,10 +85,10 @@ func (l *GlobalFeedLoader) LoadThunk(key sqlc.GetGlobalFeedViewBatchParams) func
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]sqlc.FeedEvent, error) {
+	return func() ([]coregen.FeedEvent, error) {
 		<-batch.done
 
-		var data []sqlc.FeedEvent
+		var data []coregen.FeedEvent
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,14 +113,14 @@ func (l *GlobalFeedLoader) LoadThunk(key sqlc.GetGlobalFeedViewBatchParams) func
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GlobalFeedLoader) LoadAll(keys []sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
-	results := make([]func() ([]sqlc.FeedEvent, error), len(keys))
+func (l *GlobalFeedLoader) LoadAll(keys []coregen.GetGlobalFeedViewBatchParams) ([][]coregen.FeedEvent, []error) {
+	results := make([]func() ([]coregen.FeedEvent, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEvents := make([][]sqlc.FeedEvent, len(keys))
+	feedEvents := make([][]coregen.FeedEvent, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		feedEvents[i], errors[i] = thunk()
@@ -131,13 +131,13 @@ func (l *GlobalFeedLoader) LoadAll(keys []sqlc.GetGlobalFeedViewBatchParams) ([]
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadAllThunk(keys []sqlc.GetGlobalFeedViewBatchParams) func() ([][]sqlc.FeedEvent, []error) {
-	results := make([]func() ([]sqlc.FeedEvent, error), len(keys))
+func (l *GlobalFeedLoader) LoadAllThunk(keys []coregen.GetGlobalFeedViewBatchParams) func() ([][]coregen.FeedEvent, []error) {
+	results := make([]func() ([]coregen.FeedEvent, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]sqlc.FeedEvent, []error) {
-		feedEvents := make([][]sqlc.FeedEvent, len(keys))
+	return func() ([][]coregen.FeedEvent, []error) {
+		feedEvents := make([][]coregen.FeedEvent, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			feedEvents[i], errors[i] = thunk()
@@ -149,13 +149,13 @@ func (l *GlobalFeedLoader) LoadAllThunk(keys []sqlc.GetGlobalFeedViewBatchParams
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GlobalFeedLoader) Prime(key sqlc.GetGlobalFeedViewBatchParams, value []sqlc.FeedEvent) bool {
+func (l *GlobalFeedLoader) Prime(key coregen.GetGlobalFeedViewBatchParams, value []coregen.FeedEvent) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]sqlc.FeedEvent, len(value))
+		cpy := make([]coregen.FeedEvent, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -164,22 +164,22 @@ func (l *GlobalFeedLoader) Prime(key sqlc.GetGlobalFeedViewBatchParams, value []
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *GlobalFeedLoader) Clear(key sqlc.GetGlobalFeedViewBatchParams) {
+func (l *GlobalFeedLoader) Clear(key coregen.GetGlobalFeedViewBatchParams) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *GlobalFeedLoader) unsafeSet(key sqlc.GetGlobalFeedViewBatchParams, value []sqlc.FeedEvent) {
+func (l *GlobalFeedLoader) unsafeSet(key coregen.GetGlobalFeedViewBatchParams, value []coregen.FeedEvent) {
 	if l.cache == nil {
-		l.cache = map[sqlc.GetGlobalFeedViewBatchParams][]sqlc.FeedEvent{}
+		l.cache = map[coregen.GetGlobalFeedViewBatchParams][]coregen.FeedEvent{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key sqlc.GetGlobalFeedViewBatchParams) int {
+func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coregen.GetGlobalFeedViewBatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
