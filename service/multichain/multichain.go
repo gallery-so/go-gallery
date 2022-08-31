@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -309,15 +310,9 @@ outer:
 
 func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]TokenHolder, error) {
 
-	// in the future, the current persist.CommunityRepository will replace the current persist.ContractRepository
-	// except we will not store the owners of a token in the DB. this function will be renamed to GetCommunityOwners and will be
-	// used in tandom with the community repository to get the data we need to display a community page
-
-	// graphQL resolving for a community will first go to the DB for metadata related to the community
-	// then it will call this function to get the owners of the community
-
+	cacheKey := fmt.Sprintf("%s-%t", communityIdentifiers.String(), onlyGalleryUsers)
 	if !forceRefresh {
-		bs, err := d.Cache.Get(ctx, communityIdentifiers.String())
+		bs, err := d.Cache.Get(ctx, cacheKey)
 		if err == nil && len(bs) > 0 {
 			var owners []TokenHolder
 			err = json.Unmarshal(bs, &owners)
@@ -359,18 +354,34 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 				}
 			}
 		}
-		for _, h := range asHolders {
-			if !seenAddresses[persist.Address(h.DisplayName)] {
-
-				tokensForContract, _, err := providers[0].GetOwnedTokensByContract(ctx, communityIdentifiers.Address(), persist.Address(h.DisplayName))
-				if err != nil {
-					return nil, err
-				}
-				if len(tokensForContract) > 0 {
-					h.PreviewTokens = []string{tokensForContract[0].Media.MediaURL.String()}
-				}
-				holders = append(holders, h)
+		wp := workerpool.New(10)
+		holderChan := make(chan TokenHolder)
+		for _, holder := range asHolders {
+			if !seenAddresses[persist.Address(holder.DisplayName)] {
+				h := holder
+				wp.Submit(func() {
+					innerCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+					defer cancel()
+					timeHere := time.Now()
+					tokensForContract, _, err := providers[0].GetOwnedTokensByContract(innerCtx, communityIdentifiers.Address(), persist.Address(h.DisplayName))
+					if err != nil {
+						logger.For(ctx).Errorf("error getting tokens for contract %s and address %s: %s", communityIdentifiers.Address(), h.DisplayName, err)
+						return
+					}
+					if len(tokensForContract) > 0 {
+						h.PreviewTokens = []string{tokensForContract[0].Media.MediaURL.String()}
+					}
+					holderChan <- h
+					logger.For(ctx).Infof("appended owner with previews in %s", time.Since(timeHere))
+				})
 			}
+		}
+		go func() {
+			defer close(holderChan)
+			wp.StopWait()
+		}()
+		for h := range holderChan {
+			holders = append(holders, h)
 		}
 	}
 
@@ -378,7 +389,7 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 	if err != nil {
 		return nil, err
 	}
-	err = d.Cache.Set(ctx, communityIdentifiers.String(), bs, staleCommunityTime)
+	err = d.Cache.Set(ctx, cacheKey, bs, staleCommunityTime)
 	if err != nil {
 		return nil, err
 	}

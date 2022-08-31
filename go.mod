@@ -43,6 +43,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/matryer/moq v0.2.5 // indirect
+	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.18
 	github.com/moby/buildkit v0.10.0 // indirect
 	github.com/multiformats/go-base32 v0.0.4 // indirect
@@ -53,7 +54,6 @@ require (
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/qmuntal/gltf v0.22.0
 	github.com/rjeczalik/notify v0.9.2 // indirect
-	github.com/schollz/progressbar/v3 v3.8.6
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect

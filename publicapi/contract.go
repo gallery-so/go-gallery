@@ -94,7 +94,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 
 }
 
-func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]multichain.TokenHolder, error) {
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, onlyGalleryUsers bool) ([]multichain.TokenHolder, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required"},

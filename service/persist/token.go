@@ -302,6 +302,7 @@ type TokenUpdateBalanceInput struct {
 type TokenRepository interface {
 	GetByWallet(context.Context, EthereumAddress, int64, int64) ([]Token, []Contract, error)
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
+	GetOwnedByContract(context.Context, EthereumAddress, EthereumAddress, int64, int64) ([]Token, Contract, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
 	GetByIdentifiers(context.Context, TokenID, EthereumAddress, EthereumAddress) (Token, error)
 	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)

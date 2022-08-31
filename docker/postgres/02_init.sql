@@ -117,7 +117,8 @@ CREATE TABLE IF NOT EXISTS contracts (
     CREATOR_ADDRESS varchar(255),
     PROFILE_IMAGE_URL varchar,
     PROFILE_BANNER_URL varchar,
-    BADGE_URL varchar
+    BADGE_URL varchar,
+    DESCRIPTION varchar
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS contract_address_chain_idx ON contracts (ADDRESS, CHAIN);

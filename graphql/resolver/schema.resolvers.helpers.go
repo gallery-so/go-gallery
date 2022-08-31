@@ -1030,6 +1030,7 @@ func communityToModel(ctx context.Context, community sqlc.Contract, forceRefresh
 			ForceRefresh:     forceRefresh,
 			OnlyGalleryUsers: onlyGalleryUsers,
 		},
+		Dbid:            community.ID,
 		LastUpdated:     &lastUpdated,
 		ContractAddress: &contractAddress,
 		CreatorAddress:  &creatorAddress,
