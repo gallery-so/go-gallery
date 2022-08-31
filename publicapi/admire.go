@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -9,6 +10,8 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
+
+var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire can remove it")
 
 type AdmireAPI struct {
 	repos     *persist.Repositories
@@ -62,12 +65,22 @@ func (api AdmireAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DB
 	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, actorID)
 }
 
-func (api AdmireAPI) UnadmireFeedEvent(ctx context.Context, admireID persist.DBID) error {
+func (api AdmireAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID, actorID persist.DBID) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"admireID": {admireID, "required"},
+		"actorID":  {actorID, "required"},
 	}); err != nil {
 		return err
+	}
+
+	// will also fail if admire does not exist
+	admire, err := api.GetAdmireByID(ctx, admireID)
+	if err != nil {
+		return err
+	}
+	if admire.ActorID != actorID {
+		return ErrOnlyRemoveOwnAdmire
 	}
 
 	return api.repos.AdmireRepository.RemoveAdmire(ctx, admireID)

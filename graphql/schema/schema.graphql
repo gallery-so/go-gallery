@@ -422,7 +422,7 @@ union CollectionTokenByIdOrError =
 
 union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
-type Admire {
+type Admire implements Node {
     id: ID!
     dbid: DBID!
     creationTime: Time
@@ -431,7 +431,7 @@ type Admire {
     # should we include the feed event here?
 }
 
-type Comment {
+type Comment implements Node {
     id: ID!
     dbid: DBID!
     creationTime: Time

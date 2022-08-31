@@ -646,45 +646,27 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 }
 
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, admireID)
+	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	err := publicapi.For(ctx).Admire.RemoveAdmire(ctx, admireID, user)
 	if err != nil {
 		return nil, err
 	}
-	err = publicapi.For(ctx).Admire.UnadmireFeedEvent(ctx, admireID)
-	if err != nil {
-		return nil, err
-	}
-	feedEvent, err := resolveFeedEventByEventID(ctx, admire.FeedEventID)
-	if err != nil {
-		return nil, err
-	}
+
 	output := &model.RemoveAdmirePayload{
-		Viewer:    resolveViewer(ctx),
-		FeedEvent: feedEvent,
+		Viewer: resolveViewer(ctx), // remaining fields handled by dedicated resolver
 	}
 	return output, nil
 }
 
 func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error) {
 	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, user, replyToID, comment)
+	_, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, user, replyToID, comment)
 	if err != nil {
 		return nil, err
 	}
 
-	commentDB, err := resolveCommentByCommentID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	feedEvent, err := resolveFeedEventByEventID(ctx, feedEventID)
-	if err != nil {
-		return nil, err
-	}
 	output := &model.CommentOnFeedEventPayload{
-		Viewer:    resolveViewer(ctx),
-		Comment:   commentDB,
-		FeedEvent: feedEvent,
+		Viewer: resolveViewer(ctx), // remaining fields handled by dedicated resolver
 	}
 	if replyToID != nil {
 		replyTo, err := resolveCommentByCommentID(ctx, *replyToID)
@@ -697,21 +679,13 @@ func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID p
 }
 
 func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error) {
-	comment, err := publicapi.For(ctx).Comment.GetCommentByID(ctx, commentID)
-	if err != nil {
-		return nil, err
-	}
-	err = publicapi.For(ctx).Comment.RemoveCommentOnFeedEvent(ctx, commentID)
-	if err != nil {
-		return nil, err
-	}
-	feedEvent, err := resolveFeedEventByEventID(ctx, comment.FeedEventID)
+	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	err := publicapi.For(ctx).Comment.RemoveComment(ctx, commentID, user)
 	if err != nil {
 		return nil, err
 	}
 	output := &model.RemoveCommentPayload{
-		Viewer:    resolveViewer(ctx),
-		FeedEvent: feedEvent,
+		Viewer: resolveViewer(ctx), // remaining fields handled by dedicated resolver
 	}
 	return output, nil
 }

@@ -245,7 +245,7 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 	}
 
 	loaders.AdmiresByFeedEventId = AdmiresLoaderByID{
-		maxBatch: defaultMaxBatchOne,
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadAdmiresByFeedEventId(ctx, loaders, q),
 	}
@@ -257,7 +257,7 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 	}
 
 	loaders.CommentsByFeedEventId = CommentsLoaderByID{
-		maxBatch: defaultMaxBatchOne,
+		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadCommentsByFeedEventId(ctx, loaders, q),
 	}
@@ -1031,7 +1031,7 @@ func loadAdmiresByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Que
 			admires[i] = admrs
 			errors[i] = err
 
-			// Add results to the EventById loader's cache
+			// Add results to the AdmireByAdmireId loader's cache
 			if errors[i] == nil {
 				for _, a := range admrs {
 					loaders.AdmireByAdmireId.Prime(a.ID, a)
@@ -1076,7 +1076,7 @@ func loadCommentsByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Qu
 			comments[i] = cmts
 			errors[i] = err
 
-			// Add results to the EventById loader's cache
+			// Add results to the CommentById loader's cache
 			if errors[i] == nil {
 				for _, c := range cmts {
 					loaders.CommentById.Prime(c.ID, c)

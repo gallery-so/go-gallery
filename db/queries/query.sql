@@ -324,16 +324,16 @@ SELECT * FROM admires WHERE id = $1 AND deleted = false;
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
 -- name: GetAdmiresByActorID :many
-SELECT * FROM admires WHERE actor_id = $1 AND deleted = false;
+SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetAdmiresByActorIDBatch :batchmany
-SELECT * FROM admires WHERE actor_id = $1 AND deleted = false;
+SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetAdmiresByFeedEventID :many
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false;
+SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetAdmiresByFeedEventIDBatch :batchmany
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false;
+SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
@@ -342,13 +342,13 @@ SELECT * FROM comments WHERE id = $1 AND deleted = false;
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
 -- name: GetCommentsByActorID :many
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false;
+SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetCommentsByActorIDBatch :batchmany
-SELECT * FROM comments WHERE actor_id = $1 AND deleted = false;
+SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetCommentsByFeedEventID :many
-SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false;
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetCommentsByFeedEventIDBatch :batchmany
-SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false;
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;

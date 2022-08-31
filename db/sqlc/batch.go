@@ -61,7 +61,7 @@ func (b *GetAdmireByAdmireIDBatchBatchResults) Close() error {
 }
 
 const getAdmiresByActorIDBatch = `-- name: GetAdmiresByActorIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE actor_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetAdmiresByActorIDBatchBatchResults struct {
@@ -117,7 +117,7 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Close() error {
 }
 
 const getAdmiresByFeedEventIDBatch = `-- name: GetAdmiresByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetAdmiresByFeedEventIDBatchBatchResults struct {
@@ -340,7 +340,7 @@ func (b *GetCommentByCommentIDBatchBatchResults) Close() error {
 }
 
 const getCommentsByActorIDBatch = `-- name: GetCommentsByActorIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE actor_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetCommentsByActorIDBatchBatchResults struct {
@@ -398,7 +398,7 @@ func (b *GetCommentsByActorIDBatchBatchResults) Close() error {
 }
 
 const getCommentsByFeedEventIDBatch = `-- name: GetCommentsByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetCommentsByFeedEventIDBatchBatchResults struct {

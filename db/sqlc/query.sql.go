@@ -194,7 +194,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 }
 
 const getAdmiresByActorID = `-- name: GetAdmiresByActorID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE actor_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID) ([]Admire, error) {
@@ -226,7 +226,7 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 }
 
 const getAdmiresByFeedEventID = `-- name: GetAdmiresByFeedEventID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]Admire, error) {
@@ -343,7 +343,7 @@ func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (C
 }
 
 const getCommentsByActorID = `-- name: GetCommentsByActorID :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE actor_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetCommentsByActorID(ctx context.Context, actorID persist.DBID) ([]Comment, error) {
@@ -377,7 +377,7 @@ func (q *Queries) GetCommentsByActorID(ctx context.Context, actorID persist.DBID
 }
 
 const getCommentsByFeedEventID = `-- name: GetCommentsByFeedEventID :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 func (q *Queries) GetCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]Comment, error) {

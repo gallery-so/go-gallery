@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -9,6 +10,8 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
+
+var ErrOnlyRemoveOwnComment = errors.New("only the actor who created the comment can remove it")
 
 type CommentAPI struct {
 	repos     *persist.Repositories
@@ -62,12 +65,20 @@ func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persis
 	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, actorID, replyToID, comment)
 }
 
-func (api CommentAPI) RemoveCommentOnFeedEvent(ctx context.Context, commentID persist.DBID) error {
+func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID, actorID persist.DBID) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"commentID": {commentID, "required"},
+		"actorID":   {actorID, "required"},
 	}); err != nil {
 		return err
+	}
+	comment, err := api.GetCommentByID(ctx, commentID)
+	if err != nil {
+		return err
+	}
+	if comment.ActorID != actorID {
+		return ErrOnlyRemoveOwnComment
 	}
 
 	return api.repos.CommentRepository.RemoveComment(ctx, commentID)
