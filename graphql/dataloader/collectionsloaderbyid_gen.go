@@ -7,10 +7,14 @@ import (
 	"time"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 =======
 	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+>>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -18,10 +22,14 @@ import (
 type CollectionsLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
 <<<<<<< HEAD
+<<<<<<< HEAD
 	Fetch func(keys []persist.DBID) ([][]coredb.Collection, []error)
 =======
 	Fetch func(keys []persist.DBID) ([][]coregen.Collection, []error)
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	Fetch func(keys []persist.DBID) ([][]coregen.Collection, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -43,10 +51,14 @@ func NewCollectionsLoaderByID(config CollectionsLoaderByIDConfig) *CollectionsLo
 type CollectionsLoaderByID struct {
 	// this method provides the data for the loader
 <<<<<<< HEAD
+<<<<<<< HEAD
 	fetch func(keys []persist.DBID) ([][]coredb.Collection, []error)
 =======
 	fetch func(keys []persist.DBID) ([][]coregen.Collection, []error)
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	fetch func(keys []persist.DBID) ([][]coregen.Collection, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -58,10 +70,14 @@ type CollectionsLoaderByID struct {
 
 	// lazily created cache
 <<<<<<< HEAD
+<<<<<<< HEAD
 	cache map[persist.DBID][]coredb.Collection
 =======
 	cache map[persist.DBID][]coregen.Collection
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	cache map[persist.DBID][]coregen.Collection
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -74,10 +90,14 @@ type CollectionsLoaderByID struct {
 type collectionsLoaderByIDBatch struct {
 	keys    []persist.DBID
 <<<<<<< HEAD
+<<<<<<< HEAD
 	data    [][]coredb.Collection
 =======
 	data    [][]coregen.Collection
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	data    [][]coregen.Collection
+>>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
@@ -85,16 +105,21 @@ type collectionsLoaderByIDBatch struct {
 
 // Load a Collection by key, batching and caching will be applied automatically
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *CollectionsLoaderByID) Load(key persist.DBID) ([]coredb.Collection, error) {
 =======
 func (l *CollectionsLoaderByID) Load(key persist.DBID) ([]coregen.Collection, error) {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *CollectionsLoaderByID) Load(key persist.DBID) ([]coregen.Collection, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Collection.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 <<<<<<< HEAD
 func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Collection, error) {
 	l.mu.Lock()
@@ -108,6 +133,13 @@ func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Co
 		l.mu.Unlock()
 		return func() ([]coregen.Collection, error) {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Collection, error) {
+	l.mu.Lock()
+	if it, ok := l.cache[key]; ok {
+		l.mu.Unlock()
+		return func() ([]coregen.Collection, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -119,16 +151,22 @@ func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Co
 	l.mu.Unlock()
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	return func() ([]coredb.Collection, error) {
 		<-batch.done
 
 		var data []coredb.Collection
 =======
+=======
+>>>>>>> a4e9c3f (Add indexer models)
 	return func() ([]coregen.Collection, error) {
 		<-batch.done
 
 		var data []coregen.Collection
+<<<<<<< HEAD
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+>>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -154,22 +192,31 @@ func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Co
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]coredb.Collection, []error) {
 	results := make([]func() ([]coredb.Collection, error), len(keys))
 =======
 func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.Collection, []error) {
 	results := make([]func() ([]coregen.Collection, error), len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.Collection, []error) {
+	results := make([]func() ([]coregen.Collection, error), len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	collections := make([][]coredb.Collection, len(keys))
 =======
 	collections := make([][]coregen.Collection, len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	collections := make([][]coregen.Collection, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		collections[i], errors[i] = thunk()
@@ -180,6 +227,7 @@ func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.Collec
 // LoadAllThunk returns a function that when called will block waiting for a Collections.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 <<<<<<< HEAD
 func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb.Collection, []error) {
 	results := make([]func() ([]coredb.Collection, error), len(keys))
@@ -197,6 +245,15 @@ func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]co
 	return func() ([][]coregen.Collection, []error) {
 		collections := make([][]coregen.Collection, len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coregen.Collection, []error) {
+	results := make([]func() ([]coregen.Collection, error), len(keys))
+	for i, key := range keys {
+		results[i] = l.LoadThunk(key)
+	}
+	return func() ([][]coregen.Collection, []error) {
+		collections := make([][]coregen.Collection, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			collections[i], errors[i] = thunk()
@@ -209,20 +266,28 @@ func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]co
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *CollectionsLoaderByID) Prime(key persist.DBID, value []coredb.Collection) bool {
 =======
 func (l *CollectionsLoaderByID) Prime(key persist.DBID, value []coregen.Collection) bool {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *CollectionsLoaderByID) Prime(key persist.DBID, value []coregen.Collection) bool {
+>>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
 <<<<<<< HEAD
+<<<<<<< HEAD
 		cpy := make([]coredb.Collection, len(value))
 =======
 		cpy := make([]coregen.Collection, len(value))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+		cpy := make([]coregen.Collection, len(value))
+>>>>>>> a4e9c3f (Add indexer models)
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -238,6 +303,7 @@ func (l *CollectionsLoaderByID) Clear(key persist.DBID) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *CollectionsLoaderByID) unsafeSet(key persist.DBID, value []coredb.Collection) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID][]coredb.Collection{}
@@ -246,6 +312,11 @@ func (l *CollectionsLoaderByID) unsafeSet(key persist.DBID, value []coregen.Coll
 	if l.cache == nil {
 		l.cache = map[persist.DBID][]coregen.Collection{}
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *CollectionsLoaderByID) unsafeSet(key persist.DBID, value []coregen.Collection) {
+	if l.cache == nil {
+		l.cache = map[persist.DBID][]coregen.Collection{}
+>>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }

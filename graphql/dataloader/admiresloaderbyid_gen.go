@@ -6,14 +6,22 @@ import (
 	"sync"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+=======
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+>>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // AdmiresLoaderByIDConfig captures the config to create a new AdmiresLoaderByID
 type AdmiresLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
+<<<<<<< HEAD
 	Fetch func(keys []persist.DBID) ([][]coredb.Admire, []error)
+=======
+	Fetch func(keys []persist.DBID) ([][]coregen.Admire, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +42,11 @@ func NewAdmiresLoaderByID(config AdmiresLoaderByIDConfig) *AdmiresLoaderByID {
 // AdmiresLoaderByID batches and caches requests
 type AdmiresLoaderByID struct {
 	// this method provides the data for the loader
+<<<<<<< HEAD
 	fetch func(keys []persist.DBID) ([][]coredb.Admire, []error)
+=======
+	fetch func(keys []persist.DBID) ([][]coregen.Admire, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +57,11 @@ type AdmiresLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
+<<<<<<< HEAD
 	cache map[persist.DBID][]coredb.Admire
+=======
+	cache map[persist.DBID][]coregen.Admire
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +73,41 @@ type AdmiresLoaderByID struct {
 
 type admiresLoaderByIDBatch struct {
 	keys    []persist.DBID
+<<<<<<< HEAD
 	data    [][]coredb.Admire
+=======
+	data    [][]coregen.Admire
+>>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Admire by key, batching and caching will be applied automatically
+<<<<<<< HEAD
 func (l *AdmiresLoaderByID) Load(key persist.DBID) ([]coredb.Admire, error) {
+=======
+func (l *AdmiresLoaderByID) Load(key persist.DBID) ([]coregen.Admire, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Admire.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 func (l *AdmiresLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Admire, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() ([]coredb.Admire, error) {
+=======
+func (l *AdmiresLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Admire, error) {
+	l.mu.Lock()
+	if it, ok := l.cache[key]; ok {
+		l.mu.Unlock()
+		return func() ([]coregen.Admire, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -86,10 +118,17 @@ func (l *AdmiresLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Admire,
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
+<<<<<<< HEAD
 	return func() ([]coredb.Admire, error) {
 		<-batch.done
 
 		var data []coredb.Admire
+=======
+	return func() ([]coregen.Admire, error) {
+		<-batch.done
+
+		var data []coregen.Admire
+>>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +153,23 @@ func (l *AdmiresLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Admire,
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
+<<<<<<< HEAD
 func (l *AdmiresLoaderByID) LoadAll(keys []persist.DBID) ([][]coredb.Admire, []error) {
 	results := make([]func() ([]coredb.Admire, error), len(keys))
+=======
+func (l *AdmiresLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.Admire, []error) {
+	results := make([]func() ([]coregen.Admire, error), len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
+<<<<<<< HEAD
 	admires := make([][]coredb.Admire, len(keys))
+=======
+	admires := make([][]coregen.Admire, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		admires[i], errors[i] = thunk()
@@ -132,6 +180,7 @@ func (l *AdmiresLoaderByID) LoadAll(keys []persist.DBID) ([][]coredb.Admire, []e
 // LoadAllThunk returns a function that when called will block waiting for a Admires.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 func (l *AdmiresLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb.Admire, []error) {
 	results := make([]func() ([]coredb.Admire, error), len(keys))
 	for i, key := range keys {
@@ -139,6 +188,15 @@ func (l *AdmiresLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb
 	}
 	return func() ([][]coredb.Admire, []error) {
 		admires := make([][]coredb.Admire, len(keys))
+=======
+func (l *AdmiresLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coregen.Admire, []error) {
+	results := make([]func() ([]coregen.Admire, error), len(keys))
+	for i, key := range keys {
+		results[i] = l.LoadThunk(key)
+	}
+	return func() ([][]coregen.Admire, []error) {
+		admires := make([][]coregen.Admire, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			admires[i], errors[i] = thunk()
@@ -150,13 +208,21 @@ func (l *AdmiresLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
+<<<<<<< HEAD
 func (l *AdmiresLoaderByID) Prime(key persist.DBID, value []coredb.Admire) bool {
+=======
+func (l *AdmiresLoaderByID) Prime(key persist.DBID, value []coregen.Admire) bool {
+>>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
+<<<<<<< HEAD
 		cpy := make([]coredb.Admire, len(value))
+=======
+		cpy := make([]coregen.Admire, len(value))
+>>>>>>> a4e9c3f (Add indexer models)
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -171,9 +237,15 @@ func (l *AdmiresLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
+<<<<<<< HEAD
 func (l *AdmiresLoaderByID) unsafeSet(key persist.DBID, value []coredb.Admire) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID][]coredb.Admire{}
+=======
+func (l *AdmiresLoaderByID) unsafeSet(key persist.DBID, value []coregen.Admire) {
+	if l.cache == nil {
+		l.cache = map[persist.DBID][]coregen.Admire{}
+>>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }

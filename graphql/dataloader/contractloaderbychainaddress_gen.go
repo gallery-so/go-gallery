@@ -7,10 +7,14 @@ import (
 	"time"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 =======
 	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+>>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -18,10 +22,14 @@ import (
 type ContractLoaderByChainAddressConfig struct {
 	// Fetch is a method that provides the data for the loader
 <<<<<<< HEAD
+<<<<<<< HEAD
 	Fetch func(keys []persist.ChainAddress) ([]coredb.Contract, []error)
 =======
 	Fetch func(keys []persist.ChainAddress) ([]coregen.Contract, []error)
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	Fetch func(keys []persist.ChainAddress) ([]coregen.Contract, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -43,10 +51,14 @@ func NewContractLoaderByChainAddress(config ContractLoaderByChainAddressConfig) 
 type ContractLoaderByChainAddress struct {
 	// this method provides the data for the loader
 <<<<<<< HEAD
+<<<<<<< HEAD
 	fetch func(keys []persist.ChainAddress) ([]coredb.Contract, []error)
 =======
 	fetch func(keys []persist.ChainAddress) ([]coregen.Contract, []error)
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	fetch func(keys []persist.ChainAddress) ([]coregen.Contract, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -58,10 +70,14 @@ type ContractLoaderByChainAddress struct {
 
 	// lazily created cache
 <<<<<<< HEAD
+<<<<<<< HEAD
 	cache map[persist.ChainAddress]coredb.Contract
 =======
 	cache map[persist.ChainAddress]coregen.Contract
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	cache map[persist.ChainAddress]coregen.Contract
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -74,10 +90,14 @@ type ContractLoaderByChainAddress struct {
 type contractLoaderByChainAddressBatch struct {
 	keys    []persist.ChainAddress
 <<<<<<< HEAD
+<<<<<<< HEAD
 	data    []coredb.Contract
 =======
 	data    []coregen.Contract
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	data    []coregen.Contract
+>>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
@@ -85,16 +105,21 @@ type contractLoaderByChainAddressBatch struct {
 
 // Load a Contract by key, batching and caching will be applied automatically
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *ContractLoaderByChainAddress) Load(key persist.ChainAddress) (coredb.Contract, error) {
 =======
 func (l *ContractLoaderByChainAddress) Load(key persist.ChainAddress) (coregen.Contract, error) {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *ContractLoaderByChainAddress) Load(key persist.ChainAddress) (coregen.Contract, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Contract.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 <<<<<<< HEAD
 func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (coredb.Contract, error) {
 	l.mu.Lock()
@@ -108,6 +133,13 @@ func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func(
 		l.mu.Unlock()
 		return func() (coregen.Contract, error) {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (coregen.Contract, error) {
+	l.mu.Lock()
+	if it, ok := l.cache[key]; ok {
+		l.mu.Unlock()
+		return func() (coregen.Contract, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -119,16 +151,22 @@ func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func(
 	l.mu.Unlock()
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	return func() (coredb.Contract, error) {
 		<-batch.done
 
 		var data coredb.Contract
 =======
+=======
+>>>>>>> a4e9c3f (Add indexer models)
 	return func() (coregen.Contract, error) {
 		<-batch.done
 
 		var data coregen.Contract
+<<<<<<< HEAD
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+>>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -154,22 +192,31 @@ func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func(
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coredb.Contract, []error) {
 	results := make([]func() (coredb.Contract, error), len(keys))
 =======
 func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coregen.Contract, []error) {
 	results := make([]func() (coregen.Contract, error), len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coregen.Contract, []error) {
+	results := make([]func() (coregen.Contract, error), len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	contracts := make([]coredb.Contract, len(keys))
 =======
 	contracts := make([]coregen.Contract, len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	contracts := make([]coregen.Contract, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		contracts[i], errors[i] = thunk()
@@ -180,6 +227,7 @@ func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]c
 // LoadAllThunk returns a function that when called will block waiting for a Contracts.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 <<<<<<< HEAD
 func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]coredb.Contract, []error) {
 	results := make([]func() (coredb.Contract, error), len(keys))
@@ -197,6 +245,15 @@ func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress)
 	return func() ([]coregen.Contract, []error) {
 		contracts := make([]coregen.Contract, len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]coregen.Contract, []error) {
+	results := make([]func() (coregen.Contract, error), len(keys))
+	for i, key := range keys {
+		results[i] = l.LoadThunk(key)
+	}
+	return func() ([]coregen.Contract, []error) {
+		contracts := make([]coregen.Contract, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			contracts[i], errors[i] = thunk()
@@ -209,10 +266,14 @@ func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress)
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *ContractLoaderByChainAddress) Prime(key persist.ChainAddress, value coredb.Contract) bool {
 =======
 func (l *ContractLoaderByChainAddress) Prime(key persist.ChainAddress, value coregen.Contract) bool {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *ContractLoaderByChainAddress) Prime(key persist.ChainAddress, value coregen.Contract) bool {
+>>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -230,6 +291,7 @@ func (l *ContractLoaderByChainAddress) Clear(key persist.ChainAddress) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *ContractLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value coredb.Contract) {
 	if l.cache == nil {
 		l.cache = map[persist.ChainAddress]coredb.Contract{}
@@ -238,6 +300,11 @@ func (l *ContractLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value
 	if l.cache == nil {
 		l.cache = map[persist.ChainAddress]coregen.Contract{}
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *ContractLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value coregen.Contract) {
+	if l.cache == nil {
+		l.cache = map[persist.ChainAddress]coregen.Contract{}
+>>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }

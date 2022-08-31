@@ -7,6 +7,7 @@ package indexergen
 
 import (
 	"context"
+<<<<<<< HEAD
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -53,4 +54,30 @@ func (q *Queries) BulkUpsertAddressFilters(ctx context.Context, arg BulkUpsertAd
 		arg.BloomFilter,
 	)
 	return err
+=======
+)
+
+const firstContract = `-- name: FirstContract :one
+SELECT id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, latest_block FROM contracts LIMIT 1
+`
+
+// sqlc needs at least one query in order to generate the models.
+func (q *Queries) FirstContract(ctx context.Context) (Contract, error) {
+	row := q.db.QueryRow(ctx, firstContract)
+	var i Contract
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Symbol,
+		&i.Address,
+		&i.CreatorAddress,
+		&i.Chain,
+		&i.LatestBlock,
+	)
+	return i, err
+>>>>>>> a4e9c3f (Add indexer models)
 }

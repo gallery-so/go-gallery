@@ -7,10 +7,14 @@ import (
 	"time"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 =======
 	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+>>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -18,10 +22,14 @@ import (
 type WalletLoaderByIdConfig struct {
 	// Fetch is a method that provides the data for the loader
 <<<<<<< HEAD
+<<<<<<< HEAD
 	Fetch func(keys []persist.DBID) ([]coredb.Wallet, []error)
 =======
 	Fetch func(keys []persist.DBID) ([]coregen.Wallet, []error)
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	Fetch func(keys []persist.DBID) ([]coregen.Wallet, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -43,10 +51,14 @@ func NewWalletLoaderById(config WalletLoaderByIdConfig) *WalletLoaderById {
 type WalletLoaderById struct {
 	// this method provides the data for the loader
 <<<<<<< HEAD
+<<<<<<< HEAD
 	fetch func(keys []persist.DBID) ([]coredb.Wallet, []error)
 =======
 	fetch func(keys []persist.DBID) ([]coregen.Wallet, []error)
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	fetch func(keys []persist.DBID) ([]coregen.Wallet, []error)
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -58,10 +70,14 @@ type WalletLoaderById struct {
 
 	// lazily created cache
 <<<<<<< HEAD
+<<<<<<< HEAD
 	cache map[persist.DBID]coredb.Wallet
 =======
 	cache map[persist.DBID]coregen.Wallet
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	cache map[persist.DBID]coregen.Wallet
+>>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -74,10 +90,14 @@ type WalletLoaderById struct {
 type walletLoaderByIdBatch struct {
 	keys    []persist.DBID
 <<<<<<< HEAD
+<<<<<<< HEAD
 	data    []coredb.Wallet
 =======
 	data    []coregen.Wallet
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	data    []coregen.Wallet
+>>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
@@ -85,16 +105,21 @@ type walletLoaderByIdBatch struct {
 
 // Load a Wallet by key, batching and caching will be applied automatically
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *WalletLoaderById) Load(key persist.DBID) (coredb.Wallet, error) {
 =======
 func (l *WalletLoaderById) Load(key persist.DBID) (coregen.Wallet, error) {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *WalletLoaderById) Load(key persist.DBID) (coregen.Wallet, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Wallet.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 <<<<<<< HEAD
 func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (coredb.Wallet, error) {
 	l.mu.Lock()
@@ -108,6 +133,13 @@ func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (coregen.Wallet, e
 		l.mu.Unlock()
 		return func() (coregen.Wallet, error) {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (coregen.Wallet, error) {
+	l.mu.Lock()
+	if it, ok := l.cache[key]; ok {
+		l.mu.Unlock()
+		return func() (coregen.Wallet, error) {
+>>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -119,16 +151,22 @@ func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (coregen.Wallet, e
 	l.mu.Unlock()
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	return func() (coredb.Wallet, error) {
 		<-batch.done
 
 		var data coredb.Wallet
 =======
+=======
+>>>>>>> a4e9c3f (Add indexer models)
 	return func() (coregen.Wallet, error) {
 		<-batch.done
 
 		var data coregen.Wallet
+<<<<<<< HEAD
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+>>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -154,22 +192,31 @@ func (l *WalletLoaderById) LoadThunk(key persist.DBID) func() (coregen.Wallet, e
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *WalletLoaderById) LoadAll(keys []persist.DBID) ([]coredb.Wallet, []error) {
 	results := make([]func() (coredb.Wallet, error), len(keys))
 =======
 func (l *WalletLoaderById) LoadAll(keys []persist.DBID) ([]coregen.Wallet, []error) {
 	results := make([]func() (coregen.Wallet, error), len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *WalletLoaderById) LoadAll(keys []persist.DBID) ([]coregen.Wallet, []error) {
+	results := make([]func() (coregen.Wallet, error), len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	wallets := make([]coredb.Wallet, len(keys))
 =======
 	wallets := make([]coregen.Wallet, len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+	wallets := make([]coregen.Wallet, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		wallets[i], errors[i] = thunk()
@@ -180,6 +227,7 @@ func (l *WalletLoaderById) LoadAll(keys []persist.DBID) ([]coregen.Wallet, []err
 // LoadAllThunk returns a function that when called will block waiting for a Wallets.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
+<<<<<<< HEAD
 <<<<<<< HEAD
 func (l *WalletLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Wallet, []error) {
 	results := make([]func() (coredb.Wallet, error), len(keys))
@@ -197,6 +245,15 @@ func (l *WalletLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]coregen.W
 	return func() ([]coregen.Wallet, []error) {
 		wallets := make([]coregen.Wallet, len(keys))
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *WalletLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Wallet, []error) {
+	results := make([]func() (coregen.Wallet, error), len(keys))
+	for i, key := range keys {
+		results[i] = l.LoadThunk(key)
+	}
+	return func() ([]coregen.Wallet, []error) {
+		wallets := make([]coregen.Wallet, len(keys))
+>>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			wallets[i], errors[i] = thunk()
@@ -209,10 +266,14 @@ func (l *WalletLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]coregen.W
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *WalletLoaderById) Prime(key persist.DBID, value coredb.Wallet) bool {
 =======
 func (l *WalletLoaderById) Prime(key persist.DBID, value coregen.Wallet) bool {
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *WalletLoaderById) Prime(key persist.DBID, value coregen.Wallet) bool {
+>>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -230,6 +291,7 @@ func (l *WalletLoaderById) Clear(key persist.DBID) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (l *WalletLoaderById) unsafeSet(key persist.DBID, value coredb.Wallet) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID]coredb.Wallet{}
@@ -238,6 +300,11 @@ func (l *WalletLoaderById) unsafeSet(key persist.DBID, value coregen.Wallet) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID]coregen.Wallet{}
 >>>>>>> 93a3a41 (Add indexer models)
+=======
+func (l *WalletLoaderById) unsafeSet(key persist.DBID, value coregen.Wallet) {
+	if l.cache == nil {
+		l.cache = map[persist.DBID]coregen.Wallet{}
+>>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }
