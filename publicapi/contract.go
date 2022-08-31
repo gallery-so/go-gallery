@@ -77,3 +77,19 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 	return nil
 
 }
+
+func (api ContractAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) (*multichain.Community, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractAddress": {contractAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	comm, err := api.multichainProvider.GetCommunity(ctx, contractAddress, onlyGalleryUsers, forceRefresh)
+	if err != nil {
+		return nil, err
+	}
+
+	return &comm, nil
+}

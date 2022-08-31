@@ -635,13 +635,17 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error) {
 	refresh := false
 	if forceRefresh != nil {
 		refresh = *forceRefresh
 	}
+	onlyUsers := true
+	if onlyGalleryUsers != nil {
+		onlyUsers = *onlyGalleryUsers
+	}
 
-	return resolveCommunityByContractAddress(ctx, communityAddress, refresh)
+	return resolveCommunityByContractAddress(ctx, communityAddress, refresh, onlyUsers)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {

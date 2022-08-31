@@ -226,6 +226,14 @@ func (p *Provider) RefreshContract(context.Context, persist.Address) error {
 	return nil
 }
 
+func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	return nil, nil
+}
+
+func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	return nil, multichain.ChainAgnosticContract{}, nil
+}
+
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (p *Provider) VerifySignature(pCtx context.Context,
 	pAddressStr persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {

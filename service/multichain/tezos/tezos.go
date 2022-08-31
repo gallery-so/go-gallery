@@ -269,6 +269,14 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
+func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	return nil, multichain.ChainAgnosticContract{}, nil
+}
+
+func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	return nil, nil
+}
+
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
 	return nil

@@ -772,6 +772,7 @@ func (Token) IsTokenByIDOrError() {}
 
 type TokenHolder struct {
 	HelperTokenHolderData
+	DisplayName   *string      `json:"displayName"`
 	Wallets       []*Wallet    `json:"wallets"`
 	User          *GalleryUser `json:"user"`
 	PreviewTokens []*string    `json:"previewTokens"`

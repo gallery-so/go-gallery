@@ -155,6 +155,13 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	return contractToChainAgnostic(contract.Contract), nil
 
 }
+func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	return nil, nil
+}
+
+func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	return nil, multichain.ChainAgnosticContract{}, nil
+}
 
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) error {
