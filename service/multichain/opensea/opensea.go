@@ -227,11 +227,11 @@ func (p *Provider) RefreshContract(context.Context, persist.Address) error {
 }
 
 func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	return nil, nil
+	return []multichain.ChainAgnosticCommunityOwner{}, nil
 }
 
 func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return nil, multichain.ChainAgnosticContract{}, nil
+	return []multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, nil
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)

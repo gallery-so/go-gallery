@@ -269,12 +269,50 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
-func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	return nil, multichain.ChainAgnosticContract{}, nil
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&token.contract=%s", d.apiURL, ownerAddress, contractAddress), nil)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+	}
+	var tzktBalances []tzktBalanceToken
+	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	logger.For(ctx).Info("tzktBalances: ", len(tzktBalances))
+
+	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, fmt.Sprintf("%s:%s", contractAddress, ownerAddress))
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	var contract multichain.ChainAgnosticContract
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	return tokens, contract, nil
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	return nil, nil
+func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	owners := make([]multichain.ChainAgnosticCommunityOwner, len(tokens))
+	for i, token := range tokens {
+		owners[i] = multichain.ChainAgnosticCommunityOwner{
+			Address: token.OwnerAddress,
+		}
+	}
+	return owners, nil
+
 }
 
 // RefreshToken refreshes the metadata for a given token.
