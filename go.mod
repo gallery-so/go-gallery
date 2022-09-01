@@ -36,6 +36,7 @@ require (
 	github.com/ipfs/go-ipfs-files v0.1.1 // indirect
 	github.com/jackc/pgconn v1.11.0
 	github.com/jackc/pgtype v1.10.0
+	github.com/jackc/pgx v3.6.2+incompatible // indirect
 	github.com/jackc/pgx/v4 v4.15.0
 	github.com/klauspost/cpuid/v2 v2.0.11 // indirect
 	github.com/lib/pq v1.10.4

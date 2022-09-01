@@ -6,7 +6,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/spf13/viper"

@@ -20,8 +20,8 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
-	"github.com/mikeydub/go-gallery/db/sqlc"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
+	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
@@ -597,7 +597,7 @@ func deepRefresh(ctx context.Context, idxr *indexer, throttler *throttle.Locker,
 
 	defer throttler.Unlock(ctx, fmt.Sprintf(deepRefreshAddressLockFmt, input.OwnerAddress))
 
-	fm := postgres.NewBlockFilterManager(dataloader.NewLoaders(ctx, queries), blocksPerLogsCall)
+	fm := refresh.NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
 	defer fm.Close()
 
 	events := make([]common.Hash, len(idxr.eventHashes))

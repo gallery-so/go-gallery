@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //go:generate go run github.com/vektah/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/vektah/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
@@ -25,31 +24,6 @@
 //go:generate go run github.com/vektah/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/vektah/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/vektah/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
-=======
-//go:generate go run github.com/vektah/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.User
-//go:generate go run github.com/vektah/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc/coregen.User
-//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.User
-//go:generate go run github.com/vektah/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/sqlc/coregen.User
-//go:generate go run github.com/vektah/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/sqlc/coregen.User
-//go:generate go run github.com/vektah/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.Gallery
-//go:generate go run github.com/vektah/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc/coregen.Gallery
-//go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.Collection
-//go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc/coregen.Collection
-//go:generate go run github.com/vektah/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.Membership
-//go:generate go run github.com/vektah/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.Wallet
-//go:generate go run github.com/vektah/dataloaden WalletLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc/coregen.Wallet
-//go:generate go run github.com/vektah/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc/coregen.Wallet
-//go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.Token
-//go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc/coregen.Token
-//go:generate go run github.com/vektah/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/sqlc/coregen.Token
-//go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.Contract
-//go:generate go run github.com/vektah/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc/coregen.Contract
-//go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc/coregen.Contract
-//go:generate go run github.com/vektah/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/sqlc/coregen.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc/coregen.FeedEvent
-//go:generate go run github.com/vektah/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/sqlc/coregen.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc/coregen.FeedEvent
-//go:generate go run github.com/vektah/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc/coregen.FeedEvent
->>>>>>> 93a3a41 (Add indexer models)
-
 package dataloader
 
 import (
@@ -58,11 +32,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-<<<<<<< HEAD
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-=======
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> 93a3a41 (Add indexer models)
+	"github.com/mikeydub/go-gallery/db/sqlc/indexergen"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -108,6 +79,7 @@ type Loaders struct {
 	GlobalFeed               GlobalFeedLoader
 	FeedByUserId             UserFeedLoader
 	EventByEventId           EventLoaderByID
+<<<<<<< HEAD
 	AdmireByAdmireId         AdmireLoaderByID
 	AdmiresByFeedEventId     AdmiresLoaderByID
 	CommentByCommentId       CommentLoaderByID
@@ -115,6 +87,11 @@ type Loaders struct {
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
+=======
+}
+
+func NewLoaders(ctx context.Context, q *sqlc.Queries, indexerQueries *indexergen.Queries) *Loaders {
+>>>>>>> 6fbf065 (Move loader to refresh package)
 	loaders := &Loaders{}
 
 	loaders.UserByUserId = UserLoaderByID{
@@ -273,6 +250,7 @@ func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
 		fetch:    loadGlobalFeed(ctx, loaders, q),
 	}
 
+<<<<<<< HEAD
 	loaders.AdmireByAdmireId = AdmireLoaderByID{
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
@@ -297,6 +275,8 @@ func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
 		fetch:    loadCommentsByFeedEventId(ctx, loaders, q),
 	}
 
+=======
+>>>>>>> 6fbf065 (Move loader to refresh package)
 	return loaders
 }
 
@@ -1075,6 +1055,7 @@ func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *db.Queries) func([
 		return events, errors
 	}
 }
+<<<<<<< HEAD
 
 func loadAdmireById(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Admire, []error) {
 	return func(admireIds []persist.DBID) ([]db.Admire, []error) {
@@ -1165,3 +1146,5 @@ func loadCommentsByFeedEventId(ctx context.Context, loaders *Loaders, q *db.Quer
 		return comments, errors
 	}
 }
+=======
+>>>>>>> 6fbf065 (Move loader to refresh package)

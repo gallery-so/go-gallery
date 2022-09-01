@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
