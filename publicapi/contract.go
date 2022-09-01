@@ -37,6 +37,22 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 	return &contract, nil
 }
 
+func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress persist.ChainAddress) (*sqlc.Contract, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractAddress": {contractAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	contract, err := api.loaders.ContractByChainAddress.Load(contractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contract, nil
+}
+
 func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Contract, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -76,4 +92,20 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 
 	return nil
 
+}
+
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, onlyGalleryUsers bool) ([]multichain.TokenHolder, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractAddress": {contractAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	owners, err := api.multichainProvider.GetCommunityOwners(ctx, contractAddress, onlyGalleryUsers, forceRefresh)
+	if err != nil {
+		return nil, err
+	}
+
+	return owners, nil
 }

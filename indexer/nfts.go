@@ -262,6 +262,13 @@ func processMedialessTokens(ctx context.Context, inputs <-chan processTokensInpu
 func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) ([]persist.Token, []persist.Contract, error) {
 	switch {
 	case input.WalletAddress != "":
+		if input.ContractAddress != "" {
+			tokens, contract, err := tokenRepo.GetOwnedByContract(pCtx, input.ContractAddress, input.WalletAddress, input.Limit, input.Page)
+			if err != nil {
+				return nil, nil, err
+			}
+			return tokens, []persist.Contract{contract}, nil
+		}
 		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
 	case input.TokenID != "" && input.ContractAddress != "":
 		if strings.HasPrefix(string(input.TokenID), "0x") {

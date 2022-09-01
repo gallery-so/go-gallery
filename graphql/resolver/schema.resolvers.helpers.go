@@ -13,6 +13,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/multichain"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -42,7 +43,7 @@ var nodeFetcher = model.NodeFetcher{
 
 	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
 		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), false)
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.BoolToPointer(false), util.BoolToPointer(true))
 		} else {
 			return nil, err
 		}
@@ -78,7 +79,7 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCollectionNotFound{Message: message}
 	case persist.ErrTokenNotFoundByID:
 		mappedErr = model.ErrTokenNotFound{Message: message}
-	case persist.ErrCommunityNotFound:
+	case persist.ErrContractNotFoundByAddress:
 		mappedErr = model.ErrCommunityNotFound{Message: message}
 	case persist.ErrAddressOwnedByUser:
 		mappedErr = model.ErrAddressOwnedByUser{Message: message}
@@ -423,14 +424,31 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool) (*model.Community, error) {
-	community, err := publicapi.For(ctx).User.GetCommunityByContractAddress(ctx, contractAddress, forceRefresh)
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (*model.Community, error) {
+	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return communityToModel(ctx, *community), nil
+	return communityToModel(ctx, *community, forceRefresh, onlyGalleryUsers), nil
+}
+
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, onlyGalleryUsers bool) ([]*model.TokenHolder, error) {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+	owners, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, onlyGalleryUsers)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*model.TokenHolder, len(owners))
+	for i, owner := range owners {
+		result[i] = multichainTokenHolderToModel(ctx, owner)
+	}
+
+	return result, nil
 }
 
 func resolveGeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
@@ -934,6 +952,21 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 	}
 }
 
+func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.TokenHolder) *model.TokenHolder {
+	previewTokens := make([]*string, len(tokenHolder.PreviewTokens))
+	for i, token := range tokenHolder.PreviewTokens {
+		previewTokens[i] = util.StringToPointer(token)
+	}
+
+	return &model.TokenHolder{
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs},
+		DisplayName:           &tokenHolder.DisplayName,
+		User:                  nil, // handled by dedicated resolver
+		Wallets:               nil, // handled by dedicated resolver
+		PreviewTokens:         previewTokens,
+	}
+}
+
 func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
 	metadata, _ := token.TokenMetadata.MarshalJSON()
@@ -987,28 +1020,28 @@ func tokensToModel(ctx context.Context, token []sqlc.Token) []*model.Token {
 	return res
 }
 
-func communityToModel(ctx context.Context, community persist.Community) *model.Community {
-	lastUpdated := community.LastUpdated.Time()
-	contractAddress := persist.NewChainAddress(community.ContractAddress, community.Chain)
-	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
-
-	owners := make([]*model.TokenHolder, len(community.Owners))
-	for i, owner := range community.Owners {
-		owners[i] = tokenHolderToModel(ctx, owner)
-	}
-
+func communityToModel(ctx context.Context, community sqlc.Contract, forceRefresh *bool, onlyGalleryUsers *bool) *model.Community {
+	lastUpdated := community.LastUpdated
+	contractAddress := persist.NewChainAddress(community.Address, persist.Chain(community.Chain.Int32))
+	creatorAddress := persist.NewChainAddress(community.CreatorAddress, persist.Chain(community.Chain.Int32))
+	chain := persist.Chain(community.Chain.Int32)
 	return &model.Community{
-		LastUpdated:      &lastUpdated,
-		ContractAddress:  &contractAddress,
-		CreatorAddress:   &creatorAddress,
-		Name:             util.StringToPointer(community.Name.String()),
-		Description:      util.StringToPointer(community.Description.String()),
-		PreviewImage:     util.StringToPointer(community.PreviewImage.String()),
-		Chain:            &community.Chain,
-		ProfileImageURL:  util.StringToPointer(community.ProfileImageURL.String()),
-		ProfileBannerURL: util.StringToPointer(community.ProfileBannerURL.String()),
-		BadgeURL:         util.StringToPointer(community.BadgeURL.String()),
-		Owners:           owners,
+		HelperCommunityData: model.HelperCommunityData{
+			ForceRefresh:     forceRefresh,
+			OnlyGalleryUsers: onlyGalleryUsers,
+		},
+		Dbid:            community.ID,
+		LastUpdated:     &lastUpdated,
+		ContractAddress: &contractAddress,
+		CreatorAddress:  &creatorAddress,
+		Name:            util.StringToPointer(community.Name.String),
+		Description:     util.StringToPointer(community.Description.String),
+		// PreviewImage:     util.StringToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
+		Chain:            &chain,
+		ProfileImageURL:  util.StringToPointer(community.ProfileImageUrl.String),
+		ProfileBannerURL: util.StringToPointer(community.ProfileBannerUrl.String),
+		BadgeURL:         util.StringToPointer(community.BadgeUrl.String),
+		Owners:           nil, // handled by dedicated resolver
 	}
 }
 

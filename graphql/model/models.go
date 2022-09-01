@@ -38,6 +38,11 @@ type HelperTokenHolderData struct {
 	WalletIds []persist.DBID
 }
 
+type HelperCommunityData struct {
+	ForceRefresh     *bool
+	OnlyGalleryUsers *bool
+}
+
 type HelperTokensAddedToCollectionFeedEventDataData struct {
 	FeedEventId persist.DBID
 }

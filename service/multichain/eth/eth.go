@@ -155,6 +155,49 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	return contractToChainAgnostic(contract.Contract), nil
 
 }
+func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	owners := make([]multichain.ChainAgnosticCommunityOwner, len(tokens))
+	for i, token := range tokens {
+		owners[i] = multichain.ChainAgnosticCommunityOwner{
+			Address: token.OwnerAddress,
+		}
+	}
+	return owners, nil
+}
+
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&address=%s&limit=-1", d.indexerBaseURL, contractAddress, ownerAddress), nil)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	res, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+
+		return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(res)
+	}
+
+	var tokens indexer.GetTokensOutput
+	err = json.NewDecoder(res.Body).Decode(&tokens)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	contracts := contractsToChainAgnostic(tokens.Contracts)
+
+	var contract multichain.ChainAgnosticContract
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	return tokensToChainAgnostic(tokens.NFTs), contract, nil
+}
 
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) error {

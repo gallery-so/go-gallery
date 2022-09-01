@@ -79,6 +79,18 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Cont
 	return resolveCollectionTokenByIDs(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
 }
 
+func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error) {
+	refresh := false
+	onlyGallery := true
+	if obj.HelperCommunityData.ForceRefresh != nil {
+		refresh = *obj.HelperCommunityData.ForceRefresh
+	}
+	if obj.HelperCommunityData.OnlyGalleryUsers != nil {
+		onlyGallery = *obj.HelperCommunityData.OnlyGalleryUsers
+	}
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
+}
+
 func (r *feedConnectionResolver) PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error) {
 	return resolveFeedPageInfo(ctx, obj)
 }
@@ -635,13 +647,9 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
-	refresh := false
-	if forceRefresh != nil {
-		refresh = *forceRefresh
-	}
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error) {
 
-	return resolveCommunityByContractAddress(ctx, communityAddress, refresh)
+	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh, onlyGalleryUsers)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
@@ -825,6 +833,9 @@ func (r *Resolver) CollectorsNoteAddedToTokenFeedEventData() generated.Collector
 	return &collectorsNoteAddedToTokenFeedEventDataResolver{r}
 }
 
+// Community returns generated.CommunityResolver implementation.
+func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
+
 // FeedConnection returns generated.FeedConnectionResolver implementation.
 func (r *Resolver) FeedConnection() generated.FeedConnectionResolver {
 	return &feedConnectionResolver{r}
@@ -908,6 +919,7 @@ type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
 type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
+type communityResolver struct{ *Resolver }
 type feedConnectionResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }

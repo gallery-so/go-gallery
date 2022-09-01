@@ -206,22 +206,6 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 	return &membership, nil
 }
 
-func (api UserAPI) GetCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool) (*persist.Community, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"contractAddress": {contractAddress, "required"},
-	}); err != nil {
-		return nil, err
-	}
-
-	community, err := api.repos.CommunityRepository.GetByAddress(ctx, contractAddress, forceRefresh)
-	if err != nil {
-		return nil, err
-	}
-
-	return &community, nil
-}
-
 func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{

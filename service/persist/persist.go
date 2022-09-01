@@ -64,7 +64,6 @@ type Repositories struct {
 	ContractRepository    ContractGalleryRepository
 	BackupRepository      BackupRepository
 	MembershipRepository  MembershipRepository
-	CommunityRepository   CommunityRepository
 	EarlyAccessRepository EarlyAccessRepository
 	WalletRepository      WalletRepository
 }
