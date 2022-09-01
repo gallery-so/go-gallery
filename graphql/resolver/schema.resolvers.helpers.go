@@ -654,6 +654,45 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 	return &pageInfo, nil
 }
 
+func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
+	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, admireID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return admireToModel(ctx, *admire), nil
+}
+
+func resolveAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Admire, error) {
+	admires, err := publicapi.For(ctx).Admire.GetAdmiresByFeedEventID(ctx, feedEventID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return admiresToModels(ctx, admires), nil
+}
+
+func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*model.Comment, error) {
+	comment, err := publicapi.For(ctx).Comment.GetCommentByID(ctx, commentID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return commentToModel(ctx, *comment), nil
+}
+func resolveCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Comment, error) {
+	comments, err := publicapi.For(ctx).Comment.GetCommentsByFeedEventID(ctx, feedEventID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return commentsToModels(ctx, comments), nil
+}
+
 func feedEventToDataModel(event *sqlc.FeedEvent) (model.FeedEventData, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
@@ -836,6 +875,48 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
+}
+
+// admireToModel converts a sqlc.Admire to a model.Admire
+func admireToModel(ctx context.Context, admire sqlc.Admire) *model.Admire {
+
+	return &model.Admire{
+		Dbid:         admire.ID,
+		CreationTime: &admire.CreatedAt,
+		LastUpdated:  &admire.LastUpdated,
+		Admirer:      nil, // handled by dedicated resolver
+	}
+}
+
+// admireToModel converts a sqlc.Admire to a model.Admire
+func admiresToModels(ctx context.Context, admires []sqlc.Admire) []*model.Admire {
+	result := make([]*model.Admire, len(admires))
+	for i, admire := range admires {
+		result[i] = admireToModel(ctx, admire)
+	}
+	return result
+}
+
+// commentToModel converts a sqlc.Admire to a model.Admire
+func commentToModel(ctx context.Context, comment sqlc.Comment) *model.Comment {
+
+	return &model.Comment{
+		Dbid:         comment.ID,
+		CreationTime: &comment.CreatedAt,
+		LastUpdated:  &comment.LastUpdated,
+		Comment:      &comment.Comment,
+		Commenter:    nil, // handled by dedicated resolver
+	}
+}
+
+// commentToModel converts a sqlc.Admire to a model.Admire
+func commentsToModels(ctx context.Context, comment []sqlc.Comment) []*model.Comment {
+
+	result := make([]*model.Comment, len(comment))
+	for i, comment := range comment {
+		result[i] = commentToModel(ctx, comment)
+	}
+	return result
 }
 
 func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wallet {

@@ -20,6 +20,10 @@
 //go:generate go run github.com/vektah/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
 //go:generate go run github.com/vektah/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
 //go:generate go run github.com/vektah/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
+//go:generate go run github.com/vektah/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Admire
+//go:generate go run github.com/vektah/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Admire
+//go:generate go run github.com/vektah/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Comment
+//go:generate go run github.com/vektah/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Comment
 
 package dataloader
 
@@ -75,6 +79,10 @@ type Loaders struct {
 	GlobalFeed               GlobalFeedLoader
 	FeedByUserId             UserFeedLoader
 	EventByEventId           EventLoaderByID
+	AdmireByAdmireId         AdmireLoaderByID
+	AdmiresByFeedEventId     AdmiresLoaderByID
+	CommentByCommentId       CommentLoaderByID
+	CommentsByFeedEventId    CommentsLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
@@ -234,6 +242,30 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadGlobalFeed(ctx, loaders, q),
+	}
+
+	loaders.AdmireByAdmireId = AdmireLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadAdmireById(ctx, loaders, q),
+	}
+
+	loaders.AdmiresByFeedEventId = AdmiresLoaderByID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadAdmiresByFeedEventId(ctx, loaders, q),
+	}
+
+	loaders.CommentByCommentId = CommentLoaderByID{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadCommentById(ctx, loaders, q),
+	}
+
+	loaders.CommentsByFeedEventId = CommentsLoaderByID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadCommentsByFeedEventId(ctx, loaders, q),
 	}
 
 	return loaders
@@ -995,5 +1027,95 @@ func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 		})
 
 		return events, errors
+	}
+}
+
+func loadAdmireById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Admire, []error) {
+	return func(admireIds []persist.DBID) ([]sqlc.Admire, []error) {
+		admires := make([]sqlc.Admire, len(admireIds))
+		errors := make([]error, len(admireIds))
+
+		b := q.GetAdmireByAdmireIDBatch(ctx, admireIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, a sqlc.Admire, err error) {
+			admires[i] = a
+			errors[i] = err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrAdmireNotFound{ID: admireIds[i]}
+			}
+		})
+
+		return admires, errors
+	}
+}
+
+func loadAdmiresByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Admire, []error) {
+	return func(ids []persist.DBID) ([][]sqlc.Admire, []error) {
+		admires := make([][]sqlc.Admire, len(ids))
+		errors := make([]error, len(ids))
+
+		b := q.GetAdmiresByFeedEventIDBatch(ctx, ids)
+		defer b.Close()
+
+		b.Query(func(i int, admrs []sqlc.Admire, err error) {
+			admires[i] = admrs
+			errors[i] = err
+
+			// Add results to the AdmireByAdmireId loader's cache
+			if errors[i] == nil {
+				for _, a := range admrs {
+					loaders.AdmireByAdmireId.Prime(a.ID, a)
+				}
+			}
+		})
+
+		return admires, errors
+	}
+}
+
+func loadCommentById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Comment, []error) {
+	return func(commentIds []persist.DBID) ([]sqlc.Comment, []error) {
+		comments := make([]sqlc.Comment, len(commentIds))
+		errors := make([]error, len(commentIds))
+
+		b := q.GetCommentByCommentIDBatch(ctx, commentIds)
+		defer b.Close()
+
+		b.QueryRow(func(i int, c sqlc.Comment, err error) {
+			comments[i] = c
+			errors[i] = err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrCommentNotFound{ID: commentIds[i]}
+			}
+		})
+
+		return comments, errors
+	}
+}
+
+func loadCommentsByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Comment, []error) {
+	return func(ids []persist.DBID) ([][]sqlc.Comment, []error) {
+		comments := make([][]sqlc.Comment, len(ids))
+		errors := make([]error, len(ids))
+
+		b := q.GetCommentsByFeedEventIDBatch(ctx, ids)
+		defer b.Close()
+
+		b.Query(func(i int, cmts []sqlc.Comment, err error) {
+			comments[i] = cmts
+			errors[i] = err
+
+			// Add results to the CommentById loader's cache
+			if errors[i] == nil {
+				for _, c := range cmts {
+					loaders.CommentByCommentId.Prime(c.ID, c)
+				}
+			}
+		})
+
+		return comments, errors
 	}
 }

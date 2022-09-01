@@ -174,6 +174,89 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 	return i, err
 }
 
+const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Admire, error) {
+	row := q.db.QueryRow(ctx, getAdmireByAdmireID, id)
+	var i Admire
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.FeedEventID,
+		&i.ActorID,
+		&i.Deleted,
+		&i.CreatedAt,
+		&i.LastUpdated,
+	)
+	return i, err
+}
+
+const getAdmiresByActorID = `-- name: GetAdmiresByActorID :many
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+`
+
+func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID) ([]Admire, error) {
+	rows, err := q.db.Query(ctx, getAdmiresByActorID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Admire
+	for rows.Next() {
+		var i Admire
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAdmiresByFeedEventID = `-- name: GetAdmiresByFeedEventID :many
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
+`
+
+func (q *Queries) GetAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]Admire, error) {
+	rows, err := q.db.Query(ctx, getAdmiresByFeedEventID, feedEventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Admire
+	for rows.Next() {
+		var i Admire
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCollectionById = `-- name: GetCollectionById :one
 SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings FROM collections WHERE id = $1 AND deleted = false
 `
@@ -227,6 +310,95 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 			&i.Name,
 			&i.Layout,
 			&i.TokenSettings,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCommentByCommentID = `-- name: GetCommentByCommentID :one
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetCommentByCommentID(ctx context.Context, id persist.DBID) (Comment, error) {
+	row := q.db.QueryRow(ctx, getCommentByCommentID, id)
+	var i Comment
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.FeedEventID,
+		&i.ActorID,
+		&i.ReplyTo,
+		&i.Comment,
+		&i.Deleted,
+		&i.CreatedAt,
+		&i.LastUpdated,
+	)
+	return i, err
+}
+
+const getCommentsByActorID = `-- name: GetCommentsByActorID :many
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC
+`
+
+func (q *Queries) GetCommentsByActorID(ctx context.Context, actorID persist.DBID) ([]Comment, error) {
+	rows, err := q.db.Query(ctx, getCommentsByActorID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Comment
+	for rows.Next() {
+		var i Comment
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.ReplyTo,
+			&i.Comment,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCommentsByFeedEventID = `-- name: GetCommentsByFeedEventID :many
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
+`
+
+func (q *Queries) GetCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]Comment, error) {
+	rows, err := q.db.Query(ctx, getCommentsByFeedEventID, feedEventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Comment
+	for rows.Next() {
+		var i Comment
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.ReplyTo,
+			&i.Comment,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
 		); err != nil {
 			return nil, err
 		}

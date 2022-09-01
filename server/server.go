@@ -179,6 +179,8 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		MembershipRepository:  postgres.NewMembershipRepository(db),
 		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
 		WalletRepository:      postgres.NewWalletRepository(db),
+		AdmireRepository:      postgres.NewAdmireRepository(db),
+		CommentRepository:     postgres.NewCommentRepository(db),
 	}
 }
 

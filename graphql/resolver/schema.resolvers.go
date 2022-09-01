@@ -14,6 +14,22 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 )
 
+func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.Admirer.Dbid)
+}
+
+func (r *admireFeedEventPayloadResolver) Admire(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.Admire, error) {
+	return resolveAdmireByAdmireID(ctx, obj.Admire.Dbid)
+}
+
+func (r *admireFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.FeedEvent, error) {
+	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, obj.Admire.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	return resolveFeedEventByEventID(ctx, admire.FeedEventID)
+}
+
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
 
@@ -79,6 +95,26 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Cont
 	return resolveCollectionTokenByIDs(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
 }
 
+func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.ReplyTo.Dbid)
+}
+
+func (r *commentResolver) Commenter(ctx context.Context, obj *model.Comment) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.Commenter.Dbid)
+}
+
+func (r *commentOnFeedEventPayloadResolver) Comment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.Comment.Dbid)
+}
+
+func (r *commentOnFeedEventPayloadResolver) ReplyToComment(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.ReplyToComment.Dbid)
+}
+
+func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error) {
 	refresh := false
 	onlyGallery := true
@@ -97,6 +133,14 @@ func (r *feedConnectionResolver) PageInfo(ctx context.Context, obj *model.FeedCo
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
+}
+
+func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent) ([]*model.Admire, error) {
+	return resolveAdmiresByFeedEventID(ctx, obj.Dbid)
+}
+
+func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent) ([]*model.Comment, error) {
+	return resolveCommentsByFeedEventID(ctx, obj.Dbid)
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -590,6 +634,71 @@ func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID
 	return output, err
 }
 
+func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Admire.AdmireFeedEvent(ctx, feedEventID)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.AdmireFeedEventPayload{
+		Viewer:    resolveViewer(ctx),
+		Admire:    &model.Admire{Dbid: id},
+		FeedEvent: &model.FeedEvent{Dbid: feedEventID},
+	}
+	return output, nil
+}
+
+func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
+	feedEvent, err := publicapi.For(ctx).Admire.RemoveAdmire(ctx, admireID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RemoveAdmirePayload{
+		Viewer: resolveViewer(ctx),
+		FeedEvent: &model.FeedEvent{
+			Dbid: feedEvent, // remaining fields handled by dedicated resolver
+		},
+	}
+	return output, nil
+}
+
+func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error) {
+	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, replyToID, comment)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.CommentOnFeedEventPayload{
+		Viewer: resolveViewer(ctx),
+		Comment: &model.Comment{
+			Dbid: id,
+		},
+		FeedEvent: &model.FeedEvent{
+			Dbid: feedEventID, // remaining fields handled by dedicated resolver
+		},
+	}
+	if replyToID != nil {
+		output.ReplyToComment = &model.Comment{
+			Dbid: *replyToID, // remaining fields handled by dedicated resolver
+		}
+	}
+	return output, nil
+}
+
+func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error) {
+	feedEvent, err := publicapi.For(ctx).Comment.RemoveComment(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.RemoveCommentPayload{
+		Viewer: resolveViewer(ctx),
+		FeedEvent: &model.FeedEvent{
+			Dbid: feedEvent,
+		},
+	}
+	return output, nil
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -648,7 +757,6 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 }
 
 func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error) {
-
 	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh, onlyGalleryUsers)
 }
 
@@ -679,6 +787,14 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
+}
+
+func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+}
+
+func (r *removeCommentPayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveCommentPayload) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *model.SetSpamPreferencePayload) ([]*model.Token, error) {
@@ -810,6 +926,14 @@ func (r *chainPubKeyInputResolver) Chain(ctx context.Context, obj *persist.Chain
 	return obj.GQLSetChainFromResolver(data)
 }
 
+// Admire returns generated.AdmireResolver implementation.
+func (r *Resolver) Admire() generated.AdmireResolver { return &admireResolver{r} }
+
+// AdmireFeedEventPayload returns generated.AdmireFeedEventPayloadResolver implementation.
+func (r *Resolver) AdmireFeedEventPayload() generated.AdmireFeedEventPayloadResolver {
+	return &admireFeedEventPayloadResolver{r}
+}
+
 // Collection returns generated.CollectionResolver implementation.
 func (r *Resolver) Collection() generated.CollectionResolver { return &collectionResolver{r} }
 
@@ -831,6 +955,14 @@ func (r *Resolver) CollectorsNoteAddedToCollectionFeedEventData() generated.Coll
 // CollectorsNoteAddedToTokenFeedEventData returns generated.CollectorsNoteAddedToTokenFeedEventDataResolver implementation.
 func (r *Resolver) CollectorsNoteAddedToTokenFeedEventData() generated.CollectorsNoteAddedToTokenFeedEventDataResolver {
 	return &collectorsNoteAddedToTokenFeedEventDataResolver{r}
+}
+
+// Comment returns generated.CommentResolver implementation.
+func (r *Resolver) Comment() generated.CommentResolver { return &commentResolver{r} }
+
+// CommentOnFeedEventPayload returns generated.CommentOnFeedEventPayloadResolver implementation.
+func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPayloadResolver {
+	return &commentOnFeedEventPayloadResolver{r}
 }
 
 // Community returns generated.CommunityResolver implementation.
@@ -866,6 +998,16 @@ func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &owner
 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
+
+// RemoveAdmirePayload returns generated.RemoveAdmirePayloadResolver implementation.
+func (r *Resolver) RemoveAdmirePayload() generated.RemoveAdmirePayloadResolver {
+	return &removeAdmirePayloadResolver{r}
+}
+
+// RemoveCommentPayload returns generated.RemoveCommentPayloadResolver implementation.
+func (r *Resolver) RemoveCommentPayload() generated.RemoveCommentPayloadResolver {
+	return &removeCommentPayloadResolver{r}
+}
 
 // SetSpamPreferencePayload returns generated.SetSpamPreferencePayloadResolver implementation.
 func (r *Resolver) SetSpamPreferencePayload() generated.SetSpamPreferencePayloadResolver {
@@ -914,11 +1056,15 @@ func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
 	return &chainPubKeyInputResolver{r}
 }
 
+type admireResolver struct{ *Resolver }
+type admireFeedEventPayloadResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
 type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
+type commentResolver struct{ *Resolver }
+type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
 type feedConnectionResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
@@ -929,6 +1075,8 @@ type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type removeAdmirePayloadResolver struct{ *Resolver }
+type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }

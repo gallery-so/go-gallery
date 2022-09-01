@@ -24,6 +24,16 @@ type Access struct {
 	IsAdmin             sql.NullBool
 }
 
+type Admire struct {
+	ID          persist.DBID
+	Version     int32
+	FeedEventID persist.DBID
+	ActorID     persist.DBID
+	Deleted     bool
+	CreatedAt   time.Time
+	LastUpdated time.Time
+}
+
 type Backup struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -59,6 +69,18 @@ type CollectionEvent struct {
 	LastUpdated  time.Time
 	Data         pgtype.JSONB
 	Sent         sql.NullBool
+}
+
+type Comment struct {
+	ID          persist.DBID
+	Version     int32
+	FeedEventID persist.DBID
+	ActorID     persist.DBID
+	ReplyTo     persist.DBID
+	Comment     string
+	Deleted     bool
+	CreatedAt   time.Time
+	LastUpdated time.Time
 }
 
 type Contract struct {

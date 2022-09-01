@@ -10,6 +10,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+func (r *Admire) ID() GqlID {
+	return GqlID(fmt.Sprintf("Admire:%s", r.Dbid))
+}
+
 func (r *Collection) ID() GqlID {
 	return GqlID(fmt.Sprintf("Collection:%s", r.Dbid))
 }
@@ -26,6 +30,10 @@ func (r *CollectionToken) ID() GqlID {
 	// func (r *CollectionToken) GetGqlIDField_CollectionID() string
 	//-----------------------------------------------------------------------------------------------
 	return GqlID(fmt.Sprintf("CollectionToken:%s:%s", r.GetGqlIDField_TokenID(), r.GetGqlIDField_CollectionID()))
+}
+
+func (r *Comment) ID() GqlID {
+	return GqlID(fmt.Sprintf("Comment:%s", r.Dbid))
 }
 
 func (r *Community) ID() GqlID {
@@ -71,8 +79,10 @@ func (r *Wallet) ID() GqlID {
 }
 
 type NodeFetcher struct {
+	OnAdmire          func(ctx context.Context, dbid persist.DBID) (*Admire, error)
 	OnCollection      func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionToken func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
+	OnComment         func(ctx context.Context, dbid persist.DBID) (*Comment, error)
 	OnCommunity       func(ctx context.Context, contractAddress string, chain string) (*Community, error)
 	OnContract        func(ctx context.Context, dbid persist.DBID) (*Contract, error)
 	OnFeedEvent       func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
@@ -93,6 +103,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 	ids := parts[1:]
 
 	switch typeName {
+	case "Admire":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Admire' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnAdmire(ctx, persist.DBID(ids[0]))
 	case "Collection":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Collection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -103,6 +118,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'CollectionToken' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnCollectionToken(ctx, string(ids[0]), string(ids[1]))
+	case "Comment":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Comment' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnComment(ctx, persist.DBID(ids[0]))
 	case "Community":
 		if len(ids) != 2 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Community' type requires 2 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -150,10 +170,14 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 
 func (n *NodeFetcher) ValidateHandlers() {
 	switch {
+	case n.OnAdmire == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnAdmire")
 	case n.OnCollection == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollection")
 	case n.OnCollectionToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollectionToken")
+	case n.OnComment == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnComment")
 	case n.OnCommunity == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCommunity")
 	case n.OnContract == nil:
