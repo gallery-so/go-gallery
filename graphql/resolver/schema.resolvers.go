@@ -623,8 +623,7 @@ func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID
 }
 
 func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error) {
-	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-	id, err := publicapi.For(ctx).Admire.AdmireFeedEvent(ctx, feedEventID, user)
+	id, err := publicapi.For(ctx).Admire.AdmireFeedEvent(ctx, feedEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -637,8 +636,7 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 }
 
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-	feedEvent, err := publicapi.For(ctx).Admire.RemoveAdmire(ctx, admireID, user)
+	feedEvent, err := publicapi.For(ctx).Admire.RemoveAdmire(ctx, admireID)
 	if err != nil {
 		return nil, err
 	}
@@ -653,8 +651,7 @@ func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DB
 }
 
 func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error) {
-	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, user, replyToID, comment)
+	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, replyToID, comment)
 	if err != nil {
 		return nil, err
 	}
@@ -677,8 +674,8 @@ func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID p
 }
 
 func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error) {
-	user := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-	feedEvent, err := publicapi.For(ctx).Comment.RemoveComment(ctx, commentID, user)
+
+	feedEvent, err := publicapi.For(ctx).Comment.RemoveComment(ctx, commentID)
 	if err != nil {
 		return nil, err
 	}

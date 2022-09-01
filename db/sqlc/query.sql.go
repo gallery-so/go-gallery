@@ -13,25 +13,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const admireByAdmireID = `-- name: AdmireByAdmireID :one
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE id = $1 AND deleted = false
-`
-
-func (q *Queries) AdmireByAdmireID(ctx context.Context, id persist.DBID) (Admire, error) {
-	row := q.db.QueryRow(ctx, admireByAdmireID, id)
-	var i Admire
-	err := row.Scan(
-		&i.ID,
-		&i.Version,
-		&i.FeedEventID,
-		&i.ActorID,
-		&i.Deleted,
-		&i.CreatedAt,
-		&i.LastUpdated,
-	)
-	return i, err
-}
-
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -189,6 +170,25 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetAdmireByAdmireID(ctx context.Context, id persist.DBID) (Admire, error) {
+	row := q.db.QueryRow(ctx, getAdmireByAdmireID, id)
+	var i Admire
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.FeedEventID,
+		&i.ActorID,
+		&i.Deleted,
+		&i.CreatedAt,
+		&i.LastUpdated,
 	)
 	return i, err
 }

@@ -81,7 +81,7 @@ type Loaders struct {
 	EventByEventId           EventLoaderByID
 	AdmireByAdmireId         AdmireLoaderByID
 	AdmiresByFeedEventId     AdmiresLoaderByID
-	CommentById              CommentLoaderByID
+	CommentByCommentId       CommentLoaderByID
 	CommentsByFeedEventId    CommentsLoaderByID
 }
 
@@ -250,7 +250,7 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadAdmiresByFeedEventId(ctx, loaders, q),
 	}
 
-	loaders.CommentById = CommentLoaderByID{
+	loaders.CommentByCommentId = CommentLoaderByID{
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
 		fetch:    loadCommentById(ctx, loaders, q),
@@ -1011,7 +1011,7 @@ func loadAdmireById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 			errors[i] = err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrAdmireNotFoundByID{ID: admireIds[i]}
+				errors[i] = persist.ErrAdmireNotFound{ID: admireIds[i]}
 			}
 		})
 
@@ -1056,7 +1056,7 @@ func loadCommentById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fun
 			errors[i] = err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrCommentNotFoundByID{ID: commentIds[i]}
+				errors[i] = persist.ErrCommentNotFound{ID: commentIds[i]}
 			}
 		})
 
@@ -1079,7 +1079,7 @@ func loadCommentsByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Qu
 			// Add results to the CommentById loader's cache
 			if errors[i] == nil {
 				for _, c := range cmts {
-					loaders.CommentById.Prime(c.ID, c)
+					loaders.CommentByCommentId.Prime(c.ID, c)
 				}
 			}
 		})

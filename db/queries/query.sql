@@ -317,7 +317,7 @@ SELECT * FROM feed_events
 -- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
 
--- name: AdmireByAdmireID :one
+-- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
 -- name: GetAdmireByAdmireIDBatch :batchone

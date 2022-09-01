@@ -29,7 +29,7 @@ func (api CommentAPI) GetCommentByID(ctx context.Context, commentID persist.DBID
 		return nil, err
 	}
 
-	comment, err := api.loaders.CommentById.Load(commentID)
+	comment, err := api.loaders.CommentByCommentId.Load(commentID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,23 +53,21 @@ func (api CommentAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID 
 	return comments, nil
 }
 
-func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, actorID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
-		"actorID":     {actorID, "required"},
 	}); err != nil {
 		return "", err
 	}
 
-	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, actorID, replyToID, comment)
+	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx), replyToID, comment)
 }
 
-func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID, actorID persist.DBID) (persist.DBID, error) {
+func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"commentID": {commentID, "required"},
-		"actorID":   {actorID, "required"},
 	}); err != nil {
 		return "", err
 	}
@@ -77,7 +75,7 @@ func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID,
 	if err != nil {
 		return "", err
 	}
-	if comment.ActorID != actorID {
+	if comment.ActorID != For(ctx).User.GetLoggedInUserId(ctx) {
 		return "", ErrOnlyRemoveOwnComment
 	}
 

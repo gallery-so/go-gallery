@@ -53,23 +53,21 @@ func (api AdmireAPI) GetAdmiresByFeedEventID(ctx context.Context, feedEventID pe
 	return admires, nil
 }
 
-func (api AdmireAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID, actorID persist.DBID) (persist.DBID, error) {
+func (api AdmireAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
-		"actorID":     {actorID, "required"},
 	}); err != nil {
 		return "", err
 	}
 
-	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, actorID)
+	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx))
 }
 
-func (api AdmireAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID, actorID persist.DBID) (persist.DBID, error) {
+func (api AdmireAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"admireID": {admireID, "required"},
-		"actorID":  {actorID, "required"},
 	}); err != nil {
 		return "", err
 	}
@@ -79,7 +77,7 @@ func (api AdmireAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID, ac
 	if err != nil {
 		return "", err
 	}
-	if admire.ActorID != actorID {
+	if admire.ActorID != For(ctx).User.GetLoggedInUserId(ctx) {
 		return "", ErrOnlyRemoveOwnAdmire
 	}
 

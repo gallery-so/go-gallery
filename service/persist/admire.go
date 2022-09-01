@@ -19,10 +19,10 @@ type AdmireRepository interface {
 	RemoveAdmire(ctx context.Context, admireID DBID) error
 }
 
-type ErrAdmireNotFoundByID struct {
+type ErrAdmireNotFound struct {
 	ID DBID
 }
 
-func (e ErrAdmireNotFoundByID) Error() string {
+func (e ErrAdmireNotFound) Error() string {
 	return fmt.Sprintf("admire not found by id: %s", e.ID)
 }

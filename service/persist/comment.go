@@ -22,10 +22,10 @@ type CommentRepository interface {
 	RemoveComment(ctx context.Context, commentID DBID) error
 }
 
-type ErrCommentNotFoundByID struct {
+type ErrCommentNotFound struct {
 	ID DBID
 }
 
-func (e ErrCommentNotFoundByID) Error() string {
+func (e ErrCommentNotFound) Error() string {
 	return fmt.Sprintf("comment not found by id: %s", e.ID)
 }
