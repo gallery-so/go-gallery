@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"fmt"
 )
 
 // ContractGallery represents a smart contract in the database
@@ -16,10 +17,17 @@ type ContractGallery struct {
 	Address          Address    `json:"address"`
 	Symbol           NullString `json:"symbol"`
 	Name             NullString `json:"name"`
+	Description      NullString `json:"description"`
 	CreatorAddress   Address    `json:"creator_address"`
 	ProfileImageURL  NullString `json:"profile_image_url"`
 	ProfileBannerURL NullString `json:"profile_banner_url"`
 	BadgeURL         NullString `json:"badge_url"`
+}
+
+// ErrContractNotFoundByAddress is an error type for when a contract is not found by address
+type ErrGalleryContractNotFound struct {
+	Address Address
+	Chain   Chain
 }
 
 // ContractGalleryRepository represents a repository for interacting with persisted contracts
@@ -28,4 +36,9 @@ type ContractGalleryRepository interface {
 	GetByAddresses(context.Context, []Address, Chain) ([]ContractGallery, error)
 	UpsertByAddress(context.Context, Address, Chain, ContractGallery) error
 	BulkUpsert(context.Context, []ContractGallery) error
+	GetOwnersByAddress(context.Context, Address, Chain) ([]TokenHolder, error)
+}
+
+func (e ErrGalleryContractNotFound) Error() string {
+	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }

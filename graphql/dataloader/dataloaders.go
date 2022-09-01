@@ -214,6 +214,12 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadContractByContractID(ctx, loaders, q),
 	}
 
+	loaders.ContractByChainAddress = ContractLoaderByChainAddress{
+		maxBatch: defaultMaxBatchOne,
+		wait:     defaultWaitTime,
+		fetch:    loadContractByChainAddress(ctx, loaders, q),
+	}
+
 	loaders.ContractsByUserID = ContractsLoaderByID{
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
@@ -898,6 +904,32 @@ func loadContractByContractID(ctx context.Context, loaders *Loaders, q *sqlc.Que
 
 			if errors[i] == pgx.ErrNoRows {
 				errors[i] = persist.ErrContractNotFoundByID{ID: contractIDs[i]}
+			}
+		})
+
+		return contracts, errors
+	}
+}
+func loadContractByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.ChainAddress) ([]sqlc.Contract, []error) {
+	return func(chainAddresses []persist.ChainAddress) ([]sqlc.Contract, []error) {
+		contracts := make([]sqlc.Contract, len(chainAddresses))
+		errors := make([]error, len(chainAddresses))
+
+		asParams := make([]sqlc.GetContractByChainAddressBatchParams, len(chainAddresses))
+		for i, chainAddress := range chainAddresses {
+			asParams[i] = sqlc.GetContractByChainAddressBatchParams{
+				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain()), Valid: true},
+				Address: chainAddress.Address(),
+			}
+		}
+		b := q.GetContractByChainAddressBatch(ctx, asParams)
+		defer b.Close()
+
+		b.QueryRow(func(i int, t sqlc.Contract, err error) {
+			contracts[i], errors[i] = t, err
+
+			if errors[i] == pgx.ErrNoRows {
+				errors[i] = persist.ErrGalleryContractNotFound{Address: chainAddresses[i].Address(), Chain: chainAddresses[i].Chain()}
 			}
 		})
 

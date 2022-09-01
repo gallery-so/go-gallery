@@ -97,6 +97,7 @@ type Contract struct {
 	ProfileBannerUrl sql.NullString
 	ProfileImageUrl  sql.NullString
 	BadgeUrl         sql.NullString
+	Description      sql.NullString
 }
 
 type EarlyAccess struct {

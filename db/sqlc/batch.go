@@ -456,7 +456,7 @@ func (b *GetCommentsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
 
 type GetContractByChainAddressBatchBatchResults struct {
@@ -500,6 +500,7 @@ func (b *GetContractByChainAddressBatchBatchResults) QueryRow(f func(int, Contra
 			&i.ProfileBannerUrl,
 			&i.ProfileImageUrl,
 			&i.BadgeUrl,
+			&i.Description,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -516,7 +517,7 @@ func (b *GetContractByChainAddressBatchBatchResults) Close() error {
 }
 
 const getContractByIDBatch = `-- name: GetContractByIDBatch :batchone
-select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url FROM contracts WHERE id = $1 AND deleted = false
+select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description FROM contracts WHERE id = $1 AND deleted = false
 `
 
 type GetContractByIDBatchBatchResults struct {
@@ -554,6 +555,7 @@ func (b *GetContractByIDBatchBatchResults) QueryRow(f func(int, Contract, error)
 			&i.ProfileBannerUrl,
 			&i.ProfileImageUrl,
 			&i.BadgeUrl,
+			&i.Description,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -570,7 +572,7 @@ func (b *GetContractByIDBatchBatchResults) Close() error {
 }
 
 const getContractsByUserIDBatch = `-- name: GetContractsByUserIDBatch :batchmany
-SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url FROM contracts, tokens
+SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
     AND tokens.deleted = false AND contracts.deleted = false
 `
@@ -616,6 +618,7 @@ func (b *GetContractsByUserIDBatchBatchResults) Query(f func(int, []Contract, er
 				&i.ProfileBannerUrl,
 				&i.ProfileImageUrl,
 				&i.BadgeUrl,
+				&i.Description,
 			); err != nil {
 				break
 			}

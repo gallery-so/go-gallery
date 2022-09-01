@@ -9,16 +9,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const staleCommunityTime = time.Hour * 2
+
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
-	TokenRepo    persist.TokenGalleryRepository
-	ContractRepo persist.ContractGalleryRepository
-	UserRepo     persist.UserRepository
-	Chains       map[persist.Chain][]ChainProvider
+	Repos  *persist.Repositories
+	Cache  memstore.Cache
+	Chains map[persist.Chain][]ChainProvider
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	ChainAddressOverrides map[persist.Chain]persist.Chain
 }
@@ -63,6 +66,7 @@ type ChainAgnosticContract struct {
 	Address        persist.Address `json:"address"`
 	Symbol         string          `json:"symbol"`
 	Name           string          `json:"name"`
+	Description    string          `json:"description"`
 	CreatorAddress persist.Address `json:"creator_address"`
 
 	LatestBlock persist.BlockNumber `json:"latest_block"`
@@ -72,6 +76,17 @@ type ChainAgnosticContract struct {
 type ChainAgnosticIdentifiers struct {
 	ContractAddress persist.Address `json:"contract_address"`
 	TokenID         persist.TokenID `json:"token_id"`
+}
+
+type ChainAgnosticCommunityOwner struct {
+	Address persist.Address `json:"address"`
+}
+
+type TokenHolder struct {
+	UserID        persist.DBID   `json:"user_id"`
+	DisplayName   string         `json:"display_name"`
+	WalletIDs     []persist.DBID `json:"wallet_ids"`
+	PreviewTokens []string       `json:"preview_tokens"`
 }
 
 // ErrChainNotFound is an error that occurs when a chain provider for a given chain is not registered in the MultichainProvider
@@ -108,7 +123,9 @@ type ChainProvider interface {
 	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
+	GetCommunityOwners(context.Context, persist.Address) ([]ChainAgnosticCommunityOwner, error)
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
 	RefreshContract(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
@@ -121,7 +138,7 @@ type ChainProvider interface {
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, userRepo persist.UserRepository, chainOverrides map[persist.Chain]persist.Chain, chains ...ChainProvider) *Provider {
+func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides map[persist.Chain]persist.Chain, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
@@ -131,18 +148,18 @@ func NewMultiChainDataRetriever(ctx context.Context, tokenRepo persist.TokenGall
 		c[info.Chain] = append(c[info.Chain], chain)
 	}
 	return &Provider{
-		TokenRepo:    tokenRepo,
-		ContractRepo: contractRepo,
-		UserRepo:     userRepo,
+		Repos: repos,
+		Cache: cache,
 
-		Chains: c,
+		Chains:                c,
+		ChainAddressOverrides: chainOverrides,
 	}
 }
 
 // SyncTokens updates the media for all tokens for a user
 // TODO consider updating contracts as well
 func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
-	user, err := d.UserRepo.GetByID(ctx, userID)
+	user, err := d.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -235,7 +252,7 @@ outer:
 	}
 
 	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
-	if err := d.ContractRepo.BulkUpsert(ctx, newContracts); err != nil {
+	if err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
 		return fmt.Errorf("error upserting contracts: %s", err)
 	}
 	contractsForChain := map[persist.Chain][]persist.Address{}
@@ -248,7 +265,7 @@ outer:
 
 	addressesToContracts := map[string]persist.DBID{}
 	for chain, addresses := range contractsForChain {
-		newContracts, err := d.ContractRepo.GetByAddresses(ctx, addresses, chain)
+		newContracts, err := d.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
 		if err != nil {
 			return err
 		}
@@ -258,7 +275,7 @@ outer:
 	}
 
 	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
-	if err := d.TokenRepo.BulkUpsert(ctx, newTokens); err != nil {
+	if err := d.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
 
@@ -270,7 +287,7 @@ outer:
 		ownedTokens[tokenIdentifiers{chain: t.Chain, tokenID: t.TokenID, contract: t.Contract}] = true
 	}
 
-	allUsersNFTs, err := d.TokenRepo.GetByUserID(ctx, userID, 0, 0)
+	allUsersNFTs, err := d.Repos.TokenRepository.GetByUserID(ctx, userID, 0, 0)
 	if err != nil {
 		return err
 	}
@@ -281,7 +298,7 @@ outer:
 		}
 		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
 			logger.For(ctx).Warnf("deleting nft %s-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
-			err := d.TokenRepo.DeleteByID(ctx, nft.ID)
+			err := d.Repos.TokenRepository.DeleteByID(ctx, nft.ID)
 			if err != nil {
 				return err
 			}
@@ -289,6 +306,94 @@ outer:
 	}
 
 	return nil
+}
+
+func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]TokenHolder, error) {
+
+	cacheKey := fmt.Sprintf("%s-%t", communityIdentifiers.String(), onlyGalleryUsers)
+	if !forceRefresh {
+		bs, err := d.Cache.Get(ctx, cacheKey)
+		if err == nil && len(bs) > 0 {
+			var owners []TokenHolder
+			err = json.Unmarshal(bs, &owners)
+			if err != nil {
+				return nil, err
+			}
+			return owners, nil
+		}
+	}
+	providers, ok := d.Chains[communityIdentifiers.Chain()]
+	if !ok {
+		return nil, ErrChainNotFound{Chain: communityIdentifiers.Chain()}
+	}
+
+	dbHolders, err := d.Repos.ContractRepository.GetOwnersByAddress(ctx, communityIdentifiers.Address(), communityIdentifiers.Chain())
+	if err != nil {
+		return nil, err
+	}
+
+	holders, err := tokenHoldersToTokenHolders(ctx, dbHolders, d.Repos.UserRepository)
+
+	if !onlyGalleryUsers {
+		// look for other holders from the provider directly
+		var nonGalleryOwners []ChainAgnosticCommunityOwner
+		for _, p := range providers {
+			owners, err := p.GetCommunityOwners(ctx, communityIdentifiers.Address())
+			if err != nil {
+				return nil, err
+			}
+			nonGalleryOwners = append(nonGalleryOwners, owners...)
+		}
+		asHolders := communityOwnersToTokenHolders(nonGalleryOwners)
+		seenAddresses := map[persist.Address]bool{}
+		for _, h := range holders {
+			for _, w := range h.WalletIDs {
+				wallet, err := d.Repos.WalletRepository.GetByID(ctx, w)
+				if err == nil {
+					seenAddresses[wallet.Address] = true
+				}
+			}
+		}
+		wp := workerpool.New(10)
+		holderChan := make(chan TokenHolder)
+		for _, holder := range asHolders {
+			if !seenAddresses[persist.Address(holder.DisplayName)] {
+				h := holder
+				wp.Submit(func() {
+					innerCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+					defer cancel()
+					timeHere := time.Now()
+					tokensForContract, _, err := providers[0].GetOwnedTokensByContract(innerCtx, communityIdentifiers.Address(), persist.Address(h.DisplayName))
+					if err != nil {
+						logger.For(ctx).Errorf("error getting tokens for contract %s and address %s: %s", communityIdentifiers.Address(), h.DisplayName, err)
+						return
+					}
+					if len(tokensForContract) > 0 {
+						h.PreviewTokens = []string{tokensForContract[0].Media.MediaURL.String()}
+					}
+					holderChan <- h
+					logger.For(ctx).Infof("appended owner with previews in %s", time.Since(timeHere))
+				})
+			}
+		}
+		go func() {
+			defer close(holderChan)
+			wp.StopWait()
+		}()
+		for h := range holderChan {
+			holders = append(holders, h)
+		}
+	}
+
+	bs, err := json.Marshal(holders)
+	if err != nil {
+		return nil, err
+	}
+	err = d.Cache.Set(ctx, cacheKey, bs, staleCommunityTime)
+	if err != nil {
+		return nil, err
+	}
+	return holders, nil
 }
 
 // VerifySignature verifies a signature for a wallet address
@@ -325,7 +430,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		}
 		if i == 0 {
 			for _, token := range tokens {
-				if err := d.TokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
+				if err := d.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
 					Media:       token.Media,
 					Metadata:    token.TokenMetadata,
 					Name:        persist.NullString(token.Name),
@@ -337,7 +442,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}
 			}
 			for _, contract := range contracts {
-				if err := d.ContractRepo.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
+				if err := d.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 					Chain:          ti.Chain,
 					Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
 					Symbol:         persist.NullString(contract.Symbol),
@@ -487,6 +592,55 @@ func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContra
 	}
 	return res, nil
 
+}
+
+func communityOwnersToTokenHolders(owners []ChainAgnosticCommunityOwner) []TokenHolder {
+	seen := make(map[persist.Address]TokenHolder)
+	for _, owner := range owners {
+		if _, ok := seen[owner.Address]; !ok {
+			seen[owner.Address] = TokenHolder{
+				DisplayName: owner.Address.String(),
+			}
+		}
+	}
+
+	res := make([]TokenHolder, 0, len(seen))
+	for _, t := range seen {
+		res = append(res, t)
+	}
+	return res
+}
+
+func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolder, userRepo persist.UserRepository) ([]TokenHolder, error) {
+	seenUsers := make(map[persist.DBID]persist.TokenHolder)
+	allUserIDs := make([]persist.DBID, 0, len(owners))
+	for _, owner := range owners {
+		if _, ok := seenUsers[owner.UserID]; !ok {
+			allUserIDs = append(allUserIDs, owner.UserID)
+			seenUsers[owner.UserID] = owner
+		}
+	}
+	allUsers, err := userRepo.GetByIDs(ctx, allUserIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users for token holders: %s", err)
+	}
+	res := make([]TokenHolder, 0, len(seenUsers))
+	for _, user := range allUsers {
+		owner := seenUsers[user.ID]
+		username := user.Username.String()
+		previews := make([]string, 0, len(owner.PreviewTokens))
+		for _, p := range owner.PreviewTokens {
+			previews = append(previews, p.String())
+		}
+		res = append(res, TokenHolder{
+			UserID:        owner.UserID,
+			DisplayName:   username,
+			WalletIDs:     owner.WalletIDs,
+			PreviewTokens: previews,
+		})
+	}
+
+	return res, nil
 }
 
 func addressAtBlockToAddressAtBlock(ctx context.Context, addresses []ChainAgnosticAddressAtBlock, chain persist.Chain) ([]persist.AddressAtBlock, error) {

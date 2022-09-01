@@ -182,12 +182,13 @@ type AddUserWalletPayload struct {
 func (AddUserWalletPayload) IsAddUserWalletPayloadOrError() {}
 
 type Admire struct {
-	ID           GqlID        `json:"id"`
 	Dbid         persist.DBID `json:"dbid"`
 	CreationTime *time.Time   `json:"creationTime"`
 	LastUpdated  *time.Time   `json:"lastUpdated"`
 	Admirer      *GalleryUser `json:"admirer"`
 }
+
+func (Admire) IsNode() {}
 
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
@@ -316,7 +317,6 @@ type CollectorsNoteAddedToTokenFeedEventData struct {
 func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}
 
 type Comment struct {
-	ID           GqlID        `json:"id"`
 	Dbid         persist.DBID `json:"dbid"`
 	CreationTime *time.Time   `json:"creationTime"`
 	LastUpdated  *time.Time   `json:"lastUpdated"`
@@ -324,6 +324,8 @@ type Comment struct {
 	Commenter    *GalleryUser `json:"commenter"`
 	Comment      *string      `json:"comment"`
 }
+
+func (Comment) IsNode() {}
 
 type CommentOnFeedEventPayload struct {
 	Viewer         *Viewer    `json:"viewer"`
@@ -335,6 +337,8 @@ type CommentOnFeedEventPayload struct {
 func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
 type Community struct {
+	HelperCommunityData
+	Dbid             persist.DBID          `json:"dbid"`
 	LastUpdated      *time.Time            `json:"lastUpdated"`
 	ContractAddress  *persist.ChainAddress `json:"contractAddress"`
 	CreatorAddress   *persist.ChainAddress `json:"creatorAddress"`
@@ -851,6 +855,7 @@ func (Token) IsTokenByIDOrError() {}
 
 type TokenHolder struct {
 	HelperTokenHolderData
+	DisplayName   *string      `json:"displayName"`
 	Wallets       []*Wallet    `json:"wallets"`
 	User          *GalleryUser `json:"user"`
 	PreviewTokens []*string    `json:"previewTokens"`

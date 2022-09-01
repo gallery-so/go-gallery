@@ -19,6 +19,8 @@ type TokenRepository struct {
 	db                                      *sql.DB
 	getByWalletStmt                         *sql.Stmt
 	getByWalletPaginateStmt                 *sql.Stmt
+	getOwnedByContractStmt                  *sql.Stmt
+	getOwnedByContractPaginateStmt          *sql.Stmt
 	getByContractStmt                       *sql.Stmt
 	getByContractPaginateStmt               *sql.Stmt
 	getByTokenIdentifiersStmt               *sql.Stmt
@@ -45,6 +47,12 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	checkNoErr(err)
 
 	getByWalletPaginateStmt, err := db.PrepareContext(ctx, `SELECT t.ID,t.MEDIA,t.TOKEN_TYPE,t.CHAIN,t.NAME,t.DESCRIPTION,t.TOKEN_ID,t.TOKEN_URI,t.QUANTITY,t.OWNER_ADDRESS,t.OWNERSHIP_HISTORY,t.TOKEN_METADATA,t.CONTRACT_ADDRESS,t.EXTERNAL_URL,t.BLOCK_NUMBER,t.VERSION,t.CREATED_AT,t.LAST_UPDATED,t.IS_SPAM,c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM tokens t INNER JOIN contracts c ON c.ADDRESS = t.CONTRACT_ADDRESS WHERE t.OWNER_ADDRESS = $1 ORDER BY t.BLOCK_NUMBER DESC LIMIT $2 OFFSET $3;`)
+	checkNoErr(err)
+
+	getOwnedByContractStmt, err := db.PrepareContext(ctx, `SELECT t.ID,t.MEDIA,t.TOKEN_TYPE,t.CHAIN,t.NAME,t.DESCRIPTION,t.TOKEN_ID,t.TOKEN_URI,t.QUANTITY,t.OWNER_ADDRESS,t.OWNERSHIP_HISTORY,t.TOKEN_METADATA,t.CONTRACT_ADDRESS,t.EXTERNAL_URL,t.BLOCK_NUMBER,t.VERSION,t.CREATED_AT,t.LAST_UPDATED,t.IS_SPAM,c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM tokens t INNER JOIN contracts c ON c.ADDRESS = t.CONTRACT_ADDRESS WHERE t.OWNER_ADDRESS = $1 AND t.CONTRACT_ADDRESS = $2 ORDER BY t.BLOCK_NUMBER DESC;`)
+	checkNoErr(err)
+
+	getOwnedByContractPaginateStmt, err := db.PrepareContext(ctx, `SELECT t.ID,t.MEDIA,t.TOKEN_TYPE,t.CHAIN,t.NAME,t.DESCRIPTION,t.TOKEN_ID,t.TOKEN_URI,t.QUANTITY,t.OWNER_ADDRESS,t.OWNERSHIP_HISTORY,t.TOKEN_METADATA,t.CONTRACT_ADDRESS,t.EXTERNAL_URL,t.BLOCK_NUMBER,t.VERSION,t.CREATED_AT,t.LAST_UPDATED,t.IS_SPAM,c.ID,c.VERSION,c.CREATED_AT,c.LAST_UPDATED,c.ADDRESS,c.SYMBOL,c.NAME,c.LATEST_BLOCK,c.CREATOR_ADDRESS FROM tokens t INNER JOIN contracts c ON c.ADDRESS = t.CONTRACT_ADDRESS WHERE t.OWNER_ADDRESS = $1 AND t.CONTRACT_ADDRESS = $2 ORDER BY t.BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
 	checkNoErr(err)
 
 	getByContractStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_SPAM FROM tokens WHERE CONTRACT_ADDRESS = $1 ORDER BY BLOCK_NUMBER DESC;`)
@@ -96,6 +104,8 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		db:                                      db,
 		getByWalletStmt:                         getByWalletStmt,
 		getByWalletPaginateStmt:                 getByWalletPaginateStmt,
+		getOwnedByContractStmt:                  getOwnedByContractStmt,
+		getOwnedByContractPaginateStmt:          getOwnedByContractPaginateStmt,
 		getByContractStmt:                       getByContractStmt,
 		getByContractPaginateStmt:               getByContractPaginateStmt,
 		getByTokenIdentifiersStmt:               getByTokenIdentifiersStmt,
@@ -186,6 +196,39 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 	}
 
 	return tokens, nil
+}
+
+// GetOwnedByContract retrieves all tokens associated with a wallet with a specific contract
+func (t *TokenRepository) GetOwnedByContract(pCtx context.Context, pContractAddress, pAddress persist.EthereumAddress, limit int64, page int64) ([]persist.Token, persist.Contract, error) {
+	var rows *sql.Rows
+	var err error
+	if limit > 0 {
+		rows, err = t.getOwnedByContractPaginateStmt.QueryContext(pCtx, pAddress, pContractAddress, limit, page*limit)
+	} else {
+		rows, err = t.getOwnedByContractStmt.QueryContext(pCtx, pAddress, pContractAddress)
+	}
+	if err != nil {
+		return nil, persist.Contract{}, err
+	}
+	defer rows.Close()
+
+	tokens := make([]persist.Token, 0, 10)
+	contract := persist.Contract{}
+	for rows.Next() {
+		token := persist.Token{}
+
+		if err := rows.Scan(&token.ID, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerAddress, pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.ContractAddress, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsSpam, &contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.LatestBlock, &contract.CreatorAddress); err != nil {
+			return nil, persist.Contract{}, err
+		}
+		tokens = append(tokens, token)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, persist.Contract{}, err
+	}
+
+	return tokens, contract, nil
+
 }
 
 // GetByTokenIdentifiers gets a token by its token ID and contract address

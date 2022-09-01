@@ -339,6 +339,7 @@ type Gallery implements Node {
 }
 
 type TokenHolder @goEmbedHelper {
+    displayName: String
     wallets: [Wallet] @goField(forceResolver: true)
     user: GalleryUser @goField(forceResolver: true)
     previewTokens: [String]
@@ -353,22 +354,25 @@ type MembershipTier implements Node {
     owners: [TokenHolder]
 }
 
-type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) {
-    id: ID!
+type Community implements Node
+  @goGqlId(fields: ["contractAddress", "chain"])
+  @goEmbedHelper {
+  dbid: DBID!
+  id: ID!
 
-    lastUpdated: Time
+  lastUpdated: Time
 
-    contractAddress: ChainAddress
-    creatorAddress: ChainAddress
-    chain: Chain
-    name: String
-    description: String
-    previewImage: String
-    profileImageURL: String
-    profileBannerURL: String
-    badgeURL: String
+  contractAddress: ChainAddress
+  creatorAddress: ChainAddress
+  chain: Chain
+  name: String
+  description: String
+  previewImage: String
+  profileImageURL: String
+  profileBannerURL: String
+  badgeURL: String
 
-    owners: [TokenHolder]
+  owners: [TokenHolder] @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -563,7 +567,7 @@ type Query {
     collectionById(id: DBID!): CollectionByIdOrError
     tokenById(id: DBID!): TokenByIdOrError
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
+    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean, onlyGalleryUsers: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
