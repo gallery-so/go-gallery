@@ -18,6 +18,7 @@ type UserRepository struct {
 	updateInfoStmt           *sql.Stmt
 	createStmt               *sql.Stmt
 	getByIDStmt              *sql.Stmt
+	getByIDsStmt             *sql.Stmt
 	getByWalletIDStmt        *sql.Stmt
 	getByUsernameStmt        *sql.Stmt
 	deleteStmt               *sql.Stmt
@@ -49,6 +50,9 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
+	checkNoErr(err)
+
+	getByIDsStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = ANY($1) AND DELETED = false;`)
 	checkNoErr(err)
 
 	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(WALLETS) AND DELETED = false;`)
@@ -101,6 +105,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 		updateInfoStmt:    updateInfoStmt,
 		createStmt:        createStmt,
 		getByIDStmt:       getByIDStmt,
+		getByIDsStmt:      getByIDsStmt,
 		getByWalletIDStmt: getByWalletIDStmt,
 		getByUsernameStmt: getByUsernameStmt,
 		deleteStmt:        deleteStmt,
@@ -255,6 +260,36 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 	user.Wallets = wallets
 
 	return user, nil
+}
+
+// GetByIDs gets all the users with the given IDs
+func (u *UserRepository) GetByIDs(pCtx context.Context, pIDs []persist.DBID) ([]persist.User, error) {
+
+	results := make([]persist.User, len(pIDs))
+	rows, err := u.getByIDsStmt.QueryContext(pCtx, pIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		user := persist.User{}
+		walletIDs := []persist.DBID{}
+		rows.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.CreationTime, &user.LastUpdated)
+		wallets := make([]persist.Wallet, len(walletIDs))
+
+		for i, walletID := range walletIDs {
+			wallet := persist.Wallet{ID: walletID}
+			err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get wallet: %w", err)
+			}
+			wallets[i] = wallet
+		}
+		user.Wallets = wallets
+		results = append(results, user)
+	}
+
+	return results, nil
 }
 
 // GetByChainAddress gets the user who owns the wallet with the specified ChainAddress (if any)

@@ -46,6 +46,7 @@ type UserRepository interface {
 	AddWallet(context.Context, DBID, ChainAddress, WalletType) error
 	RemoveWallet(context.Context, DBID, DBID) error
 	GetByID(context.Context, DBID) (User, error)
+	GetByIDs(context.Context, []DBID) ([]User, error)
 	GetByWalletID(context.Context, DBID) (User, error)
 	GetByChainAddress(context.Context, ChainAddress) (User, error)
 	GetByUsername(context.Context, string) (User, error)

@@ -25,7 +25,7 @@ type ContractGallery struct {
 }
 
 // ErrContractNotFoundByAddress is an error type for when a contract is not found by address
-type ErrGalleryContractNotFoundByAddress struct {
+type ErrGalleryContractNotFound struct {
 	Address Address
 	Chain   Chain
 }
@@ -39,6 +39,6 @@ type ContractGalleryRepository interface {
 	GetOwnersByAddress(context.Context, Address, Chain) ([]TokenHolder, error)
 }
 
-func (e ErrGalleryContractNotFoundByAddress) Error() string {
+func (e ErrGalleryContractNotFound) Error() string {
 	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }

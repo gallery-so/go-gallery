@@ -897,7 +897,7 @@ func loadContractByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Q
 			contracts[i], errors[i] = t, err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrGalleryContractNotFoundByAddress{Address: chainAddresses[i].Address(), Chain: chainAddresses[i].Chain()}
+				errors[i] = persist.ErrGalleryContractNotFound{Address: chainAddresses[i].Address(), Chain: chainAddresses[i].Chain()}
 			}
 		})
 

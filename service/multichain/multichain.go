@@ -612,33 +612,34 @@ func communityOwnersToTokenHolders(owners []ChainAgnosticCommunityOwner) []Token
 }
 
 func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolder, userRepo persist.UserRepository) ([]TokenHolder, error) {
-	seen := make(map[persist.DBID]TokenHolder)
+	seenUsers := make(map[persist.DBID]persist.TokenHolder)
+	allUserIDs := make([]persist.DBID, 0, len(owners))
 	for _, owner := range owners {
-
-		if _, ok := seen[owner.UserID]; !ok {
-			var username string
-			user, err := userRepo.GetByID(ctx, owner.UserID)
-			if err != nil {
-				return nil, err
-			}
-			username = user.Username.String()
-			previews := make([]string, 0, len(owner.PreviewTokens))
-			for _, p := range owner.PreviewTokens {
-				previews = append(previews, p.String())
-			}
-			seen[owner.UserID] = TokenHolder{
-				UserID:        owner.UserID,
-				DisplayName:   username,
-				WalletIDs:     owner.WalletIDs,
-				PreviewTokens: previews,
-			}
+		if _, ok := seenUsers[owner.UserID]; !ok {
+			allUserIDs = append(allUserIDs, owner.UserID)
+			seenUsers[owner.UserID] = owner
 		}
 	}
-
-	res := make([]TokenHolder, 0, len(seen))
-	for _, t := range seen {
-		res = append(res, t)
+	allUsers, err := userRepo.GetByIDs(ctx, allUserIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users for token holders: %s", err)
 	}
+	res := make([]TokenHolder, 0, len(seenUsers))
+	for _, user := range allUsers {
+		owner := seenUsers[user.ID]
+		username := user.Username.String()
+		previews := make([]string, 0, len(owner.PreviewTokens))
+		for _, p := range owner.PreviewTokens {
+			previews = append(previews, p.String())
+		}
+		res = append(res, TokenHolder{
+			UserID:        owner.UserID,
+			DisplayName:   username,
+			WalletIDs:     owner.WalletIDs,
+			PreviewTokens: previews,
+		})
+	}
+
 	return res, nil
 }
 
