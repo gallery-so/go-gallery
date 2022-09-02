@@ -35,7 +35,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var defaultStartingBlock persist.BlockNumber = 8000000
+var defaultStartingBlock persist.BlockNumber = 5000000
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 

@@ -33,7 +33,6 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/db/sqlc/indexergen"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -79,7 +78,6 @@ type Loaders struct {
 	GlobalFeed               GlobalFeedLoader
 	FeedByUserId             UserFeedLoader
 	EventByEventId           EventLoaderByID
-<<<<<<< HEAD
 	AdmireByAdmireId         AdmireLoaderByID
 	AdmiresByFeedEventId     AdmiresLoaderByID
 	CommentByCommentId       CommentLoaderByID
@@ -87,11 +85,6 @@ type Loaders struct {
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
-=======
-}
-
-func NewLoaders(ctx context.Context, q *sqlc.Queries, indexerQueries *indexergen.Queries) *Loaders {
->>>>>>> 6fbf065 (Move loader to refresh package)
 	loaders := &Loaders{}
 
 	loaders.UserByUserId = UserLoaderByID{
@@ -250,7 +243,6 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries, indexerQueries *indexergen
 		fetch:    loadGlobalFeed(ctx, loaders, q),
 	}
 
-<<<<<<< HEAD
 	loaders.AdmireByAdmireId = AdmireLoaderByID{
 		maxBatch: defaultMaxBatchOne,
 		wait:     defaultWaitTime,
@@ -275,8 +267,6 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries, indexerQueries *indexergen
 		fetch:    loadCommentsByFeedEventId(ctx, loaders, q),
 	}
 
-=======
->>>>>>> 6fbf065 (Move loader to refresh package)
 	return loaders
 }
 
@@ -1055,7 +1045,6 @@ func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *db.Queries) func([
 		return events, errors
 	}
 }
-<<<<<<< HEAD
 
 func loadAdmireById(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Admire, []error) {
 	return func(admireIds []persist.DBID) ([]db.Admire, []error) {
@@ -1146,5 +1135,3 @@ func loadCommentsByFeedEventId(ctx context.Context, loaders *Loaders, q *db.Quer
 		return comments, errors
 	}
 }
-=======
->>>>>>> 6fbf065 (Move loader to refresh package)

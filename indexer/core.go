@@ -118,11 +118,13 @@ func coreInitServer() *gin.Engine {
 	logger.For(ctx).Info("Registering handlers...")
 
 	queueChan := make(chan processTokensInput)
-
+	refreshQueue := NewRefreshQueue()
+	refreshLock := NewRefreshLock()
 	t := newThrottler()
 
+	go processDeepRefreshes(sentryutil.NewSentryHubContext(ctx), refreshQueue, refreshLock, tokenRepo, ethClient, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), contractRepo, persist.Chain(viper.GetInt("CHAIN")), blockFilterRepo, queries)
 	go processMedialessTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, persist.Chain(viper.GetInt("CHAIN")), blockFilterRepo, queries)
+	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, refreshQueue)
 }
 
 func setDefaults(envFilePath string) {
