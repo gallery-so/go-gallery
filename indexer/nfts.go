@@ -644,7 +644,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 					go func() {
 						ctx := sentryutil.NewSentryHubContext(ctx)
 						logs := idxr.fetchLogs(ctx, b, [][]common.Hash{events})
-						transfers := filterTransfers(ctx, message, LogsToTransfers(ctx, logs))
+						transfers := filterTransfers(ctx, message, logsToTransfers(ctx, logs))
 						transfersAtBlock := transfersToTransfersAtBlock(transfers)
 						batchTransfers(ctx, transferCh, transfersAtBlock)
 						close(transferCh)

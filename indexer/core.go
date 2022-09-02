@@ -46,7 +46,9 @@ func coreInit() (*gin.Engine, *indexer) {
 	initSentry()
 	initLogger()
 
-	tokenRepo, contractRepo, blockFilterRepo := newRepos()
+	queries := sqlc.New(postgres.NewPgxClient())
+	tokenRepo, contractRepo, blockFilterRepo := newRepos(queries)
+
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -89,8 +91,8 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	tokenRepo, contractRepo, blockFilterRepo := newRepos()
 	queries := sqlc.New(postgres.NewPgxClient())
+	tokenRepo, contractRepo, blockFilterRepo := newRepos(queries)
 
 	var s *storage.Client
 	var err error
@@ -169,10 +171,9 @@ func setDefaults(envFilePath string) {
 	}
 }
 
-func newRepos() (persist.TokenRepository, persist.ContractRepository, postgres.BlockFilterRepository) {
+func newRepos(q *sqlc.Queries) (persist.TokenRepository, persist.ContractRepository, postgres.BlockFilterRepository) {
 	pgClient := postgres.NewClient()
-	pgx := postgres.NewPgxClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.BlockFilterRepository{Queries: sqlc.New(pgx)}
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.BlockFilterRepository{Queries: q}
 }
 
 func newThrottler() *throttle.Locker {

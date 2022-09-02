@@ -66,13 +66,13 @@ const blocksPerLogsCall = 50
 type eventHash string
 
 const (
-	// TransferEventHash represents the keccak256 hash of Transfer(address,address,uint256)
+	// transferEventHash represents the keccak256 hash of Transfer(address,address,uint256)
 	transferEventHash eventHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-	// TransferSingleEventHash represents the keccak256 hash of TransferSingle(address,address,address,uint256,uint256)
+	// transferSingleEventHash represents the keccak256 hash of TransferSingle(address,address,address,uint256,uint256)
 	transferSingleEventHash eventHash = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
-	// TransferBatchEventHash represents the keccak256 hash of TransferBatch(address,address,address,uint256[],uint256[])
+	// transferBatchEventHash represents the keccak256 hash of TransferBatch(address,address,address,uint256[],uint256[])
 	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
-	// UriEventHash represents the keccak256 hash of URI(string,uint256)
+	// uriEventHash represents the keccak256 hash of URI(string,uint256)
 	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
 	// // foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
 	// foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
@@ -317,7 +317,6 @@ func (i *indexer) listenForNewBlocks(ctx context.Context) {
 
 	for {
 		<-time.After(time.Minute * 2)
-
 		finalBlockUint, err := rpc.RetryGetBlockNumber(ctx, i.ethClient, rpc.DefaultRetry)
 		if err != nil {
 			panic(fmt.Sprintf("error getting block number: %s", err))
@@ -339,7 +338,6 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 	defer cancel()
 
 	var logsTo []types.Log
-
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
 	if err == nil {
 		func() {
@@ -352,7 +350,6 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 	} else {
 		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
 	}
-
 	if len(logsTo) > 0 {
 		lastLog := logsTo[len(logsTo)-1]
 		if nextBlock.Uint64()-lastLog.BlockNumber > (blocksPerLogsCall / 5) {
@@ -406,7 +403,7 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 	defer close(transfersChan)
 	defer recoverAndWait(ctx)
 	defer sentryutil.RecoverAndRaise(ctx)
-	transfers := LogsToTransfers(ctx, logsTo)
+	transfers := logsToTransfers(ctx, logsTo)
 
 	logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
@@ -431,8 +428,7 @@ func batchTransfers(ctx context.Context, transfersChan chan<- []transfersAtBlock
 	logger.For(ctx).Infof("Finished processing logs, closing transfers channel...")
 }
 
-// LogsToTransfers formats logs of different event types into a standardized Transfer object.
-func LogsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
+func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 
 	result := make([]rpc.Transfer, 0, len(pLogs)*2)
 	for _, pLog := range pLogs {
@@ -600,15 +596,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 						}
 					}
 					i.polledLogs = append(i.polledLogs, logsTo[:indexToCut]...)
-
-					go func() {
-						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-						defer cancel()
-						err := saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
-						if err != nil {
-							logger.For(ctx).WithError(err).Warnf("failed to save logs %s to %s", i.lastSavedLog, blockLimit)
-						}
-					}()
+					saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
 					i.lastSavedLog = blockLimit
 					i.polledLogs = logsTo[indexToCut:]
 				} else {
@@ -617,7 +605,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 				logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock)
 
-				transfers := LogsToTransfers(ctx, logsTo)
+				transfers := logsToTransfers(ctx, logsTo)
 
 				logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
@@ -718,7 +706,7 @@ func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, f
 		}
 	}
 	if to.String() != persist.ZeroAddress.String() {
-		toBalance, err = rpc.GetBalanceOfERC1155Token(ctx, to, contractAddress, tokenID, ethClient)
+		toBalance, err = rpc.RetryGetBalanceOfERC1155Token(ctx, to, contractAddress, tokenID, ethClient, rpc.DefaultRetry)
 		if err != nil {
 			return tokenBalances{}, err
 		}
@@ -1158,7 +1146,6 @@ func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsT
 	if err := storageWriter.Close(); err != nil {
 		return err
 	}
-
 	return nil
 }
 
