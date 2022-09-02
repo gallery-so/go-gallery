@@ -265,7 +265,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 // GetByIDs gets all the users with the given IDs
 func (u *UserRepository) GetByIDs(pCtx context.Context, pIDs []persist.DBID) ([]persist.User, error) {
 
-	results := make([]persist.User, len(pIDs))
+	results := make([]persist.User, 0, len(pIDs))
 	rows, err := u.getByIDsStmt.QueryContext(pCtx, pIDs)
 	if err != nil {
 		return nil, err
