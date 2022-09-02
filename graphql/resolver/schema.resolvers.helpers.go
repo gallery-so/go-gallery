@@ -36,6 +36,8 @@ var nodeFetcher = model.NodeFetcher{
 	OnWallet:         resolveWalletByAddress,
 	OnContract:       resolveContractByContractID,
 	OnFeedEvent:      resolveFeedEventByEventID,
+	OnAdmire:         resolveAdmireByAdmireID,
+	OnComment:        resolveCommentByCommentID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
