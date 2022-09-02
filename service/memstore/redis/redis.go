@@ -246,7 +246,7 @@ func (s *Semaphore) Refresh(ctx context.Context, id string) (bool, error) {
 
 // Exists returns true if a semaphore is held by the id.
 func (s *Semaphore) Exists(ctx context.Context, id string) (bool, error) {
-	_, err := s.client.ZScore(ctx, s.name, "lalalla").Result()
+	_, err := s.client.ZScore(ctx, s.name, id).Result()
 	if err == redis.Nil {
 		return false, nil
 	}

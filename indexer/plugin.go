@@ -41,7 +41,7 @@ func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Co
 
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
-// A plugin can be stopped by closing its `in` channel, which closes the plugin and lets receivers know that there are no more results.
+// A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
 func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, blockFilterRepo postgres.BlockFilterRepository, storageClient *storage.Client) TransferPlugins {
 	return TransferPlugins{
 		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
@@ -51,7 +51,7 @@ func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenR
 	}
 }
 
-// RunPlugins returns when all plugins have finished.
+// RunPlugins returns when all plugins have received the message.
 func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, plugins []chan<- PluginMsg) {
 	span, _ := startSpan(ctx, "submitMessage")
 	defer tracing.FinishSpan(span)

@@ -14,7 +14,7 @@ import (
 	"github.com/bits-and-blooms/bloom"
 	"github.com/gammazero/workerpool"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v4"
 	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -69,7 +69,7 @@ func (r *RefreshQueue) AddMessage(ctx context.Context, input UpdateTokenMediaInp
 	return err
 }
 
-// GetMessage blocks and pops a message from the queue.
+// GetMessage blocks until a message is received from the queue.
 func (r *RefreshQueue) GetMessage(ctx context.Context) (UpdateTokenMediaInput, error) {
 	queued, err := r.q.Pop(ctx, 0)
 

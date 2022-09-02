@@ -53,9 +53,9 @@ var uniqueMetadataHandlers = uniqueMetadatas{
 const defaultWorkerPoolSize = 3
 
 var defaultTransferEvents = []eventHash{
-	TransferBatchEventHash,
-	TransferEventHash,
-	TransferSingleEventHash,
+	transferBatchEventHash,
+	transferEventHash,
+	transferSingleEventHash,
 }
 
 const defaultWorkerPoolWaitSize = 10
@@ -67,13 +67,13 @@ type eventHash string
 
 const (
 	// TransferEventHash represents the keccak256 hash of Transfer(address,address,uint256)
-	TransferEventHash eventHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+	transferEventHash eventHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 	// TransferSingleEventHash represents the keccak256 hash of TransferSingle(address,address,address,uint256,uint256)
-	TransferSingleEventHash eventHash = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
+	transferSingleEventHash eventHash = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
 	// TransferBatchEventHash represents the keccak256 hash of TransferBatch(address,address,address,uint256[],uint256[])
-	TransferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
+	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
 	// UriEventHash represents the keccak256 hash of URI(string,uint256)
-	UriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
+	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
 	// // foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
 	// foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
 	// //foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
@@ -154,11 +154,7 @@ type indexer struct {
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
 func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, blockFilterRepo postgres.BlockFilterRepository, pChain persist.Chain, pEvents []eventHash) *indexer {
-	mostRecentBlockUint64, err := rpc.RetryGetBlockNumber(context.Background(), ethClient, rpc.RetryInput{
-		Base:  5,
-		Cap:   30,
-		Tries: 8,
-	})
+	mostRecentBlockUint64, err := rpc.RetryGetBlockNumber(context.Background(), ethClient, rpc.DefaultRetry)
 	if err != nil {
 		panic(err)
 	}
@@ -322,11 +318,7 @@ func (i *indexer) listenForNewBlocks(ctx context.Context) {
 	for {
 		<-time.After(time.Minute * 2)
 
-		finalBlockUint, err := rpc.RetryGetBlockNumber(ctx, i.ethClient, rpc.RetryInput{
-			Base:  5,
-			Cap:   30,
-			Tries: 8,
-		})
+		finalBlockUint, err := rpc.RetryGetBlockNumber(ctx, i.ethClient, rpc.DefaultRetry)
 		if err != nil {
 			panic(fmt.Sprintf("error getting block number: %s", err))
 		}
@@ -349,17 +341,16 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 	var logsTo []types.Log
 
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
-	if err != nil {
-		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
-		logger.For(ctx).WithError(err).Warnf(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))
-		logger.For(ctx).WithError(err).Warnf(fmt.Sprintf("%d-%d", curBlock, nextBlock))
-		panic(err)
+	if err == nil {
+		func() {
+			defer reader.Close()
+			err = json.NewDecoder(reader).Decode(&logsTo)
+			if err != nil {
+				panic(err)
+			}
+		}()
 	} else {
-		defer reader.Close()
-		err = json.NewDecoder(reader).Decode(&logsTo)
-		if err != nil {
-			panic(err)
-		}
+		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
 	}
 
 	if len(logsTo) > 0 {
@@ -374,11 +365,7 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
-		}, rpc.RetryInput{
-			Base:  10,
-			Cap:   60,
-			Tries: 8,
-		})
+		}, rpc.DefaultRetry)
 		if err != nil {
 			ctx, cancel := context.WithTimeout(ctx, time.Minute)
 			defer cancel()
@@ -406,14 +393,7 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 			return nil
 		}
 
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-			err := SaveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
-			if err != nil {
-				logger.For(ctx).WithError(err).Warnf("failed to save logs %s to %s", curBlock, nextBlock)
-			}
-		}()
+		saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
 	} else {
 		logger.For(ctx).Info("Found logs in cache...")
 	}
@@ -458,7 +438,7 @@ func LogsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 	for _, pLog := range pLogs {
 		initial := time.Now()
 		switch {
-		case strings.EqualFold(pLog.Topics[0].Hex(), string(TransferEventHash)):
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferEventHash)):
 
 			if len(pLog.Topics) < 4 {
 				continue
@@ -477,7 +457,7 @@ func LogsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 			})
 
 			logger.For(ctx).Debugf("Processed transfer event in %s", time.Since(initial))
-		case strings.EqualFold(pLog.Topics[0].Hex(), string(TransferSingleEventHash)):
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferSingleEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
 			}
@@ -511,7 +491,7 @@ func LogsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 				BlockHash:       pLog.BlockHash,
 			})
 			logger.For(ctx).Debugf("Processed single transfer event in %s", time.Since(initial))
-		case strings.EqualFold(pLog.Topics[0].Hex(), string(TransferBatchEventHash)):
+		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
 			if len(pLog.Topics) < 4 {
 				continue
 			}
@@ -566,11 +546,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 	defer recoverAndWait(ctx)
 	defer sentryutil.RecoverAndRaise(ctx)
 
-	mostRecentBlock, err := rpc.RetryGetBlockNumber(ctx, i.ethClient, rpc.RetryInput{
-		Base:  10,
-		Cap:   30,
-		Tries: 8,
-	})
+	mostRecentBlock, err := rpc.RetryGetBlockNumber(ctx, i.ethClient, rpc.DefaultRetry)
 	if err != nil {
 		panic(err)
 	}
@@ -593,11 +569,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 					FromBlock: persist.BlockNumber(curBlock).BigInt(),
 					ToBlock:   persist.BlockNumber(nextBlock).BigInt(),
 					Topics:    topics,
-				}, rpc.RetryInput{
-					Base:  10,
-					Cap:   60,
-					Tries: 8,
-				})
+				}, rpc.DefaultRetry)
 				if err != nil {
 					ctx, cancel := context.WithTimeout(ctx, time.Minute)
 					defer cancel()
@@ -632,7 +604,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 					go func() {
 						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 						defer cancel()
-						err := SaveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
+						err := saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
 						if err != nil {
 							logger.For(ctx).WithError(err).Warnf("failed to save logs %s to %s", i.lastSavedLog, blockLimit)
 						}
@@ -740,11 +712,7 @@ func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, f
 	var err error
 
 	if from.String() != persist.ZeroAddress.String() {
-		fromBalance, err = rpc.RetryGetBalanceOfERC1155Token(ctx, from, contractAddress, tokenID, ethClient, rpc.RetryInput{
-			Base:  5,
-			Cap:   10,
-			Tries: 8,
-		})
+		fromBalance, err = rpc.RetryGetBalanceOfERC1155Token(ctx, from, contractAddress, tokenID, ethClient, rpc.DefaultRetry)
 		if err != nil {
 			return tokenBalances{}, err
 		}
@@ -760,11 +728,7 @@ func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, f
 }
 
 func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenID persist.TokenID, tokenType persist.TokenType, ethClient *ethclient.Client) persist.TokenURI {
-	u, err := rpc.RetryGetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient, rpc.RetryInput{
-		Base:  5,
-		Cap:   60,
-		Tries: 8,
-	})
+	u, err := rpc.RetryGetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient, rpc.DefaultRetry)
 	if err != nil {
 		logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 			"tokenType":       tokenType,
@@ -1112,11 +1076,7 @@ func fillContractFields(ctx context.Context, ethClient *ethclient.Client, contra
 		Address:     contractAddress,
 		LatestBlock: lastSyncedBlock,
 	}
-	cMetadata, err := rpc.RetryGetTokenContractMetadata(ctx, contractAddress, ethClient, rpc.RetryInput{
-		Base:  5,
-		Cap:   60,
-		Tries: 8,
-	})
+	cMetadata, err := rpc.RetryGetTokenContractMetadata(ctx, contractAddress, ethClient, rpc.DefaultRetry)
 	if err != nil {
 		logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 			"contractAddress": contractAddress,
@@ -1131,23 +1091,6 @@ func fillContractFields(ctx context.Context, ethClient *ethclient.Client, contra
 }
 
 // HELPER FUNCS ---------------------------------------------------------------
-
-// SaveLogsInBlockRange stores logs to GCP, overwriting an existing log file if one already exists.
-func SaveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) error {
-	logger.For(ctx).Infof("Saving logs in block range %s to %s", curBlock, nextBlock)
-	obj := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
-	obj.Delete(ctx)
-	storageWriter := obj.NewWriter(ctx)
-
-	if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
-		panic(err)
-	}
-	if err := storageWriter.Close(); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func findFirstFieldFromMetadata(metadata persist.TokenMetadata, fields ...string) interface{} {
 
@@ -1201,6 +1144,22 @@ func storeErr(ctx context.Context, err error, prefix string, from persist.Ethere
 	if err != nil {
 		panic(err)
 	}
+}
+
+func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) error {
+	logger.For(ctx).Infof("Saving logs in block range %s to %s", curBlock, nextBlock)
+	obj := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
+	obj.Delete(ctx)
+	storageWriter := obj.NewWriter(ctx)
+
+	if err := json.NewEncoder(storageWriter).Encode(logsTo); err != nil {
+		panic(err)
+	}
+	if err := storageWriter.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func recoverAndWait(ctx context.Context) {

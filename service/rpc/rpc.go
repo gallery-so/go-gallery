@@ -48,7 +48,16 @@ var client = &http.Client{
 		MaxIdleConnsPerHost: 100,
 	}, true),
 }
+
+// rateLimited is the content returned from an RPC call when rate limited.
 var rateLimited = "429 Too Many Requests"
+
+// DefaultRetry is the default retry applied to RPC calls.
+var DefaultRetry = Retry{
+	Base:  4,
+	Cap:   64,
+	Tries: 8,
+}
 
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
@@ -76,11 +85,17 @@ type ErrHTTP struct {
 	Status int
 }
 
-// RetryInput configures retries for RPC calls.
-type RetryInput struct {
+// Retry configures retries for RPC calls.
+type Retry struct {
 	Base  int // min amount of time to sleep per iteration
 	Cap   int // max amount of time to sleep per iteration
 	Tries int // number of times to retry
+}
+
+// Sleep will sleep based on the current iteration.
+func (r Retry) Sleep(i int) {
+	sleep := rand.Intn(util.MinInt(r.Cap, r.Base*util.PowerInt(2, i)))
+	time.Sleep(time.Duration(sleep) * time.Second)
 }
 
 // NewEthClient returns an ethclient.Client
@@ -137,7 +152,7 @@ func GetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, e
 }
 
 // RetryGetBlockNumber calls GetBlockNumber with backoff.
-func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client, retry RetryInput) (uint64, error) {
+func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client, retry Retry) (uint64, error) {
 	var height uint64
 	var err error
 	for i := 0; i < retry.Tries; i++ {
@@ -145,9 +160,7 @@ func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client, retry
 		if err == nil || !strings.Contains(err.Error(), rateLimited) {
 			break
 		}
-		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
-		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
-		time.Sleep(time.Duration(sleep) * time.Second)
+		retry.Sleep(i)
 	}
 	return height, err
 }
@@ -158,7 +171,7 @@ func GetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.Fi
 }
 
 // RetryGetLogs calls GetLogs with backoff.
-func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery, retry RetryInput) ([]types.Log, error) {
+func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery, retry Retry) ([]types.Log, error) {
 	logs := make([]types.Log, 0)
 	var err error
 	for i := 0; i < retry.Tries; i++ {
@@ -166,9 +179,7 @@ func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethere
 		if err == nil || !strings.Contains(err.Error(), rateLimited) {
 			break
 		}
-		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
-		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
-		time.Sleep(time.Duration(sleep) * time.Second)
+		retry.Sleep(i)
 	}
 	return logs, err
 }
@@ -179,7 +190,7 @@ func GetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash com
 }
 
 // RetryGetTransaction calls GetTransaction with backoff.
-func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, retry RetryInput) (*types.Transaction, bool, error) {
+func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, retry Retry) (*types.Transaction, bool, error) {
 	var tx *types.Transaction
 	var pending bool
 	var err error
@@ -188,9 +199,7 @@ func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHas
 		if err == nil || !strings.Contains(err.Error(), rateLimited) {
 			break
 		}
-		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
-		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
-		time.Sleep(time.Duration(sleep) * time.Second)
+		retry.Sleep(i)
 	}
 	return tx, pending, err
 }
@@ -220,7 +229,7 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 }
 
 // RetryGetTokenContractMetaData calls GetTokenContractMetadata with backoff.
-func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client, retry RetryInput) (*TokenContractMetadata, error) {
+func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client, retry Retry) (*TokenContractMetadata, error) {
 	var metadata *TokenContractMetadata
 	var err error
 	for i := 0; i < retry.Tries; i++ {
@@ -228,9 +237,7 @@ func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.
 		if err == nil || !strings.Contains(err.Error(), rateLimited) {
 			break
 		}
-		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
-		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
-		time.Sleep(time.Duration(sleep) * time.Second)
+		retry.Sleep(i)
 	}
 	return metadata, err
 }
@@ -548,7 +555,7 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 }
 
 // RetryGetTokenURI calls GetTokenURI with backoff.
-func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.TokenID, ethClient *ethclient.Client, retry RetryInput) (persist.TokenURI, error) {
+func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.TokenID, ethClient *ethclient.Client, retry Retry) (persist.TokenURI, error) {
 	var u persist.TokenURI
 	var err error
 	for i := 0; i < retry.Tries; i++ {
@@ -556,9 +563,7 @@ func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contract
 		if err == nil || !strings.Contains(err.Error(), rateLimited) {
 			break
 		}
-		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
-		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
-		time.Sleep(time.Duration(sleep) * time.Second)
+		retry.Sleep(i)
 	}
 	return u, err
 }
@@ -583,7 +588,7 @@ func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddre
 }
 
 // RetryGetBalanceOfERC1155Token calls GetBalanceOfERC1155Token with backoff.
-func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client, retry RetryInput) (*big.Int, error) {
+func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client, retry Retry) (*big.Int, error) {
 	var balance *big.Int
 	var err error
 	for i := 0; i < retry.Tries; i++ {
@@ -591,9 +596,7 @@ func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContract
 		if err == nil || !strings.Contains(err.Error(), rateLimited) {
 			break
 		}
-		sleep := rand.Intn(util.MinInt(retry.Cap, retry.Base*util.PowerInt(2, i)))
-		logger.For(ctx).Warnf("attempt=%d, backing off for %ds...", i, sleep)
-		time.Sleep(time.Duration(sleep) * time.Second)
+		retry.Sleep(i)
 	}
 	return balance, err
 }

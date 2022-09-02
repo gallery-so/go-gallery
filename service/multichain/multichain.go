@@ -403,7 +403,6 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 
 // DeepRefresh re-indexes a user's wallets.
 func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, chain persist.Chain) error {
-	// No providers configured for the chain
 	if _, ok := d.Chains[chain]; !ok {
 		return nil
 	}

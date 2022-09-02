@@ -582,21 +582,6 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			continue
 		}
 
-		span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "deepRefresh")
-		fm := NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
-
-		// Don't run past the Indexer
-		indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
-		if err != nil {
-			panic(err)
-		}
-
-		indexerBlock -= indexerBlock % blocksPerLogsCall
-		startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
-		if startBlock < defaultStartingBlock {
-			startBlock = defaultStartingBlock
-		}
-
 		isRunning, err := refreshLock.Exists(ctx, message)
 		if err != nil {
 			logger.For(ctx).WithError(err).Errorf("failed to check if already being refreshed")
@@ -616,6 +601,23 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			}
 			time.Sleep(time.Minute)
 			continue
+		}
+
+		span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "deepRefresh")
+
+		fm := NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
+
+		// Don't run past the Indexer
+		indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
+		if err != nil {
+			panic(err)
+		}
+
+		// Normalize blocks
+		indexerBlock -= indexerBlock % blocksPerLogsCall
+		startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
+		if startBlock < defaultStartingBlock {
+			startBlock = defaultStartingBlock
 		}
 
 		refreshPool := workerpool.New(defaultRefreshConfig.DefaultPoolSize)
@@ -682,7 +684,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 	}
 }
 
-// filterTransfers checks each transfer against the input and returns ones that matched the criteria.
+// filterTransfers checks each transfer against the input and returns ones that match the criteria.
 func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers []rpc.Transfer) []rpc.Transfer {
 	ownerFilter := func(t rpc.Transfer) bool {
 		return t.To.String() == input.OwnerAddress.String() || t.From.String() == input.OwnerAddress.String()

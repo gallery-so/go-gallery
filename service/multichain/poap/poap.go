@@ -302,7 +302,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	return nil
 }
 
-// DeepRefresh re-indexes a wallet address. Because we don't index Tezos ourselves, this is a no-op.
+// DeepRefresh re-indexes a wallet address. Because we don't index POAP ourselves, this is a no-op.
 func (p *Provider) DeepRefresh(context.Context, persist.Address) error {
 	return nil
 }

@@ -20,12 +20,19 @@ func (r *BlockFilterRepository) BulkUpsert(ctx context.Context, filters map[[2]p
 
 	var i int
 	for key, bf := range filters {
-		data, _ := bf.MarshalJSON()
+		data, err := bf.MarshalJSON()
+		if err != nil {
+			return err
+		}
+
 		fromBlock, toBlock := key[0], key[1]
+
 		ids[i] = persist.GenerateID().String()
 		fromBlocks[i] = fromBlock.BigInt().Int64()
 		toBlocks[i] = toBlock.BigInt().Int64()
 		bfs[i] = data
+
+		i++
 	}
 
 	return r.Queries.BulkUpsertBlockFilter(ctx, sqlc.BulkUpsertBlockFilterParams{
