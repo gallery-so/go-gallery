@@ -567,8 +567,8 @@ func submitDeepRefresh(ctx context.Context, input UpdateTokenMediaInput, refresh
 	return refreshQueue.AddMessage(ctx, input)
 }
 
-func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refreshLock *RefreshLock, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, blockFilterRepository postgres.BlockFilterRepository, queries *sqlc.Queries) {
-	idxr := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, blockFilterRepository, chain, defaultTransferEvents)
+func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refreshLock *RefreshLock, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, addressFilterRepository postgres.AddressFilterRepository, queries *sqlc.Queries) {
+	idxr := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, addressFilterRepository, chain, defaultTransferEvents)
 
 	events := make([]common.Hash, len(idxr.eventHashes))
 	for i, event := range idxr.eventHashes {
@@ -638,7 +638,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 				if exists {
 					transferCh := make(chan []transfersAtBlock)
-					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.blockFilterRepo, idxr.storageClient)
+					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.addressFilterRepo, idxr.storageClient)
 					enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in}
 
 					go func() {

@@ -35,7 +35,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var defaultStartingBlock persist.BlockNumber = 5000000
+// XXX: var defaultStartingBlock persist.BlockNumber = 5000000
+var defaultStartingBlock persist.BlockNumber = 10000000
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
@@ -124,6 +125,7 @@ type tokenMedia struct {
 // indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type indexer struct {
+<<<<<<< HEAD
 	isRPCEnabled bool
 
 	ethClient       *ethclient.Client
@@ -134,6 +136,16 @@ type indexer struct {
 	contractRepo    persist.ContractRepository
 	blockFilterRepo postgres.BlockFilterRepository
 	dbMu            *sync.Mutex
+=======
+	ethClient         *ethclient.Client
+	ipfsClient        *shell.Shell
+	arweaveClient     *goar.Client
+	storageClient     *storage.Client
+	tokenRepo         persist.TokenRepository
+	contractRepo      persist.ContractRepository
+	addressFilterRepo postgres.AddressFilterRepository
+	dbMu              *sync.Mutex
+>>>>>>> 1097ce1 (Rename table to address_filter)
 
 	tokenBucket string
 
@@ -153,7 +165,7 @@ type indexer struct {
 }
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
-func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, blockFilterRepo postgres.BlockFilterRepository, pChain persist.Chain, pEvents []eventHash) *indexer {
+func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, addressFilterRepo postgres.AddressFilterRepository, pChain persist.Chain, pEvents []eventHash) *indexer {
 	mostRecentBlockUint64, err := rpc.RetryGetBlockNumber(context.Background(), ethClient, rpc.DefaultRetry)
 	if err != nil {
 		panic(err)
@@ -164,6 +176,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	}
 
 	return &indexer{
+<<<<<<< HEAD
 		isRPCEnabled:    rpcEnabled,
 		ethClient:       ethClient,
 		ipfsClient:      ipfsClient,
@@ -173,6 +186,17 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		contractRepo:    contractRepo,
 		blockFilterRepo: blockFilterRepo,
 		dbMu:            &sync.Mutex{},
+=======
+
+		ethClient:         ethClient,
+		ipfsClient:        ipfsClient,
+		arweaveClient:     arweaveClient,
+		storageClient:     storageClient,
+		tokenRepo:         tokenRepo,
+		contractRepo:      contractRepo,
+		addressFilterRepo: addressFilterRepo,
+		dbMu:              &sync.Mutex{},
+>>>>>>> 1097ce1 (Rename table to address_filter)
 
 		tokenBucket: viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
@@ -194,6 +218,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 	// XXX: defer cancel()
 
 	lastSyncedBlock := defaultStartingBlock
+	i.mostRecentBlock = 11000000
 	// XXX: recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
 	// XXX: if err == nil && recentDBBlock > defaultStartingBlock {
 	// XXX: 	lastSyncedBlock = recentDBBlock
@@ -215,33 +240,20 @@ func (i *indexer) Start(rootCtx context.Context) {
 
 	// XXX: go i.listenForNewBlocks(sentryutil.NewSentryHubContext(rootCtx))
 
-	// XXX: for ; lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock); lastSyncedBlock += blocksPerLogsCall {
-	// XXX: 	input := lastSyncedBlock
-	// XXX: 	toQueue := func() {
-	// XXX: 		workerCtx := sentryutil.NewSentryHubContext(rootCtx)
-	// XXX: 		defer recoverAndWait(workerCtx)
-	// XXX: 		defer sentryutil.RecoverAndRaise(workerCtx)
+	for ; lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock); lastSyncedBlock += blocksPerLogsCall {
+		input := lastSyncedBlock
+		toQueue := func() {
+			workerCtx := sentryutil.NewSentryHubContext(rootCtx)
+			defer recoverAndWait(workerCtx)
+			defer sentryutil.RecoverAndRaise(workerCtx)
 
-	// XXX: 		i.startPipeline(workerCtx, input, topics)
-	// XXX: 	}
-	// XXX: 	if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
-	// XXX: 		wp.SubmitWait(toQueue)
-	// XXX: 	} else {
-	// XXX: 		wp.Submit(toQueue)
-	// XXX: 	}
-	// XXX: }
-	input := lastSyncedBlock
-	toQueue := func() {
-		workerCtx := sentryutil.NewSentryHubContext(rootCtx)
-		defer recoverAndWait(workerCtx)
-		defer sentryutil.RecoverAndRaise(workerCtx)
-
-		i.startPipeline(workerCtx, input, topics)
-	}
-	if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
-		wp.SubmitWait(toQueue)
-	} else {
-		wp.Submit(toQueue)
+			i.startPipeline(workerCtx, input, topics)
+		}
+		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
+			wp.SubmitWait(toQueue)
+		} else {
+			wp.Submit(toQueue)
+		}
 	}
 	wp.StopWait()
 	logger.For(rootCtx).Info("done!")
@@ -268,7 +280,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	startTime := time.Now()
 	i.isListening = false
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.blockFilterRepo, i.storageClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
 	enabledPlugins := []chan<- PluginMsg{
 		plugins.balances.in,
 		plugins.owners.in,
@@ -300,7 +312,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 
 	i.isListening = true
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.blockFilterRepo, i.storageClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
 	enabledPlugins := []chan<- PluginMsg{
 		plugins.balances.in,
 		plugins.owners.in,

@@ -9,20 +9,20 @@ import (
 	"context"
 )
 
-const bulkUpsertBlockFilter = `-- name: BulkUpsertBlockFilter :exec
-INSERT INTO block_filters (id, from_block, to_block, bloom_filter, created_at, last_updated) values (unnest($1::varchar[]), unnest($2::bigint[]), unnest($3::bigint[]), unnest($4::bytea[]), now(), now())
+const bulkUpsertAddressFilters = `-- name: BulkUpsertAddressFilters :exec
+INSERT INTO address_filters (id, from_block, to_block, bloom_filter, created_at, last_updated) values (unnest($1::varchar[]), unnest($2::bigint[]), unnest($3::bigint[]), unnest($4::bytea[]), now(), now())
 ON CONFLICT(from_block, to_block) DO UPDATE SET bloom_filter = EXCLUDED.bloom_filter, last_updated = now(), deleted = false
 `
 
-type BulkUpsertBlockFilterParams struct {
+type BulkUpsertAddressFiltersParams struct {
 	ID          []string
 	FromBlock   []int64
 	ToBlock     []int64
 	BloomFilter [][]byte
 }
 
-func (q *Queries) BulkUpsertBlockFilter(ctx context.Context, arg BulkUpsertBlockFilterParams) error {
-	_, err := q.db.Exec(ctx, bulkUpsertBlockFilter,
+func (q *Queries) BulkUpsertAddressFilters(ctx context.Context, arg BulkUpsertAddressFiltersParams) error {
+	_, err := q.db.Exec(ctx, bulkUpsertAddressFilters,
 		arg.ID,
 		arg.FromBlock,
 		arg.ToBlock,

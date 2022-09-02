@@ -47,7 +47,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	initLogger()
 
 	queries := sqlc.New(postgres.NewPgxClient())
-	tokenRepo, contractRepo, blockFilterRepo := newRepos(queries)
+	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
 
 	var s *storage.Client
 	var err error
@@ -63,7 +63,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, blockFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents)
 
 	router := gin.Default()
 
@@ -92,7 +92,7 @@ func coreInitServer() *gin.Engine {
 	initLogger()
 
 	queries := sqlc.New(postgres.NewPgxClient())
-	tokenRepo, contractRepo, blockFilterRepo := newRepos(queries)
+	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
 
 	var s *storage.Client
 	var err error
@@ -124,7 +124,7 @@ func coreInitServer() *gin.Engine {
 	refreshLock := NewRefreshLock()
 	t := newThrottler()
 
-	go processDeepRefreshes(sentryutil.NewSentryHubContext(ctx), refreshQueue, refreshLock, tokenRepo, ethClient, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), contractRepo, persist.Chain(viper.GetInt("CHAIN")), blockFilterRepo, queries)
+	go processDeepRefreshes(sentryutil.NewSentryHubContext(ctx), refreshQueue, refreshLock, tokenRepo, ethClient, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), contractRepo, persist.Chain(viper.GetInt("CHAIN")), addressFilterRepo, queries)
 	go processMedialessTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, refreshQueue)
 }
@@ -171,9 +171,9 @@ func setDefaults(envFilePath string) {
 	}
 }
 
-func newRepos(q *sqlc.Queries) (persist.TokenRepository, persist.ContractRepository, postgres.BlockFilterRepository) {
+func newRepos(q *sqlc.Queries) (persist.TokenRepository, persist.ContractRepository, postgres.AddressFilterRepository) {
 	pgClient := postgres.NewClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.BlockFilterRepository{Queries: q}
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.AddressFilterRepository{Queries: q}
 }
 
 func newThrottler() *throttle.Locker {

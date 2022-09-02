@@ -1,4 +1,4 @@
-//go:generate go run github.com/vektah/dataloaden BlockFilterLoader github.com/mikeydub/go-gallery/db/sqlc/indexergen.GetBlockFilterBatchParams github.com/mikeydub/go-gallery/db/sqlc/indexergen.BlockFilter
+//go:generate go run github.com/vektah/dataloaden AddressFilterLoader github.com/mikeydub/go-gallery/db/sqlc/indexergen.GetAddressFilterBatchParams github.com/mikeydub/go-gallery/db/sqlc/indexergen.AddressFilter
 
 package indexer
 
@@ -142,7 +142,7 @@ type BlockFilterManager struct {
 	chunkSize        int
 	fetchWorkerSize  int
 
-	loader   *BlockFilterLoader
+	loader   *AddressFilterLoader
 	lru      *lru.Cache
 	fetchers map[persist.BlockNumber]*filterFetcher
 	baseDir  string
@@ -161,7 +161,7 @@ func NewBlockFilterManager(ctx context.Context, q *sqlc.Queries, blocksPerLogFil
 		blocksPerLogFile: blocksPerLogFile,
 		chunkSize:        defaultRefreshConfig.ChunkSize,
 		fetchWorkerSize:  defaultRefreshConfig.ChunkWorkerSize,
-		loader: &BlockFilterLoader{
+		loader: &AddressFilterLoader{
 			maxBatch: defaultRefreshConfig.DataloaderDefaultMaxBatch,
 			wait:     defaultRefreshConfig.DataloaderDefaultWaitTime,
 			fetch:    loadBlockFilter(ctx, q),
@@ -229,12 +229,12 @@ func (b *BlockFilterManager) prime(ctx context.Context, chunkStart persist.Block
 type filterFetcher struct {
 	chunkSize  int
 	workerSize int
-	loader     *BlockFilterLoader
+	loader     *AddressFilterLoader
 	outDir     string
 	done       chan struct{}
 }
 
-func newFilterFetcher(chunkSize, workerSize int, blockFilterLoader *BlockFilterLoader, baseDir string) *filterFetcher {
+func newFilterFetcher(chunkSize, workerSize int, addressFilterLoader *AddressFilterLoader, baseDir string) *filterFetcher {
 	outDir, err := os.MkdirTemp(baseDir, "*")
 	if err != nil {
 		panic(err)
@@ -242,7 +242,7 @@ func newFilterFetcher(chunkSize, workerSize int, blockFilterLoader *BlockFilterL
 	return &filterFetcher{
 		chunkSize:  chunkSize,
 		workerSize: workerSize,
-		loader:     blockFilterLoader,
+		loader:     addressFilterLoader,
 		outDir:     outDir,
 	}
 }
@@ -309,8 +309,8 @@ func loadFromFile(path string) (*bloom.BloomFilter, error) {
 	return &bf, nil
 }
 
-func loadFromRepo(ctx context.Context, from, to persist.BlockNumber, blockFilterLoader *BlockFilterLoader) (*bloom.BloomFilter, error) {
-	data, err := blockFilterLoader.Load(sqlc.GetBlockFilterBatchParams{
+func loadFromRepo(ctx context.Context, from, to persist.BlockNumber, addressFilterLoader *AddressFilterLoader) (*bloom.BloomFilter, error) {
+	data, err := addressFilterLoader.Load(sqlc.GetAddressFilterBatchParams{
 		FromBlock: from,
 		ToBlock:   to,
 	})
@@ -345,15 +345,15 @@ func logFileName(outDir string, from, to persist.BlockNumber) string {
 	return filepath.Join(outDir, fmt.Sprintf("%s-%s", from, to))
 }
 
-func loadBlockFilter(ctx context.Context, q *sqlc.Queries) func([]sqlc.GetBlockFilterBatchParams) ([]sqlc.BlockFilter, []error) {
-	return func(params []sqlc.GetBlockFilterBatchParams) ([]sqlc.BlockFilter, []error) {
-		filters := make([]sqlc.BlockFilter, len(params))
+func loadBlockFilter(ctx context.Context, q *sqlc.Queries) func([]sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
+	return func(params []sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
+		filters := make([]sqlc.AddressFilter, len(params))
 		errs := make([]error, len(params))
 
-		b := q.GetBlockFilterBatch(ctx, params)
+		b := q.GetAddressFilterBatch(ctx, params)
 		defer b.Close()
 
-		b.QueryRow(func(i int, bf sqlc.BlockFilter, err error) {
+		b.QueryRow(func(i int, bf sqlc.AddressFilter, err error) {
 			filters[i], errs[i] = bf, err
 		})
 

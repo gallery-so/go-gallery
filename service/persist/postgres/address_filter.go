@@ -8,11 +8,11 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type BlockFilterRepository struct {
+type AddressFilterRepository struct {
 	Queries *sqlc.Queries
 }
 
-func (r *BlockFilterRepository) BulkUpsert(ctx context.Context, filters map[[2]persist.BlockNumber]*bloom.BloomFilter) error {
+func (r *AddressFilterRepository) BulkUpsert(ctx context.Context, filters map[[2]persist.BlockNumber]*bloom.BloomFilter) error {
 	ids := make([]string, len(filters))
 	fromBlocks := make([]int64, len(filters))
 	toBlocks := make([]int64, len(filters))
@@ -35,7 +35,7 @@ func (r *BlockFilterRepository) BulkUpsert(ctx context.Context, filters map[[2]p
 		i++
 	}
 
-	return r.Queries.BulkUpsertBlockFilter(ctx, sqlc.BulkUpsertBlockFilterParams{
+	return r.Queries.BulkUpsertAddressFilters(ctx, sqlc.BulkUpsertAddressFiltersParams{
 		ID:          ids,
 		FromBlock:   fromBlocks,
 		ToBlock:     toBlocks,

@@ -12,6 +12,19 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+<<<<<<< HEAD:db/gen/coredb/indexergen/models_gen.go
+=======
+type AddressFilter struct {
+	ID          persist.DBID
+	FromBlock   persist.BlockNumber
+	ToBlock     persist.BlockNumber
+	BloomFilter []byte
+	CreatedAt   time.Time
+	LastUpdated time.Time
+	Deleted     bool
+}
+
+>>>>>>> 7aeaece (Rename table to address_filter):db/sqlc/indexergen/models_gen.go
 type Contract struct {
 	ID             persist.DBID
 	Deleted        bool

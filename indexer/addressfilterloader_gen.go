@@ -9,10 +9,10 @@ import (
 	"github.com/mikeydub/go-gallery/db/sqlc/indexergen"
 )
 
-// BlockFilterLoaderConfig captures the config to create a new BlockFilterLoader
-type BlockFilterLoaderConfig struct {
+// AddressFilterLoaderConfig captures the config to create a new AddressFilterLoader
+type AddressFilterLoaderConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []indexergen.GetBlockFilterBatchParams) ([]indexergen.BlockFilter, []error)
+	Fetch func(keys []indexergen.GetAddressFilterBatchParams) ([]indexergen.AddressFilter, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -21,19 +21,19 @@ type BlockFilterLoaderConfig struct {
 	MaxBatch int
 }
 
-// NewBlockFilterLoader creates a new BlockFilterLoader given a fetch, wait, and maxBatch
-func NewBlockFilterLoader(config BlockFilterLoaderConfig) *BlockFilterLoader {
-	return &BlockFilterLoader{
+// NewAddressFilterLoader creates a new AddressFilterLoader given a fetch, wait, and maxBatch
+func NewAddressFilterLoader(config AddressFilterLoaderConfig) *AddressFilterLoader {
+	return &AddressFilterLoader{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// BlockFilterLoader batches and caches requests
-type BlockFilterLoader struct {
+// AddressFilterLoader batches and caches requests
+type AddressFilterLoader struct {
 	// this method provides the data for the loader
-	fetch func(keys []indexergen.GetBlockFilterBatchParams) ([]indexergen.BlockFilter, []error)
+	fetch func(keys []indexergen.GetAddressFilterBatchParams) ([]indexergen.AddressFilter, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,51 +44,51 @@ type BlockFilterLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[indexergen.GetBlockFilterBatchParams]indexergen.BlockFilter
+	cache map[indexergen.GetAddressFilterBatchParams]indexergen.AddressFilter
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *blockFilterLoaderBatch
+	batch *addressFilterLoaderBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type blockFilterLoaderBatch struct {
-	keys    []indexergen.GetBlockFilterBatchParams
-	data    []indexergen.BlockFilter
+type addressFilterLoaderBatch struct {
+	keys    []indexergen.GetAddressFilterBatchParams
+	data    []indexergen.AddressFilter
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a BlockFilter by key, batching and caching will be applied automatically
-func (l *BlockFilterLoader) Load(key indexergen.GetBlockFilterBatchParams) (indexergen.BlockFilter, error) {
+// Load a AddressFilter by key, batching and caching will be applied automatically
+func (l *AddressFilterLoader) Load(key indexergen.GetAddressFilterBatchParams) (indexergen.AddressFilter, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a BlockFilter.
+// LoadThunk returns a function that when called will block waiting for a AddressFilter.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *BlockFilterLoader) LoadThunk(key indexergen.GetBlockFilterBatchParams) func() (indexergen.BlockFilter, error) {
+func (l *AddressFilterLoader) LoadThunk(key indexergen.GetAddressFilterBatchParams) func() (indexergen.AddressFilter, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (indexergen.BlockFilter, error) {
+		return func() (indexergen.AddressFilter, error) {
 			return it, nil
 		}
 	}
 	if l.batch == nil {
-		l.batch = &blockFilterLoaderBatch{done: make(chan struct{})}
+		l.batch = &addressFilterLoaderBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (indexergen.BlockFilter, error) {
+	return func() (indexergen.AddressFilter, error) {
 		<-batch.done
 
-		var data indexergen.BlockFilter
+		var data indexergen.AddressFilter
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,43 +113,43 @@ func (l *BlockFilterLoader) LoadThunk(key indexergen.GetBlockFilterBatchParams) 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *BlockFilterLoader) LoadAll(keys []indexergen.GetBlockFilterBatchParams) ([]indexergen.BlockFilter, []error) {
-	results := make([]func() (indexergen.BlockFilter, error), len(keys))
+func (l *AddressFilterLoader) LoadAll(keys []indexergen.GetAddressFilterBatchParams) ([]indexergen.AddressFilter, []error) {
+	results := make([]func() (indexergen.AddressFilter, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	blockFilters := make([]indexergen.BlockFilter, len(keys))
+	addressFilters := make([]indexergen.AddressFilter, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		blockFilters[i], errors[i] = thunk()
+		addressFilters[i], errors[i] = thunk()
 	}
-	return blockFilters, errors
+	return addressFilters, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a BlockFilters.
+// LoadAllThunk returns a function that when called will block waiting for a AddressFilters.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *BlockFilterLoader) LoadAllThunk(keys []indexergen.GetBlockFilterBatchParams) func() ([]indexergen.BlockFilter, []error) {
-	results := make([]func() (indexergen.BlockFilter, error), len(keys))
+func (l *AddressFilterLoader) LoadAllThunk(keys []indexergen.GetAddressFilterBatchParams) func() ([]indexergen.AddressFilter, []error) {
+	results := make([]func() (indexergen.AddressFilter, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]indexergen.BlockFilter, []error) {
-		blockFilters := make([]indexergen.BlockFilter, len(keys))
+	return func() ([]indexergen.AddressFilter, []error) {
+		addressFilters := make([]indexergen.AddressFilter, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			blockFilters[i], errors[i] = thunk()
+			addressFilters[i], errors[i] = thunk()
 		}
-		return blockFilters, errors
+		return addressFilters, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *BlockFilterLoader) Prime(key indexergen.GetBlockFilterBatchParams, value indexergen.BlockFilter) bool {
+func (l *AddressFilterLoader) Prime(key indexergen.GetAddressFilterBatchParams, value indexergen.AddressFilter) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -160,22 +160,22 @@ func (l *BlockFilterLoader) Prime(key indexergen.GetBlockFilterBatchParams, valu
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *BlockFilterLoader) Clear(key indexergen.GetBlockFilterBatchParams) {
+func (l *AddressFilterLoader) Clear(key indexergen.GetAddressFilterBatchParams) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *BlockFilterLoader) unsafeSet(key indexergen.GetBlockFilterBatchParams, value indexergen.BlockFilter) {
+func (l *AddressFilterLoader) unsafeSet(key indexergen.GetAddressFilterBatchParams, value indexergen.AddressFilter) {
 	if l.cache == nil {
-		l.cache = map[indexergen.GetBlockFilterBatchParams]indexergen.BlockFilter{}
+		l.cache = map[indexergen.GetAddressFilterBatchParams]indexergen.AddressFilter{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *blockFilterLoaderBatch) keyIndex(l *BlockFilterLoader, key indexergen.GetBlockFilterBatchParams) int {
+func (b *addressFilterLoaderBatch) keyIndex(l *AddressFilterLoader, key indexergen.GetAddressFilterBatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -199,7 +199,7 @@ func (b *blockFilterLoaderBatch) keyIndex(l *BlockFilterLoader, key indexergen.G
 	return pos
 }
 
-func (b *blockFilterLoaderBatch) startTimer(l *BlockFilterLoader) {
+func (b *addressFilterLoaderBatch) startTimer(l *AddressFilterLoader) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -215,7 +215,7 @@ func (b *blockFilterLoaderBatch) startTimer(l *BlockFilterLoader) {
 	b.end(l)
 }
 
-func (b *blockFilterLoaderBatch) end(l *BlockFilterLoader) {
+func (b *addressFilterLoaderBatch) end(l *AddressFilterLoader) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
