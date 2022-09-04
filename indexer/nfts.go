@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
+	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
@@ -550,7 +551,7 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 
 		var err error
 		if input.DeepRefresh {
-			err = submitDeepRefresh(c, input, refreshQueue)
+			err = refreshQueue.Add(c, input)
 		} else {
 			err = refreshToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 		}
@@ -563,10 +564,6 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 	}
 }
 
-func submitDeepRefresh(ctx context.Context, input UpdateTokenMediaInput, refreshQueue *RefreshQueue) error {
-	return refreshQueue.AddMessage(ctx, input)
-}
-
 func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refreshLock *RefreshLock, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, addressFilterRepository postgres.AddressFilterRepository, queries *sqlc.Queries) {
 	idxr := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, addressFilterRepository, chain, defaultTransferEvents)
 
@@ -576,10 +573,14 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 	}
 
 	for {
-		message, err := refreshQueue.GetMessage(ctx)
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("failed to get message")
+		message, err := refreshQueue.Get(ctx)
+		if err == ErrNoMessage {
+			logger.For(ctx).WithError(err).Info("no pending refreshes, sleeping")
+			time.Sleep(defaultRefreshConfig.DefaultNoMessageWaitTime)
 			continue
+		}
+		if err != nil {
+			panic(err)
 		}
 
 		isRunning, err := refreshLock.Exists(ctx, message)
@@ -588,6 +589,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			continue
 		}
 		if isRunning {
+			logger.For(ctx).Info("refresh already running, skipping")
 			continue
 		}
 
@@ -596,24 +598,25 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			panic(err)
 		}
 		if !acquired {
-			if err := refreshQueue.PutbackMessage(ctx, message); err != nil {
+			if err := refreshQueue.ReAdd(ctx, message); err != nil {
 				panic(err)
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(defaultRefreshConfig.DefaultNoMessageWaitTime)
 			continue
 		}
 
-		span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "deepRefresh")
+		span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "handleMessage", sentry.TransactionName("indexer-server:deepRefresh"))
 
-		fm := NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
+		fm := NewBlockFilterManager(ctx, queries)
 
 		// Don't run past the Indexer
-		indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
-		if err != nil {
-			panic(err)
-		}
+		// XXX: indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
+		// XXX: if err != nil {
+		// XXX: 	panic(err)
+		// XXX: }
 
 		// Normalize blocks
+		var indexerBlock persist.BlockNumber = 15100000
 		indexerBlock -= indexerBlock % blocksPerLogsCall
 		startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
 		if startBlock < defaultStartingBlock {
@@ -623,18 +626,19 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		refreshPool := workerpool.New(defaultRefreshConfig.DefaultPoolSize)
 		for block := persist.BlockNumber(startBlock); block < indexerBlock; block += persist.BlockNumber(blocksPerLogsCall) {
 			b := block
-			toQueue := func() {
+			refresh := func() {
 				ctx := sentryutil.NewSentryHubContext(ctx)
 
-				exists := true
-
-				bf, err := fm.Get(ctx, b, b+persist.BlockNumber(blocksPerLogsCall))
+				exists, err := AddressExists(fm, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
 				if err != nil {
-					logger.For(ctx).WithError(err).Warnf("failed to fetch filter")
+					if err != ErrNoFilter {
+						logger.For(ctx).WithError(err).Warnf("failed to check address")
+					}
+					exists = true
 				}
-				if bf != nil {
-					exists = bf.TestString(message.OwnerAddress.String())
-				}
+
+				// Don't need the filter anymore
+				fm.Clear(ctx, b, b+persist.BlockNumber(blocksPerLogsCall))
 
 				if exists {
 					transferCh := make(chan []transfersAtBlock)
@@ -651,36 +655,40 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 					}()
 
 					go idxr.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
-					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out)
+					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, nil)
 
 					refreshed, err := refreshLock.Refresh(ctx, message)
 					if err != nil || !refreshed {
-						panic(errors.New("job timed out"))
+						panic(ErrRefreshTimedOut)
 					}
 				}
 			}
 
 			if refreshPool.WaitingQueueSize() > defaultRefreshConfig.DefaultPoolSize {
-				refreshPool.SubmitWait(toQueue)
+				refreshPool.SubmitWait(refresh)
 			} else {
-				refreshPool.Submit(toQueue)
+				refreshPool.Submit(refresh)
 			}
 		}
 
 		refreshPool.StopWait()
 
+		// Finish the message
+		err = refreshQueue.Ack(ctx, message)
+		if err != nil {
+			panic(err)
+		}
+
+		// Release lock
 		released, err := refreshLock.Release(ctx, message)
 		if err != nil {
-			logger.For(ctx).WithError(err).Warnf("failed to release refresh")
+			logger.For(ctx).WithError(err).Error("failed to release refresh")
 		}
 		if !released {
-			logger.For(ctx).Warnf("refresh had already timed out")
+			logger.For(ctx).Error("refresh had already timed out")
 		}
 
-		fm.Close()
 		span.Finish()
-
-		fmt.Println("done with refresh")
 	}
 }
 

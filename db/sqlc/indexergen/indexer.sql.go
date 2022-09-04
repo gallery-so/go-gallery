@@ -7,10 +7,34 @@ package indexergen
 
 import (
 	"context"
+
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const addAddressFilter = `-- name: AddAddressFilter :exec
+INSERT INTO address_filters (id, from_block, to_block, bloom_filter, created_at, last_updated) VALUES ($1, $2, $3, $4, now(), now())
+ON CONFLICT(from_block, to_block) DO UPDATE SET bloom_filter = EXCLUDED.bloom_filter, last_updated = now(), deleted = false
+`
+
+type AddAddressFilterParams struct {
+	ID          persist.DBID
+	FromBlock   persist.BlockNumber
+	ToBlock     persist.BlockNumber
+	BloomFilter []byte
+}
+
+func (q *Queries) AddAddressFilter(ctx context.Context, arg AddAddressFilterParams) error {
+	_, err := q.db.Exec(ctx, addAddressFilter,
+		arg.ID,
+		arg.FromBlock,
+		arg.ToBlock,
+		arg.BloomFilter,
+	)
+	return err
+}
+
 const bulkUpsertAddressFilters = `-- name: BulkUpsertAddressFilters :exec
-INSERT INTO address_filters (id, from_block, to_block, bloom_filter, created_at, last_updated) values (unnest($1::varchar[]), unnest($2::bigint[]), unnest($3::bigint[]), unnest($4::bytea[]), now(), now())
+INSERT INTO address_filters (id, from_block, to_block, bloom_filter, created_at, last_updated) VALUES (unnest($1::varchar[]), unnest($2::bigint[]), unnest($3::bigint[]), unnest($4::bytea[]), now(), now())
 ON CONFLICT(from_block, to_block) DO UPDATE SET bloom_filter = EXCLUDED.bloom_filter, last_updated = now(), deleted = false
 `
 

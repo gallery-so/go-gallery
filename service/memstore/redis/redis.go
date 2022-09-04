@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -110,42 +111,71 @@ func (c *Cache) Close(clear bool) error {
 	return c.client.Close()
 }
 
-// FifoQueue implements a first-in, first-out queue with Redis Lists.
+// FifoQueue implements a reliable unique FIFO queue.
+// When an message is popped from the pending queue it gets added to the processing queue which
+// is unique identifier for that consumer. When the consumer is done with the message, it is
+// responsible for removing the message from the processing queue.
+//
+// TODOs:
+// * Add another process to figure out what to do with unacked messages like putting the message
+//   back in the the pending queue for re-processing.
+// * Consider looking into Redis streams instead
 type FifoQueue struct {
-	client *redis.Client
-	name   string
+	client     *redis.Client
+	pending    string
+	processing string
+	id         string
 }
 
 // NewFifoQueue returns a connection to a new connection to a queue.
 func NewFifoQueue(db int, name string) *FifoQueue {
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+	id := fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix())
 	return &FifoQueue{
-		client: newRedisClient(db),
-		name:   name,
+		client:     newRedisClient(db),
+		pending:    fmt.Sprintf("%s:%s", name, "pending"),
+		processing: fmt.Sprintf("%s:%s:%s", name, "processing", id),
+		id:         id,
 	}
 }
 
 // Push adds an item to the end of the queue.
-func (q *FifoQueue) Push(ctx context.Context, value interface{}) (size int, err error) {
-	sz, err := q.client.RPush(ctx, q.name, value).Result()
-	return int(sz), err
+func (q *FifoQueue) Push(ctx context.Context, value interface{}) (bool, error) {
+	added, err := q.client.Do(ctx, "ZADD", q.pending, "NX", float64(time.Now().Unix()), value).Int()
+	return added > 1, err
 }
 
 // LPush adds an item to the beginning of the queue.
-func (q *FifoQueue) LPush(ctx context.Context, value interface{}) (size int, err error) {
-	sz, err := q.client.LPush(ctx, q.name, value).Result()
-	return int(sz), err
+func (q *FifoQueue) LPush(ctx context.Context, value interface{}) (bool, error) {
+	added, err := q.client.Do(ctx, "ZADD", q.pending, "NX", "-INF", value).Int()
+	return added > 1, err
 }
 
-// Pop gets the first item from the queue, blocking until an item is received or until the timeout.
-func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error) {
-	reply, err := q.client.BLPop(ctx, wait, q.name).Result()
+// popMessage atomically receives a message from the pending queue and adds it to the processing queue.
+var popMessage *redis.Script = redis.NewScript(`
+	local item = redis.call("ZPOPMIN", KEYS[1])
+	if item[1] == nil then
+		return nil
+	end
+	redis.call("LPUSH", KEYS[2], item[1])
+	return item[1]
+`)
 
+// Pop removes the earliest item from the pending queue and adds it to the processing queue.
+func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error) {
+	item, err := popMessage.Run(ctx, q.client, []string{q.pending, q.processing}, q.id).Result()
 	if err != nil {
 		return "", err
 	}
+	return item.(string), nil
+}
 
-	// Reply is in format: [key, value]
-	return reply[1], nil
+// Ack removes the last item from the processing queue.
+func (q *FifoQueue) Ack(ctx context.Context) (string, error) {
+	return q.client.RPop(ctx, q.processing).Result()
 }
 
 // Semaphore implements a semaphore in Redis described here:
@@ -164,8 +194,8 @@ func NewSemaphore(db int, name string, cap, timeout int) *Semaphore {
 	return &Semaphore{
 		client:  newRedisClient(db),
 		name:    name,
-		owners:  fmt.Sprintf("%s:%s", name, ":owner"),
-		counter: fmt.Sprintf("%s:%s", name, ":counter"),
+		owners:  fmt.Sprintf("%s:%s", name, "owner"),
+		counter: fmt.Sprintf("%s:%s", name, "counter"),
 		cap:     cap,
 		timeout: timeout,
 	}
@@ -230,7 +260,8 @@ func (s *Semaphore) Release(ctx context.Context, id string) (bool, error) {
 
 // Refresh increases the lease on a held sempahore.
 func (s *Semaphore) Refresh(ctx context.Context, id string) (bool, error) {
-	result, err := s.client.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), id).Int64()
+	// Try to update the lease.
+	result, err := s.client.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), id).Int()
 	if err != nil {
 		return false, err
 	}

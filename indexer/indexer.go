@@ -125,18 +125,8 @@ type tokenMedia struct {
 // indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type indexer struct {
-<<<<<<< HEAD
 	isRPCEnabled bool
 
-	ethClient       *ethclient.Client
-	ipfsClient      *shell.Shell
-	arweaveClient   *goar.Client
-	storageClient   *storage.Client
-	tokenRepo       persist.TokenRepository
-	contractRepo    persist.ContractRepository
-	blockFilterRepo postgres.BlockFilterRepository
-	dbMu            *sync.Mutex
-=======
 	ethClient         *ethclient.Client
 	ipfsClient        *shell.Shell
 	arweaveClient     *goar.Client
@@ -145,7 +135,6 @@ type indexer struct {
 	contractRepo      persist.ContractRepository
 	addressFilterRepo postgres.AddressFilterRepository
 	dbMu              *sync.Mutex
->>>>>>> 1097ce1 (Rename table to address_filter)
 
 	tokenBucket string
 
@@ -176,18 +165,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	}
 
 	return &indexer{
-<<<<<<< HEAD
-		isRPCEnabled:    rpcEnabled,
-		ethClient:       ethClient,
-		ipfsClient:      ipfsClient,
-		arweaveClient:   arweaveClient,
-		storageClient:   storageClient,
-		tokenRepo:       tokenRepo,
-		contractRepo:    contractRepo,
-		blockFilterRepo: blockFilterRepo,
-		dbMu:            &sync.Mutex{},
-=======
-
+		isRPCEnabled:      rpcEnabled,
 		ethClient:         ethClient,
 		ipfsClient:        ipfsClient,
 		arweaveClient:     arweaveClient,
@@ -196,7 +174,6 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		contractRepo:      contractRepo,
 		addressFilterRepo: addressFilterRepo,
 		dbMu:              &sync.Mutex{},
->>>>>>> 1097ce1 (Rename table to address_filter)
 
 		tokenBucket: viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
@@ -218,7 +195,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 	// XXX: defer cancel()
 
 	lastSyncedBlock := defaultStartingBlock
-	i.mostRecentBlock = 11000000
+	i.mostRecentBlock = 10001000
 	// XXX: recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
 	// XXX: if err == nil && recentDBBlock > defaultStartingBlock {
 	// XXX: 	lastSyncedBlock = recentDBBlock
@@ -281,12 +258,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	i.isListening = false
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
-	enabledPlugins := []chan<- PluginMsg{
-		plugins.balances.in,
-		plugins.owners.in,
-		plugins.uris.in,
-		plugins.refresh.in,
-	}
+	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
 
 	go func() {
 		ctx := sentryutil.NewSentryHubContext(ctx)
@@ -299,7 +271,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 		}
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
-	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out)
+	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, plugins.refresh.out)
 	if i.lastSyncedBlock < start.Uint64() {
 		i.lastSyncedBlock = start.Uint64()
 	}
@@ -313,15 +285,10 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	i.isListening = true
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
-	enabledPlugins := []chan<- PluginMsg{
-		plugins.balances.in,
-		plugins.owners.in,
-		plugins.uris.in,
-		plugins.refresh.in,
-	}
+	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
-	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out)
+	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, plugins.refresh.out)
 }
 
 func (i *indexer) listenForNewBlocks(ctx context.Context) {
@@ -756,22 +723,54 @@ func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenI
 
 // TOKENS FUNCS ---------------------------------------------------------------
 
-func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owners <-chan ownersPluginResult, balances <-chan tokenBalances) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processTokens")
-	defer tracing.FinishSpan(span)
-
-	wg := &sync.WaitGroup{}
-	wg.Add(3)
+func (i *indexer) processTokens(ctx context.Context,
+	uris <-chan tokenURI,
+	owners <-chan ownersPluginResult,
+	balances <-chan tokenBalances,
+	refreshes <-chan error,
+) {
 	ownersMap := map[persist.EthereumTokenIdentifiers]ownerAtBlock{}
 	previousOwnersMap := map[persist.EthereumTokenIdentifiers][]ownerAtBlock{}
 	balancesMap := map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock{}
 	metadatasMap := map[persist.EthereumTokenIdentifiers]tokenMetadata{}
 	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
 
-	go receiveBalances(sentryutil.NewSentryHubContext(ctx), wg, balances, balancesMap, i.tokenRepo)
-	go receiveOwners(sentryutil.NewSentryHubContext(ctx), wg, owners, ownersMap, previousOwnersMap, i.tokenRepo)
-	go receiveURIs(sentryutil.NewSentryHubContext(ctx), wg, uris, urisMap)
-	wg.Wait()
+	receivers := make([]Receiver, 0)
+	wg := &sync.WaitGroup{}
+
+	if uris != nil {
+		receivers = AddReceiver(
+			wg,
+			receivers,
+			urisPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, uris, urisMap),
+		)
+	}
+
+	if owners != nil {
+		receivers = AddReceiver(
+			wg,
+			receivers,
+			ownersPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, owners, ownersMap, previousOwnersMap, i.tokenRepo),
+		)
+	}
+
+	if balances != nil {
+		receivers = AddReceiver(
+			wg,
+			receivers,
+			balancesPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, balances, balancesMap, i.tokenRepo),
+		)
+	}
+
+	if refreshes != nil {
+		receivers = AddReceiver(
+			wg,
+			receivers,
+			refreshesPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, refreshes),
+		)
+	}
+
+	ReceivePlugins(ctx, wg, receivers)
 
 	logger.For(ctx).Info("Done recieving field data, converting fields into tokens...")
 
@@ -822,55 +821,92 @@ func (i *indexer) createTokens(ctx context.Context,
 	logger.For(ctx).Info("Done upserting tokens and contracts")
 }
 
-func receiveURIs(ctx context.Context, wg *sync.WaitGroup, uris <-chan tokenURI, uriMap map[persist.EthereumTokenIdentifiers]tokenURI) {
-	defer wg.Done()
-	for uri := range uris {
-		uriMap[uri.ti] = uri
+func ownersPluginReceiver(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	results <-chan ownersPluginResult,
+	ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock,
+	previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
+	tokenRepo persist.TokenRepository,
+) Receiver {
+	return func() {
+		defer wg.Done()
+		for result := range results {
+			// Current owner
+			ownersMap[result.currentOwner.ti] = result.currentOwner
+
+			// Previous owners
+			currentPreviousOwners, ok := previousOwnersMap[result.previousOwner.ti]
+			if !ok {
+				currentPreviousOwners = make([]ownerAtBlock, 0, 20)
+			}
+			currentPreviousOwners = append(currentPreviousOwners, result.previousOwner)
+			previousOwnersMap[result.previousOwner.ti] = currentPreviousOwners
+		}
 	}
 }
 
-func receiveBalances(ctx context.Context, wg *sync.WaitGroup, balanceChan <-chan tokenBalances, balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock, tokenRepo persist.TokenRepository) {
-	defer wg.Done()
-	for balance := range balanceChan {
+func balancesPluginReceiver(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	results <-chan tokenBalances,
+	balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
+	tokenRepo persist.TokenRepository,
+) Receiver {
+	return func() {
+		defer wg.Done()
+		for balance := range results {
+			balanceMap, ok := balancesMap[balance.ti]
+			if !ok {
+				balanceMap = make(map[persist.EthereumAddress]balanceAtBlock)
+			}
+			toBal := balanceMap[balance.to]
+			if toBal.block < balance.block {
+				toBal.block = balance.block
+				toBal.amnt = balance.toAmt
+				balanceMap[balance.to] = toBal
+			}
 
-		balanceMap, ok := balances[balance.ti]
-		if !ok {
-			balanceMap = make(map[persist.EthereumAddress]balanceAtBlock)
-		}
-		toBal := balanceMap[balance.to]
-		if toBal.block < balance.block {
-			toBal.block = balance.block
-			toBal.amnt = balance.toAmt
-			balanceMap[balance.to] = toBal
-		}
+			fromBal := balanceMap[balance.from]
+			if fromBal.block < balance.block {
+				fromBal.block = balance.block
+				fromBal.amnt = balance.fromAmt
+				balanceMap[balance.from] = fromBal
+			}
 
-		fromBal := balanceMap[balance.from]
-		if fromBal.block < balance.block {
-			fromBal.block = balance.block
-			fromBal.amnt = balance.fromAmt
-			balanceMap[balance.from] = fromBal
+			if len(balanceMap) > 0 {
+				balancesMap[balance.ti] = balanceMap
+			}
 		}
-
-		if len(balanceMap) > 0 {
-			balances[balance.ti] = balanceMap
-		}
-
 	}
 }
 
-func receiveOwners(ctx context.Context, wg *sync.WaitGroup, ownersChan <-chan ownersPluginResult, owners map[persist.EthereumTokenIdentifiers]ownerAtBlock, prevOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock, tokenRepo persist.TokenRepository) {
-	defer wg.Done()
-	for result := range ownersChan {
-		// Current owner
-		owners[result.currentOwner.ti] = result.currentOwner
-
-		// Previous owners
-		currentPreviousOwners, ok := prevOwnersMap[result.previousOwner.ti]
-		if !ok {
-			currentPreviousOwners = make([]ownerAtBlock, 0, 20)
+func urisPluginReceiver(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	results <-chan tokenURI,
+	urisMap map[persist.EthereumTokenIdentifiers]tokenURI,
+) Receiver {
+	return func() {
+		defer wg.Done()
+		for uri := range results {
+			urisMap[uri.ti] = uri
 		}
-		currentPreviousOwners = append(currentPreviousOwners, result.previousOwner)
-		prevOwnersMap[result.previousOwner.ti] = currentPreviousOwners
+	}
+}
+
+func refreshesPluginReceiver(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	results <-chan error,
+) Receiver {
+	return func() {
+		defer wg.Done()
+		for err := range results {
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("failed to save filter")
+			}
+		}
 	}
 }
 
@@ -1163,9 +1199,8 @@ func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsT
 
 func recoverAndWait(ctx context.Context) {
 	if err := recover(); err != nil {
-		panic(err)
-		// XXX: logger.For(ctx).Errorf("Error in indexer: %v", err)
-		// XXX: time.Sleep(time.Second * 10)
+		logger.For(ctx).Errorf("Error in indexer: %v", err)
+		time.Sleep(time.Second * 10)
 	}
 }
 

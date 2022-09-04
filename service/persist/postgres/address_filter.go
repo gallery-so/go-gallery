@@ -12,6 +12,19 @@ type AddressFilterRepository struct {
 	Queries *sqlc.Queries
 }
 
+func (r *AddressFilterRepository) Add(ctx context.Context, from, to persist.BlockNumber, bf *bloom.BloomFilter) error {
+	data, err := bf.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return r.Queries.AddAddressFilter(ctx, sqlc.AddAddressFilterParams{
+		ID:          persist.GenerateID(),
+		FromBlock:   from,
+		ToBlock:     to,
+		BloomFilter: data,
+	})
+}
+
 func (r *AddressFilterRepository) BulkUpsert(ctx context.Context, filters map[[2]persist.BlockNumber]*bloom.BloomFilter) error {
 	ids := make([]string, len(filters))
 	fromBlocks := make([]int64, len(filters))

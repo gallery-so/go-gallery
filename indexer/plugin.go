@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"sync"
 
 	"cloud.google.com/go/storage"
 	"github.com/bits-and-blooms/bloom"
@@ -35,6 +36,9 @@ type TransferPlugins struct {
 	refresh  refreshPlugin
 }
 
+// Receiver receives the results of a plugin.
+type Receiver func()
+
 func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Context) {
 	return tracing.StartSpan(ctx, "indexer.runPlugin", pluginName)
 }
@@ -63,6 +67,20 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 	for _, plugin := range plugins {
 		plugin <- msg
 	}
+}
+
+// ReceivePlugins blocks until all plugin results have been handled.
+func ReceivePlugins(ctx context.Context, wg *sync.WaitGroup, receivers []Receiver) {
+	for _, receiver := range receivers {
+		go receiver()
+	}
+	wg.Wait()
+}
+
+// AddReceiver adds the receiver to the list of receivers to wait for.
+func AddReceiver(wg *sync.WaitGroup, receivers []Receiver, receiver Receiver) []Receiver {
+	wg.Add(1)
+	return append(receivers, receiver)
 }
 
 // urisPlugin pulls URI information for a token.
@@ -213,15 +231,18 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 
 // refreshPlugin stores additional data to enable deep refreshes.
 type refreshPlugin struct {
-	in chan PluginMsg
+	in  chan PluginMsg
+	out chan error
 }
 
 func newRefreshPlugin(ctx context.Context, addressFilterRepo postgres.AddressFilterRepository) refreshPlugin {
 	in := make(chan PluginMsg)
+	out := make(chan error, 1)
 
 	go func() {
 		span, _ := startSpan(ctx, "refreshPlugin")
 		defer tracing.FinishSpan(span)
+		defer close(out)
 
 		filters := make(map[[2]persist.BlockNumber]*bloom.BloomFilter)
 
@@ -242,12 +263,11 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo postgres.AddressFil
 			tracing.FinishSpan(child)
 		}
 
-		if err := addressFilterRepo.BulkUpsert(ctx, filters); err != nil {
-			logger.For(ctx).WithError(err).Error("failed to save block filters")
-		}
+		out <- addressFilterRepo.BulkUpsert(ctx, filters)
 	}()
 
 	return refreshPlugin{
-		in: in,
+		in:  in,
+		out: out,
 	}
 }

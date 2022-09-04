@@ -5,42 +5,54 @@ package indexer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/bits-and-blooms/bloom"
-	"github.com/gammazero/workerpool"
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/jackc/pgx/v4"
 	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/logger"
+	memstore "github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
+
+	"github.com/go-redis/redis/v8"
 )
 
 var defaultRefreshConfig RefreshConfig = RefreshConfig{
-	DefaultPoolSize:           4,
-	LookbackWindow:            100,
-	ChunkSize:                 10000,
-	CacheSize:                 10,
-	ChunkWorkerSize:           32,
-	DataloaderDefaultMaxBatch: 100,
-	DataloaderDefaultWaitTime: 10 * time.Millisecond,
+	// XXX: DefaultNoMessageWaitTime:  5 * time.Minute,
+	DefaultNoMessageWaitTime:  5 * time.Second,
+	DefaultPoolSize:           defaultWorkerPoolSize,
+	LookbackWindow:            100000,
+	DataloaderDefaultMaxBatch: 0, // no restriction on batch size
+	DataloaderDefaultWaitTime: 2 * time.Millisecond,
 	RefreshQueueName:          "deepRefresh:addressQueue",
 	RefreshLockName:           "deepRefresh:addressLock",
-	MaxConcurrentRuns:         1,
+	MaxConcurrentRuns:         24,
 	Liveness:                  15 * 60,
 }
 
+// ErrNoFilter is returned when a filter does not exist.
+var ErrNoFilter = errors.New("no filter")
+
+// ErrRefreshTimedOut is returned when refresh is expired.
+var ErrRefreshTimedOut = errors.New("refresh timed out")
+
+// ErrNoMessage is returned when there are no messages to work on.
+var ErrNoMessage = errors.New("no queued messages")
+
+// ErrPopFromEmpty is returned when a pop from the processing queue returns no result.
+var ErrPopFromEmpty = errors.New("processing queue is empty; expected one message")
+
+// ErrUnexpectedMessage is returned when the message that was handled is not the
+// message that is in the processing queue.
+var ErrUnexpectedMessage = errors.New("message in processing queue is not the message that was handled")
+
 // RefreshConfig configures how deep refreshes are ran.
 type RefreshConfig struct {
+	DefaultNoMessageWaitTime  time.Duration // How long to wait before polling for a message
 	DefaultPoolSize           int           // Number of workers to allocate to a refresh
 	LookbackWindow            int           // Refreshes will start this many blocks before the last indexer block processed
-	ChunkSize                 int           // The number of filters in a chunk
-	CacheSize                 int           // The number of chunks to keep on disk
-	ChunkWorkerSize           int           // The number of workers used to download a chunk
 	DataloaderDefaultMaxBatch int           // The max batch size before submitting a batch
 	DataloaderDefaultWaitTime time.Duration // Max time to wait before submitting a batch
 	RefreshQueueName          string        // The name of the queue to buffer refreshes
@@ -51,30 +63,42 @@ type RefreshConfig struct {
 
 // RefreshQueue buffers deep refresh requests.
 type RefreshQueue struct {
-	q *redis.FifoQueue
+	q *memstore.FifoQueue
 }
 
 // NewRefreshQueue returns a connection to the refresh queue.
 func NewRefreshQueue() *RefreshQueue {
-	return &RefreshQueue{redis.NewFifoQueue(redis.IndexerServerThrottleDB, defaultRefreshConfig.RefreshQueueName)}
+	return &RefreshQueue{memstore.NewFifoQueue(memstore.IndexerServerThrottleDB, defaultRefreshConfig.RefreshQueueName)}
 }
 
-// AddMessage adds a message to the queue.
-func (r *RefreshQueue) AddMessage(ctx context.Context, input UpdateTokenMediaInput) error {
+// Add adds a message to the queue.
+func (r *RefreshQueue) Add(ctx context.Context, input UpdateTokenMediaInput) error {
 	message, err := json.Marshal(input)
 	if err != nil {
 		return err
 	}
-	_, err = r.q.Push(ctx, message)
-	return err
+	added, err := r.q.Push(ctx, message)
+	if err != nil {
+		return err
+	}
+	if !added {
+		logger.For(ctx).Info("refresh already exists, skipping")
+	}
+
+	return nil
 }
 
-// GetMessage blocks until a message is received from the queue.
-func (r *RefreshQueue) GetMessage(ctx context.Context) (UpdateTokenMediaInput, error) {
+// Get blocks until a message is received from the queue.
+func (r *RefreshQueue) Get(ctx context.Context) (UpdateTokenMediaInput, error) {
 	queued, err := r.q.Pop(ctx, 0)
+	if err == redis.Nil {
+		return UpdateTokenMediaInput{}, ErrNoMessage
+	}
+	if err != nil {
+		return UpdateTokenMediaInput{}, err
+	}
 
 	var msg UpdateTokenMediaInput
-
 	err = json.Unmarshal([]byte(queued), &msg)
 	if err != nil {
 		return UpdateTokenMediaInput{}, err
@@ -83,25 +107,64 @@ func (r *RefreshQueue) GetMessage(ctx context.Context) (UpdateTokenMediaInput, e
 	return msg, nil
 }
 
-// PutbackMessage adds a message to the top of the queue.
-func (r *RefreshQueue) PutbackMessage(ctx context.Context, input UpdateTokenMediaInput) error {
+// Ack completes a message by removing it from the processing queue.
+func (r *RefreshQueue) Ack(ctx context.Context, processed UpdateTokenMediaInput) error {
+	last, err := r.q.Ack(ctx)
+
+	// Should always be at most one message in the processing queue if
+	// `processed` was obtained by calling `Get`.
+	if err == redis.Nil {
+		return ErrPopFromEmpty
+	}
+
+	processedMessage, err := json.Marshal(processed)
+	if err != nil {
+		return err
+	}
+
+	// `last` should always be the same message as `processed`.
+	if last != string(processedMessage) {
+		return ErrUnexpectedMessage
+	}
+
+	return nil
+}
+
+// ReAdd adds a message to the top of the queue.
+func (r *RefreshQueue) ReAdd(ctx context.Context, input UpdateTokenMediaInput) error {
+	// Remove from processing queue.
+	err := r.Ack(ctx, input)
+	if err != nil {
+		return err
+	}
+
 	message, err := json.Marshal(input)
 	if err != nil {
 		return err
 	}
-	_, err = r.q.LPush(ctx, message)
-	return err
+
+	// Add to front of pending queue.
+	added, err := r.q.LPush(ctx, message)
+	if err != nil {
+		return err
+	}
+	if !added {
+		logger.For(ctx).Info("refresh already exists, skipping")
+	}
+
+	return nil
 }
 
 // RefreshLock manages the number of concurrent refreshes allowed.
 type RefreshLock struct {
-	s *redis.Semaphore
+	s *memstore.Semaphore
 }
 
+// NewRefreshLock returns a connection to the fresh lock.
 func NewRefreshLock() *RefreshLock {
 	return &RefreshLock{
-		s: redis.NewSemaphore(
-			redis.IndexerServerThrottleDB,
+		s: memstore.NewSemaphore(
+			memstore.IndexerServerThrottleDB,
 			defaultRefreshConfig.RefreshLockName,
 			defaultRefreshConfig.MaxConcurrentRuns,
 			defaultRefreshConfig.Liveness,
@@ -133,189 +196,39 @@ func (r *RefreshLock) Exists(ctx context.Context, input UpdateTokenMediaInput) (
 	return r.s.Exists(ctx, key)
 }
 
-// BlockFilterManager handles the downloading and removing of block filters.
-// When a filter is requested, it attempts to load it from disk. If the filter's respective
-// chunk hasn't been downloaded yet, BlockFilterManager will download the entire chunk to disk via
-// a dataloader.
-type BlockFilterManager struct {
-	blocksPerLogFile int
-	chunkSize        int
-	fetchWorkerSize  int
+// AddressExists checks if an address transacted in a block range.
+func AddressExists(fm *BlockFilterManager, address persist.EthereumAddress, from, to persist.BlockNumber) (bool, error) {
+	bf, err := fm.Get(from, to)
+	if err != nil {
+		return false, err
+	}
+	return bf.TestString(address.String()), nil
+}
 
-	loader   *AddressFilterLoader
-	lru      *lru.Cache
-	fetchers map[persist.BlockNumber]*filterFetcher
-	baseDir  string
-	mu       *sync.Mutex
+// BlockFilterManager handles the downloading and removing of block filters.
+type BlockFilterManager struct {
+	loader AddressFilterLoader
 }
 
 // NewBlockFilterManager returns a new instance of a BlockFilterManager.
-func NewBlockFilterManager(ctx context.Context, q *sqlc.Queries, blocksPerLogFile int) *BlockFilterManager {
-	var mu sync.Mutex
-	baseDir, err := os.MkdirTemp("", "*")
-	if err != nil {
-		panic(err)
-	}
-
-	b := BlockFilterManager{
-		blocksPerLogFile: blocksPerLogFile,
-		chunkSize:        defaultRefreshConfig.ChunkSize,
-		fetchWorkerSize:  defaultRefreshConfig.ChunkWorkerSize,
-		loader: &AddressFilterLoader{
+func NewBlockFilterManager(ctx context.Context, q *sqlc.Queries) *BlockFilterManager {
+	return &BlockFilterManager{
+		loader: AddressFilterLoader{
 			maxBatch: defaultRefreshConfig.DataloaderDefaultMaxBatch,
 			wait:     defaultRefreshConfig.DataloaderDefaultWaitTime,
-			fetch:    loadBlockFilter(ctx, q),
+			fetch:    fetcher(ctx, q),
 		},
-		fetchers: make(map[persist.BlockNumber]*filterFetcher),
-		baseDir:  baseDir,
-		mu:       &mu,
-	}
-
-	lru, err := lru.NewWithEvict(defaultRefreshConfig.CacheSize, func(key, value interface{}) {
-		err := value.(*filterFetcher).deleteChunk()
-		if err != nil {
-			panic(err)
-		}
-	})
-
-	b.lru = lru
-	return &b
-}
-
-// Get returns a filter if it exists. If the filter's chunk hasn't been loaded yet, this
-// call will block until the chunk has been downloaded.
-func (b *BlockFilterManager) Get(ctx context.Context, from, to persist.BlockNumber) (*bloom.BloomFilter, error) {
-	chunk := from - (from % persist.BlockNumber(b.chunkSize))
-
-	if _, ok := b.lru.Get(chunk); !ok {
-		if err := b.prime(ctx, chunk); err != nil {
-			return nil, err
-		}
-	}
-
-	f, _ := b.lru.Get(chunk)
-	return f.(*filterFetcher).loadFilter(ctx, from, to)
-}
-
-// Close deletes filters that have been loaded.
-func (b *BlockFilterManager) Close() {
-	os.RemoveAll(b.baseDir)
-}
-
-func (b *BlockFilterManager) prime(ctx context.Context, chunkStart persist.BlockNumber) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if _, ok := b.fetchers[chunkStart]; !ok {
-		b.fetchers[chunkStart] = newFilterFetcher(b.chunkSize, b.fetchWorkerSize, b.loader, b.baseDir)
-	}
-
-	f := b.fetchers[chunkStart]
-
-	if f.done == nil {
-		f.done = make(chan struct{})
-		if err := f.loadChunk(ctx, chunkStart, b.blocksPerLogFile); err != nil {
-			f.done = nil
-			return err
-		}
-		b.lru.Add(chunkStart, f)
-	}
-
-	<-f.done
-	return nil
-}
-
-// filterFetcher is an unexported type that handles the downloading of a chunk of filter objects.
-type filterFetcher struct {
-	chunkSize  int
-	workerSize int
-	loader     *AddressFilterLoader
-	outDir     string
-	done       chan struct{}
-}
-
-func newFilterFetcher(chunkSize, workerSize int, addressFilterLoader *AddressFilterLoader, baseDir string) *filterFetcher {
-	outDir, err := os.MkdirTemp(baseDir, "*")
-	if err != nil {
-		panic(err)
-	}
-	return &filterFetcher{
-		chunkSize:  chunkSize,
-		workerSize: workerSize,
-		loader:     addressFilterLoader,
-		outDir:     outDir,
 	}
 }
 
-func (f *filterFetcher) loadChunk(ctx context.Context, chunkStart persist.BlockNumber, blocksPerLogFile int) error {
-	errors := make(chan error)
-	to := chunkStart + persist.BlockNumber(f.chunkSize)
-	wp := workerpool.New(f.workerSize)
-
-	for block := chunkStart; block < to; block += persist.BlockNumber(blocksPerLogFile) {
-		filterStart := block
-		filterEnd := filterStart + persist.BlockNumber(blocksPerLogFile)
-		wp.Submit(func() {
-			bf, err := loadFromRepo(ctx, filterStart, filterEnd, f.loader)
-			if err != nil {
-				errors <- err
-			}
-
-			err = f.saveFilter(ctx, filterStart, filterEnd, bf)
-			if err != nil {
-				errors <- err
-			}
-		})
-	}
-	wp.StopWait()
-	close(errors)
-	close(f.done)
-	return <-errors
-}
-
-func (f *filterFetcher) loadFilter(ctx context.Context, from, to persist.BlockNumber) (*bloom.BloomFilter, error) {
-	return loadFromFile(f.logFileName(from, to))
-}
-
-func (f *filterFetcher) saveFilter(ctx context.Context, from, to persist.BlockNumber, bf *bloom.BloomFilter) error {
-	if bf != nil {
-		return saveToFile(f.logFileName(from, to), bf)
-	}
-	return nil
-}
-
-func (f *filterFetcher) deleteChunk() error {
-	return os.RemoveAll(f.outDir)
-}
-
-func (f *filterFetcher) logFileName(from, to persist.BlockNumber) string {
-	return logFileName(f.outDir, from, to)
-}
-
-func loadFromFile(path string) (*bloom.BloomFilter, error) {
-	if _, err := os.Stat(path); err != nil {
-		return nil, nil
-	}
-
-	f, err := os.Open(path)
-	defer f.Close()
-
-	if err != nil {
-		return nil, err
-	}
-
-	var bf bloom.BloomFilter
-	bf.ReadFrom(f)
-	return &bf, nil
-}
-
-func loadFromRepo(ctx context.Context, from, to persist.BlockNumber, addressFilterLoader *AddressFilterLoader) (*bloom.BloomFilter, error) {
-	data, err := addressFilterLoader.Load(sqlc.GetAddressFilterBatchParams{
+// Get returns a filter if one exists.
+func (b *BlockFilterManager) Get(from, to persist.BlockNumber) (*bloom.BloomFilter, error) {
+	data, err := b.loader.Load(sqlc.GetAddressFilterBatchParams{
 		FromBlock: from,
 		ToBlock:   to,
 	})
 	if err != nil && err.Error() == pgx.ErrNoRows.Error() {
-		return nil, nil
+		return nil, ErrNoFilter
 	}
 	if err != nil {
 		return nil, err
@@ -329,23 +242,12 @@ func loadFromRepo(ctx context.Context, from, to persist.BlockNumber, addressFilt
 	return &bf, nil
 }
 
-func saveToFile(path string, bf *bloom.BloomFilter) error {
-	f, err := os.Create(path)
-	defer f.Close()
-
-	if err != nil {
-		return err
-	}
-
-	_, err = bf.WriteTo(f)
-	return err
+// Clear removes the filter from it's cache.
+func (b *BlockFilterManager) Clear(ctx context.Context, from, to persist.BlockNumber) {
+	b.loader.Clear(sqlc.GetAddressFilterBatchParams{FromBlock: from, ToBlock: to})
 }
 
-func logFileName(outDir string, from, to persist.BlockNumber) string {
-	return filepath.Join(outDir, fmt.Sprintf("%s-%s", from, to))
-}
-
-func loadBlockFilter(ctx context.Context, q *sqlc.Queries) func([]sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
+func fetcher(ctx context.Context, q *sqlc.Queries) func([]sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
 	return func(params []sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
 		filters := make([]sqlc.AddressFilter, len(params))
 		errs := make([]error, len(params))
