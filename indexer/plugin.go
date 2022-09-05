@@ -69,15 +69,18 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 	}
 }
 
-// ReceivePlugins blocks until all plugin results have been handled.
+// ReceivePlugins blocks until all plugins have completed.
 func ReceivePlugins(ctx context.Context, wg *sync.WaitGroup, receivers []Receiver) {
+	span, _ := startSpan(ctx, "receivePlugins")
+	defer tracing.FinishSpan(span)
+
 	for _, receiver := range receivers {
 		go receiver()
 	}
 	wg.Wait()
 }
 
-// AddReceiver adds the receiver to the list of receivers to wait for.
+// AddReceiver adds a receiver to the list of receivers to synchronize.
 func AddReceiver(wg *sync.WaitGroup, receivers []Receiver, receiver Receiver) []Receiver {
 	wg.Add(1)
 	return append(receivers, receiver)
@@ -94,9 +97,9 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 	out := make(chan tokenURI)
 
 	go func() {
-		defer close(out)
 		span, ctx := startSpan(ctx, "uriPlugin")
 		defer tracing.FinishSpan(span)
+		defer close(out)
 
 		for msg := range in {
 			child := span.StartChild("handleMessage")

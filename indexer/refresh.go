@@ -35,7 +35,7 @@ var defaultRefreshConfig RefreshConfig = RefreshConfig{
 // ErrNoFilter is returned when a filter does not exist.
 var ErrNoFilter = errors.New("no filter")
 
-// ErrRefreshTimedOut is returned when refresh is expired.
+// ErrRefreshTimedOut is returned when a consumer no longer holds a lock.
 var ErrRefreshTimedOut = errors.New("refresh timed out")
 
 // ErrNoMessage is returned when there are no messages to work on.
@@ -44,8 +44,7 @@ var ErrNoMessage = errors.New("no queued messages")
 // ErrPopFromEmpty is returned when a pop from the processing queue returns no result.
 var ErrPopFromEmpty = errors.New("processing queue is empty; expected one message")
 
-// ErrUnexpectedMessage is returned when the message that was handled is not the
-// message that is in the processing queue.
+// ErrUnexpectedMessage is returned when the message that was handled is not the same message that is in the processing queue.
 var ErrUnexpectedMessage = errors.New("message in processing queue is not the message that was handled")
 
 // RefreshConfig configures how deep refreshes are ran.
@@ -56,12 +55,12 @@ type RefreshConfig struct {
 	DataloaderDefaultMaxBatch int           // The max batch size before submitting a batch
 	DataloaderDefaultWaitTime time.Duration // Max time to wait before submitting a batch
 	RefreshQueueName          string        // The name of the queue to buffer refreshes
-	RefreshLockName           string        // The name of the lock to acquire refreshes
+	RefreshLockName           string        // The name of the lock ask permission to run a refresh
 	MaxConcurrentRuns         int           // The number of refreshes that can run concurrently
-	Liveness                  int           // How often jobs needs to refresh their locks
+	Liveness                  int           // How frequently a consumer needs to refresh its lock
 }
 
-// RefreshQueue buffers deep refresh requests.
+// RefreshQueue buffers refresh requests.
 type RefreshQueue struct {
 	q *memstore.FifoQueue
 }

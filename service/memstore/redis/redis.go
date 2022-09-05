@@ -113,8 +113,8 @@ func (c *Cache) Close(clear bool) error {
 
 // FifoQueue implements a reliable unique FIFO queue.
 // When an message is popped from the pending queue it gets added to the processing queue which
-// is unique identifier for that consumer. When the consumer is done with the message, it is
-// responsible for removing the message from the processing queue.
+// is unique for that consumer. When the consumer is done with the message, it is responsible
+// for removing the message from its processing queue.
 //
 // TODOs:
 // * Add another process to figure out what to do with unacked messages like putting the message

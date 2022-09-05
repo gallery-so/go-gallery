@@ -586,15 +586,24 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		isRunning, err := refreshLock.Exists(ctx, message)
 		if err != nil {
 			logger.For(ctx).WithError(err).Errorf("failed to check if already being refreshed")
+			if err := refreshQueue.Ack(ctx, message); err != nil {
+				panic(err)
+			}
 			continue
 		}
 		if isRunning {
 			logger.For(ctx).Info("refresh already running, skipping")
+			if err := refreshQueue.Ack(ctx, message); err != nil {
+				panic(err)
+			}
 			continue
 		}
 
 		acquired, err := refreshLock.Acquire(ctx, message)
 		if err != nil {
+			if err := refreshQueue.ReAdd(ctx, message); err != nil {
+				panic(err)
+			}
 			panic(err)
 		}
 		if !acquired {
@@ -607,7 +616,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 		span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "handleMessage", sentry.TransactionName("indexer-server:deepRefresh"))
 
-		fm := NewBlockFilterManager(ctx, queries)
+		filterManager := NewBlockFilterManager(ctx, queries)
 
 		// Don't run past the Indexer
 		// XXX: indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
@@ -629,7 +638,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			refresh := func() {
 				ctx := sentryutil.NewSentryHubContext(ctx)
 
-				exists, err := AddressExists(fm, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
+				exists, err := AddressExists(filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
 				if err != nil {
 					if err != ErrNoFilter {
 						logger.For(ctx).WithError(err).Warnf("failed to check address")
@@ -638,7 +647,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 				}
 
 				// Don't need the filter anymore
-				fm.Clear(ctx, b, b+persist.BlockNumber(blocksPerLogsCall))
+				filterManager.Clear(ctx, b, b+persist.BlockNumber(blocksPerLogsCall))
 
 				if exists {
 					transferCh := make(chan []transfersAtBlock)
@@ -659,6 +668,9 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 					refreshed, err := refreshLock.Refresh(ctx, message)
 					if err != nil || !refreshed {
+						if err := refreshQueue.Ack(ctx, message); err != nil {
+							panic(err)
+						}
 						panic(ErrRefreshTimedOut)
 					}
 				}
@@ -674,8 +686,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		refreshPool.StopWait()
 
 		// Finish the message
-		err = refreshQueue.Ack(ctx, message)
-		if err != nil {
+		if err := refreshQueue.Ack(ctx, message); err != nil {
 			panic(err)
 		}
 
@@ -694,12 +705,17 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 // filterTransfers checks each transfer against the input and returns ones that match the criteria.
 func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers []rpc.Transfer) []rpc.Transfer {
+	// Filters transfers matching the input address
 	ownerFilter := func(t rpc.Transfer) bool {
 		return t.To.String() == input.OwnerAddress.String() || t.From.String() == input.OwnerAddress.String()
 	}
+
+	// Filters transfers matching the input contract
 	contractFilter := func(t rpc.Transfer) bool {
 		return t.ContractAddress.String() == input.ContractAddress.String()
 	}
+
+	// Filters transfers matching the input contract and token
 	tokenFilter := func(t rpc.Transfer) bool {
 		return contractFilter(t) && (t.TokenID.String() == input.TokenID.String())
 	}
@@ -721,7 +737,7 @@ func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers
 		return []rpc.Transfer{}
 	}
 
-	result := make([]rpc.Transfer, 0)
+	result := make([]rpc.Transfer, 0, len(transfers))
 
 	for _, transfer := range transfers {
 		if criteria(transfer) {
