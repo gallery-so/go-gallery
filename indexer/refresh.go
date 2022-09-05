@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/bits-and-blooms/bloom"
@@ -23,7 +22,7 @@ var defaultRefreshConfig RefreshConfig = RefreshConfig{
 	// XXX: DefaultNoMessageWaitTime:  5 * time.Minute,
 	DefaultNoMessageWaitTime:  5 * time.Second,
 	DefaultPoolSize:           defaultWorkerPoolSize,
-	LookbackWindow:            100000,
+	LookbackWindow:            1400000,
 	DataloaderDefaultMaxBatch: 0, // no restriction on batch size
 	DataloaderDefaultWaitTime: 2 * time.Millisecond,
 	RefreshQueueName:          "deepRefresh:addressQueue",
@@ -172,27 +171,18 @@ func NewRefreshLock() *RefreshLock {
 }
 
 // Acquire attempts to acquire permission to run a refresh.
-func (r *RefreshLock) Acquire(ctx context.Context, input UpdateTokenMediaInput) (bool, error) {
-	key := fmt.Sprintf("%s:%s:%s", input.OwnerAddress, input.ContractAddress, input.TokenID)
-	return r.s.Acquire(ctx, key)
+func (r *RefreshLock) Acquire(ctx context.Context) (bool, error) {
+	return r.s.Acquire(ctx)
 }
 
 // Release removes a refresh from the running jobs.
-func (r *RefreshLock) Release(ctx context.Context, input UpdateTokenMediaInput) (bool, error) {
-	key := fmt.Sprintf("%s:%s:%s", input.OwnerAddress, input.ContractAddress, input.TokenID)
-	return r.s.Release(ctx, key)
+func (r *RefreshLock) Release(ctx context.Context) (bool, error) {
+	return r.s.Release(ctx)
 }
 
 // Refresh updates the lease on a running job.
-func (r *RefreshLock) Refresh(ctx context.Context, input UpdateTokenMediaInput) (bool, error) {
-	key := fmt.Sprintf("%s:%s:%s", input.OwnerAddress, input.ContractAddress, input.TokenID)
-	return r.s.Refresh(ctx, key)
-}
-
-// Exists checks if a job is already running.
-func (r *RefreshLock) Exists(ctx context.Context, input UpdateTokenMediaInput) (bool, error) {
-	key := fmt.Sprintf("%s:%s:%s", input.OwnerAddress, input.ContractAddress, input.TokenID)
-	return r.s.Exists(ctx, key)
+func (r *RefreshLock) Refresh(ctx context.Context) (bool, error) {
+	return r.s.Refresh(ctx)
 }
 
 // AddressExists checks if an address transacted in a block range.

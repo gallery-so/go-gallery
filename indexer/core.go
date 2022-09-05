@@ -182,18 +182,17 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	// XXX: if viper.GetString("ENV") == "local" {
-	// XXX: 	logger.For(nil).Info("skipping sentry init")
-	// XXX: 	return
-	// XXX: }
+	if viper.GetString("ENV") == "local" {
+		logger.For(nil).Info("skipping sentry init")
+		return
+	}
 
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:         viper.GetString("SENTRY_DSN"),
-		Environment: viper.GetString("ENV"),
-		// XXX: TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
-		TracesSampleRate: 1.0,
+		Dsn:              viper.GetString("SENTRY_DSN"),
+		Environment:      viper.GetString("ENV"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)

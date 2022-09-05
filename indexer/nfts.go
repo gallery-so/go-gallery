@@ -575,7 +575,6 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 	for {
 		message, err := refreshQueue.Get(ctx)
 		if err == ErrNoMessage {
-			logger.For(ctx).WithError(err).Info("no pending refreshes, sleeping")
 			time.Sleep(defaultRefreshConfig.DefaultNoMessageWaitTime)
 			continue
 		}
@@ -583,30 +582,16 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			panic(err)
 		}
 
-		isRunning, err := refreshLock.Exists(ctx, message)
+		acquired, err := refreshLock.Acquire(ctx)
 		if err != nil {
-			logger.For(ctx).WithError(err).Errorf("failed to check if already being refreshed")
-			if err := refreshQueue.Ack(ctx, message); err != nil {
-				panic(err)
-			}
-			continue
-		}
-		if isRunning {
-			logger.For(ctx).Info("refresh already running, skipping")
-			if err := refreshQueue.Ack(ctx, message); err != nil {
-				panic(err)
-			}
-			continue
-		}
-
-		acquired, err := refreshLock.Acquire(ctx, message)
-		if err != nil {
+			logger.For(ctx).WithError(err).Errorf("failed to acquire lock")
 			if err := refreshQueue.ReAdd(ctx, message); err != nil {
 				panic(err)
 			}
 			panic(err)
 		}
 		if !acquired {
+			logger.For(ctx).Errorf("too many refreshes runnning, waiting")
 			if err := refreshQueue.ReAdd(ctx, message); err != nil {
 				panic(err)
 			}
@@ -666,7 +651,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 					go idxr.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
 					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, nil)
 
-					refreshed, err := refreshLock.Refresh(ctx, message)
+					refreshed, err := refreshLock.Refresh(ctx)
 					if err != nil || !refreshed {
 						if err := refreshQueue.Ack(ctx, message); err != nil {
 							panic(err)
@@ -691,7 +676,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		}
 
 		// Release lock
-		released, err := refreshLock.Release(ctx, message)
+		released, err := refreshLock.Release(ctx)
 		if err != nil {
 			logger.For(ctx).WithError(err).Error("failed to release refresh")
 		}

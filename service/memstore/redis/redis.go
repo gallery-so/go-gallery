@@ -129,11 +129,7 @@ type FifoQueue struct {
 
 // NewFifoQueue returns a connection to a new connection to a queue.
 func NewFifoQueue(db int, name string) *FifoQueue {
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
-	id := fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix())
+	id := consumerID()
 	return &FifoQueue{
 		client:     newRedisClient(db),
 		pending:    fmt.Sprintf("%s:%s", name, "pending"),
@@ -145,16 +141,22 @@ func NewFifoQueue(db int, name string) *FifoQueue {
 // Push adds an item to the end of the queue.
 func (q *FifoQueue) Push(ctx context.Context, value interface{}) (bool, error) {
 	added, err := q.client.Do(ctx, "ZADD", q.pending, "NX", float64(time.Now().Unix()), value).Int()
-	return added > 1, err
+	if err != nil {
+		return false, err
+	}
+	return added > 0, err
 }
 
 // LPush adds an item to the beginning of the queue.
 func (q *FifoQueue) LPush(ctx context.Context, value interface{}) (bool, error) {
 	added, err := q.client.Do(ctx, "ZADD", q.pending, "NX", "-INF", value).Int()
-	return added > 1, err
+	if err != nil {
+		return false, err
+	}
+	return added > 0, err
 }
 
-// popMessage atomically receives a message from the pending queue and adds it to the processing queue.
+// popMessage atomically receives a message from the pending queue and adds it to processing.
 var popMessage *redis.Script = redis.NewScript(`
 	local item = redis.call("ZPOPMIN", KEYS[1])
 	if item[1] == nil then
@@ -164,7 +166,7 @@ var popMessage *redis.Script = redis.NewScript(`
 	return item[1]
 `)
 
-// Pop removes the earliest item from the pending queue and adds it to the processing queue.
+// Pop removes the earliest item from the pending queue and adds it to processing.
 func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error) {
 	item, err := popMessage.Run(ctx, q.client, []string{q.pending, q.processing}, q.id).Result()
 	if err != nil {
@@ -187,6 +189,7 @@ type Semaphore struct {
 	counter string
 	cap     int
 	timeout int
+	id      string
 }
 
 // NewSemaphore returns a new instance of a Sempahore.
@@ -198,18 +201,19 @@ func NewSemaphore(db int, name string, cap, timeout int) *Semaphore {
 		counter: fmt.Sprintf("%s:%s", name, "counter"),
 		cap:     cap,
 		timeout: timeout,
+		id:      consumerID(),
 	}
 }
 
 // Acquire attempts to acquire a semaphore.
-func (s *Semaphore) Acquire(ctx context.Context, id string) (bool, error) {
+func (s *Semaphore) Acquire(ctx context.Context) (bool, error) {
 	pipe := s.client.Pipeline()
 	defer pipe.Close()
 
 	// Timeout old holders
 	done := time.Now().Unix() - int64(s.timeout)
 	pipe.ZRemRangeByScore(ctx, s.name, "-inf", fmt.Sprintf("%d", done))
-	pipe.ZInterWithScores(ctx, &redis.ZStore{
+	pipe.ZInterStore(ctx, s.owners, &redis.ZStore{
 		Keys:      []string{s.owners, s.name},
 		Weights:   []float64{1, 0},
 		Aggregate: "SUM",
@@ -222,9 +226,9 @@ func (s *Semaphore) Acquire(ctx context.Context, id string) (bool, error) {
 	}
 
 	// Try to acquire the semaphore
-	pipe.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), id)
-	pipe.Do(ctx, "ZADD", s.owners, count.Val(), id)
-	rank := pipe.ZRank(ctx, s.name, id)
+	pipe.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), s.id)
+	pipe.Do(ctx, "ZADD", s.owners, count.Val(), s.id)
+	rank := pipe.ZRank(ctx, s.owners, s.id)
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return false, err
@@ -236,19 +240,19 @@ func (s *Semaphore) Acquire(ctx context.Context, id string) (bool, error) {
 	}
 
 	// Failed to acquire, remove from the set
-	pipe.ZRem(ctx, s.name, id)
-	pipe.ZRem(ctx, s.owners, id)
+	pipe.ZRem(ctx, s.name, s.id)
+	pipe.ZRem(ctx, s.owners, s.id)
 	_, err = pipe.Exec(ctx)
 	return false, err
 }
 
 // Release releases a semaphore.
-func (s *Semaphore) Release(ctx context.Context, id string) (bool, error) {
+func (s *Semaphore) Release(ctx context.Context) (bool, error) {
 	pipe := s.client.Pipeline()
 	defer pipe.Close()
 
-	removed := pipe.ZRem(ctx, s.name, id)
-	pipe.ZRem(ctx, s.owners, id)
+	removed := pipe.ZRem(ctx, s.name, s.id)
+	pipe.ZRem(ctx, s.owners, s.id)
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {
@@ -259,30 +263,26 @@ func (s *Semaphore) Release(ctx context.Context, id string) (bool, error) {
 }
 
 // Refresh increases the lease on a held sempahore.
-func (s *Semaphore) Refresh(ctx context.Context, id string) (bool, error) {
+func (s *Semaphore) Refresh(ctx context.Context) (bool, error) {
 	// Try to update the lease.
-	result, err := s.client.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), id).Int()
+	result, err := s.client.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), s.id).Int()
 	if err != nil {
 		return false, err
 	}
 
 	// Semaphore was lost already
 	if result > 0 {
-		_, err := s.client.ZRem(ctx, s.name, id).Result()
+		_, err := s.client.ZRem(ctx, s.name, s.id).Result()
 		return false, err
 	}
 
 	return true, nil
 }
 
-// Exists returns true if a semaphore is held by the id.
-func (s *Semaphore) Exists(ctx context.Context, id string) (bool, error) {
-	_, err := s.client.ZScore(ctx, s.name, id).Result()
-	if err == redis.Nil {
-		return false, nil
-	}
+func consumerID() string {
+	hostname, err := os.Hostname()
 	if err != nil {
-		return false, err
+		panic(err)
 	}
-	return true, nil
+	return fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix())
 }
