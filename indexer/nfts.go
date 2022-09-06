@@ -586,7 +586,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 		acquired, err := refreshLock.Acquire(ctx)
 		if err != nil {
-			logger.For(ctx).WithError(err).Errorf("failed to acquire lock")
+			logger.For(ctx).WithError(err).Errorf("error occurred acquiring lock")
 			if err := refreshQueue.ReAdd(ctx, message); err != nil {
 				panic(err)
 			}
@@ -606,19 +606,17 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		filterManager := NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
 
 		// Don't run past the Indexer
-		// XXX: indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
-		// XXX: if err != nil {
-		// XXX: 	panic(err)
-		// XXX: }
+		indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
+		if err != nil {
+			panic(err)
+		}
 
 		// Normalize blocks
-		var indexerBlock persist.BlockNumber = 15400000
 		indexerBlock -= indexerBlock % blocksPerLogsCall
-		var startBlock persist.BlockNumber = 14000000
-		// XXX: startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
-		// XXX: if startBlock < defaultStartingBlock {
-		// XXX: 	startBlock = defaultStartingBlock
-		// XXX: }
+		startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
+		if startBlock < defaultStartingBlock {
+			startBlock = defaultStartingBlock
+		}
 
 		refreshPool := workerpool.New(defaultRefreshConfig.DefaultPoolSize)
 		for block := persist.BlockNumber(startBlock); block < indexerBlock; block += persist.BlockNumber(blocksPerLogsCall) {
@@ -656,7 +654,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 					refreshed, err := refreshLock.Refresh(ctx)
 					if err != nil || !refreshed {
-						if err := refreshQueue.Ack(ctx, message); err != nil {
+						if err := refreshQueue.ReAdd(ctx, message); err != nil {
 							panic(err)
 						}
 						panic(ErrRefreshTimedOut)

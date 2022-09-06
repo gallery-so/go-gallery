@@ -113,8 +113,8 @@ func (c *Cache) Close(clear bool) error {
 
 // FifoQueue implements a reliable unique FIFO queue.
 // When an message is popped from the pending queue it gets added to the processing queue which
-// is unique for that consumer. When the consumer is done with the message, it is responsible
-// for removing the message from its processing queue.
+// is unique to that consumer. When the consumer is done with the message, it is responsible
+// for removing the message from its processing queue by calling `Ack`.
 //
 // TODOs:
 // * Add another process to figure out what to do with unacked messages like putting the message
@@ -127,7 +127,7 @@ type FifoQueue struct {
 	id         string
 }
 
-// NewFifoQueue returns a connection to a new connection to a queue.
+// NewFifoQueue returns a new connection to a queue.
 func NewFifoQueue(db int, name string) *FifoQueue {
 	id := consumerID()
 	return &FifoQueue{
@@ -141,15 +141,6 @@ func NewFifoQueue(db int, name string) *FifoQueue {
 // Push adds an item to the end of the queue.
 func (q *FifoQueue) Push(ctx context.Context, value interface{}) (bool, error) {
 	added, err := q.client.Do(ctx, "ZADD", q.pending, "NX", float64(time.Now().Unix()), value).Int()
-	if err != nil {
-		return false, err
-	}
-	return added > 0, err
-}
-
-// LPush adds an item to the beginning of the queue.
-func (q *FifoQueue) LPush(ctx context.Context, value interface{}) (bool, error) {
-	added, err := q.client.Do(ctx, "ZADD", q.pending, "NX", "-INF", value).Int()
 	if err != nil {
 		return false, err
 	}

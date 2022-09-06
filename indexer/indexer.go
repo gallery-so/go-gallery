@@ -35,8 +35,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// XXX: var defaultStartingBlock persist.BlockNumber = 5000000
-var defaultStartingBlock persist.BlockNumber = 10000000
+var defaultStartingBlock persist.BlockNumber = 5000000
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
@@ -191,22 +190,20 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 
 // Start begins indexing events from the blockchain
 func (i *indexer) Start(rootCtx context.Context) {
-	// XXX: ctx, cancel := context.WithTimeout(rootCtx, time.Minute)
-	// XXX: defer cancel()
+	ctx, cancel := context.WithTimeout(rootCtx, time.Minute)
+	defer cancel()
 
 	lastSyncedBlock := defaultStartingBlock
-	i.mostRecentBlock = 10001000
-	// XXX: recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
-	// XXX: if err == nil && recentDBBlock > defaultStartingBlock {
-	// XXX: 	lastSyncedBlock = recentDBBlock
-	// XXX: }
+	recentDBBlock, err := i.tokenRepo.MostRecentBlock(ctx)
+	if err == nil && recentDBBlock > defaultStartingBlock {
+		lastSyncedBlock = recentDBBlock
+	}
 
-	// XXX: remainder := lastSyncedBlock % blocksPerLogsCall
-	// XXX: lastSyncedBlock -= (remainder + (blocksPerLogsCall * defaultWorkerPoolWaitSize))
-	// XXX: i.lastSyncedBlock = uint64(lastSyncedBlock)
+	remainder := lastSyncedBlock % blocksPerLogsCall
+	lastSyncedBlock -= (remainder + (blocksPerLogsCall * defaultWorkerPoolWaitSize))
+	i.lastSyncedBlock = uint64(lastSyncedBlock)
 
-	// XXX: wp := workerpool.New(defaultWorkerPoolSize)
-	wp := workerpool.New(1)
+	wp := workerpool.New(defaultWorkerPoolSize)
 
 	events := make([]common.Hash, len(i.eventHashes))
 	for i, event := range i.eventHashes {
@@ -215,7 +212,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 
 	topics := [][]common.Hash{events}
 
-	// XXX: go i.listenForNewBlocks(sentryutil.NewSentryHubContext(rootCtx))
+	go i.listenForNewBlocks(sentryutil.NewSentryHubContext(rootCtx))
 
 	for ; lastSyncedBlock.Uint64() < atomic.LoadUint64(&i.mostRecentBlock); lastSyncedBlock += blocksPerLogsCall {
 		input := lastSyncedBlock
@@ -233,8 +230,6 @@ func (i *indexer) Start(rootCtx context.Context) {
 		}
 	}
 	wp.StopWait()
-	logger.For(rootCtx).Info("done!")
-	return
 	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
 	i.lastSavedLog = uint64(lastSyncedBlock)
@@ -1182,7 +1177,7 @@ func storeErr(ctx context.Context, err error, prefix string, from persist.Ethere
 	}
 }
 
-func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) error {
+func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) {
 	logger.For(ctx).Infof("Saving logs in block range %s to %s", curBlock, nextBlock)
 	obj := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
 	obj.Delete(ctx)
@@ -1192,9 +1187,8 @@ func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsT
 		panic(err)
 	}
 	if err := storageWriter.Close(); err != nil {
-		return err
+		panic(err)
 	}
-	return nil
 }
 
 func recoverAndWait(ctx context.Context) {

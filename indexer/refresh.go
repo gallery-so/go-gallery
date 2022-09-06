@@ -25,13 +25,12 @@ import (
 )
 
 var defaultRefreshConfig RefreshConfig = RefreshConfig{
-	// XXX: DefaultNoMessageWaitTime:  5 * time.Minute,
-	DefaultNoMessageWaitTime:  5 * time.Second,
+	DefaultNoMessageWaitTime:  2 * time.Minute,
 	DefaultPoolSize:           defaultWorkerPoolSize,
 	ChunkSize:                 10000,
 	CacheSize:                 8,
 	ChunkWorkerSize:           128,
-	LookbackWindow:            1400000,
+	LookbackWindow:            5000000,
 	DataloaderDefaultMaxBatch: 1000,
 	DataloaderDefaultWaitTime: 2 * time.Millisecond,
 	RefreshQueueName:          "deepRefresh:addressQueue",
@@ -52,7 +51,7 @@ var ErrNoMessage = errors.New("no queued messages")
 // ErrPopFromEmpty is returned when a pop from the processing queue returns no result.
 var ErrPopFromEmpty = errors.New("processing queue is empty; expected one message")
 
-// ErrUnexpectedMessage is returned when the message that was handled is not the same message that is in the processing queue.
+// ErrUnexpectedMessage is returned when the message that was handled is not the same message that is in the consumer's processing queue.
 var ErrUnexpectedMessage = errors.New("message in processing queue is not the message that was handled")
 
 // RefreshConfig configures how deep refreshes are ran.
@@ -60,13 +59,13 @@ type RefreshConfig struct {
 	DefaultNoMessageWaitTime  time.Duration // How long to wait before polling for a message
 	DefaultPoolSize           int           // Number of workers to allocate to a refresh
 	LookbackWindow            int           // Refreshes will start this many blocks before the last indexer block processed
-	ChunkSize                 int           // The number of filters in a chunk
-	CacheSize                 int           // The number of chunks to keep on disk
+	ChunkSize                 int           // The number of filters to download per chunk
+	CacheSize                 int           // The number of chunks to keep on disk at a time
 	ChunkWorkerSize           int           // The number of workers used to download a chunk
 	DataloaderDefaultMaxBatch int           // The max batch size before submitting a batch
 	DataloaderDefaultWaitTime time.Duration // Max time to wait before submitting a batch
 	RefreshQueueName          string        // The name of the queue to buffer refreshes
-	RefreshLockName           string        // The name of the lock ask permission to run a refresh
+	RefreshLockName           string        // The name of the lock which grants permission to run a refresh
 	MaxConcurrentRuns         int           // The number of refreshes that can run concurrently
 	Liveness                  int           // How frequently a consumer needs to refresh its lock
 }
@@ -98,7 +97,7 @@ func (r *RefreshQueue) Add(ctx context.Context, input UpdateTokenMediaInput) err
 	return nil
 }
 
-// Get blocks until a message is received from the queue.
+// Get gets a message from the queue.
 func (r *RefreshQueue) Get(ctx context.Context) (UpdateTokenMediaInput, error) {
 	queued, err := r.q.Pop(ctx, 0)
 	if err == redis.Nil {
@@ -140,9 +139,9 @@ func (r *RefreshQueue) Ack(ctx context.Context, processed UpdateTokenMediaInput)
 	return nil
 }
 
-// ReAdd adds a message to the top of the queue.
+// ReAdd puts a message back in the queue.
 func (r *RefreshQueue) ReAdd(ctx context.Context, input UpdateTokenMediaInput) error {
-	// Remove from processing queue.
+	// Remove from processing queue
 	err := r.Ack(ctx, input)
 	if err != nil {
 		return err
@@ -153,8 +152,8 @@ func (r *RefreshQueue) ReAdd(ctx context.Context, input UpdateTokenMediaInput) e
 		return err
 	}
 
-	// Add to front of pending queue.
-	added, err := r.q.LPush(ctx, message)
+	// Add back to pending queue
+	added, err := r.q.Push(ctx, message)
 	if err != nil {
 		return err
 	}
@@ -304,7 +303,7 @@ func (b *BlockFilterManager) prime(ctx context.Context, chunkStart persist.Block
 	return nil
 }
 
-// filterFetcher is an unexported type that handles the downloading of a chunk of filter objects.
+// filterFetcher is an unexported type that handles the downloading a chunk of filter objects.
 type filterFetcher struct {
 	chunkSize  int
 	workerSize int

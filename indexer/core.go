@@ -114,8 +114,7 @@ func coreInitServer() *gin.Engine {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		// XXX: logrus.SetLevel(logrus.DebugLevel)
-		logrus.SetLevel(logrus.InfoLevel)
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	logger.For(ctx).Info("Registering handlers...")
@@ -212,8 +211,7 @@ func initLogger() {
 		l.SetReportCaller(true)
 
 		if viper.GetString("ENV") != "production" {
-			// XXX: l.SetLevel(logrus.DebugLevel)
-			l.SetLevel(logrus.InfoLevel)
+			l.SetLevel(logrus.DebugLevel)
 		}
 
 		if viper.GetString("ENV") == "local" {
@@ -230,8 +228,7 @@ func initLogger() {
 func configureRootContext() context.Context {
 	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
 	if viper.GetString("ENV") != "production" {
-		// XXX: logger.For(ctx).Logger.SetLevel(logrus.DebugLevel)
-		logger.For(ctx).Logger.SetLevel(logrus.InfoLevel)
+		logger.For(ctx).Logger.SetLevel(logrus.DebugLevel)
 	}
 	logger.For(ctx).Logger.SetReportCaller(true)
 	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
