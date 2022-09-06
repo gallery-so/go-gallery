@@ -582,6 +582,8 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			panic(err)
 		}
 
+		start := time.Now()
+
 		acquired, err := refreshLock.Acquire(ctx)
 		if err != nil {
 			logger.For(ctx).WithError(err).Errorf("failed to acquire lock")
@@ -601,7 +603,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 		span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "handleMessage", sentry.TransactionName("indexer-server:deepRefresh"))
 
-		filterManager := NewBlockFilterManager(ctx, queries)
+		filterManager := NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
 
 		// Don't run past the Indexer
 		// XXX: indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
@@ -610,12 +612,13 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		// XXX: }
 
 		// Normalize blocks
-		var indexerBlock persist.BlockNumber = 15100000
+		var indexerBlock persist.BlockNumber = 15400000
 		indexerBlock -= indexerBlock % blocksPerLogsCall
-		startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
-		if startBlock < defaultStartingBlock {
-			startBlock = defaultStartingBlock
-		}
+		var startBlock persist.BlockNumber = 14000000
+		// XXX: startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
+		// XXX: if startBlock < defaultStartingBlock {
+		// XXX: 	startBlock = defaultStartingBlock
+		// XXX: }
 
 		refreshPool := workerpool.New(defaultRefreshConfig.DefaultPoolSize)
 		for block := persist.BlockNumber(startBlock); block < indexerBlock; block += persist.BlockNumber(blocksPerLogsCall) {
@@ -623,7 +626,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			refresh := func() {
 				ctx := sentryutil.NewSentryHubContext(ctx)
 
-				exists, err := AddressExists(filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
+				exists, err := AddressExists(ctx, filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
 				if err != nil {
 					if err != ErrNoFilter {
 						logger.For(ctx).WithError(err).Warnf("failed to check address")
@@ -683,6 +686,11 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		if !released {
 			logger.For(ctx).Error("refresh had already timed out")
 		}
+
+		// Delete filters
+		filterManager.Close()
+
+		logger.For(ctx).Infof("refresh finished in %v", time.Now().Sub(start))
 
 		span.Finish()
 	}
