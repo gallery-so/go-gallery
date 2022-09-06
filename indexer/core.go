@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
@@ -115,7 +117,7 @@ func coreInitServer() *gin.Engine {
 }
 
 func setDefaults() {
-	viper.SetDefault("RPC_URL", "https://eth-mainnet.alchemyapi.io/v2/Lxc2B4z57qtwik_KfOS0I476UUUmXT86")
+	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
 	viper.SetDefault("IPFS_PROJECT_ID", "")
@@ -139,6 +141,22 @@ func setDefaults() {
 	}
 
 	viper.AutomaticEnv()
+
+	if viper.GetString("ENV") == "local" {
+		path, err := util.FindFile("_internal/app-local-indexer.yaml", 3)
+		if err != nil {
+			panic(err)
+		}
+
+		viper.SetConfigFile(path)
+		if err := viper.ReadInConfig(); err != nil {
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _internal directory is decrypted and up-to-date", err))
+		}
+	}
+
+	if viper.GetString("RPC_URL") == "" {
+		panic("RPC_URL must be set")
+	}
 }
 
 func newRepos() (persist.TokenRepository, persist.ContractRepository) {
