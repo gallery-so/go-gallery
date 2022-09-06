@@ -157,7 +157,7 @@ func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client, retry
 	var err error
 	for i := 0; i < retry.Tries; i++ {
 		height, err = GetBlockNumber(ctx, ethClient)
-		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+		if !isRateLimitedError(err) {
 			break
 		}
 		retry.Sleep(i)
@@ -176,7 +176,7 @@ func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethere
 	var err error
 	for i := 0; i < retry.Tries; i++ {
 		logs, err = GetLogs(ctx, ethClient, query)
-		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+		if !isRateLimitedError(err) {
 			break
 		}
 		retry.Sleep(i)
@@ -196,7 +196,7 @@ func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHas
 	var err error
 	for i := 0; i < retry.Tries; i++ {
 		tx, pending, err = GetTransaction(ctx, ethClient, txHash)
-		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+		if !isRateLimitedError(err) {
 			break
 		}
 		retry.Sleep(i)
@@ -234,7 +234,7 @@ func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.
 	var err error
 	for i := 0; i < retry.Tries; i++ {
 		metadata, err = GetTokenContractMetadata(ctx, contractAddress, ethClient)
-		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+		if !isRateLimitedError(err) {
 			break
 		}
 		retry.Sleep(i)
@@ -560,7 +560,7 @@ func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contract
 	var err error
 	for i := 0; i < retry.Tries; i++ {
 		u, err = GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
-		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+		if !isRateLimitedError(err) {
 			break
 		}
 		retry.Sleep(i)
@@ -593,7 +593,7 @@ func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContract
 	var err error
 	for i := 0; i < retry.Tries; i++ {
 		balance, err = GetBalanceOfERC1155Token(ctx, pOwnerAddress, pContractAddress, pTokenID, ethClient)
-		if err == nil || !strings.Contains(err.Error(), rateLimited) {
+		if !isRateLimitedError(err) {
 			break
 		}
 		retry.Sleep(i)
@@ -769,4 +769,11 @@ func padHex(pHex string, pLength int) string {
 
 func (h ErrHTTP) Error() string {
 	return fmt.Sprintf("HTTP Error Status - %d | URL - %s", h.Status, h.URL)
+}
+
+func isRateLimitedError(err error) bool {
+	if err != nil && strings.Contains(err.Error(), rateLimited) {
+		return true
+	}
+	return false
 }

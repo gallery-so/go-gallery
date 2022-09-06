@@ -36,8 +36,8 @@ type TransferPlugins struct {
 	refresh  refreshPlugin
 }
 
-// Receiver receives the results of a plugin.
-type Receiver func()
+// PluginReceiver receives the results of a plugin.
+type PluginReceiver func()
 
 func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Context) {
 	return tracing.StartSpan(ctx, "indexer.runPlugin", pluginName)
@@ -70,7 +70,7 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 }
 
 // ReceivePlugins blocks until all plugins have completed.
-func ReceivePlugins(ctx context.Context, wg *sync.WaitGroup, receivers []Receiver) {
+func ReceivePlugins(ctx context.Context, wg *sync.WaitGroup, receivers []PluginReceiver) {
 	span, _ := startSpan(ctx, "receivePlugins")
 	defer tracing.FinishSpan(span)
 
@@ -81,7 +81,7 @@ func ReceivePlugins(ctx context.Context, wg *sync.WaitGroup, receivers []Receive
 }
 
 // AddReceiver adds a receiver to the list of receivers to synchronize.
-func AddReceiver(wg *sync.WaitGroup, receivers []Receiver, receiver Receiver) []Receiver {
+func AddReceiver(wg *sync.WaitGroup, receivers []PluginReceiver, receiver PluginReceiver) []PluginReceiver {
 	wg.Add(1)
 	return append(receivers, receiver)
 }

@@ -147,7 +147,7 @@ func (q *FifoQueue) Push(ctx context.Context, value interface{}) (bool, error) {
 	return added > 0, err
 }
 
-// popMessage atomically receives a message from the pending queue and adds it to processing.
+// popMessage atomically receives a message from the pending queue and adds it to the consumer's processing queue.
 var popMessage *redis.Script = redis.NewScript(`
 	local item = redis.call("ZPOPMIN", KEYS[1])
 	if item[1] == nil then
@@ -157,7 +157,7 @@ var popMessage *redis.Script = redis.NewScript(`
 	return item[1]
 `)
 
-// Pop removes the earliest item from the pending queue and adds it to processing.
+// Pop removes the earliest item from the pending queue and adds it to the consumer's processing queue.
 func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error) {
 	item, err := popMessage.Run(ctx, q.client, []string{q.pending, q.processing}, q.id).Result()
 	if err != nil {
@@ -166,7 +166,7 @@ func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error)
 	return item.(string), nil
 }
 
-// Ack removes the last item from the processing queue.
+// Ack removes the last item from the consumer's processing queue.
 func (q *FifoQueue) Ack(ctx context.Context) (string, error) {
 	return q.client.RPop(ctx, q.processing).Result()
 }

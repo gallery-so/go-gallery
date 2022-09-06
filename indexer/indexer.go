@@ -730,7 +730,7 @@ func (i *indexer) processTokens(ctx context.Context,
 	metadatasMap := map[persist.EthereumTokenIdentifiers]tokenMetadata{}
 	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
 
-	receivers := make([]Receiver, 0)
+	receivers := make([]PluginReceiver, 0)
 	wg := &sync.WaitGroup{}
 
 	if uris != nil {
@@ -823,7 +823,7 @@ func ownersPluginReceiver(
 	ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock,
 	previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
 	tokenRepo persist.TokenRepository,
-) Receiver {
+) PluginReceiver {
 	return func() {
 		defer wg.Done()
 		for result := range results {
@@ -847,7 +847,7 @@ func balancesPluginReceiver(
 	results <-chan tokenBalances,
 	balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
 	tokenRepo persist.TokenRepository,
-) Receiver {
+) PluginReceiver {
 	return func() {
 		defer wg.Done()
 		for balance := range results {
@@ -881,7 +881,7 @@ func urisPluginReceiver(
 	wg *sync.WaitGroup,
 	results <-chan tokenURI,
 	urisMap map[persist.EthereumTokenIdentifiers]tokenURI,
-) Receiver {
+) PluginReceiver {
 	return func() {
 		defer wg.Done()
 		for uri := range results {
@@ -894,7 +894,7 @@ func refreshesPluginReceiver(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	results <-chan error,
-) Receiver {
+) PluginReceiver {
 	return func() {
 		defer wg.Done()
 		for err := range results {

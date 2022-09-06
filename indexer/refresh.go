@@ -210,18 +210,28 @@ type BlockFilterManager struct {
 	blocksPerLogFile int
 	chunkSize        int
 	fetchWorkerSize  int
-
-	loader   *AddressFilterLoader
-	lru      *lru.Cache
-	fetchers map[persist.BlockNumber]*filterFetcher
-	baseDir  string
-	mu       *sync.Mutex
+	loader           *AddressFilterLoader
+	lru              *lru.Cache
+	fetchers         map[persist.BlockNumber]*filterFetcher
+	baseDir          string
+	mu               *sync.Mutex
 }
 
 // NewBlockFilterManager returns a new instance of a BlockFilterManager.
 func NewBlockFilterManager(ctx context.Context, q *sqlc.Queries, blocksPerLogFile int) *BlockFilterManager {
 	var mu sync.Mutex
 	baseDir, err := os.MkdirTemp("", "*")
+	if err != nil {
+		panic(err)
+	}
+
+	lru, err := lru.NewWithEvict(defaultRefreshConfig.CacheSize, func(key, value interface{}) {
+		fetcher := value.(*filterFetcher)
+		err := fetcher.deleteChunk()
+		if err != nil {
+			panic(err)
+		}
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -238,19 +248,9 @@ func NewBlockFilterManager(ctx context.Context, q *sqlc.Queries, blocksPerLogFil
 		fetchers: make(map[persist.BlockNumber]*filterFetcher),
 		baseDir:  baseDir,
 		mu:       &mu,
+		lru:      lru,
 	}
 
-	lru, err := lru.NewWithEvict(defaultRefreshConfig.CacheSize, func(key, value interface{}) {
-		fetcher := value.(*filterFetcher)
-		err := fetcher.deleteChunk()
-		if err != nil {
-			panic(err)
-		}
-		// Allow re-priming
-		fetcher.done = nil
-	})
-
-	b.lru = lru
 	return &b
 }
 
@@ -303,7 +303,7 @@ func (b *BlockFilterManager) prime(ctx context.Context, chunkStart persist.Block
 	return nil
 }
 
-// filterFetcher is an unexported type that handles the downloading a chunk of filter objects.
+// filterFetcher is an unexported type that handles downloading a chunk of filter objects.
 type filterFetcher struct {
 	chunkSize  int
 	workerSize int
@@ -372,7 +372,7 @@ func (f *filterFetcher) deleteChunk() error {
 }
 
 func (f *filterFetcher) logFileName(from, to persist.BlockNumber) string {
-	return logFileName(f.outDir, from, to)
+	return filepath.Join(f.outDir, fmt.Sprintf("%s-%s", from, to))
 }
 
 func loadFromFile(path string) (*bloom.BloomFilter, error) {
@@ -422,10 +422,6 @@ func saveToFile(path string, bf *bloom.BloomFilter) error {
 
 	_, err = bf.WriteTo(f)
 	return err
-}
-
-func logFileName(outDir string, from, to persist.BlockNumber) string {
-	return filepath.Join(outDir, fmt.Sprintf("%s-%s", from, to))
 }
 
 func loadBlockFilter(ctx context.Context, q *sqlc.Queries) func([]sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
