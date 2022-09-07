@@ -21,7 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
+	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
@@ -564,7 +564,7 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 	}
 }
 
-func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refreshLock *RefreshLock, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, addressFilterRepository postgres.AddressFilterRepository, queries *sqlc.Queries) {
+func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refreshLock *RefreshLock, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, addressFilterRepository postgres.AddressFilterRepository, queries *db.Queries) {
 	idxr := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, addressFilterRepository, chain, defaultTransferEvents)
 
 	events := make([]common.Hash, len(idxr.eventHashes))
@@ -619,7 +619,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		refreshPool := workerpool.New(defaultRefreshConfig.DefaultPoolSize)
 		for block := persist.BlockNumber(startBlock); block < indexerBlock; block += persist.BlockNumber(blocksPerLogsCall) {
 			b := block
-			refresh := func() {
+			refreshPool.Submit(func() {
 				ctx := sentryutil.NewSentryHubContext(ctx)
 
 				exists, err := AddressExists(ctx, filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
@@ -658,13 +658,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 						panic(ErrRefreshTimedOut)
 					}
 				}
-			}
-
-			if refreshPool.WaitingQueueSize() > defaultRefreshConfig.DefaultPoolSize {
-				refreshPool.SubmitWait(refresh)
-			} else {
-				refreshPool.Submit(refresh)
-			}
+			})
 		}
 
 		refreshPool.StopWait()

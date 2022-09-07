@@ -6,11 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
-<<<<<<< HEAD
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-=======
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> a1c2c79 (Fix README commands)
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 )

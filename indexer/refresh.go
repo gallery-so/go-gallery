@@ -1,4 +1,4 @@
-//go:generate go run github.com/vektah/dataloaden AddressFilterLoader github.com/mikeydub/go-gallery/db/sqlc/indexergen.GetAddressFilterBatchParams github.com/mikeydub/go-gallery/db/sqlc/indexergen.AddressFilter
+//go:generate go run github.com/vektah/dataloaden AddressFilterLoader github.com/mikeydub/go-gallery/db/gen/indexerdb.GetAddressFilterBatchParams github.com/mikeydub/go-gallery/db/gen/indexerdb.AddressFilter
 
 package indexer
 
@@ -15,7 +15,7 @@ import (
 	"github.com/bits-and-blooms/bloom"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/jackc/pgx/v4"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
+	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	memstore "github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -218,7 +218,7 @@ type BlockFilterManager struct {
 }
 
 // NewBlockFilterManager returns a new instance of a BlockFilterManager.
-func NewBlockFilterManager(ctx context.Context, q *sqlc.Queries, blocksPerLogFile int) *BlockFilterManager {
+func NewBlockFilterManager(ctx context.Context, q *db.Queries, blocksPerLogFile int) *BlockFilterManager {
 	var mu sync.Mutex
 	baseDir, err := os.MkdirTemp("", "*")
 	if err != nil {
@@ -272,7 +272,7 @@ func (b *BlockFilterManager) Get(ctx context.Context, from, to persist.BlockNumb
 
 // Clear removes the filter from it's cache.
 func (b *BlockFilterManager) Clear(ctx context.Context, from, to persist.BlockNumber) {
-	b.loader.Clear(sqlc.GetAddressFilterBatchParams{FromBlock: from, ToBlock: to})
+	b.loader.Clear(db.GetAddressFilterBatchParams{FromBlock: from, ToBlock: to})
 }
 
 // Close deletes filters that have been loaded.
@@ -393,7 +393,7 @@ func loadFromFile(path string) (*bloom.BloomFilter, error) {
 }
 
 func loadFromRepo(ctx context.Context, from, to persist.BlockNumber, addressFilterLoader *AddressFilterLoader) (*bloom.BloomFilter, error) {
-	data, err := addressFilterLoader.Load(sqlc.GetAddressFilterBatchParams{
+	data, err := addressFilterLoader.Load(db.GetAddressFilterBatchParams{
 		FromBlock: from,
 		ToBlock:   to,
 	})
@@ -424,15 +424,15 @@ func saveToFile(path string, bf *bloom.BloomFilter) error {
 	return err
 }
 
-func loadBlockFilter(ctx context.Context, q *sqlc.Queries) func([]sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
-	return func(params []sqlc.GetAddressFilterBatchParams) ([]sqlc.AddressFilter, []error) {
-		filters := make([]sqlc.AddressFilter, len(params))
+func loadBlockFilter(ctx context.Context, q *db.Queries) func([]db.GetAddressFilterBatchParams) ([]db.AddressFilter, []error) {
+	return func(params []db.GetAddressFilterBatchParams) ([]db.AddressFilter, []error) {
+		filters := make([]db.AddressFilter, len(params))
 		errs := make([]error, len(params))
 
 		b := q.GetAddressFilterBatch(ctx, params)
 		defer b.Close()
 
-		b.QueryRow(func(i int, bf sqlc.AddressFilter, err error) {
+		b.QueryRow(func(i int, bf db.AddressFilter, err error) {
 			filters[i], errs[i] = bf, err
 		})
 

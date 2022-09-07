@@ -6,30 +6,14 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-=======
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // EventLoaderByIDConfig captures the config to create a new EventLoaderByID
 type EventLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-<<<<<<< HEAD
-<<<<<<< HEAD
 	Fetch func(keys []persist.DBID) ([]coredb.FeedEvent, []error)
-=======
-	Fetch func(keys []persist.DBID) ([]coregen.FeedEvent, []error)
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	Fetch func(keys []persist.DBID) ([]coregen.FeedEvent, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -50,15 +34,7 @@ func NewEventLoaderByID(config EventLoaderByIDConfig) *EventLoaderByID {
 // EventLoaderByID batches and caches requests
 type EventLoaderByID struct {
 	// this method provides the data for the loader
-<<<<<<< HEAD
-<<<<<<< HEAD
 	fetch func(keys []persist.DBID) ([]coredb.FeedEvent, []error)
-=======
-	fetch func(keys []persist.DBID) ([]coregen.FeedEvent, []error)
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	fetch func(keys []persist.DBID) ([]coregen.FeedEvent, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -69,15 +45,7 @@ type EventLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-<<<<<<< HEAD
-<<<<<<< HEAD
 	cache map[persist.DBID]coredb.FeedEvent
-=======
-	cache map[persist.DBID]coregen.FeedEvent
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	cache map[persist.DBID]coregen.FeedEvent
->>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -89,57 +57,25 @@ type EventLoaderByID struct {
 
 type eventLoaderByIDBatch struct {
 	keys    []persist.DBID
-<<<<<<< HEAD
-<<<<<<< HEAD
 	data    []coredb.FeedEvent
-=======
-	data    []coregen.FeedEvent
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	data    []coregen.FeedEvent
->>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *EventLoaderByID) Load(key persist.DBID) (coredb.FeedEvent, error) {
-=======
-func (l *EventLoaderByID) Load(key persist.DBID) (coregen.FeedEvent, error) {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *EventLoaderByID) Load(key persist.DBID) (coregen.FeedEvent, error) {
->>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (coredb.FeedEvent, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() (coredb.FeedEvent, error) {
-=======
-func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (coregen.FeedEvent, error) {
-	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
-		l.mu.Unlock()
-		return func() (coregen.FeedEvent, error) {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (coregen.FeedEvent, error) {
-	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
-		l.mu.Unlock()
-		return func() (coregen.FeedEvent, error) {
->>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -150,23 +86,10 @@ func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (coregen.FeedEvent,
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	return func() (coredb.FeedEvent, error) {
 		<-batch.done
 
 		var data coredb.FeedEvent
-=======
-=======
->>>>>>> a4e9c3f (Add indexer models)
-	return func() (coregen.FeedEvent, error) {
-		<-batch.done
-
-		var data coregen.FeedEvent
-<<<<<<< HEAD
->>>>>>> 93a3a41 (Add indexer models)
-=======
->>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -191,32 +114,14 @@ func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (coregen.FeedEvent,
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *EventLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.FeedEvent, []error) {
 	results := make([]func() (coredb.FeedEvent, error), len(keys))
-=======
-func (l *EventLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.FeedEvent, []error) {
-	results := make([]func() (coregen.FeedEvent, error), len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *EventLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.FeedEvent, []error) {
-	results := make([]func() (coregen.FeedEvent, error), len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	feedEvents := make([]coredb.FeedEvent, len(keys))
-=======
-	feedEvents := make([]coregen.FeedEvent, len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	feedEvents := make([]coregen.FeedEvent, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		feedEvents[i], errors[i] = thunk()
@@ -227,8 +132,6 @@ func (l *EventLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.FeedEvent, []e
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.FeedEvent, []error) {
 	results := make([]func() (coredb.FeedEvent, error), len(keys))
 	for i, key := range keys {
@@ -236,24 +139,6 @@ func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Fee
 	}
 	return func() ([]coredb.FeedEvent, []error) {
 		feedEvents := make([]coredb.FeedEvent, len(keys))
-=======
-func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.FeedEvent, []error) {
-	results := make([]func() (coregen.FeedEvent, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
-	}
-	return func() ([]coregen.FeedEvent, []error) {
-		feedEvents := make([]coregen.FeedEvent, len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.FeedEvent, []error) {
-	results := make([]func() (coregen.FeedEvent, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
-	}
-	return func() ([]coregen.FeedEvent, []error) {
-		feedEvents := make([]coregen.FeedEvent, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			feedEvents[i], errors[i] = thunk()
@@ -265,15 +150,7 @@ func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Fe
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *EventLoaderByID) Prime(key persist.DBID, value coredb.FeedEvent) bool {
-=======
-func (l *EventLoaderByID) Prime(key persist.DBID, value coregen.FeedEvent) bool {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *EventLoaderByID) Prime(key persist.DBID, value coregen.FeedEvent) bool {
->>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -290,21 +167,9 @@ func (l *EventLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *EventLoaderByID) unsafeSet(key persist.DBID, value coredb.FeedEvent) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID]coredb.FeedEvent{}
-=======
-func (l *EventLoaderByID) unsafeSet(key persist.DBID, value coregen.FeedEvent) {
-	if l.cache == nil {
-		l.cache = map[persist.DBID]coregen.FeedEvent{}
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *EventLoaderByID) unsafeSet(key persist.DBID, value coregen.FeedEvent) {
-	if l.cache == nil {
-		l.cache = map[persist.DBID]coregen.FeedEvent{}
->>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }

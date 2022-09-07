@@ -12,6 +12,16 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+type AddressFilter struct {
+	ID          persist.DBID
+	FromBlock   persist.BlockNumber
+	ToBlock     persist.BlockNumber
+	BloomFilter []byte
+	CreatedAt   time.Time
+	LastUpdated time.Time
+	Deleted     bool
+}
+
 type Contract struct {
 	ID             persist.DBID
 	Deleted        bool

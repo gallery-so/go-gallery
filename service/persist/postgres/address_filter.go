@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/bits-and-blooms/bloom"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
+	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type AddressFilterRepository struct {
-	Queries *sqlc.Queries
+	Queries *db.Queries
 }
 
 func (r *AddressFilterRepository) Add(ctx context.Context, from, to persist.BlockNumber, bf *bloom.BloomFilter) error {
@@ -17,7 +17,7 @@ func (r *AddressFilterRepository) Add(ctx context.Context, from, to persist.Bloc
 	if err != nil {
 		return err
 	}
-	return r.Queries.AddAddressFilter(ctx, sqlc.AddAddressFilterParams{
+	return r.Queries.AddAddressFilter(ctx, db.AddAddressFilterParams{
 		ID:          persist.GenerateID(),
 		FromBlock:   from,
 		ToBlock:     to,
@@ -48,7 +48,7 @@ func (r *AddressFilterRepository) BulkUpsert(ctx context.Context, filters map[[2
 		i++
 	}
 
-	return r.Queries.BulkUpsertAddressFilters(ctx, sqlc.BulkUpsertAddressFiltersParams{
+	return r.Queries.BulkUpsertAddressFilters(ctx, db.BulkUpsertAddressFiltersParams{
 		ID:          ids,
 		FromBlock:   fromBlocks,
 		ToBlock:     toBlocks,

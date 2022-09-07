@@ -9,11 +9,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
-<<<<<<< HEAD
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-=======
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/membership"

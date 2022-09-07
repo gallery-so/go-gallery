@@ -6,22 +6,14 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-=======
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // CommentLoaderByIDConfig captures the config to create a new CommentLoaderByID
 type CommentLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-<<<<<<< HEAD
 	Fetch func(keys []persist.DBID) ([]coredb.Comment, []error)
-=======
-	Fetch func(keys []persist.DBID) ([]coregen.Comment, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -42,11 +34,7 @@ func NewCommentLoaderByID(config CommentLoaderByIDConfig) *CommentLoaderByID {
 // CommentLoaderByID batches and caches requests
 type CommentLoaderByID struct {
 	// this method provides the data for the loader
-<<<<<<< HEAD
 	fetch func(keys []persist.DBID) ([]coredb.Comment, []error)
-=======
-	fetch func(keys []persist.DBID) ([]coregen.Comment, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -57,11 +45,7 @@ type CommentLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-<<<<<<< HEAD
 	cache map[persist.DBID]coredb.Comment
-=======
-	cache map[persist.DBID]coregen.Comment
->>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -73,41 +57,25 @@ type CommentLoaderByID struct {
 
 type commentLoaderByIDBatch struct {
 	keys    []persist.DBID
-<<<<<<< HEAD
 	data    []coredb.Comment
-=======
-	data    []coregen.Comment
->>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Comment by key, batching and caching will be applied automatically
-<<<<<<< HEAD
 func (l *CommentLoaderByID) Load(key persist.DBID) (coredb.Comment, error) {
-=======
-func (l *CommentLoaderByID) Load(key persist.DBID) (coregen.Comment, error) {
->>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Comment.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
 func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coredb.Comment, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() (coredb.Comment, error) {
-=======
-func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Comment, error) {
-	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
-		l.mu.Unlock()
-		return func() (coregen.Comment, error) {
->>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -118,17 +86,10 @@ func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Comment,
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-<<<<<<< HEAD
 	return func() (coredb.Comment, error) {
 		<-batch.done
 
 		var data coredb.Comment
-=======
-	return func() (coregen.Comment, error) {
-		<-batch.done
-
-		var data coregen.Comment
->>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -153,23 +114,14 @@ func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Comment,
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-<<<<<<< HEAD
 func (l *CommentLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.Comment, []error) {
 	results := make([]func() (coredb.Comment, error), len(keys))
-=======
-func (l *CommentLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Comment, []error) {
-	results := make([]func() (coregen.Comment, error), len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-<<<<<<< HEAD
 	comments := make([]coredb.Comment, len(keys))
-=======
-	comments := make([]coregen.Comment, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		comments[i], errors[i] = thunk()
@@ -180,7 +132,6 @@ func (l *CommentLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Comment, []e
 // LoadAllThunk returns a function that when called will block waiting for a Comments.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
 func (l *CommentLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Comment, []error) {
 	results := make([]func() (coredb.Comment, error), len(keys))
 	for i, key := range keys {
@@ -188,15 +139,6 @@ func (l *CommentLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.C
 	}
 	return func() ([]coredb.Comment, []error) {
 		comments := make([]coredb.Comment, len(keys))
-=======
-func (l *CommentLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Comment, []error) {
-	results := make([]func() (coregen.Comment, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
-	}
-	return func() ([]coregen.Comment, []error) {
-		comments := make([]coregen.Comment, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			comments[i], errors[i] = thunk()
@@ -208,11 +150,7 @@ func (l *CommentLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-<<<<<<< HEAD
 func (l *CommentLoaderByID) Prime(key persist.DBID, value coredb.Comment) bool {
-=======
-func (l *CommentLoaderByID) Prime(key persist.DBID, value coregen.Comment) bool {
->>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -229,15 +167,9 @@ func (l *CommentLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-<<<<<<< HEAD
 func (l *CommentLoaderByID) unsafeSet(key persist.DBID, value coredb.Comment) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID]coredb.Comment{}
-=======
-func (l *CommentLoaderByID) unsafeSet(key persist.DBID, value coregen.Comment) {
-	if l.cache == nil {
-		l.cache = map[persist.DBID]coregen.Comment{}
->>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }

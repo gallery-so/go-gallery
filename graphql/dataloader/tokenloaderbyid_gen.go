@@ -6,30 +6,14 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-=======
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // TokenLoaderByIDConfig captures the config to create a new TokenLoaderByID
 type TokenLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-<<<<<<< HEAD
-<<<<<<< HEAD
 	Fetch func(keys []persist.DBID) ([]coredb.Token, []error)
-=======
-	Fetch func(keys []persist.DBID) ([]coregen.Token, []error)
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	Fetch func(keys []persist.DBID) ([]coregen.Token, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -50,15 +34,7 @@ func NewTokenLoaderByID(config TokenLoaderByIDConfig) *TokenLoaderByID {
 // TokenLoaderByID batches and caches requests
 type TokenLoaderByID struct {
 	// this method provides the data for the loader
-<<<<<<< HEAD
-<<<<<<< HEAD
 	fetch func(keys []persist.DBID) ([]coredb.Token, []error)
-=======
-	fetch func(keys []persist.DBID) ([]coregen.Token, []error)
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	fetch func(keys []persist.DBID) ([]coregen.Token, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -69,15 +45,7 @@ type TokenLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-<<<<<<< HEAD
-<<<<<<< HEAD
 	cache map[persist.DBID]coredb.Token
-=======
-	cache map[persist.DBID]coregen.Token
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	cache map[persist.DBID]coregen.Token
->>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -89,57 +57,25 @@ type TokenLoaderByID struct {
 
 type tokenLoaderByIDBatch struct {
 	keys    []persist.DBID
-<<<<<<< HEAD
-<<<<<<< HEAD
 	data    []coredb.Token
-=======
-	data    []coregen.Token
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	data    []coregen.Token
->>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Token by key, batching and caching will be applied automatically
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *TokenLoaderByID) Load(key persist.DBID) (coredb.Token, error) {
-=======
-func (l *TokenLoaderByID) Load(key persist.DBID) (coregen.Token, error) {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *TokenLoaderByID) Load(key persist.DBID) (coregen.Token, error) {
->>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Token.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *TokenLoaderByID) LoadThunk(key persist.DBID) func() (coredb.Token, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() (coredb.Token, error) {
-=======
-func (l *TokenLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Token, error) {
-	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
-		l.mu.Unlock()
-		return func() (coregen.Token, error) {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *TokenLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Token, error) {
-	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
-		l.mu.Unlock()
-		return func() (coregen.Token, error) {
->>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -150,23 +86,10 @@ func (l *TokenLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Token, err
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	return func() (coredb.Token, error) {
 		<-batch.done
 
 		var data coredb.Token
-=======
-=======
->>>>>>> a4e9c3f (Add indexer models)
-	return func() (coregen.Token, error) {
-		<-batch.done
-
-		var data coregen.Token
-<<<<<<< HEAD
->>>>>>> 93a3a41 (Add indexer models)
-=======
->>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -191,32 +114,14 @@ func (l *TokenLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Token, err
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *TokenLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.Token, []error) {
 	results := make([]func() (coredb.Token, error), len(keys))
-=======
-func (l *TokenLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Token, []error) {
-	results := make([]func() (coregen.Token, error), len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *TokenLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Token, []error) {
-	results := make([]func() (coregen.Token, error), len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	tokens := make([]coredb.Token, len(keys))
-=======
-	tokens := make([]coregen.Token, len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	tokens := make([]coregen.Token, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		tokens[i], errors[i] = thunk()
@@ -227,8 +132,6 @@ func (l *TokenLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Token, []error
 // LoadAllThunk returns a function that when called will block waiting for a Tokens.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *TokenLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Token, []error) {
 	results := make([]func() (coredb.Token, error), len(keys))
 	for i, key := range keys {
@@ -236,24 +139,6 @@ func (l *TokenLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Tok
 	}
 	return func() ([]coredb.Token, []error) {
 		tokens := make([]coredb.Token, len(keys))
-=======
-func (l *TokenLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Token, []error) {
-	results := make([]func() (coregen.Token, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
-	}
-	return func() ([]coregen.Token, []error) {
-		tokens := make([]coregen.Token, len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *TokenLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Token, []error) {
-	results := make([]func() (coregen.Token, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
-	}
-	return func() ([]coregen.Token, []error) {
-		tokens := make([]coregen.Token, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			tokens[i], errors[i] = thunk()
@@ -265,15 +150,7 @@ func (l *TokenLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.To
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *TokenLoaderByID) Prime(key persist.DBID, value coredb.Token) bool {
-=======
-func (l *TokenLoaderByID) Prime(key persist.DBID, value coregen.Token) bool {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *TokenLoaderByID) Prime(key persist.DBID, value coregen.Token) bool {
->>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -290,21 +167,9 @@ func (l *TokenLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *TokenLoaderByID) unsafeSet(key persist.DBID, value coredb.Token) {
 	if l.cache == nil {
 		l.cache = map[persist.DBID]coredb.Token{}
-=======
-func (l *TokenLoaderByID) unsafeSet(key persist.DBID, value coregen.Token) {
-	if l.cache == nil {
-		l.cache = map[persist.DBID]coregen.Token{}
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *TokenLoaderByID) unsafeSet(key persist.DBID, value coregen.Token) {
-	if l.cache == nil {
-		l.cache = map[persist.DBID]coregen.Token{}
->>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }

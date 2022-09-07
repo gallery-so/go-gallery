@@ -6,30 +6,14 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-=======
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
->>>>>>> a4e9c3f (Add indexer models)
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // WalletLoaderByChainAddressConfig captures the config to create a new WalletLoaderByChainAddress
 type WalletLoaderByChainAddressConfig struct {
 	// Fetch is a method that provides the data for the loader
-<<<<<<< HEAD
-<<<<<<< HEAD
 	Fetch func(keys []persist.ChainAddress) ([]coredb.Wallet, []error)
-=======
-	Fetch func(keys []persist.ChainAddress) ([]coregen.Wallet, []error)
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	Fetch func(keys []persist.ChainAddress) ([]coregen.Wallet, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -50,15 +34,7 @@ func NewWalletLoaderByChainAddress(config WalletLoaderByChainAddressConfig) *Wal
 // WalletLoaderByChainAddress batches and caches requests
 type WalletLoaderByChainAddress struct {
 	// this method provides the data for the loader
-<<<<<<< HEAD
-<<<<<<< HEAD
 	fetch func(keys []persist.ChainAddress) ([]coredb.Wallet, []error)
-=======
-	fetch func(keys []persist.ChainAddress) ([]coregen.Wallet, []error)
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	fetch func(keys []persist.ChainAddress) ([]coregen.Wallet, []error)
->>>>>>> a4e9c3f (Add indexer models)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -69,15 +45,7 @@ type WalletLoaderByChainAddress struct {
 	// INTERNAL
 
 	// lazily created cache
-<<<<<<< HEAD
-<<<<<<< HEAD
 	cache map[persist.ChainAddress]coredb.Wallet
-=======
-	cache map[persist.ChainAddress]coregen.Wallet
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	cache map[persist.ChainAddress]coregen.Wallet
->>>>>>> a4e9c3f (Add indexer models)
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -89,57 +57,25 @@ type WalletLoaderByChainAddress struct {
 
 type walletLoaderByChainAddressBatch struct {
 	keys    []persist.ChainAddress
-<<<<<<< HEAD
-<<<<<<< HEAD
 	data    []coredb.Wallet
-=======
-	data    []coregen.Wallet
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	data    []coregen.Wallet
->>>>>>> a4e9c3f (Add indexer models)
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Wallet by key, batching and caching will be applied automatically
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *WalletLoaderByChainAddress) Load(key persist.ChainAddress) (coredb.Wallet, error) {
-=======
-func (l *WalletLoaderByChainAddress) Load(key persist.ChainAddress) (coregen.Wallet, error) {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *WalletLoaderByChainAddress) Load(key persist.ChainAddress) (coregen.Wallet, error) {
->>>>>>> a4e9c3f (Add indexer models)
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Wallet.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *WalletLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (coredb.Wallet, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
 		return func() (coredb.Wallet, error) {
-=======
-func (l *WalletLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (coregen.Wallet, error) {
-	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
-		l.mu.Unlock()
-		return func() (coregen.Wallet, error) {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *WalletLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (coregen.Wallet, error) {
-	l.mu.Lock()
-	if it, ok := l.cache[key]; ok {
-		l.mu.Unlock()
-		return func() (coregen.Wallet, error) {
->>>>>>> a4e9c3f (Add indexer models)
 			return it, nil
 		}
 	}
@@ -150,23 +86,10 @@ func (l *WalletLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() 
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	return func() (coredb.Wallet, error) {
 		<-batch.done
 
 		var data coredb.Wallet
-=======
-=======
->>>>>>> a4e9c3f (Add indexer models)
-	return func() (coregen.Wallet, error) {
-		<-batch.done
-
-		var data coregen.Wallet
-<<<<<<< HEAD
->>>>>>> 93a3a41 (Add indexer models)
-=======
->>>>>>> a4e9c3f (Add indexer models)
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -191,32 +114,14 @@ func (l *WalletLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *WalletLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coredb.Wallet, []error) {
 	results := make([]func() (coredb.Wallet, error), len(keys))
-=======
-func (l *WalletLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coregen.Wallet, []error) {
-	results := make([]func() (coregen.Wallet, error), len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *WalletLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coregen.Wallet, []error) {
-	results := make([]func() (coregen.Wallet, error), len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	wallets := make([]coredb.Wallet, len(keys))
-=======
-	wallets := make([]coregen.Wallet, len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-	wallets := make([]coregen.Wallet, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		wallets[i], errors[i] = thunk()
@@ -227,8 +132,6 @@ func (l *WalletLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]cor
 // LoadAllThunk returns a function that when called will block waiting for a Wallets.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]coredb.Wallet, []error) {
 	results := make([]func() (coredb.Wallet, error), len(keys))
 	for i, key := range keys {
@@ -236,24 +139,6 @@ func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) f
 	}
 	return func() ([]coredb.Wallet, []error) {
 		wallets := make([]coredb.Wallet, len(keys))
-=======
-func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]coregen.Wallet, []error) {
-	results := make([]func() (coregen.Wallet, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
-	}
-	return func() ([]coregen.Wallet, []error) {
-		wallets := make([]coregen.Wallet, len(keys))
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]coregen.Wallet, []error) {
-	results := make([]func() (coregen.Wallet, error), len(keys))
-	for i, key := range keys {
-		results[i] = l.LoadThunk(key)
-	}
-	return func() ([]coregen.Wallet, []error) {
-		wallets := make([]coregen.Wallet, len(keys))
->>>>>>> a4e9c3f (Add indexer models)
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			wallets[i], errors[i] = thunk()
@@ -265,15 +150,7 @@ func (l *WalletLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) f
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *WalletLoaderByChainAddress) Prime(key persist.ChainAddress, value coredb.Wallet) bool {
-=======
-func (l *WalletLoaderByChainAddress) Prime(key persist.ChainAddress, value coregen.Wallet) bool {
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *WalletLoaderByChainAddress) Prime(key persist.ChainAddress, value coregen.Wallet) bool {
->>>>>>> a4e9c3f (Add indexer models)
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -290,21 +167,9 @@ func (l *WalletLoaderByChainAddress) Clear(key persist.ChainAddress) {
 	l.mu.Unlock()
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 func (l *WalletLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value coredb.Wallet) {
 	if l.cache == nil {
 		l.cache = map[persist.ChainAddress]coredb.Wallet{}
-=======
-func (l *WalletLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value coregen.Wallet) {
-	if l.cache == nil {
-		l.cache = map[persist.ChainAddress]coregen.Wallet{}
->>>>>>> 93a3a41 (Add indexer models)
-=======
-func (l *WalletLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value coregen.Wallet) {
-	if l.cache == nil {
-		l.cache = map[persist.ChainAddress]coregen.Wallet{}
->>>>>>> a4e9c3f (Add indexer models)
 	}
 	l.cache[key] = value
 }

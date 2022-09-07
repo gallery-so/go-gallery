@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/indexergen"
+	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
@@ -46,7 +46,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	initSentry()
 	initLogger()
 
-	queries := sqlc.New(postgres.NewPgxClient())
+	queries := db.New(postgres.NewPgxClient())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
 
 	var s *storage.Client
@@ -91,7 +91,7 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	queries := sqlc.New(postgres.NewPgxClient())
+	queries := db.New(postgres.NewPgxClient())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
 
 	var s *storage.Client
@@ -171,7 +171,7 @@ func setDefaults(envFilePath string) {
 	}
 }
 
-func newRepos(q *sqlc.Queries) (persist.TokenRepository, persist.ContractRepository, postgres.AddressFilterRepository) {
+func newRepos(q *db.Queries) (persist.TokenRepository, persist.ContractRepository, postgres.AddressFilterRepository) {
 	pgClient := postgres.NewClient()
 	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.AddressFilterRepository{Queries: q}
 }
