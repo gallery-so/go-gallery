@@ -582,8 +582,6 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			panic(err)
 		}
 
-		start := time.Now()
-
 		acquired, err := refreshLock.Acquire(ctx)
 		if err != nil {
 			logger.For(ctx).WithError(err).Errorf("error occurred acquiring lock")
@@ -687,8 +685,6 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 		// Delete filters
 		filterManager.Close()
-
-		logger.For(ctx).Infof("refresh finished in %v", time.Now().Sub(start))
 
 		span.Finish()
 	}
