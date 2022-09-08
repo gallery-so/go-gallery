@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // EventLoaderByIDConfig captures the config to create a new EventLoaderByID
 type EventLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([]sqlc.FeedEvent, []error)
+	Fetch func(keys []persist.DBID) ([]coredb.FeedEvent, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewEventLoaderByID(config EventLoaderByIDConfig) *EventLoaderByID {
 // EventLoaderByID batches and caches requests
 type EventLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([]sqlc.FeedEvent, []error)
+	fetch func(keys []persist.DBID) ([]coredb.FeedEvent, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type EventLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID]sqlc.FeedEvent
+	cache map[persist.DBID]coredb.FeedEvent
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type EventLoaderByID struct {
 
 type eventLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    []sqlc.FeedEvent
+	data    []coredb.FeedEvent
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *EventLoaderByID) Load(key persist.DBID) (sqlc.FeedEvent, error) {
+func (l *EventLoaderByID) Load(key persist.DBID) (coredb.FeedEvent, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (sqlc.FeedEvent, error) {
+func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (coredb.FeedEvent, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (sqlc.FeedEvent, error) {
+		return func() (coredb.FeedEvent, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (sqlc.FeedEvent, er
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (sqlc.FeedEvent, error) {
+	return func() (coredb.FeedEvent, error) {
 		<-batch.done
 
-		var data sqlc.FeedEvent
+		var data coredb.FeedEvent
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *EventLoaderByID) LoadThunk(key persist.DBID) func() (sqlc.FeedEvent, er
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *EventLoaderByID) LoadAll(keys []persist.DBID) ([]sqlc.FeedEvent, []error) {
-	results := make([]func() (sqlc.FeedEvent, error), len(keys))
+func (l *EventLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.FeedEvent, []error) {
+	results := make([]func() (coredb.FeedEvent, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEvents := make([]sqlc.FeedEvent, len(keys))
+	feedEvents := make([]coredb.FeedEvent, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		feedEvents[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *EventLoaderByID) LoadAll(keys []persist.DBID) ([]sqlc.FeedEvent, []erro
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]sqlc.FeedEvent, []error) {
-	results := make([]func() (sqlc.FeedEvent, error), len(keys))
+func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.FeedEvent, []error) {
+	results := make([]func() (coredb.FeedEvent, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]sqlc.FeedEvent, []error) {
-		feedEvents := make([]sqlc.FeedEvent, len(keys))
+	return func() ([]coredb.FeedEvent, []error) {
+		feedEvents := make([]coredb.FeedEvent, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			feedEvents[i], errors[i] = thunk()
@@ -150,7 +150,7 @@ func (l *EventLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]sqlc.FeedE
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *EventLoaderByID) Prime(key persist.DBID, value sqlc.FeedEvent) bool {
+func (l *EventLoaderByID) Prime(key persist.DBID, value coredb.FeedEvent) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -167,9 +167,9 @@ func (l *EventLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *EventLoaderByID) unsafeSet(key persist.DBID, value sqlc.FeedEvent) {
+func (l *EventLoaderByID) unsafeSet(key persist.DBID, value coredb.FeedEvent) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID]sqlc.FeedEvent{}
+		l.cache = map[persist.DBID]coredb.FeedEvent{}
 	}
 	l.cache[key] = value
 }

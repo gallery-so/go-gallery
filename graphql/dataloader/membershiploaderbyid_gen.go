@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // MembershipLoaderByIdConfig captures the config to create a new MembershipLoaderById
 type MembershipLoaderByIdConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([]sqlc.Membership, []error)
+	Fetch func(keys []persist.DBID) ([]coredb.Membership, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewMembershipLoaderById(config MembershipLoaderByIdConfig) *MembershipLoade
 // MembershipLoaderById batches and caches requests
 type MembershipLoaderById struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([]sqlc.Membership, []error)
+	fetch func(keys []persist.DBID) ([]coredb.Membership, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type MembershipLoaderById struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID]sqlc.Membership
+	cache map[persist.DBID]coredb.Membership
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type MembershipLoaderById struct {
 
 type membershipLoaderByIdBatch struct {
 	keys    []persist.DBID
-	data    []sqlc.Membership
+	data    []coredb.Membership
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Membership by key, batching and caching will be applied automatically
-func (l *MembershipLoaderById) Load(key persist.DBID) (sqlc.Membership, error) {
+func (l *MembershipLoaderById) Load(key persist.DBID) (coredb.Membership, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Membership.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *MembershipLoaderById) LoadThunk(key persist.DBID) func() (sqlc.Membership, error) {
+func (l *MembershipLoaderById) LoadThunk(key persist.DBID) func() (coredb.Membership, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (sqlc.Membership, error) {
+		return func() (coredb.Membership, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *MembershipLoaderById) LoadThunk(key persist.DBID) func() (sqlc.Membersh
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (sqlc.Membership, error) {
+	return func() (coredb.Membership, error) {
 		<-batch.done
 
-		var data sqlc.Membership
+		var data coredb.Membership
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *MembershipLoaderById) LoadThunk(key persist.DBID) func() (sqlc.Membersh
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *MembershipLoaderById) LoadAll(keys []persist.DBID) ([]sqlc.Membership, []error) {
-	results := make([]func() (sqlc.Membership, error), len(keys))
+func (l *MembershipLoaderById) LoadAll(keys []persist.DBID) ([]coredb.Membership, []error) {
+	results := make([]func() (coredb.Membership, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	memberships := make([]sqlc.Membership, len(keys))
+	memberships := make([]coredb.Membership, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		memberships[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *MembershipLoaderById) LoadAll(keys []persist.DBID) ([]sqlc.Membership, 
 // LoadAllThunk returns a function that when called will block waiting for a Memberships.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *MembershipLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]sqlc.Membership, []error) {
-	results := make([]func() (sqlc.Membership, error), len(keys))
+func (l *MembershipLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Membership, []error) {
+	results := make([]func() (coredb.Membership, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]sqlc.Membership, []error) {
-		memberships := make([]sqlc.Membership, len(keys))
+	return func() ([]coredb.Membership, []error) {
+		memberships := make([]coredb.Membership, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			memberships[i], errors[i] = thunk()
@@ -150,7 +150,7 @@ func (l *MembershipLoaderById) LoadAllThunk(keys []persist.DBID) func() ([]sqlc.
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *MembershipLoaderById) Prime(key persist.DBID, value sqlc.Membership) bool {
+func (l *MembershipLoaderById) Prime(key persist.DBID, value coredb.Membership) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -167,9 +167,9 @@ func (l *MembershipLoaderById) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *MembershipLoaderById) unsafeSet(key persist.DBID, value sqlc.Membership) {
+func (l *MembershipLoaderById) unsafeSet(key persist.DBID, value coredb.Membership) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID]sqlc.Membership{}
+		l.cache = map[persist.DBID]coredb.Membership{}
 	}
 	l.cache[key] = value
 }

@@ -4,20 +4,20 @@ import (
 	"context"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
 
 type EventRepository struct {
-	Queries *sqlc.Queries
+	Queries *db.Queries
 }
 
-func (r *EventRepository) Get(ctx context.Context, eventID persist.DBID) (sqlc.Event, error) {
+func (r *EventRepository) Get(ctx context.Context, eventID persist.DBID) (db.Event, error) {
 	return r.Queries.GetEvent(ctx, eventID)
 }
 
-func (r *EventRepository) Add(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
+func (r *EventRepository) Add(ctx context.Context, event db.Event) (*db.Event, error) {
 	switch event.ResourceTypeID {
 	case persist.ResourceTypeUser:
 		return r.AddUserEvent(ctx, event)
@@ -30,8 +30,8 @@ func (r *EventRepository) Add(ctx context.Context, event sqlc.Event) (*sqlc.Even
 	}
 }
 
-func (r *EventRepository) AddUserEvent(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
-	event, err := r.Queries.CreateUserEvent(ctx, sqlc.CreateUserEventParams{
+func (r *EventRepository) AddUserEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateUserEvent(ctx, db.CreateUserEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
@@ -42,8 +42,8 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event sqlc.Event) (*
 	return &event, err
 }
 
-func (r *EventRepository) AddTokenEvent(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
-	event, err := r.Queries.CreateTokenEvent(ctx, sqlc.CreateTokenEventParams{
+func (r *EventRepository) AddTokenEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateTokenEvent(ctx, db.CreateTokenEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
@@ -54,8 +54,8 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event sqlc.Event) (
 	return &event, err
 }
 
-func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.Event, error) {
-	event, err := r.Queries.CreateCollectionEvent(ctx, sqlc.CreateCollectionEventParams{
+func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateCollectionEvent(ctx, db.CreateCollectionEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        event.ActorID,
 		Action:         event.Action,
@@ -67,8 +67,8 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event sqlc.Eve
 }
 
 // WindowActive checks if there are more recent events with an action that matches the provided event.
-func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (bool, error) {
-	return r.Queries.IsWindowActive(ctx, sqlc.IsWindowActiveParams{
+func (r *EventRepository) WindowActive(ctx context.Context, event db.Event) (bool, error) {
+	return r.Queries.IsWindowActive(ctx, db.IsWindowActiveParams{
 		ActorID:     event.ActorID,
 		Action:      event.Action,
 		WindowStart: event.CreatedAt,
@@ -78,8 +78,8 @@ func (r *EventRepository) WindowActive(ctx context.Context, event sqlc.Event) (b
 
 // WindowActiveForSubject checks if there are more recent events with an action on a specific resource such as
 // as a collection or a token.
-func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc.Event) (bool, error) {
-	return r.Queries.IsWindowActiveWithSubject(ctx, sqlc.IsWindowActiveWithSubjectParams{
+func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event db.Event) (bool, error) {
+	return r.Queries.IsWindowActiveWithSubject(ctx, db.IsWindowActiveWithSubjectParams{
 		ActorID:     event.ActorID,
 		Action:      event.Action,
 		SubjectID:   event.SubjectID,
@@ -89,8 +89,8 @@ func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event sqlc
 }
 
 // EventsInWindow returns events belonging to the same window of activity as the given eventID.
-func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]sqlc.Event, error) {
-	return r.Queries.GetEventsInWindow(ctx, sqlc.GetEventsInWindowParams{
+func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]db.Event, error) {
+	return r.Queries.GetEventsInWindow(ctx, db.GetEventsInWindowParams{
 		ID:   eventID,
 		Secs: float64(windowSeconds),
 	})

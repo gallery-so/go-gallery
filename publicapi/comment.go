@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -15,13 +15,13 @@ var ErrOnlyRemoveOwnComment = errors.New("only the actor who created the comment
 
 type CommentAPI struct {
 	repos     *persist.Repositories
-	queries   *sqlc.Queries
+	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
 }
 
-func (api CommentAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*sqlc.Comment, error) {
+func (api CommentAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"commentID": {commentID, "required"},
@@ -37,7 +37,7 @@ func (api CommentAPI) GetCommentByID(ctx context.Context, commentID persist.DBID
 	return &comment, nil
 }
 
-func (api CommentAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]sqlc.Comment, error) {
+func (api CommentAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]db.Comment, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},

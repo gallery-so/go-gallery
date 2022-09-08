@@ -7,7 +7,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -16,7 +16,7 @@ import (
 
 type MiscAPI struct {
 	repos         *persist.Repositories
-	queries       *sqlc.Queries
+	queries       *db.Queries
 	loaders       *dataloader.Loaders
 	validator     *validator.Validate
 	ethClient     *ethclient.Client
@@ -50,7 +50,7 @@ func (api MiscAPI) GetGeneralAllowlist(ctx context.Context) ([]persist.EthereumA
 	return addresses, nil
 }
 
-func (api MiscAPI) GetGalleryOfTheWeekWinners(ctx context.Context) ([]sqlc.User, error) {
+func (api MiscAPI) GetGalleryOfTheWeekWinners(ctx context.Context) ([]db.User, error) {
 	// hard-coded for now
 	winnerUserIds := []persist.DBID{
 		// hamsun
@@ -73,7 +73,7 @@ func (api MiscAPI) GetGalleryOfTheWeekWinners(ctx context.Context) ([]sqlc.User,
 
 	possibleWinners, errors := api.loaders.UserByUserId.LoadAll(winnerUserIds)
 
-	winners := []sqlc.User{}
+	winners := []db.User{}
 	for i, err := range errors {
 		if err == nil {
 			winners = append(winners, possibleWinners[i])

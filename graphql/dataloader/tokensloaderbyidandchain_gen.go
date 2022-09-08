@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
 // TokensLoaderByIDAndChainConfig captures the config to create a new TokensLoaderByIDAndChain
 type TokensLoaderByIDAndChainConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []IDAndChain) ([][]sqlc.Token, []error)
+	Fetch func(keys []IDAndChain) ([][]coredb.Token, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +33,7 @@ func NewTokensLoaderByIDAndChain(config TokensLoaderByIDAndChainConfig) *TokensL
 // TokensLoaderByIDAndChain batches and caches requests
 type TokensLoaderByIDAndChain struct {
 	// this method provides the data for the loader
-	fetch func(keys []IDAndChain) ([][]sqlc.Token, []error)
+	fetch func(keys []IDAndChain) ([][]coredb.Token, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +44,7 @@ type TokensLoaderByIDAndChain struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[IDAndChain][]sqlc.Token
+	cache map[IDAndChain][]coredb.Token
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -56,25 +56,25 @@ type TokensLoaderByIDAndChain struct {
 
 type tokensLoaderByIDAndChainBatch struct {
 	keys    []IDAndChain
-	data    [][]sqlc.Token
+	data    [][]coredb.Token
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Token by key, batching and caching will be applied automatically
-func (l *TokensLoaderByIDAndChain) Load(key IDAndChain) ([]sqlc.Token, error) {
+func (l *TokensLoaderByIDAndChain) Load(key IDAndChain) ([]coredb.Token, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Token.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokensLoaderByIDAndChain) LoadThunk(key IDAndChain) func() ([]sqlc.Token, error) {
+func (l *TokensLoaderByIDAndChain) LoadThunk(key IDAndChain) func() ([]coredb.Token, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]sqlc.Token, error) {
+		return func() ([]coredb.Token, error) {
 			return it, nil
 		}
 	}
@@ -85,10 +85,10 @@ func (l *TokensLoaderByIDAndChain) LoadThunk(key IDAndChain) func() ([]sqlc.Toke
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]sqlc.Token, error) {
+	return func() ([]coredb.Token, error) {
 		<-batch.done
 
-		var data []sqlc.Token
+		var data []coredb.Token
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,14 +113,14 @@ func (l *TokensLoaderByIDAndChain) LoadThunk(key IDAndChain) func() ([]sqlc.Toke
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *TokensLoaderByIDAndChain) LoadAll(keys []IDAndChain) ([][]sqlc.Token, []error) {
-	results := make([]func() ([]sqlc.Token, error), len(keys))
+func (l *TokensLoaderByIDAndChain) LoadAll(keys []IDAndChain) ([][]coredb.Token, []error) {
+	results := make([]func() ([]coredb.Token, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	tokens := make([][]sqlc.Token, len(keys))
+	tokens := make([][]coredb.Token, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		tokens[i], errors[i] = thunk()
@@ -131,13 +131,13 @@ func (l *TokensLoaderByIDAndChain) LoadAll(keys []IDAndChain) ([][]sqlc.Token, [
 // LoadAllThunk returns a function that when called will block waiting for a Tokens.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokensLoaderByIDAndChain) LoadAllThunk(keys []IDAndChain) func() ([][]sqlc.Token, []error) {
-	results := make([]func() ([]sqlc.Token, error), len(keys))
+func (l *TokensLoaderByIDAndChain) LoadAllThunk(keys []IDAndChain) func() ([][]coredb.Token, []error) {
+	results := make([]func() ([]coredb.Token, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]sqlc.Token, []error) {
-		tokens := make([][]sqlc.Token, len(keys))
+	return func() ([][]coredb.Token, []error) {
+		tokens := make([][]coredb.Token, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			tokens[i], errors[i] = thunk()
@@ -149,13 +149,13 @@ func (l *TokensLoaderByIDAndChain) LoadAllThunk(keys []IDAndChain) func() ([][]s
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *TokensLoaderByIDAndChain) Prime(key IDAndChain, value []sqlc.Token) bool {
+func (l *TokensLoaderByIDAndChain) Prime(key IDAndChain, value []coredb.Token) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]sqlc.Token, len(value))
+		cpy := make([]coredb.Token, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -170,9 +170,9 @@ func (l *TokensLoaderByIDAndChain) Clear(key IDAndChain) {
 	l.mu.Unlock()
 }
 
-func (l *TokensLoaderByIDAndChain) unsafeSet(key IDAndChain, value []sqlc.Token) {
+func (l *TokensLoaderByIDAndChain) unsafeSet(key IDAndChain, value []coredb.Token) {
 	if l.cache == nil {
-		l.cache = map[IDAndChain][]sqlc.Token{}
+		l.cache = map[IDAndChain][]coredb.Token{}
 	}
 	l.cache[key] = value
 }

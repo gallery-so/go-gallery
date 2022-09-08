@@ -9,7 +9,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/membership"
@@ -22,7 +22,7 @@ import (
 
 type UserAPI struct {
 	repos         *persist.Repositories
-	queries       *sqlc.Queries
+	queries       *db.Queries
 	loaders       *dataloader.Loaders
 	validator     *validator.Validate
 	ethClient     *ethclient.Client
@@ -41,7 +41,7 @@ func (api UserAPI) IsUserLoggedIn(ctx context.Context) bool {
 	return auth.GetUserAuthedFromCtx(gc)
 }
 
-func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*sqlc.User, error) {
+func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
@@ -57,7 +57,7 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*sqlc.
 	return &user, nil
 }
 
-func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sqlc.User, error) {
+func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required"},
@@ -73,7 +73,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*sql
 	return &user, nil
 }
 
-func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]sqlc.User, error) {
+func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"trait": {trait, "required"},
@@ -146,7 +146,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, bio, api.repos.UserRepository, api.repos.GalleryRepository)
 
 	// Send event
-	dispatchEventToFeed(ctx, sqlc.Event{
+	dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
@@ -190,7 +190,7 @@ func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([
 	return membership.GetMembershipTiers(ctx, forceRefresh, api.repos.MembershipRepository, api.repos.UserRepository, api.repos.GalleryRepository, api.repos.WalletRepository, api.ethClient, api.ipfsClient, api.arweaveClient, api.storageClient)
 }
 
-func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID persist.DBID) (*sqlc.Membership, error) {
+func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID persist.DBID) (*db.Membership, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"membershipID": {membershipID, "required"},
@@ -206,7 +206,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 	return &membership, nil
 }
 
-func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
+func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
@@ -226,7 +226,7 @@ func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID
 	return followers, nil
 }
 
-func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID) ([]sqlc.User, error) {
+func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
@@ -298,7 +298,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		return
 	}
 
-	pushFeedEvent(ctx, sqlc.Event{
+	pushFeedEvent(ctx, db.Event{
 		ActorID:        curUserID,
 		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeUser,

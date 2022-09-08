@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // ContractLoaderByChainAddressConfig captures the config to create a new ContractLoaderByChainAddress
 type ContractLoaderByChainAddressConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.ChainAddress) ([]sqlc.Contract, []error)
+	Fetch func(keys []persist.ChainAddress) ([]coredb.Contract, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewContractLoaderByChainAddress(config ContractLoaderByChainAddressConfig) 
 // ContractLoaderByChainAddress batches and caches requests
 type ContractLoaderByChainAddress struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.ChainAddress) ([]sqlc.Contract, []error)
+	fetch func(keys []persist.ChainAddress) ([]coredb.Contract, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type ContractLoaderByChainAddress struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.ChainAddress]sqlc.Contract
+	cache map[persist.ChainAddress]coredb.Contract
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type ContractLoaderByChainAddress struct {
 
 type contractLoaderByChainAddressBatch struct {
 	keys    []persist.ChainAddress
-	data    []sqlc.Contract
+	data    []coredb.Contract
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Contract by key, batching and caching will be applied automatically
-func (l *ContractLoaderByChainAddress) Load(key persist.ChainAddress) (sqlc.Contract, error) {
+func (l *ContractLoaderByChainAddress) Load(key persist.ChainAddress) (coredb.Contract, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Contract.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (sqlc.Contract, error) {
+func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func() (coredb.Contract, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (sqlc.Contract, error) {
+		return func() (coredb.Contract, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func(
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (sqlc.Contract, error) {
+	return func() (coredb.Contract, error) {
 		<-batch.done
 
-		var data sqlc.Contract
+		var data coredb.Contract
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *ContractLoaderByChainAddress) LoadThunk(key persist.ChainAddress) func(
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]sqlc.Contract, []error) {
-	results := make([]func() (sqlc.Contract, error), len(keys))
+func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]coredb.Contract, []error) {
+	results := make([]func() (coredb.Contract, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	contracts := make([]sqlc.Contract, len(keys))
+	contracts := make([]coredb.Contract, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		contracts[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *ContractLoaderByChainAddress) LoadAll(keys []persist.ChainAddress) ([]s
 // LoadAllThunk returns a function that when called will block waiting for a Contracts.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]sqlc.Contract, []error) {
-	results := make([]func() (sqlc.Contract, error), len(keys))
+func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress) func() ([]coredb.Contract, []error) {
+	results := make([]func() (coredb.Contract, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]sqlc.Contract, []error) {
-		contracts := make([]sqlc.Contract, len(keys))
+	return func() ([]coredb.Contract, []error) {
+		contracts := make([]coredb.Contract, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			contracts[i], errors[i] = thunk()
@@ -150,7 +150,7 @@ func (l *ContractLoaderByChainAddress) LoadAllThunk(keys []persist.ChainAddress)
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *ContractLoaderByChainAddress) Prime(key persist.ChainAddress, value sqlc.Contract) bool {
+func (l *ContractLoaderByChainAddress) Prime(key persist.ChainAddress, value coredb.Contract) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -167,9 +167,9 @@ func (l *ContractLoaderByChainAddress) Clear(key persist.ChainAddress) {
 	l.mu.Unlock()
 }
 
-func (l *ContractLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value sqlc.Contract) {
+func (l *ContractLoaderByChainAddress) unsafeSet(key persist.ChainAddress, value coredb.Contract) {
 	if l.cache == nil {
-		l.cache = map[persist.ChainAddress]sqlc.Contract{}
+		l.cache = map[persist.ChainAddress]coredb.Contract{}
 	}
 	l.cache[key] = value
 }

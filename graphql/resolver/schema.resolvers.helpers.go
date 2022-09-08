@@ -18,7 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -695,7 +695,7 @@ func resolveCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID)
 	return commentsToModels(ctx, comments), nil
 }
 
-func feedEventToDataModel(event *sqlc.FeedEvent) (model.FeedEventData, error) {
+func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
 		return eventToUserCreatedFeedEventData(event), nil
@@ -714,7 +714,7 @@ func feedEventToDataModel(event *sqlc.FeedEvent) (model.FeedEventData, error) {
 	}
 }
 
-func eventToUserCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
+func eventToUserCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	return model.UserCreatedFeedEventData{
 		EventTime: &event.EventTime,
 		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
@@ -722,7 +722,7 @@ func eventToUserCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEventData 
 	}
 }
 
-func eventToUserFollowedUsersFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
+func eventToUserFollowedUsersFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	followed := make([]*model.FollowInfo, len(event.Data.UserFollowedIDs))
 
 	for i, userID := range event.Data.UserFollowedIDs {
@@ -740,7 +740,7 @@ func eventToUserFollowedUsersFeedEventData(event *sqlc.FeedEvent) model.FeedEven
 	}
 }
 
-func eventToCollectorsNoteAddedToTokenFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
+func eventToCollectorsNoteAddedToTokenFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	return model.CollectorsNoteAddedToTokenFeedEventData{
 		EventTime: &event.EventTime,
 		Owner:     &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
@@ -754,7 +754,7 @@ func eventToCollectorsNoteAddedToTokenFeedEventData(event *sqlc.FeedEvent) model
 	}
 }
 
-func eventToCollectionCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
+func eventToCollectionCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	return model.CollectionCreatedFeedEventData{
 		EventTime:  &event.EventTime,
 		Owner:      &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
@@ -767,7 +767,7 @@ func eventToCollectionCreatedFeedEventData(event *sqlc.FeedEvent) model.FeedEven
 	}
 }
 
-func eventToCollectorsNoteAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
+func eventToCollectorsNoteAddedToCollectionFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	return model.CollectorsNoteAddedToCollectionFeedEventData{
 		EventTime:         &event.EventTime,
 		Owner:             &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
@@ -777,7 +777,7 @@ func eventToCollectorsNoteAddedToCollectionFeedEventData(event *sqlc.FeedEvent) 
 	}
 }
 
-func eventToTokensAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.FeedEventData {
+func eventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	return model.TokensAddedToCollectionFeedEventData{
 		EventTime:  &event.EventTime,
 		Owner:      &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
@@ -791,7 +791,7 @@ func eventToTokensAddedToCollectionFeedEventData(event *sqlc.FeedEvent) model.Fe
 	}
 }
 
-func eventsToFeedEdges(events []sqlc.FeedEvent) ([]*model.FeedEdge, error) {
+func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
@@ -816,7 +816,7 @@ func eventsToFeedEdges(events []sqlc.FeedEvent) ([]*model.FeedEdge, error) {
 	return edges, nil
 }
 
-func galleryToModel(ctx context.Context, gallery sqlc.Gallery) *model.Gallery {
+func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
 	return &model.Gallery{
 		Dbid:        gallery.ID,
 		Owner:       nil, // handled by dedicated resolver
@@ -852,8 +852,8 @@ func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int)
 	}
 }
 
-// userToModel converts a sqlc.User to a model.User
-func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
+// userToModel converts a db.User to a model.User
+func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 	userApi := publicapi.For(ctx).User
 	isAuthenticatedUser := userApi.IsUserLoggedIn(ctx) && userApi.GetLoggedInUserId(ctx) == user.ID
 
@@ -879,8 +879,8 @@ func userToModel(ctx context.Context, user sqlc.User) *model.GalleryUser {
 	}
 }
 
-// admireToModel converts a sqlc.Admire to a model.Admire
-func admireToModel(ctx context.Context, admire sqlc.Admire) *model.Admire {
+// admireToModel converts a db.Admire to a model.Admire
+func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 
 	return &model.Admire{
 		Dbid:         admire.ID,
@@ -890,8 +890,8 @@ func admireToModel(ctx context.Context, admire sqlc.Admire) *model.Admire {
 	}
 }
 
-// admireToModel converts a sqlc.Admire to a model.Admire
-func admiresToModels(ctx context.Context, admires []sqlc.Admire) []*model.Admire {
+// admireToModel converts a db.Admire to a model.Admire
+func admiresToModels(ctx context.Context, admires []db.Admire) []*model.Admire {
 	result := make([]*model.Admire, len(admires))
 	for i, admire := range admires {
 		result[i] = admireToModel(ctx, admire)
@@ -899,8 +899,8 @@ func admiresToModels(ctx context.Context, admires []sqlc.Admire) []*model.Admire
 	return result
 }
 
-// commentToModel converts a sqlc.Admire to a model.Admire
-func commentToModel(ctx context.Context, comment sqlc.Comment) *model.Comment {
+// commentToModel converts a db.Admire to a model.Admire
+func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 
 	return &model.Comment{
 		Dbid:         comment.ID,
@@ -911,8 +911,8 @@ func commentToModel(ctx context.Context, comment sqlc.Comment) *model.Comment {
 	}
 }
 
-// commentToModel converts a sqlc.Admire to a model.Admire
-func commentsToModels(ctx context.Context, comment []sqlc.Comment) []*model.Comment {
+// commentToModel converts a db.Admire to a model.Admire
+func commentsToModels(ctx context.Context, comment []db.Comment) []*model.Comment {
 
 	result := make([]*model.Comment, len(comment))
 	for i, comment := range comment {
@@ -933,7 +933,7 @@ func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wal
 	}
 }
 
-func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
+func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
 	chain := persist.Chain(wallet.Chain.Int32)
 	chainAddress := persist.NewChainAddress(wallet.Address, chain)
 
@@ -946,7 +946,7 @@ func walletToModelSqlc(ctx context.Context, wallet sqlc.Wallet) *model.Wallet {
 	}
 }
 
-func contractToModel(ctx context.Context, contract sqlc.Contract) *model.Contract {
+func contractToModel(ctx context.Context, contract db.Contract) *model.Contract {
 	chain := persist.Chain(contract.Chain.Int32)
 	addr := persist.NewChainAddress(contract.Address, chain)
 	creator := persist.NewChainAddress(contract.CreatorAddress, chain)
@@ -964,7 +964,7 @@ func contractToModel(ctx context.Context, contract sqlc.Contract) *model.Contrac
 	}
 }
 
-func contractToBadgeModel(ctx context.Context, contract sqlc.Contract) *model.Badge {
+func contractToBadgeModel(ctx context.Context, contract db.Contract) *model.Badge {
 
 	return &model.Badge{
 		ContractID: &contract.ID,
@@ -972,7 +972,7 @@ func contractToBadgeModel(ctx context.Context, contract sqlc.Contract) *model.Ba
 		ImageURL:   contract.BadgeUrl.String,
 	}
 }
-func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.Collection {
+func collectionToModel(ctx context.Context, collection db.Collection) *model.Collection {
 	version := int(collection.Version.Int32)
 
 	return &model.Collection{
@@ -987,7 +987,7 @@ func collectionToModel(ctx context.Context, collection sqlc.Collection) *model.C
 	}
 }
 
-func membershipToModel(ctx context.Context, membershipTier sqlc.Membership) *model.MembershipTier {
+func membershipToModel(ctx context.Context, membershipTier db.Membership) *model.MembershipTier {
 	owners := make([]*model.TokenHolder, 0, len(membershipTier.Owners))
 	for _, owner := range membershipTier.Owners {
 		if owner.UserID != "" {
@@ -1050,7 +1050,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 	}
 }
 
-func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
+func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
 	metadata, _ := token.TokenMetadata.MarshalJSON()
 	metadataString := string(metadata)
@@ -1095,7 +1095,7 @@ func tokenToModel(ctx context.Context, token sqlc.Token) *model.Token {
 	}
 }
 
-func tokensToModel(ctx context.Context, token []sqlc.Token) []*model.Token {
+func tokensToModel(ctx context.Context, token []db.Token) []*model.Token {
 	res := make([]*model.Token, len(token))
 	for i, token := range token {
 		res[i] = tokenToModel(ctx, token)
@@ -1103,7 +1103,7 @@ func tokensToModel(ctx context.Context, token []sqlc.Token) []*model.Token {
 	return res
 }
 
-func communityToModel(ctx context.Context, community sqlc.Contract, forceRefresh *bool, onlyGalleryUsers *bool) *model.Community {
+func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool, onlyGalleryUsers *bool) *model.Community {
 	lastUpdated := community.LastUpdated
 	contractAddress := persist.NewChainAddress(community.Address, persist.Chain(community.Chain.Int32))
 	creatorAddress := persist.NewChainAddress(community.CreatorAddress, persist.Chain(community.Chain.Int32))
@@ -1132,7 +1132,7 @@ func getUrlExtension(url string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
 }
 
-func getMediaForToken(ctx context.Context, token sqlc.Token) model.MediaSubtype {
+func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 	var med persist.Media
 	err := token.Media.AssignTo(&med)
 	if err != nil {

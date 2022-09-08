@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.13.0
 
-package sqlc
+package coredb
 
 import (
 	"database/sql"

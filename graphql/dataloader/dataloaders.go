@@ -1,29 +1,29 @@
-//go:generate go run github.com/vektah/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/sqlc.User
-//go:generate go run github.com/vektah/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Gallery
-//go:generate go run github.com/vektah/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Gallery
-//go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Collection
-//go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Collection
-//go:generate go run github.com/vektah/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Membership
-//go:generate go run github.com/vektah/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Wallet
-//go:generate go run github.com/vektah/dataloaden WalletLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Wallet
-//go:generate go run github.com/vektah/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Wallet
-//go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Token
-//go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Token
-//go:generate go run github.com/vektah/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/sqlc.Token
-//go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Contract
-//go:generate go run github.com/vektah/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Contract
-//go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/sqlc.Contract
-//go:generate go run github.com/vektah/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
-//go:generate go run github.com/vektah/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/sqlc.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
-//go:generate go run github.com/vektah/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.FeedEvent
-//go:generate go run github.com/vektah/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Admire
-//go:generate go run github.com/vektah/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Admire
-//go:generate go run github.com/vektah/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/sqlc.Comment
-//go:generate go run github.com/vektah/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/sqlc.Comment
+//go:generate go run github.com/vektah/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/vektah/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/vektah/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/vektah/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/vektah/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/vektah/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Gallery
+//go:generate go run github.com/vektah/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Gallery
+//go:generate go run github.com/vektah/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Collection
+//go:generate go run github.com/vektah/dataloaden CollectionsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Collection
+//go:generate go run github.com/vektah/dataloaden MembershipLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Membership
+//go:generate go run github.com/vektah/dataloaden WalletLoaderById github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
+//go:generate go run github.com/vektah/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
+//go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/vektah/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
+//go:generate go run github.com/vektah/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
+//go:generate go run github.com/vektah/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
+//go:generate go run github.com/vektah/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/vektah/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/vektah/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/vektah/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
+//go:generate go run github.com/vektah/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
+//go:generate go run github.com/vektah/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Comment
+//go:generate go run github.com/vektah/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 
 package dataloader
 
@@ -33,7 +33,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -63,7 +63,7 @@ type Loaders struct {
 	CollectionsByGalleryId   CollectionsLoaderByID
 	MembershipByMembershipId MembershipLoaderById
 	WalletByWalletId         WalletLoaderById
-	WalletsByUserID          WalletsLoaderByUserID
+	WalletsByUserID          WalletsLoaderByID
 	WalletByChainAddress     WalletLoaderByChainAddress
 	TokenByTokenID           TokenLoaderByID
 	TokensByCollectionID     TokensLoaderByID
@@ -85,7 +85,7 @@ type Loaders struct {
 	CommentsByFeedEventId    CommentsLoaderByID
 }
 
-func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
+func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
 	loaders := &Loaders{}
 
 	loaders.UserByUserId = UserLoaderByID{
@@ -148,7 +148,7 @@ func NewLoaders(ctx context.Context, q *sqlc.Queries) *Loaders {
 		fetch:    loadWalletByWalletId(ctx, loaders, q),
 	}
 
-	loaders.WalletsByUserID = WalletsLoaderByUserID{
+	loaders.WalletsByUserID = WalletsLoaderByID{
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadWalletsByUserId(ctx, loaders, q),
@@ -391,15 +391,15 @@ func (l *Loaders) ClearFeedCaches() {
 	l.GlobalFeed.mu.Unlock()
 }
 
-func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.User, []error) {
-	return func(userIds []persist.DBID) ([]sqlc.User, []error) {
-		users := make([]sqlc.User, len(userIds))
+func loadUserByUserId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.User, []error) {
+	return func(userIds []persist.DBID) ([]db.User, []error) {
+		users := make([]db.User, len(userIds))
 		errors := make([]error, len(userIds))
 
 		b := q.GetUserByIdBatch(ctx, userIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, user sqlc.User, err error) {
+		b.QueryRow(func(i int, user db.User, err error) {
 			if err == pgx.ErrNoRows {
 				err = persist.ErrUserNotFound{UserID: userIds[i]}
 			}
@@ -416,15 +416,15 @@ func loadUserByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fu
 	}
 }
 
-func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]string) ([]sqlc.User, []error) {
-	return func(usernames []string) ([]sqlc.User, []error) {
-		users := make([]sqlc.User, len(usernames))
+func loadUserByUsername(ctx context.Context, loaders *Loaders, q *db.Queries) func([]string) ([]db.User, []error) {
+	return func(usernames []string) ([]db.User, []error) {
+		users := make([]db.User, len(usernames))
 		errors := make([]error, len(usernames))
 
 		b := q.GetUserByUsernameBatch(ctx, usernames)
 		defer b.Close()
 
-		b.QueryRow(func(i int, user sqlc.User, err error) {
+		b.QueryRow(func(i int, user db.User, err error) {
 			if err == pgx.ErrNoRows {
 				err = persist.ErrUserNotFound{Username: usernames[i]}
 			}
@@ -441,15 +441,15 @@ func loadUserByUsername(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 	}
 }
 
-func loadUsersWithTrait(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]string) ([][]sqlc.User, []error) {
-	return func(trait []string) ([][]sqlc.User, []error) {
-		users := make([][]sqlc.User, len(trait))
+func loadUsersWithTrait(ctx context.Context, loaders *Loaders, q *db.Queries) func([]string) ([][]db.User, []error) {
+	return func(trait []string) ([][]db.User, []error) {
+		users := make([][]db.User, len(trait))
 		errors := make([]error, len(trait))
 
 		b := q.GetUsersWithTraitBatch(ctx, trait)
 		defer b.Close()
 
-		b.Query(func(i int, user []sqlc.User, err error) {
+		b.Query(func(i int, user []db.User, err error) {
 
 			users[i], errors[i] = user, err
 
@@ -466,15 +466,15 @@ func loadUsersWithTrait(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 	}
 }
 
-func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Gallery, []error) {
-	return func(galleryIds []persist.DBID) ([]sqlc.Gallery, []error) {
-		galleries := make([]sqlc.Gallery, len(galleryIds))
+func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Gallery, []error) {
+	return func(galleryIds []persist.DBID) ([]db.Gallery, []error) {
+		galleries := make([]db.Gallery, len(galleryIds))
 		errors := make([]error, len(galleryIds))
 
 		b := q.GetGalleryByIdBatch(ctx, galleryIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, g sqlc.Gallery, err error) {
+		b.QueryRow(func(i int, g db.Gallery, err error) {
 			galleries[i] = g
 			errors[i] = err
 
@@ -494,15 +494,15 @@ func loadGalleryByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Queri
 	}
 }
 
-func loadGalleryByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Gallery, []error) {
-	return func(collectionIds []persist.DBID) ([]sqlc.Gallery, []error) {
-		galleries := make([]sqlc.Gallery, len(collectionIds))
+func loadGalleryByCollectionId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Gallery, []error) {
+	return func(collectionIds []persist.DBID) ([]db.Gallery, []error) {
+		galleries := make([]db.Gallery, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
 		b := q.GetGalleryByCollectionIdBatch(ctx, collectionIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, g sqlc.Gallery, err error) {
+		b.QueryRow(func(i int, g db.Gallery, err error) {
 			galleries[i] = g
 			errors[i] = err
 
@@ -520,15 +520,15 @@ func loadGalleryByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Qu
 	}
 }
 
-func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Gallery, []error) {
-	return func(userIds []persist.DBID) ([][]sqlc.Gallery, []error) {
-		galleries := make([][]sqlc.Gallery, len(userIds))
+func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Gallery, []error) {
+	return func(userIds []persist.DBID) ([][]db.Gallery, []error) {
+		galleries := make([][]db.Gallery, len(userIds))
 		errors := make([]error, len(userIds))
 
 		b := q.GetGalleriesByUserIdBatch(ctx, userIds)
 		defer b.Close()
 
-		b.Query(func(i int, g []sqlc.Gallery, err error) {
+		b.Query(func(i int, g []db.Gallery, err error) {
 			galleries[i] = g
 			errors[i] = err
 
@@ -547,15 +547,15 @@ func loadGalleriesByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 	}
 }
 
-func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Collection, []error) {
-	return func(collectionIds []persist.DBID) ([]sqlc.Collection, []error) {
-		collections := make([]sqlc.Collection, len(collectionIds))
+func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Collection, []error) {
+	return func(collectionIds []persist.DBID) ([]db.Collection, []error) {
+		collections := make([]db.Collection, len(collectionIds))
 		errors := make([]error, len(collectionIds))
 
 		b := q.GetCollectionByIdBatch(ctx, collectionIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, c sqlc.Collection, err error) {
+		b.QueryRow(func(i int, c db.Collection, err error) {
 			collections[i] = c
 			errors[i] = err
 
@@ -568,15 +568,15 @@ func loadCollectionByCollectionId(ctx context.Context, loaders *Loaders, q *sqlc
 	}
 }
 
-func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Collection, []error) {
-	return func(galleryIds []persist.DBID) ([][]sqlc.Collection, []error) {
-		collections := make([][]sqlc.Collection, len(galleryIds))
+func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Collection, []error) {
+	return func(galleryIds []persist.DBID) ([][]db.Collection, []error) {
+		collections := make([][]db.Collection, len(galleryIds))
 		errors := make([]error, len(galleryIds))
 
 		b := q.GetCollectionsByGalleryIdBatch(ctx, galleryIds)
 		defer b.Close()
 
-		b.Query(func(i int, c []sqlc.Collection, err error) {
+		b.Query(func(i int, c []db.Collection, err error) {
 			collections[i] = c
 			errors[i] = err
 
@@ -592,15 +592,15 @@ func loadCollectionsByGalleryId(ctx context.Context, loaders *Loaders, q *sqlc.Q
 	}
 }
 
-func loadMembershipByMembershipId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Membership, []error) {
-	return func(membershipIds []persist.DBID) ([]sqlc.Membership, []error) {
-		memberships := make([]sqlc.Membership, len(membershipIds))
+func loadMembershipByMembershipId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Membership, []error) {
+	return func(membershipIds []persist.DBID) ([]db.Membership, []error) {
+		memberships := make([]db.Membership, len(membershipIds))
 		errors := make([]error, len(membershipIds))
 
 		b := q.GetMembershipByMembershipIdBatch(ctx, membershipIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, m sqlc.Membership, err error) {
+		b.QueryRow(func(i int, m db.Membership, err error) {
 			memberships[i] = m
 			errors[i] = err
 
@@ -612,15 +612,15 @@ func loadMembershipByMembershipId(ctx context.Context, loaders *Loaders, q *sqlc
 		return memberships, errors
 	}
 }
-func loadWalletByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Wallet, []error) {
-	return func(walletIds []persist.DBID) ([]sqlc.Wallet, []error) {
-		wallets := make([]sqlc.Wallet, len(walletIds))
+func loadWalletByWalletId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Wallet, []error) {
+	return func(walletIds []persist.DBID) ([]db.Wallet, []error) {
+		wallets := make([]db.Wallet, len(walletIds))
 		errors := make([]error, len(walletIds))
 
 		b := q.GetWalletByIDBatch(ctx, walletIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
+		b.QueryRow(func(i int, wallet db.Wallet, err error) {
 			// TODO err for not found by ID
 
 			// Add results to other loaders' caches
@@ -635,15 +635,15 @@ func loadWalletByWalletId(ctx context.Context, loaders *Loaders, q *sqlc.Queries
 	}
 }
 
-func loadWalletsByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Wallet, []error) {
-	return func(userIds []persist.DBID) ([][]sqlc.Wallet, []error) {
-		wallets := make([][]sqlc.Wallet, len(userIds))
+func loadWalletsByUserId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Wallet, []error) {
+	return func(userIds []persist.DBID) ([][]db.Wallet, []error) {
+		wallets := make([][]db.Wallet, len(userIds))
 		errors := make([]error, len(userIds))
 
 		b := q.GetWalletsByUserIDBatch(ctx, userIds)
 		defer b.Close()
 
-		b.Query(func(i int, w []sqlc.Wallet, err error) {
+		b.Query(func(i int, w []db.Wallet, err error) {
 			// TODO err for not found by user ID
 			wallets[i], errors[i] = w, err
 
@@ -660,14 +660,14 @@ func loadWalletsByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries)
 	}
 }
 
-func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.ChainAddress) ([]sqlc.Wallet, []error) {
-	return func(chainAddresses []persist.ChainAddress) ([]sqlc.Wallet, []error) {
-		wallets := make([]sqlc.Wallet, len(chainAddresses))
+func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.ChainAddress) ([]db.Wallet, []error) {
+	return func(chainAddresses []persist.ChainAddress) ([]db.Wallet, []error) {
+		wallets := make([]db.Wallet, len(chainAddresses))
 		errors := make([]error, len(chainAddresses))
 
-		sqlChainAddress := make([]sqlc.GetWalletByChainAddressBatchParams, len(chainAddresses))
+		sqlChainAddress := make([]db.GetWalletByChainAddressBatchParams, len(chainAddresses))
 		for i, chainAddress := range chainAddresses {
-			sqlChainAddress[i] = sqlc.GetWalletByChainAddressBatchParams{
+			sqlChainAddress[i] = db.GetWalletByChainAddressBatchParams{
 				Address: chainAddress.Address(),
 				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain()), Valid: true},
 			}
@@ -676,7 +676,7 @@ func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Que
 		b := q.GetWalletByChainAddressBatch(ctx, sqlChainAddress)
 		defer b.Close()
 
-		b.QueryRow(func(i int, wallet sqlc.Wallet, err error) {
+		b.QueryRow(func(i int, wallet db.Wallet, err error) {
 			if err == pgx.ErrNoRows {
 				err = persist.ErrWalletNotFound{ChainAddress: chainAddresses[i]}
 			}
@@ -693,15 +693,15 @@ func loadWalletByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Que
 	}
 }
 
-func loadFollowersByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.User, []error) {
-	return func(userIds []persist.DBID) ([][]sqlc.User, []error) {
-		followers := make([][]sqlc.User, len(userIds))
+func loadFollowersByUserId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.User, []error) {
+	return func(userIds []persist.DBID) ([][]db.User, []error) {
+		followers := make([][]db.User, len(userIds))
 		errors := make([]error, len(followers))
 
 		b := q.GetFollowersByUserIdBatch(ctx, userIds)
 		defer b.Close()
 
-		b.Query(func(i int, u []sqlc.User, err error) {
+		b.Query(func(i int, u []db.User, err error) {
 			followers[i] = u
 			errors[i] = err
 
@@ -718,15 +718,15 @@ func loadFollowersByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 	}
 }
 
-func loadFollowingByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.User, []error) {
-	return func(userIds []persist.DBID) ([][]sqlc.User, []error) {
-		following := make([][]sqlc.User, len(userIds))
+func loadFollowingByUserId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.User, []error) {
+	return func(userIds []persist.DBID) ([][]db.User, []error) {
+		following := make([][]db.User, len(userIds))
 		errors := make([]error, len(following))
 
 		b := q.GetFollowingByUserIdBatch(ctx, userIds)
 		defer b.Close()
 
-		b.Query(func(i int, u []sqlc.User, err error) {
+		b.Query(func(i int, u []db.User, err error) {
 			following[i] = u
 			errors[i] = err
 
@@ -743,15 +743,15 @@ func loadFollowingByUserId(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 	}
 }
 
-func loadTokenByTokenID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Token, []error) {
-	return func(tokenIDs []persist.DBID) ([]sqlc.Token, []error) {
-		tokens := make([]sqlc.Token, len(tokenIDs))
+func loadTokenByTokenID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Token, []error) {
+	return func(tokenIDs []persist.DBID) ([]db.Token, []error) {
+		tokens := make([]db.Token, len(tokenIDs))
 		errors := make([]error, len(tokenIDs))
 
 		b := q.GetTokenByIdBatch(ctx, tokenIDs)
 		defer b.Close()
 
-		b.QueryRow(func(i int, t sqlc.Token, err error) {
+		b.QueryRow(func(i int, t db.Token, err error) {
 			tokens[i], errors[i] = t, err
 
 			if errors[i] == pgx.ErrNoRows {
@@ -763,15 +763,15 @@ func loadTokenByTokenID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 	}
 }
 
-func loadTokensByCollectionID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
-	return func(collectionIDs []persist.DBID) ([][]sqlc.Token, []error) {
-		tokens := make([][]sqlc.Token, len(collectionIDs))
+func loadTokensByCollectionID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Token, []error) {
+	return func(collectionIDs []persist.DBID) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(collectionIDs))
 		errors := make([]error, len(collectionIDs))
 
 		b := q.GetTokensByCollectionIdBatch(ctx, collectionIDs)
 		defer b.Close()
 
-		b.Query(func(i int, t []sqlc.Token, err error) {
+		b.Query(func(i int, t []db.Token, err error) {
 			tokens[i], errors[i] = t, err
 
 			// Add results to the TokenByTokenID loader's cache
@@ -786,9 +786,9 @@ func loadTokensByCollectionID(ctx context.Context, loaders *Loaders, q *sqlc.Que
 	}
 }
 
-func loadTokensByWalletID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
-	return func(walletIds []persist.DBID) ([][]sqlc.Token, []error) {
-		tokens := make([][]sqlc.Token, len(walletIds))
+func loadTokensByWalletID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Token, []error) {
+	return func(walletIds []persist.DBID) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(walletIds))
 		errors := make([]error, len(walletIds))
 
 		convertedIds := make([]persist.DBIDList, len(walletIds))
@@ -799,7 +799,7 @@ func loadTokensByWalletID(ctx context.Context, loaders *Loaders, q *sqlc.Queries
 		b := q.GetTokensByWalletIdsBatch(ctx, convertedIds)
 		defer b.Close()
 
-		b.Query(func(i int, t []sqlc.Token, err error) {
+		b.Query(func(i int, t []db.Token, err error) {
 			tokens[i], errors[i] = t, err
 
 			// Add results to the TokenByTokenID loader's cache
@@ -814,15 +814,15 @@ func loadTokensByWalletID(ctx context.Context, loaders *Loaders, q *sqlc.Queries
 	}
 }
 
-func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
-	return func(userIDs []persist.DBID) ([][]sqlc.Token, []error) {
-		tokens := make([][]sqlc.Token, len(userIDs))
+func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Token, []error) {
+	return func(userIDs []persist.DBID) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(userIDs))
 		errors := make([]error, len(userIDs))
 
 		b := q.GetTokensByUserIdBatch(ctx, userIDs)
 		defer b.Close()
 
-		b.Query(func(i int, t []sqlc.Token, err error) {
+		b.Query(func(i int, t []db.Token, err error) {
 			tokens[i], errors[i] = t, err
 
 			// Add results to the TokenByTokenID loader's cache
@@ -837,14 +837,14 @@ func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) 
 	}
 }
 
-func loadTokensByUserIDAndChain(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]IDAndChain) ([][]sqlc.Token, []error) {
-	return func(userIDsAndChains []IDAndChain) ([][]sqlc.Token, []error) {
-		tokens := make([][]sqlc.Token, len(userIDsAndChains))
+func loadTokensByUserIDAndChain(ctx context.Context, loaders *Loaders, q *db.Queries) func([]IDAndChain) ([][]db.Token, []error) {
+	return func(userIDsAndChains []IDAndChain) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(userIDsAndChains))
 		errors := make([]error, len(userIDsAndChains))
 
-		params := make([]sqlc.GetTokensByUserIdAndChainBatchParams, len(userIDsAndChains))
+		params := make([]db.GetTokensByUserIdAndChainBatchParams, len(userIDsAndChains))
 		for i, userIDAndChain := range userIDsAndChains {
-			params[i] = sqlc.GetTokensByUserIdAndChainBatchParams{
+			params[i] = db.GetTokensByUserIdAndChainBatchParams{
 				OwnerUserID: userIDAndChain.ID,
 				Chain:       sql.NullInt32{Int32: int32(userIDAndChain.Chain), Valid: true},
 			}
@@ -853,7 +853,7 @@ func loadTokensByUserIDAndChain(ctx context.Context, loaders *Loaders, q *sqlc.Q
 		b := q.GetTokensByUserIdAndChainBatch(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, t []sqlc.Token, err error) {
+		b.Query(func(i int, t []db.Token, err error) {
 			tokens[i], errors[i] = t, err
 
 			// Add results to the TokenByTokenID loader's cache
@@ -868,15 +868,15 @@ func loadTokensByUserIDAndChain(ctx context.Context, loaders *Loaders, q *sqlc.Q
 	}
 }
 
-func loadNewTokensByFeedEventID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Token, []error) {
-	return func(tokenIDs []persist.DBID) ([][]sqlc.Token, []error) {
-		tokens := make([][]sqlc.Token, len(tokenIDs))
+func loadNewTokensByFeedEventID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Token, []error) {
+	return func(tokenIDs []persist.DBID) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(tokenIDs))
 		errors := make([]error, len(tokenIDs))
 
 		b := q.GetNewTokensByFeedEventIdBatch(ctx, tokenIDs)
 		defer b.Close()
 
-		b.Query(func(i int, t []sqlc.Token, err error) {
+		b.Query(func(i int, t []db.Token, err error) {
 			tokens[i], errors[i] = t, err
 
 			// Add results to the TokenByTokenID loader's cache
@@ -891,15 +891,15 @@ func loadNewTokensByFeedEventID(ctx context.Context, loaders *Loaders, q *sqlc.Q
 	}
 }
 
-func loadContractByContractID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Contract, []error) {
-	return func(contractIDs []persist.DBID) ([]sqlc.Contract, []error) {
-		contracts := make([]sqlc.Contract, len(contractIDs))
+func loadContractByContractID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Contract, []error) {
+	return func(contractIDs []persist.DBID) ([]db.Contract, []error) {
+		contracts := make([]db.Contract, len(contractIDs))
 		errors := make([]error, len(contractIDs))
 
 		b := q.GetContractByIDBatch(ctx, contractIDs)
 		defer b.Close()
 
-		b.QueryRow(func(i int, t sqlc.Contract, err error) {
+		b.QueryRow(func(i int, t db.Contract, err error) {
 			contracts[i], errors[i] = t, err
 
 			if errors[i] == pgx.ErrNoRows {
@@ -910,14 +910,14 @@ func loadContractByContractID(ctx context.Context, loaders *Loaders, q *sqlc.Que
 		return contracts, errors
 	}
 }
-func loadContractByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.ChainAddress) ([]sqlc.Contract, []error) {
-	return func(chainAddresses []persist.ChainAddress) ([]sqlc.Contract, []error) {
-		contracts := make([]sqlc.Contract, len(chainAddresses))
+func loadContractByChainAddress(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.ChainAddress) ([]db.Contract, []error) {
+	return func(chainAddresses []persist.ChainAddress) ([]db.Contract, []error) {
+		contracts := make([]db.Contract, len(chainAddresses))
 		errors := make([]error, len(chainAddresses))
 
-		asParams := make([]sqlc.GetContractByChainAddressBatchParams, len(chainAddresses))
+		asParams := make([]db.GetContractByChainAddressBatchParams, len(chainAddresses))
 		for i, chainAddress := range chainAddresses {
-			asParams[i] = sqlc.GetContractByChainAddressBatchParams{
+			asParams[i] = db.GetContractByChainAddressBatchParams{
 				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain()), Valid: true},
 				Address: chainAddress.Address(),
 			}
@@ -925,7 +925,7 @@ func loadContractByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Q
 		b := q.GetContractByChainAddressBatch(ctx, asParams)
 		defer b.Close()
 
-		b.QueryRow(func(i int, t sqlc.Contract, err error) {
+		b.QueryRow(func(i int, t db.Contract, err error) {
 			contracts[i], errors[i] = t, err
 
 			if errors[i] == pgx.ErrNoRows {
@@ -937,15 +937,15 @@ func loadContractByChainAddress(ctx context.Context, loaders *Loaders, q *sqlc.Q
 	}
 }
 
-func loadContractsByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Contract, []error) {
-	return func(contractIDs []persist.DBID) ([][]sqlc.Contract, []error) {
-		contracts := make([][]sqlc.Contract, len(contractIDs))
+func loadContractsByUserID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Contract, []error) {
+	return func(contractIDs []persist.DBID) ([][]db.Contract, []error) {
+		contracts := make([][]db.Contract, len(contractIDs))
 		errors := make([]error, len(contractIDs))
 
 		b := q.GetContractsByUserIDBatch(ctx, contractIDs)
 		defer b.Close()
 
-		b.Query(func(i int, c []sqlc.Contract, err error) {
+		b.Query(func(i int, c []db.Contract, err error) {
 			contracts[i], errors[i] = c, err
 
 			// Add results to the ContractByContractId loader's cache
@@ -961,15 +961,15 @@ func loadContractsByUserID(ctx context.Context, loaders *Loaders, q *sqlc.Querie
 	}
 }
 
-func loadEventById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.FeedEvent, []error) {
-	return func(eventIds []persist.DBID) ([]sqlc.FeedEvent, []error) {
-		events := make([]sqlc.FeedEvent, len(eventIds))
+func loadEventById(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.FeedEvent, []error) {
+	return func(eventIds []persist.DBID) ([]db.FeedEvent, []error) {
+		events := make([]db.FeedEvent, len(eventIds))
 		errors := make([]error, len(eventIds))
 
 		b := q.GetEventByIdBatch(ctx, eventIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, p sqlc.FeedEvent, err error) {
+		b.QueryRow(func(i int, p db.FeedEvent, err error) {
 			events[i] = p
 			errors[i] = err
 
@@ -982,15 +982,15 @@ func loadEventById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func(
 	}
 }
 
-func loadUserFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]sqlc.GetUserFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
-	return func(params []sqlc.GetUserFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
-		events := make([][]sqlc.FeedEvent, len(params))
+func loadUserFeed(ctx context.Context, loaders *Loaders, q *db.Queries) func([]db.GetUserFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+	return func(params []db.GetUserFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+		events := make([][]db.FeedEvent, len(params))
 		errors := make([]error, len(params))
 
 		b := q.GetUserFeedViewBatch(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []sqlc.FeedEvent, err error) {
+		b.Query(func(i int, evts []db.FeedEvent, err error) {
 			events[i] = evts
 			errors[i] = err
 
@@ -1006,15 +1006,15 @@ func loadUserFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([
 	}
 }
 
-func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
-	return func(params []sqlc.GetGlobalFeedViewBatchParams) ([][]sqlc.FeedEvent, []error) {
-		events := make([][]sqlc.FeedEvent, len(params))
+func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *db.Queries) func([]db.GetGlobalFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+	return func(params []db.GetGlobalFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+		events := make([][]db.FeedEvent, len(params))
 		errors := make([]error, len(params))
 
 		b := q.GetGlobalFeedViewBatch(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, evts []sqlc.FeedEvent, err error) {
+		b.Query(func(i int, evts []db.FeedEvent, err error) {
 			events[i] = evts
 			errors[i] = err
 
@@ -1030,15 +1030,15 @@ func loadGlobalFeed(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 	}
 }
 
-func loadAdmireById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Admire, []error) {
-	return func(admireIds []persist.DBID) ([]sqlc.Admire, []error) {
-		admires := make([]sqlc.Admire, len(admireIds))
+func loadAdmireById(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Admire, []error) {
+	return func(admireIds []persist.DBID) ([]db.Admire, []error) {
+		admires := make([]db.Admire, len(admireIds))
 		errors := make([]error, len(admireIds))
 
 		b := q.GetAdmireByAdmireIDBatch(ctx, admireIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, a sqlc.Admire, err error) {
+		b.QueryRow(func(i int, a db.Admire, err error) {
 			admires[i] = a
 			errors[i] = err
 
@@ -1051,15 +1051,15 @@ func loadAdmireById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func
 	}
 }
 
-func loadAdmiresByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Admire, []error) {
-	return func(ids []persist.DBID) ([][]sqlc.Admire, []error) {
-		admires := make([][]sqlc.Admire, len(ids))
+func loadAdmiresByFeedEventId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Admire, []error) {
+	return func(ids []persist.DBID) ([][]db.Admire, []error) {
+		admires := make([][]db.Admire, len(ids))
 		errors := make([]error, len(ids))
 
 		b := q.GetAdmiresByFeedEventIDBatch(ctx, ids)
 		defer b.Close()
 
-		b.Query(func(i int, admrs []sqlc.Admire, err error) {
+		b.Query(func(i int, admrs []db.Admire, err error) {
 			admires[i] = admrs
 			errors[i] = err
 
@@ -1075,15 +1075,15 @@ func loadAdmiresByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Que
 	}
 }
 
-func loadCommentById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([]sqlc.Comment, []error) {
-	return func(commentIds []persist.DBID) ([]sqlc.Comment, []error) {
-		comments := make([]sqlc.Comment, len(commentIds))
+func loadCommentById(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([]db.Comment, []error) {
+	return func(commentIds []persist.DBID) ([]db.Comment, []error) {
+		comments := make([]db.Comment, len(commentIds))
 		errors := make([]error, len(commentIds))
 
 		b := q.GetCommentByCommentIDBatch(ctx, commentIds)
 		defer b.Close()
 
-		b.QueryRow(func(i int, c sqlc.Comment, err error) {
+		b.QueryRow(func(i int, c db.Comment, err error) {
 			comments[i] = c
 			errors[i] = err
 
@@ -1096,15 +1096,15 @@ func loadCommentById(ctx context.Context, loaders *Loaders, q *sqlc.Queries) fun
 	}
 }
 
-func loadCommentsByFeedEventId(ctx context.Context, loaders *Loaders, q *sqlc.Queries) func([]persist.DBID) ([][]sqlc.Comment, []error) {
-	return func(ids []persist.DBID) ([][]sqlc.Comment, []error) {
-		comments := make([][]sqlc.Comment, len(ids))
+func loadCommentsByFeedEventId(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Comment, []error) {
+	return func(ids []persist.DBID) ([][]db.Comment, []error) {
+		comments := make([][]db.Comment, len(ids))
 		errors := make([]error, len(ids))
 
 		b := q.GetCommentsByFeedEventIDBatch(ctx, ids)
 		defer b.Close()
 
-		b.Query(func(i int, cmts []sqlc.Comment, err error) {
+		b.Query(func(i int, cmts []db.Comment, err error) {
 			comments[i] = cmts
 			errors[i] = err
 

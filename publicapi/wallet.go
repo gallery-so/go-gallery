@@ -3,7 +3,7 @@ package publicapi
 import (
 	"context"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -14,14 +14,14 @@ import (
 
 type WalletAPI struct {
 	repos              *persist.Repositories
-	queries            *sqlc.Queries
+	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
 }
 
-func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (*sqlc.Wallet, error) {
+func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (*db.Wallet, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"walletID": {walletID, "required"},
@@ -37,7 +37,7 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 	return &address, nil
 }
 
-func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress persist.ChainAddress) (*sqlc.Wallet, error) {
+func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.Wallet, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"chainAddress": {chainAddress, "required"},
@@ -53,7 +53,7 @@ func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress p
 	return &a, nil
 }
 
-func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Wallet, error) {
+func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID) ([]db.Wallet, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},

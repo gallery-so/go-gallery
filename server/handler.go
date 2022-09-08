@@ -12,7 +12,7 @@ import (
 	sentry "github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	graphql "github.com/mikeydub/go-gallery/graphql/resolver"
@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker) *gin.Engine {
 
 	graphqlGroup := router.Group("/glry/graphql")
 
@@ -35,7 +35,7 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *sqlc
 	return router
 }
 
-func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker) {
+func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker) {
 	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler))
 
 	if viper.GetString("ENV") != "production" {
@@ -44,7 +44,7 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, q
 	}
 }
 
-func graphqlHandler(repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker) gin.HandlerFunc {
+func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker) gin.HandlerFunc {
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler()
 	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()

@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -15,13 +15,13 @@ var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire c
 
 type AdmireAPI struct {
 	repos     *persist.Repositories
-	queries   *sqlc.Queries
+	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
 }
 
-func (api AdmireAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*sqlc.Admire, error) {
+func (api AdmireAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*db.Admire, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"admireID": {admireID, "required"},
@@ -37,7 +37,7 @@ func (api AdmireAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (
 	return &admire, nil
 }
 
-func (api AdmireAPI) GetAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]sqlc.Admire, error) {
+func (api AdmireAPI) GetAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]db.Admire, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},

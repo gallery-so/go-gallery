@@ -3,7 +3,7 @@ package publicapi
 import (
 	"context"
 
-	"github.com/mikeydub/go-gallery/db/sqlc"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -14,14 +14,14 @@ import (
 
 type ContractAPI struct {
 	repos              *persist.Repositories
-	queries            *sqlc.Queries
+	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
 }
 
-func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.DBID) (*sqlc.Contract, error) {
+func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.DBID) (*db.Contract, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractID": {contractID, "required"},
@@ -37,7 +37,7 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 	return &contract, nil
 }
 
-func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress persist.ChainAddress) (*sqlc.Contract, error) {
+func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress persist.ChainAddress) (*db.Contract, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required"},
@@ -53,7 +53,7 @@ func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress
 	return &contract, nil
 }
 
-func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Contract, error) {
+func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
