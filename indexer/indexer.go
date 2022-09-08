@@ -50,7 +50,7 @@ var uniqueMetadataHandlers = uniqueMetadatas{
 	persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"): cryptopunks,
 }
 
-const defaultWorkerPoolSize = 4
+const defaultWorkerPoolSize = 3
 
 const defaultWorkerPoolWaitSize = 10
 
