@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/validate"
@@ -20,13 +20,13 @@ const (
 
 type CollectionAPI struct {
 	repos     *persist.Repositories
-	queries   *sqlc.Queries
+	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
 }
 
-func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID persist.DBID) (*sqlc.Collection, error) {
+func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID persist.DBID) (*db.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
@@ -42,7 +42,7 @@ func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID per
 	return &collection, nil
 }
 
-func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryID persist.DBID) ([]sqlc.Collection, error) {
+func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryID persist.DBID) ([]db.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID": {galleryID, "required"},
@@ -58,7 +58,7 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings) (*sqlc.Collection, error) {
+func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings) (*db.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID":      {galleryID, "required"},
@@ -124,7 +124,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	dispatchEventToFeed(ctx, sqlc.Event{
+	dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -194,7 +194,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	dispatchEventToFeed(ctx, sqlc.Event{
+	dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -254,7 +254,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	dispatchEventToFeed(ctx, sqlc.Event{
+	dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,

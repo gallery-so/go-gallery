@@ -2,12 +2,12 @@ version: 2
 sql:
 # Indexer model gen
 - schema: "db/migrations/indexer"
-  queries: "db/queries/indexer.sql"
+  queries: "db/queries/indexer"
   engine: "postgresql"
   gen:
     go:
-      package: "indexergen"
-      out: "db/sqlc/indexergen"
+      package: "indexerdb"
+      out: "db/gen/indexerdb"
       sql_package: "pgx/v4"
       output_db_file_name: "db_gen.go"
       output_models_file_name: "models_gen.go"
@@ -22,12 +22,12 @@ sql:
 
 # Backend model gen
 - schema: "db/migrations/core"
-  queries: "db/queries/core.sql"
+  queries: "db/queries/core"
   engine: "postgresql"
   gen:
     go:
-      package: "coregen"
-      out: "db/sqlc/coregen"
+      package: "coredb"
+      out: "db/gen/coredb"
       sql_package: "pgx/v4"
       output_db_file_name: "db_gen.go"
       output_models_file_name: "models_gen.go"

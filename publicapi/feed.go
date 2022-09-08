@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -14,13 +14,13 @@ import (
 
 type FeedAPI struct {
 	repos     *persist.Repositories
-	queries   *sqlc.Queries
+	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
 }
 
-func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*sqlc.FeedEvent, error) {
+func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"eventID": {eventID, "required"},
@@ -36,7 +36,7 @@ func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*sql
 	return &event, nil
 }
 
-func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) (persist.DBID, []sqlc.FeedEvent, error) {
+func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) (persist.DBID, []db.FeedEvent, error) {
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return "", nil, err
@@ -60,7 +60,7 @@ func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, afte
 		return "", nil, err
 	}
 
-	params := sqlc.GetUserFeedViewBatchParams{Follower: userID}
+	params := db.GetUserFeedViewBatchParams{Follower: userID}
 
 	if first != nil {
 		params.FromFirst = true
@@ -85,7 +85,7 @@ func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, afte
 	return userID, events, err
 }
 
-func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]sqlc.FeedEvent, error) {
+func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]db.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"first": {first, "omitempty,gte=0"},
@@ -103,7 +103,7 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 		return nil, err
 	}
 
-	params := sqlc.GetGlobalFeedViewBatchParams{}
+	params := db.GetGlobalFeedViewBatchParams{}
 
 	if first != nil {
 		params.FromFirst = true
@@ -133,13 +133,13 @@ func (api FeedAPI) HasPage(ctx context.Context, cursor string, userId persist.DB
 	}
 
 	if userId != "" {
-		return api.queries.UserFeedHasMoreEvents(ctx, sqlc.UserFeedHasMoreEventsParams{
+		return api.queries.UserFeedHasMoreEvents(ctx, db.UserFeedHasMoreEventsParams{
 			Follower:  userId,
 			ID:        *eventID,
 			FromFirst: byFirst,
 		})
 	} else {
-		return api.queries.GlobalFeedHasMoreEvents(ctx, sqlc.GlobalFeedHasMoreEventsParams{
+		return api.queries.GlobalFeedHasMoreEvents(ctx, db.GlobalFeedHasMoreEventsParams{
 			ID:        *eventID,
 			FromFirst: byFirst,
 		})

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v4/pgxpool"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -19,7 +19,7 @@ type EventBuilder struct {
 }
 
 func NewEventBuilder(pgx *pgxpool.Pool) *EventBuilder {
-	queries := sqlc.New(pgx)
+	queries := db.New(pgx)
 	return &EventBuilder{
 		eventRepo:         &postgres.EventRepository{Queries: queries},
 		feedRepo:          &postgres.FeedRepository{Queries: queries},
@@ -27,7 +27,7 @@ func NewEventBuilder(pgx *pgxpool.Pool) *EventBuilder {
 	}
 }
 
-func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (*sqlc.FeedEvent, error) {
+func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
 	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
 	defer tracing.FinishSpan(span)
 
@@ -68,7 +68,7 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	}
 }
 
-func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActive(ctx, event)
 
 	// more recent events are bufferred
@@ -86,7 +86,7 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Ev
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
+	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:        persist.GenerateID(),
 		OwnerID:   event.ActorID,
 		Action:    event.Action,
@@ -96,7 +96,7 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event sqlc.Ev
 	})
 }
 
-func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActive(ctx, event)
 
 	// more recent events are bufferred
@@ -109,7 +109,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 		return nil, err
 	}
 
-	events := []sqlc.Event{event}
+	events := []db.Event{event}
 
 	if feedEvent != nil {
 		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"))
@@ -134,7 +134,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
+	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
 		Action:  event.Action,
@@ -147,7 +147,7 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event s
 	})
 }
 
-func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
@@ -175,7 +175,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
+	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
 		Action:  event.Action,
@@ -189,7 +189,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 	})
 }
 
-func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
@@ -202,7 +202,7 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event s
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
+	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
 		Action:  event.Action,
@@ -217,7 +217,7 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event s
 	})
 }
 
-func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
@@ -240,7 +240,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
+	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
 		Action:  event.Action,
@@ -253,7 +253,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 	})
 }
 
-func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
 
 	// more recent events are bufferred
@@ -298,7 +298,7 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, sqlc.FeedEvent{
+	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
 		Action:  event.Action,

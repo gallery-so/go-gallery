@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -15,7 +15,7 @@ import (
 
 type AuthAPI struct {
 	repos              *persist.Repositories
-	queries            *sqlc.Queries
+	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
 	ethClient          *ethclient.Client

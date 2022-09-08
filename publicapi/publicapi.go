@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
 
 	"cloud.google.com/go/storage"
@@ -28,7 +28,7 @@ const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
 	repos      *persist.Repositories
-	queries    *sqlc.Queries
+	queries    *db.Queries
 	loaders    *dataloader.Loaders
 	validator  *validator.Validate
 	Auth       *AuthAPI
@@ -44,7 +44,7 @@ type PublicAPI struct {
 	Comment    *CommentAPI
 }
 
-func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *sqlc.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, throttler *throttle.Locker) {
+func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, throttler *throttle.Locker) {
 	// Use the request context so dataloaders will add their traces to the request span
 	loaders := dataloader.NewLoaders(ctx.Request.Context(), queries)
 	validator := newValidator()
@@ -137,12 +137,12 @@ func (e ErrInvalidInput) Error() string {
 	return str
 }
 
-func dispatchEventToFeed(ctx context.Context, evt sqlc.Event) {
+func dispatchEventToFeed(ctx context.Context, evt db.Event) {
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
 	go pushFeedEvent(ctx, evt)
 }
 
-func pushFeedEvent(ctx context.Context, evt sqlc.Event) {
+func pushFeedEvent(ctx context.Context, evt db.Event) {
 	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 		sentryutil.SetEventContext(hub.Scope(), evt.ActorID, evt.SubjectID, evt.Action)
 	}

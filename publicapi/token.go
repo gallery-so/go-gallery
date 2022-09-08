@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gammazero/workerpool"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/validate"
@@ -17,7 +17,7 @@ import (
 
 type TokenAPI struct {
 	repos              *persist.Repositories
-	queries            *sqlc.Queries
+	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
@@ -35,7 +35,7 @@ func (e ErrTokenRefreshFailed) Error() string {
 	return e.Message
 }
 
-func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*sqlc.Token, error) {
+func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"tokenID": {tokenID, "required"},
@@ -51,7 +51,7 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*sq
 	return &token, nil
 }
 
-func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID) ([]sqlc.Token, error) {
+func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
@@ -67,14 +67,14 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]sqlc.Token, []error) {
+func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, []error) {
 	return api.loaders.TokenByTokenID.LoadAll(tokenIDs)
 }
 
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
 // Since its possible for tokens to be deleted, the return size may not be the same size of
 // the tokens added, so the caller should handle the matching of arguments to response if used in that context.
-func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persist.DBID) ([]sqlc.Token, error) {
+func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persist.DBID) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"eventID": {eventID, "required"},
@@ -90,7 +90,7 @@ func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persi
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]sqlc.Token, error) {
+func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"walletID": {walletID, "required"},
@@ -106,7 +106,7 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) ([]sqlc.Token, error) {
+func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
@@ -122,7 +122,7 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]sqlc.Token, error) {
+func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
@@ -283,7 +283,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	api.loaders.ClearAllCaches()
 
 	// Send event
-	dispatchEventToFeed(ctx, sqlc.Event{
+	dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,

@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // CollectionsLoaderByIDConfig captures the config to create a new CollectionsLoaderByID
 type CollectionsLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([][]coregen.Collection, []error)
+	Fetch func(keys []persist.DBID) ([][]coredb.Collection, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewCollectionsLoaderByID(config CollectionsLoaderByIDConfig) *CollectionsLo
 // CollectionsLoaderByID batches and caches requests
 type CollectionsLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([][]coregen.Collection, []error)
+	fetch func(keys []persist.DBID) ([][]coredb.Collection, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type CollectionsLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID][]coregen.Collection
+	cache map[persist.DBID][]coredb.Collection
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type CollectionsLoaderByID struct {
 
 type collectionsLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    [][]coregen.Collection
+	data    [][]coredb.Collection
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Collection by key, batching and caching will be applied automatically
-func (l *CollectionsLoaderByID) Load(key persist.DBID) ([]coregen.Collection, error) {
+func (l *CollectionsLoaderByID) Load(key persist.DBID) ([]coredb.Collection, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Collection.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Collection, error) {
+func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.Collection, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]coregen.Collection, error) {
+		return func() ([]coredb.Collection, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Co
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coregen.Collection, error) {
+	return func() ([]coredb.Collection, error) {
 		<-batch.done
 
-		var data []coregen.Collection
+		var data []coredb.Collection
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *CollectionsLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.Co
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.Collection, []error) {
-	results := make([]func() ([]coregen.Collection, error), len(keys))
+func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]coredb.Collection, []error) {
+	results := make([]func() ([]coredb.Collection, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	collections := make([][]coregen.Collection, len(keys))
+	collections := make([][]coredb.Collection, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		collections[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *CollectionsLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.Collec
 // LoadAllThunk returns a function that when called will block waiting for a Collections.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coregen.Collection, []error) {
-	results := make([]func() ([]coregen.Collection, error), len(keys))
+func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb.Collection, []error) {
+	results := make([]func() ([]coredb.Collection, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coregen.Collection, []error) {
-		collections := make([][]coregen.Collection, len(keys))
+	return func() ([][]coredb.Collection, []error) {
+		collections := make([][]coredb.Collection, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			collections[i], errors[i] = thunk()
@@ -150,13 +150,13 @@ func (l *CollectionsLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]co
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *CollectionsLoaderByID) Prime(key persist.DBID, value []coregen.Collection) bool {
+func (l *CollectionsLoaderByID) Prime(key persist.DBID, value []coredb.Collection) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coregen.Collection, len(value))
+		cpy := make([]coredb.Collection, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -171,9 +171,9 @@ func (l *CollectionsLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *CollectionsLoaderByID) unsafeSet(key persist.DBID, value []coregen.Collection) {
+func (l *CollectionsLoaderByID) unsafeSet(key persist.DBID, value []coredb.Collection) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID][]coregen.Collection{}
+		l.cache = map[persist.DBID][]coredb.Collection{}
 	}
 	l.cache[key] = value
 }

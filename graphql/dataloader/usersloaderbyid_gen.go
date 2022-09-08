@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // UsersLoaderByIDConfig captures the config to create a new UsersLoaderByID
 type UsersLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([][]coregen.User, []error)
+	Fetch func(keys []persist.DBID) ([][]coredb.User, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewUsersLoaderByID(config UsersLoaderByIDConfig) *UsersLoaderByID {
 // UsersLoaderByID batches and caches requests
 type UsersLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([][]coregen.User, []error)
+	fetch func(keys []persist.DBID) ([][]coredb.User, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type UsersLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID][]coregen.User
+	cache map[persist.DBID][]coredb.User
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type UsersLoaderByID struct {
 
 type usersLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    [][]coregen.User
+	data    [][]coredb.User
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a User by key, batching and caching will be applied automatically
-func (l *UsersLoaderByID) Load(key persist.DBID) ([]coregen.User, error) {
+func (l *UsersLoaderByID) Load(key persist.DBID) ([]coredb.User, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a User.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UsersLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.User, error) {
+func (l *UsersLoaderByID) LoadThunk(key persist.DBID) func() ([]coredb.User, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]coregen.User, error) {
+		return func() ([]coredb.User, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *UsersLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.User, er
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coregen.User, error) {
+	return func() ([]coredb.User, error) {
 		<-batch.done
 
-		var data []coregen.User
+		var data []coredb.User
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *UsersLoaderByID) LoadThunk(key persist.DBID) func() ([]coregen.User, er
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UsersLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.User, []error) {
-	results := make([]func() ([]coregen.User, error), len(keys))
+func (l *UsersLoaderByID) LoadAll(keys []persist.DBID) ([][]coredb.User, []error) {
+	results := make([]func() ([]coredb.User, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	users := make([][]coregen.User, len(keys))
+	users := make([][]coredb.User, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		users[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *UsersLoaderByID) LoadAll(keys []persist.DBID) ([][]coregen.User, []erro
 // LoadAllThunk returns a function that when called will block waiting for a Users.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UsersLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coregen.User, []error) {
-	results := make([]func() ([]coregen.User, error), len(keys))
+func (l *UsersLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coredb.User, []error) {
+	results := make([]func() ([]coredb.User, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coregen.User, []error) {
-		users := make([][]coregen.User, len(keys))
+	return func() ([][]coredb.User, []error) {
+		users := make([][]coredb.User, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			users[i], errors[i] = thunk()
@@ -150,13 +150,13 @@ func (l *UsersLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([][]coregen.
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UsersLoaderByID) Prime(key persist.DBID, value []coregen.User) bool {
+func (l *UsersLoaderByID) Prime(key persist.DBID, value []coredb.User) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coregen.User, len(value))
+		cpy := make([]coredb.User, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -171,9 +171,9 @@ func (l *UsersLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *UsersLoaderByID) unsafeSet(key persist.DBID, value []coregen.User) {
+func (l *UsersLoaderByID) unsafeSet(key persist.DBID, value []coredb.User) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID][]coregen.User{}
+		l.cache = map[persist.DBID][]coredb.User{}
 	}
 	l.cache[key] = value
 }

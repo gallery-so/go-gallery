@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // CommentLoaderByIDConfig captures the config to create a new CommentLoaderByID
 type CommentLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([]coregen.Comment, []error)
+	Fetch func(keys []persist.DBID) ([]coredb.Comment, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewCommentLoaderByID(config CommentLoaderByIDConfig) *CommentLoaderByID {
 // CommentLoaderByID batches and caches requests
 type CommentLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([]coregen.Comment, []error)
+	fetch func(keys []persist.DBID) ([]coredb.Comment, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type CommentLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID]coregen.Comment
+	cache map[persist.DBID]coredb.Comment
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type CommentLoaderByID struct {
 
 type commentLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    []coregen.Comment
+	data    []coredb.Comment
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Comment by key, batching and caching will be applied automatically
-func (l *CommentLoaderByID) Load(key persist.DBID) (coregen.Comment, error) {
+func (l *CommentLoaderByID) Load(key persist.DBID) (coredb.Comment, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Comment.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Comment, error) {
+func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coredb.Comment, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (coregen.Comment, error) {
+		return func() (coredb.Comment, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Comment,
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (coregen.Comment, error) {
+	return func() (coredb.Comment, error) {
 		<-batch.done
 
-		var data coregen.Comment
+		var data coredb.Comment
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *CommentLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Comment,
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *CommentLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Comment, []error) {
-	results := make([]func() (coregen.Comment, error), len(keys))
+func (l *CommentLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.Comment, []error) {
+	results := make([]func() (coredb.Comment, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	comments := make([]coregen.Comment, len(keys))
+	comments := make([]coredb.Comment, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		comments[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *CommentLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Comment, []e
 // LoadAllThunk returns a function that when called will block waiting for a Comments.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *CommentLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Comment, []error) {
-	results := make([]func() (coregen.Comment, error), len(keys))
+func (l *CommentLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Comment, []error) {
+	results := make([]func() (coredb.Comment, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]coregen.Comment, []error) {
-		comments := make([]coregen.Comment, len(keys))
+	return func() ([]coredb.Comment, []error) {
+		comments := make([]coredb.Comment, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			comments[i], errors[i] = thunk()
@@ -150,7 +150,7 @@ func (l *CommentLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *CommentLoaderByID) Prime(key persist.DBID, value coregen.Comment) bool {
+func (l *CommentLoaderByID) Prime(key persist.DBID, value coredb.Comment) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -167,9 +167,9 @@ func (l *CommentLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *CommentLoaderByID) unsafeSet(key persist.DBID, value coregen.Comment) {
+func (l *CommentLoaderByID) unsafeSet(key persist.DBID, value coredb.Comment) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID]coregen.Comment{}
+		l.cache = map[persist.DBID]coredb.Comment{}
 	}
 	l.cache[key] = value
 }

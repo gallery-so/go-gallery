@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 // ContractLoaderByIDConfig captures the config to create a new ContractLoaderByID
 type ContractLoaderByIDConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []persist.DBID) ([]coregen.Contract, []error)
+	Fetch func(keys []persist.DBID) ([]coredb.Contract, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -34,7 +34,7 @@ func NewContractLoaderByID(config ContractLoaderByIDConfig) *ContractLoaderByID 
 // ContractLoaderByID batches and caches requests
 type ContractLoaderByID struct {
 	// this method provides the data for the loader
-	fetch func(keys []persist.DBID) ([]coregen.Contract, []error)
+	fetch func(keys []persist.DBID) ([]coredb.Contract, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -45,7 +45,7 @@ type ContractLoaderByID struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[persist.DBID]coregen.Contract
+	cache map[persist.DBID]coredb.Contract
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -57,25 +57,25 @@ type ContractLoaderByID struct {
 
 type contractLoaderByIDBatch struct {
 	keys    []persist.DBID
-	data    []coregen.Contract
+	data    []coredb.Contract
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a Contract by key, batching and caching will be applied automatically
-func (l *ContractLoaderByID) Load(key persist.DBID) (coregen.Contract, error) {
+func (l *ContractLoaderByID) Load(key persist.DBID) (coredb.Contract, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Contract.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Contract, error) {
+func (l *ContractLoaderByID) LoadThunk(key persist.DBID) func() (coredb.Contract, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (coregen.Contract, error) {
+		return func() (coredb.Contract, error) {
 			return it, nil
 		}
 	}
@@ -86,10 +86,10 @@ func (l *ContractLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Contrac
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (coregen.Contract, error) {
+	return func() (coredb.Contract, error) {
 		<-batch.done
 
-		var data coregen.Contract
+		var data coredb.Contract
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -114,14 +114,14 @@ func (l *ContractLoaderByID) LoadThunk(key persist.DBID) func() (coregen.Contrac
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *ContractLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Contract, []error) {
-	results := make([]func() (coregen.Contract, error), len(keys))
+func (l *ContractLoaderByID) LoadAll(keys []persist.DBID) ([]coredb.Contract, []error) {
+	results := make([]func() (coredb.Contract, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	contracts := make([]coregen.Contract, len(keys))
+	contracts := make([]coredb.Contract, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		contracts[i], errors[i] = thunk()
@@ -132,13 +132,13 @@ func (l *ContractLoaderByID) LoadAll(keys []persist.DBID) ([]coregen.Contract, [
 // LoadAllThunk returns a function that when called will block waiting for a Contracts.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *ContractLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen.Contract, []error) {
-	results := make([]func() (coregen.Contract, error), len(keys))
+func (l *ContractLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coredb.Contract, []error) {
+	results := make([]func() (coredb.Contract, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]coregen.Contract, []error) {
-		contracts := make([]coregen.Contract, len(keys))
+	return func() ([]coredb.Contract, []error) {
+		contracts := make([]coredb.Contract, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			contracts[i], errors[i] = thunk()
@@ -150,7 +150,7 @@ func (l *ContractLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]coregen
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *ContractLoaderByID) Prime(key persist.DBID, value coregen.Contract) bool {
+func (l *ContractLoaderByID) Prime(key persist.DBID, value coredb.Contract) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -167,9 +167,9 @@ func (l *ContractLoaderByID) Clear(key persist.DBID) {
 	l.mu.Unlock()
 }
 
-func (l *ContractLoaderByID) unsafeSet(key persist.DBID, value coregen.Contract) {
+func (l *ContractLoaderByID) unsafeSet(key persist.DBID, value coredb.Contract) {
 	if l.cache == nil {
-		l.cache = map[persist.DBID]coregen.Contract{}
+		l.cache = map[persist.DBID]coredb.Contract{}
 	}
 	l.cache[key] = value
 }

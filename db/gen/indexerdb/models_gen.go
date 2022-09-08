@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.13.0
 
-package indexergen
+package indexerdb
 
 import (
 	"database/sql"

@@ -6,16 +6,16 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	sqlc "github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 type FeedRepository struct {
-	Queries *sqlc.Queries
+	Queries *db.Queries
 }
 
-func (r *FeedRepository) Add(ctx context.Context, event sqlc.FeedEvent) (*sqlc.FeedEvent, error) {
-	evt, err := r.Queries.CreateFeedEvent(ctx, sqlc.CreateFeedEventParams{
+func (r *FeedRepository) Add(ctx context.Context, event db.FeedEvent) (*db.FeedEvent, error) {
+	evt, err := r.Queries.CreateFeedEvent(ctx, db.CreateFeedEventParams{
 		ID:        persist.GenerateID(),
 		OwnerID:   event.OwnerID,
 		Action:    event.Action,
@@ -28,8 +28,8 @@ func (r *FeedRepository) Add(ctx context.Context, event sqlc.FeedEvent) (*sqlc.F
 }
 
 // LastEventFrom returns the most recent event which occurred before `event`.
-func (r *FeedRepository) LastEventFrom(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	evt, err := r.Queries.GetLastFeedEvent(ctx, sqlc.GetLastFeedEventParams{
+func (r *FeedRepository) LastEventFrom(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	evt, err := r.Queries.GetLastFeedEvent(ctx, db.GetLastFeedEventParams{
 		OwnerID:   event.ActorID,
 		Action:    event.Action,
 		EventTime: event.CreatedAt,
@@ -43,8 +43,8 @@ func (r *FeedRepository) LastEventFrom(ctx context.Context, event sqlc.Event) (*
 }
 
 // LastTokenEventFromEvent returns the most recent token event which occured before `event`.
-func (r *FeedRepository) LastTokenEventFromEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
-	evt, err := r.Queries.GetLastFeedEventForToken(ctx, sqlc.GetLastFeedEventForTokenParams{
+func (r *FeedRepository) LastTokenEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	evt, err := r.Queries.GetLastFeedEventForToken(ctx, db.GetLastFeedEventForTokenParams{
 		OwnerID:   event.ActorID,
 		Action:    event.Action,
 		TokenID:   string(event.SubjectID),
@@ -59,13 +59,13 @@ func (r *FeedRepository) LastTokenEventFromEvent(ctx context.Context, event sqlc
 }
 
 // LastCollectionEventFromEvent returns the most recent collection event which occurred before `event`.
-func (r *FeedRepository) LastCollectionEventFromEvent(ctx context.Context, event sqlc.Event) (*sqlc.FeedEvent, error) {
+func (r *FeedRepository) LastCollectionEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	return r.LastCollectionEvent(ctx, event.ActorID, event.Action, event.SubjectID, event.CreatedAt)
 }
 
 // LastCollectionEvent returns the most recent collection event for the given owner, action, and collection that occurred before time `since`.
-func (r *FeedRepository) LastCollectionEvent(ctx context.Context, ownerID persist.DBID, action persist.Action, collectionID persist.DBID, since time.Time) (*sqlc.FeedEvent, error) {
-	evt, err := r.Queries.GetLastFeedEventForCollection(ctx, sqlc.GetLastFeedEventForCollectionParams{
+func (r *FeedRepository) LastCollectionEvent(ctx context.Context, ownerID persist.DBID, action persist.Action, collectionID persist.DBID, since time.Time) (*db.FeedEvent, error) {
+	evt, err := r.Queries.GetLastFeedEventForCollection(ctx, db.GetLastFeedEventForCollectionParams{
 		OwnerID:      ownerID,
 		Action:       action,
 		CollectionID: string(collectionID),

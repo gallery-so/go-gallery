@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/sqlc/coregen"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
 // UserFeedLoaderConfig captures the config to create a new UserFeedLoader
 type UserFeedLoaderConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []coregen.GetUserFeedViewBatchParams) ([][]coregen.FeedEvent, []error)
+	Fetch func(keys []coredb.GetUserFeedViewBatchParams) ([][]coredb.FeedEvent, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -33,7 +33,7 @@ func NewUserFeedLoader(config UserFeedLoaderConfig) *UserFeedLoader {
 // UserFeedLoader batches and caches requests
 type UserFeedLoader struct {
 	// this method provides the data for the loader
-	fetch func(keys []coregen.GetUserFeedViewBatchParams) ([][]coregen.FeedEvent, []error)
+	fetch func(keys []coredb.GetUserFeedViewBatchParams) ([][]coredb.FeedEvent, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -44,7 +44,7 @@ type UserFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coregen.GetUserFeedViewBatchParams][]coregen.FeedEvent
+	cache map[coredb.GetUserFeedViewBatchParams][]coredb.FeedEvent
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -55,26 +55,26 @@ type UserFeedLoader struct {
 }
 
 type userFeedLoaderBatch struct {
-	keys    []coregen.GetUserFeedViewBatchParams
-	data    [][]coregen.FeedEvent
+	keys    []coredb.GetUserFeedViewBatchParams
+	data    [][]coredb.FeedEvent
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *UserFeedLoader) Load(key coregen.GetUserFeedViewBatchParams) ([]coregen.FeedEvent, error) {
+func (l *UserFeedLoader) Load(key coredb.GetUserFeedViewBatchParams) ([]coredb.FeedEvent, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserFeedLoader) LoadThunk(key coregen.GetUserFeedViewBatchParams) func() ([]coregen.FeedEvent, error) {
+func (l *UserFeedLoader) LoadThunk(key coredb.GetUserFeedViewBatchParams) func() ([]coredb.FeedEvent, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() ([]coregen.FeedEvent, error) {
+		return func() ([]coredb.FeedEvent, error) {
 			return it, nil
 		}
 	}
@@ -85,10 +85,10 @@ func (l *UserFeedLoader) LoadThunk(key coregen.GetUserFeedViewBatchParams) func(
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coregen.FeedEvent, error) {
+	return func() ([]coredb.FeedEvent, error) {
 		<-batch.done
 
-		var data []coregen.FeedEvent
+		var data []coredb.FeedEvent
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -113,14 +113,14 @@ func (l *UserFeedLoader) LoadThunk(key coregen.GetUserFeedViewBatchParams) func(
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UserFeedLoader) LoadAll(keys []coregen.GetUserFeedViewBatchParams) ([][]coregen.FeedEvent, []error) {
-	results := make([]func() ([]coregen.FeedEvent, error), len(keys))
+func (l *UserFeedLoader) LoadAll(keys []coredb.GetUserFeedViewBatchParams) ([][]coredb.FeedEvent, []error) {
+	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEvents := make([][]coregen.FeedEvent, len(keys))
+	feedEvents := make([][]coredb.FeedEvent, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
 		feedEvents[i], errors[i] = thunk()
@@ -131,13 +131,13 @@ func (l *UserFeedLoader) LoadAll(keys []coregen.GetUserFeedViewBatchParams) ([][
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserFeedLoader) LoadAllThunk(keys []coregen.GetUserFeedViewBatchParams) func() ([][]coregen.FeedEvent, []error) {
-	results := make([]func() ([]coregen.FeedEvent, error), len(keys))
+func (l *UserFeedLoader) LoadAllThunk(keys []coredb.GetUserFeedViewBatchParams) func() ([][]coredb.FeedEvent, []error) {
+	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coregen.FeedEvent, []error) {
-		feedEvents := make([][]coregen.FeedEvent, len(keys))
+	return func() ([][]coredb.FeedEvent, []error) {
+		feedEvents := make([][]coredb.FeedEvent, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
 			feedEvents[i], errors[i] = thunk()
@@ -149,13 +149,13 @@ func (l *UserFeedLoader) LoadAllThunk(keys []coregen.GetUserFeedViewBatchParams)
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UserFeedLoader) Prime(key coregen.GetUserFeedViewBatchParams, value []coregen.FeedEvent) bool {
+func (l *UserFeedLoader) Prime(key coredb.GetUserFeedViewBatchParams, value []coredb.FeedEvent) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coregen.FeedEvent, len(value))
+		cpy := make([]coredb.FeedEvent, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -164,22 +164,22 @@ func (l *UserFeedLoader) Prime(key coregen.GetUserFeedViewBatchParams, value []c
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *UserFeedLoader) Clear(key coregen.GetUserFeedViewBatchParams) {
+func (l *UserFeedLoader) Clear(key coredb.GetUserFeedViewBatchParams) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *UserFeedLoader) unsafeSet(key coregen.GetUserFeedViewBatchParams, value []coregen.FeedEvent) {
+func (l *UserFeedLoader) unsafeSet(key coredb.GetUserFeedViewBatchParams, value []coredb.FeedEvent) {
 	if l.cache == nil {
-		l.cache = map[coregen.GetUserFeedViewBatchParams][]coregen.FeedEvent{}
+		l.cache = map[coredb.GetUserFeedViewBatchParams][]coredb.FeedEvent{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *userFeedLoaderBatch) keyIndex(l *UserFeedLoader, key coregen.GetUserFeedViewBatchParams) int {
+func (b *userFeedLoaderBatch) keyIndex(l *UserFeedLoader, key coredb.GetUserFeedViewBatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
