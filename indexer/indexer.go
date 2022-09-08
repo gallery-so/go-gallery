@@ -825,15 +825,15 @@ func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenI
 		}
 	}
 
-	uriReplaced := u.ReplaceID(tokenID)
-	if (len(uriReplaced.String())) > util.KB {
-		logger.For(ctx).Infof("URI size for %s-%s: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(uriReplaced.String()))))
-		if (len(uriReplaced.String())) > util.KB*100 {
-			logger.For(ctx).Errorf("Skipping URI for %s-%s with size: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(uriReplaced.String()))))
+	u = u.ReplaceID(tokenID)
+	if (len(u.String())) > util.KB {
+		logger.For(ctx).Infof("URI size for %s-%s: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(u.String()))))
+		if (len(u.String())) > util.KB*100 {
+			logger.For(ctx).Errorf("Skipping URI for %s-%s with size: %s", contractAddress, tokenID, util.InByteSizeFormat(uint64(len(u.String()))))
 			return ""
 		}
 	}
-	return uriReplaced
+	return u
 }
 
 func getMetadata(ctx context.Context, contractAddress persist.EthereumAddress, uriReplaced persist.TokenURI, tokenID persist.TokenID, um uniqueMetadatas, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (persist.TokenMetadata, persist.TokenURI) {
