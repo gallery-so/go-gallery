@@ -217,6 +217,11 @@ type Media struct {
 	MediaType    MediaType  `json:"media_type"`
 }
 
+// IsServable returns true if the Media's url is not empty and the MediaType isn't unknown.
+func (m Media) IsServable() bool {
+	return m.MediaURL != "" && m.MediaType != MediaTypeUnknown && m.MediaType != ""
+}
+
 // NFT represents an old nft throughout the application
 type NFT struct {
 	Version         NullInt32       `json:"version"` // schema version for this model
