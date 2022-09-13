@@ -13,6 +13,7 @@ solc:
 	solc --abi ./contracts/sol/ISignatureValidator.sol > ./contracts/abi/ISignatureValidator.abi
 	solc --abi ./contracts/sol/CryptopunksData.sol > ./contracts/abi/CryptopunksData.abi
 	solc --abi ./contracts/sol/Cryptopunks.sol > ./contracts/abi/Cryptopunks.abi
+	solc --abi ./contracts/sol/Zora.sol > ./contracts/abi/Zora.abi
 	tail -n +4 "./contracts/abi/IERC721.abi" > "./contracts/abi/IERC721.abi.tmp" && mv "./contracts/abi/IERC721.abi.tmp" "./contracts/abi/IERC721.abi"
 	tail -n +4 "./contracts/abi/IERC20.abi" > "./contracts/abi/IERC20.abi.tmp" && mv "./contracts/abi/IERC20.abi.tmp" "./contracts/abi/IERC20.abi"
 	tail -n +4 "./contracts/abi/IERC721Metadata.abi" > "./contracts/abi/IERC721Metadata.abi.tmp" && mv "./contracts/abi/IERC721Metadata.abi.tmp" "./contracts/abi/IERC721Metadata.abi"
@@ -22,6 +23,7 @@ solc:
 	tail -n +4 "./contracts/abi/ISignatureValidator.abi" > "./contracts/abi/ISignatureValidator.abi.tmp" && mv "./contracts/abi/ISignatureValidator.abi.tmp" "./contracts/abi/ISignatureValidator.abi"
 	tail -n +4 "./contracts/abi/CryptopunksData.abi" > "./contracts/abi/CryptopunksData.abi.tmp" && mv "./contracts/abi/CryptopunksData.abi.tmp" "./contracts/abi/CryptopunksData.abi"
 	tail -n +4 "./contracts/abi/Cryptopunks.abi" > "./contracts/abi/Cryptopunks.abi.tmp" && mv "./contracts/abi/Cryptopunks.abi.tmp" "./contracts/abi/Cryptopunks.abi"
+	tail -n +4 "./contracts/abi/Zora.abi" > "./contracts/abi/Zora.abi.tmp" && mv "./contracts/abi/Zora.abi.tmp" "./contracts/abi/Zora.abi"
 abi-gen:
 	abigen --abi=./contracts/abi/IERC721.abi --pkg=contracts --type=IERC721 > ./contracts/IERC721.go
 	abigen --abi=./contracts/abi/IERC20.abi --pkg=contracts --type=IERC20 > ./contracts/IERC20.go
@@ -32,6 +34,7 @@ abi-gen:
 	abigen --abi=./contracts/abi/ISignatureValidator.abi --pkg=contracts --type=ISignatureValidator > ./contracts/ISignatureValidator.go
 	abigen --abi=./contracts/abi/CryptopunksData.abi --pkg=contracts --type=CryptopunksData > ./contracts/CryptopunksData.go
 	abigen --abi=./contracts/abi/Cryptopunks.abi --pkg=contracts --type=Cryptopunks > ./contracts/Cryptopunks.go
+	abigen --abi=./contracts/abi/Zora.abi --pkg=contracts --type=Zora > ./contracts/Zora.go
 
 g-docker:
 	docker-compose down
