@@ -118,6 +118,8 @@ type tokenMedia struct {
 // indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type indexer struct {
+	isRPCEnabled bool
+
 	ethClient     *ethclient.Client
 	ipfsClient    *shell.Shell
 	arweaveClient *goar.Client
@@ -149,9 +151,13 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	if err != nil {
 		panic(err)
 	}
+	rpcEnabled := viper.GetString("ENV") == "production"
+	if !rpcEnabled {
+		ethClient = nil
+	}
 
 	return &indexer{
-
+		isRPCEnabled:  rpcEnabled,
 		ethClient:     ethClient,
 		ipfsClient:    ipfsClient,
 		arweaveClient: arweaveClient,
@@ -219,6 +225,10 @@ func (i *indexer) Start(rootCtx context.Context) {
 	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
 	i.lastSavedLog = uint64(lastSyncedBlock)
+	if !i.isRPCEnabled {
+		logger.For(rootCtx).Info("Running in cached logs only mode, not listening for new logs")
+		return
+	}
 	for {
 		timeAfterWait := <-time.After(time.Minute * 3)
 		i.startNewBlocksPipeline(rootCtx, topics)
@@ -237,7 +247,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	transfers := make(chan []transfersAtBlock)
 
 	go i.processLogs(sentryutil.NewSentryHubContext(ctx), transfers, start, topics)
-	go i.processTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances)
+	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances)
 	i.processTokens(ctx, uris, owners, previousOwners, balances)
 	if i.lastSyncedBlock < start.Uint64() {
 		i.lastSyncedBlock = start.Uint64()
@@ -254,7 +264,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	transfers := make(chan []transfersAtBlock)
 	subscriptions := make(chan types.Log)
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, subscriptions, topics)
-	go i.processTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances)
+	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, uris, owners, previousOwners, balances)
 	i.processTokens(ctx, uris, owners, previousOwners, balances)
 }
 
@@ -307,7 +317,7 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 			logsTo = []types.Log{}
 		}
 	}
-	if len(logsTo) == 0 {
+	if len(logsTo) == 0 && i.isRPCEnabled {
 		logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
@@ -574,7 +584,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 // TRANSFERS FUNCS -------------------------------------------------------------
 
-func (i *indexer) processTransfers(ctx context.Context,
+func (i *indexer) processAllTransfers(ctx context.Context,
 	incomingTransfers <-chan []transfersAtBlock,
 	uris chan<- tokenURI,
 	owners chan<- ownerAtBlock,
@@ -600,7 +610,7 @@ func (i *indexer) processTransfers(ctx context.Context,
 			ctx := sentryutil.NewSentryHubContext(ctx)
 			timeStart := time.Now()
 			logger.For(ctx).Infof("Processing %d transfers", len(submit))
-			processTransfers(ctx, i, submit, uris, nil, owners, previousOwners, balances, nil, false)
+			i.processTransfers(ctx, submit, uris, nil, owners, previousOwners, balances, nil, false)
 			logger.For(ctx).Infof("Processed %d transfers in %s", len(submit), time.Since(timeStart))
 		})
 	}
@@ -609,7 +619,7 @@ func (i *indexer) processTransfers(ctx context.Context,
 	logger.For(ctx).Info("Closing field channels...")
 }
 
-func processTransfers(ctx context.Context, i *indexer, transfers []transfersAtBlock,
+func (i *indexer) processTransfers(ctx context.Context, transfers []transfersAtBlock,
 	uris chan<- tokenURI,
 	metadatas chan<- tokenMetadata,
 	owners chan<- ownerAtBlock,
@@ -630,7 +640,7 @@ func processTransfers(ctx context.Context, i *indexer, transfers []transfersAtBl
 			key := persist.NewEthereumTokenIdentifiers(contractAddress, tokenID)
 			// logrus.Infof("Processing transfer %s to %s and from %s ", key, to, from)
 
-			findFields(ctx, i, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, optionalFields)
+			i.findFields(ctx, transfer, key, to, from, contractAddress, tokenID, balances, uris, metadatas, owners, previousOwners, medias, optionalFields)
 
 			logger.For(ctx).WithFields(logrus.Fields{
 				"tokenID":         tokenID,
@@ -645,7 +655,7 @@ func processTransfers(ctx context.Context, i *indexer, transfers []transfersAtBl
 
 }
 
-func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, to persist.EthereumAddress, from persist.EthereumAddress, contractAddress persist.EthereumAddress, tokenID persist.TokenID,
+func (i *indexer) findFields(ctx context.Context, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, to persist.EthereumAddress, from persist.EthereumAddress, contractAddress persist.EthereumAddress, tokenID persist.TokenID,
 	balances chan<- tokenBalances,
 	uris chan<- tokenURI,
 	metadatas chan<- tokenMetadata,
@@ -686,18 +696,32 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 		go func(ctx context.Context) {
 			defer wg.Done()
 			defer sentryutil.RecoverAndRaise(ctx)
+			if i.isRPCEnabled {
+				bals, err := getBalances(ctx, contractAddress, from, tokenID, key, transfer.BlockNumber, to, i.ethClient)
+				if err != nil {
+					logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+						"fromAddress":     from,
+						"tokenIdentifier": key,
+						"block":           transfer.BlockNumber,
+					}).Errorf("error getting balance of %s for %s", from, key)
+					storeErr(ctx, err, "ERR-BALANCE", from, key, transfer.BlockNumber, i.storageClient)
+				}
 
-			bals, err := getBalances(ctx, contractAddress, from, tokenID, key, transfer.BlockNumber, to, i.ethClient)
-			if err != nil {
-				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-					"fromAddress":     from,
-					"tokenIdentifier": key,
-					"block":           transfer.BlockNumber,
-				}).Errorf("error getting balance of %s for %s", from, key)
-				storeErr(ctx, err, "ERR-BALANCE", from, key, transfer.BlockNumber, i.storageClient)
+				balances <- bals
+			} else {
+				fromAmount := bigZero
+				toAmount := big.NewInt(int64(transfer.Amount))
+				curToken, err := i.tokenRepo.GetByIdentifiers(ctx, tokenID, contractAddress, from)
+				if err == nil {
+					fromAmount = big.NewInt(0).Sub(curToken.Quantity.BigInt(), big.NewInt(int64(transfer.Amount)))
+				}
+				toToken, err := i.tokenRepo.GetByIdentifiers(ctx, tokenID, contractAddress, to)
+				if err == nil {
+					toAmount = big.NewInt(0).Add(toToken.Quantity.BigInt(), big.NewInt(int64(transfer.Amount)))
+				}
+
+				balances <- tokenBalances{key, from, to, fromAmount, toAmount, transfer.BlockNumber}
 			}
-
-			balances <- bals
 		}(sentryutil.NewSentryHubContext(ctx))
 
 	default:
@@ -732,7 +756,7 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 			}
 		}
 
-		if uri == "" {
+		if uri == "" && i.isRPCEnabled {
 			uri = getURI(ctx, contractAddress, tokenID, transfer.TokenType, i.ethClient)
 		}
 
@@ -743,7 +767,7 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 	}()
 
 	if optionalFields {
-		if metadata == nil {
+		if metadata == nil && i.isRPCEnabled {
 			metadata, uri = getMetadata(ctx, contractAddress, uri, tokenID, i.uniqueMetadatas, i.ethClient, i.ipfsClient, i.arweaveClient)
 		}
 		go func() {
@@ -754,14 +778,14 @@ func findFields(ctx context.Context, i *indexer, transfer rpc.Transfer, key pers
 		}()
 		go func() {
 			defer wg.Done()
-			findOptionalFields(ctx, i, key, to, from, uri, metadata, medias)
+			i.findOptionalFields(ctx, key, to, from, uri, metadata, medias)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func findOptionalFields(ctx context.Context, i *indexer, key persist.EthereumTokenIdentifiers, to, from persist.EthereumAddress, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) {
+func (i *indexer) findOptionalFields(ctx context.Context, key persist.EthereumTokenIdentifiers, to, from persist.EthereumAddress, tokenURI persist.TokenURI, metadata persist.TokenMetadata, medias chan<- tokenMedia) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
@@ -886,10 +910,10 @@ func (i *indexer) processTokens(ctx context.Context, uris <-chan tokenURI, owner
 
 	logger.For(ctx).Info("Done recieving field data, converting fields into tokens...")
 
-	createTokens(ctx, i, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
+	i.createTokens(ctx, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
 }
 
-func createTokens(ctx context.Context, i *indexer,
+func (i *indexer) createTokens(ctx context.Context,
 	ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock,
 	previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
 	balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
@@ -907,11 +931,11 @@ func createTokens(ctx context.Context, i *indexer,
 
 	logger.For(ctx).Info("Created tokens to insert into database...")
 
-	timeout := (time.Minute * time.Duration((len(tokens) / 100)))
+	timeout := (time.Minute * time.Duration((len(tokens) / 100))) + time.Minute
 	logger.For(ctx).Infof("Upserting %d tokens and contracts with a timeout of %s", len(tokens), timeout)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu)
+	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu, i.isRPCEnabled)
 	if err != nil {
 		logger.For(ctx).WithError(err).Error("error upserting tokens and contracts")
 		randKey := util.RandStringBytes(24)
@@ -1114,7 +1138,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 	return result
 }
 
-func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, dbMu *sync.Mutex) error {
+func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, dbMu *sync.Mutex, rpcEnabled bool) error {
 
 	err := func() error {
 		dbMu.Lock()
@@ -1161,7 +1185,13 @@ func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo 
 			}
 			wp.Submit(func() {
 				ctx := sentryutil.NewSentryHubContext(ctx)
-				contract := fillContractFields(ctx, ethClient, to.ContractAddress, to.BlockNumber)
+				contract := persist.Contract{
+					Address:     to.ContractAddress,
+					LatestBlock: to.BlockNumber,
+				}
+				if rpcEnabled {
+					contract = fillContractFields(ctx, ethClient, to.ContractAddress, to.BlockNumber)
+				}
 				logger.For(ctx).Debugf("Processing contract %s", contract.Address)
 				contractsChan <- contract
 			})
