@@ -204,7 +204,7 @@ func processMedialessTokens(ctx context.Context, inputs <-chan processTokensInpu
 					tokensWithoutMedia := make([]persist.Token, 0, len(i.tokens))
 					contractsWithoutMedia := make([]persist.Contract, 0, len(i.contracts))
 					for _, token := range i.tokens {
-						if token.Media.MediaURL == "" || token.Media.MediaType == "" || token.Media.MediaType == persist.MediaTypeUnknown {
+						if !token.Media.IsServable() {
 							tokensWithoutMedia = append(tokensWithoutMedia, token)
 						}
 					}
@@ -550,7 +550,6 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 			return
 		}
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
-
 	}
 }
 

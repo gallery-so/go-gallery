@@ -217,7 +217,7 @@ type Media struct {
 	MediaType    MediaType  `json:"media_type"`
 }
 
-// IsServable returns true if the Media's url is not empty and the MediaType isn't unknown.
+// IsServable returns true if the token's Media has enough information to serve it's assets.
 func (m Media) IsServable() bool {
 	return m.MediaURL != "" && m.MediaType != MediaTypeUnknown && m.MediaType != ""
 }
