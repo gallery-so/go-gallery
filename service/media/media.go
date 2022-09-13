@@ -13,7 +13,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -327,7 +326,7 @@ func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgU
 	} else if storageImageURL, err = getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("svg-%s", name), storageClient); err == nil {
 		logger.For(pCtx).Infof("found svg for thumbnail %s: %s", name, storageImageURL)
 		return storageImageURL
-	} else if imgURL != "" {
+	} else if imgURL != "" && persist.TokenURI(imgURL).IsRenderable() {
 		logger.For(pCtx).Infof("using imgURL for thumbnail %s: %s", name, imgURL)
 		return imgURL
 	} else if storageImageURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient); err == nil {
@@ -455,8 +454,7 @@ func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client 
 
 func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.MediaType, error) {
 
-	unescaped, _ := url.QueryUnescape(mediaURL)
-	asURI := persist.TokenURI(unescaped)
+	asURI := persist.TokenURI(mediaURL)
 
 	mediaType, _ := PredictMediaType(pCtx, asURI.String())
 

@@ -40,7 +40,7 @@ func InitServer() {
 
 func coreInit() (*gin.Engine, *indexer) {
 
-	setDefaults()
+	setDefaults(false)
 	initSentry()
 	initLogger()
 
@@ -78,7 +78,7 @@ func coreInit() (*gin.Engine, *indexer) {
 func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
-	setDefaults()
+	setDefaults(true)
 	initSentry()
 	initLogger()
 
@@ -116,7 +116,7 @@ func coreInitServer() *gin.Engine {
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
-func setDefaults() {
+func setDefaults(server bool) {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -143,7 +143,11 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") == "local" {
-		path, err := util.FindFile("_internal/app-local-indexer.yaml", 3)
+		filePath := "_internal/app-local-indexer.yaml"
+		if server {
+			filePath = "_internal/app-local-indexer-server.yaml"
+		}
+		path, err := util.FindFile(filePath, 3)
 		if err != nil {
 			panic(err)
 		}

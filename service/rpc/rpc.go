@@ -242,7 +242,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		if err != nil {
 			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
 			if err != nil {
-				return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+				return nil, fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
 			}
 		}
 		img, err := bmp.Decode(bytes.NewReader(decoded))
