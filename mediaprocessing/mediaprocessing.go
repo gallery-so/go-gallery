@@ -100,7 +100,7 @@ func newRepos() persist.TokenGalleryRepository {
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.IndexerServerThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.MediaProcessingThrottleDB), time.Minute*5)
 }
 
 func initSentry() {

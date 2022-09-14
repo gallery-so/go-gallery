@@ -19,11 +19,11 @@ import (
 )
 
 type ProcessMediaInput struct {
-	Key               string                          `json:"key,required"`
-	Chain             persist.Chain                   `json:"chain,required"`
-	Tokens            []multichain.ChainAgnosticToken `json:"tokens,required"`
-	ImageKeywords     []string                        `json:"image_keywords,required"`
-	AnimationKeywords []string                        `json:"animation_keywords,required"`
+	Key               string                          `json:"key" binding:"required"`
+	Chain             persist.Chain                   `json:"chain" binding:"required"`
+	Tokens            []multichain.ChainAgnosticToken `json:"tokens" binding:"required"`
+	ImageKeywords     []string                        `json:"image_keywords" binding:"required"`
+	AnimationKeywords []string                        `json:"animation_keywords" binding:"required"`
 }
 
 func processIPFSMetadata(queue chan<- ProcessMediaInput, throttler *throttle.Locker) gin.HandlerFunc {
@@ -49,11 +49,6 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 		logger.For(nil).Infof("Processing Media: %s", in.Key)
 		wp.Submit(func() {
 			innerWp := workerpool.New(10)
-			go func() {
-				defer throttler.Unlock(context.Background(), in.Key)
-				innerWp.StopWait()
-				logger.For(nil).Infof("Processing Media: %s - Finished", in.Key)
-			}()
 			for _, token := range in.Tokens {
 				t := token
 				innerWp.Submit(func() {
@@ -82,6 +77,11 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 					logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%s", in.Key, t.ContractAddress, t.TokenID, in.Chain)
 				})
 			}
+			func() {
+				defer throttler.Unlock(context.Background(), in.Key)
+				innerWp.StopWait()
+				logger.For(nil).Infof("Processing Media: %s - Finished", in.Key)
+			}()
 		})
 	}
 }

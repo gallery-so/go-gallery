@@ -13,13 +13,14 @@ import (
 )
 
 const (
-	GalleriesDB             = 0
-	GalleriesTokenDB        = 1
-	CommunitiesDB           = 2
-	RequireNftsDB           = 3
-	TestSuiteDB             = 5
-	IndexerServerThrottleDB = 6
-	RefreshNFTsThrottleDB   = 7
+	GalleriesDB               = 0
+	GalleriesTokenDB          = 1
+	CommunitiesDB             = 2
+	RequireNftsDB             = 3
+	TestSuiteDB               = 5
+	IndexerServerThrottleDB   = 6
+	RefreshNFTsThrottleDB     = 7
+	MediaProcessingThrottleDB = 8
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.
