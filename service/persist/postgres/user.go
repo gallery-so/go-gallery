@@ -172,7 +172,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, cha
 	if walletID != "" {
 		// If we do have a wallet with this ChainAddress, does it belong to a user?
 		var user persist.User
-		err := tx.StmtContext(ctx, u.getByWalletIDStmt).QueryRowContext(ctx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.CreationTime, &user.LastUpdated)
+		err := tx.StmtContext(ctx, u.getByWalletIDStmt).QueryRowContext(ctx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
 		if err != nil && err != sql.ErrNoRows {
 			return "", err
 		}
