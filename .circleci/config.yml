@@ -133,6 +133,9 @@ jobs:
     working_directory: ~/go-gallery
     docker:
       - image: keybaseio/client
+    environment:
+      - SENTRY_ORG: usegallery
+      - SENTRY_PROJECT: gallery-backend
     steps:
       - checkout
       - run:
@@ -146,16 +149,10 @@ jobs:
           command: apt-get update
       - run:
           name: "Install cli dependencies"
-          command: apt-get -y install unzip curl sudo python3
+          command: apt-get -y install unzip curl sudo python3 make git
       - run:
           name: "Unzip secrets file"
-          command: echo "A" | unzip _deploy.zip
-      - run:
-          name: "Copy Backend app.yaml"
-          command: cp -R dev/app-dev-backend.yaml ./app-backend.yaml
-      - run:
-          name: "Copy Indexer app.yaml"
-          command: cp -R dev/app-dev-indexer.yaml ./app-indexer.yaml
+          command: unzip _deploy.zip -d _deploy
       - run:
           command: |
             install () {
@@ -200,10 +197,15 @@ jobs:
           name: Initialize gcloud CLI to connect to Google Cloud
       - run:
           name: "Deploy Backend"
-          command: gcloud beta app deploy --quiet --appyaml app-backend.yaml --version $(echo ${CIRCLE_BRANCH}-${CIRCLE_SHA1} | sed 's/[^a-zA-Z0-9]/-/g')
-      # - run:
-      #     name: "Deploy Indexer"
-      #     command: gcloud beta app deploy --quiet --appyaml app-indexer.yaml
+          command: |
+            cd _deploy
+            make deploy-dev-backend
+      - run:
+          name: "Publish New Release"
+          command: |
+            curl -sL https://sentry.io/get-cli/ | bash
+            cd _deploy
+            make release-dev-backend
   post-deploy:
     working_directory: ~/go-gallery
     docker:
@@ -212,7 +214,6 @@ jobs:
       - HEALTH_URL: https://api.dev.gallery.so/glry/v1/health
       - GRACE: 20
       - TIMES: 5
-      - INTERVAL: 10
     steps:
       - run:
           name: "Ping Backend"
@@ -227,7 +228,7 @@ jobs:
               echo "-------------------------------"
               echo " INFO: [attempt $i] waiting... "
               echo "-------------------------------"
-              sleep $INTERVAL
+              sleep 2^$TIMES
             else
               echo "-------------------------------"
               echo " INFO: backend is operational! "

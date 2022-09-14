@@ -57,6 +57,7 @@ func Init() {
 // so the test server can also utilize it
 func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
+	logger.For(nil).Infof("GAE_VERSION=%s", viper.GetString("GAE_VERSION"))
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -136,6 +137,7 @@ func setDefaults() {
 	viper.SetDefault("TEZOS_API_URL", "https://api.ghostnet.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
+	viper.SetDefault("GAE_VERSION", "")
 
 	viper.AutomaticEnv()
 
@@ -172,6 +174,12 @@ func setDefaults() {
 
 	if viper.GetString("IMGIX_SECRET") == "" {
 		panic("IMGIX_SECRET must be set")
+	}
+
+	if viper.GetString("GAE_VERSION") == "" {
+		panic("GAE_VERSION must be set")
+	} else {
+		logger.For(nil).Infof("GAE_VERSION=%s", viper.GetString("GAE_VERSION"))
 	}
 }
 
@@ -233,6 +241,7 @@ func initSentry() {
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Release:          viper.GetString("GAE_VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)
