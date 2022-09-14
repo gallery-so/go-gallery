@@ -345,15 +345,20 @@ type svgXML struct {
 }
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
-func SniffMediaType(buf []byte) MediaType {
+func SniffMediaType(buf []byte) (MediaType, string) {
 
 	var asXML svgXML
 	if err := xml.Unmarshal(buf, &asXML); err == nil {
-		return MediaTypeSVG
+		return MediaTypeSVG, "image/svg+xml"
 	}
 
 	contentType := http.DetectContentType(buf)
-	return MediaFromContentType(contentType)
+	contentType = strings.TrimSpace(contentType)
+	whereCharset := strings.IndexByte(contentType, ';')
+	if whereCharset != -1 {
+		contentType = contentType[:whereCharset]
+	}
+	return MediaFromContentType(contentType), contentType
 }
 
 // MediaFromContentType will attempt to convert a content type to a media type

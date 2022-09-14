@@ -452,7 +452,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 
 		bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient, arweaveClient)
 		if err == nil {
-			mediaType := persist.SniffMediaType(bs)
+			mediaType, _ := persist.SniffMediaType(bs)
 			if mediaType != persist.MediaTypeUnknown {
 				media = persist.Media{
 					MediaURL:     persist.NullString(a.ImageURL),
