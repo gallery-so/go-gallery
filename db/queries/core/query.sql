@@ -106,8 +106,8 @@ SELECT w.* FROM users u, unnest(u.wallets) WITH ORDINALITY AS a(wallet_id, walle
 -- name: GetContractByID :one
 select * FROM contracts WHERE id = $1 AND deleted = false;
 
--- name: GetContractByIDBatch :batchone
-select * FROM contracts WHERE id = $1 AND deleted = false;
+-- name: GetContractsByIDs :many
+SELECT * from contracts WHERE id = ANY(@contract_ids) AND deleted = false;
 
 -- name: GetContractByChainAddress :one
 select * FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false;
