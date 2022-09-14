@@ -496,33 +496,34 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
-			if it, ok := seenTokens[ti]; ok {
-				if !(it.Media.MediaType == persist.MediaTypeVideo && it.Media.ThumbnailURL == "") {
-					if it.Media.MediaURL != "" && it.Name != "" {
-						continue
-					}
-				} else {
-					if it.Media.MediaURL != "" {
-						token.Media.MediaURL = it.Media.MediaURL
-					}
-				}
-				logger.For(ctx).Debugf("updating token %s because current version is invalid", ti)
+			if seen, ok := seenTokens[ti]; ok && !seen.Media.IsServable() && token.Media.IsServable() {
+				seen.Media = token.Media
+				seenTokens[ti] = seen
 			} else {
 				if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
 					seenWallets[ti] = append(seenWallets[ti], w)
 				}
 				if q, ok := seenQuantities[ti]; ok {
-					if token.Name == "aspiring chad" {
-						asJSON, _ := json.MarshalIndent(token, "", "  ")
-						logger.For(ctx).Warnf("t quantity again %s | %s", token.Quantity, string(asJSON))
-					}
 					seenQuantities[ti] = q.Add(token.Quantity)
 				} else {
-					if token.Name == "aspiring chad" {
-						asJSON, _ := json.MarshalIndent(token, "", "  ")
-						logger.For(ctx).Warnf("t quantity %s | %s", token.Quantity, string(asJSON))
-					}
 					seenQuantities[ti] = token.Quantity
+				}
+				seenTokens[ti] = persist.TokenGallery{
+					Media:                token.Media,
+					TokenType:            token.TokenType,
+					Chain:                chainToken.chain,
+					Name:                 persist.NullString(token.Name),
+					Description:          persist.NullString(token.Description),
+					TokenURI:             token.TokenURI,
+					TokenID:              token.TokenID,
+					Quantity:             seenQuantities[ti],
+					OwnerUserID:          ownerUser.ID,
+					OwnedByWallets:       seenWallets[ti],
+					TokenMetadata:        token.TokenMetadata,
+					Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
+					ExternalURL:          persist.NullString(token.ExternalURL),
+					BlockNumber:          token.BlockNumber,
+					IsProviderMarkedSpam: token.IsSpam,
 				}
 			}
 
@@ -531,25 +532,9 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 				return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
 			}
 
-			t := persist.TokenGallery{
-				Media:                token.Media,
-				TokenType:            token.TokenType,
-				Chain:                chainToken.chain,
-				Name:                 persist.NullString(token.Name),
-				Description:          persist.NullString(token.Description),
-				TokenURI:             token.TokenURI,
-				TokenID:              token.TokenID,
-				Quantity:             seenQuantities[ti],
-				OwnerUserID:          ownerUser.ID,
-				OwnedByWallets:       seenWallets[ti],
-				OwnershipHistory:     ownership,
-				TokenMetadata:        token.TokenMetadata,
-				Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
-				ExternalURL:          persist.NullString(token.ExternalURL),
-				BlockNumber:          token.BlockNumber,
-				IsProviderMarkedSpam: token.IsSpam,
-			}
-			seenTokens[ti] = t
+			seenToken := seenTokens[ti]
+			seenToken.OwnershipHistory = ownership
+			seenTokens[ti] = seenToken
 		}
 	}
 
