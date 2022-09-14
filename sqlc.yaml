@@ -140,3 +140,5 @@ sql:
           go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
         - column: "*.creator_address"
           go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
+        - column: "*.contract_ids"
+          go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"

@@ -271,6 +271,14 @@ func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
 	return loaders
 }
 
+// fillErrors fills a slice of errors with the specified error. Useful for batched lookups where
+// a single top-level error may need to be returned for each request in the batch.
+func fillErrors(errors []error, err error) {
+	for i := 0; i < len(errors); i++ {
+		errors[i] = err
+	}
+}
+
 // These are pretty verbose and repetitive; hopefully generics make this cleaner in the future
 
 func (l *Loaders) ClearAllCaches() {
@@ -896,20 +904,29 @@ func loadContractByContractID(ctx context.Context, loaders *Loaders, q *db.Queri
 		contracts := make([]db.Contract, len(contractIDs))
 		errors := make([]error, len(contractIDs))
 
-		b := q.GetContractByIDBatch(ctx, contractIDs)
-		defer b.Close()
+		rows, err := q.GetContractsByIDs(ctx, contractIDs)
+		if err != nil {
+			fillErrors(errors, err)
+			return contracts, errors
+		}
 
-		b.QueryRow(func(i int, t db.Contract, err error) {
-			contracts[i], errors[i] = t, err
+		contractsByID := make(map[persist.DBID]db.Contract)
+		for _, row := range rows {
+			contractsByID[row.ID] = row
+		}
 
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrContractNotFoundByID{ID: contractIDs[i]}
+		for i, id := range contractIDs {
+			if contract, ok := contractsByID[id]; ok {
+				contracts[i] = contract
+			} else {
+				errors[i] = persist.ErrContractNotFoundByID{ID: id}
 			}
-		})
+		}
 
 		return contracts, errors
 	}
 }
+
 func loadContractByChainAddress(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.ChainAddress) ([]db.Contract, []error) {
 	return func(chainAddresses []persist.ChainAddress) ([]db.Contract, []error) {
 		contracts := make([]db.Contract, len(chainAddresses))
