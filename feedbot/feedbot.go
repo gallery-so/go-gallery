@@ -8,6 +8,7 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -48,14 +49,12 @@ func setDefaults() {
 	viper.SetDefault("GALLERY_API", "http://localhost:4000/glry/graphql/query")
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.SetDefault("SENTRY_DSN", "")
+
 	viper.AutomaticEnv()
 
-	if viper.GetString("BOT_TOKEN") == "" {
-		panic("BOT_TOKEN must be set")
-	}
-
-	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
-		panic("SENTRY_DSN must be set")
+	util.MustExist("BOT_TOKEN")
+	if viper.GetString("ENV") != "local" {
+		util.MustExist("SENTRY_DSN")
 	}
 }
 

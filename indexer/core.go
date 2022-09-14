@@ -142,10 +142,7 @@ func setDefaults(envFilePath string) {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
-
-	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
-		panic("SENTRY_DSN must be set")
-	}
+	viper.SetDefault("GAE_VERSION", "")
 
 	viper.AutomaticEnv()
 
@@ -161,8 +158,10 @@ func setDefaults(envFilePath string) {
 		}
 	}
 
-	if viper.GetString("RPC_URL") == "" {
-		panic("RPC_URL must be set")
+	util.MustExist("RPC_URL")
+	if viper.GetString("ENV") != "local" {
+		util.MustExist("SENTRY_DSN")
+		util.MustExist("GAE_VERSION")
 	}
 }
 

@@ -57,7 +57,6 @@ func Init() {
 // so the test server can also utilize it
 func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
-	logger.For(nil).Infof("GAE_VERSION=%s", viper.GetString("GAE_VERSION"))
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
@@ -119,7 +118,7 @@ func setDefaults() {
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
 	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
-	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
+	viper.SetDefault("ADMIN_PASS", "")
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
 	viper.SetDefault("SIGNUPS_TOPIC", "user-signup")
@@ -164,22 +163,11 @@ func setDefaults() {
 		}
 	}
 
-	if viper.GetString("ENV") != "local" && viper.GetString("ADMIN_PASS") == "TEST_ADMIN_PASS" {
-		panic("ADMIN_PASS must be set")
-	}
-
-	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
-		panic("SENTRY_DSN must be set")
-	}
-
-	if viper.GetString("IMGIX_SECRET") == "" {
-		panic("IMGIX_SECRET must be set")
-	}
-
-	if viper.GetString("GAE_VERSION") == "" {
-		panic("GAE_VERSION must be set")
-	} else {
-		logger.For(nil).Infof("GAE_VERSION=%s", viper.GetString("GAE_VERSION"))
+	util.MustExist("IMGIX_SECRET")
+	if viper.GetString("ENV") != "local" {
+		util.MustExist("ADMIN_PASS")
+		util.MustExist("SENTRY_DSN")
+		util.MustExist("GAE_VERSION")
 	}
 }
 
