@@ -23,7 +23,7 @@ type Provider struct {
 	Cache  memstore.Cache
 	Chains map[persist.Chain][]ChainProvider
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	ChainAddressOverrides map[persist.Chain]persist.Chain
+	ChainAddressOverrides map[persist.Chain]*persist.Chain
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -138,7 +138,7 @@ type ChainProvider interface {
 }
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides map[persist.Chain]persist.Chain, chains ...ChainProvider) *Provider {
+func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides map[persist.Chain]*persist.Chain, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
@@ -176,7 +176,9 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	for _, chain := range chains {
 		for _, wallet := range user.Wallets {
-			if wallet.Chain == chain || d.ChainAddressOverrides[chain] == wallet.Chain {
+			override := d.ChainAddressOverrides[chain]
+
+			if wallet.Chain == chain || (override != nil && *override == wallet.Chain) {
 				chainsToAddresses[chain] = append(chainsToAddresses[chain], wallet.Address)
 			}
 		}
