@@ -36,7 +36,7 @@ const (
 	MediaTypeGIF MediaType = "gif"
 	// MediaTypeSVG represents an SVG
 	MediaTypeSVG MediaType = "svg"
-	// MediaTypeBase64Image represents a base64 encoded image
+	// MediaTypeBase64BMP represents a base64 encoded bmp file
 	MediaTypeBase64BMP MediaType = "base64bmp"
 	// MediaTypeText represents plain text
 	MediaTypeText MediaType = "text"
@@ -350,15 +350,20 @@ type svgXML struct {
 }
 
 // SniffMediaType will attempt to detect the media type for a given array of bytes
-func SniffMediaType(buf []byte) MediaType {
+func SniffMediaType(buf []byte) (MediaType, string) {
 
 	var asXML svgXML
 	if err := xml.Unmarshal(buf, &asXML); err == nil {
-		return MediaTypeSVG
+		return MediaTypeSVG, "image/svg+xml"
 	}
 
 	contentType := http.DetectContentType(buf)
-	return MediaFromContentType(contentType)
+	contentType = strings.TrimSpace(contentType)
+	whereCharset := strings.IndexByte(contentType, ';')
+	if whereCharset != -1 {
+		contentType = contentType[:whereCharset]
+	}
+	return MediaFromContentType(contentType), contentType
 }
 
 // MediaFromContentType will attempt to convert a content type to a media type
@@ -573,6 +578,18 @@ func (uri TokenURI) Type() URIType {
 	default:
 		return URITypeUnknown
 	}
+}
+
+// IsRenderable returns whether a frontend could render the given URI directly
+func (uri TokenURI) IsRenderable() bool {
+	return uri.IsHTTP() // || uri.IsIPFS() || uri.IsArweave()
+}
+
+// IsHTTP returns whether a frontend could render the given URI directly
+func (uri TokenURI) IsHTTP() bool {
+	asString := uri.String()
+	asString = strings.TrimSpace(asString)
+	return strings.HasPrefix(asString, "http")
 }
 
 func (id TokenID) String() string {

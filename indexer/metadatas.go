@@ -20,7 +20,10 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	colorful "github.com/lucasb-eyer/go-colorful"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 var white = color.RGBA{255, 255, 255, 255}
@@ -417,4 +420,51 @@ func cryptopunks(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 		"image":       withBase64Prefix,
 	}, nil
 
+}
+
+func zora(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
+	metadataContract, err := contracts.NewZoraCaller(common.HexToAddress(addr.String()), ethCl)
+	if err != nil {
+		return turi, nil, err
+	}
+	metadataURI, err := metadataContract.TokenMetadataURI(&bind.CallOpts{Context: ctx}, tid.BigInt())
+	if err != nil {
+		return turi, nil, err
+	}
+	tokenMetadata, err := rpc.GetMetadataFromURI(ctx, persist.TokenURI(metadataURI), ipfs, arweave)
+	if err != nil {
+		return turi, nil, err
+	}
+
+	resultMetadata := persist.TokenMetadata{}
+	resultMetadata["name"] = util.FindFirstFieldFromMap(tokenMetadata, "name", "title")
+	resultMetadata["description"] = util.FindFirstFieldFromMap(tokenMetadata, "description", "desc", "notes")
+	mediaURI, err := metadataContract.TokenURI(&bind.CallOpts{Context: ctx}, tid.BigInt())
+	if err != nil {
+		return turi, nil, err
+	}
+	contentType, ok := util.FindFirstFieldFromMap(tokenMetadata, "mimeType", "contentType", "content-type", "type").(string)
+	var mediaType persist.MediaType
+	if ok {
+		mediaType = persist.MediaFromContentType(contentType)
+	} else {
+		mediaType, _, err = media.PredictMediaType(ctx, mediaURI)
+	}
+	switch mediaType {
+	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG, persist.MediaTypeBase64BMP:
+		resultMetadata["image"] = mediaURI
+	default:
+		resultMetadata["animation_url"] = mediaURI
+		someOtherURI, ok := util.FindFirstFieldFromMap(tokenMetadata, "image", "thumbnail", "uri").(string)
+		if ok {
+			resultMetadata["image"] = someOtherURI
+		}
+	}
+	for k, v := range tokenMetadata {
+		if k == "name" || k == "description" || k == "image" || k == "animation_url" {
+			continue
+		}
+		resultMetadata[k] = v
+	}
+	return persist.TokenURI(metadataURI), resultMetadata, nil
 }

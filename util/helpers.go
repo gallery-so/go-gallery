@@ -236,3 +236,14 @@ func GetIPFSPath(initial string) string {
 	path = strings.TrimSuffix(path, "/")
 	return path
 }
+
+// FindFirstFieldFromMap finds the first field in the map that contains the given field
+func FindFirstFieldFromMap(it map[string]interface{}, fields ...string) interface{} {
+
+	for _, field := range fields {
+		if val := GetValueFromMapUnsafe(it, field, DefaultSearchDepth); val != nil {
+			return val
+		}
+	}
+	return nil
+}
