@@ -30,7 +30,7 @@ yarn.lock
 
 # SECRITS
 _deploy*
-_internal*
+_local*
 
 *.mp4
 *.jpg

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/everFinance/goar"
@@ -41,6 +42,7 @@ import (
 
 // Init initializes the server
 func Init() {
+
 	setDefaults()
 
 	initLogger()
@@ -138,15 +140,25 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") == "local" {
+
+		filePath := "_local/app-local-backend.yaml"
+		if len(os.Args) > 1 {
+			if os.Args[1] == "dev" {
+				filePath = "_local/app-dev-backend.yaml"
+			} else if os.Args[1] == "prod" {
+				filePath = "_local/app-prod-backend.yaml"
+			}
+		}
+
 		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-		path, err := util.FindFile("_internal/app-local-backend.yaml", 3)
+		path, err := util.FindFile(filePath, 3)
 		if err != nil {
 			panic(err)
 		}
 
 		viper.SetConfigFile(path)
 		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _internal directory is decrypted and up-to-date", err))
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
 		}
 	}
 

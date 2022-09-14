@@ -38,7 +38,7 @@ jobs:
     working_directory: ~/go-gallery
     machine:
       image: ubuntu-2004:202111-02
-      docker_layer_caching: false  # can enable when on performance plan
+      docker_layer_caching: false # can enable when on performance plan
     environment:
       GO_VERSION: 1.16.13
       GOTESTSUM_VERSION: 1.7.0
@@ -75,7 +75,7 @@ jobs:
     working_directory: ~/go-gallery
     machine:
       image: ubuntu-2004:202111-02
-      docker_layer_caching: false  # can enable when on performance plan
+      docker_layer_caching: false # can enable when on performance plan
     environment:
       GO_VERSION: 1.16.13
       GOTESTSUM_VERSION: 1.7.0
@@ -115,13 +115,13 @@ jobs:
           command: "keybase oneshot"
       - run:
           name: "Decrypt secrets"
-          command: keybase decrypt -i _encrypted_internal -o _internal.zip
+          command: keybase decrypt -i _encrypted_local -o _local.zip
       - run:
           name: "Install cli dependencies"
           command: sudo apt-get -y install unzip
       - run:
           name: "Unzip secrets file"
-          command: echo "A" | unzip _internal.zip -d _internal
+          command: echo "A" | unzip _local.zip -d _local
       - run:
           name: Run integration-tests
           command: |

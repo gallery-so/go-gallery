@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -40,7 +41,7 @@ func InitServer() {
 
 func coreInit() (*gin.Engine, *indexer) {
 
-	setDefaults("_internal/app-local-indexer.yaml")
+	setDefaults("_local/app-local-indexer.yaml")
 	initSentry()
 	initLogger()
 
@@ -78,7 +79,13 @@ func coreInit() (*gin.Engine, *indexer) {
 func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
-	setDefaults("_internal/app-local-indexer-server.yaml")
+	path := "_local/app-local-indexer-server.yaml"
+	if len(os.Args) > 0 {
+		if os.Args[0] == "prod" {
+			path = "_local/app-prod-indexer-server.yaml"
+		}
+	}
+	setDefaults(path)
 	initSentry()
 	initLogger()
 
@@ -150,7 +157,7 @@ func setDefaults(envFilePath string) {
 
 		viper.SetConfigFile(path)
 		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _internal directory is decrypted and up-to-date", err))
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
 		}
 	}
 
