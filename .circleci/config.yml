@@ -2,19 +2,7 @@ version: 2.1
 workflows:
   main:
     jobs:
-      - build
-      - integration-tests
-      - unit-tests:
-          requires:
-            - build
-      - deploy:
-          filters:
-            branches:
-              only:
-                - "main"
-      - post-deploy:
-          requires:
-            - deploy
+      - deploy
 jobs:
   build:
     working_directory: ~/go-gallery
@@ -151,6 +139,9 @@ jobs:
           name: "Install cli dependencies"
           command: apt-get -y install unzip curl sudo python3 make git
       - run:
+          name: "Install Sentry"
+          command: curl -sL https://sentry.io/get-cli/ | bash
+      - run:
           name: "Unzip secrets file"
           command: unzip _deploy.zip -d _deploy
       - run:
@@ -200,12 +191,6 @@ jobs:
           command: |
             cd _deploy
             make deploy-dev-backend
-      - run:
-          name: "Publish New Release"
-          command: |
-            curl -sL https://sentry.io/get-cli/ | bash
-            cd _deploy
-            make release-dev-backend
   post-deploy:
     working_directory: ~/go-gallery
     docker:
