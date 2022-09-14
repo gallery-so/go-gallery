@@ -23,7 +23,7 @@ type Provider struct {
 	Cache  memstore.Cache
 	Chains map[persist.Chain][]ChainProvider
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
-	ChainAddressOverrides map[persist.Chain]*persist.Chain
+	ChainAddressOverrides ChainOverrideMap
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -137,8 +137,10 @@ type ChainProvider interface {
 	VerifySignature(context.Context, persist.PubKey, persist.WalletType, string, string) (bool, error)
 }
 
+type ChainOverrideMap = map[persist.Chain]*persist.Chain
+
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides map[persist.Chain]*persist.Chain, chains ...ChainProvider) *Provider {
+func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
