@@ -72,11 +72,13 @@ _Do not run this script if you've run the shell script for seeding NFT data._
 **Working with migrations**
 
 The `migrate` cli can be installed via brew (assuming MacOS):
+
 ```bash
 brew install golang-migrate
 ```
 
 Create a new migration:
+
 ```bash
 # New migration for the backend db
 migrate create -ext sql -dir db/migrations/core -seq <name of migration>
@@ -86,6 +88,7 @@ migrate create -ext sql -dir db/migrations/indexer -seq <name of migration>
 ```
 
 Run a migration on dev backend db:
+
 ```bash
 # Apply an up migration to the backend db
 migrate -path db/migrations/core -database "postgresql://postgres:<dev db password here>@34.102.59.201:5432/postgres" up
@@ -95,6 +98,7 @@ migrate -path db/migrations/core -database "postgresql://postgres:<dev db passwo
 ```
 
 Run a migration on the indexer db:
+
 ```bash
 # Apply an up migration to the indexer db
 migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db password here>@<indexer db ip>:5432/postgres" up
@@ -104,6 +108,7 @@ migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db
 ```
 
 Run a migration locally:
+
 ```bash
 # Run all migrations for the local backend db
 migrate -path db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
@@ -121,9 +126,11 @@ $ curl localhost:4000/glry/v1/health
 ```
 
 ## Testing services via Cloud Tasks
+
 We use [aertje/cloud-tasks-emulator](https://github.com/aertje/cloud-tasks-emulator) to emulate running Cloud Tasks locally. The emulator is added as a submodule to the repo.
 
 See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targeting-services) for more info on the setup. A typical local setup looks something like below:
+
 ```
 +-----------+
 |     ui    |
@@ -144,6 +151,7 @@ See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targetin
 ```
 
 To get started:
+
 ```bash
 # If first time pulling down the submodule
 git submodule update --init --recursive
@@ -153,6 +161,7 @@ git pull --recurse-submodules
 ```
 
 After pulling the repo, start the services you're interested in running:
+
 ```bash
 # Start the cloud task emulator and docker dependencies
 make cloud-tasks
@@ -199,4 +208,20 @@ Run integration tests against ethereum mainnet:
 
 ```bash
 go test -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
+```
+
+### Running locally with live data
+
+If you have access to the `_encrypted_local` file, you can run the server locally with live data. This is useful for testing the server locally with real data.
+
+For example, to run the server locally with live data from the `dev` environment, run the following command:
+
+```bash
+go run cmd/server/main.go dev
+```
+
+To run the indexer server connected to production, run the following command:
+
+```bash
+go run cmd/indexer/server/main.go prod
 ```
