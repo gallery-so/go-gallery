@@ -158,10 +158,10 @@ func setDefaults(envFilePath string) {
 		}
 	}
 
-	util.MustExist("RPC_URL", "")
+	util.EnvVarMustExist("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
-		util.MustExist("SENTRY_DSN", "")
-		util.MustExist("GAE_VERSION", "")
+		util.EnvVarMustExist("SENTRY_DSN", "")
+		util.EnvVarMustExist("GAE_VERSION", "")
 	}
 }
 

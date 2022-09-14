@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -246,4 +247,11 @@ func FindFirstFieldFromMap(it map[string]interface{}, fields ...string) interfac
 		}
 	}
 	return nil
+}
+
+// EnvVarMustExist panics if an environment variable is not set.
+func EnvVarMustExist(envVar, emptyVal string) {
+	if viper.GetString(envVar) == emptyVal {
+		panic(fmt.Sprintf("%s must be set", envVar))
+	}
 }

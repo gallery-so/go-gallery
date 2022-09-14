@@ -163,11 +163,11 @@ func setDefaults() {
 		}
 	}
 
-	util.MustExist("IMGIX_SECRET", "")
+	util.EnvVarMustExist("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {
-		util.MustExist("ADMIN_PASS", "TEST_ADMIN_PASS")
-		util.MustExist("SENTRY_DSN", "")
-		util.MustExist("GAE_VERSION", "")
+		util.EnvVarMustExist("ADMIN_PASS", "TEST_ADMIN_PASS")
+		util.EnvVarMustExist("SENTRY_DSN", "")
+		util.EnvVarMustExist("GAE_VERSION", "")
 	}
 }
 
