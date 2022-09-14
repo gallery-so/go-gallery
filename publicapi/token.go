@@ -204,20 +204,14 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 		return err
 	}
 
-	collection, err := api.loaders.CollectionByCollectionId.Load(collectionDBID)
+	tokens, err := api.loaders.TokensByCollectionID.Load(collectionDBID)
 	if err != nil {
 		return err
 	}
 	wp := workerpool.New(10)
 	errChan := make(chan error)
-	for _, t := range collection.Nfts {
-		tokenID := t
+	for _, token := range tokens {
 		wp.Submit(func() {
-			token, err := api.loaders.TokenByTokenID.Load(tokenID)
-			if err != nil {
-				errChan <- err
-				return
-			}
 			contract, err := api.loaders.ContractByContractId.Load(token.Contract)
 			if err != nil {
 				errChan <- err
