@@ -451,7 +451,7 @@ func zora(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddre
 		mediaType, err = media.PredictMediaType(ctx, mediaURI)
 	}
 	switch mediaType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
+	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG, persist.MediaTypeBase64BMP:
 		resultMetadata["image"] = mediaURI
 	default:
 		resultMetadata["animation_url"] = mediaURI
@@ -459,6 +459,12 @@ func zora(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddre
 		if ok {
 			resultMetadata["image"] = someOtherURI
 		}
+	}
+	for k, v := range tokenMetadata {
+		if k == "name" || k == "description" || k == "image" || k == "animation_url" {
+			continue
+		}
+		resultMetadata[k] = v
 	}
 	return persist.TokenURI(metadataURI), resultMetadata, nil
 }

@@ -572,9 +572,14 @@ func (uri TokenURI) Type() URIType {
 
 // IsRenderable returns whether a frontend could render the given URI directly
 func (uri TokenURI) IsRenderable() bool {
+	return uri.IsHTTP() // || uri.IsIPFS() || uri.IsArweave()
+}
+
+// IsHTTP returns whether a frontend could render the given URI directly
+func (uri TokenURI) IsHTTP() bool {
 	asString := uri.String()
 	asString = strings.TrimSpace(asString)
-	return strings.HasPrefix(asString, "http") || strings.HasPrefix(asString, "https")
+	return strings.HasPrefix(asString, "http")
 }
 
 func (id TokenID) String() string {
