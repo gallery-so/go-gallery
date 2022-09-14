@@ -7,8 +7,8 @@ import (
 )
 
 // MustExist panics if an environment variable is not set.
-func MustExist(envVar string) {
-	if viper.GetString(envVar) == "" {
+func MustExist(envVar, emptyVal string) {
+	if viper.GetString(envVar) == emptyVal {
 		panic(fmt.Sprintf("%s must be set", envVar))
 	}
 }
