@@ -2,7 +2,19 @@ version: 2.1
 workflows:
   main:
     jobs:
-      - deploy
+      - build
+      - integration-tests
+      - unit-tests:
+          requires:
+            - build
+      - deploy:
+          filters:
+            branches:
+              only:
+                - "main"
+      - post-deploy:
+          requires:
+            - deploy
 jobs:
   build:
     working_directory: ~/go-gallery
