@@ -188,7 +188,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 
-		return removeBOM(bs), nil
+		return bs, nil
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")

@@ -426,11 +426,11 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			}
 		}
 
-		tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
-		if err != nil {
-			return err
-		}
 		if i == 0 {
+			tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
+			if err != nil {
+				return err
+			}
 			for _, token := range tokens {
 				if err := d.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
 					Media:       token.Media,
