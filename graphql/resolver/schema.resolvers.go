@@ -452,13 +452,13 @@ func (r *mutationResolver) SetSpamPreference(ctx context.Context, input model.Se
 	return model.SetSpamPreferencePayload{Tokens: tokens}, nil
 }
 
-func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error) {
+func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain, userID *persist.DBID) (model.SyncTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	if chains == nil || len(chains) == 0 {
 		chains = []persist.Chain{persist.ChainETH}
 	}
-	err := api.Token.SyncTokens(ctx, chains)
+	err := api.Token.SyncTokens(ctx, chains, userID)
 	if err != nil {
 		return nil, err
 	}
