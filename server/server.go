@@ -136,6 +136,7 @@ func setDefaults() {
 	viper.SetDefault("TEZOS_API_URL", "https://api.ghostnet.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
+	viper.SetDefault("GAE_VERSION", "")
 
 	viper.AutomaticEnv()
 
@@ -162,16 +163,11 @@ func setDefaults() {
 		}
 	}
 
-	if viper.GetString("ENV") != "local" && viper.GetString("ADMIN_PASS") == "TEST_ADMIN_PASS" {
-		panic("ADMIN_PASS must be set")
-	}
-
-	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
-		panic("SENTRY_DSN must be set")
-	}
-
-	if viper.GetString("IMGIX_SECRET") == "" {
-		panic("IMGIX_SECRET must be set")
+	util.EnvVarMustExist("IMGIX_SECRET", "")
+	if viper.GetString("ENV") != "local" {
+		util.EnvVarMustExist("ADMIN_PASS", "TEST_ADMIN_PASS")
+		util.EnvVarMustExist("SENTRY_DSN", "")
+		util.EnvVarMustExist("GAE_VERSION", "")
 	}
 }
 
@@ -233,6 +229,7 @@ func initSentry() {
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Release:          viper.GetString("GAE_VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)

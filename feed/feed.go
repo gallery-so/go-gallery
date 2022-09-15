@@ -10,6 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -51,10 +52,12 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
 	viper.SetDefault("FEED_WINDOW_SIZE", 5)
+	viper.SetDefault("GAE_VERSION", "")
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
-		panic("SENTRY_DSN must be set")
+	if viper.GetString("ENV") != "local" {
+		util.EnvVarMustExist("SENTRY_DSN", "")
+		util.EnvVarMustExist("GAE_VERSION", "")
 	}
 }
 
