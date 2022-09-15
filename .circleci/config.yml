@@ -210,7 +210,8 @@ jobs:
     environment:
       - HEALTH_URL: https://api.dev.gallery.so/glry/v1/health
       - GRACE: 20
-      - TIMES: 5
+      - TIMES: 8
+      - INTERVAL: 10
     steps:
       - run:
           name: "Ping Backend"
@@ -225,7 +226,7 @@ jobs:
               echo "-------------------------------"
               echo " INFO: [attempt $i] waiting... "
               echo "-------------------------------"
-              sleep 2^$TIMES
+              sleep $INTERVAL
             else
               echo "-------------------------------"
               echo " INFO: backend is operational! "

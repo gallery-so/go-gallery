@@ -225,3 +225,10 @@ To run the indexer server connected to production, run the following command:
 ```bash
 go run cmd/indexer/server/main.go prod
 ```
+
+When testing the indexer locally, you may want to sync log data from the prod to dev bucket. You can do this by running the sync command below. This command can take a few minutes depending on when the buckets were last synced.
+
+```bash
+# Do not switch the order of the buckets! Doing so may overwrite prod data.
+gsutil -m rsync -r gs://prod-eth-token-logs gs://dev-eth-token-logs
+```
