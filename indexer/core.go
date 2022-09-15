@@ -51,7 +51,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	if viper.GetString("ENV") != "local" {
 		s, err = storage.NewClient(context.Background())
 	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
 	}
 	if err != nil {
 		panic(err)
@@ -95,7 +95,7 @@ func coreInitServer() *gin.Engine {
 	if viper.GetString("ENV") != "local" {
 		s, err = storage.NewClient(ctx)
 	} else {
-		s, err = storage.NewClient(ctx, option.WithCredentialsFile("./_deploy/service-key.json"))
+		s, err = storage.NewClient(ctx, option.WithCredentialsFile("./_deploy/service-key-dev.json"))
 	}
 	if err != nil {
 		panic(err)
@@ -131,8 +131,8 @@ func setDefaults(envFilePath string) {
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
-	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "prod-eth-token-logs")
-	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "prod-token-content")
+	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "dev-eth-token-logs")
+	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5433)
 	viper.SetDefault("POSTGRES_USER", "postgres")
