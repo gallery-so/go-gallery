@@ -211,8 +211,8 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	wp := workerpool.New(10)
 	errChan := make(chan error)
 	for _, token := range tokens {
+		token := token
 		wp.Submit(func() {
-			token := token
 			contract, err := api.loaders.ContractByContractId.Load(token.Contract)
 			if err != nil {
 				errChan <- err
