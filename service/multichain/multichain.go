@@ -501,15 +501,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			if seen, ok := seenTokens[ti]; ok && !seen.Media.IsServable() && token.Media.IsServable() {
 				seen.Media = token.Media
 				seenTokens[ti] = seen
-			} else {
-				if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
-					seenWallets[ti] = append(seenWallets[ti], w)
-				}
-				if q, ok := seenQuantities[ti]; ok {
-					seenQuantities[ti] = q.Add(token.Quantity)
-				} else {
-					seenQuantities[ti] = token.Quantity
-				}
+			} else if _, ok := seenTokens[ti]; !ok {
 				seenTokens[ti] = persist.TokenGallery{
 					Media:                token.Media,
 					TokenType:            token.TokenType,
@@ -518,15 +510,32 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 					Description:          persist.NullString(token.Description),
 					TokenURI:             token.TokenURI,
 					TokenID:              token.TokenID,
-					Quantity:             seenQuantities[ti],
 					OwnerUserID:          ownerUser.ID,
-					OwnedByWallets:       seenWallets[ti],
 					TokenMetadata:        token.TokenMetadata,
 					Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
 					ExternalURL:          persist.NullString(token.ExternalURL),
 					BlockNumber:          token.BlockNumber,
 					IsProviderMarkedSpam: token.IsSpam,
 				}
+			}
+
+			var found bool
+			for _, wallet := range seenWallets[ti] {
+				if wallet.Address == token.OwnerAddress {
+					found = true
+				}
+			}
+			if !found {
+				if q, ok := seenQuantities[ti]; ok {
+					seenQuantities[ti] = q.Add(token.Quantity)
+				} else {
+					seenQuantities[ti] = token.Quantity
+				}
+			}
+
+			if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
+				seenWallets[ti] = append(seenWallets[ti], w)
+				seenWallets[ti] = dedupeWallets(seenWallets[ti])
 			}
 
 			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
@@ -536,6 +545,8 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 
 			seenToken := seenTokens[ti]
 			seenToken.OwnershipHistory = ownership
+			seenToken.OwnedByWallets = seenWallets[ti]
+			seenToken.Quantity = seenQuantities[ti]
 			seenTokens[ti] = seenToken
 		}
 	}
@@ -652,4 +663,18 @@ func (e ErrChainNotFound) Error() string {
 
 func (e errWithPriority) Error() string {
 	return e.err.Error()
+}
+
+func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
+	deduped := map[persist.Address]persist.Wallet{}
+	for _, wallet := range wallets {
+		deduped[wallet.Address] = wallet
+	}
+
+	ret := make([]persist.Wallet, 0, len(wallets))
+	for _, wallet := range deduped {
+		ret = append(ret, wallet)
+	}
+
+	return ret
 }
