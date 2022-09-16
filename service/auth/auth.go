@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/eth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -265,7 +264,7 @@ func Logout(pCtx context.Context) {
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPreAuthed bool, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
+func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
 	walletRepository persist.WalletRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
 	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
@@ -285,12 +284,6 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 		return nonce, userExists, nil
 	}
 
-	if !pPreAuthed {
-		if hasAccess, err := HasGalleryAccess(pCtx, []persist.ChainAddress{pChainAddress}, earlyAccessRepo, ethClient); !hasAccess {
-			return "", false, err
-		}
-	}
-
 	dbNonce, err := nonceRepo.Get(pCtx, pChainAddress)
 	if err != nil || dbNonce.ID == "" {
 		err = nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
@@ -306,39 +299,6 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, pPre
 
 	nonce = NewNoncePrepend + dbNonce.Value.String()
 	return nonce, userExists, nil
-}
-
-func HasGalleryAccess(ctx context.Context, addresses []persist.ChainAddress, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (bool, error) {
-	tokenAccess, tokenErr := HasAllowlistToken(ctx, addresses, ethClient)
-	if tokenErr == nil && tokenAccess {
-		return true, nil
-	}
-
-	eaAccess, eaErr := earlyAccessRepo.IsAllowedByAddresses(ctx, addresses)
-	if eaErr == nil && eaAccess {
-		return true, nil
-	}
-
-	return false, tokenErr
-}
-
-func HasAllowlistToken(ctx context.Context, addresses []persist.ChainAddress, ethClient *ethclient.Client) (bool, error) {
-	allowlist := GetAllowlistContracts()
-	for _, addr := range addresses {
-		if addr.Chain() != persist.ChainETH {
-			continue
-		}
-		for k, v := range allowlist {
-			found, err := eth.HasNFTs(ctx, k, v, persist.EthereumAddress(addr.Address()), ethClient)
-			if found {
-				return true, nil
-			} else if err != nil {
-				logger.For(ctx).Warnf("error checking whether address %s owns NFTs with contractAddress: %s and ids: %v: %s\n", addr, k, v, err)
-			}
-		}
-	}
-
-	return false, ErrDoesNotOwnRequiredNFT{addresses: addresses}
 }
 
 // NonceRotate will rotate a nonce for a user
