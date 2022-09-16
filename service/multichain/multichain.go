@@ -498,10 +498,9 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
 
-			if seen, ok := seenTokens[ti]; ok && !seen.Media.IsServable() && token.Media.IsServable() {
-				seen.Media = token.Media
-				seenTokens[ti] = seen
-			} else if _, ok := seenTokens[ti]; !ok {
+			// If we've never seen the incoming token before, then add it. If we have the token but its not servable
+			// then we replace it entirely with the incoming token.
+			if seen, ok := seenTokens[ti]; !ok || (ok && !seen.Media.IsServable() && token.Media.IsServable()) {
 				seenTokens[ti] = persist.TokenGallery{
 					Media:                token.Media,
 					TokenType:            token.TokenType,
