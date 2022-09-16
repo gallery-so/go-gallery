@@ -65,8 +65,8 @@ type tzMetadata struct {
 		Decimals string            `json:"decimals"`
 	} `json:"royalties"`
 	Attributes []struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
+		Name  string      `json:"name"`
+		Value interface{} `json:"value"`
 	} `json:"attributes"`
 	DisplayURI         string `json:"displayUri"`
 	ArtifactURI        string `json:"artifactUri"`
