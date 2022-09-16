@@ -700,6 +700,7 @@ func (d DefaultKeywords) ForToken(tokenID persist.TokenID, contract persist.Addr
 const (
 	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
 	fxHash    = "KT1BJC12dG17CVvPKJ1VYaNnaT5mzfnUTwXv"
+	fxHash2   = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
 )
 
 func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
@@ -709,7 +710,7 @@ func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Add
 	case hicEtNunc:
 		return []string{"displayUri", "image", "artifactUri", "uri"}
 		// fxhash
-	case fxHash:
+	case fxHash, fxHash2:
 		return []string{"displayUri", "image", "artifactUri", "uri"}
 	default:
 		return i
@@ -718,7 +719,7 @@ func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Add
 
 func (a TezAnimationKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
 	switch contract {
-	case fxHash:
+	case fxHash, fxHash2:
 		return []string{}
 	default:
 		return a
