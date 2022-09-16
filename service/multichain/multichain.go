@@ -276,11 +276,12 @@ outer:
 		}
 	}
 
-	dbTokens, err := d.Repos.TokenRepository.GetByUserID(ctx, userID, -1, 0)
+	allUsersNFTs, err := d.Repos.TokenRepository.GetByUserID(ctx, userID, 0, 0)
 	if err != nil {
 		return err
 	}
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, dbTokens, user)
+
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersNFTs, user)
 	if err := d.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
@@ -291,11 +292,6 @@ outer:
 	ownedTokens := make(map[tokenIdentifiers]bool)
 	for _, t := range newTokens {
 		ownedTokens[tokenIdentifiers{chain: t.Chain, tokenID: t.TokenID, contract: t.Contract}] = true
-	}
-
-	allUsersNFTs, err := d.Repos.TokenRepository.GetByUserID(ctx, userID, 0, 0)
-	if err != nil {
-		return err
 	}
 
 	for _, nft := range allUsersNFTs {
