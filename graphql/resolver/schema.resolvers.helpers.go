@@ -886,7 +886,7 @@ func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 		Dbid:         admire.ID,
 		CreationTime: &admire.CreatedAt,
 		LastUpdated:  &admire.LastUpdated,
-		Admirer:      nil, // handled by dedicated resolver
+		Admirer:      &model.GalleryUser{Dbid: admire.ActorID}, // remaining fields handled by dedicated resolver
 	}
 }
 
@@ -907,7 +907,7 @@ func commentToModel(ctx context.Context, comment db.Comment) *model.Comment {
 		CreationTime: &comment.CreatedAt,
 		LastUpdated:  &comment.LastUpdated,
 		Comment:      &comment.Comment,
-		Commenter:    nil, // handled by dedicated resolver
+		Commenter:    &model.GalleryUser{Dbid: comment.ActorID}, // remaining fields handled by dedicated resolver
 	}
 }
 
