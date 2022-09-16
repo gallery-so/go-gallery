@@ -549,7 +549,8 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 	for _, t := range seenTokens {
 		if !t.Media.IsServable() {
 			if dbToken, ok := dbSeen[persist.NewTokenIdentifiers(persist.Address(t.Contract), t.TokenID, t.Chain)]; ok && dbToken.Media.IsServable() {
-				t.Media = dbToken.Media
+				res = append(res, dbToken)
+				continue
 			}
 		}
 		res = append(res, t)
