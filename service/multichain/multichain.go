@@ -276,7 +276,11 @@ outer:
 		}
 	}
 
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
+	dbTokens, err := d.Repos.TokenRepository.GetByUserID(ctx, userID, -1, 0)
+	if err != nil {
+		return err
+	}
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, dbTokens, user)
 	if err := d.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
@@ -473,7 +477,7 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return nil
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
@@ -540,8 +544,18 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 		}
 	}
 
+	dbSeen := make(map[persist.TokenIdentifiers]persist.TokenGallery)
+	for _, token := range dbTokens {
+		dbSeen[persist.NewTokenIdentifiers(persist.Address(token.Contract), token.TokenID, token.Chain)] = token
+	}
+
 	res := make([]persist.TokenGallery, 0, len(seenTokens))
 	for _, t := range seenTokens {
+		if !t.Media.IsServable() {
+			if dbToken, ok := dbSeen[persist.NewTokenIdentifiers(persist.Address(t.Contract), t.TokenID, t.Chain)]; ok && dbToken.Media.IsServable() {
+				t.Media = dbToken.Media
+			}
+		}
 		res = append(res, t)
 	}
 	return res, nil

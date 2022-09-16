@@ -398,7 +398,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			med := d.makeTempMedia(agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
+			med := d.makeTempMedia(tid, tzToken.Token.Contract.Address, agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
 
 			agnostic := multichain.ChainAgnosticToken{
 				TokenType:       persist.TokenTypeERC1155,
@@ -480,11 +480,11 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 	}
 }
 
-func (d *Provider) makeTempMedia(agnosticMetadata persist.TokenMetadata, name string) persist.Media {
+func (d *Provider) makeTempMedia(tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, name string) persist.Media {
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
-	img, anim := media.FindImageAndAnimationURLs(agnosticMetadata, "", tezAnimationKeywords, tezImageKeywords, name)
+	img, anim := media.FindImageAndAnimationURLs(tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(tezAnimationKeywords), media.TezImageKeywords(tezImageKeywords), name)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)

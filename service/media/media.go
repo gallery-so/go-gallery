@@ -36,6 +36,14 @@ var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URL
 
 var downloadLock = &sync.Mutex{}
 
+type Keywords interface {
+	ForToken(tokenID persist.TokenID, contract persist.Address) []string
+}
+
+type DefaultKeywords []string
+type TezImageKeywords []string
+type TezAnimationKeywords []string
+
 type errUnsupportedURL struct {
 	url string
 }
@@ -68,11 +76,11 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
-func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress string, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords []string) (persist.Media, error) {
+func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords Keywords) (persist.Media, error) {
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
-	imgURL, vURL := FindImageAndAnimationURLs(metadata, turi, animationKeywords, imageKeywords, name)
+	imgURL, vURL := FindImageAndAnimationURLs(tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name)
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
@@ -282,7 +290,7 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func FindImageAndAnimationURLs(metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords []string, name string) (imgURL string, vURL string) {
+func FindImageAndAnimationURLs(tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords Keywords, name string) (imgURL string, vURL string) {
 
 	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
 		logger.For(nil).Infof("found media metadata for %s: %s", name, metaMedia)
@@ -301,7 +309,7 @@ func FindImageAndAnimationURLs(metadata persist.TokenMetadata, turi persist.Toke
 		}
 	}
 
-	for _, keyword := range animationKeywords {
+	for _, keyword := range animationKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(nil).Infof("found initial animation url for %s with keyword %s: %s", name, keyword, it)
 			vURL = it
@@ -309,7 +317,7 @@ func FindImageAndAnimationURLs(metadata persist.TokenMetadata, turi persist.Toke
 		}
 	}
 
-	for _, keyword := range imageKeywords {
+	for _, keyword := range imageKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
 			logger.For(nil).Infof("found initial image url for %s with keyword %s: %s", name, keyword, it)
 			imgURL = it
@@ -683,6 +691,40 @@ func pipeIOForCmd(c *exec.Cmd, input []byte) ([]byte, error) {
 	}()
 
 	return c.Output()
+}
+
+func (d DefaultKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
+	return d
+}
+
+func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
+
+	switch contract {
+	case "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton":
+		return []string{"displayUri", "image", "artifactUri", "uri"}
+	case "KT1BJC12dG17CVvPKJ1VYaNnaT5mzfnUTwXv":
+		return []string{"displayUri", "image", "artifactUri", "uri"}
+	default:
+		return i
+	}
+}
+
+func (a TezAnimationKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
+	switch contract {
+	case "KT1BJC12dG17CVvPKJ1VYaNnaT5mzfnUTwXv":
+		return []string{}
+	default:
+		return a
+	}
+}
+
+func KeywordsForChain(chain persist.Chain, imageKeywords []string, animationKeywords []string) (Keywords, Keywords) {
+	switch chain {
+	case persist.ChainTezos:
+		return TezImageKeywords(imageKeywords), TezAnimationKeywords(animationKeywords)
+	default:
+		return DefaultKeywords(imageKeywords), DefaultKeywords(animationKeywords)
+	}
 }
 
 func (e errUnsupportedURL) Error() string {

@@ -795,8 +795,9 @@ func (i *indexer) findOptionalFields(ctx context.Context, key persist.EthereumTo
 		logger.For(ctx).WithError(err).Errorf("error getting parts of %s", key)
 		return
 	}
+	image, animation := media.KeywordsForChain(i.chain, imageKeywords, animationKeywords)
 
-	med, err := media.MakePreviewsForMetadata(ctx, metadata, contractAddress.String(), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient, i.tokenBucket, imageKeywords, animationKeywords)
+	med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(contractAddress.String()), tokenID, tokenURI, i.chain, i.ipfsClient, i.arweaveClient, i.storageClient, i.tokenBucket, image, animation)
 	if err != nil {
 		logger.For(ctx).WithError(err).Errorf("error making previews for %s", key)
 		return

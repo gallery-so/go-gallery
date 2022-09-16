@@ -133,7 +133,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("MEDIA_PROCESSING_URL", "http://localhost:6500")
-	viper.SetDefault("TEZOS_API_URL", "https://api.ghostnet.tzkt.io")
+	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
