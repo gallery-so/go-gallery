@@ -219,7 +219,7 @@ type Media struct {
 
 // IsServable returns true if the token's Media has enough information to serve it's assets.
 func (m Media) IsServable() bool {
-	return m.MediaURL != "" && m.MediaType != MediaTypeUnknown && m.MediaType != ""
+	return m.MediaURL != "" && m.MediaType != MediaTypeUnknown && m.MediaType != "" && m.MediaType != MediaTypeSyncing
 }
 
 // NFT represents an old nft throughout the application

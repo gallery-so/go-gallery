@@ -723,8 +723,9 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 	if !ok {
 		description = ""
 	}
+	image, animation := media.KeywordsForChain(chain, imageKeywords, animationKeywords)
 
-	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, contractAddress.String(), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient, tokenBucket, imageKeywords, animationKeywords)
+	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, persist.Address(contractAddress.String()), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient, tokenBucket, image, animation)
 	if err != nil {
 		return tokenUpdate{}, MetadataPreviewUpdateErr{
 			contractAddress: persist.Address(contractAddress),

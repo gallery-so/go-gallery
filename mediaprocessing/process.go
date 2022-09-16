@@ -56,8 +56,9 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 					defer cancel()
 
 					logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%s", in.Key, t.ContractAddress, t.TokenID, in.Chain)
+					image, animation := media.KeywordsForChain(in.Chain, in.ImageKeywords, in.AnimationKeywords)
 
-					media, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress.String(), persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, in.ImageKeywords, in.AnimationKeywords)
+					media, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 					if err != nil {
 						logger.For(ctx).Errorf("error processing media for %s: %v", in.Key, err)
 						return
