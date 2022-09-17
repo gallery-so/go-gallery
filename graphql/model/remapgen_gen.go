@@ -13,6 +13,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"AdmireOrComment": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdmireOrComment)
+		return obj, ok
+	},
+
 	"AuthorizationError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AuthorizationError)
 		return obj, ok

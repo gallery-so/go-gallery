@@ -19,6 +19,10 @@ type AdmireFeedEventPayloadOrError interface {
 	IsAdmireFeedEventPayloadOrError()
 }
 
+type AdmireOrComment interface {
+	IsAdmireOrComment()
+}
+
 type AuthorizationError interface {
 	IsAuthorizationError()
 }
@@ -188,7 +192,8 @@ type Admire struct {
 	Admirer      *GalleryUser `json:"admirer"`
 }
 
-func (Admire) IsNode() {}
+func (Admire) IsNode()            {}
+func (Admire) IsAdmireOrComment() {}
 
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
@@ -325,7 +330,8 @@ type Comment struct {
 	Comment      *string      `json:"comment"`
 }
 
-func (Comment) IsNode() {}
+func (Comment) IsNode()            {}
+func (Comment) IsAdmireOrComment() {}
 
 type CommentOnFeedEventPayload struct {
 	Viewer         *Viewer    `json:"viewer"`
@@ -599,15 +605,49 @@ type FeedEdge struct {
 }
 
 type FeedEvent struct {
-	Dbid      persist.DBID  `json:"dbid"`
-	EventData FeedEventData `json:"eventData"`
-	Admires   []*Admire     `json:"admires"`
-	Comments  []*Comment    `json:"comments"`
+	Dbid               persist.DBID                           `json:"dbid"`
+	EventData          FeedEventData                          `json:"eventData"`
+	Admires            *FeedEventAdmiresConnection            `json:"admires"`
+	Comments           *FeedEventCommentsConnection           `json:"comments"`
+	AdmiresAndComments *FeedEventAdmiresAndCommentsConnection `json:"admiresAndComments"`
 }
 
 func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
+
+type FeedEventAdmireEdge struct {
+	Node   *Admire    `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor GqlID      `json:"cursor"`
+}
+
+type FeedEventAdmiresAndCommentEdge struct {
+	Node   AdmireOrComment `json:"node"`
+	Event  *FeedEvent      `json:"event"`
+	Cursor GqlID           `json:"cursor"`
+}
+
+type FeedEventAdmiresAndCommentsConnection struct {
+	Edges    []*FeedEventAdmiresAndCommentEdge `json:"edges"`
+	PageInfo *PageInfo                         `json:"pageInfo"`
+}
+
+type FeedEventAdmiresConnection struct {
+	Edges    []*FeedEventAdmireEdge `json:"edges"`
+	PageInfo *PageInfo              `json:"pageInfo"`
+}
+
+type FeedEventCommentEdge struct {
+	Node   *Comment   `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor GqlID      `json:"cursor"`
+}
+
+type FeedEventCommentsConnection struct {
+	Edges    []*FeedEventCommentEdge `json:"edges"`
+	PageInfo *PageInfo               `json:"pageInfo"`
+}
 
 type FollowInfo struct {
 	User         *GalleryUser `json:"user"`
@@ -732,6 +772,7 @@ type OwnerAtBlock struct {
 }
 
 type PageInfo struct {
+	Total           *int   `json:"total"`
 	Size            int    `json:"size"`
 	HasPreviousPage bool   `json:"hasPreviousPage"`
 	HasNextPage     bool   `json:"hasNextPage"`

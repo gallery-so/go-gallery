@@ -135,12 +135,100 @@ func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent)
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
 }
 
-func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent) ([]*model.Admire, error) {
-	return resolveAdmiresByFeedEventID(ctx, obj.Dbid)
+func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error) {
+	admires, err := resolveAdmiresByFeedEventID(ctx, obj.Dbid)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.FeedEventAdmireEdge
+	for _, admire := range admires {
+		edges = append(edges, &model.FeedEventAdmireEdge{Event: obj, Node: admire, Cursor: model.GqlID(admire.Dbid)})
+	}
+
+	total := len(admires)
+
+	// TODO(Ezra): Write professional golang
+	return &model.FeedEventAdmiresConnection{Edges: edges, PageInfo: &model.PageInfo{
+		Total:           &total,
+		Size:            total,
+		HasPreviousPage: false,
+		HasNextPage:     false,
+		StartCursor:     "",
+		EndCursor:       "",
+	}}, nil
 }
 
-func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent) ([]*model.Comment, error) {
-	return resolveCommentsByFeedEventID(ctx, obj.Dbid)
+func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error) {
+	comments, err := resolveCommentsByFeedEventID(ctx, obj.Dbid)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.FeedEventCommentEdge
+	for _, comment := range comments {
+		edges = append(edges, &model.FeedEventCommentEdge{Event: obj, Node: comment, Cursor: model.GqlID(comment.Dbid)})
+	}
+
+	total := len(comments)
+
+	// TODO(Ezra): Write professional golang
+	return &model.FeedEventCommentsConnection{Edges: edges, PageInfo: &model.PageInfo{
+		Total:           &total,
+		Size:            total,
+		HasPreviousPage: false,
+		HasNextPage:     false,
+		StartCursor:     "",
+		EndCursor:       "",
+	}}, nil
+}
+
+func (r *feedEventResolver) AdmiresAndComments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresAndCommentsConnection, error) {
+	var err error
+
+	comments, err := resolveCommentsByFeedEventID(ctx, obj.Dbid)
+
+	if err != nil {
+		return nil, err
+	}
+
+	admires, err := resolveAdmiresByFeedEventID(ctx, obj.Dbid)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var admiresAndComments []*model.FeedEventAdmiresAndCommentEdge
+
+	for _, comment := range comments {
+		admiresAndComments = append(admiresAndComments, &model.FeedEventAdmiresAndCommentEdge{
+			Event:  obj,
+			Node:   comment,
+			Cursor: model.GqlID(comment.Dbid),
+		})
+	}
+
+	for _, admire := range admires {
+		admiresAndComments = append(admiresAndComments, &model.FeedEventAdmiresAndCommentEdge{
+			Event:  obj,
+			Node:   admire,
+			Cursor: model.GqlID(admire.Dbid),
+		})
+	}
+
+	total := len(admiresAndComments)
+
+	// TODO(Ezra): Write professional golang
+	return &model.FeedEventAdmiresAndCommentsConnection{Edges: admiresAndComments, PageInfo: &model.PageInfo{
+		Total:           &total,
+		Size:            total,
+		HasPreviousPage: false,
+		HasNextPage:     false,
+		StartCursor:     "",
+		EndCursor:       "",
+	}}, nil
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -1088,3 +1176,13 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+type feedEventAdmiresAndCommentsConnectionResolver struct{ *Resolver }
+type feedEventAdmiresConnectionResolver struct{ *Resolver }
+type feedEventCommentsConnectionResolver struct{ *Resolver }
