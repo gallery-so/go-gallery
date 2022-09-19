@@ -49,7 +49,7 @@ var (
 			MaxIdleConnsPerHost: 100,
 		}, true),
 	}
-	defaultMetricsHandler = metricsHandler{op: "gethRPC"}
+	defaultMetricsHandler = metricsHandler{}
 )
 
 // Transfer represents a Transfer from the RPC response
@@ -107,12 +107,12 @@ func NewWithTracing() *ethclient.Client {
 }
 
 // metricsHandler traces RPC records that get logged by the RPC client
-type metricsHandler struct{ op string }
+type metricsHandler struct{}
 
 func (h metricsHandler) Log(r *log.Record) error {
 	reqID := valFromSlice(r.Ctx, "reqid")
 
-	span, _ := tracing.StartSpan(context.Background(), h.op, "rpc.Call", sentry.TransactionName("gethRpcCall"))
+	span, _ := tracing.StartSpan(context.Background(), "geth.wss", "rpcCall", sentry.TransactionName("gethRPC"))
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"reqID": reqID})
 	defer tracing.FinishSpan(span)
 
