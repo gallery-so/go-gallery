@@ -26,12 +26,9 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
-type tokenStandard string
+const limit = 1000
 
-var (
-	tezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
-	tezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
-)
+type tokenStandard string
 
 const (
 	tokenStandardFa12 tokenStandard = "fa1.2"
@@ -40,10 +37,11 @@ const (
 
 const tezosNoncePrepend = "Tezos Signed Message: "
 
-type tzMetadataAttribute struct {
-	Name  string      `json:"name"`
-	Value interface{} `json:"value"`
-}
+var (
+	tezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
+	tezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
+)
+
 type tzMetadata struct {
 	Date    string   `json:"date"`
 	Name    string   `json:"name"`
@@ -170,7 +168,6 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	}
 	offset := 0
 	resultTokens := []tzktBalanceToken{}
-	limit := 1000
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
 		if err != nil {
@@ -209,7 +206,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 	offset := 0
 	resultTokens := []tzktBalanceToken{}
-	limit := 1000
+
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.contract=%s&limit=%d&offset=%d", d.apiURL, contractAddress.String(), limit, offset), nil)
 		if err != nil {
@@ -252,7 +249,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	offset := 0
 	resultTokens := []tzktBalanceToken{}
-	limit := 1000
+
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s&limit=%d&offset=%d", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress, limit, offset), nil)
 		if err != nil {
@@ -310,7 +307,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
 	resultTokens := []tzktBalanceToken{}
-	limit := 1000
+
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&token.contract=%s", d.apiURL, ownerAddress, contractAddress, limit, offset), nil)
 		if err != nil {
