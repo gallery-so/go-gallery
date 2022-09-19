@@ -40,7 +40,7 @@ const (
 
 const tezosNoncePrepend = "Tezos Signed Message: "
 
-type tzMetadataAttribute []struct {
+type tzMetadataAttribute struct {
 	Name  string      `json:"name"`
 	Value interface{} `json:"value"`
 }
