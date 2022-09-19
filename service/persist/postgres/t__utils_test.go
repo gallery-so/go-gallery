@@ -20,7 +20,7 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
 	rd, rdUnpatch := docker.InitRedis()
 
 	db := NewClient()
-	err := migrate.RunMigration(db)
+	err := migrate.RunMigration(db, "./db/migrations/core")
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
 	}

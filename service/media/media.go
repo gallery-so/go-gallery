@@ -63,16 +63,16 @@ type mediaWithContentType struct {
 }
 
 var postfixesToMediaTypes = map[string]mediaWithContentType{
-	"jpg":  mediaWithContentType{persist.MediaTypeImage, "image/jpeg"},
-	"jpeg": mediaWithContentType{persist.MediaTypeImage, "image/jpeg"},
-	"png":  mediaWithContentType{persist.MediaTypeImage, "image/png"},
-	"webp": mediaWithContentType{persist.MediaTypeImage, "image/webp"},
-	"gif":  mediaWithContentType{persist.MediaTypeGIF, "image/gif"},
-	"mp4":  mediaWithContentType{persist.MediaTypeVideo, "video/mp4"},
-	"webm": mediaWithContentType{persist.MediaTypeVideo, "video/webm"},
-	"glb":  mediaWithContentType{persist.MediaTypeAnimation, "model/gltf-binary"},
-	"gltf": mediaWithContentType{persist.MediaTypeAnimation, "model/gltf+json"},
-	"svg":  mediaWithContentType{persist.MediaTypeImage, "image/svg+xml"},
+	"jpg":  {persist.MediaTypeImage, "image/jpeg"},
+	"jpeg": {persist.MediaTypeImage, "image/jpeg"},
+	"png":  {persist.MediaTypeImage, "image/png"},
+	"webp": {persist.MediaTypeImage, "image/webp"},
+	"gif":  {persist.MediaTypeGIF, "image/gif"},
+	"mp4":  {persist.MediaTypeVideo, "video/mp4"},
+	"webm": {persist.MediaTypeVideo, "video/webm"},
+	"glb":  {persist.MediaTypeAnimation, "model/gltf-binary"},
+	"gltf": {persist.MediaTypeAnimation, "model/gltf+json"},
+	"svg":  {persist.MediaTypeImage, "image/svg+xml"},
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
@@ -515,12 +515,12 @@ outer:
 	buf := bytes.NewBuffer(bs)
 
 	if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
-		mediaType, contentType = GuessMediaType(bs)
+		mediaType, contentType = persist.SniffMediaType(bs)
 		if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
-			mediaType, contentType = persist.SniffMediaType(bs)
-			logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
-		} else {
+			mediaType, contentType = GuessMediaType(bs)
 			logger.For(pCtx).Infof("guessed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
+		} else {
+			logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
 		}
 	}
 
@@ -630,13 +630,6 @@ func GuessMediaType(bs []byte) (persist.MediaType, string) {
 	cpy := make([]byte, len(bs))
 	copy(cpy, bs)
 	cpyBuff := bytes.NewBuffer(cpy)
-	var doc gltf.Document
-	if err := gltf.NewDecoder(cpyBuff).Decode(&doc); err == nil {
-		return persist.MediaTypeAnimation, "model/gltf-binary"
-	}
-	cpy = make([]byte, len(bs))
-	copy(cpy, bs)
-	cpyBuff = bytes.NewBuffer(cpy)
 	if _, err := gif.Decode(cpyBuff); err == nil {
 		return persist.MediaTypeGIF, "image/gif"
 	}
@@ -658,6 +651,13 @@ func GuessMediaType(bs []byte) (persist.MediaType, string) {
 	cpyBuff = bytes.NewBuffer(cpy)
 	if _, err := jpeg.Decode(cpyBuff); err == nil {
 		return persist.MediaTypeImage, "image/jpeg"
+	}
+	cpy = make([]byte, len(bs))
+	copy(cpy, bs)
+	cpyBuff = bytes.NewBuffer(cpy)
+	var doc gltf.Document
+	if err := gltf.NewDecoder(cpyBuff).Decode(&doc); err == nil {
+		return persist.MediaTypeAnimation, "model/gltf-binary"
 	}
 	return persist.MediaTypeUnknown, ""
 
