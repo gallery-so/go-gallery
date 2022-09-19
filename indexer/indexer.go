@@ -37,6 +37,7 @@ import (
 )
 
 var defaultStartingBlock persist.BlockNumber = 5000000
+var defaultMaxBlock persist.BlockNumber = 14000000
 
 var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
 
@@ -189,7 +190,11 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		}
 		i.mostRecentBlock = mostRecentBlockUint64
 	} else {
-		i.mostRecentBlock = 14000000
+		if startingBlock == nil {
+			i.mostRecentBlock = defaultMaxBlock.Uint64()
+		} else {
+			i.mostRecentBlock = *maxBlock
+		}
 	}
 	if maxBlock != nil {
 		if i.mostRecentBlock > *maxBlock {
@@ -200,6 +205,8 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	lastSyncedBlock := defaultStartingBlock
 	if startingBlock != nil {
 		lastSyncedBlock = persist.BlockNumber(*startingBlock)
+		remainder := lastSyncedBlock % blocksPerLogsCall
+		lastSyncedBlock -= remainder
 	} else {
 		recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
 		if err == nil && recentDBBlock > defaultStartingBlock {
@@ -342,18 +349,16 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 
 	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
 
-	if len(transfersAtBlocks) > 0 && transfersAtBlocks != nil {
-		logger.For(ctx).Infof("Sending %d total transfers to transfers channel", len(transfers))
+	logger.For(ctx).Infof("Sending %d total transfers to transfers channel", len(transfers))
 
-		for j := 0; j < len(transfersAtBlocks); j += 10 {
-			to := j + 10
-			if to > len(transfersAtBlocks) {
-				to = len(transfersAtBlocks)
-			}
-			transfersChan <- transfersAtBlocks[j:to]
+	for j := 0; j < len(transfersAtBlocks); j += 10 {
+		to := j + 10
+		if to > len(transfersAtBlocks) {
+			to = len(transfersAtBlocks)
 		}
-
+		transfersChan <- transfersAtBlocks[j:to]
 	}
+
 	logger.For(ctx).Infof("Finished processing logs, closing transfers channel...")
 }
 
@@ -600,20 +605,19 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 				transfersAtBlocks := transfersToTransfersAtBlock(transfers)
 
-				if len(transfersAtBlocks) > 0 && transfersAtBlocks != nil {
-					logger.For(ctx).Debugf("Sending %d total transfers to transfers channel", len(transfers))
-					interval := len(transfersAtBlocks) / 4
-					if interval == 0 {
-						interval = 1
-					}
-					for j := 0; j < len(transfersAtBlocks); j += interval {
-						to := j + interval
-						if to > len(transfersAtBlocks) {
-							to = len(transfersAtBlocks)
-						}
-						transfersChan <- transfersAtBlocks[j:to]
-					}
+				logger.For(ctx).Debugf("Sending %d total transfers to transfers channel", len(transfers))
+				interval := len(transfersAtBlocks) / 4
+				if interval == 0 {
+					interval = 1
 				}
+				for j := 0; j < len(transfersAtBlocks); j += interval {
+					to := j + interval
+					if to > len(transfersAtBlocks) {
+						to = len(transfersAtBlocks)
+					}
+					transfersChan <- transfersAtBlocks[j:to]
+				}
+
 			})
 	}
 	wp.StopWait()

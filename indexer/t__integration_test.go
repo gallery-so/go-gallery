@@ -22,6 +22,9 @@ func TestIndexLogs_Success(t *testing.T) {
 	i := newMockIndexer(db)
 	i.Start(configureRootContext())
 
+	a.EqualValues(100, i.lastSyncedBlock)
+	a.EqualValues(i.mostRecentBlock, i.lastSyncedBlock)
+
 	tokenRepo := postgres.NewTokenRepository(db)
 	tokens, _, err := tokenRepo.GetByWallet(context.Background(), "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", -1, 0)
 	a.NoError(err)
