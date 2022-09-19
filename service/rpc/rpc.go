@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/image/bmp"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/everFinance/goar"
 	goartypes "github.com/everFinance/goar/types"
@@ -35,17 +37,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-var keepAliveTimeout = 600 * time.Second
-var client = &http.Client{
-	Timeout: time.Second * 30,
-	Transport: tracing.NewTracingTransport(&http.Transport{
-		Dial: (&net.Dialer{
-			KeepAlive: keepAliveTimeout,
-		}).Dial,
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 100,
-	}, true),
-}
+var (
+	keepAliveTimeout = 600 * time.Second
+	client           = &http.Client{
+		Timeout: time.Second * 30,
+		Transport: tracing.NewTracingTransport(&http.Transport{
+			Dial: (&net.Dialer{
+				KeepAlive: keepAliveTimeout,
+			}).Dial,
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 100,
+		}, true),
+	}
+	defaultMetricsHandler = metricsHandler{op: "gethRPC"}
+)
 
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
@@ -85,6 +90,39 @@ func NewEthClient() *ethclient.Client {
 
 	return ethclient.NewClient(rpcClient)
 
+}
+
+// NewWithTracing returns a new ethclient.Client with request tracing enabled
+func NewWithTracing() *ethclient.Client {
+	if !strings.HasPrefix(viper.GetString("RPC_URL"), "wss://") {
+		return NewEthClient()
+	}
+	log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
+		if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil {
+			return false
+		}
+		return true
+	}, defaultMetricsHandler))
+	return NewEthClient()
+}
+
+// metricsHandler traces RPC records that get logged by the RPC client
+type metricsHandler struct{ op string }
+
+func (h metricsHandler) Log(r *log.Record) error {
+	reqID := valFromSlice(r.Ctx, "reqid")
+
+	span, _ := tracing.StartSpan(context.Background(), h.op, "rpc.Call", sentry.TransactionName("gethRpcCall"))
+	tracing.AddEventDataToSpan(span, map[string]interface{}{"reqID": reqID})
+	defer tracing.FinishSpan(span)
+
+	if d := valFromSlice(r.Ctx, "duration"); d != nil {
+		d := d.(time.Duration)
+		span.StartTime = r.Time.Add(-d)
+		span.EndTime = r.Time
+	}
+
+	return nil
 }
 
 // NewIPFSShell returns an IPFS shell
@@ -646,4 +684,14 @@ func padHex(pHex string, pLength int) string {
 
 func (h ErrHTTP) Error() string {
 	return fmt.Sprintf("HTTP Error Status - %d | URL - %s", h.Status, h.URL)
+}
+
+// valFromSlice returns the value from a slice formatted as [key val key val ...]
+func valFromSlice(s []interface{}, keyName string) interface{} {
+	for i, key := range s {
+		if key == keyName {
+			return s[i+1]
+		}
+	}
+	return nil
 }

@@ -56,7 +56,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewEthClient()
+	ethClient := rpc.NewWithTracing()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
@@ -100,7 +100,7 @@ func coreInitServer() *gin.Engine {
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewEthClient()
+	ethClient := rpc.NewWithTracing()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
@@ -175,17 +175,18 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	if viper.GetString("ENV") == "local" {
-		logger.For(nil).Info("skipping sentry init")
-		return
-	}
+	// XXX: if viper.GetString("ENV") == "local" {
+	// XXX: 	logger.For(nil).Info("skipping sentry init")
+	// XXX: 	return
+	// XXX: }
 
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              viper.GetString("SENTRY_DSN"),
-		Environment:      viper.GetString("ENV"),
-		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Dsn:         viper.GetString("SENTRY_DSN"),
+		Environment: viper.GetString("ENV"),
+		// XXX: TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		TracesSampleRate: 0.5,
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)
