@@ -26,7 +26,16 @@ func getSqlConnectionString() string {
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
 
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	if viper.GetString("ENV") != "local" {
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	} else {
+		dbServerCa := viper.GetString("POSTGRES_SERVER_CA")
+		dbClientKey := viper.GetString("POSTGRES_CLIENT_KEY")
+		dbClientCert := viper.GetString("POSTGRES_CLIENT_CERT")
+
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=verify-ca sslrootcert=%s sslcert=%s sslkey=%s", dbHost, dbPort, dbUser, dbPwd, dbName, dbServerCa, dbClientCert, dbClientKey)
+	}
+
 }
 
 // NewClient creates a new postgres client
