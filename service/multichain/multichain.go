@@ -246,9 +246,9 @@ outer:
 		case err := <-errChan:
 			if err, ok := err.(errWithPriority); ok {
 				if err.priority == 0 {
-					return err.err
+					return err
 				}
-				logger.For(ctx).Errorf("error updating fallback media for user %s: %s", user.Username, err.err)
+				logger.For(ctx).Errorf("error updating fallback media for user %s: %w", user.Username, err)
 			} else {
 				return err
 			}
@@ -674,7 +674,7 @@ func (e ErrChainNotFound) Error() string {
 }
 
 func (e errWithPriority) Error() string {
-	return e.err.Error()
+	return fmt.Sprintf("error with priority %d: %s", e.priority, e.err)
 }
 
 func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
