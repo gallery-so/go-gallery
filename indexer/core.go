@@ -56,7 +56,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewWithTracing()
+	ethClient := rpc.NewEthHTTPClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
@@ -100,7 +100,7 @@ func coreInitServer() *gin.Engine {
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewWithTracing()
+	ethClient := rpc.NewEthHTTPClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 

@@ -33,22 +33,20 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
+const (
+	defaultHTTPTimeout             = 30
+	defaultHTTPKeepAlive           = 600
+	defaultHTTPMaxIdleConns        = 100
+	defaultHTTPMaxIdleConnsPerHost = 100
+)
+
 var (
-	keepAliveTimeout = 600 * time.Second
-	client           = &http.Client{
-		Timeout: time.Second * 30,
-		Transport: tracing.NewTracingTransport(&http.Transport{
-			Dial: (&net.Dialer{
-				KeepAlive: keepAliveTimeout,
-			}).Dial,
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 100,
-		}, true),
-	}
+	defaultHTTPClient     = newHTTPClientForRPC(true)
 	defaultMetricsHandler = metricsHandler{}
 )
 
@@ -92,27 +90,50 @@ func NewEthClient() *ethclient.Client {
 
 }
 
-// NewWithTracing returns a new ethclient.Client with request tracing enabled
-func NewWithTracing() *ethclient.Client {
-	if !strings.HasPrefix(viper.GetString("RPC_URL"), "wss://") {
+// NewEthHTTPClient returns a new http client with request tracing enabled
+func NewEthHTTPClient() *ethclient.Client {
+	if !strings.HasPrefix(viper.GetString("RPC_URL"), "http") {
 		return NewEthClient()
 	}
+
+	httpClient := newHTTPClientForRPC(false, sentryutil.TransactionNameSafe("gethRPC"))
+	rpcClient, err := rpc.DialHTTPWithClient(viper.GetString("RPC_URL"), httpClient)
+	if err != nil {
+		panic(err)
+	}
+
+	return ethclient.NewClient(rpcClient)
+}
+
+// NewEthSocketClient returns a new websocket client with request tracing enabled
+func NewEthSocketClient() *ethclient.Client {
+	if !strings.HasPrefix(viper.GetString("RPC_URL"), "wss") {
+		return NewEthClient()
+	}
+
 	log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
 		if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil {
 			return false
 		}
 		return true
 	}, defaultMetricsHandler))
+
 	return NewEthClient()
 }
 
 // metricsHandler traces RPC records that get logged by the RPC client
 type metricsHandler struct{}
 
+// Log sends trace information to Sentry.
+// Geth logs the duration of each RPC call: https://github.com/ethereum/go-ethereum/blob/master/rpc/handler.go#L242
+// We take advantage of this by configuring the root logger with a custom handler that parses records
+// that have useful metrics data attached such as the duration and the request id.
 func (h metricsHandler) Log(r *log.Record) error {
 	reqID := valFromSlice(r.Ctx, "reqid")
 
-	span, _ := tracing.StartSpan(context.Background(), "geth.wss", "rpcCall", sentry.TransactionName("gethRPC"))
+	// A useful context isn't passed to the log record, so we use the background context here.
+	ctx := context.Background()
+	span, _ := tracing.StartSpan(ctx, "geth.wss", "rpcCall", sentryutil.TransactionNameSafe("gethRPC"))
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"reqID": reqID})
 	defer tracing.FinishSpan(span)
 
@@ -139,6 +160,18 @@ func NewClientForIpfs(projectId, projectSecret string) *http.Client {
 			ProjectId:     projectId,
 			ProjectSecret: projectSecret,
 		},
+	}
+}
+
+// newHTTPClientForRPC returns an http.Client configured with default settings intended for RPC calls.
+func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *http.Client {
+	return &http.Client{
+		Timeout: time.Second * defaultHTTPTimeout,
+		Transport: tracing.NewTracingTransport(&http.Transport{
+			Dial:                (&net.Dialer{KeepAlive: defaultHTTPKeepAlive * time.Second}).Dial,
+			MaxIdleConns:        defaultHTTPMaxIdleConns,
+			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,
+		}, continueTrace, spanOptions...),
 	}
 }
 
@@ -241,7 +274,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %s", err)
 		}
-		resp, err := client.Do(req)
+		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
@@ -350,7 +383,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		if err != nil {
 			return fmt.Errorf("error creating request: %s", err)
 		}
-		resp, err := client.Do(req)
+		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("error getting data from http: %s", err)
 		}
@@ -402,7 +435,7 @@ func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %s", err)
 		}
-		resp, err := client.Do(req)
+		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
@@ -436,7 +469,7 @@ func GetIPFSHeaders(pCtx context.Context, path string) (http.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %s", err)
 	}
-	resp, err := client.Do(req)
+	resp, err := defaultHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error getting data from http: %s", err)
 	}
