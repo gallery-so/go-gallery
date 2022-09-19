@@ -1321,9 +1321,8 @@ func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsT
 
 func recoverAndWait(ctx context.Context) {
 	if err := recover(); err != nil {
-		panic(err)
-		// XXX: logger.For(ctx).Errorf("Error in indexer: %v", err)
-		// XXX: time.Sleep(time.Second * 10)
+		logger.For(ctx).Errorf("Error in indexer: %v", err)
+		time.Sleep(time.Second * 10)
 	}
 }
 
