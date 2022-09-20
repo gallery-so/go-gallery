@@ -310,7 +310,8 @@ type consumerID string
 
 // GenTime returns the time the ID was generated.
 func (c consumerID) GenTime() time.Time {
-	ut, err := strconv.Atoi(strings.Split(string(c), ":")[2])
+	parts := strings.Split(string(c), ":")
+	ut, err := strconv.Atoi(parts[len(parts)-1])
 	if err != nil {
 		panic(err)
 	}

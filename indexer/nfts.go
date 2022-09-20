@@ -683,7 +683,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		span.Finish()
 
 		// Cleanup dangling jobs
-		err = refreshQueue.Reprocess(ctx)
+		err = refreshQueue.Prune(ctx)
 		if err != nil {
 			panic(err)
 		}

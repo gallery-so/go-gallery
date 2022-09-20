@@ -42,7 +42,8 @@ type RefreshConfig struct {
 }
 
 var defaultRefreshConfig RefreshConfig = RefreshConfig{
-	DefaultNoMessageWaitTime:  2 * time.Minute,
+	// XXX: DefaultNoMessageWaitTime:  2 * time.Minute,
+	DefaultNoMessageWaitTime:  5 * time.Second,
 	DefaultPoolSize:           defaultWorkerPoolSize,
 	ChunkSize:                 10000,
 	CacheSize:                 8,
@@ -54,7 +55,8 @@ var defaultRefreshConfig RefreshConfig = RefreshConfig{
 	RefreshLockName:           "deepRefresh:addressLock",
 	MaxConcurrentRuns:         24,
 	Liveness:                  5 * 60,
-	TimeoutDuration:           3 * time.Hour,
+	// XXX: TimeoutDuration:           3 * time.Hour,
+	TimeoutDuration: time.Millisecond,
 }
 
 // ErrNoFilter is returned when a filter does not exist.
@@ -166,8 +168,8 @@ func (r *RefreshQueue) ReAdd(ctx context.Context, input UpdateTokenMediaInput) e
 	return nil
 }
 
-// Reprocess finds refreshes that were dropped and re-enqueues them.
-func (r *RefreshQueue) Reprocess(ctx context.Context) error {
+// Prune finds refreshes that were dropped and re-enqueues them.
+func (r *RefreshQueue) Prune(ctx context.Context) error {
 	return r.q.Reprocess(ctx, defaultRefreshConfig.TimeoutDuration)
 }
 
