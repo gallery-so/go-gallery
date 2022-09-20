@@ -224,7 +224,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		i.getLogsFunc = i.defaultGetLogs
 	}
 
-	logger.For(nil).Infof("Starting indexer at block %d until block %d (max block %d) with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, *i.maxBlock, i.isRPCEnabled)
+	logger.For(nil).Infof("Starting indexer at block %d until block %d (max block %d) with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, i.maxBlock, i.isRPCEnabled)
 	return i
 }
 
