@@ -82,15 +82,16 @@ func coreInit() (*gin.Engine, *indexer) {
 
 func getBlockRangeFromArgs() (*uint64, *uint64) {
 	var startingBlock, maxBlock *uint64
-	if len(os.Args) > 0 {
-		start, err := strconv.ParseUint(os.Args[0], 10, 64)
+	if len(os.Args) > 1 {
+		fmt.Println(os.Args)
+		start, err := strconv.ParseUint(os.Args[1], 10, 64)
 		if err != nil {
 			panic(err)
 		}
 		startingBlock = &start
 	}
-	if len(os.Args) > 1 {
-		max, err := strconv.ParseUint(os.Args[1], 10, 64)
+	if len(os.Args) > 2 {
+		max, err := strconv.ParseUint(os.Args[2], 10, 64)
 		if err != nil {
 			panic(err)
 		}
