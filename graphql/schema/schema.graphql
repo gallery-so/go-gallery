@@ -575,6 +575,7 @@ union FeedEventByIdOrError =
     | ErrUnknownAction
 
 type PageInfo {
+    total: Int
     size: Int!
     hasPreviousPage: Boolean!
     hasNextPage: Boolean!
