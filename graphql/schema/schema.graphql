@@ -343,6 +343,7 @@ type TokenHolder @goEmbedHelper {
     wallets: [Wallet] @goField(forceResolver: true)
     user: GalleryUser @goField(forceResolver: true)
     previewTokens: [String]
+    tokensInCollection: [Token] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {

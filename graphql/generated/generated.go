@@ -561,10 +561,11 @@ type ComplexityRoot struct {
 	}
 
 	TokenHolder struct {
-		DisplayName   func(childComplexity int) int
-		PreviewTokens func(childComplexity int) int
-		User          func(childComplexity int) int
-		Wallets       func(childComplexity int) int
+		DisplayName        func(childComplexity int) int
+		PreviewTokens      func(childComplexity int) int
+		TokensInCollection func(childComplexity int) int
+		User               func(childComplexity int) int
+		Wallets            func(childComplexity int) int
 	}
 
 	TokensAddedToCollectionFeedEventData struct {
@@ -794,6 +795,8 @@ type TokenResolver interface {
 type TokenHolderResolver interface {
 	Wallets(ctx context.Context, obj *model.TokenHolder) ([]*model.Wallet, error)
 	User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error)
+
+	TokensInCollection(ctx context.Context, obj *model.TokenHolder) ([]*model.Token, error)
 }
 type TokensAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error)
@@ -2920,6 +2923,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokenHolder.PreviewTokens(childComplexity), true
 
+	case "TokenHolder.tokensInCollection":
+		if e.complexity.TokenHolder.TokensInCollection == nil {
+			break
+		}
+
+		return e.complexity.TokenHolder.TokensInCollection(childComplexity), true
+
 	case "TokenHolder.user":
 		if e.complexity.TokenHolder.User == nil {
 			break
@@ -3649,6 +3659,7 @@ type TokenHolder @goEmbedHelper {
     wallets: [Wallet] @goField(forceResolver: true)
     user: GalleryUser @goField(forceResolver: true)
     previewTokens: [String]
+    tokensInCollection: [Token] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {
@@ -14670,6 +14681,38 @@ func (ec *executionContext) _TokenHolder_previewTokens(ctx context.Context, fiel
 	return ec.marshalOString2ᚕᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TokenHolder_tokensInCollection(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHolder",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.TokenHolder().TokensInCollection(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _TokensAddedToCollectionFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -23716,6 +23759,23 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "tokensInCollection":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._TokenHolder_tokensInCollection(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

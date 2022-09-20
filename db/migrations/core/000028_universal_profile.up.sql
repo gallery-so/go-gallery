@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN universal boolean NOT NULL DEFAULT false;

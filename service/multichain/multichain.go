@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"sync"
@@ -83,10 +84,11 @@ type ChainAgnosticCommunityOwner struct {
 }
 
 type TokenHolder struct {
-	UserID        persist.DBID   `json:"user_id"`
-	DisplayName   string         `json:"display_name"`
-	WalletIDs     []persist.DBID `json:"wallet_ids"`
-	PreviewTokens []string       `json:"preview_tokens"`
+	UserID        persist.DBID    `json:"user_id"`
+	DisplayName   string          `json:"display_name"`
+	Address       persist.Address `json:"address"`
+	WalletIDs     []persist.DBID  `json:"wallet_ids"`
+	PreviewTokens []string        `json:"preview_tokens"`
 }
 
 // ErrChainNotFound is an error that occurs when a chain provider for a given chain is not registered in the MultichainProvider
@@ -255,37 +257,19 @@ outer:
 		}
 	}
 
-	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
-	if err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
-		return fmt.Errorf("error upserting contracts: %s", err)
-	}
-	contractsForChain := map[persist.Chain][]persist.Address{}
-	for _, c := range newContracts {
-		if _, ok := contractsForChain[c.Chain]; !ok {
-			contractsForChain[c.Chain] = []persist.Address{}
-		}
-		contractsForChain[c.Chain] = append(contractsForChain[c.Chain], c.Address)
-	}
-
-	addressesToContracts := map[string]persist.DBID{}
-	for chain, addresses := range contractsForChain {
-		newContracts, err := d.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
-		if err != nil {
-			return err
-		}
-		for _, c := range newContracts {
-			addressesToContracts[c.Chain.NormalizeAddress(c.Address)] = c.ID
-		}
-	}
-
 	allUsersNFTs, err := d.Repos.TokenRepository.GetByUserID(ctx, userID, 0, 0)
 	if err != nil {
 		return err
 	}
 
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersNFTs, user)
-	if err := d.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
-		return fmt.Errorf("error upserting tokens: %s", err)
+	addressToContract, err := d.upsertContracts(ctx, allContracts)
+	if err != nil {
+		return err
+	}
+
+	newTokens, err := d.upsertTokens(ctx, allTokens, addressToContract, allUsersNFTs, user)
+	if err != nil {
+		return err
 	}
 
 	logger.For(ctx).Warn("preparing to delete old tokens")
@@ -326,9 +310,9 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 			return owners, nil
 		}
 	}
-	providers, ok := d.Chains[communityIdentifiers.Chain()]
-	if !ok {
-		return nil, ErrChainNotFound{Chain: communityIdentifiers.Chain()}
+	providers, err := d.getProvidersForChain(communityIdentifiers.Chain())
+	if err != nil {
+		return nil, err
 	}
 
 	dbHolders, err := d.Repos.ContractRepository.GetOwnersByAddress(ctx, communityIdentifiers.Address(), communityIdentifiers.Chain())
@@ -361,19 +345,50 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 		wp := workerpool.New(10)
 		holderChan := make(chan TokenHolder)
 		for _, holder := range asHolders {
-			if !seenAddresses[persist.Address(holder.DisplayName)] {
+			if !seenAddresses[holder.Address] {
 				h := holder
 				wp.Submit(func() {
 					innerCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 					defer cancel()
 					timeHere := time.Now()
-					tokensForContract, _, err := providers[0].GetOwnedTokensByContract(innerCtx, communityIdentifiers.Address(), persist.Address(h.DisplayName))
+					userID, err := d.Repos.UserRepository.Create(innerCtx, persist.CreateUserInput{
+						// TODO how to get ENS here?
+						Username:     h.Address.String(),
+						ChainAddress: persist.NewChainAddress(h.Address, communityIdentifiers.Chain()),
+						Universal:    true,
+					})
+					user, err := d.Repos.UserRepository.GetByID(innerCtx, userID)
 					if err != nil {
-						logger.For(ctx).Errorf("error getting tokens for contract %s and address %s: %s", communityIdentifiers.Address(), h.DisplayName, err)
+						logger.For(ctx).Errorf("error getting user: %s", err)
 						return
 					}
-					if len(tokensForContract) > 0 {
-						h.PreviewTokens = []string{tokensForContract[0].Media.MediaURL.String()}
+
+					tokens, contracts, err := providers[0].GetOwnedTokensByContract(innerCtx, communityIdentifiers.Address(), persist.Address(h.Address))
+					if err != nil {
+						logger.For(ctx).Errorf("error getting tokens for contract %s and address %s: %s", communityIdentifiers.Address(), h.Address, err)
+						return
+					}
+					cToken := chainTokens{chain: communityIdentifiers.Chain(), tokens: tokens, priority: 0}
+					cContract := chainContracts{chain: communityIdentifiers.Chain(), contracts: []ChainAgnosticContract{contracts}, priority: 0}
+					addressToContract, err := d.upsertContracts(innerCtx, []chainContracts{cContract})
+					if err != nil {
+						logger.For(ctx).Errorf("error upserting contracts: %s", err)
+						return
+					}
+					_, err = d.upsertTokens(innerCtx, []chainTokens{cToken}, addressToContract, []persist.TokenGallery{}, user)
+					if err != nil {
+						logger.For(ctx).Errorf("error upserting tokens: %s", err)
+						return
+					}
+					if len(tokens) > 0 {
+						previews := make([]string, int(math.Min(3, float64(len(tokens)))))
+						for i, t := range tokens {
+							if i > 2 {
+								break
+							}
+							previews[i] = t.Media.MediaURL.String()
+						}
+						h.PreviewTokens = previews
 					}
 					holderChan <- h
 					logger.For(ctx).Infof("appended owner with previews in %s", time.Since(timeHere))
@@ -416,9 +431,9 @@ func (d *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 
 // RefreshToken refreshes a token on the given chain using the chain provider for that chain
 func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers, ownerAddresses []persist.Address) error {
-	providers, ok := d.Chains[ti.Chain]
-	if !ok {
-		return ErrChainNotFound{Chain: ti.Chain}
+	providers, err := d.getProvidersForChain(ti.Chain)
+	if err != nil {
+		return err
 	}
 	for i, provider := range providers {
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
@@ -463,9 +478,9 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 // RefreshContract refreshes a contract on the given chain using the chain provider for that chain
 func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdentifiers) error {
-	providers, ok := d.Chains[ci.Chain]
-	if !ok {
-		return ErrChainNotFound{Chain: ci.Chain}
+	providers, err := d.getProvidersForChain(ci.Chain)
+	if err != nil {
+		return err
 	}
 	for _, provider := range providers {
 		if err := provider.RefreshContract(ctx, ci.ContractAddress); err != nil {
@@ -473,6 +488,196 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 		}
 	}
 	return nil
+}
+
+// RefreshTokensForCollection refreshes all tokens in a given collection
+func (d *Provider) RefreshTokensForCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
+	providers, err := d.getProvidersForChain(ci.Chain)
+	if err != nil {
+		return err
+	}
+
+	allTokens := []chainTokens{}
+	allContracts := []chainContracts{}
+	tokensReceive := make(chan chainTokens)
+	contractsReceive := make(chan chainContracts)
+	errChan := make(chan errWithPriority)
+	wg := &sync.WaitGroup{}
+	wg.Add(len(providers))
+	for i, provider := range providers {
+		go func(priority int, p ChainProvider) {
+			defer wg.Done()
+			tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress)
+			if err != nil {
+				errChan <- errWithPriority{priority: priority, err: err}
+				return
+			}
+			tokensReceive <- chainTokens{chain: ci.Chain, tokens: tokens, priority: priority}
+			contractsReceive <- chainContracts{chain: ci.Chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
+		}(i, provider)
+	}
+	go func() {
+		defer close(tokensReceive)
+		defer close(contractsReceive)
+		wg.Wait()
+	}()
+
+outer:
+	for {
+		select {
+		case err := <-errChan:
+			if err.priority == 0 {
+				return err
+			}
+		case tokens := <-tokensReceive:
+			allTokens = append(allTokens, tokens)
+		case contract, ok := <-contractsReceive:
+			if !ok {
+				break outer
+			}
+			allContracts = append(allContracts, contract)
+		}
+	}
+
+	addressToContract, err := d.upsertContracts(ctx, allContracts)
+	if err != nil {
+		return err
+	}
+
+	chainTokensForUsers, users, err := d.createUsersForTokens(ctx, allTokens)
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		allUserTokens, err := d.Repos.TokenRepository.GetByUserID(ctx, user.ID, -1, 0)
+		if err != nil {
+			return err
+		}
+
+		_, err = d.upsertTokens(ctx, chainTokensForUsers[user.ID], addressToContract, allUserTokens, user)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Provider) getProvidersForChain(chain persist.Chain) ([]ChainProvider, error) {
+	providers, ok := d.Chains[chain]
+	if !ok {
+		return nil, ErrChainNotFound{Chain: chain}
+	}
+	return providers, nil
+}
+
+type tokenUniqueIdentifiers struct {
+	chain          persist.Chain
+	contract       persist.Address
+	tokenID        persist.TokenID
+	ownerAddresses persist.Address
+}
+
+func (d *Provider) createUsersForTokens(ctx context.Context, tokens []chainTokens) (map[persist.DBID][]chainTokens, map[persist.DBID]persist.User, error) {
+	users := map[persist.DBID]persist.User{}
+	userTokens := map[persist.DBID]map[int]chainTokens{}
+	seenTokens := map[tokenUniqueIdentifiers]bool{}
+	seenAddresses := map[persist.Address]persist.User{}
+	for _, token := range tokens {
+		for _, t := range token.tokens {
+			if seenTokens[tokenUniqueIdentifiers{chain: token.chain, contract: t.ContractAddress, tokenID: t.TokenID, ownerAddresses: t.OwnerAddress}] {
+				continue
+			}
+			seenTokens[tokenUniqueIdentifiers{chain: token.chain, contract: t.ContractAddress, tokenID: t.TokenID, ownerAddresses: t.OwnerAddress}] = true
+			user, ok := seenAddresses[t.OwnerAddress]
+			if !ok {
+				userID, err := d.Repos.UserRepository.Create(ctx, persist.CreateUserInput{
+					Username:     t.OwnerAddress.String(),
+					ChainAddress: persist.NewChainAddress(t.OwnerAddress, token.chain),
+					Universal:    true,
+				})
+				if err != nil {
+					if _, ok := err.(persist.ErrUsernameNotAvailable); ok {
+						user, err = d.Repos.UserRepository.GetByUsername(ctx, t.OwnerAddress.String())
+						if err != nil {
+							return nil, nil, err
+						}
+					} else if _, ok := err.(persist.ErrAddressOwnedByUser); ok {
+						user, err = d.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, token.chain))
+						if err != nil {
+							return nil, nil, err
+						}
+					} else {
+						return nil, nil, err
+					}
+				} else {
+					user, err = d.Repos.UserRepository.GetByID(ctx, userID)
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+				users[user.ID] = user
+			}
+			chainTokensForUser, ok := userTokens[user.ID]
+			if !ok {
+				chainTokensForUser = map[int]chainTokens{}
+			}
+			tokensInChainTokens, ok := chainTokensForUser[token.priority]
+			if !ok {
+				tokensInChainTokens = chainTokens{chain: token.chain, tokens: []ChainAgnosticToken{}, priority: token.priority}
+			}
+			tokensInChainTokens.tokens = append(tokensInChainTokens.tokens, t)
+			chainTokensForUser[token.priority] = tokensInChainTokens
+			userTokens[user.ID] = chainTokensForUser
+		}
+	}
+	chainTokensForUser := map[persist.DBID][]chainTokens{}
+	for userID, chainTokens := range userTokens {
+		for _, chainToken := range chainTokens {
+			chainTokensForUser[userID] = append(chainTokensForUser[userID], chainToken)
+		}
+	}
+	return chainTokensForUser, users, nil
+}
+
+func (d *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User) ([]persist.TokenGallery, error) {
+
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersTokens, user)
+	if err != nil {
+		return nil, err
+	}
+	if err := d.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
+		return nil, fmt.Errorf("error upserting tokens: %s", err)
+	}
+	return newTokens, nil
+}
+
+func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainContracts) (map[string]persist.DBID, error) {
+	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
+	if err != nil {
+		return nil, err
+	}
+	if err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
+		return nil, fmt.Errorf("error upserting tokens: %s", err)
+	}
+	contractsForChain := map[persist.Chain][]persist.Address{}
+	for _, c := range newContracts {
+		if _, ok := contractsForChain[c.Chain]; !ok {
+			contractsForChain[c.Chain] = []persist.Address{}
+		}
+		contractsForChain[c.Chain] = append(contractsForChain[c.Chain], c.Address)
+	}
+
+	addressesToContracts := map[string]persist.DBID{}
+	for chain, addresses := range contractsForChain {
+		newContracts, err := d.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
+		if err != nil {
+			return nil, fmt.Errorf("error upserting tokens: %s", err)
+		}
+		for _, c := range newContracts {
+			addressesToContracts[c.Chain.NormalizeAddress(c.Address)] = c.ID
+		}
+	}
+	return addressesToContracts, nil
 }
 
 func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
@@ -609,7 +814,7 @@ func communityOwnersToTokenHolders(owners []ChainAgnosticCommunityOwner) []Token
 	for _, owner := range owners {
 		if _, ok := seen[owner.Address]; !ok {
 			seen[owner.Address] = TokenHolder{
-				DisplayName: owner.Address.String(),
+				Address: owner.Address,
 			}
 		}
 	}
