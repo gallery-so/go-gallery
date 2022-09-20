@@ -647,7 +647,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 						close(transferCh)
 					}()
 
-					go idxr.processTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
+					go idxr.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
 					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, nil)
 
 					refreshed, err := refreshLock.Refresh(ctx)
@@ -690,12 +690,10 @@ func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers
 	ownerFilter := func(t rpc.Transfer) bool {
 		return t.To.String() == input.OwnerAddress.String() || t.From.String() == input.OwnerAddress.String()
 	}
-
 	// Filters transfers matching the input contract
 	contractFilter := func(t rpc.Transfer) bool {
 		return t.ContractAddress.String() == input.ContractAddress.String()
 	}
-
 	// Filters transfers matching the input contract and token
 	tokenFilter := func(t rpc.Transfer) bool {
 		return contractFilter(t) && (t.TokenID.String() == input.TokenID.String())

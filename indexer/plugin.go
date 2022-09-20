@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"math/big"
 	"sync"
 
 	"cloud.google.com/go/storage"
@@ -49,7 +50,7 @@ func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Co
 func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, addressFilterRepo postgres.AddressFilterRepository, storageClient *storage.Client) TransferPlugins {
 	return TransferPlugins{
 		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
-		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, storageClient),
+		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
 		owners:   newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
 		refresh:  newRefreshPlugin(sentryutil.NewSentryHubContext(ctx), addressFilterRepo),
 	}
@@ -108,14 +109,9 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 
 			ct, tid, err := msg.key.GetParts()
 			if err != nil {
-				logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-					"fromAddress": msg.transfer.From,
-					"tokenKey":    msg.key,
-					"block":       msg.transfer.BlockNumber,
-				}).Errorf("error getting parts of %s", msg.key)
-				storeErr(ctx, err, "ERR-PARTS", msg.transfer.From, msg.key, msg.transfer.BlockNumber, storageClient)
 				panic(err)
 			}
+
 			dbURI, _, _, err := tokenRepo.GetMetadataByTokenIdentifiers(ctx, tid, ct)
 			if err == nil {
 				if dbURI != "" {
@@ -123,7 +119,7 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 				}
 			}
 
-			if uri == "" {
+			if uri == "" && rpcEnabled {
 				uri = getURI(ctx, msg.transfer.ContractAddress, msg.transfer.TokenID, msg.transfer.TokenType, ethClient)
 			}
 
@@ -148,7 +144,7 @@ type balancesPlugin struct {
 	out chan tokenBalances
 }
 
-func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, storageClient *storage.Client) balancesPlugin {
+func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, storageClient *storage.Client) balancesPlugin {
 	in := make(chan PluginMsg)
 	out := make(chan tokenBalances)
 
@@ -161,16 +157,21 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, storage
 			child := span.StartChild("handleMessage")
 
 			if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
-				bals, err := getBalances(ctx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
-				if err != nil {
-					logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-						"fromAddress":     msg.transfer.From,
-						"tokenIdentifier": msg.key,
-						"block":           msg.transfer.BlockNumber,
-					}).Errorf("error getting balance of %s for %s", msg.transfer.From, msg.key)
-					storeErr(ctx, err, "ERR-BALANCE", msg.transfer.From, msg.key, msg.transfer.BlockNumber, storageClient)
+				if rpcEnabled {
+					bals, err := getBalances(ctx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
+					if err != nil {
+						logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+							"fromAddress":     msg.transfer.From,
+							"tokenIdentifier": msg.key,
+							"block":           msg.transfer.BlockNumber,
+						}).Errorf("error getting balance of %s for %s", msg.transfer.From, msg.key)
+					} else {
+						out <- bals
+					}
+				} else {
+					bals := balancesFromRepo(ctx, tokenRepo, msg)
+					out <- bals
 				}
-				out <- bals
 			}
 
 			tracing.FinishSpan(child)
@@ -272,5 +273,29 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo postgres.AddressFil
 	return refreshPlugin{
 		in:  in,
 		out: out,
+	}
+}
+
+func balancesFromRepo(ctx context.Context, tokenRepo persist.TokenRepository, msg PluginMsg) tokenBalances {
+	fromAmount := bigZero
+	toAmount := big.NewInt(int64(msg.transfer.Amount))
+
+	curToken, err := tokenRepo.GetByIdentifiers(ctx, msg.transfer.TokenID, msg.transfer.ContractAddress, msg.transfer.From)
+	if err == nil {
+		fromAmount = big.NewInt(0).Sub(curToken.Quantity.BigInt(), big.NewInt(int64(msg.transfer.Amount)))
+	}
+
+	toToken, err := tokenRepo.GetByIdentifiers(ctx, msg.transfer.TokenID, msg.transfer.ContractAddress, msg.transfer.To)
+	if err == nil {
+		toAmount = big.NewInt(0).Add(toToken.Quantity.BigInt(), big.NewInt(int64(msg.transfer.Amount)))
+	}
+
+	return tokenBalances{
+		ti:      msg.key,
+		from:    msg.transfer.From,
+		to:      msg.transfer.To,
+		fromAmt: fromAmount,
+		toAmt:   toAmount,
+		block:   msg.transfer.BlockNumber,
 	}
 }

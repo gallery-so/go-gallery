@@ -35,36 +35,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var defaultStartingBlock persist.BlockNumber = 5000000
-
-var erc1155ABI, _ = contracts.IERC1155MetaData.GetAbi()
-
-var animationKeywords = []string{"animation", "video"}
-var imageKeywords = []string{"image"}
-
-var uniqueMetadataHandlers = uniqueMetadatas{
-	persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
-	persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
-	persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
-	persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"): cryptopunks,
-	persist.EthereumAddress("0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7"): zora,
-}
-
-const defaultWorkerPoolSize = 3
-
-var defaultTransferEvents = []eventHash{
-	transferBatchEventHash,
-	transferEventHash,
-	transferSingleEventHash,
-}
-
-const defaultWorkerPoolWaitSize = 10
-
-const blocksPerLogsCall = 50
-
-// eventHash represents an event keccak256 hash
-type eventHash string
-
 const (
 	// transferEventHash represents the keccak256 hash of Transfer(address,address,uint256)
 	transferEventHash eventHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
@@ -74,11 +44,34 @@ const (
 	transferBatchEventHash eventHash = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb"
 	// uriEventHash represents the keccak256 hash of URI(string,uint256)
 	uriEventHash eventHash = "0x6bb7ff708619ba0610cba295a58592e0451dee2622938c8755667688daf3529b"
-	// // foundationMintedEventHash represents the keccak256 hash of Minted(address,uint256,string,string)
-	// foundationMintedEventHash eventHash = "0xe2406cfd356cfbe4e42d452bde96d27f48c423e5f02b5d78695893308399519d"
-	// //foundationTransferEventHash represents the keccak256 hash of NFTOwnerMigrated(uint256,address,address)
-	// foundationTransferEventHash eventHash = "0xde55f075ebd46256cd6bd57d8fb53e0406f687db372e90ae8c18e72be46f5c16"
+
+	defaultWorkerPoolSize     = 3
+	defaultWorkerPoolWaitSize = 10
+	blocksPerLogsCall         = 50
 )
+
+var (
+	defaultStartingBlock  persist.BlockNumber = 5000000
+	rpcEnabled            bool                = false // Enables external RPC calls
+	erc1155ABI, _                             = contracts.IERC1155MetaData.GetAbi()
+	animationKeywords                         = []string{"animation", "video"}
+	imageKeywords                             = []string{"image"}
+	defaultTransferEvents                     = []eventHash{
+		transferBatchEventHash,
+		transferEventHash,
+		transferSingleEventHash,
+	}
+	uniqueMetadataHandlers = uniqueMetadatas{
+		persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
+		persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
+		persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
+		persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"): cryptopunks,
+		persist.EthereumAddress("0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7"): zora,
+	}
+)
+
+// eventHash represents an event keccak256 hash
+type eventHash string
 
 type tokenMetadata struct {
 	ti persist.EthereumTokenIdentifiers
@@ -124,8 +117,6 @@ type tokenMedia struct {
 // indexer is the indexer for the blockchain that uses JSON RPC to scan through logs and process them
 // into a format used by the application
 type indexer struct {
-	isRPCEnabled bool
-
 	ethClient         *ethclient.Client
 	ipfsClient        *shell.Shell
 	arweaveClient     *goar.Client
@@ -164,7 +155,6 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	}
 
 	return &indexer{
-		isRPCEnabled:      rpcEnabled,
 		ethClient:         ethClient,
 		ipfsClient:        ipfsClient,
 		arweaveClient:     arweaveClient,
@@ -233,7 +223,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSyncedBlock = uint64(lastSyncedBlock)
 	i.lastSavedLog = uint64(lastSyncedBlock)
-	if !i.isRPCEnabled {
+	if rpcEnabled {
 		logger.For(rootCtx).Info("Running in cached logs only mode, not listening for new logs")
 		return
 	}
@@ -331,7 +321,7 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 			logsTo = []types.Log{}
 		}
 	}
-	if len(logsTo) == 0 && i.isRPCEnabled {
+	if len(logsTo) == 0 && rpcEnabled {
 		logsTo, err := rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
@@ -794,7 +784,7 @@ func (i *indexer) createTokens(ctx context.Context,
 	logger.For(ctx).Infof("Upserting %d tokens and contracts with a timeout of %s", len(tokens), timeout)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu, i.isRPCEnabled)
+	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu)
 	if err != nil {
 		logger.For(ctx).WithError(err).Error("error upserting tokens and contracts")
 		randKey := util.RandStringBytes(24)
@@ -1014,7 +1004,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 	return result
 }
 
-func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, dbMu *sync.Mutex, rpcEnabled bool) error {
+func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, dbMu *sync.Mutex) error {
 
 	err := func() error {
 		dbMu.Lock()
@@ -1157,24 +1147,6 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 		i++
 	}
 	return allTransfersAtBlock
-}
-
-func storeErr(ctx context.Context, err error, prefix string, from persist.EthereumAddress, key persist.EthereumTokenIdentifiers, atBlock persist.BlockNumber, storageClient *storage.Client) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
-	storageWriter := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s-%s-%s", prefix, from, key, atBlock)).NewWriter(ctx)
-	defer storageWriter.Close()
-	errData := map[string]interface{}{
-		"from":  from,
-		"key":   key,
-		"block": atBlock,
-		"err":   err.Error(),
-	}
-	err = json.NewEncoder(storageWriter).Encode(errData)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) {
