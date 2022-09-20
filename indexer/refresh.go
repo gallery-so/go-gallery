@@ -42,8 +42,7 @@ type RefreshConfig struct {
 }
 
 var defaultRefreshConfig RefreshConfig = RefreshConfig{
-	// XXX: DefaultNoMessageWaitTime:  2 * time.Minute,
-	DefaultNoMessageWaitTime:  5 * time.Second,
+	DefaultNoMessageWaitTime:  3 * time.Minute,
 	DefaultPoolSize:           defaultWorkerPoolSize,
 	ChunkSize:                 10000,
 	CacheSize:                 8,
@@ -55,8 +54,7 @@ var defaultRefreshConfig RefreshConfig = RefreshConfig{
 	RefreshLockName:           "deepRefresh:addressLock",
 	MaxConcurrentRuns:         24,
 	Liveness:                  5 * 60,
-	// XXX: TimeoutDuration:           3 * time.Hour,
-	TimeoutDuration: time.Millisecond,
+	TimeoutDuration:           2 * time.Hour,
 }
 
 // ErrNoFilter is returned when a filter does not exist.
@@ -73,6 +71,12 @@ var ErrPopFromEmpty = errors.New("processing queue is empty; expected one messag
 
 // ErrUnexpectedMessage is returned when the message that was handled is not the same message that is in the consumer's processing queue.
 var ErrUnexpectedMessage = errors.New("message in processing queue is not the message that was handled")
+
+// ErrInvalidRefreshRange is returned when the message inputs are invalid.
+var ErrInvalidRefreshRange = errors.New("refresh range is invalid")
+
+// RefreshRange is an inclusive range to refresh.
+type RefreshRange [2]persist.BlockNumber
 
 // RefreshQueue buffers refresh requests.
 type RefreshQueue struct {

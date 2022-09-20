@@ -72,6 +72,7 @@ type UpdateTokenMediaInput struct {
 	ContractAddress persist.EthereumAddress `json:"contract_address,omitempty"`
 	UpdateAll       bool                    `json:"update_all"`
 	DeepRefresh     bool                    `json:"deep_refresh"`
+	RefreshRange    RefreshRange            `json:"deep_refresh_range"`
 }
 
 type tokenUpdate struct {
@@ -582,6 +583,18 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			panic(err)
 		}
 
+		// Figure out the range
+		indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
+		if err != nil {
+			panic(err)
+		}
+		refreshRange, err := resolveRange(message.RefreshRange, indexerBlock)
+		if err != nil {
+			if err := refreshQueue.Ack(ctx, message); err != nil {
+				panic(err)
+			}
+		}
+
 		acquired, err := refreshLock.Acquire(ctx)
 		if err != nil {
 			logger.For(ctx).WithError(err).Errorf("error occurred acquiring lock")
@@ -603,21 +616,8 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 		filterManager := NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
 
-		// Don't run past the Indexer
-		indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
-		if err != nil {
-			panic(err)
-		}
-
-		// Normalize blocks
-		indexerBlock -= indexerBlock % blocksPerLogsCall
-		startBlock := indexerBlock - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
-		if startBlock < defaultStartingBlock {
-			startBlock = defaultStartingBlock
-		}
-
 		refreshPool := workerpool.New(defaultRefreshConfig.DefaultPoolSize)
-		for block := persist.BlockNumber(startBlock); block < indexerBlock; block += persist.BlockNumber(blocksPerLogsCall) {
+		for block := refreshRange[0]; block < refreshRange[1]; block += blocksPerLogsCall {
 			b := block
 			refreshPool.Submit(func() {
 				ctx := sentryutil.NewSentryHubContext(ctx)
@@ -688,6 +688,35 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 			panic(err)
 		}
 	}
+}
+
+// resolveRange standardizes the refresh input range.
+func resolveRange(r RefreshRange, indexerBlock persist.BlockNumber) (RefreshRange, error) {
+	out := r
+	from, to := out[0], out[1]
+
+	if (from == 0 || to == 0) && !(from == 0 && to == 0) {
+		return out, ErrInvalidRefreshRange
+	}
+	if from > to {
+		return out, ErrInvalidRefreshRange
+	}
+
+	if out[0] == 0 && out[1] == 0 {
+		out[1] = indexerBlock - (indexerBlock % blocksPerLogsCall)
+		out[0] = out[1] - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
+	}
+	if out[0] < defaultStartingBlock {
+		out[0] = defaultStartingBlock
+	}
+	if out[1] > indexerBlock {
+		out[1] = indexerBlock
+	}
+	if out[1] < out[0] {
+		out[1] = out[0]
+	}
+
+	return out, nil
 }
 
 // filterTransfers checks each transfer against the input and returns ones that match the criteria.
