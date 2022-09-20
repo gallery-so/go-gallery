@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/memstore"
@@ -125,16 +127,20 @@ type FifoQueue struct {
 	pending    string
 	processing string
 	id         string
+	name       string
+	pgSize     int
 }
 
 // NewFifoQueue returns a new connection to a queue.
 func NewFifoQueue(db int, name string) *FifoQueue {
-	id := consumerID()
+	id := newConsumerID()
 	return &FifoQueue{
 		client:     newRedisClient(db),
 		pending:    fmt.Sprintf("%s:%s", name, "pending"),
 		processing: fmt.Sprintf("%s:%s:%s", name, "processing", id),
-		id:         id,
+		id:         string(id),
+		name:       name,
+		pgSize:     100,
 	}
 }
 
@@ -171,6 +177,35 @@ func (q *FifoQueue) Ack(ctx context.Context) (string, error) {
 	return q.client.RPop(ctx, q.processing).Result()
 }
 
+// getProcessing returns keys that are being processed.
+func (q *FifoQueue) getProcessing(ctx context.Context) []string {
+	pattern := fmt.Sprintf("%s:%s:*", q.name, "processing")
+	processing := make([]string, 0, 100)
+	iterator := q.client.Scan(ctx, 0, pattern, int64(q.pgSize)).Iterator()
+	for iterator.Next(ctx) {
+		processing = append(processing, iterator.Val())
+	}
+	return processing
+}
+
+// Reprocess moves inactive jobs back to the pending queuing for reprocessing.
+func (q *FifoQueue) Reprocess(ctx context.Context, timeout time.Duration) error {
+	processing := q.getProcessing(ctx)
+	for _, job := range processing {
+		timeoutOn := consumerID(job).GenTime().Add(timeout)
+		if time.Now().After(timeoutOn) {
+			val, err := q.client.RPop(ctx, job).Result()
+			if err != nil {
+				return err
+			}
+			if _, err := q.Push(ctx, val); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Semaphore implements a semaphore in Redis described here:
 // https://redis.com/ebook/part-2-core-concepts/chapter-6-application-components-in-redis/6-3-counting-semaphores/
 type Semaphore struct {
@@ -192,7 +227,7 @@ func NewSemaphore(db int, name string, cap, timeout int) *Semaphore {
 		counter: fmt.Sprintf("%s:%s", name, "counter"),
 		cap:     cap,
 		timeout: timeout,
-		id:      consumerID(),
+		id:      string(newConsumerID()),
 	}
 }
 
@@ -219,7 +254,7 @@ func (s *Semaphore) Acquire(ctx context.Context) (bool, error) {
 	// Try to acquire the semaphore
 	pipe.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), s.id)
 	pipe.Do(ctx, "ZADD", s.owners, count.Val(), s.id)
-	rank := pipe.ZRank(ctx, s.owners, s.id)
+	rank := pipe.ZRank(ctx, s.owners, string(s.id))
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return false, err
@@ -270,10 +305,23 @@ func (s *Semaphore) Refresh(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func consumerID() string {
+// consumerID is an ID stored in redis to denote a consumer of the queue.
+type consumerID string
+
+// GenTime returns the time the ID was generated.
+func (c consumerID) GenTime() time.Time {
+	ut, err := strconv.Atoi(strings.Split(string(c), ":")[2])
+	if err != nil {
+		panic(err)
+	}
+	return time.Unix(int64(ut), 0)
+}
+
+// newConsumerID generates a new consumerID
+func newConsumerID() consumerID {
 	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix())
+	return consumerID(fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix()))
 }

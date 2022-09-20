@@ -681,6 +681,12 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		filterManager.Close()
 
 		span.Finish()
+
+		// Cleanup dangling jobs
+		err = refreshQueue.Reprocess(ctx)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 

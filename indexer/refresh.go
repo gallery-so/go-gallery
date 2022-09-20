@@ -24,6 +24,23 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+// RefreshConfig configures how deep refreshes are ran.
+type RefreshConfig struct {
+	DefaultNoMessageWaitTime  time.Duration // How long to wait before polling for a message
+	DefaultPoolSize           int           // Number of workers to allocate to a refresh
+	LookbackWindow            int           // Refreshes will start this many blocks before the last indexer block processed
+	ChunkSize                 int           // The number of filters to download per chunk
+	CacheSize                 int           // The number of chunks to keep on disk at a time
+	ChunkWorkerSize           int           // The number of workers used to download a chunk
+	DataloaderDefaultMaxBatch int           // The max batch size before submitting a batch
+	DataloaderDefaultWaitTime time.Duration // Max time to wait before submitting a batch
+	RefreshQueueName          string        // The name of the queue to buffer refreshes
+	RefreshLockName           string        // The name of the lock which grants permission to run a refresh
+	MaxConcurrentRuns         int           // The number of refreshes that can run concurrently
+	Liveness                  int           // How frequently a consumer needs to refresh its lock
+	TimeoutDuration           time.Duration // Jobs that take longer than this are considered to be inactive
+}
+
 var defaultRefreshConfig RefreshConfig = RefreshConfig{
 	DefaultNoMessageWaitTime:  2 * time.Minute,
 	DefaultPoolSize:           defaultWorkerPoolSize,
@@ -37,6 +54,7 @@ var defaultRefreshConfig RefreshConfig = RefreshConfig{
 	RefreshLockName:           "deepRefresh:addressLock",
 	MaxConcurrentRuns:         24,
 	Liveness:                  5 * 60,
+	TimeoutDuration:           3 * time.Hour,
 }
 
 // ErrNoFilter is returned when a filter does not exist.
@@ -53,22 +71,6 @@ var ErrPopFromEmpty = errors.New("processing queue is empty; expected one messag
 
 // ErrUnexpectedMessage is returned when the message that was handled is not the same message that is in the consumer's processing queue.
 var ErrUnexpectedMessage = errors.New("message in processing queue is not the message that was handled")
-
-// RefreshConfig configures how deep refreshes are ran.
-type RefreshConfig struct {
-	DefaultNoMessageWaitTime  time.Duration // How long to wait before polling for a message
-	DefaultPoolSize           int           // Number of workers to allocate to a refresh
-	LookbackWindow            int           // Refreshes will start this many blocks before the last indexer block processed
-	ChunkSize                 int           // The number of filters to download per chunk
-	CacheSize                 int           // The number of chunks to keep on disk at a time
-	ChunkWorkerSize           int           // The number of workers used to download a chunk
-	DataloaderDefaultMaxBatch int           // The max batch size before submitting a batch
-	DataloaderDefaultWaitTime time.Duration // Max time to wait before submitting a batch
-	RefreshQueueName          string        // The name of the queue to buffer refreshes
-	RefreshLockName           string        // The name of the lock which grants permission to run a refresh
-	MaxConcurrentRuns         int           // The number of refreshes that can run concurrently
-	Liveness                  int           // How frequently a consumer needs to refresh its lock
-}
 
 // RefreshQueue buffers refresh requests.
 type RefreshQueue struct {
@@ -162,6 +164,11 @@ func (r *RefreshQueue) ReAdd(ctx context.Context, input UpdateTokenMediaInput) e
 	}
 
 	return nil
+}
+
+// Reprocess finds refreshes that were dropped and re-enqueues them.
+func (r *RefreshQueue) Reprocess(ctx context.Context) error {
+	return r.q.Reprocess(ctx, defaultRefreshConfig.TimeoutDuration)
 }
 
 // RefreshLock manages the number of concurrent refreshes allowed.
