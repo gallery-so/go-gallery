@@ -45,20 +45,3 @@ func RemoveLeftPaddedZeros(hex string) string {
 	}
 	return hex
 }
-
-// PowerInt returns the base-x exponential of y.
-func PowerInt(x, y int) int {
-	ret := 1
-	for i := 0; i < y; i++ {
-		ret *= x
-	}
-	return ret
-}
-
-// MinInt returns the minimum of two ints.
-func MinInt(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}

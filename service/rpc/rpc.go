@@ -97,7 +97,7 @@ type Retry struct {
 
 // Sleep will sleep based on the current iteration.
 func (r Retry) Sleep(i int) {
-	sleep := rand.Intn(util.MinInt(r.Cap, r.Base*util.PowerInt(2, i)))
+	sleep := rand.Intn(minInt(r.Cap, r.Base*powerInt(2, i)))
 	time.Sleep(time.Duration(sleep) * time.Second)
 }
 
@@ -850,6 +850,23 @@ func valFromSlice(s []interface{}, keyName string) interface{} {
 		}
 	}
 	return nil
+}
+
+// powerInt returns the base-x exponential of y.
+func powerInt(x, y int) int {
+	ret := 1
+	for i := 0; i < y; i++ {
+		ret *= x
+	}
+	return ret
+}
+
+// minInt returns the minimum of two ints.
+func minInt(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }
 
 func isRateLimitedError(err error) bool {
