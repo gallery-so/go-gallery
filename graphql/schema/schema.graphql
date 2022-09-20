@@ -1013,7 +1013,7 @@ type RemoveCommentPayload {
   feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
-interface Notification implements Node{
+interface Notification implements Node {
     id: ID!
     seen: Boolean
     creationTime: Time
@@ -1092,8 +1092,6 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
     viewers: [GalleryUser]
     gallery: Gallery
 }
-
-union Notification = SomeoneAdmiredYourFeedEventNotification | SomeoneCommentedOnYourFeedEventNotification | SomeoneFollowedYouBackNotification | SomeoneFollowedYouNotification| SomeoneViewedYourGalleryNotification
 
 type ClearAllNotificationsPayload {
     notifications: [Notification]
