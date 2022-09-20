@@ -566,7 +566,7 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 }
 
 func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refreshLock *RefreshLock, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, addressFilterRepository postgres.AddressFilterRepository, queries *db.Queries) {
-	idxr := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, addressFilterRepository, chain, defaultTransferEvents)
+	idxr := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, addressFilterRepository, chain, defaultTransferEvents, nil, nil, nil)
 
 	events := make([]common.Hash, len(idxr.eventHashes))
 	for i, event := range idxr.eventHashes {

@@ -9,8 +9,8 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-func RunMigration(client *sql.DB) error {
-	dir, err := util.FindFile("./db/migrations", 3)
+func RunMigration(client *sql.DB, file string) error {
+	dir, err := util.FindFile(file, 3)
 	if err != nil {
 		return err
 	}

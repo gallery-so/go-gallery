@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -59,11 +60,13 @@ func coreInit() (*gin.Engine, *indexer) {
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewEthClient()
+	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents)
+	// overrides for where the indexer starts and stops
+	startingBlock, maxBlock := getBlockRangeFromArgs()
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, startingBlock, maxBlock)
 
 	router := gin.Default()
 
@@ -78,13 +81,34 @@ func coreInit() (*gin.Engine, *indexer) {
 	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
 }
 
+func getBlockRangeFromArgs() (*uint64, *uint64) {
+	var startingBlock, maxBlock *uint64
+	if len(os.Args) > 1 {
+		start, err := strconv.ParseUint(os.Args[1], 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		startingBlock = &start
+	}
+	if len(os.Args) > 2 {
+		max, err := strconv.ParseUint(os.Args[2], 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		maxBlock = &max
+	}
+	return startingBlock, maxBlock
+}
+
 func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
 	path := "_local/app-local-indexer-server.yaml"
+	storageKeyPath := "./_deploy/service-key-dev.json"
 	if len(os.Args) > 0 {
 		if os.Args[0] == "prod" {
 			path = "_local/app-prod-indexer-server.yaml"
+			storageKeyPath = "./_deploy/service-key.json"
 		}
 	}
 	setDefaults(path)
@@ -99,12 +123,12 @@ func coreInitServer() *gin.Engine {
 	if viper.GetString("ENV") != "local" {
 		s, err = storage.NewClient(ctx)
 	} else {
-		s, err = storage.NewClient(ctx, option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		s, err = storage.NewClient(ctx, option.WithCredentialsFile(storageKeyPath))
 	}
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewEthClient()
+	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 

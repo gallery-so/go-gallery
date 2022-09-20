@@ -43,23 +43,14 @@ var (
 )
 
 type tzMetadata struct {
-	Date    string   `json:"date"`
-	Name    string   `json:"name"`
-	Tags    []string `json:"tags"`
-	Image   string   `json:"image"`
-	Minter  string   `json:"minter"`
-	Rights  string   `json:"rights"`
-	Symbol  string   `json:"symbol"`
-	Formats []struct {
-		URI        string `json:"uri"`
-		FileName   string `json:"fileName"`
-		FileSize   string `json:"fileSize"`
-		MimeType   string `json:"mimeType"`
-		Dimensions struct {
-			Unit  string `json:"unit"`
-			Value string `json:"value"`
-		} `json:"dimensions"`
-	} `json:"formats"`
+	Date               string      `json:"date"`
+	Name               string      `json:"name"`
+	Tags               interface{} `json:"tags"`
+	Image              string      `json:"image"`
+	Minter             string      `json:"minter"`
+	Rights             string      `json:"rights"`
+	Symbol             string      `json:"symbol"`
+	Formats            interface{}
 	Creators           []string `json:"creators"`
 	Decimals           string   `json:"decimals"`
 	Attributes         interface{}

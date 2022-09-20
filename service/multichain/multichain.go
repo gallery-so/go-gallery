@@ -247,9 +247,9 @@ outer:
 		case err := <-errChan:
 			if err, ok := err.(errWithPriority); ok {
 				if err.priority == 0 {
-					return err.err
+					return err
 				}
-				logger.For(ctx).Errorf("error updating fallback media for user %s: %s", user.Username, err.err)
+				logger.For(ctx).Errorf("error updating fallback media for user %s: %w", user.Username, err)
 			} else {
 				return err
 			}
@@ -459,11 +459,11 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			}
 		}
 
-		tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
-		if err != nil {
-			return err
-		}
 		if i == 0 {
+			tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
+			if err != nil {
+				return err
+			}
 			for _, token := range tokens {
 				if err := d.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
 					Media:       token.Media,
@@ -705,7 +705,7 @@ func (e ErrChainNotFound) Error() string {
 }
 
 func (e errWithPriority) Error() string {
-	return e.err.Error()
+	return fmt.Sprintf("error with priority %d: %s", e.priority, e.err)
 }
 
 func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {

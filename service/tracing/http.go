@@ -12,18 +12,19 @@ type tracingTransport struct {
 	http.RoundTripper
 
 	continueOnly bool
+	opts         []sentry.SpanOption
 }
 
 // NewTracingTransport creates an http transport that will trace requests via Sentry. If continueOnly is true,
 // traces will only be generated if they'd contribute to an existing parent trace (e.g. if a trace is not in progress,
 // no new trace would be started).
-func NewTracingTransport(roundTripper http.RoundTripper, continueOnly bool) *tracingTransport {
+func NewTracingTransport(roundTripper http.RoundTripper, continueOnly bool, spanOptions ...sentry.SpanOption) *tracingTransport {
 	// If roundTripper is already a tracer, grab its underlying RoundTripper instead
 	if existingTracer, ok := roundTripper.(*tracingTransport); ok {
-		return &tracingTransport{RoundTripper: existingTracer.RoundTripper, continueOnly: continueOnly}
+		return &tracingTransport{RoundTripper: existingTracer.RoundTripper, continueOnly: continueOnly, opts: spanOptions}
 	}
 
-	return &tracingTransport{RoundTripper: roundTripper, continueOnly: continueOnly}
+	return &tracingTransport{RoundTripper: roundTripper, continueOnly: continueOnly, opts: spanOptions}
 }
 
 func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -34,7 +35,7 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		}
 	}
 
-	span, _ := StartSpan(req.Context(), "http."+strings.ToLower(req.Method), fmt.Sprintf("HTTP %s %s", req.Method, req.URL.String()))
+	span, _ := StartSpan(req.Context(), "http."+strings.ToLower(req.Method), fmt.Sprintf("HTTP %s %s", req.Method, req.URL.String()), t.opts...)
 	defer FinishSpan(span)
 
 	// Send sentry-trace header in case the receiving service can continue our trace
