@@ -150,7 +150,7 @@ type indexer struct {
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
 func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, addressFilterRepo postgres.AddressFilterRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
-	rpcEnabled := viper.GetString("ENV") == "production"
+	rpcEnabled = viper.GetString("ENV") == "production"
 	if !rpcEnabled {
 		ethClient = nil
 	}
@@ -262,7 +262,7 @@ func (i *indexer) Start(rootCtx context.Context) {
 	wp.StopWait()
 	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
 	i.lastSavedLog = i.lastSyncedBlock
-	if rpcEnabled {
+	if !rpcEnabled {
 		logger.For(rootCtx).Info("Running in cached logs only mode, not listening for new logs")
 		return
 	}

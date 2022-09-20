@@ -18,8 +18,8 @@ import (
 )
 
 func TestIndexLogs_Success(t *testing.T) {
-	a, db := setupTest(t)
-	i := newMockIndexer(db)
+	a, db, pgx := setupTest(t)
+	i := newMockIndexer(db, pgx)
 	i.Start(configureRootContext())
 
 	a.EqualValues(100, i.lastSyncedBlock)
