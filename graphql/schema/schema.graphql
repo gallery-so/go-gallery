@@ -396,11 +396,46 @@ type ViewerGallery {
     gallery: Gallery
 }
 
+type NotificationEdge {
+    node: Notification
+}
+
+type NotificationsConnection {
+    edges: [NotificationEdge]
+    unseenCount: Int
+    pageInfo: PageInfo
+}
+
 type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
     feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
+
+    """
+    Returns a list of notifications in reverse chronological order.
+    Seen notifications come after unseen notifications
+    """
+    notifications(before: String, after: String, first: Int, last: Int): NotificationsConnection
+
+    notificationSettings: NotificationSettings
 }
+
+type NotificationSettings implements Node {
+    id: ID!
+
+    someoneFollowedYou: Boolean
+    someoneAdmiredYourUpdate: Boolean
+    someoneCommentedOnYourUpdate: Boolean
+    someoneViewedYourGallery: Boolean
+}
+
+input NotificationSettingsInput {
+    someoneFollowedYou: Boolean
+    someoneAdmiredYourUpdate: Boolean
+    someoneCommentedOnYourUpdate: Boolean
+    someoneViewedYourGallery: Boolean
+}
+
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
@@ -977,6 +1012,92 @@ type RemoveCommentPayload {
   feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
+interface Notification implements Node{
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+}
+
+interface GroupedNotification implements Notification & Node {
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+
+    count: Int
+}
+
+type GroupNotificationUserEdge {
+    node: GalleryUser
+}
+
+type GroupNotificationUsersConnection {
+    edges:  [GroupNotificationUserEdge]
+    pageInfo: PageInfo
+}
+
+type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification {
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+    count: Int
+
+    followers: GroupNotificationUsersConnection
+}
+
+type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification{
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+    count: Int
+
+    followers: GroupNotificationUsersConnection
+}
+
+type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification{
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+    count: Int
+
+    feedEvent: FeedEvent
+    admirers: GroupNotificationUsersConnection
+}
+
+type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node{
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+    count: Int
+
+    # Don't need a `who` here since the `comment` can provide that
+    comment: Comment
+    feedEvent: FeedEvent
+
+}
+
+type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification{
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+    count: Int
+
+    viewers: [GalleryUser]
+    gallery: Gallery
+}
+
+union Notification = SomeoneAdmiredYourFeedEventNotification | SomeoneCommentedOnYourFeedEventNotification | SomeoneFollowedYouBackNotification | SomeoneFollowedYouNotification| SomeoneViewedYourGalleryNotification
+
+type ClearAllNotificationsPayload {
+    notifications: [Notification]
+}
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1014,4 +1135,13 @@ type Mutation {
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+
+    clearAllNotifications: ClearAllNotificationsPayload
+
+    updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
+}
+
+type Subscription {
+    newNotification: Notification
+    notificationUpdated: Notification
 }
