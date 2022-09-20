@@ -25,7 +25,7 @@ func (r *AddressFilterRepository) Add(ctx context.Context, from, to persist.Bloc
 	})
 }
 
-func (r *AddressFilterRepository) BulkUpsert(ctx context.Context, filters map[[2]persist.BlockNumber]*bloom.BloomFilter) error {
+func (r *AddressFilterRepository) BulkUpsert(ctx context.Context, filters map[persist.BlockRange]*bloom.BloomFilter) error {
 	ids := make([]string, len(filters))
 	fromBlocks := make([]int64, len(filters))
 	toBlocks := make([]int64, len(filters))

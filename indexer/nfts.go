@@ -72,7 +72,7 @@ type UpdateTokenMediaInput struct {
 	ContractAddress persist.EthereumAddress `json:"contract_address,omitempty"`
 	UpdateAll       bool                    `json:"update_all"`
 	DeepRefresh     bool                    `json:"deep_refresh"`
-	RefreshRange    RefreshRange            `json:"deep_refresh_range"`
+	RefreshRange    persist.BlockRange      `json:"deep_refresh_range"`
 }
 
 type tokenUpdate struct {
@@ -691,7 +691,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 }
 
 // resolveRange standardizes the refresh input range.
-func resolveRange(r RefreshRange, indexerBlock persist.BlockNumber) (RefreshRange, error) {
+func resolveRange(r persist.BlockRange, indexerBlock persist.BlockNumber) (persist.BlockRange, error) {
 	out := r
 	from, to := out[0], out[1]
 

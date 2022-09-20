@@ -75,9 +75,6 @@ var ErrUnexpectedMessage = errors.New("message in processing queue is not the me
 // ErrInvalidRefreshRange is returned when the message inputs are invalid.
 var ErrInvalidRefreshRange = errors.New("refresh range is invalid")
 
-// RefreshRange is an inclusive range to refresh.
-type RefreshRange [2]persist.BlockNumber
-
 // RefreshQueue buffers refresh requests.
 type RefreshQueue struct {
 	q *memstore.FifoQueue

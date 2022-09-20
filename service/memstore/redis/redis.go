@@ -117,11 +117,6 @@ func (c *Cache) Close(clear bool) error {
 // When an message is popped from the pending queue it gets added to the processing queue which
 // is unique to that consumer. When the consumer is done with the message, it is responsible
 // for removing the message from its processing queue by calling `Ack`.
-//
-// TODOs:
-// * Add another process to figure out what to do with unacked messages like putting the message
-//   back in the the pending queue for re-processing.
-// * Consider looking into Redis streams instead
 type FifoQueue struct {
 	client     *redis.Client
 	pending    string

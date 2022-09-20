@@ -248,14 +248,14 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo postgres.AddressFil
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
-		filters := make(map[[2]persist.BlockNumber]*bloom.BloomFilter)
+		filters := make(map[persist.BlockRange]*bloom.BloomFilter)
 
 		for msg := range in {
 			child := span.StartChild("handleMessage")
 
 			fromBlock := msg.transfer.BlockNumber - (msg.transfer.BlockNumber % blocksPerLogsCall)
 			toBlock := fromBlock + blocksPerLogsCall
-			key := [2]persist.BlockNumber{fromBlock, toBlock}
+			key := persist.BlockRange{fromBlock, toBlock}
 
 			if _, ok := filters[key]; !ok {
 				filters[key] = bloom.NewWithEstimates(bloomFilterSize, falsePositiveRate)
