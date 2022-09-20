@@ -60,7 +60,8 @@ func testCreateSVGMedia(ctx context.Context, ethClient *ethclient.Client, a *ass
 	svgMetadata, err := rpc.GetMetadataFromURI(ctx, svgURI, ipfsShell, arweaveClient)
 	a.NoError(err)
 	a.NotEmpty(svgMetadata["image"])
-	med, err := media.MakePreviewsForMetadata(ctx, svgMetadata, "0x69c40e500b84660cb2ab09cb9614fa2387f95f64", "1", svgURI, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), imageKeywords, animationKeywords)
+	image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
+	med, err := media.MakePreviewsForMetadata(ctx, svgMetadata, "0x69c40e500b84660cb2ab09cb9614fa2387f95f64", "1", svgURI, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
 	a.NoError(err)
 	a.Equal(persist.MediaTypeSVG, med.MediaType)
 	a.Empty(med.ThumbnailURL)
@@ -68,7 +69,8 @@ func testCreateSVGMedia(ctx context.Context, ethClient *ethclient.Client, a *ass
 }
 
 func testCreateImageMedia(ctx context.Context, metadata persist.TokenMetadata, uri persist.TokenURI, ipfsShell *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, a *assert.Assertions) {
-	med, err := media.MakePreviewsForMetadata(ctx, metadata, "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", "1", uri, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), imageKeywords, animationKeywords)
+	image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
+	med, err := media.MakePreviewsForMetadata(ctx, metadata, "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", "1", uri, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
 	a.NoError(err)
 	a.Equal(persist.MediaTypeImage, med.MediaType)
 	a.Empty(med.ThumbnailURL)
