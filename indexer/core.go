@@ -57,7 +57,7 @@ func coreInit() (*gin.Engine, *indexer) {
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewEthHTTPClient()
+	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
@@ -83,7 +83,6 @@ func coreInit() (*gin.Engine, *indexer) {
 func getBlockRangeFromArgs() (*uint64, *uint64) {
 	var startingBlock, maxBlock *uint64
 	if len(os.Args) > 1 {
-		fmt.Println(os.Args)
 		start, err := strconv.ParseUint(os.Args[1], 10, 64)
 		if err != nil {
 			panic(err)
@@ -126,7 +125,7 @@ func coreInitServer() *gin.Engine {
 	if err != nil {
 		panic(err)
 	}
-	ethClient := rpc.NewEthHTTPClient()
+	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
