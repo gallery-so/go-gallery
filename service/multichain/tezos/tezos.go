@@ -51,8 +51,8 @@ type tzMetadata struct {
 	Rights             string      `json:"rights"`
 	Symbol             string      `json:"symbol"`
 	Formats            interface{}
-	Creators           []string `json:"creators"`
-	Decimals           string   `json:"decimals"`
+	Creators           interface{} `json:"creators"`
+	Decimals           string      `json:"decimals"`
 	Attributes         interface{}
 	DisplayURI         string      `json:"displayUri"`
 	ArtifactURI        string      `json:"artifactUri"`
