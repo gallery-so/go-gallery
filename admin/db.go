@@ -28,10 +28,10 @@ type statements struct {
 	updateCollectionStmt  *sql.Stmt
 
 	galleryRepo persist.GalleryRepository
-	nftRepo     persist.NFTRepository
-	userRepo    persist.UserRepository
-	collRepo    persist.CollectionRepository
-	backupRepo  persist.BackupRepository
+	// nftRepo     persist.NFTRepository
+	userRepo   persist.UserRepository
+	collRepo   persist.CollectionRepository
+	backupRepo persist.BackupRepository
 }
 
 func newStatements(db *sql.DB) *statements {
@@ -98,10 +98,10 @@ func newStatements(db *sql.DB) *statements {
 		updateCollectionStmt:  updateCollectionStmt,
 
 		galleryRepo: galleryRepo,
-		nftRepo:     postgres.NewNFTRepository(db, galleryRepo),
-		userRepo:    postgres.NewUserRepository(db),
-		collRepo:    postgres.NewCollectionRepository(db, galleryRepo),
-		backupRepo:  postgres.NewBackupRepository(db),
+		// nftRepo:     postgres.NewNFTRepository(db, galleryRepo),
+		userRepo: postgres.NewUserRepository(db),
+		// collRepo:    postgres.NewCollectionRepository(db, galleryRepo),
+		backupRepo: postgres.NewBackupRepository(db),
 	}
 
 }
