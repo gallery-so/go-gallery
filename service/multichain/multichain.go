@@ -352,7 +352,7 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 					defer cancel()
 					timeHere := time.Now()
 					userID, err := d.Repos.UserRepository.Create(innerCtx, persist.CreateUserInput{
-						// TODO how to get ENS here?
+						// TODO get ENS here with a ChainProvider.GetDisplayNameForAddress func
 						Username:     h.Address.String(),
 						ChainAddress: persist.NewChainAddress(h.Address, communityIdentifiers.Chain()),
 						Universal:    true,
@@ -363,6 +363,7 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 						return
 					}
 
+					// TODO do some limiting here or this will take forever (get only enough for previews)
 					tokens, contracts, err := providers[0].GetOwnedTokensByContract(innerCtx, communityIdentifiers.Address(), persist.Address(h.Address))
 					if err != nil {
 						logger.For(ctx).Errorf("error getting tokens for contract %s and address %s: %s", communityIdentifiers.Address(), h.Address, err)
