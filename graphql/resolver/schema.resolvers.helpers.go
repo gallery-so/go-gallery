@@ -369,7 +369,11 @@ func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID 
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.Post(fmt.Sprintf("%s/collection/tokens/refresh", viper.GetString("TOKEN_PROCESSING_URL")), "application/json", bytes.NewBufferString(string(asJSON)))
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/collection/tokens/refresh", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
