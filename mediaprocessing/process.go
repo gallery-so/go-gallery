@@ -72,7 +72,7 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 						LastUpdated: persist.LastUpdatedTime{},
 					}
 					if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, t.ContractAddress, in.Chain, up); err != nil {
-						logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s %v", t.TokenID, t.ContractAddress, in.Chain, err)
+						logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, t.ContractAddress, in.Chain, err)
 						return
 					}
 					logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d", in.Key, t.ContractAddress, t.TokenID, in.Chain)
