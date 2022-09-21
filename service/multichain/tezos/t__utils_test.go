@@ -46,7 +46,7 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	path, err := util.FindFile("_local/app-local-backend.yaml", 3)
+	path, err := util.FindFile("_local/app-local-backend.yaml", 5)
 	if err != nil {
 		panic(err)
 	}
