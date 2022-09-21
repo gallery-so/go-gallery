@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/everFinance/goar"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -67,9 +70,13 @@ func coreInitServer() *gin.Engine {
 	mc := server.NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, storageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
 	mediaQueue := make(chan ProcessMediaInput)
 	collectionTokensQueue := make(chan ProcessCollectionTokensRefreshInput)
+	startJobs(mediaQueue, repos, ipfsClient, arweaveClient, s, t, collectionTokensQueue, mc)
+	return handlersInitServer(router, mediaQueue, collectionTokensQueue, t)
+}
+
+func startJobs(mediaQueue chan ProcessMediaInput, repos *persist.Repositories, ipfsClient *shell.Shell, arweaveClient *goar.Client, s *storage.Client, t *throttle.Locker, collectionTokensQueue chan ProcessCollectionTokensRefreshInput, mc *multichain.Provider) {
 	go processMedias(mediaQueue, repos.TokenRepository, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	go processTokensInCollectionRefreshes(collectionTokensQueue, mc, t)
-	return handlersInitServer(router, mediaQueue, collectionTokensQueue, t)
 }
 
 func setDefaults() {
