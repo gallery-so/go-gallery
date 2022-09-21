@@ -130,9 +130,9 @@ type Provider struct {
 }
 
 // NewProvider creates a new Tezos Provider
-func NewProvider(indexerBaseURL, mediaURL, ipfsGatewayURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *Provider {
+func NewProvider(tezosAPIUrl, mediaURL, ipfsGatewayURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *Provider {
 	return &Provider{
-		apiURL:         indexerBaseURL,
+		apiURL:         tezosAPIUrl,
 		mediaURL:       mediaURL,
 		ipfsGatewayURL: ipfsGatewayURL,
 		httpClient:     httpClient,
@@ -300,7 +300,7 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 	resultTokens := []tzktBalanceToken{}
 
 	for {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&token.contract=%s", d.apiURL, ownerAddress, contractAddress, limit, offset), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&token.contract=%s&limit=%d&offset=%d", d.apiURL, ownerAddress, contractAddress, limit, offset), nil)
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
