@@ -65,11 +65,6 @@ jobs:
           paths:
             - "~/go/pkg/mod"
       - run:
-          name: Run tests
-          command: |
-            mkdir -p /tmp/test-reports
-            gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -short ./...
-      - run:
           name: "Update apt"
           command: sudo apt-get update
       - run:
@@ -90,6 +85,11 @@ jobs:
       - run:
           name: "Unzip secrets file"
           command: echo "A" | unzip _local.zip -d _local
+      - run:
+          name: Run tests
+          command: |
+            mkdir -p /tmp/test-reports
+            gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -short ./...
       - store_test_results:
           path: /tmp/test-reports
   integration-tests:
