@@ -252,7 +252,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return removeBOM(decoded), nil
 	case persist.URITypeIPFS:
-		path := util.GetIPFSPath(asString)
+		path := util.GetIPFSPath(asString, true)
 
 		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
