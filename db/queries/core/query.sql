@@ -159,6 +159,22 @@ SELECT tokens.* FROM tokens, users
       AND tokens.deleted = false AND users.deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
+-- name: GetTokensByUserIdAndContractID :many
+SELECT tokens.* FROM tokens, users
+    WHERE tokens.owner_user_id = $1 AND users.id = $1
+      AND tokens.owned_by_wallets && users.wallets
+      AND tokens.contract = $2
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByUserIdAndContractIDBatch :batchmany
+SELECT tokens.* FROM tokens, users
+    WHERE tokens.owner_user_id = $1 AND users.id = $1
+      AND tokens.owned_by_wallets && users.wallets
+      AND tokens.contract = $2
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
 -- name: GetTokensByUserIdAndChainBatch :batchmany
 SELECT tokens.* FROM tokens, users
 WHERE tokens.owner_user_id = $1 AND users.id = $1

@@ -1347,6 +1347,89 @@ func (b *GetTokensByUserIdAndChainBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getTokensByUserIdAndContractIDBatch = `-- name: GetTokensByUserIdAndContractIDBatch :batchmany
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam FROM tokens, users
+    WHERE tokens.owner_user_id = $1 AND users.id = $1
+      AND tokens.owned_by_wallets && users.wallets
+      AND tokens.contract = $2
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
+`
+
+type GetTokensByUserIdAndContractIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetTokensByUserIdAndContractIDBatchParams struct {
+	OwnerUserID persist.DBID
+	Contract    persist.DBID
+}
+
+func (q *Queries) GetTokensByUserIdAndContractIDBatch(ctx context.Context, arg []GetTokensByUserIdAndContractIDBatchParams) *GetTokensByUserIdAndContractIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.OwnerUserID,
+			a.Contract,
+		}
+		batch.Queue(getTokensByUserIdAndContractIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetTokensByUserIdAndContractIDBatchBatchResults{br, 0}
+}
+
+func (b *GetTokensByUserIdAndContractIDBatchBatchResults) Query(f func(int, []Token, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Token
+		for rows.Next() {
+			var i Token
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.Version,
+				&i.CreatedAt,
+				&i.LastUpdated,
+				&i.Name,
+				&i.Description,
+				&i.CollectorsNote,
+				&i.Media,
+				&i.TokenUri,
+				&i.TokenType,
+				&i.TokenID,
+				&i.Quantity,
+				&i.OwnershipHistory,
+				&i.TokenMetadata,
+				&i.ExternalUrl,
+				&i.BlockNumber,
+				&i.OwnerUserID,
+				&i.OwnedByWallets,
+				&i.Chain,
+				&i.Contract,
+				&i.IsUserMarkedSpam,
+				&i.IsProviderMarkedSpam,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetTokensByUserIdAndContractIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getTokensByUserIdBatch = `-- name: GetTokensByUserIdBatch :batchmany
 SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1

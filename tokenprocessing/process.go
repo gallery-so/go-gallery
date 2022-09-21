@@ -1,4 +1,4 @@
-package mediaprocessing
+package tokenprocessing
 
 import (
 	"context"
@@ -26,9 +26,30 @@ type ProcessMediaInput struct {
 	AnimationKeywords []string                        `json:"animation_keywords" binding:"required"`
 }
 
-func processIPFSMetadata(queue chan<- ProcessMediaInput, throttler *throttle.Locker) gin.HandlerFunc {
+type ProcessCollectionTokensRefreshInput struct {
+	Key                 string                      `json:"key" binding:"required"`
+	ContractIdentifiers persist.ContractIdentifiers `json:"contract_identifiers" binding:"required"`
+}
+
+func processIncomingMedia(queue chan<- ProcessMediaInput, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+		if err := throttler.Lock(c, input.Key); err != nil {
+			util.ErrResponse(c, http.StatusTooManyRequests, err)
+			return
+		}
+		queue <- input
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
+}
+
+func processIncomingCollectionTokensRefresh(queue chan<- ProcessCollectionTokensRefreshInput, throttler *throttle.Locker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input ProcessCollectionTokensRefreshInput
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -83,6 +104,30 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 				innerWp.StopWait()
 				logger.For(nil).Infof("Processing Media: %s - Finished", in.Key)
 			}()
+		})
+	}
+}
+
+func processTokensInCollectionRefreshes(queue <-chan ProcessCollectionTokensRefreshInput, mc *multichain.Provider, throttler *throttle.Locker) {
+	wp := workerpool.New(10)
+	for processInput := range queue {
+		in := processInput
+		logger.For(nil).Infof("Processing Collection Tokens Refresh: %s", in.Key)
+		wp.Submit(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			defer cancel()
+			if err := throttler.Lock(ctx, in.Key); err != nil {
+				logger.For(ctx).Errorf("error locking: %v", err)
+				return
+			}
+			defer throttler.Unlock(ctx, in.Key)
+			logger.For(ctx).Infof("Processing: %s - Processing Collection Refresh", in.Key)
+			if err := mc.RefreshTokensForCollection(ctx, in.ContractIdentifiers); err != nil {
+				logger.For(ctx).Errorf("error processing media for %s: %v", in.Key, err)
+				return
+			}
+			logger.For(ctx).Infof("Processing: %s - Finished Processing Collection Refresh", in.Key)
+
 		})
 	}
 }

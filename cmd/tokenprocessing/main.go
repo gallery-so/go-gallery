@@ -4,15 +4,15 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/mikeydub/go-gallery/mediaprocessing"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"google.golang.org/appengine"
 )
 
 func main() {
 	defer sentryutil.RecoverAndRaise(nil)
 
-	mediaprocessing.InitServer()
+	tokenprocessing.InitServer()
 	if appengine.IsAppEngine() {
 		appengine.Main()
 	} else {

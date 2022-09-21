@@ -13,6 +13,7 @@
 //go:generate go run github.com/vektah/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/vektah/dataloaden TokensLoaderByIDTuple github.com/mikeydub/go-gallery/service/persist.DBIDTuple []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/vektah/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
@@ -53,36 +54,37 @@ type Loaders struct {
 
 	// Every entry here must have a corresponding entry in the Clear___Caches methods below
 
-	UserByUserId             UserLoaderByID
-	UserByUsername           UserLoaderByString
-	UsersWithTrait           UsersLoaderByString
-	GalleryByGalleryId       GalleryLoaderByID
-	GalleryByCollectionId    GalleryLoaderByID
-	GalleriesByUserId        GalleriesLoaderByID
-	CollectionByCollectionId CollectionLoaderByID
-	CollectionsByGalleryId   CollectionsLoaderByID
-	MembershipByMembershipId MembershipLoaderById
-	WalletByWalletId         WalletLoaderById
-	WalletsByUserID          WalletsLoaderByID
-	WalletByChainAddress     WalletLoaderByChainAddress
-	TokenByTokenID           TokenLoaderByID
-	TokensByCollectionID     TokensLoaderByID
-	TokensByWalletID         TokensLoaderByID
-	TokensByUserID           TokensLoaderByID
-	TokensByUserIDAndChain   TokensLoaderByIDAndChain
-	NewTokensByFeedEventID   TokensLoaderByID
-	ContractByContractId     ContractLoaderByID
-	ContractsByUserID        ContractsLoaderByID
-	ContractByChainAddress   ContractLoaderByChainAddress
-	FollowersByUserId        UsersLoaderByID
-	FollowingByUserId        UsersLoaderByID
-	GlobalFeed               GlobalFeedLoader
-	FeedByUserId             UserFeedLoader
-	EventByEventId           EventLoaderByID
-	AdmireByAdmireId         AdmireLoaderByID
-	AdmiresByFeedEventId     AdmiresLoaderByID
-	CommentByCommentId       CommentLoaderByID
-	CommentsByFeedEventId    CommentsLoaderByID
+	UserByUserId                UserLoaderByID
+	UserByUsername              UserLoaderByString
+	UsersWithTrait              UsersLoaderByString
+	GalleryByGalleryId          GalleryLoaderByID
+	GalleryByCollectionId       GalleryLoaderByID
+	GalleriesByUserId           GalleriesLoaderByID
+	CollectionByCollectionId    CollectionLoaderByID
+	CollectionsByGalleryId      CollectionsLoaderByID
+	MembershipByMembershipId    MembershipLoaderById
+	WalletByWalletId            WalletLoaderById
+	WalletsByUserID             WalletsLoaderByID
+	WalletByChainAddress        WalletLoaderByChainAddress
+	TokenByTokenID              TokenLoaderByID
+	TokensByCollectionID        TokensLoaderByID
+	TokensByWalletID            TokensLoaderByID
+	TokensByUserID              TokensLoaderByID
+	TokensByUserIDAndChain      TokensLoaderByIDAndChain
+	TokensByUserIDAndContractID TokensLoaderByIDTuple
+	NewTokensByFeedEventID      TokensLoaderByID
+	ContractByContractId        ContractLoaderByID
+	ContractsByUserID           ContractsLoaderByID
+	ContractByChainAddress      ContractLoaderByChainAddress
+	FollowersByUserId           UsersLoaderByID
+	FollowingByUserId           UsersLoaderByID
+	GlobalFeed                  GlobalFeedLoader
+	FeedByUserId                UserFeedLoader
+	EventByEventId              EventLoaderByID
+	AdmireByAdmireId            AdmireLoaderByID
+	AdmiresByFeedEventId        AdmiresLoaderByID
+	CommentByCommentId          CommentLoaderByID
+	CommentsByFeedEventId       CommentsLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
@@ -194,6 +196,12 @@ func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadTokensByUserID(ctx, loaders, q),
+	}
+
+	loaders.TokensByUserIDAndContractID = TokensLoaderByIDTuple{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByUserIDAndContractID(ctx, loaders, q),
 	}
 
 	loaders.TokensByUserIDAndChain = TokensLoaderByIDAndChain{
@@ -828,6 +836,37 @@ func loadTokensByUserID(ctx context.Context, loaders *Loaders, q *db.Queries) fu
 		errors := make([]error, len(userIDs))
 
 		b := q.GetTokensByUserIdBatch(ctx, userIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []db.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByUserIDAndContractID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBIDTuple) ([][]db.Token, []error) {
+	return func(idTuples []persist.DBIDTuple) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(idTuples))
+		errors := make([]error, len(idTuples))
+
+		params := make([]db.GetTokensByUserIdAndContractIDBatchParams, len(idTuples))
+		for i, tuple := range idTuples {
+			params[i] = db.GetTokensByUserIdAndContractIDBatchParams{
+				OwnerUserID: tuple[0],
+				Contract:    tuple[1],
+			}
+		}
+
+		b := q.GetTokensByUserIdAndContractIDBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, t []db.Token, err error) {

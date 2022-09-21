@@ -81,7 +81,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 	storage := newStorageClient()
-	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")), newThrottler())
+	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")), newThrottler())
 }
 
 func newStorageClient() *storage.Client {
@@ -132,7 +132,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
-	viper.SetDefault("MEDIA_PROCESSING_URL", "http://localhost:6500")
+	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
@@ -243,10 +243,10 @@ func initSentry() {
 	}
 }
 
-func newMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *multichain.Provider {
+func NewMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *multichain.Provider {
 	ethChain := persist.ChainETH
 
-	return multichain.NewMultiChainDataRetriever(context.Background(), repos, cache, multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket), poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN")))
+	return multichain.NewProvider(context.Background(), repos, cache, multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket), poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN")))
 }
 
 func newThrottler() *throttle.Locker {

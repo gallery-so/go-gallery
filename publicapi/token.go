@@ -122,6 +122,23 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	return tokens, nil
 }
 
+func (api TokenAPI) GetTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]db.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID":     {userID, "required"},
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.TokensByUserIDAndContractID.Load(persist.DBIDTuple{userID, contractID})
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
 func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -214,6 +231,23 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	}
 
 	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
+	if err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+
+	api.loaders.ClearAllCaches()
+
+	return nil
+}
+
+func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
+	if err := validateFields(api.validator, validationMap{
+		"contractIdentifiers": {ci, "required"},
+	}); err != nil {
+		return err
+	}
+
+	err := api.multichainProvider.RefreshTokensForCollection(ctx, ci)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}

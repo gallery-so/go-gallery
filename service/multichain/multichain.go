@@ -141,8 +141,8 @@ type ChainProvider interface {
 
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
-// NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
+// NewProvider creates a new MultiChainDataRetriever
+func NewProvider(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)

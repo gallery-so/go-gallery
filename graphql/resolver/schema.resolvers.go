@@ -856,7 +856,7 @@ func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) 
 }
 
 func (r *tokenHolderResolver) TokensInCollection(ctx context.Context, obj *model.TokenHolder) ([]*model.Token, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveTokensByUserIDAndContractID(ctx, obj.UserId, obj.ContractId)
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error) {

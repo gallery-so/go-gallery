@@ -1,7 +1,8 @@
-package mediaprocessing
+package tokenprocessing
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -24,7 +26,7 @@ import (
 // InitServer initializes the indexer server
 func InitServer() {
 	router := coreInitServer()
-	logger.For(nil).Info("Starting mediaprocessing server...")
+	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
@@ -35,7 +37,7 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	tokenRepo := newRepos()
+	repos := newRepos(postgres.NewClient())
 	var s *storage.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
@@ -48,6 +50,7 @@ func coreInitServer() *gin.Engine {
 	}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
+	storageClient := newStorageClient()
 
 	router := gin.Default()
 
@@ -61,10 +64,12 @@ func coreInitServer() *gin.Engine {
 	logger.For(ctx).Info("Registering handlers...")
 
 	t := newThrottler()
-
-	queue := make(chan ProcessMediaInput)
-	go processMedias(queue, tokenRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queue, t)
+	mc := server.NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, storageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
+	mediaQueue := make(chan ProcessMediaInput)
+	collectionTokensQueue := make(chan ProcessCollectionTokensRefreshInput)
+	go processMedias(mediaQueue, repos.TokenRepository, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	go processTokensInCollectionRefreshes(collectionTokensQueue, mc, t)
+	return handlersInitServer(router, mediaQueue, collectionTokensQueue, t)
 }
 
 func setDefaults() {
@@ -85,6 +90,7 @@ func setDefaults() {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
+	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")
@@ -93,14 +99,8 @@ func setDefaults() {
 	viper.AutomaticEnv()
 }
 
-func newRepos() persist.TokenGalleryRepository {
-	pgClient := postgres.NewClient()
-	galleryRepo := postgres.NewGalleryRepository(pgClient, redis.NewCache(redis.GalleriesDB))
-	return postgres.NewTokenGalleryRepository(pgClient, galleryRepo)
-}
-
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.MediaProcessingThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleDB), time.Minute*5)
 }
 
 func initSentry() {
@@ -145,6 +145,41 @@ func initLogger() {
 		}
 
 	})
+}
+
+func newRepos(db *sql.DB) *persist.Repositories {
+	galleriesCacheToken := redis.NewCache(1)
+	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
+
+	return &persist.Repositories{
+		UserRepository:        postgres.NewUserRepository(db),
+		NonceRepository:       postgres.NewNonceRepository(db),
+		LoginRepository:       postgres.NewLoginRepository(db),
+		TokenRepository:       postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
+		CollectionRepository:  postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
+		GalleryRepository:     galleryTokenRepo,
+		ContractRepository:    postgres.NewContractGalleryRepository(db),
+		BackupRepository:      postgres.NewBackupRepository(db),
+		MembershipRepository:  postgres.NewMembershipRepository(db),
+		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
+		WalletRepository:      postgres.NewWalletRepository(db),
+		AdmireRepository:      postgres.NewAdmireRepository(db),
+		CommentRepository:     postgres.NewCommentRepository(db),
+	}
+}
+
+func newStorageClient() *storage.Client {
+	var s *storage.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		s, err = storage.NewClient(context.Background())
+	} else {
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+	}
+	if err != nil {
+		logger.For(nil).Errorf("error creating storage client: %v", err)
+	}
+	return s
 }
 
 // configureRootContext configures the main context from which other contexts are derived.

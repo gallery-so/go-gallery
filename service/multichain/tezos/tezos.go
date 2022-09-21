@@ -16,7 +16,6 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/mediaprocessing"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -479,18 +478,18 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.Canceled {
-				processMediaInput := mediaprocessing.ProcessMediaInput{
-					Key:               mediaKey,
-					Chain:             persist.ChainTezos,
-					Tokens:            resultTokens,
-					ImageKeywords:     tezImageKeywords,
-					AnimationKeywords: tezAnimationKeywords,
+				processMediaInput := map[string]interface{}{
+					"key":                mediaKey,
+					"chain":              persist.ChainTezos,
+					"tokens":             resultTokens,
+					"image_keywords":     tezImageKeywords,
+					"animation_keywords": tezAnimationKeywords,
 				}
 				asJSON, err := json.Marshal(processMediaInput)
 				if err != nil {
 					return nil, nil, err
 				}
-				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/process", d.mediaURL), bytes.NewBuffer(asJSON))
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/media/process", d.mediaURL), bytes.NewBuffer(asJSON))
 				if err != nil {
 					return nil, nil, fmt.Errorf("failed to create media request: %w", err)
 				}

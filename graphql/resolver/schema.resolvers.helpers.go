@@ -5,13 +5,17 @@ package graphql
 // helper functions without interfering with code generation.
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 
@@ -345,6 +349,38 @@ func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*mod
 	return tokensToModel(ctx, tokens), nil
 }
 
+func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]*model.Token, error) {
+
+	tokens, err := publicapi.For(ctx).Token.GetTokensByUserIDAndContractID(ctx, userID, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	in := map[string]interface{}{
+		"key":                  contractID,
+		"contract_identifiers": persist.NewContractIdentifiers(contract.Address, persist.Chain(contract.Chain.Int32)),
+	}
+	asJSON, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.Post(fmt.Sprintf("%s/collection/tokens/refresh", viper.GetString("TOKEN_PROCESSING_URL")), "application/json", bytes.NewBufferString(string(asJSON)))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		logger.For(ctx).Errorf("failed to refresh tokens in collection: %s", util.GetErrFromResp(resp))
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
 func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
 	tokens, err := publicapi.For(ctx).Token.GetTokensByUserID(ctx, userID)
 
@@ -447,7 +483,7 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	}
 	result := make([]*model.TokenHolder, len(owners))
 	for i, owner := range owners {
-		result[i] = multichainTokenHolderToModel(ctx, owner)
+		result[i] = multichainTokenHolderToModel(ctx, owner, contractID)
 	}
 
 	return result, nil
@@ -1035,14 +1071,14 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 	}
 }
 
-func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.TokenHolder) *model.TokenHolder {
+func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.TokenHolder, contractID persist.DBID) *model.TokenHolder {
 	previewTokens := make([]*string, len(tokenHolder.PreviewTokens))
 	for i, token := range tokenHolder.PreviewTokens {
 		previewTokens[i] = util.StringToPointer(token)
 	}
 
 	return &model.TokenHolder{
-		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs},
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs, ContractId: contractID},
 		DisplayName:           &tokenHolder.DisplayName,
 		User:                  nil, // handled by dedicated resolver
 		Wallets:               nil, // handled by dedicated resolver
