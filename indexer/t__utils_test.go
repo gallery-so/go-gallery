@@ -13,18 +13,22 @@ import (
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
 )
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
-
-	setDefaults("../_local/app-local-indexer-server.yaml")
+	fi, err := util.FindFile("_local/app-local-indexer-server.yaml", 4)
+	if err != nil {
+		panic(err)
+	}
+	setDefaults(fi)
 	pg, pgUnpatch := docker.InitPostgresIndexer()
 
 	db := postgres.NewClient()
-	err := migrate.RunMigration(db, "./db/migrations/indexer")
+	err = migrate.RunMigration(db, "./db/migrations/indexer")
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
 	}
@@ -94,7 +98,11 @@ func newMockIndexer(db *sql.DB) *indexer {
 }
 
 func newStorageClient(ctx context.Context) *storage.Client {
-	stg, err := storage.NewClient(ctx, option.WithCredentialsFile("../_deploy/service-key-dev.json"))
+	fi, err := util.FindFile("_deploy/service-key-dev.json", 4)
+	if err != nil {
+		panic(err)
+	}
+	stg, err := storage.NewClient(ctx, option.WithCredentialsFile(fi))
 	if err != nil {
 		panic(err)
 	}

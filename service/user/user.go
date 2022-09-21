@@ -438,7 +438,7 @@ func (e ErrUserAlreadyExists) Error() string {
 }
 
 func (e errCouldNotEnsureMediaForAddress) Error() string {
-	return fmt.Sprintf("could not ensure media for address: %s", e.address)
+	return fmt.Sprintf("could not ensure media for wallet: %s", e.address.Address)
 }
 
 type errCouldNotEnsureMediaForAddress struct {

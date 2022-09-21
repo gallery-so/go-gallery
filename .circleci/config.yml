@@ -65,6 +65,33 @@ jobs:
           paths:
             - "~/go/pkg/mod"
       - run:
+          name: "Update apt"
+          command: sudo apt-get update
+      - run:
+          name: "Install Keybase"
+          command: |
+            curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
+            sudo apt install ./keybase_amd64.deb
+            run_keybase -g
+      - run:
+          name: "Oneshot Keybase"
+          command: "keybase oneshot"
+      - run:
+          name: "Decrypt secrets"
+          command: keybase decrypt -i _encrypted_local -o _local.zip
+      - run:
+          name: "Decrypt deploy"
+          command: keybase decrypt -i _encrypted_deploy -o _deploy.zip
+      - run:
+          name: "Install cli dependencies"
+          command: sudo apt-get -y install unzip
+      - run:
+          name: "Unzip secrets file"
+          command: echo "A" | unzip _local.zip -d _local
+      - run:
+          name: "Unzip deploy file"
+          command: echo "A" | unzip _deploy.zip -d _deploy
+      - run:
           name: Run tests
           command: |
             mkdir -p /tmp/test-reports
@@ -117,11 +144,17 @@ jobs:
           name: "Decrypt secrets"
           command: keybase decrypt -i _encrypted_local -o _local.zip
       - run:
+          name: "Decrypt deploy"
+          command: keybase decrypt -i _encrypted_deploy -o _deploy.zip
+      - run:
           name: "Install cli dependencies"
           command: sudo apt-get -y install unzip
       - run:
           name: "Unzip secrets file"
           command: echo "A" | unzip _local.zip -d _local
+      - run:
+          name: "Unzip deploy file"
+          command: echo "A" | unzip _deploy.zip -d _deploy
       - run:
           name: Run integration-tests
           command: |
