@@ -343,7 +343,6 @@ type TokenHolder @goEmbedHelper {
     wallets: [Wallet] @goField(forceResolver: true)
     user: GalleryUser @goField(forceResolver: true)
     previewTokens: [String]
-    tokensInCollection: [Token] @goField(forceResolver: true)
 }
 
 type MembershipTier implements Node {
@@ -372,6 +371,8 @@ type Community implements Node
   profileImageURL: String
   profileBannerURL: String
   badgeURL: String
+
+  tokensInCollection(limit: Int, offset: Int): [Token] @goField(forceResolver: true)
 
   owners: [TokenHolder] @goField(forceResolver: true)
 }

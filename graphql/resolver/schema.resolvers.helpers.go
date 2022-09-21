@@ -356,9 +356,23 @@ func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID 
 		return nil, err
 	}
 
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	return tokensToModel(ctx, tokens), nil
+}
+
+func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]*model.Token, error) {
+
+	tokens, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, contractID)
 	if err != nil {
 		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
+func refreshTokensInCollectionAsync(ctx context.Context, contractID persist.DBID) error {
+	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
+	if err != nil {
+		return err
 	}
 
 	in := map[string]interface{}{
@@ -367,22 +381,21 @@ func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID 
 	}
 	asJSON, err := json.Marshal(in)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/collection/tokens/refresh", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		logger.For(ctx).Errorf("failed to refresh tokens in collection: %s", util.GetErrFromResp(resp))
 	}
-
-	return tokensToModel(ctx, tokens), nil
+	return nil
 }
 
 func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
@@ -1082,7 +1095,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 	}
 
 	return &model.TokenHolder{
-		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs, ContractId: contractID},
+		HelperTokenHolderData: model.HelperTokenHolderData{UserId: tokenHolder.UserID, WalletIds: tokenHolder.WalletIDs},
 		DisplayName:           &tokenHolder.DisplayName,
 		User:                  nil, // handled by dedicated resolver
 		Wallets:               nil, // handled by dedicated resolver

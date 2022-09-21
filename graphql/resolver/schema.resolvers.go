@@ -115,6 +115,22 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
+func (r *communityResolver) TokensInCollection(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.Token, error) {
+	// l := 100
+	// off := 0
+	// if limit != nil {
+	// 	l = *limit
+	// }
+	// if offset != nil {
+	// 	off = *offset
+	// }
+	err := refreshTokensInCollectionAsync(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	return resolveTokensByContractID(ctx, obj.Dbid)
+}
+
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error) {
 	refresh := false
 	onlyGallery := true
@@ -124,6 +140,12 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([
 	if obj.HelperCommunityData.OnlyGalleryUsers != nil {
 		onlyGallery = *obj.HelperCommunityData.OnlyGalleryUsers
 	}
+
+	err := refreshTokensInCollectionAsync(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
 }
 
@@ -853,10 +875,6 @@ func (r *tokenHolderResolver) Wallets(ctx context.Context, obj *model.TokenHolde
 
 func (r *tokenHolderResolver) User(ctx context.Context, obj *model.TokenHolder) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.UserId)
-}
-
-func (r *tokenHolderResolver) TokensInCollection(ctx context.Context, obj *model.TokenHolder) ([]*model.Token, error) {
-	return resolveTokensByUserIDAndContractID(ctx, obj.UserId, obj.ContractId)
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) (*model.GalleryUser, error) {

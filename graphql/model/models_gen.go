@@ -338,18 +338,19 @@ func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
 type Community struct {
 	HelperCommunityData
-	Dbid             persist.DBID          `json:"dbid"`
-	LastUpdated      *time.Time            `json:"lastUpdated"`
-	ContractAddress  *persist.ChainAddress `json:"contractAddress"`
-	CreatorAddress   *persist.ChainAddress `json:"creatorAddress"`
-	Chain            *persist.Chain        `json:"chain"`
-	Name             *string               `json:"name"`
-	Description      *string               `json:"description"`
-	PreviewImage     *string               `json:"previewImage"`
-	ProfileImageURL  *string               `json:"profileImageURL"`
-	ProfileBannerURL *string               `json:"profileBannerURL"`
-	BadgeURL         *string               `json:"badgeURL"`
-	Owners           []*TokenHolder        `json:"owners"`
+	Dbid               persist.DBID          `json:"dbid"`
+	LastUpdated        *time.Time            `json:"lastUpdated"`
+	ContractAddress    *persist.ChainAddress `json:"contractAddress"`
+	CreatorAddress     *persist.ChainAddress `json:"creatorAddress"`
+	Chain              *persist.Chain        `json:"chain"`
+	Name               *string               `json:"name"`
+	Description        *string               `json:"description"`
+	PreviewImage       *string               `json:"previewImage"`
+	ProfileImageURL    *string               `json:"profileImageURL"`
+	ProfileBannerURL   *string               `json:"profileBannerURL"`
+	BadgeURL           *string               `json:"badgeURL"`
+	TokensInCollection []*Token              `json:"tokensInCollection"`
+	Owners             []*TokenHolder        `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
@@ -855,11 +856,10 @@ func (Token) IsTokenByIDOrError() {}
 
 type TokenHolder struct {
 	HelperTokenHolderData
-	DisplayName        *string      `json:"displayName"`
-	Wallets            []*Wallet    `json:"wallets"`
-	User               *GalleryUser `json:"user"`
-	PreviewTokens      []*string    `json:"previewTokens"`
-	TokensInCollection []*Token     `json:"tokensInCollection"`
+	DisplayName   *string      `json:"displayName"`
+	Wallets       []*Wallet    `json:"wallets"`
+	User          *GalleryUser `json:"user"`
+	PreviewTokens []*string    `json:"previewTokens"`
 }
 
 type TokensAddedToCollectionFeedEventData struct {
