@@ -20,7 +20,11 @@ func setupTest(t *testing.T) *assert.Assertions {
 }
 
 func newStorageClient(ctx context.Context) *storage.Client {
-	stg, err := storage.NewClient(ctx, option.WithCredentialsFile("../../../_deploy/service-key-dev.json"))
+	fi, err := util.FindFile("_deploy/service-key-dev.json", 4)
+	if err != nil {
+		panic(err)
+	}
+	stg, err := storage.NewClient(ctx, option.WithCredentialsFile(fi))
 	if err != nil {
 		panic(err)
 	}

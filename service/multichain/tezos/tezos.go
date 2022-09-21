@@ -500,7 +500,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				}
 				defer resp.Body.Close()
 				if resp.StatusCode != http.StatusOK {
-					return nil, nil, fmt.Errorf("media request failed: %w", util.GetErrFromResp(resp))
+					logger.For(ctx).Errorf("media request failed: %s", util.GetErrFromResp(resp))
 				}
 
 				return resultTokens, resultContracts, nil
