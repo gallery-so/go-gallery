@@ -2,12 +2,14 @@ package mediaprocessing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 )
 
 func keepAlive() gin.HandlerFunc {
@@ -17,7 +19,7 @@ func keepAlive() gin.HandlerFunc {
 }
 
 func pingKeepAlive(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/keepalive", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/keepalive", viper.GetString("SELF_HOST")), nil)
 	if err != nil {
 		return err
 	}
