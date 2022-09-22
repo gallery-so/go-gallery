@@ -36,6 +36,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+var rpcEnabled = false
 var defaultStartingBlock persist.BlockNumber = 5000000
 var defaultMaxBlock persist.BlockNumber = 14000000
 
@@ -153,13 +154,10 @@ type indexer struct {
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
 func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
-	rpcEnabled := viper.GetString("ENV") == "production"
-	if !rpcEnabled {
-		ethClient = nil
+	if rpcEnabled && ethClient == nil {
+		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
-
 	i := &indexer{
-		isRPCEnabled:  rpcEnabled,
 		ethClient:     ethClient,
 		ipfsClient:    ipfsClient,
 		arweaveClient: arweaveClient,
@@ -224,32 +222,42 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		i.getLogsFunc = i.defaultGetLogs
 	}
 
-	logger.For(nil).Infof("Starting indexer at block %d until block %d (max block %d) with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, i.maxBlock, i.isRPCEnabled)
+	logger.For(nil).Infof("Starting indexer at block %d until block %d (max block %d) with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, i.maxBlock, rpcEnabled)
 	return i
 }
 
 // INITIALIZATION FUNCS ---------------------------------------------------------
 
 // Start begins indexing events from the blockchain
-func (i *indexer) Start(rootCtx context.Context) {
+func (i *indexer) Start(ctx context.Context) {
+	if rpcEnabled && i.maxBlock == nil {
+		go i.listenForNewBlocks(sentryutil.NewSentryHubContext(ctx))
+	}
 
+	topics := eventsToTopics(i.eventHashes)
+
+	logger.For(ctx).Info("Catching up to latest block")
+	i.catchUp(ctx, topics)
+	i.lastSavedLog = i.lastSyncedBlock
+
+	if !rpcEnabled {
+		logger.For(ctx).Info("Running in cached logs only mode, not listening for new logs")
+		return
+	}
+
+	logger.For(ctx).Info("Subscribing to new logs")
+	i.waitForBlocks(ctx, topics)
+}
+
+// catchUp processes logs up to the most recent block.
+func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 	wp := workerpool.New(defaultWorkerPoolSize)
-
-	events := make([]common.Hash, len(i.eventHashes))
-	for i, event := range i.eventHashes {
-		events[i] = common.HexToHash(string(event))
-	}
-
-	topics := [][]common.Hash{events}
-
-	if i.isRPCEnabled && i.maxBlock == nil {
-		go i.listenForNewBlocks(sentryutil.NewSentryHubContext(rootCtx))
-	}
+	defer wp.StopWait()
 
 	for ; i.lastSyncedBlock < atomic.LoadUint64(&i.mostRecentBlock); i.lastSyncedBlock += blocksPerLogsCall {
 		input := i.lastSyncedBlock
 		toQueue := func() {
-			workerCtx := sentryutil.NewSentryHubContext(rootCtx)
+			workerCtx := sentryutil.NewSentryHubContext(ctx)
 			defer recoverAndWait(workerCtx)
 			defer sentryutil.RecoverAndRaise(workerCtx)
 			logger.For(workerCtx).Infof("Indexing block range starting at %d", input)
@@ -262,17 +270,14 @@ func (i *indexer) Start(rootCtx context.Context) {
 			wp.Submit(toQueue)
 		}
 	}
-	wp.StopWait()
-	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
-	i.lastSavedLog = i.lastSyncedBlock
-	if !i.isRPCEnabled {
-		logger.For(rootCtx).Info("Running in cached logs only mode, not listening for new logs")
-		return
-	}
+}
+
+// waitForBlocks polls for new blocks.
+func (i *indexer) waitForBlocks(ctx context.Context, topics [][]common.Hash) {
 	for {
 		timeAfterWait := <-time.After(time.Minute * 3)
-		i.startNewBlocksPipeline(rootCtx, topics)
-		logger.For(rootCtx).Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
+		i.startNewBlocksPipeline(ctx, topics)
+		logger.For(ctx).Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
 	}
 }
 
@@ -383,7 +388,7 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 			logsTo = []types.Log{}
 		}
 	}
-	if len(logsTo) == 0 && i.isRPCEnabled {
+	if len(logsTo) == 0 && rpcEnabled {
 		logsTo, err = i.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
@@ -740,7 +745,7 @@ func (i *indexer) findFields(ctx context.Context, transfer rpc.Transfer, key per
 		go func(ctx context.Context) {
 			defer wg.Done()
 			defer sentryutil.RecoverAndRaise(ctx)
-			if i.isRPCEnabled {
+			if rpcEnabled {
 				bals, err := getBalances(ctx, contractAddress, from, tokenID, key, transfer.BlockNumber, to, i.ethClient)
 				if err != nil {
 					logger.For(ctx).WithError(err).WithFields(logrus.Fields{
@@ -800,7 +805,7 @@ func (i *indexer) findFields(ctx context.Context, transfer rpc.Transfer, key per
 			}
 		}
 
-		if uri == "" && i.isRPCEnabled {
+		if uri == "" && rpcEnabled {
 			uri = getURI(ctx, contractAddress, tokenID, transfer.TokenType, i.ethClient)
 		}
 
@@ -811,7 +816,7 @@ func (i *indexer) findFields(ctx context.Context, transfer rpc.Transfer, key per
 	}()
 
 	if optionalFields {
-		if metadata == nil && i.isRPCEnabled {
+		if metadata == nil && rpcEnabled {
 			metadata, uri = getMetadata(ctx, contractAddress, uri, tokenID, i.uniqueMetadatas, i.ethClient, i.ipfsClient, i.arweaveClient)
 		}
 		go func() {
@@ -980,7 +985,7 @@ func (i *indexer) createTokens(ctx context.Context,
 	logger.For(ctx).Infof("Upserting %d tokens and contracts with a timeout of %s", len(tokens), timeout)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu, i.isRPCEnabled)
+	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu)
 	if err != nil {
 		logger.For(ctx).WithError(err).Error("error upserting tokens and contracts")
 		randKey := util.RandStringBytes(24)
@@ -1183,7 +1188,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 	return result
 }
 
-func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, dbMu *sync.Mutex, rpcEnabled bool) error {
+func upsertTokensAndContracts(ctx context.Context, t []persist.Token, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, dbMu *sync.Mutex) error {
 
 	err := func() error {
 		dbMu.Lock()
@@ -1379,4 +1384,12 @@ func logEthCallRPCError(entry *logrus.Entry, err error, message string) {
 	} else {
 		entry.Error(message)
 	}
+}
+
+func eventsToTopics(hashes []eventHash) [][]common.Hash {
+	events := make([]common.Hash, len(hashes))
+	for i, event := range hashes {
+		events[i] = common.HexToHash(string(event))
+	}
+	return [][]common.Hash{events}
 }
