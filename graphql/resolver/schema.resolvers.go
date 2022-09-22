@@ -115,20 +115,20 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
-func (r *communityResolver) TokensInCollection(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.Token, error) {
-	// l := 100
-	// off := 0
-	// if limit != nil {
-	// 	l = *limit
-	// }
-	// if offset != nil {
-	// 	off = *offset
-	// }
-	err := refreshTokensInCollectionAsync(ctx, obj.Dbid)
+func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.Token, error) {
+	l := 100
+	off := 0
+	if limit != nil {
+		l = *limit
+	}
+	if offset != nil {
+		off = *offset
+	}
+	err := refreshTokensInContractAsync(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
-	return resolveTokensByContractID(ctx, obj.Dbid)
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, l, off)
 }
 
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error) {
@@ -141,7 +141,7 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([
 		onlyGallery = *obj.HelperCommunityData.OnlyGalleryUsers
 	}
 
-	err := refreshTokensInCollectionAsync(ctx, obj.Dbid)
+	err := refreshTokensInContractAsync(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}

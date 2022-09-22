@@ -145,6 +145,27 @@ SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
 SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
+-- name: GetTokensByContractId :many
+SELECT * FROM tokens WHERE contract = $1 AND deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByContractIdBatch :batchmany
+SELECT * FROM tokens WHERE contract = $1 AND deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByContractIdPaginate :many
+SELECT t.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.contract = $1 AND t.deleted = false
+    ORDER BY u.universal DESC, t.created_at DESC, t.name DESC, t.id DESC LIMIT $2 OFFSET $3;
+
+-- name: GetTokensByContractIdPaginateBatch :batchmany
+SELECT t.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.contract = $1 AND t.deleted = false
+    ORDER BY u.universal DESC, t.created_at DESC, t.name DESC, t.id DESC LIMIT $2 OFFSET $3;
+
+
 -- name: GetTokensByUserId :many
 SELECT tokens.* FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1

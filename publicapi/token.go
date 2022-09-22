@@ -67,6 +67,42 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
+func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persist.DBID) ([]db.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.TokensByContractID.Load(contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, limit, offset int) ([]db.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.TokensByContractIDWithPagination.Load(dataloader.IDWithPagination{
+		ID:     contractID,
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
 func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, []error) {
 	return api.loaders.TokenByTokenID.LoadAll(tokenIDs)
 }

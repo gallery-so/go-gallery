@@ -372,7 +372,7 @@ type Community implements Node
   profileBannerURL: String
   badgeURL: String
 
-  tokensInCollection(limit: Int, offset: Int): [Token] @goField(forceResolver: true)
+  tokensInCommunity(limit: Int, offset: Int): [Token] @goField(forceResolver: true)
 
   owners: [TokenHolder] @goField(forceResolver: true)
 }

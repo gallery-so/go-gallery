@@ -361,7 +361,7 @@ func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID 
 
 func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]*model.Token, error) {
 
-	tokens, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, contractID)
+	tokens, err := publicapi.For(ctx).Token.GetTokensByContractId(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +369,17 @@ func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]
 	return tokensToModel(ctx, tokens), nil
 }
 
-func refreshTokensInCollectionAsync(ctx context.Context, contractID persist.DBID) error {
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, limit int, offset int) ([]*model.Token, error) {
+
+	tokens, err := publicapi.For(ctx).Token.GetTokensByContractId(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
+func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID) error {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return err

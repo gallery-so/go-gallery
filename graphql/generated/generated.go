@@ -204,20 +204,20 @@ type ComplexityRoot struct {
 	}
 
 	Community struct {
-		BadgeURL           func(childComplexity int) int
-		Chain              func(childComplexity int) int
-		ContractAddress    func(childComplexity int) int
-		CreatorAddress     func(childComplexity int) int
-		Dbid               func(childComplexity int) int
-		Description        func(childComplexity int) int
-		ID                 func(childComplexity int) int
-		LastUpdated        func(childComplexity int) int
-		Name               func(childComplexity int) int
-		Owners             func(childComplexity int) int
-		PreviewImage       func(childComplexity int) int
-		ProfileBannerURL   func(childComplexity int) int
-		ProfileImageURL    func(childComplexity int) int
-		TokensInCollection func(childComplexity int, limit *int, offset *int) int
+		BadgeURL          func(childComplexity int) int
+		Chain             func(childComplexity int) int
+		ContractAddress   func(childComplexity int) int
+		CreatorAddress    func(childComplexity int) int
+		Dbid              func(childComplexity int) int
+		Description       func(childComplexity int) int
+		ID                func(childComplexity int) int
+		LastUpdated       func(childComplexity int) int
+		Name              func(childComplexity int) int
+		Owners            func(childComplexity int) int
+		PreviewImage      func(childComplexity int) int
+		ProfileBannerURL  func(childComplexity int) int
+		ProfileImageURL   func(childComplexity int) int
+		TokensInCommunity func(childComplexity int, limit *int, offset *int) int
 	}
 
 	Contract struct {
@@ -701,7 +701,7 @@ type CommentOnFeedEventPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error)
 }
 type CommunityResolver interface {
-	TokensInCollection(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.Token, error)
+	TokensInCommunity(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.Token, error)
 	Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error)
 }
 type FeedConnectionResolver interface {
@@ -1412,17 +1412,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.ProfileImageURL(childComplexity), true
 
-	case "Community.tokensInCollection":
-		if e.complexity.Community.TokensInCollection == nil {
+	case "Community.tokensInCommunity":
+		if e.complexity.Community.TokensInCommunity == nil {
 			break
 		}
 
-		args, err := ec.field_Community_tokensInCollection_args(context.TODO(), rawArgs)
+		args, err := ec.field_Community_tokensInCommunity_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Community.TokensInCollection(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Community.TokensInCommunity(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Contract.badgeURL":
 		if e.complexity.Contract.BadgeURL == nil {
@@ -3692,7 +3692,7 @@ type Community implements Node
   profileBannerURL: String
   badgeURL: String
 
-  tokensInCollection(limit: Int, offset: Int): [Token] @goField(forceResolver: true)
+  tokensInCommunity(limit: Int, offset: Int): [Token] @goField(forceResolver: true)
 
   owners: [TokenHolder] @goField(forceResolver: true)
 }
@@ -4360,7 +4360,7 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 	return args, nil
 }
 
-func (ec *executionContext) field_Community_tokensInCollection_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Community_tokensInCommunity_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 *int
@@ -7717,7 +7717,7 @@ func (ec *executionContext) _Community_badgeURL(ctx context.Context, field graph
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Community_tokensInCollection(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+func (ec *executionContext) _Community_tokensInCommunity(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -7734,7 +7734,7 @@ func (ec *executionContext) _Community_tokensInCollection(ctx context.Context, f
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Community_tokensInCollection_args(ctx, rawArgs)
+	args, err := ec.field_Community_tokensInCommunity_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -7742,7 +7742,7 @@ func (ec *executionContext) _Community_tokensInCollection(ctx context.Context, f
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Community().TokensInCollection(rctx, obj, args["limit"].(*int), args["offset"].(*int))
+		return ec.resolvers.Community().TokensInCommunity(rctx, obj, args["limit"].(*int), args["offset"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -20774,7 +20774,7 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "tokensInCollection":
+		case "tokensInCommunity":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -20783,7 +20783,7 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Community_tokensInCollection(ctx, field, obj)
+				res = ec._Community_tokensInCommunity(ctx, field, obj)
 				return res
 			}
 

@@ -13,6 +13,7 @@
 //go:generate go run github.com/vektah/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/vektah/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/vektah/dataloaden TokensLoaderByIDWithPagination github.com/mikeydub/go-gallery/graphql/dataloader.IDWithPagination []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByIDTuple github.com/mikeydub/go-gallery/service/persist.DBIDTuple []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/vektah/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/vektah/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
@@ -47,6 +48,12 @@ type IDAndChain struct {
 	Chain persist.Chain
 }
 
+type IDWithPagination struct {
+	ID     persist.DBID
+	Limit  int
+	Offset int
+}
+
 // Loaders will cache and batch lookups. They are short-lived and should never persist beyond
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
@@ -54,37 +61,39 @@ type Loaders struct {
 
 	// Every entry here must have a corresponding entry in the Clear___Caches methods below
 
-	UserByUserId                UserLoaderByID
-	UserByUsername              UserLoaderByString
-	UsersWithTrait              UsersLoaderByString
-	GalleryByGalleryId          GalleryLoaderByID
-	GalleryByCollectionId       GalleryLoaderByID
-	GalleriesByUserId           GalleriesLoaderByID
-	CollectionByCollectionId    CollectionLoaderByID
-	CollectionsByGalleryId      CollectionsLoaderByID
-	MembershipByMembershipId    MembershipLoaderById
-	WalletByWalletId            WalletLoaderById
-	WalletsByUserID             WalletsLoaderByID
-	WalletByChainAddress        WalletLoaderByChainAddress
-	TokenByTokenID              TokenLoaderByID
-	TokensByCollectionID        TokensLoaderByID
-	TokensByWalletID            TokensLoaderByID
-	TokensByUserID              TokensLoaderByID
-	TokensByUserIDAndChain      TokensLoaderByIDAndChain
-	TokensByUserIDAndContractID TokensLoaderByIDTuple
-	NewTokensByFeedEventID      TokensLoaderByID
-	ContractByContractId        ContractLoaderByID
-	ContractsByUserID           ContractsLoaderByID
-	ContractByChainAddress      ContractLoaderByChainAddress
-	FollowersByUserId           UsersLoaderByID
-	FollowingByUserId           UsersLoaderByID
-	GlobalFeed                  GlobalFeedLoader
-	FeedByUserId                UserFeedLoader
-	EventByEventId              EventLoaderByID
-	AdmireByAdmireId            AdmireLoaderByID
-	AdmiresByFeedEventId        AdmiresLoaderByID
-	CommentByCommentId          CommentLoaderByID
-	CommentsByFeedEventId       CommentsLoaderByID
+	UserByUserId                     UserLoaderByID
+	UserByUsername                   UserLoaderByString
+	UsersWithTrait                   UsersLoaderByString
+	GalleryByGalleryId               GalleryLoaderByID
+	GalleryByCollectionId            GalleryLoaderByID
+	GalleriesByUserId                GalleriesLoaderByID
+	CollectionByCollectionId         CollectionLoaderByID
+	CollectionsByGalleryId           CollectionsLoaderByID
+	MembershipByMembershipId         MembershipLoaderById
+	WalletByWalletId                 WalletLoaderById
+	WalletsByUserID                  WalletsLoaderByID
+	WalletByChainAddress             WalletLoaderByChainAddress
+	TokenByTokenID                   TokenLoaderByID
+	TokensByCollectionID             TokensLoaderByID
+	TokensByContractID               TokensLoaderByID
+	TokensByContractIDWithPagination TokensLoaderByIDWithPagination
+	TokensByWalletID                 TokensLoaderByID
+	TokensByUserID                   TokensLoaderByID
+	TokensByUserIDAndChain           TokensLoaderByIDAndChain
+	TokensByUserIDAndContractID      TokensLoaderByIDTuple
+	NewTokensByFeedEventID           TokensLoaderByID
+	ContractByContractId             ContractLoaderByID
+	ContractsByUserID                ContractsLoaderByID
+	ContractByChainAddress           ContractLoaderByChainAddress
+	FollowersByUserId                UsersLoaderByID
+	FollowingByUserId                UsersLoaderByID
+	GlobalFeed                       GlobalFeedLoader
+	FeedByUserId                     UserFeedLoader
+	EventByEventId                   EventLoaderByID
+	AdmireByAdmireId                 AdmireLoaderByID
+	AdmiresByFeedEventId             AdmiresLoaderByID
+	CommentByCommentId               CommentLoaderByID
+	CommentsByFeedEventId            CommentsLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
@@ -184,6 +193,18 @@ func NewLoaders(ctx context.Context, q *db.Queries) *Loaders {
 		maxBatch: defaultMaxBatchMany,
 		wait:     defaultWaitTime,
 		fetch:    loadTokensByCollectionID(ctx, loaders, q),
+	}
+
+	loaders.TokensByContractID = TokensLoaderByID{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByContractID(ctx, loaders, q),
+	}
+
+	loaders.TokensByContractIDWithPagination = TokensLoaderByIDWithPagination{
+		maxBatch: defaultMaxBatchMany,
+		wait:     defaultWaitTime,
+		fetch:    loadTokensByContractIDWithPagination(ctx, loaders, q),
 	}
 
 	loaders.TokensByWalletID = TokensLoaderByID{
@@ -785,6 +806,61 @@ func loadTokensByCollectionID(ctx context.Context, loaders *Loaders, q *db.Queri
 		errors := make([]error, len(collectionIDs))
 
 		b := q.GetTokensByCollectionIdBatch(ctx, collectionIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []db.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByContractID(ctx context.Context, loaders *Loaders, q *db.Queries) func([]persist.DBID) ([][]db.Token, []error) {
+	return func(contractIDs []persist.DBID) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetTokensByContractIdBatch(ctx, contractIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []db.Token, err error) {
+			tokens[i], errors[i] = t, err
+
+			// Add results to the TokenByTokenID loader's cache
+			if errors[i] == nil {
+				for _, token := range tokens[i] {
+					loaders.TokenByTokenID.Prime(token.ID, token)
+				}
+			}
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByContractIDWithPagination(ctx context.Context, loaders *Loaders, q *db.Queries) func([]IDWithPagination) ([][]db.Token, []error) {
+	return func(contractIDs []IDWithPagination) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		params := make([]db.GetTokensByContractIdPaginateBatchParams, len(contractIDs))
+		for i, id := range contractIDs {
+			params[i] = db.GetTokensByContractIdPaginateBatchParams{
+				Contract: id.ID,
+				Limit:    int32(id.Limit),
+				Offset:   int32(id.Offset),
+			}
+		}
+
+		b := q.GetTokensByContractIdPaginateBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, t []db.Token, err error) {
