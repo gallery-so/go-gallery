@@ -43,11 +43,15 @@ func processIPFSMetadata(queue chan<- ProcessMediaInput, throttler *throttle.Loc
 }
 
 func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) {
-	wp := workerpool.New(10)
+	wp := workerpool.New(20)
 	for processInput := range queue {
 		in := processInput
 		logger.For(nil).Infof("Processing Media: %s", in.Key)
 		wp.Submit(func() {
+			done := make(chan struct{})
+
+			go keepAliveUntilDone(done, in.Key)
+
 			innerWp := workerpool.New(10)
 			for _, token := range in.Tokens {
 				t := token
@@ -79,6 +83,7 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 				})
 			}
 			func() {
+				defer close(done)
 				defer throttler.Unlock(context.Background(), in.Key)
 				innerWp.StopWait()
 				logger.For(nil).Infof("Processing Media: %s - Finished", in.Key)
