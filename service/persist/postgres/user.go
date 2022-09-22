@@ -207,7 +207,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	defer tx.Rollback()
 
 	var user persist.User
-	err = tx.StmtContext(pCtx, u.getByUsernameStmt).QueryRowContext(pCtx, strings.ToLower(pUser.Username)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.CreationTime, &user.LastUpdated)
+	err = tx.StmtContext(pCtx, u.getByUsernameStmt).QueryRowContext(pCtx, strings.ToLower(pUser.Username)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
 	if err == nil {
 		return "", persist.ErrUsernameNotAvailable{Username: pUser.Username}
 	}
