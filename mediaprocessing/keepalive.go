@@ -42,7 +42,7 @@ func keepAliveUntilDone(done chan struct{}, taskName string) {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 				return pingKeepAlive(ctx)
-			}
+			}()
 			if err != nil {
 				logger.For(nil).Errorf("Error pinging keepalive: %s", err)
 			}
