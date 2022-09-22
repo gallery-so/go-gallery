@@ -333,13 +333,17 @@ type graphResponse struct {
 }
 
 func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
+	// The TokenID type strips leading zeros when variables are casted to it, but we want the zeros
+	// because its part of the hash that's used to look up a label.
+	// We convert the token ID to decimal then back to hexadecimal to get back the padding.
+	labelHash := common.BigToHash(tid.BigInt()).Hex()[2:]
 
 	gql := fmt.Sprintf(`
 	{
 	  domains(first:1, where:{labelhash:"%s"}){
 		labelName
 	  }
-	}`, tid)
+	}`, labelHash)
 
 	jsonData := map[string]interface{}{
 		"query": gql,
