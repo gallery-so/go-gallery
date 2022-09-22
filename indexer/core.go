@@ -65,6 +65,11 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	// overrides for where the indexer starts and stops
 	startingBlock, maxBlock := getBlockRangeFromArgs()
+
+	if viper.GetString("ENV") == "production" {
+		rpcEnabled = true
+	}
+
 	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events, nil, startingBlock, maxBlock)
 
 	router := gin.Default()
