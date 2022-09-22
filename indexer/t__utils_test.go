@@ -24,7 +24,7 @@ var (
 	testBlockFrom  = 0
 	testBlockTo    = 100
 	testAddress    = "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5"
-	contribAddress = "0xda3845b44736b57e05ee80fc011a52a9c777423a" // Jarrel's address with a contributer card in it
+	contribAddress = "0xda3845b44736b57e05ee80fc011a52a9c777423a" // Jarrel's address with a contributor card in it
 )
 
 var allLogs = func() []types.Log {
