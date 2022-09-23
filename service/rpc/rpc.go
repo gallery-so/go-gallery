@@ -148,16 +148,17 @@ func (h metricsHandler) Log(r *log.Record) error {
 
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
-	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), NewClientForIpfs(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET")))
+	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), newClientForIPFS(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET"), false))
 	sh.SetTimeout(time.Minute * 2)
 	return sh
 }
 
-func NewClientForIpfs(projectId, projectSecret string) *http.Client {
+// newHTTPClientForIPFS returns an http.Client configured with default settings intended for IPFS calls.
+func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.Client {
 	return &http.Client{
 		Transport: authTransport{
-			RoundTripper:  http.DefaultTransport,
-			ProjectId:     projectId,
+			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly),
+			ProjectID:     projectID,
 			ProjectSecret: projectSecret,
 		},
 	}
@@ -178,12 +179,12 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 // authTransport decorates each request with a basic auth header.
 type authTransport struct {
 	http.RoundTripper
-	ProjectId     string
+	ProjectID     string
 	ProjectSecret string
 }
 
 func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.SetBasicAuth(t.ProjectId, t.ProjectSecret)
+	r.SetBasicAuth(t.ProjectID, t.ProjectSecret)
 	return t.RoundTripper.RoundTrip(r)
 }
 
