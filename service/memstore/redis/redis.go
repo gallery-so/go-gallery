@@ -160,7 +160,7 @@ var popMessage *redis.Script = redis.NewScript(`
 
 // Pop removes the earliest item from the pending queue and adds it to the consumer's processing queue.
 func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error) {
-	item, err := popMessage.Run(ctx, q.client, []string{q.pending, q.processing}, q.id).Result()
+	item, err := popMessage.Run(ctx, q.client, []string{q.pending, q.processing}).Result()
 	if err != nil {
 		return "", err
 	}
@@ -249,7 +249,7 @@ func (s *Semaphore) Acquire(ctx context.Context) (bool, error) {
 	// Try to acquire the semaphore
 	pipe.Do(ctx, "ZADD", s.name, float64(time.Now().Unix()), s.id)
 	pipe.Do(ctx, "ZADD", s.owners, count.Val(), s.id)
-	rank := pipe.ZRank(ctx, s.owners, string(s.id))
+	rank := pipe.ZRank(ctx, s.owners, s.id)
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return false, err
@@ -303,6 +303,15 @@ func (s *Semaphore) Refresh(ctx context.Context) (bool, error) {
 // consumerID is an ID stored in redis to denote a consumer of the queue.
 type consumerID string
 
+// newConsumerID generates a new consumerID
+func newConsumerID() consumerID {
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+	return consumerID(fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix()))
+}
+
 // GenTime returns the time the ID was generated.
 func (c consumerID) GenTime() time.Time {
 	parts := strings.Split(string(c), ":")
@@ -311,13 +320,4 @@ func (c consumerID) GenTime() time.Time {
 		panic(err)
 	}
 	return time.Unix(int64(ut), 0)
-}
-
-// newConsumerID generates a new consumerID
-func newConsumerID() consumerID {
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
-	return consumerID(fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix()))
 }

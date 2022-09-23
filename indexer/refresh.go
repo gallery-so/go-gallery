@@ -246,7 +246,7 @@ func NewBlockFilterManager(ctx context.Context, q *db.Queries, blocksPerLogFile 
 		panic(err)
 	}
 
-	b := BlockFilterManager{
+	return &BlockFilterManager{
 		blocksPerLogFile: blocksPerLogFile,
 		chunkSize:        defaultRefreshConfig.ChunkSize,
 		fetchWorkerSize:  defaultRefreshConfig.ChunkWorkerSize,
@@ -260,8 +260,6 @@ func NewBlockFilterManager(ctx context.Context, q *db.Queries, blocksPerLogFile 
 		mu:       &mu,
 		lru:      lru,
 	}
-
-	return &b
 }
 
 // Get returns a filter if it exists. If the filter's chunk hasn't been loaded yet, this

@@ -77,7 +77,7 @@ func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 	rpcEnabled = true
 	ethClient := rpc.NewEthSocketClient()
 
-	i := newIndexer(ethClient, nil, nil, nil, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), postgres.AddressFilterRepository{Queries: queries}, persist.ChainETH, []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
+	i := newIndexer(ethClient, nil, nil, nil, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), postgres.AddressFilterRepository{Queries: queries}, persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 		transferAgainLogs := []types.Log{{
 			Address:     common.HexToAddress("0x0c2ee19b2a89943066c2dc7f1bddcc907f614033"),
 			Topics:      []common.Hash{common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"), common.HexToHash(testAddress), common.HexToHash("0x0000000000000000000000008914496dc01efcc49a2fa340331fb90969b6f1d2"), common.HexToHash("0x00000000000000000000000000000000000000000000000000000000000000d9")},

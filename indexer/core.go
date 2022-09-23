@@ -71,7 +71,7 @@ func coreInit() (*gin.Engine, *indexer) {
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events, nil, startingBlock, maxBlock)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, startingBlock, maxBlock)
 
 	router := gin.Default()
 
