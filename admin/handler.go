@@ -21,10 +21,10 @@ func handlersInit(router *gin.Engine, db *sql.DB, stmts *statements, ethcl *ethc
 	raw := api.Group("/raw")
 	raw.POST("/query", queryRaw(db))
 
-	nfts := api.Group("/nfts")
-	nfts.GET("/get", getNFTs(stmts.nftRepo))
-	nfts.POST("/opensea", refreshOpensea(stmts.nftRepo, stmts.userRepo, stmts.collRepo, stmts.galleryRepo, stmts.backupRepo))
-	nfts.GET("/owns", ownsGeneral(ethcl))
+	// nfts := api.Group("/nfts")
+	// nfts.GET("/get", getNFTs(stmts.nftRepo))
+	// nfts.POST("/opensea", refreshOpensea(stmts.nftRepo, stmts.userRepo, stmts.collRepo, stmts.galleryRepo, stmts.backupRepo))
+	// nfts.GET("/owns", ownsGeneral(ethcl))
 
 	galleries := api.Group("/galleries")
 	galleries.GET("/get", getGalleries(stmts.galleryRepo))

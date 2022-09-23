@@ -349,7 +349,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return removeBOM(decoded), nil
 	case persist.URITypeIPFS:
-		path := util.GetIPFSPath(asString)
+		path := util.GetIPFSPath(asString, true)
 
 		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
@@ -524,7 +524,7 @@ func removeBOM(bs []byte) []byte {
 func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
 	dataReader, err := ipfsClient.Cat(path)
 	if err != nil {
-		logger.For(pCtx).WithError(err).Errorf("error getting cat data from ipfs: %s", path)
+		logger.For(pCtx).WithError(err).Warnf("error getting cat data from ipfs: %s", path)
 
 		url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 

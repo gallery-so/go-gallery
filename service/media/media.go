@@ -280,7 +280,7 @@ func remapIPFS(ipfs string) string {
 	if persist.TokenURI(ipfs).Type() != persist.URITypeIPFS {
 		return ipfs
 	}
-	path := util.GetIPFSPath(ipfs)
+	path := util.GetIPFSPath(ipfs, false)
 	return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 }
 

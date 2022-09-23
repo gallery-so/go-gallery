@@ -249,7 +249,7 @@ outer:
 				if err.priority == 0 {
 					return err
 				}
-				logger.For(ctx).Errorf("error updating fallback media for user %s: %w", user.Username, err)
+				logger.For(ctx).Errorf("error updating fallback media for user %s: %s", user.Username, err)
 			} else {
 				return err
 			}
@@ -302,7 +302,7 @@ outer:
 			continue
 		}
 		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
-			logger.For(ctx).Warnf("deleting nft %s-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
+			logger.For(ctx).Warnf("deleting nft %d-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
 			err := d.Repos.TokenRepository.DeleteByID(ctx, nft.ID)
 			if err != nil {
 				return err

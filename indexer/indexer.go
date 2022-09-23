@@ -150,11 +150,9 @@ type indexer struct {
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
 func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository, addressFilterRepo postgres.AddressFilterRepository, pChain persist.Chain, pEvents []eventHash, getLogsFunc getLogsFunc, startingBlock, maxBlock *uint64) *indexer {
-	rpcEnabled = viper.GetString("ENV") == "production"
-	if !rpcEnabled {
-		ethClient = nil
+	if rpcEnabled && ethClient == nil {
+		panic("RPC is enabled but an ethClient wasn't provided!")
 	}
-
 	i := &indexer{
 		ethClient:         ethClient,
 		ipfsClient:        ipfsClient,
@@ -228,25 +226,35 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 // INITIALIZATION FUNCS ---------------------------------------------------------
 
 // Start begins indexing events from the blockchain
-func (i *indexer) Start(rootCtx context.Context) {
-
-	wp := workerpool.New(defaultWorkerPoolSize)
-
-	events := make([]common.Hash, len(i.eventHashes))
-	for i, event := range i.eventHashes {
-		events[i] = common.HexToHash(string(event))
-	}
-
-	topics := [][]common.Hash{events}
-
+func (i *indexer) Start(ctx context.Context) {
 	if rpcEnabled && i.maxBlock == nil {
-		go i.listenForNewBlocks(sentryutil.NewSentryHubContext(rootCtx))
+		go i.listenForNewBlocks(sentryutil.NewSentryHubContext(ctx))
 	}
+
+	topics := eventsToTopics(i.eventHashes)
+
+	logger.For(ctx).Info("Catching up to latest block")
+	i.catchUp(ctx, topics)
+	i.lastSavedLog = i.lastSyncedBlock
+
+	if !rpcEnabled {
+		logger.For(ctx).Info("Running in cached logs only mode, not listening for new logs")
+		return
+	}
+
+	logger.For(ctx).Info("Subscribing to new logs")
+	i.waitForBlocks(ctx, topics)
+}
+
+// catchUp processes logs up to the most recent block.
+func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
+	wp := workerpool.New(defaultWorkerPoolSize)
+	defer wp.StopWait()
 
 	for ; i.lastSyncedBlock < atomic.LoadUint64(&i.mostRecentBlock); i.lastSyncedBlock += blocksPerLogsCall {
 		input := i.lastSyncedBlock
 		toQueue := func() {
-			workerCtx := sentryutil.NewSentryHubContext(rootCtx)
+			workerCtx := sentryutil.NewSentryHubContext(ctx)
 			defer recoverAndWait(workerCtx)
 			defer sentryutil.RecoverAndRaise(workerCtx)
 			logger.For(workerCtx).Infof("Indexing block range starting at %d", input)
@@ -259,17 +267,14 @@ func (i *indexer) Start(rootCtx context.Context) {
 			wp.Submit(toQueue)
 		}
 	}
-	wp.StopWait()
-	logger.For(rootCtx).Info("Finished processing old logs, subscribing to new logs...")
-	i.lastSavedLog = i.lastSyncedBlock
-	if !rpcEnabled {
-		logger.For(rootCtx).Info("Running in cached logs only mode, not listening for new logs")
-		return
-	}
+}
+
+// waitForBlocks polls for new blocks.
+func (i *indexer) waitForBlocks(ctx context.Context, topics [][]common.Hash) {
 	for {
 		timeAfterWait := <-time.After(time.Minute * 3)
-		i.startNewBlocksPipeline(rootCtx, topics)
-		logger.For(rootCtx).Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
+		i.startNewBlocksPipeline(ctx, topics)
+		logger.For(ctx).Infof("Waiting for new blocks... Finished recent blocks in %s", time.Since(timeAfterWait))
 	}
 }
 
@@ -1223,4 +1228,12 @@ func logEthCallRPCError(entry *logrus.Entry, err error, message string) {
 	} else {
 		entry.Error(message)
 	}
+}
+
+func eventsToTopics(hashes []eventHash) [][]common.Hash {
+	events := make([]common.Hash, len(hashes))
+	for i, event := range hashes {
+		events[i] = common.HexToHash(string(event))
+	}
+	return [][]common.Hash{events}
 }

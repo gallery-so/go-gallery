@@ -66,7 +66,12 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	// overrides for where the indexer starts and stops
 	startingBlock, maxBlock := getBlockRangeFromArgs()
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, startingBlock, maxBlock)
+
+	if viper.GetString("ENV") == "production" {
+		rpcEnabled = true
+	}
+
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events, nil, startingBlock, maxBlock)
 
 	router := gin.Default()
 
@@ -131,6 +136,10 @@ func coreInitServer() *gin.Engine {
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
+
+	if viper.GetString("ENV") == "production" {
+		rpcEnabled = true
+	}
 
 	router := gin.Default()
 

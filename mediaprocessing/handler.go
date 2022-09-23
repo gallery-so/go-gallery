@@ -6,6 +6,8 @@ import (
 )
 
 func handlersInitServer(router *gin.Engine, queue chan<- ProcessMediaInput, throttler *throttle.Locker) *gin.Engine {
+	router.GET("/keepalive", keepAlive())
+
 	router.POST("/process", processIPFSMetadata(queue, throttler))
 	return router
 }
