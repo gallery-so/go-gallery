@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -19,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 // InitServer initializes the indexer server
@@ -37,16 +36,7 @@ func coreInitServer() *gin.Engine {
 	initLogger()
 
 	tokenRepo := newRepos()
-	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(ctx)
-	} else {
-		s, err = storage.NewClient(ctx, option.WithCredentialsFile("./_deploy/service-key-dev.json"))
-	}
-	if err != nil {
-		panic(err)
-	}
+	s := media.NewStorageClient(ctx, "./_deploy/service-key-dev.json")
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 	ipfsClient := rpc.NewIPFSShell()

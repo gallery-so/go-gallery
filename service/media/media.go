@@ -20,7 +20,9 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/option"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -30,6 +32,7 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/qmuntal/gltf"
 	"github.com/spf13/viper"
+	htransport "google.golang.org/api/transport/http"
 )
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
@@ -73,6 +76,43 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 	"glb":  {persist.MediaTypeAnimation, "model/gltf-binary"},
 	"gltf": {persist.MediaTypeAnimation, "model/gltf+json"},
 	"svg":  {persist.MediaTypeImage, "image/svg+xml"},
+}
+
+// NewStorageClient returns a GCP storage client with default settings.
+func NewStorageClient(ctx context.Context, keyPath string) *storage.Client {
+	scopes := []string{storage.ScopeFullControl}
+	if viper.GetString("ENV") == "local" {
+		return newLocalClient(ctx, keyPath, scopes)
+	}
+	return newClient(ctx, scopes)
+}
+
+func newLocalClient(ctx context.Context, keyPath string, scopes []string) *storage.Client {
+	transport, err := htransport.NewTransport(ctx, http.DefaultTransport, option.WithCredentialsFile(keyPath), option.WithScopes(scopes...))
+	if err != nil {
+		panic(err)
+	}
+	client, _, err := htransport.NewClient(ctx, option.WithCredentialsFile(keyPath))
+	if err != nil {
+		panic(err)
+	}
+	client.Transport = transport
+	s, _ := storage.NewClient(ctx, option.WithHTTPClient(client))
+	return s
+}
+
+func newClient(ctx context.Context, scopes []string) *storage.Client {
+	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false), option.WithScopes(scopes...))
+	if err != nil {
+		panic(err)
+	}
+	client, _, err := htransport.NewClient(ctx)
+	if err != nil {
+		panic(err)
+	}
+	client.Transport = transport
+	s, _ := storage.NewClient(ctx, option.WithHTTPClient(client))
+	return s
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.

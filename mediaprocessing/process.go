@@ -51,7 +51,7 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 		in := processInput
 		logger.For(nil).Infof("Processing Media: %s", in.Key)
 		wp.Submit(func() {
-			span, ctx := tracing.StartSpan(ctx, "processMedia", fmt.Sprintf("chain=%d;key=%s", processInput.Chain, processInput.Key), sentryutil.TransactionNameSafe("processMedia"))
+			span, ctx := tracing.StartSpan(ctx, "processMedia", fmt.Sprintf("processing key=%s;chain=%d", processInput.Key, processInput.Chain), sentryutil.TransactionNameSafe("processMedia"))
 
 			done := make(chan struct{})
 
