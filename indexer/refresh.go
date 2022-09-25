@@ -104,7 +104,7 @@ func (r *RefreshQueue) Add(ctx context.Context, input UpdateTokenMediaInput) err
 
 // Get gets a message from the queue.
 func (r *RefreshQueue) Get(ctx context.Context) (UpdateTokenMediaInput, error) {
-	queued, err := r.q.Pop(ctx, 0)
+	queued, err := r.q.Pop(ctx)
 	if err == redis.Nil {
 		return UpdateTokenMediaInput{}, ErrNoMessage
 	}
@@ -122,56 +122,27 @@ func (r *RefreshQueue) Get(ctx context.Context) (UpdateTokenMediaInput, error) {
 }
 
 // Ack completes a message by removing it from the processing queue.
-func (r *RefreshQueue) Ack(ctx context.Context, processed UpdateTokenMediaInput) error {
-	last, err := r.q.Ack(ctx)
-
-	// Should always be at most one message in the processing queue if
-	// `processed` was obtained by calling `Get`.
+func (r *RefreshQueue) Ack(ctx context.Context) error {
+	_, err := r.q.Ack(ctx)
 	if err == redis.Nil {
 		return ErrPopFromEmpty
 	}
-
-	processedMessage, err := json.Marshal(processed)
-	if err != nil {
-		return err
-	}
-
-	// `last` should always be the same message as `processed`.
-	if last != string(processedMessage) {
-		return ErrUnexpectedMessage
-	}
-
 	return nil
 }
 
 // ReAdd puts a message back in the queue.
-func (r *RefreshQueue) ReAdd(ctx context.Context, input UpdateTokenMediaInput) error {
-	// Remove from processing queue
-	err := r.Ack(ctx, input)
+func (r *RefreshQueue) ReAdd(ctx context.Context) error {
+	msg, err := r.q.Ack(ctx)
 	if err != nil {
 		return err
 	}
-
-	message, err := json.Marshal(input)
-	if err != nil {
-		return err
-	}
-
-	// Add back to pending queue
-	added, err := r.q.Push(ctx, message)
-	if err != nil {
-		return err
-	}
-	if !added {
-		logger.For(ctx).Info("refresh already exists, skipping")
-	}
-
-	return nil
+	_, err = r.q.Push(ctx, msg)
+	return err
 }
 
 // Prune finds refreshes that were dropped and re-enqueues them.
-func (r *RefreshQueue) Prune(ctx context.Context) error {
-	return r.q.Reprocess(ctx, defaultRefreshConfig.TimeoutDuration)
+func (r *RefreshQueue) Prune(ctx context.Context, sem *memstore.Semaphore) error {
+	return r.q.Reprocess(ctx, defaultRefreshConfig.TimeoutDuration, sem)
 }
 
 // RefreshLock manages the number of concurrent refreshes allowed.

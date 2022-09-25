@@ -590,7 +590,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		}
 		refreshRange, err := resolveRange(message.RefreshRange, indexerBlock)
 		if err != nil {
-			if err := refreshQueue.Ack(ctx, message); err != nil {
+			if err := refreshQueue.Ack(ctx); err != nil {
 				panic(err)
 			}
 		}
@@ -598,14 +598,14 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		acquired, err := refreshLock.Acquire(ctx)
 		if err != nil {
 			logger.For(ctx).WithError(err).Errorf("error occurred acquiring lock")
-			if err := refreshQueue.ReAdd(ctx, message); err != nil {
+			if err := refreshQueue.ReAdd(ctx); err != nil {
 				panic(err)
 			}
 			panic(err)
 		}
 		if !acquired {
 			logger.For(ctx).Errorf("too many refreshes runnning, waiting")
-			if err := refreshQueue.ReAdd(ctx, message); err != nil {
+			if err := refreshQueue.ReAdd(ctx); err != nil {
 				panic(err)
 			}
 			time.Sleep(defaultRefreshConfig.DefaultNoMessageWaitTime)
@@ -652,7 +652,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 
 					refreshed, err := refreshLock.Refresh(ctx)
 					if err != nil || !refreshed {
-						if err := refreshQueue.ReAdd(ctx, message); err != nil {
+						if err := refreshQueue.ReAdd(ctx); err != nil {
 							panic(err)
 						}
 						panic(ErrRefreshTimedOut)
@@ -664,7 +664,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		refreshPool.StopWait()
 
 		// Finish the message
-		if err := refreshQueue.Ack(ctx, message); err != nil {
+		if err := refreshQueue.Ack(ctx); err != nil {
 			panic(err)
 		}
 
@@ -683,7 +683,7 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 		span.Finish()
 
 		// Cleanup dangling jobs
-		err = refreshQueue.Prune(ctx)
+		err = refreshQueue.Prune(ctx, refreshLock.s)
 		if err != nil {
 			panic(err)
 		}

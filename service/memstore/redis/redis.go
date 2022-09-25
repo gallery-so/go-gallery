@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -151,16 +150,17 @@ func (q *FifoQueue) Push(ctx context.Context, value interface{}) (bool, error) {
 // popMessage atomically receives a message from the pending queue and adds it to the consumer's processing queue.
 var popMessage *redis.Script = redis.NewScript(`
 	local item = redis.call("ZPOPMIN", KEYS[1])
-	if item[1] == nil then
+	local message = item[1]
+	if message == nil then
 		return nil
 	end
-	redis.call("LPUSH", KEYS[2], item[1])
+	redis.call("ZADD", KEYS[2], ARGV[1], message)
 	return item[1]
 `)
 
 // Pop removes the earliest item from the pending queue and adds it to the consumer's processing queue.
-func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error) {
-	item, err := popMessage.Run(ctx, q.client, []string{q.pending, q.processing}).Result()
+func (q *FifoQueue) Pop(ctx context.Context) (string, error) {
+	item, err := popMessage.Run(ctx, q.client, []string{q.pending, q.processing}, time.Now().Unix()).Result()
 	if err != nil {
 		return "", err
 	}
@@ -169,7 +169,14 @@ func (q *FifoQueue) Pop(ctx context.Context, wait time.Duration) (string, error)
 
 // Ack removes the last item from the consumer's processing queue.
 func (q *FifoQueue) Ack(ctx context.Context) (string, error) {
-	return q.client.RPop(ctx, q.processing).Result()
+	messages, err := q.client.ZPopMin(ctx, q.processing, 1).Result()
+	if err != nil {
+		return "", err
+	}
+	if len(messages) == 0 {
+		return "", redis.Nil
+	}
+	return messages[0].Member.(string), nil
 }
 
 // getProcessing returns keys that are being processed.
@@ -184,16 +191,28 @@ func (q *FifoQueue) getProcessing(ctx context.Context) []string {
 }
 
 // Reprocess moves inactive jobs back to the pending queuing for reprocessing.
-func (q *FifoQueue) Reprocess(ctx context.Context, timeout time.Duration) error {
+func (q *FifoQueue) Reprocess(ctx context.Context, timeout time.Duration, sem *Semaphore) error {
 	processing := q.getProcessing(ctx)
-	for _, job := range processing {
-		timeoutOn := consumerID(job).GenTime().Add(timeout)
+	for _, consumerQueue := range processing {
+		hasLock, err := sem.hasLock(ctx, consumerIDFromQueue(consumerQueue))
+		if err != nil {
+			return err
+		}
+		if hasLock {
+			continue
+		}
+		messages, err := q.client.ZRangeWithScores(ctx, consumerQueue, 0, 0).Result()
+		if err != nil {
+			return err
+		}
+		message := messages[0]
+		// Remove from processing queue and add back to pending queue
+		timeoutOn := time.Unix(int64(message.Score), 0).Add(timeout)
 		if time.Now().After(timeoutOn) {
-			val, err := q.client.RPop(ctx, job).Result()
-			if err != nil {
+			if _, err := q.client.ZRem(ctx, consumerQueue, message.Member).Result(); err != nil {
 				return err
 			}
-			if _, err := q.Push(ctx, val); err != nil {
+			if _, err := q.Push(ctx, message.Member); err != nil {
 				return err
 			}
 		}
@@ -222,7 +241,7 @@ func NewSemaphore(db int, name string, cap, timeout int) *Semaphore {
 		counter: fmt.Sprintf("%s:%s", name, "counter"),
 		cap:     cap,
 		timeout: timeout,
-		id:      string(newConsumerID()),
+		id:      newConsumerID(),
 	}
 }
 
@@ -300,24 +319,28 @@ func (s *Semaphore) Refresh(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// consumerID is an ID stored in redis to denote a consumer of the queue.
-type consumerID string
-
-// newConsumerID generates a new consumerID
-func newConsumerID() consumerID {
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
+func (s *Semaphore) hasLock(ctx context.Context, consumerID string) (bool, error) {
+	_, err := s.client.ZScore(ctx, s.owners, consumerID).Result()
+	if err == redis.Nil {
+		return false, nil
 	}
-	return consumerID(fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), time.Now().Unix()))
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
-// GenTime returns the time the ID was generated.
-func (c consumerID) GenTime() time.Time {
-	parts := strings.Split(string(c), ":")
-	ut, err := strconv.Atoi(parts[len(parts)-1])
+// newConsumerID generates a new consumerID
+func newConsumerID() string {
+	hostname, err := os.Hostname()
+	hostname = strings.ReplaceAll(hostname, ":", "_")
 	if err != nil {
 		panic(err)
 	}
-	return time.Unix(int64(ut), 0)
+	return fmt.Sprintf("%s_%d", hostname, os.Getpid())
+}
+
+func consumerIDFromQueue(queue string) string {
+	parts := strings.Split(queue, ":")
+	return parts[len(parts)-1]
 }
