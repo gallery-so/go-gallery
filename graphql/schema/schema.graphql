@@ -417,7 +417,7 @@ type ErrTokenNotFound implements Error {
     message: String!
 }
 
-union CollectionByIdOrError = Collection | ErrCollectionNotFound
+union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInput
 
 union CollectionTokenByIdOrError =
     CollectionToken
@@ -565,6 +565,7 @@ type Query {
     usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
+    collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
     tokenById(id: DBID!): TokenByIdOrError
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean, onlyGalleryUsers: Boolean): CommunityByAddressOrError

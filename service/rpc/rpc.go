@@ -543,7 +543,7 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
 	dataReader, err := ipfsClient.Cat(path)
 	if err != nil {
-		logger.For(pCtx).WithError(err).Errorf("error getting cat data from ipfs: %s", path)
+		logger.For(pCtx).WithError(err).Warnf("error getting cat data from ipfs: %s", path)
 
 		url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 

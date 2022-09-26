@@ -478,6 +478,7 @@ type ErrInvalidInput struct {
 
 func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
 func (ErrInvalidInput) IsUserByIDOrError()                        {}
+func (ErrInvalidInput) IsCollectionByIDOrError()                  {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()              {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}

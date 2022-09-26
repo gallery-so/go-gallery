@@ -21,10 +21,12 @@ import (
 )
 
 var (
-	testBlockFrom  = 0
-	testBlockTo    = 100
-	testAddress    = "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5"
-	contribAddress = "0xda3845b44736b57e05ee80fc011a52a9c777423a" // Jarrel's address with a contributor card in it
+	testBlockFrom            = 0
+	testBlockTo              = 100
+	testAddress              = "0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5"
+	galleryMembershipAddress = "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698"
+	ensAddress               = "0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"
+	contribAddress           = "0xda3845b44736b57e05ee80fc011a52a9c777423a" // Jarrel's address with a contributor card in it
 )
 
 var allLogs = func() []types.Log {
@@ -33,6 +35,7 @@ var allLogs = func() []types.Log {
 	logs = append(logs, customHandlerLogs...)
 	logs = append(logs, svgLogs...)
 	logs = append(logs, erc1155Logs...)
+	logs = append(logs, ensLogs...)
 	return logs
 }()
 
@@ -157,7 +160,7 @@ var svgLogs = []types.Log{
 }
 var erc1155Logs = []types.Log{
 	{
-		Address: common.HexToAddress("0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698"),
+		Address: common.HexToAddress(galleryMembershipAddress),
 		Topics: []common.Hash{
 			common.HexToHash(string(transferSingleEventHash)),
 			common.HexToHash(persist.ZeroAddress.String()),
@@ -166,6 +169,29 @@ var erc1155Logs = []types.Log{
 		},
 		Data:        common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"),
 		BlockNumber: 5,
+	},
+}
+var ensLogs = []types.Log{
+	{
+		Address: common.HexToAddress(ensAddress),
+		Topics: []common.Hash{
+			common.HexToHash(string(transferEventHash)),
+			common.HexToHash(persist.ZeroAddress.String()),
+			common.HexToHash(testAddress),
+			common.HexToHash("0xc1cb7903f69821967b365cce775cd62d694cd7ae7cfe00efe1917a55fdae2bb7"),
+		},
+		BlockNumber: 42,
+	},
+	{
+		Address: common.HexToAddress(ensAddress),
+		Topics: []common.Hash{
+			common.HexToHash(string(transferEventHash)),
+			common.HexToHash(persist.ZeroAddress.String()),
+			common.HexToHash(testAddress),
+			// Leading zero in token ID
+			common.HexToHash("0x08c111a4e7c31becd720bde47f538417068e102d45b7732f24cfeda9e2b22a45"),
+		},
+		BlockNumber: 42,
 	},
 }
 
@@ -212,12 +238,28 @@ var expectedResults expectedTokenResults = expectedTokenResults{
 		TokenID:         "d9",
 		Quantity:        "1",
 	},
-	persist.NewTokenIdentifiers("0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698", "0", 0): persist.Token{
+	persist.NewTokenIdentifiers(persist.Address(galleryMembershipAddress), "0", 0): persist.Token{
 		BlockNumber:     5,
 		OwnerAddress:    persist.EthereumAddress(contribAddress),
-		ContractAddress: persist.EthereumAddress("0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698"),
+		ContractAddress: persist.EthereumAddress(galleryMembershipAddress),
 		TokenType:       persist.TokenTypeERC1155,
 		TokenID:         "0",
+		Quantity:        "1",
+	},
+	persist.NewTokenIdentifiers(persist.Address(ensAddress), "c1cb7903f69821967b365cce775cd62d694cd7ae7cfe00efe1917a55fdae2bb7", 0): persist.Token{
+		BlockNumber:     42,
+		OwnerAddress:    persist.EthereumAddress(testAddress),
+		ContractAddress: persist.EthereumAddress(ensAddress),
+		TokenType:       persist.TokenTypeERC721,
+		TokenID:         "c1cb7903f69821967b365cce775cd62d694cd7ae7cfe00efe1917a55fdae2bb7",
+		Quantity:        "1",
+	},
+	persist.NewTokenIdentifiers(persist.Address(ensAddress), "8c111a4e7c31becd720bde47f538417068e102d45b7732f24cfeda9e2b22a45", 0): persist.Token{
+		BlockNumber:     42,
+		OwnerAddress:    persist.EthereumAddress(testAddress),
+		ContractAddress: persist.EthereumAddress(ensAddress),
+		TokenType:       persist.TokenTypeERC721,
+		TokenID:         "8c111a4e7c31becd720bde47f538417068e102d45b7732f24cfeda9e2b22a45",
 		Quantity:        "1",
 	},
 }
