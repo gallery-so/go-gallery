@@ -492,29 +492,15 @@ outer:
 		}
 	}
 
-	// if util.Contains([]string{"development", "sandbox-backend", "production"}, strings.ToLower(viper.GetString("ENV"))) {
-	// 	downloadLock.Lock()
-	// 	defer downloadLock.Unlock()
-	// }
-
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return persist.MediaTypeUnknown, fmt.Errorf("could not download %s: %s", mediaURL, err)
+		return persist.MediaTypeUnknown, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
 	}
 	defer reader.Close()
 
-	// logger.For(pCtx).Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, truncateString(mediaURL, 50), name)
-
-	// buf := bytes.NewBuffer(bs)
-
 	if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
 		mediaType, contentType = persist.SniffMediaType(reader.Headers())
-		// if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
-		// 	mediaType, contentType = GuessMediaType(bs)
-		// 	logger.For(pCtx).Infof("guessed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
-		// } else {
 		logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
-		// }
 	}
 
 	if mediaType != persist.MediaTypeVideo {

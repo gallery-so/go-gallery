@@ -91,6 +91,17 @@ func Contains(s []string, str string) bool {
 	return false
 }
 
+// ContainsAny checks whether a string contains any of the given substrings
+func ContainsAny(s string, strs ...string) bool {
+	for _, v := range strs {
+		if strings.Contains(s, v) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // UnmarshallBody takes a request body and unmarshals it into the given struct
 // input must be a pointer to a struct with json tags
 func UnmarshallBody(pInput interface{}, body io.Reader) error {
