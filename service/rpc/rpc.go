@@ -353,7 +353,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 
 		buf := bytes.NewBuffer(util.RemoveBOM(decoded))
 
-		return util.NewFileHeaderReader(buf), nil
+		return util.NewFileHeaderReader(buf)
 	case persist.URITypeIPFS:
 		path := util.GetIPFSPath(asString, true)
 
@@ -362,7 +362,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			return util.FileHeaderReader{}, err
 		}
 
-		return util.NewFileHeaderReader(resp), nil
+		return util.NewFileHeaderReader(resp)
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
@@ -371,7 +371,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			return util.FileHeaderReader{}, err
 		}
 		buf := bytes.NewBuffer(util.RemoveBOM(bs))
-		return util.NewFileHeaderReader(buf), nil
+		return util.NewFileHeaderReader(buf)
 	case persist.URITypeHTTP, persist.URITypeIPFSGateway:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
@@ -385,7 +385,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
 			return util.FileHeaderReader{}, ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
-		return util.NewFileHeaderReader(resp.Body), nil
+		return util.NewFileHeaderReader(resp.Body)
 	case persist.URITypeIPFSAPI:
 		parsedURL, err := url.Parse(asString)
 		if err != nil {
@@ -397,15 +397,15 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 			return util.FileHeaderReader{}, err
 		}
 
-		return util.NewFileHeaderReader(resp), nil
+		return util.NewFileHeaderReader(resp)
 	case persist.URITypeJSON, persist.URITypeSVG:
 		idx := strings.IndexByte(asString, ',')
 		if idx == -1 {
 			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString)))
-			return util.NewFileHeaderReader(buf), nil
+			return util.NewFileHeaderReader(buf)
 		}
 		buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString[idx+1:])))
-		return util.NewFileHeaderReader(buf), nil
+		return util.NewFileHeaderReader(buf)
 	case persist.URITypeBase64BMP:
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
@@ -424,10 +424,10 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		if err != nil {
 			return util.FileHeaderReader{}, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
 		}
-		return util.NewFileHeaderReader(newImage), nil
+		return util.NewFileHeaderReader(newImage)
 	default:
 		buf := bytes.NewBuffer([]byte(turi))
-		return util.NewFileHeaderReader(buf), nil
+		return util.NewFileHeaderReader(buf)
 	}
 
 }

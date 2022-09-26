@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -37,31 +38,24 @@ const (
 // When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
 // so that the first 512 bytes are not lost
 type FileHeaderReader struct {
-	headers []byte
+	headers *bytes.Buffer
 	reader  io.Reader
 }
 
 // NewFileHeaderReader returns a new FileHeaderReader
-func NewFileHeaderReader(reader io.Reader) FileHeaderReader {
+func NewFileHeaderReader(reader io.Reader) (FileHeaderReader, error) {
 	fi := FileHeaderReader{
-		reader:  reader,
-		headers: make([]byte, 512),
+		headers: bytes.NewBuffer(make([]byte, 0, 512)),
 	}
-	fi.reader.Read(fi.headers)
-	fi.headers = RemoveBOM(fi.headers)
-	return fi
+	_, err := io.CopyN(fi.headers, reader, 512)
+	if err != nil {
+		return FileHeaderReader{}, err
+	}
+	fi.reader = io.MultiReader(fi.headers, reader)
+	return fi, nil
 }
 
 func (f FileHeaderReader) Read(p []byte) (n int, err error) {
-	// first 512 bytes are already read into the headers, so copy those until they are exhausted, then start reading from the reader
-	curLenHeaders := len(f.headers)
-	if curLenHeaders > 0 {
-		n = copy(p, f.headers)
-		f.headers = f.headers[n:]
-		if len(p) < curLenHeaders {
-			return
-		}
-	}
 	return f.reader.Read(p)
 }
 
@@ -75,7 +69,7 @@ func (f FileHeaderReader) Close() error {
 
 // Headers returns the first 512 bytes of the reader
 func (f FileHeaderReader) Headers() []byte {
-	return f.headers
+	return f.headers.Bytes()
 }
 
 // RemoveBOM removes the byte order mark from a byte array
@@ -309,4 +303,13 @@ func EnvVarMustExist(envVar, emptyVal string) {
 	if viper.GetString(envVar) == emptyVal {
 		panic(fmt.Sprintf("%s must be set", envVar))
 	}
+}
+
+func IndexOfFirstDifferentByte(a, b []byte) int {
+	for i, v := range a {
+		if v != b[i] {
+			return i
+		}
+	}
+	return -1
 }
