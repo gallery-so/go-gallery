@@ -33,6 +33,59 @@ const (
 	EB = 1024 * PB
 )
 
+// FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
+// When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
+// so that the first 512 bytes are not lost
+type FileHeaderReader struct {
+	headers []byte
+	reader  io.Reader
+}
+
+// NewFileHeaderReader returns a new FileHeaderReader
+func NewFileHeaderReader(reader io.Reader) FileHeaderReader {
+	fi := FileHeaderReader{
+		reader:  reader,
+		headers: make([]byte, 512),
+	}
+	fi.reader.Read(fi.headers)
+	fi.headers = RemoveBOM(fi.headers)
+	return fi
+}
+
+func (f FileHeaderReader) Read(p []byte) (n int, err error) {
+	// first 512 bytes are already read into the headers, so copy those until they are exhausted, then start reading from the reader
+	curLenHeaders := len(f.headers)
+	if curLenHeaders > 0 {
+		n = copy(p, f.headers)
+		f.headers = f.headers[n:]
+		if len(p) < curLenHeaders {
+			return
+		}
+	}
+	return f.reader.Read(p)
+}
+
+// Close closes the given io.Reader if it is also a closer
+func (f FileHeaderReader) Close() error {
+	if closer, ok := f.reader.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+// Headers returns the first 512 bytes of the reader
+func (f FileHeaderReader) Headers() []byte {
+	return f.headers
+}
+
+// RemoveBOM removes the byte order mark from a byte array
+func RemoveBOM(bs []byte) []byte {
+	if len(bs) > 3 && bs[0] == 0xEF && bs[1] == 0xBB && bs[2] == 0xBF {
+		return bs[3:]
+	}
+	return bs
+}
+
 // Contains checks whether an item exists in a slice
 func Contains(s []string, str string) bool {
 	for _, v := range s {

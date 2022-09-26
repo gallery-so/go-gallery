@@ -19,7 +19,9 @@ func keepAlive() gin.HandlerFunc {
 }
 
 func pingKeepAlive(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/keepalive", viper.GetString("SELF_HOST")), nil)
+	url := fmt.Sprintf("%s/keepalive", viper.GetString("SELF_HOST"))
+	logger.For(ctx).Infof("pinging keepalive at %s", url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -46,7 +48,7 @@ func keepAliveUntilDone(done chan struct{}, taskName string) {
 				return pingKeepAlive(ctx)
 			}()
 			if err != nil {
-				logger.For(nil).Errorf("Error pinging keepalive: %s", err)
+				logger.For(nil).Errorf("error pinging keepalive at %s/keepalive: %s", viper.GetString("SELF_HOST"), err)
 			}
 			logger.For(nil).Infof("keep-alive during: %s", taskName)
 		}
