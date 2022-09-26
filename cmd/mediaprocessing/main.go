@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 
 	"github.com/mikeydub/go-gallery/mediaprocessing"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -16,6 +18,10 @@ func main() {
 	if appengine.IsAppEngine() {
 		appengine.Main()
 	} else {
-		http.ListenAndServe(":6500", nil)
+		port := "6500"
+		if it := os.Getenv("PORT"); it != "" {
+			port = it
+		}
+		http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 	}
 }

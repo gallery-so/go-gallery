@@ -349,8 +349,6 @@ func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgU
 
 func cacheRawSvgMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
 
-	deleteMedia(ctx, bucket, fileName, client)
-
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	_, err := io.Copy(sw, reader)
 	if err != nil {
@@ -381,7 +379,6 @@ func cacheRawSvgMedia(ctx context.Context, reader io.Reader, bucket, fileName st
 }
 
 func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
-	deleteMedia(ctx, bucket, fileName, client)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 
@@ -419,8 +416,6 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileN
 
 func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName string, contentType string, client *storage.Client) error {
 	logger.For(ctx).Infof("caching raw media for %s", fileName)
-
-	deleteMedia(ctx, bucket, fileName, client)
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	_, err := io.Copy(sw, reader)
