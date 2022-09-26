@@ -17,7 +17,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -34,8 +33,6 @@ import (
 )
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
-
-var downloadLock = &sync.Mutex{}
 
 type Keywords interface {
 	ForToken(tokenID persist.TokenID, contract persist.Address) []string
