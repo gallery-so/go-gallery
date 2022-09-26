@@ -2,6 +2,7 @@ package mediaprocessing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -14,7 +15,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -42,12 +45,14 @@ func processIPFSMetadata(queue chan<- ProcessMediaInput, throttler *throttle.Loc
 	}
 }
 
-func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) {
+func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRepo persist.TokenGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) {
 	wp := workerpool.New(20)
 	for processInput := range queue {
 		in := processInput
 		logger.For(nil).Infof("Processing Media: %s", in.Key)
 		wp.Submit(func() {
+			span, ctx := tracing.StartSpan(ctx, "processMedia", fmt.Sprintf("processing key=%s;chain=%d", processInput.Key, processInput.Chain), sentryutil.TransactionNameSafe("processMedia"))
+
 			done := make(chan struct{})
 
 			go keepAliveUntilDone(done, in.Key)
@@ -83,8 +88,9 @@ func processMedias(queue <-chan ProcessMediaInput, tokenRepo persist.TokenGaller
 				})
 			}
 			func() {
+				defer tracing.FinishSpan(span)
 				defer close(done)
-				defer throttler.Unlock(context.Background(), in.Key)
+				defer throttler.Unlock(ctx, in.Key)
 				innerWp.StopWait()
 				logger.For(nil).Infof("Processing Media: %s - Finished", in.Key)
 			}()

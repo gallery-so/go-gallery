@@ -5,20 +5,20 @@ import (
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 // InitServer initializes the indexer server
@@ -29,23 +29,16 @@ func InitServer() {
 }
 
 func coreInitServer() *gin.Engine {
-	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
+	ctx := configureRootContext()
 
 	setDefaults()
 	initSentry()
 	initLogger()
 
 	tokenRepo := newRepos()
-	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(ctx)
-	} else {
-		s, err = storage.NewClient(ctx, option.WithCredentialsFile("./_deploy/service-key.json"))
-	}
-	if err != nil {
-		panic(err)
-	}
+	s := media.NewStorageClient(ctx, "./_deploy/service-key-dev.json")
+
+	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false, true)}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
@@ -63,7 +56,7 @@ func coreInitServer() *gin.Engine {
 	t := newThrottler()
 
 	queue := make(chan ProcessMediaInput)
-	go processMedias(queue, tokenRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	go processMedias(sentryutil.NewSentryHubContext(ctx), queue, tokenRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queue, t)
 }
 
@@ -74,8 +67,8 @@ func setDefaults() {
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
-	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "prod-eth-token-logs")
-	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "prod-token-content")
+	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "dev-eth-token-logs")
+	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "postgres")

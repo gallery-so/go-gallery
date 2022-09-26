@@ -226,7 +226,7 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 
 func Tracing() gin.HandlerFunc {
 	// Trace outgoing HTTP requests
-	http.DefaultTransport = tracing.NewTracingTransport(http.DefaultTransport, true)
+	http.DefaultTransport = tracing.NewTracingTransport(http.DefaultTransport, true, false)
 	http.DefaultClient = &http.Client{Transport: http.DefaultTransport}
 
 	return func(c *gin.Context) {
