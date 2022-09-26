@@ -475,8 +475,8 @@ func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, i
 
 	asURI := persist.TokenURI(mediaURL)
 
-	mediaType, contentType, _, _ := PredictMediaType(pCtx, asURI.String())
-	logger.For(pCtx).Infof("predicted media type for %s: %s", truncateString(mediaURL, 50), mediaType)
+	mediaType, contentType, contentLength, _ := PredictMediaType(pCtx, asURI.String())
+	logger.For(pCtx).Infof("predicted media type for %s: %s with length %s", truncateString(mediaURL, 50), mediaType, util.InByteSizeFormat(uint64(contentLength)))
 
 	if mediaType != persist.MediaTypeHTML && asURI.Type() == persist.URITypeIPFSGateway {
 		indexAfterGateway := strings.Index(asURI.String(), "/ipfs/")
@@ -560,7 +560,7 @@ outer:
 			if mediaType == persist.MediaTypeHTML && strings.HasPrefix(mediaURL, "https://") {
 				return mediaType, nil
 			}
-			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(len(buf.Bytes()))/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
+			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
 			if mediaType == persist.MediaTypeAnimation {
 				return mediaType, cacheRawAnimationMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 			}
