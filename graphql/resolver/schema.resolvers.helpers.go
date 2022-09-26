@@ -277,6 +277,23 @@ func resolveCollectionByCollectionID(ctx context.Context, collectionID persist.D
 	return collectionToModel(ctx, *collection), nil
 }
 
+func resolveCollectionsByCollectionIDs(ctx context.Context, collectionIDs []persist.DBID) ([]*model.Collection, []error) {
+	models := make([]*model.Collection, len(collectionIDs))
+	errors := make([]error, len(collectionIDs))
+
+	collections, collectionErrs := publicapi.For(ctx).Collection.GetCollectionsByIds(ctx, collectionIDs)
+
+	for i, err := range collectionErrs {
+		if err != nil {
+			errors[i] = err
+		} else {
+			models[i] = collectionToModel(ctx, *collections[i])
+		}
+	}
+
+	return models, errors
+}
+
 func resolveCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*model.Collection, error) {
 	collections, err := publicapi.For(ctx).Collection.GetCollectionsByGalleryId(ctx, galleryID)
 	if err != nil {

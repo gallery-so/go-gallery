@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -746,6 +747,31 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 
 func (r *queryResolver) CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error) {
 	return resolveCollectionByCollectionID(ctx, id)
+}
+
+func (r *queryResolver) CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error) {
+	collections, errs := resolveCollectionsByCollectionIDs(ctx, ids)
+
+	models := make([]model.CollectionByIDOrError, len(ids))
+
+	// TODO: Figure out how to handle errors for slice returns automatically, the same way we handle typical resolvers.
+	//       Without that kind of handling, errors must be checked manually (as is happening below).
+	for i, err := range errs {
+		if err == nil {
+			models[i] = collections[i]
+		} else if notFoundErr, ok := err.(persist.ErrCollectionNotFoundByID); ok {
+			models[i] = model.ErrCollectionNotFound{Message: notFoundErr.Error()}
+		} else if validationErr, ok := err.(publicapi.ErrInvalidInput); ok {
+			models[i] = model.ErrInvalidInput{Message: validationErr.Error(), Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
+		} else {
+			// Unhandled error -- add it to the unhandled error stack, but don't fail the whole operation
+			// because one collection hit an unexpected error. Consider making "unhandled error" an expected type,
+			// such that it can be returned as part of a model "OrError" union instead of returning null.
+			graphql.AddError(ctx, err)
+		}
+	}
+
+	return models, nil
 }
 
 func (r *queryResolver) TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error) {

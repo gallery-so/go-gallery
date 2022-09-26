@@ -42,6 +42,44 @@ func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID per
 	return &collection, nil
 }
 
+func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs []persist.DBID) ([]*db.Collection, []error) {
+	collectionThunk := func(collectionID persist.DBID) func() (db.Collection, error) {
+		// Validate
+		if err := validateFields(api.validator, validationMap{
+			"collectionID": {collectionID, "required"},
+		}); err != nil {
+			return func() (db.Collection, error) { return db.Collection{}, err }
+		}
+
+		return api.loaders.CollectionByCollectionId.LoadThunk(collectionID)
+	}
+
+	// A "thunk" will add this request to a batch, and then return a function that will block to fetch
+	// data when called. By creating all of the thunks first (without invoking the functions they return),
+	// we're setting up a batch that will eventually fetch all of these requests at the same time when
+	// their functions are invoked. "LoadAll" would accomplish something similar, but wouldn't let us
+	// validate each collectionID parameter first.
+	thunks := make([]func() (db.Collection, error), len(collectionIDs))
+
+	for i, collectionID := range collectionIDs {
+		thunks[i] = collectionThunk(collectionID)
+	}
+
+	collections := make([]*db.Collection, len(collectionIDs))
+	errors := make([]error, len(collectionIDs))
+
+	for i, _ := range collectionIDs {
+		collection, err := thunks[i]()
+		if err == nil {
+			collections[i] = &collection
+		} else {
+			errors[i] = err
+		}
+	}
+
+	return collections, errors
+}
+
 func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryID persist.DBID) ([]db.Collection, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
