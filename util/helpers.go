@@ -315,12 +315,3 @@ func EnvVarMustExist(envVar, emptyVal string) {
 		panic(fmt.Sprintf("%s must be set", envVar))
 	}
 }
-
-func IndexOfFirstDifferentByte(a, b []byte) int {
-	for i, v := range a {
-		if v != b[i] {
-			return i
-		}
-	}
-	return -1
-}
