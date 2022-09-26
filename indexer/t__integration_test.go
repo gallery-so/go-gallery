@@ -68,7 +68,7 @@ func TestIndexLogs_Success(t *testing.T) {
 		metadata, err := rpc.GetMetadataFromURI(ctx, uri, ipfsShell, arweaveClient)
 		mediaHasContent(t, a, err, metadata)
 
-		predicted, _, err := media.PredictMediaType(ctx, metadata["image"].(string))
+		predicted, _, _, err := media.PredictMediaType(ctx, metadata["image"].(string))
 		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeImage, predicted)
 
 		imageData, err := rpc.GetDataFromURI(ctx, persist.TokenURI(metadata["image"].(string)), ipfsShell, arweaveClient)
@@ -84,7 +84,7 @@ func TestIndexLogs_Success(t *testing.T) {
 		a.Empty(med.ThumbnailURL)
 		a.NotEmpty(med.MediaURL)
 
-		mediaType, _, err := media.PredictMediaType(ctx, med.MediaURL.String())
+		mediaType, _, _, err := media.PredictMediaType(ctx, med.MediaURL.String())
 		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeImage, mediaType)
 	})
 

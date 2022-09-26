@@ -614,23 +614,23 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 					switch {
 					case nft.AnimationURL != "":
 						med.MediaURL = persist.NullString(nft.AnimationURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.AnimationURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationURL)
 
 					case nft.AnimationOriginalURL != "":
 						med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.AnimationOriginalURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationOriginalURL)
 
 					case nft.ImageURL != "":
 						med.MediaURL = persist.NullString(nft.ImageURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.ImageURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageURL)
 
 					case nft.ImageOriginalURL != "":
 						med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.ImageOriginalURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageOriginalURL)
 
 					default:
 						med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.ImageThumbnailURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageThumbnailURL)
 					}
 
 					if err != nil {

@@ -125,6 +125,8 @@ const InvalidTokenURI TokenURI = "INVALID"
 // ZeroAddress is the all-zero Ethereum address
 const ZeroAddress EthereumAddress = "0x0000000000000000000000000000000000000000"
 
+var gltfFields = []string{"scene", "scenes", "nodes", "meshes", "accessors", "bufferViews", "buffers", "materials", "textures", "images", "samplers", "cameras", "skins", "animations", "extensions", "extras"}
+
 // EthereumAddress represents an Ethereum address
 type EthereumAddress string
 
@@ -362,6 +364,16 @@ func SniffMediaType(buf []byte) (MediaType, string) {
 	whereCharset := strings.IndexByte(contentType, ';')
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]
+	}
+	if contentType == "application/octet-stream" || contentType == "text/plain" {
+		// fallback of http.DetectContentType
+		if strings.EqualFold(string(buf[:4]), "glTF") {
+			return MediaTypeAnimation, "model/gltf+binary"
+		}
+
+		if strings.HasPrefix(strings.TrimSpace(string(buf[:20])), "{") && util.ContainsAny(strings.TrimSpace(string(buf)), gltfFields...) {
+			return MediaTypeAnimation, "model/gltf+json"
+		}
 	}
 	return MediaFromContentType(contentType), contentType
 }

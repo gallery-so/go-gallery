@@ -57,11 +57,11 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 
 			go keepAliveUntilDone(done, in.Key)
 
-			innerWp := workerpool.New(10)
+			innerWp := workerpool.New(25)
 			for _, token := range in.Tokens {
 				t := token
 				innerWp.Submit(func() {
-					ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+					ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 					defer cancel()
 
 					logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", in.Key, t.ContractAddress, t.TokenID, in.Chain)

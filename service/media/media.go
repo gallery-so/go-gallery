@@ -15,8 +15,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -36,8 +36,6 @@ import (
 )
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
-
-var downloadLock = &sync.Mutex{}
 
 type Keywords interface {
 	ForToken(tokenID persist.TokenID, contract persist.Address) []string
@@ -389,12 +387,10 @@ func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgU
 	return ""
 }
 
-func cacheRawSvgMedia(ctx context.Context, img []byte, bucket, fileName string, client *storage.Client) error {
-
-	deleteMedia(ctx, bucket, fileName, client)
+func cacheRawSvgMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	_, err := sw.Write(img)
+	_, err := io.Copy(sw, reader)
 	if err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
@@ -422,14 +418,13 @@ func cacheRawSvgMedia(ctx context.Context, img []byte, bucket, fileName string, 
 	return nil
 }
 
-func cacheRawAnimationMedia(ctx context.Context, animation []byte, bucket, fileName string, client *storage.Client) error {
-	deleteMedia(ctx, bucket, fileName, client)
+func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
 
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 
 	writer := gzip.NewWriter(sw)
 
-	_, err := io.Copy(writer, bytes.NewBuffer(animation))
+	_, err := io.Copy(writer, reader)
 	if err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
@@ -459,13 +454,11 @@ func cacheRawAnimationMedia(ctx context.Context, animation []byte, bucket, fileN
 	return nil
 }
 
-func cacheRawMedia(ctx context.Context, img []byte, bucket, fileName string, contentType string, client *storage.Client) error {
+func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName string, contentType string, client *storage.Client) error {
 	logger.For(ctx).Infof("caching raw media for %s", fileName)
 
-	deleteMedia(ctx, bucket, fileName, client)
-
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	_, err := sw.Write(img)
+	_, err := io.Copy(sw, reader)
 	if err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
@@ -512,9 +505,8 @@ func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, i
 
 	asURI := persist.TokenURI(mediaURL)
 
-	mediaType, contentType, _ := PredictMediaType(pCtx, asURI.String())
-
-	logger.For(pCtx).Infof("predicted media type for %s: %s", truncateString(mediaURL, 50), mediaType)
+	mediaType, contentType, contentLength, _ := PredictMediaType(pCtx, asURI.String())
+	logger.For(pCtx).Infof("predicted media type for %s: %s with length %s", truncateString(mediaURL, 50), mediaType, util.InByteSizeFormat(uint64(contentLength)))
 
 	if mediaType != persist.MediaTypeHTML && asURI.Type() == persist.URITypeIPFSGateway {
 		indexAfterGateway := strings.Index(asURI.String(), "/ipfs/")
@@ -540,28 +532,15 @@ outer:
 		}
 	}
 
-	if util.Contains([]string{"development", "sandbox-backend", "production"}, strings.ToLower(viper.GetString("ENV"))) {
-		downloadLock.Lock()
-		defer downloadLock.Unlock()
-	}
-
-	bs, err := rpc.GetDataFromURI(pCtx, asURI, ipfsClient, arweaveClient)
+	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return persist.MediaTypeUnknown, fmt.Errorf("could not download %s: %s", mediaURL, err)
+		return persist.MediaTypeUnknown, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
 	}
-
-	logger.For(pCtx).Infof("downloaded %f MB from %s for %s", float64(len(bs))/1024/1024, truncateString(mediaURL, 50), name)
-
-	buf := bytes.NewBuffer(bs)
+	defer reader.Close()
 
 	if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
-		mediaType, contentType = persist.SniffMediaType(bs)
-		if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
-			mediaType, contentType = GuessMediaType(bs)
-			logger.For(pCtx).Infof("guessed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
-		} else {
-			logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
-		}
+		mediaType, contentType = persist.SniffMediaType(reader.Headers())
+		logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
 	}
 
 	if mediaType != persist.MediaTypeVideo {
@@ -571,36 +550,37 @@ outer:
 
 	switch mediaType {
 	case persist.MediaTypeVideo:
-		err := cacheRawMedia(pCtx, bs, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), contentType, storageClient)
+		err := cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), contentType, storageClient)
 		if err != nil {
 			return mediaType, err
 		}
 
 		videoURL := fmt.Sprintf("https://storage.googleapis.com/%s/video-%s", viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name)
 
+		// TODO this does not read the whole video into memory I hope?
 		jp, err := thumbnailVideo(videoURL)
 		if err != nil {
 			logger.For(pCtx).Infof("error generating thumbnail for %s: %s", mediaURL, err)
 			return mediaType, errGeneratingThumbnail{url: mediaURL, err: err}
 		}
-		buf = bytes.NewBuffer(jp)
+		buf := bytes.NewBuffer(jp)
 		logger.For(pCtx).Infof("generated thumbnail for %s - file size %s", mediaURL, util.InByteSizeFormat(uint64(buf.Len())))
-		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), "image/jpeg", storageClient)
+		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), "image/jpeg", storageClient)
 	case persist.MediaTypeSVG:
-		return persist.MediaTypeSVG, cacheRawSvgMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
+		return persist.MediaTypeSVG, cacheRawSvgMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
 	case persist.MediaTypeBase64BMP:
-		return persist.MediaTypeImage, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), contentType, storageClient)
+		return persist.MediaTypeImage, cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), contentType, storageClient)
 	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
 			if mediaType == persist.MediaTypeHTML && strings.HasPrefix(mediaURL, "https://") {
 				return mediaType, nil
 			}
-			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(len(buf.Bytes()))/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
+			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
 			if mediaType == persist.MediaTypeAnimation {
-				return mediaType, cacheRawAnimationMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
+				return mediaType, cacheRawAnimationMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 			}
-			return mediaType, cacheRawMedia(pCtx, buf.Bytes(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), contentType, storageClient)
+			return mediaType, cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), contentType, storageClient)
 		default:
 			return mediaType, nil
 		}
@@ -608,14 +588,14 @@ outer:
 }
 
 // PredictMediaType guesses the media type of the given URL.
-func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, string, error) {
+func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, string, int64, error) {
 
 	spl := strings.Split(url, ".")
 	if len(spl) > 1 {
 		ext := spl[len(spl)-1]
 		ext = strings.Split(ext, "?")[0]
 		if t, ok := postfixesToMediaTypes[ext]; ok {
-			return t.mediaType, t.contentType, nil
+			return t.mediaType, t.contentType, 0, nil
 		}
 	}
 	asURI := persist.TokenURI(url)
@@ -623,22 +603,22 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 	logger.For(pCtx).Debugf("predicting media type for %s: %s", url, uriType)
 	switch uriType {
 	case persist.URITypeBase64JSON, persist.URITypeJSON:
-		return persist.MediaTypeJSON, "application/json", nil
+		return persist.MediaTypeJSON, "application/json", int64(len(asURI.String())), nil
 	case persist.URITypeBase64SVG, persist.URITypeSVG:
-		return persist.MediaTypeSVG, "image/svg", nil
+		return persist.MediaTypeSVG, "image/svg", int64(len(asURI.String())), nil
 	case persist.URITypeBase64BMP:
-		return persist.MediaTypeBase64BMP, "image/bmp", nil
+		return persist.MediaTypeBase64BMP, "image/bmp", int64(len(asURI.String())), nil
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
 		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 		if err != nil {
-			return persist.MediaTypeUnknown, "", err
+			return persist.MediaTypeUnknown, "", 0, err
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return persist.MediaTypeUnknown, "", err
+			return persist.MediaTypeUnknown, "", 0, err
 		}
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return persist.MediaTypeUnknown, "", rpc.ErrHTTP{Status: resp.StatusCode, URL: url}
+			return persist.MediaTypeUnknown, "", 0, rpc.ErrHTTP{Status: resp.StatusCode, URL: url}
 		}
 		contentType := resp.Header.Get("Content-Type")
 		contentType = strings.TrimSpace(contentType)
@@ -646,12 +626,13 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 		if whereCharset != -1 {
 			contentType = contentType[:whereCharset]
 		}
-		return persist.MediaFromContentType(contentType), contentType, nil
+		contentLength := resp.ContentLength
+		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
 	case persist.URITypeIPFS:
 		path := strings.TrimPrefix(asURI.String(), "ipfs://")
 		headers, err := rpc.GetIPFSHeaders(pCtx, path)
 		if err != nil {
-			return persist.MediaTypeUnknown, "", err
+			return persist.MediaTypeUnknown, "", 0, err
 		}
 		contentType := headers.Get("Content-Type")
 		contentType = strings.TrimSpace(contentType)
@@ -659,9 +640,17 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 		if whereCharset != -1 {
 			contentType = contentType[:whereCharset]
 		}
-		return persist.MediaFromContentType(contentType), contentType, nil
+		contentLength := headers.Get("Content-Length")
+		contentLengthInt := 0
+		if contentLength != "" {
+			contentLengthInt, err = strconv.Atoi(contentLength)
+			if err != nil {
+				return persist.MediaTypeUnknown, "", 0, err
+			}
+		}
+		return persist.MediaFromContentType(contentType), contentType, int64(contentLengthInt), nil
 	}
-	return persist.MediaTypeUnknown, "", nil
+	return persist.MediaTypeUnknown, "", 0, nil
 }
 
 // GuessMediaType guesses the media type of the given bytes.
