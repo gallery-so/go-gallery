@@ -33,8 +33,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-const largeSize = util.MB * 100
-
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
 
 var downloadLock = &sync.Mutex{}
