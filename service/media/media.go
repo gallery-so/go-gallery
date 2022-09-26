@@ -102,7 +102,7 @@ func newLocalClient(ctx context.Context, keyPath string, scopes []string) *stora
 }
 
 func newClient(ctx context.Context, scopes []string) *storage.Client {
-	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false), option.WithScopes(scopes...))
+	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false, true), option.WithScopes(scopes...))
 	if err != nil {
 		panic(err)
 	}

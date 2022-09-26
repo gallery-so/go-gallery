@@ -38,7 +38,7 @@ func coreInitServer() *gin.Engine {
 	tokenRepo := newRepos()
 	s := media.NewStorageClient(ctx, "./_deploy/service-key-dev.json")
 
-	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
+	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false, true)}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
