@@ -152,6 +152,7 @@ func setDefaults() {
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "dev-token-processing")
 
 	viper.AutomaticEnv()
 
