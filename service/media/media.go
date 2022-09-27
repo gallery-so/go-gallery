@@ -458,6 +458,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileN
 func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName string, contentType string, client *storage.Client) error {
 	logger.For(ctx).Infof("caching raw media for %s", fileName)
 
+	timeBeforeCopy := time.Now()
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	_, err := io.Copy(sw, reader)
 	if err != nil {
@@ -468,6 +469,9 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName strin
 		return err
 	}
 
+	logger.For(ctx).Infof("storage copy took %s", time.Since(timeBeforeCopy))
+
+	timeBeforeUpdate := time.Now()
 	o := client.Bucket(bucket).Object(fileName)
 
 	// Update the object to set the metadata.
@@ -481,10 +485,14 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName strin
 		return err
 	}
 
+	logger.For(ctx).Infof("storage update took %s", time.Since(timeBeforeUpdate))
+
+	timeBeforePurge := time.Now()
 	err = mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
 	if err != nil {
 		logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
 	}
+	logger.For(ctx).Infof("storage purge took %s", time.Since(timeBeforePurge))
 	return nil
 }
 

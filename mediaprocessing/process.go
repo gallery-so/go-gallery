@@ -61,12 +61,14 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 			for _, token := range in.Tokens {
 				t := token
 				innerWp.Submit(func() {
+					totalTimeOfWp := time.Now()
 					ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 					defer cancel()
 
 					logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", in.Key, t.ContractAddress, t.TokenID, in.Chain)
 					image, animation := media.KeywordsForChain(in.Chain, in.ImageKeywords, in.AnimationKeywords)
 
+					totalTimeOfMedia := time.Now()
 					media, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 					if err != nil {
 						logger.For(ctx).Errorf("error processing media for %s: %s", in.Key, err)
@@ -74,6 +76,8 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 							MediaType: persist.MediaTypeUnknown,
 						}
 					}
+					logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", in.Key, t.ContractAddress, t.TokenID, in.Chain, time.Since(totalTimeOfMedia))
+
 					up := persist.TokenUpdateMediaInput{
 						Media:       media,
 						Metadata:    t.TokenMetadata,
@@ -82,11 +86,14 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 						Description: persist.NullString(t.Description),
 						LastUpdated: persist.LastUpdatedTime{},
 					}
+					totalUpdateTime := time.Now()
 					if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, t.ContractAddress, in.Chain, up); err != nil {
 						logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, t.ContractAddress, in.Chain, err)
 						return
 					}
-					logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d", in.Key, t.ContractAddress, t.TokenID, in.Chain)
+					logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", in.Key, t.ContractAddress, t.TokenID, in.Chain, time.Since(totalUpdateTime))
+
+					logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", in.Key, t.ContractAddress, t.TokenID, in.Chain, time.Since(totalTimeOfWp))
 				})
 			}
 			func() {
