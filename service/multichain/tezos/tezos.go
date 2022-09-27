@@ -35,11 +35,6 @@ const (
 
 const tezosNoncePrepend = "Tezos Signed Message: "
 
-var (
-	tezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
-	tezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
-)
-
 type tzMetadata struct {
 	Date               string      `json:"date"`
 	Name               string      `json:"name"`
@@ -496,7 +491,7 @@ func (d *Provider) makeTempMedia(tokenID persist.TokenID, contract persist.Addre
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
-	img, anim := media.FindImageAndAnimationURLs(tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(tezAnimationKeywords), media.TezImageKeywords(tezImageKeywords), name)
+	img, anim := media.FindImageAndAnimationURLs(tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(multichain.TezAnimationKeywords), media.TezImageKeywords(multichain.TezImageKeywords), name)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)

@@ -12,14 +12,31 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
-	"github.com/mikeydub/go-gallery/mediaprocessing"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 )
 
 const staleCommunityTime = time.Hour * 2
+
+var (
+	TezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
+	TezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
+)
+
+type keywordsForChain struct {
+	imageKeywords     []string
+	animationKeywords []string
+}
+
+var allKeywordsForChain = map[persist.Chain]keywordsForChain{
+	persist.ChainTezos: {
+		imageKeywords:     TezImageKeywords,
+		animationKeywords: TezAnimationKeywords,
+	},
+}
 
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
@@ -287,14 +304,19 @@ outer:
 		return err
 	}
 
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersNFTs, user)
+	newTokens, tokensToBeProcessed, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersNFTs, user)
 	if err := d.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
 
-	tokensToBeProcessed, err := getMediaLessTokens(ctx, d.Repos, newTokens)
-
-	err := processMediaLessTokens(ctx, tokensToBeProcessed)
+	for chain, tokens := range tokensToBeProcessed {
+		keywords, ok := allKeywordsForChain[chain]
+		if !ok {
+			continue
+		}
+		logger.For(ctx).Infof("processing %d tokens for chain %s with %d total new tokens", len(tokens), chain, len(newTokens))
+		err = processMedialessTokens(ctx, fmt.Sprintf("%d-%s", chain, userID.String()), chain, tokens, keywords.imageKeywords, keywords.animationKeywords)
+	}
 
 	logger.For(ctx).Warn("preparing to delete old tokens")
 
@@ -320,31 +342,31 @@ outer:
 	return nil
 }
 
-func processMediaLessTokens() {
-	processMediaInput := mediaprocessing.ProcessMediaInput{
-		Key:               mediaKey,
-		Chain:             persist.ChainTezos,
-		Tokens:            resultTokens,
-		ImageKeywords:     tezImageKeywords,
-		AnimationKeywords: tezAnimationKeywords,
+func processMedialessTokens(ctx context.Context, mediaKey string, chain persist.Chain, tokens []ChainAgnosticToken, imageKeywords, animationKeywords []string) error {
+	processMediaInput := map[string]interface{}{
+		"key":                mediaKey,
+		"chain":              persist.ChainTezos,
+		"tokens":             tokens,
+		"image_keywords":     imageKeywords,
+		"animation_keywords": animationKeywords,
 	}
 	asJSON, err := json.Marshal(processMediaInput)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/process", d.mediaURL), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/process", viper.GetString("MEDIA_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create media request: %w", err)
+		return fmt.Errorf("failed to create media request: %w", err)
 	}
-	resp, err := d.httpClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to send media request: %w", err)
+		return fmt.Errorf("failed to send media request: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		logger.For(ctx).Errorf("media request failed: %s", util.GetErrFromResp(resp))
 	}
-
+	return nil
 }
 
 func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]TokenHolder, error) {
@@ -510,29 +532,18 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return nil
 }
 
-func getMediaLessTokens(ctx context.Context, tokens []persist.Token) ([]ChainAgnosticToken, error) {
-	var chainAgnosticTokens []ChainAgnosticToken
-	for _, token := range tokens {
-		chainAgnosticToken, err := getChainAgnosticToken(ctx, token)
-		if err != nil {
-			return nil, err
-		}
-		chainAgnosticTokens = append(chainAgnosticTokens, chainAgnosticToken)
-	}
-	return chainAgnosticTokens, nil
-}
-
-func getAgnosticToken(ctx context.Context, token persist.Token) (ChainAgnosticToken, error) {
-	chainAgnosticToken, err := getChainAgnosticToken(ctx, token)
-	if err != nil {
-		return ChainAgnosticToken{}, err
-	}
-	chainAgnosticToken.Media = token.Media
-	return chainAgnosticToken, nil
-}
-
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, map[persist.Chain][]ChainAgnosticToken, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
+
+	// a map of contract IDs to addresses (the inverse of contractAddressIDs)
+	idsToAddresses := make(map[persist.DBID]string)
+	for address, id := range contractAddressIDs {
+		idsToAddresses[id] = address
+	}
+
+	// a map to dedupe chain agnostic tokens that will end up being the chain agnostic version of whatever seenTokens has
+	agnosticTokens := map[persist.TokenIdentifiers]ChainAgnosticToken{}
+
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
@@ -574,6 +585,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 					BlockNumber:          token.BlockNumber,
 					IsProviderMarkedSpam: token.IsSpam,
 				}
+				agnosticTokens[ti] = token
 			}
 
 			var found bool
@@ -597,7 +609,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 
 			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
+				return nil, nil, fmt.Errorf("failed to get ownership history for token: %s", err)
 			}
 
 			seenToken := seenTokens[ti]
@@ -614,16 +626,20 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 	}
 
 	res := make([]persist.TokenGallery, 0, len(seenTokens))
+	resUnservable := map[persist.Chain][]ChainAgnosticToken{}
 	for _, t := range seenTokens {
 		if !t.Media.IsServable() {
 			if dbToken, ok := dbSeen[persist.NewTokenIdentifiers(persist.Address(t.Contract), t.TokenID, t.Chain)]; ok && dbToken.Media.IsServable() {
 				res = append(res, dbToken)
 				continue
+			} else {
+				// if we don't have a servable version of this token in the db, then we should add it to the unservable list
+				resUnservable[t.Chain] = append(resUnservable[t.Chain], agnosticTokens[persist.NewTokenIdentifiers(persist.Address(idsToAddresses[t.Contract]), t.TokenID, t.Chain)])
 			}
 		}
 		res = append(res, t)
 	}
-	return res, nil
+	return res, resUnservable, nil
 
 }
 
