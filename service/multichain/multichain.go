@@ -1,18 +1,22 @@
 package multichain
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/mikeydub/go-gallery/mediaprocessing"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 const staleCommunityTime = time.Hour * 2
@@ -288,6 +292,10 @@ outer:
 		return fmt.Errorf("error upserting tokens: %s", err)
 	}
 
+	tokensToBeProcessed, err := getMediaLessTokens(ctx, d.Repos, newTokens)
+
+	err := processMediaLessTokens(ctx, tokensToBeProcessed)
+
 	logger.For(ctx).Warn("preparing to delete old tokens")
 
 	// ensure all old tokens are deleted
@@ -310,6 +318,33 @@ outer:
 	}
 
 	return nil
+}
+
+func processMediaLessTokens() {
+	processMediaInput := mediaprocessing.ProcessMediaInput{
+		Key:               mediaKey,
+		Chain:             persist.ChainTezos,
+		Tokens:            resultTokens,
+		ImageKeywords:     tezImageKeywords,
+		AnimationKeywords: tezAnimationKeywords,
+	}
+	asJSON, err := json.Marshal(processMediaInput)
+	if err != nil {
+		return nil, nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/process", d.mediaURL), bytes.NewBuffer(asJSON))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create media request: %w", err)
+	}
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to send media request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		logger.For(ctx).Errorf("media request failed: %s", util.GetErrFromResp(resp))
+	}
+
 }
 
 func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]TokenHolder, error) {
@@ -473,6 +508,27 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 		}
 	}
 	return nil
+}
+
+func getMediaLessTokens(ctx context.Context, tokens []persist.Token) ([]ChainAgnosticToken, error) {
+	var chainAgnosticTokens []ChainAgnosticToken
+	for _, token := range tokens {
+		chainAgnosticToken, err := getChainAgnosticToken(ctx, token)
+		if err != nil {
+			return nil, err
+		}
+		chainAgnosticTokens = append(chainAgnosticTokens, chainAgnosticToken)
+	}
+	return chainAgnosticTokens, nil
+}
+
+func getAgnosticToken(ctx context.Context, token persist.Token) (ChainAgnosticToken, error) {
+	chainAgnosticToken, err := getChainAgnosticToken(ctx, token)
+	if err != nil {
+		return ChainAgnosticToken{}, err
+	}
+	chainAgnosticToken.Media = token.Media
+	return chainAgnosticToken, nil
 }
 
 func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {

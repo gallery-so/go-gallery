@@ -1,7 +1,6 @@
 package tezos
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -16,7 +15,6 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/mediaprocessing"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -479,30 +477,6 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.Canceled {
-				processMediaInput := mediaprocessing.ProcessMediaInput{
-					Key:               mediaKey,
-					Chain:             persist.ChainTezos,
-					Tokens:            resultTokens,
-					ImageKeywords:     tezImageKeywords,
-					AnimationKeywords: tezAnimationKeywords,
-				}
-				asJSON, err := json.Marshal(processMediaInput)
-				if err != nil {
-					return nil, nil, err
-				}
-				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/process", d.mediaURL), bytes.NewBuffer(asJSON))
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to create media request: %w", err)
-				}
-				resp, err := d.httpClient.Do(req)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to send media request: %w", err)
-				}
-				defer resp.Body.Close()
-				if resp.StatusCode != http.StatusOK {
-					logger.For(ctx).Errorf("media request failed: %s", util.GetErrFromResp(resp))
-				}
-
 				return resultTokens, resultContracts, nil
 			}
 			return nil, nil, ctx.Err()
