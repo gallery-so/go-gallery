@@ -60,7 +60,7 @@ func coreInitServer() *gin.Engine {
 
 	queue := make(chan ProcessMediaInput)
 	go processMedias(sentryutil.NewSentryHubContext(ctx), queue, tokenRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queue, t)
+	return handlersInitServer(router, queue, tokenRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
@@ -82,6 +82,8 @@ func setDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("SELF_HOST", "http://localhost:6500")
+
+	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") == "local" {
 
@@ -110,7 +112,6 @@ func setDefaults() {
 		panic("SENTRY_DSN must be set")
 	}
 
-	viper.AutomaticEnv()
 }
 
 func newRepos() persist.TokenGalleryRepository {

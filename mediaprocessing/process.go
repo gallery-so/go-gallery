@@ -29,7 +29,7 @@ type ProcessMediaInput struct {
 	AnimationKeywords []string                        `json:"animation_keywords" binding:"required"`
 }
 
-func processIPFSMetadata(queue chan<- ProcessMediaInput, throttler *throttle.Locker) gin.HandlerFunc {
+func processIPFSMetadata(queue chan<- ProcessMediaInput, tokenRepo persist.TokenGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -40,7 +40,55 @@ func processIPFSMetadata(queue chan<- ProcessMediaInput, throttler *throttle.Loc
 			util.ErrResponse(c, http.StatusTooManyRequests, err)
 			return
 		}
-		queue <- input
+		// queue <- input
+		ctx, cancel := context.WithTimeout(c, 25*time.Minute)
+		defer cancel()
+
+		innerWp := workerpool.New(100)
+		for _, token := range input.Tokens {
+			t := token
+			innerWp.Submit(func() {
+				totalTimeOfWp := time.Now()
+				ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+				defer cancel()
+
+				logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", input.Key, t.ContractAddress, t.TokenID, input.Chain)
+				image, animation := media.KeywordsForChain(input.Chain, input.ImageKeywords, input.AnimationKeywords)
+
+				totalTimeOfMedia := time.Now()
+				med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, input.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
+				if err != nil {
+					logger.For(ctx).Errorf("error processing media for %s: %s", input.Key, err)
+					med = persist.Media{
+						MediaType: persist.MediaTypeUnknown,
+					}
+				}
+				logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", input.Key, t.ContractAddress, t.TokenID, input.Chain, time.Since(totalTimeOfMedia))
+
+				up := persist.TokenUpdateMediaInput{
+					Media:       med,
+					Metadata:    t.TokenMetadata,
+					TokenURI:    t.TokenURI,
+					Name:        persist.NullString(t.Name),
+					Description: persist.NullString(t.Description),
+					LastUpdated: persist.LastUpdatedTime{},
+				}
+				totalUpdateTime := time.Now()
+				logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", input.Key, t.ContractAddress, t.TokenID, input.Chain)
+				if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, t.ContractAddress, input.Chain, up); err != nil {
+					logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, t.ContractAddress, input.Chain, err)
+					return
+				}
+				logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", input.Key, t.ContractAddress, t.TokenID, input.Chain, time.Since(totalUpdateTime))
+
+				logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", input.Key, t.ContractAddress, t.TokenID, input.Chain, time.Since(totalTimeOfWp))
+			})
+		}
+		func() {
+			defer throttler.Unlock(ctx, input.Key)
+			innerWp.StopWait()
+			logger.For(nil).Infof("Processing Media: %s - Finished", input.Key)
+		}()
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
@@ -57,7 +105,7 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 
 			go keepAliveUntilDone(done, in.Key)
 
-			innerWp := workerpool.New(25)
+			innerWp := workerpool.New(100)
 			for _, token := range in.Tokens {
 				t := token
 				innerWp.Submit(func() {
@@ -69,17 +117,17 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 					image, animation := media.KeywordsForChain(in.Chain, in.ImageKeywords, in.AnimationKeywords)
 
 					totalTimeOfMedia := time.Now()
-					media, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
+					med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 					if err != nil {
 						logger.For(ctx).Errorf("error processing media for %s: %s", in.Key, err)
-						media = persist.Media{
+						med = persist.Media{
 							MediaType: persist.MediaTypeUnknown,
 						}
 					}
 					logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", in.Key, t.ContractAddress, t.TokenID, in.Chain, time.Since(totalTimeOfMedia))
 
 					up := persist.TokenUpdateMediaInput{
-						Media:       media,
+						Media:       med,
 						Metadata:    t.TokenMetadata,
 						TokenURI:    t.TokenURI,
 						Name:        persist.NullString(t.Name),

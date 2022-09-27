@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
@@ -90,12 +91,26 @@ func newStorageClient() *storage.Client {
 	if viper.GetString("ENV") != "local" {
 		s, err = storage.NewClient(context.Background())
 	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
+		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
 	}
 	if err != nil {
 		logger.For(nil).Errorf("error creating storage client: %v", err)
 	}
 	return s
+}
+
+func newTasksClient() *cloudtasks.Client {
+	var c *cloudtasks.Client
+	var err error
+	if viper.GetString("ENV") != "local" {
+		c, err = cloudtasks.NewClient(context.Background())
+	} else {
+		c, err = cloudtasks.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+	}
+	if err != nil {
+		logger.For(nil).Errorf("error creating tasks client: %v", err)
+	}
+	return c
 }
 
 func setDefaults() {
@@ -246,7 +261,7 @@ func initSentry() {
 func newMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *multichain.Provider {
 	ethChain := persist.ChainETH
 
-	return multichain.NewMultiChainDataRetriever(context.Background(), repos, cache, multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket), poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN")))
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos, cache, newTasksClient(), multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket), poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN")))
 }
 
 func newThrottler() *throttle.Locker {
