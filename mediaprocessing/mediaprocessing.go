@@ -2,7 +2,9 @@ package mediaprocessing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -17,6 +19,7 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -79,6 +82,29 @@ func setDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("SELF_HOST", "http://localhost:6500")
+
+	if viper.GetString("ENV") == "local" {
+
+		filePath := "_local/app-local-mediaprocessing.yaml"
+		if len(os.Args) > 1 {
+			if os.Args[1] == "dev" {
+				filePath = "_local/app-dev-mediaprocessing.yaml"
+			} else if os.Args[1] == "prod" {
+				filePath = "_local/app-prod-mediaprocessing.yaml"
+			}
+		}
+
+		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+		path, err := util.FindFile(filePath, 3)
+		if err != nil {
+			panic(err)
+		}
+
+		viper.SetConfigFile(path)
+		if err := viper.ReadInConfig(); err != nil {
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
+		}
+	}
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")

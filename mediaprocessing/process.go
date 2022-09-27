@@ -70,7 +70,9 @@ func processMedias(ctx context.Context, queue <-chan ProcessMediaInput, tokenRep
 					media, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, t.ContractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, in.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 					if err != nil {
 						logger.For(ctx).Errorf("error processing media for %s: %s", in.Key, err)
-						return
+						media = persist.Media{
+							MediaType: persist.MediaTypeUnknown,
+						}
 					}
 					up := persist.TokenUpdateMediaInput{
 						Media:       media,
