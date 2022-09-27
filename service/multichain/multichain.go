@@ -314,7 +314,7 @@ outer:
 		if !ok {
 			continue
 		}
-		logger.For(ctx).Infof("processing %d tokens for chain %s with %d total new tokens", len(tokens), chain, len(newTokens))
+		logger.For(ctx).Infof("processing %d tokens for chain %d with %d total new tokens", len(tokens), chain, len(newTokens))
 		err = processMedialessTokens(ctx, fmt.Sprintf("%d-%s", chain, userID.String()), chain, tokens, keywords.imageKeywords, keywords.animationKeywords)
 	}
 
