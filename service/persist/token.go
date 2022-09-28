@@ -814,6 +814,11 @@ func (a EthereumAddressAtBlock) Value() (driver.Value, error) {
 	return json.Marshal(a)
 }
 
+// IsValid returns true if the media type is not unknown, syncing, or invalid
+func (m MediaType) IsValid() bool {
+	return m != MediaTypeUnknown && m != MediaTypeInvalid && m != MediaTypeSyncing
+}
+
 // Value implements the database/sql/driver Valuer interface for the MediaType type
 func (m MediaType) Value() (driver.Value, error) {
 	return string(m), nil

@@ -149,7 +149,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 	}
-	if vURL != "" {
+	if !mediaType.IsValid() || (mediaType == persist.MediaTypeImage && vURL != "") {
 		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
 		var err error
 		mediaType, err = downloadAndCache(pCtx, vURL, name, "video", ipfsClient, arweaveClient, storageClient)
@@ -534,6 +534,7 @@ func thumbnailAndCache(ctx context.Context, videoURL, bucket, fileName string, c
 	exists := err != storage.ErrObjectNotExist
 
 	sw := o.NewWriter(ctx)
+	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	err = thumbnailVideoToWriter(videoURL, sw)
 	if err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
@@ -808,7 +809,7 @@ func GuessMediaType(bs []byte) (persist.MediaType, string) {
 }
 
 func thumbnailVideoToWriter(url string, writer io.Writer) error {
-	c := exec.Command("ffmpeg", "-seekable", "1", "-i", url, "-ss", "00:00:01.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
+	c := exec.Command("ffmpeg", "-seekable", "1", "-i", url, "-ss", "00:00:00.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
@@ -820,21 +821,6 @@ func truncateString(s string, i int) string {
 		return string(asRunes[:i])
 	}
 	return s
-}
-
-func pipeIOForCmd(c *exec.Cmd, input []byte) ([]byte, error) {
-
-	stdin, err := c.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-		defer stdin.Close()
-		stdin.Write(input)
-	}()
-
-	return c.Output()
 }
 
 func (d DefaultKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
