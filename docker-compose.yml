@@ -45,3 +45,17 @@ services:
       - "8080:80"
     volumes:
       - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
+  # mediaprocessing:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/mediaprocessing/DOCKERFILE"
+  #   ports:
+  #     - "6500:6500"
+  #   env_file:
+  #     - _local/app-local-mediaprocessing.env
+  #   volumes:
+  #     - ${PWD}/_local:/_local
+  #     - ${PWD}/_deploy:/_deploy
+  #   depends_on:
+  #     - postgres
+  #     - redis
