@@ -3,7 +3,6 @@ package mediaprocessing
 import (
 	"context"
 	"net/http"
-	"sort"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -44,19 +43,13 @@ func processMediaForUsersTokensOfChain(queue chan<- ProcessMediaInput, tokenRepo
 		}
 		filtered := make([]persist.TokenGallery, 0, len(allTokens))
 		for _, token := range allTokens {
-			if token.Chain == input.Chain {
+			if token.Chain == input.Chain && !token.Media.IsServable() {
 				filtered = append(filtered, token)
 			}
 		}
-		sort.Slice(allTokens, func(i, j int) bool {
-			if allTokens[i].Media.IsServable() && !allTokens[j].Media.IsServable() {
-				return false
-			}
-			return true
-		})
 
 		innerWp := workerpool.New(100)
-		for _, token := range allTokens {
+		for _, token := range filtered {
 			t := token
 			innerWp.Submit(func() {
 				totalTimeOfWp := time.Now()
@@ -69,7 +62,6 @@ func processMediaForUsersTokensOfChain(queue chan<- ProcessMediaInput, tokenRepo
 				contract, err := contractRepo.GetByID(ctx, t.Contract)
 				if err != nil {
 					logger.For(ctx).Errorf("Error getting contract: %s", err)
-					return
 				}
 				totalTimeOfMedia := time.Now()
 				med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contract.Address, persist.TokenID(t.TokenID.String()), t.TokenURI, input.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
