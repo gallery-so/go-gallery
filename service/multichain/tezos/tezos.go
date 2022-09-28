@@ -1,7 +1,6 @@
 package tezos
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -16,7 +15,6 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/mikeydub/go-gallery/mediaprocessing"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -36,11 +34,6 @@ const (
 )
 
 const tezosNoncePrepend = "Tezos Signed Message: "
-
-var (
-	tezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
-	tezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
-)
 
 type tzMetadata struct {
 	Date               string      `json:"date"`
@@ -479,30 +472,6 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.Canceled {
-				processMediaInput := mediaprocessing.ProcessMediaInput{
-					Key:               mediaKey,
-					Chain:             persist.ChainTezos,
-					Tokens:            resultTokens,
-					ImageKeywords:     tezImageKeywords,
-					AnimationKeywords: tezAnimationKeywords,
-				}
-				asJSON, err := json.Marshal(processMediaInput)
-				if err != nil {
-					return nil, nil, err
-				}
-				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/process", d.mediaURL), bytes.NewBuffer(asJSON))
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to create media request: %w", err)
-				}
-				resp, err := d.httpClient.Do(req)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to send media request: %w", err)
-				}
-				defer resp.Body.Close()
-				if resp.StatusCode != http.StatusOK {
-					logger.For(ctx).Errorf("media request failed: %s", util.GetErrFromResp(resp))
-				}
-
 				return resultTokens, resultContracts, nil
 			}
 			return nil, nil, ctx.Err()
@@ -522,7 +491,7 @@ func (d *Provider) makeTempMedia(tokenID persist.TokenID, contract persist.Addre
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
-	img, anim := media.FindImageAndAnimationURLs(tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(tezAnimationKeywords), media.TezImageKeywords(tezImageKeywords), name)
+	img, anim := media.FindImageAndAnimationURLs(tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(multichain.TezAnimationKeywords), media.TezImageKeywords(multichain.TezImageKeywords), name)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)

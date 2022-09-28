@@ -38,14 +38,16 @@ const (
 // When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
 // so that the first 512 bytes are not lost
 type FileHeaderReader struct {
-	headers *bytes.Buffer
-	reader  io.Reader
+	headers   *bytes.Buffer
+	reader    io.Reader
+	subreader io.Reader
 }
 
 // NewFileHeaderReader returns a new FileHeaderReader
 func NewFileHeaderReader(reader io.Reader) (FileHeaderReader, error) {
 	fi := FileHeaderReader{
-		headers: bytes.NewBuffer(make([]byte, 0, 512)),
+		headers:   bytes.NewBuffer(make([]byte, 0, 512)),
+		subreader: reader,
 	}
 	_, err := io.CopyN(fi.headers, reader, 512)
 	if err != nil {
@@ -61,7 +63,7 @@ func (f FileHeaderReader) Read(p []byte) (n int, err error) {
 
 // Close closes the given io.Reader if it is also a closer
 func (f FileHeaderReader) Close() error {
-	if closer, ok := f.reader.(io.Closer); ok {
+	if closer, ok := f.subreader.(io.Closer); ok {
 		return closer.Close()
 	}
 	return nil

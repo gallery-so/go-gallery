@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -457,6 +458,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileN
 func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName string, contentType string, client *storage.Client) error {
 	logger.For(ctx).Infof("caching raw media for %s", fileName)
 
+	timeBeforeCopy := time.Now()
 	sw := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	_, err := io.Copy(sw, reader)
 	if err != nil {
@@ -467,6 +469,9 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName strin
 		return err
 	}
 
+	logger.For(ctx).Infof("storage copy took %s", time.Since(timeBeforeCopy))
+
+	timeBeforeUpdate := time.Now()
 	o := client.Bucket(bucket).Object(fileName)
 
 	// Update the object to set the metadata.
@@ -480,10 +485,14 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName strin
 		return err
 	}
 
+	logger.For(ctx).Infof("storage update took %s", time.Since(timeBeforeUpdate))
+
+	timeBeforePurge := time.Now()
 	err = mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
 	if err != nil {
 		logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
 	}
+	logger.For(ctx).Infof("storage purge took %s", time.Since(timeBeforePurge))
 	return nil
 }
 
@@ -505,8 +514,9 @@ func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, i
 
 	asURI := persist.TokenURI(mediaURL)
 
+	timeBeforePredict := time.Now()
 	mediaType, contentType, contentLength, _ := PredictMediaType(pCtx, asURI.String())
-	logger.For(pCtx).Infof("predicted media type for %s: %s with length %s", truncateString(mediaURL, 50), mediaType, util.InByteSizeFormat(uint64(contentLength)))
+	logger.For(pCtx).Infof("predicted media type for %s: %s with length %s in %s", truncateString(mediaURL, 50), mediaType, util.InByteSizeFormat(uint64(contentLength)), time.Since(timeBeforePredict))
 
 	if mediaType != persist.MediaTypeHTML && asURI.Type() == persist.URITypeIPFSGateway {
 		indexAfterGateway := strings.Index(asURI.String(), "/ipfs/")
@@ -525,51 +535,79 @@ outer:
 			logger.For(pCtx).Infof("uri for %s is of type %s: trying to cache", name, asURI.Type())
 			break outer
 		default:
+			timeBeforeDelete := time.Now()
 			// delete medias that are stored because the current media should be reflected directly in the metadata, not in GCP
 			deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 			deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+			logger.For(pCtx).Infof("deleted medias for %s in %s", name, time.Since(timeBeforeDelete))
 			return mediaType, nil
 		}
 	}
 
+	timeBeforeDataReader := time.Now()
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
 		return persist.MediaTypeUnknown, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
 	}
+	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
 
 	if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
+		timeBeforeSniff := time.Now()
 		mediaType, contentType = persist.SniffMediaType(reader.Headers())
-		logger.For(pCtx).Infof("sniffed media type for %s: %s", truncateString(mediaURL, 50), mediaType)
+		logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
 	}
 
 	if mediaType != persist.MediaTypeVideo {
+		timeBeforeDeleteVideo := time.Now()
 		// only videos get thumbnails, if the NFT was previously a video however, it might still have a thumbnail
 		deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
+		logger.For(pCtx).Infof("deleted thumbnail for %s in %s", name, time.Since(timeBeforeDeleteVideo))
 	}
 
 	switch mediaType {
 	case persist.MediaTypeVideo:
+		timeBeforeCacheVideo := time.Now()
 		err := cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), contentType, storageClient)
 		if err != nil {
 			return mediaType, err
 		}
+		logger.For(pCtx).Infof("cached video for %s in %s", name, time.Since(timeBeforeCacheVideo))
 
 		videoURL := fmt.Sprintf("https://storage.googleapis.com/%s/video-%s", viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name)
 
-		// TODO this does not read the whole video into memory I hope?
+		timeBeforeThumbnail := time.Now()
 		jp, err := thumbnailVideo(videoURL)
 		if err != nil {
 			logger.For(pCtx).Infof("error generating thumbnail for %s: %s", mediaURL, err)
 			return mediaType, errGeneratingThumbnail{url: mediaURL, err: err}
 		}
+		logger.For(pCtx).Infof("generated thumbnail for %s in %s", name, time.Since(timeBeforeThumbnail))
 		buf := bytes.NewBuffer(jp)
 		logger.For(pCtx).Infof("generated thumbnail for %s - file size %s", mediaURL, util.InByteSizeFormat(uint64(buf.Len())))
-		return persist.MediaTypeVideo, cacheRawMedia(pCtx, buf, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), "image/jpeg", storageClient)
+		timeBeforeCache := time.Now()
+		err = cacheRawMedia(pCtx, buf, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), "image/jpeg", storageClient)
+		if err != nil {
+			return mediaType, err
+		}
+		logger.For(pCtx).Infof("cached thumbnail for %s in %s", name, time.Since(timeBeforeCache))
+		return persist.MediaTypeVideo, nil
 	case persist.MediaTypeSVG:
-		return persist.MediaTypeSVG, cacheRawSvgMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
+		timeBeforeCache := time.Now()
+		err = cacheRawSvgMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
+		if err != nil {
+			return mediaType, err
+		}
+		logger.For(pCtx).Infof("cached svg for %s in %s", name, time.Since(timeBeforeCache))
+		return persist.MediaTypeSVG, nil
 	case persist.MediaTypeBase64BMP:
-		return persist.MediaTypeImage, cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), contentType, storageClient)
+		timeBeforeCache := time.Now()
+		err = cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), contentType, storageClient)
+		if err != nil {
+			return mediaType, err
+		}
+		logger.For(pCtx).Infof("cached image for %s in %s", name, time.Since(timeBeforeCache))
+		return persist.MediaTypeImage, nil
 	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
@@ -578,9 +616,21 @@ outer:
 			}
 			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
 			if mediaType == persist.MediaTypeAnimation {
-				return mediaType, cacheRawAnimationMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
+				timeBeforeCache := time.Now()
+				err = cacheRawAnimationMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
+				if err != nil {
+					return mediaType, err
+				}
+				logger.For(pCtx).Infof("cached animation for %s in %s", name, time.Since(timeBeforeCache))
+				return mediaType, nil
 			}
-			return mediaType, cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), contentType, storageClient)
+			timeBeforeCache := time.Now()
+			err = cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), contentType, storageClient)
+			if err != nil {
+				return mediaType, err
+			}
+			logger.For(pCtx).Infof("cached raw media for %s in %s", name, time.Since(timeBeforeCache))
+			return mediaType, nil
 		default:
 			return mediaType, nil
 		}
