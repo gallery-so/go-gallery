@@ -19,8 +19,7 @@ func main() {
 	cfg := profiler.Config{
 		Service:        "mediaprocessing",
 		ServiceVersion: "1.0.0",
-		// ProjectID must be set if not running on GCP.
-		// ProjectID: "my-project",
+		MutexProfiling: true,
 	}
 
 	// Profiler initialization, best done as early as possible.
