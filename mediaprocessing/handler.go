@@ -9,7 +9,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/throttle"
 )
 
-func handlersInitServer(router *gin.Engine, queue chan<- ProcessMediaInput, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) *gin.Engine {
-	router.POST("/process", processMediaForUsersTokensOfChain(queue, tokenRepo, contractRepo, ipfsClient, arweaveClient, stg, tokenBucket, throttler))
+func handlersInitServer(router *gin.Engine, repos *persist.Repositories, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) *gin.Engine {
+	router.POST("/process", processMediaForUsersTokensOfChain(repos.TokenRepository, repos.ContractRepository, ipfsClient, arweaveClient, stg, tokenBucket, throttler))
+	router.POST("/process/token", processMediaForToken(repos.TokenRepository, repos.UserRepository, repos.WalletRepository, ipfsClient, arweaveClient, stg, tokenBucket, throttler))
 	return router
 }

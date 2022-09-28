@@ -82,8 +82,8 @@ func RemoveBOM(bs []byte) []byte {
 	return bs
 }
 
-// Contains checks whether an item exists in a slice
-func Contains(s []string, str string) bool {
+// ContainsString checks whether an item exists in a slice
+func ContainsString(s []string, str string) bool {
 	for _, v := range s {
 		if v == str {
 			return true
@@ -93,8 +93,8 @@ func Contains(s []string, str string) bool {
 	return false
 }
 
-// ContainsAny checks whether a string contains any of the given substrings
-func ContainsAny(s string, strs ...string) bool {
+// ContainsAnyString checks whether a string contains any of the given substrings
+func ContainsAnyString(s string, strs ...string) bool {
 	for _, v := range strs {
 		if strings.Contains(s, v) {
 			return true

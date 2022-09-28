@@ -1,10 +1,12 @@
 package multichain
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"sort"
 	"sync"
@@ -15,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 )
@@ -144,7 +147,8 @@ type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
 	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 	GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
 	GetCommunityOwners(context.Context, persist.Address) ([]ChainAgnosticCommunityOwner, error)
@@ -361,6 +365,35 @@ func (p *Provider) processMedialessTokens(ctx context.Context, userID persist.DB
 	return nil
 }
 
+func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+	input := map[string]interface{}{
+		"token_id":           tokenID,
+		"contract_address":   contractAddress,
+		"chain":              chain,
+		"owner_address":      ownerAddress,
+		"image_keywords":     imageKeywords,
+		"animation_keywords": animationKeywords,
+	}
+	asJSON, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/process/token", viper.GetString("MEDIA_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return util.GetErrFromResp(resp)
+	}
+	return nil
+}
+
 func (p *Provider) createTaskForProcessingTokens(ctx context.Context, message []byte) (*taskspb.Task, error) {
 
 	queuePath := fmt.Sprintf("projects/%s/locations/us-west2/queues/%s", os.Getenv("GOOGLE_CLOUD_PROJECT"), viper.GetString("TOKEN_PROCESSING_QUEUE"))
@@ -505,11 +538,12 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		}
 
 		if i == 0 {
-			tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
-			if err != nil {
-				return err
-			}
-			for _, token := range tokens {
+			for _, ownerAddress := range ownerAddresses {
+				token, contract, err := provider.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
+				if err != nil {
+					return err
+				}
+
 				if err := d.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
 					Media:       token.Media,
 					Metadata:    token.TokenMetadata,
@@ -520,8 +554,15 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}); err != nil {
 					return err
 				}
-			}
-			for _, contract := range contracts {
+				if !token.Media.IsServable() {
+					if keywords, ok := allKeywordsForChain[ti.Chain]; ok {
+						err = d.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, keywords.imageKeywords, keywords.animationKeywords)
+						if err != nil {
+							return err
+						}
+					}
+				}
+
 				if err := d.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 					Chain:          ti.Chain,
 					Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
@@ -532,6 +573,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 			}
+
 		}
 	}
 	return nil

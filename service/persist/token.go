@@ -371,7 +371,7 @@ func SniffMediaType(buf []byte) (MediaType, string) {
 			return MediaTypeAnimation, "model/gltf+binary"
 		}
 
-		if strings.HasPrefix(strings.TrimSpace(string(buf[:20])), "{") && util.ContainsAny(strings.TrimSpace(string(buf)), gltfFields...) {
+		if strings.HasPrefix(strings.TrimSpace(string(buf[:20])), "{") && util.ContainsAnyString(strings.TrimSpace(string(buf)), gltfFields...) {
 			return MediaTypeAnimation, "model/gltf+json"
 		}
 	}
