@@ -38,7 +38,7 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	tokenRepo := newRepos()
+	tokenRepo, contractRepo := newRepos()
 	s := media.NewStorageClient(ctx, "./_deploy/service-key-dev.json")
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false, true)}
@@ -59,8 +59,7 @@ func coreInitServer() *gin.Engine {
 	t := newThrottler()
 
 	queue := make(chan ProcessMediaInput)
-	go processMedias(sentryutil.NewSentryHubContext(ctx), queue, tokenRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queue, tokenRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, queue, tokenRepo, contractRepo, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
@@ -114,10 +113,10 @@ func setDefaults() {
 
 }
 
-func newRepos() persist.TokenGalleryRepository {
+func newRepos() (persist.TokenGalleryRepository, persist.ContractGalleryRepository) {
 	pgClient := postgres.NewClient()
 	galleryRepo := postgres.NewGalleryRepository(pgClient, redis.NewCache(redis.GalleriesDB))
-	return postgres.NewTokenGalleryRepository(pgClient, galleryRepo)
+	return postgres.NewTokenGalleryRepository(pgClient, galleryRepo), postgres.NewContractGalleryRepository(pgClient)
 }
 
 func newThrottler() *throttle.Locker {
