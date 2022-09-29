@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net/http"
 
 	"cloud.google.com/go/storage"
 	gqlgen "github.com/99designs/gqlgen/graphql"
@@ -23,6 +24,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
@@ -31,6 +33,8 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *db.Q
 	graphqlGroup := router.Group("/glry/graphql")
 
 	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler)
+
+	router.GET("/alive", healthCheckHandler())
 
 	return router
 }
@@ -96,5 +100,11 @@ func graphqlPlaygroundHandler() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+func healthCheckHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }

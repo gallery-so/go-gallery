@@ -222,9 +222,9 @@ type AuthNonce struct {
 func (AuthNonce) IsGetAuthNoncePayloadOrError() {}
 
 type Badge struct {
-	Name       *string       `json:"name"`
-	ImageURL   string        `json:"imageURL"`
-	ContractID *persist.DBID `json:"contractId"`
+	Name     *string   `json:"name"`
+	ImageURL string    `json:"imageURL"`
+	Contract *Contract `json:"contract"`
 }
 
 type ChainTokens struct {
@@ -479,6 +479,7 @@ type ErrInvalidInput struct {
 
 func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
 func (ErrInvalidInput) IsUserByIDOrError()                        {}
+func (ErrInvalidInput) IsCollectionByIDOrError()                  {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()              {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}

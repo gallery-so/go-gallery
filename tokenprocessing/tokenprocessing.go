@@ -3,27 +3,26 @@ package tokenprocessing
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
-	"cloud.google.com/go/storage"
-	"github.com/everFinance/goar"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
-	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
-	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 // InitServer initializes the indexer server
@@ -34,26 +33,18 @@ func InitServer() {
 }
 
 func coreInitServer() *gin.Engine {
-	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
+	ctx := configureRootContext()
 
 	setDefaults()
 	initSentry()
 	initLogger()
 
 	repos := newRepos(postgres.NewClient())
-	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(ctx)
-	} else {
-		s, err = storage.NewClient(ctx, option.WithCredentialsFile("./_deploy/service-key.json"))
-	}
-	if err != nil {
-		panic(err)
-	}
+	s := media.NewStorageClient(ctx, "./_deploy/service-key-dev.json")
+
+	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false, true)}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-	storageClient := newStorageClient()
 
 	router := gin.Default()
 
@@ -67,16 +58,11 @@ func coreInitServer() *gin.Engine {
 	logger.For(ctx).Info("Registering handlers...")
 
 	t := newThrottler()
-	mc := server.NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, storageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
-	mediaQueue := make(chan ProcessMediaInput)
-	collectionTokensQueue := make(chan ProcessCollectionTokensRefreshInput)
-	startJobs(mediaQueue, repos, ipfsClient, arweaveClient, s, t, collectionTokensQueue, mc)
-	return handlersInitServer(router, mediaQueue, collectionTokensQueue, t)
-}
-
-func startJobs(mediaQueue chan ProcessMediaInput, repos *persist.Repositories, ipfsClient *shell.Shell, arweaveClient *goar.Client, s *storage.Client, t *throttle.Locker, collectionTokensQueue chan ProcessCollectionTokensRefreshInput, mc *multichain.Provider) {
-	go processMedias(mediaQueue, repos.TokenRepository, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	go processTokensInCollectionRefreshes(collectionTokensQueue, mc, t)
+	// mc := server.NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, storageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
+	// mediaQueue := make(chan ProcessMediaInput)
+	// collectionTokensQueue := make(chan ProcessCollectionTokensRefreshInput)
+	// startJobs(mediaQueue, repos, ipfsClient, arweaveClient, s, t, collectionTokensQueue, mc)
+	return handlersInitServer(router, repos, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
@@ -86,8 +72,8 @@ func setDefaults() {
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
-	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "prod-eth-token-logs")
-	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "prod-token-content")
+	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "dev-eth-token-logs")
+	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "postgres")
@@ -97,13 +83,37 @@ func setDefaults() {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
-	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("SELF_HOST", "http://localhost:6500")
+
+	viper.AutomaticEnv()
+
+	if viper.GetString("ENV") == "local" {
+
+		filePath := "_local/app-local-mediaprocessing.yaml"
+		if len(os.Args) > 1 {
+			if os.Args[1] == "dev" {
+				filePath = "_local/app-dev-mediaprocessing.yaml"
+			} else if os.Args[1] == "prod" {
+				filePath = "_local/app-prod-mediaprocessing.yaml"
+			}
+		}
+
+		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+		path, err := util.FindFile(filePath, 3)
+		if err != nil {
+			panic(err)
+		}
+
+		viper.SetConfigFile(path)
+		if err := viper.ReadInConfig(); err != nil {
+			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
+		}
+	}
 
 	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
 		panic("SENTRY_DSN must be set")
 	}
 
-	viper.AutomaticEnv()
 }
 
 func newThrottler() *throttle.Locker {
@@ -173,20 +183,6 @@ func newRepos(db *sql.DB) *persist.Repositories {
 		AdmireRepository:      postgres.NewAdmireRepository(db),
 		CommentRepository:     postgres.NewCommentRepository(db),
 	}
-}
-
-func newStorageClient() *storage.Client {
-	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(context.Background())
-	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key.json"))
-	}
-	if err != nil {
-		logger.For(nil).Errorf("error creating storage client: %v", err)
-	}
-	return s
 }
 
 // configureRootContext configures the main context from which other contexts are derived.

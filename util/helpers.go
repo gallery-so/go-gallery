@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -33,10 +34,69 @@ const (
 	EB = 1024 * PB
 )
 
-// Contains checks whether an item exists in a slice
-func Contains(s []string, str string) bool {
+// FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
+// When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
+// so that the first 512 bytes are not lost
+type FileHeaderReader struct {
+	headers   *bytes.Buffer
+	reader    io.Reader
+	subreader io.Reader
+}
+
+// NewFileHeaderReader returns a new FileHeaderReader
+func NewFileHeaderReader(reader io.Reader) (FileHeaderReader, error) {
+	fi := FileHeaderReader{
+		headers:   bytes.NewBuffer(make([]byte, 0, 512)),
+		subreader: reader,
+	}
+	_, err := io.CopyN(fi.headers, reader, 512)
+	if err != nil {
+		return FileHeaderReader{}, err
+	}
+	fi.reader = io.MultiReader(fi.headers, reader)
+	return fi, nil
+}
+
+func (f FileHeaderReader) Read(p []byte) (n int, err error) {
+	return f.reader.Read(p)
+}
+
+// Close closes the given io.Reader if it is also a closer
+func (f FileHeaderReader) Close() error {
+	if closer, ok := f.subreader.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+// Headers returns the first 512 bytes of the reader
+func (f FileHeaderReader) Headers() []byte {
+	return f.headers.Bytes()
+}
+
+// RemoveBOM removes the byte order mark from a byte array
+func RemoveBOM(bs []byte) []byte {
+	if len(bs) > 3 && bs[0] == 0xEF && bs[1] == 0xBB && bs[2] == 0xBF {
+		return bs[3:]
+	}
+	return bs
+}
+
+// ContainsString checks whether an item exists in a slice
+func ContainsString(s []string, str string) bool {
 	for _, v := range s {
 		if v == str {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ContainsAnyString checks whether a string contains any of the given substrings
+func ContainsAnyString(s string, strs ...string) bool {
+	for _, v := range strs {
+		if strings.Contains(s, v) {
 			return true
 		}
 	}

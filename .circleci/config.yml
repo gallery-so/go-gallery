@@ -156,10 +156,15 @@ jobs:
           name: "Unzip deploy file"
           command: echo "A" | unzip _deploy.zip -d _deploy
       - run:
-          name: Run integration-tests
+          name: Run backend integration-tests
           command: |
             mkdir -p /tmp/test-reports
             gotestsum --junitfile /tmp/test-reports/integration-tests.xml -- -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
+      - run:
+          name: Run indexer integration-tests
+          command: |
+            mkdir -p /tmp/test-reports
+            gotestsum --junitfile /tmp/test-reports/indexer-integration-tests.xml -- ./indexer/...
       - store_test_results:
           path: /tmp/test-reports
   deploy:
@@ -241,7 +246,7 @@ jobs:
     docker:
       - image: cimg/base:stable
     environment:
-      - HEALTH_URL: https://api.dev.gallery.so/glry/v1/health
+      - HEALTH_URL: https://api.dev.gallery.so/alive
       - GRACE: 20
       - TIMES: 8
       - INTERVAL: 10

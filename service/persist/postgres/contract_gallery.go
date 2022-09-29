@@ -14,6 +14,7 @@ import (
 // ContractGalleryRepository represents a contract repository in the postgres database
 type ContractGalleryRepository struct {
 	db                    *sql.DB
+	getByIDStmt           *sql.Stmt
 	getByAddressStmt      *sql.Stmt
 	getByAddressesStmt    *sql.Stmt
 	upsertByAddressStmt   *sql.Stmt
@@ -26,6 +27,9 @@ type ContractGalleryRepository struct {
 func NewContractGalleryRepository(db *sql.DB) *ContractGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
+
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ID = $1;`)
+	checkNoErr(err)
 
 	getByAddressStmt, err := db.PrepareContext(ctx, `SELECT ID,VERSION,CREATED_AT,LAST_UPDATED,ADDRESS,SYMBOL,NAME,CREATOR_ADDRESS,CHAIN FROM contracts WHERE ADDRESS = $1 AND CHAIN = $2 AND DELETED = false;`)
 	checkNoErr(err)
@@ -51,7 +55,17 @@ func NewContractGalleryRepository(db *sql.DB) *ContractGalleryRepository {
 	getPreviewNFTsStmt, err := db.PrepareContext(ctx, `SELECT MEDIA->>'thumbnail_url' FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNED_BY_WALLETS && $2 AND LENGTH(MEDIA->>'thumbnail_url') > 0 ORDER BY ID LIMIT 3`)
 	checkNoErr(err)
 
-	return &ContractGalleryRepository{db: db, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
+	return &ContractGalleryRepository{db: db, getByIDStmt: getByIDStmt, getByAddressStmt: getByAddressStmt, upsertByAddressStmt: upsertByAddressStmt, getByAddressesStmt: getByAddressesStmt, getOwnersStmt: getOwnersStmt, getUserByWalletIDStmt: getUserByWalletIDStmt, getPreviewNFTsStmt: getPreviewNFTsStmt}
+}
+
+func (c *ContractGalleryRepository) GetByID(ctx context.Context, id persist.DBID) (persist.ContractGallery, error) {
+	contract := persist.ContractGallery{}
+	err := c.getByIDStmt.QueryRowContext(ctx, id).Scan(&contract.ID, &contract.Version, &contract.CreationTime, &contract.LastUpdated, &contract.Address, &contract.Symbol, &contract.Name, &contract.CreatorAddress, &contract.Chain)
+	if err != nil {
+		return persist.ContractGallery{}, err
+	}
+
+	return contract, nil
 }
 
 // GetByAddress returns the contract with the given address
