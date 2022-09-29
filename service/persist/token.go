@@ -58,6 +58,8 @@ const (
 	MediaTypeSyncing MediaType = "syncing"
 )
 
+var mediaTypePriorities = []MediaType{MediaTypeInvalid, MediaTypeUnknown, MediaTypeSyncing, MediaTypeText, MediaTypeBase64Text, MediaTypeJSON, MediaTypeImage, MediaTypeSVG, MediaTypeGIF, MediaTypeBase64BMP, MediaTypeVideo, MediaTypeAnimation, MediaTypeAudio, MediaTypeHTML}
+
 const (
 	// ChainETH represents the Ethereum blockchain
 	ChainETH Chain = iota
@@ -817,6 +819,29 @@ func (a EthereumAddressAtBlock) Value() (driver.Value, error) {
 // IsValid returns true if the media type is not unknown, syncing, or invalid
 func (m MediaType) IsValid() bool {
 	return m != MediaTypeUnknown && m != MediaTypeInvalid && m != MediaTypeSyncing
+}
+
+// IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
+func (m MediaType) IsImageLike() bool {
+	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG
+}
+
+// IsAnimationLike returns true if the media type is a type that is expected to be like an animation and live render
+func (m MediaType) IsAnimationLike() bool {
+	return m == MediaTypeVideo || m == MediaTypeHTML || m == MediaTypeAudio || m == MediaTypeAnimation
+}
+
+// IsMorePriorityThan returns true if the media type is more important than the other media type
+func (m MediaType) IsMorePriorityThan(other MediaType) bool {
+	for _, t := range mediaTypePriorities {
+		if t == m {
+			return true
+		}
+		if t == other {
+			return false
+		}
+	}
+	return true
 }
 
 // Value implements the database/sql/driver Valuer interface for the MediaType type

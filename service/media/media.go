@@ -119,7 +119,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
-	imgURL, vURL := FindImageAndAnimationURLs(tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name)
+	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name)
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
@@ -149,7 +149,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 			}
 		}
 	}
-	if !mediaType.IsValid() || (mediaType == persist.MediaTypeImage && vURL != "") {
+	if vURL != "" {
 		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
 		var err error
 		mediaType, err = downloadAndCache(pCtx, vURL, name, "video", ipfsClient, arweaveClient, storageClient)
@@ -329,7 +329,7 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func FindImageAndAnimationURLs(tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords Keywords, name string) (imgURL string, vURL string) {
+func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords Keywords, name string) (imgURL string, vURL string) {
 
 	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
 		logger.For(nil).Infof("found media metadata for %s: %s", name, metaMedia)
@@ -368,7 +368,26 @@ func FindImageAndAnimationURLs(tokenID persist.TokenID, contractAddress persist.
 		logger.For(nil).Infof("no image url found for %s - using token URI %s", name, turi)
 		imgURL = turi.String()
 	}
-	return imgURL, vURL
+	return predictTrueURLs(ctx, imgURL, vURL)
+}
+
+func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
+	imgMediaType, _, _, _ := PredictMediaType(ctx, curImg)
+	vMediaType, _, _, _ := PredictMediaType(ctx, curV)
+
+	if imgMediaType.IsAnimationLike() && !vMediaType.IsAnimationLike() {
+		return curV, curImg
+	}
+
+	if !imgMediaType.IsValid() || !vMediaType.IsValid() {
+		return curImg, curV
+	}
+
+	if imgMediaType.IsMorePriorityThan(vMediaType) {
+		return curV, curImg
+	}
+
+	return curImg, curV
 }
 
 func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgURL string, storageClient *storage.Client) string {
@@ -388,15 +407,22 @@ func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgU
 	return ""
 }
 
+func objectExists(ctx context.Context, o *storage.ObjectHandle) (bool, error) {
+	_, err := o.Attrs(ctx)
+	if err != nil && err != storage.ErrObjectNotExist {
+		return false, fmt.Errorf("could not get object attrs for %s: %s", o.ObjectName(), err)
+	}
+	return err != storage.ErrObjectNotExist, nil
+}
+
 func cacheRawSvgMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
 
 	o := client.Bucket(bucket).Object(fileName)
 
-	_, err := o.Attrs(ctx)
-	if err != nil && err != storage.ErrObjectNotExist {
-		return fmt.Errorf("could not get object attrs for %s: %s", fileName, err)
+	exists, err := objectExists(ctx, o)
+	if err != nil {
+		return err
 	}
-	exists := err != storage.ErrObjectNotExist
 
 	sw := o.NewWriter(ctx)
 	_, err = io.Copy(sw, reader)
@@ -428,15 +454,25 @@ func cacheRawSvgMedia(ctx context.Context, reader io.Reader, bucket, fileName st
 	return nil
 }
 
+func purgeIfExists(ctx context.Context, exists bool, bucket string, fileName string) error {
+	if exists {
+		err := mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
+		if err != nil {
+			logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
+			return err
+		}
+	}
+	return nil
+}
+
 func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
 
 	o := client.Bucket(bucket).Object(fileName)
 
-	_, err := o.Attrs(ctx)
-	if err != nil && err != storage.ErrObjectNotExist {
-		return fmt.Errorf("could not get object attrs for %s: %s", fileName, err)
+	exists, err := objectExists(ctx, o)
+	if err != nil {
+		return err
 	}
-	exists := err != storage.ErrObjectNotExist
 
 	sw := o.NewWriter(ctx)
 
@@ -463,12 +499,7 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileN
 		return err
 	}
 
-	if exists {
-		err = mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
-		if err != nil {
-			logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
-		}
-	}
+	purgeIfExists(ctx, exists, bucket, fileName)
 	return nil
 }
 
@@ -478,12 +509,10 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName strin
 	timeBeforeCopy := time.Now()
 	o := client.Bucket(bucket).Object(fileName)
 
-	_, err := o.Attrs(ctx)
-	if err != nil && err != storage.ErrObjectNotExist {
-		return fmt.Errorf("could not get object attrs for %s: %s", fileName, err)
+	exists, err := objectExists(ctx, o)
+	if err != nil {
+		return err
 	}
-	exists := err != storage.ErrObjectNotExist
-
 	sw := o.NewWriter(ctx)
 	_, err = io.Copy(sw, reader)
 	if err != nil {
@@ -510,14 +539,7 @@ func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName strin
 	}
 
 	logger.For(ctx).Infof("storage update took %s", time.Since(timeBeforeUpdate))
-	if exists {
-		timeBeforePurge := time.Now()
-		err = mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
-		if err != nil {
-			logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
-		}
-		logger.For(ctx).Infof("storage purge took %s", time.Since(timeBeforePurge))
-	}
+	purgeIfExists(ctx, exists, bucket, fileName)
 	return nil
 }
 
@@ -527,12 +549,10 @@ func thumbnailAndCache(ctx context.Context, videoURL, bucket, fileName string, c
 	timeBeforeCopy := time.Now()
 	o := client.Bucket(bucket).Object(fileName)
 
-	_, err := o.Attrs(ctx)
-	if err != nil && err != storage.ErrObjectNotExist {
-		return fmt.Errorf("could not get object attrs for %s: %s", fileName, err)
+	exists, err := objectExists(ctx, o)
+	if err != nil {
+		return err
 	}
-	exists := err != storage.ErrObjectNotExist
-
 	sw := o.NewWriter(ctx)
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
 	err = thumbnailVideoToWriter(videoURL, sw)
@@ -560,14 +580,7 @@ func thumbnailAndCache(ctx context.Context, videoURL, bucket, fileName string, c
 	}
 
 	logger.For(ctx).Infof("storage update took %s", time.Since(timeBeforeUpdate))
-	if exists {
-		timeBeforePurge := time.Now()
-		err = mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
-		if err != nil {
-			logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
-		}
-		logger.For(ctx).Infof("storage purge took %s", time.Since(timeBeforePurge))
-	}
+	purgeIfExists(ctx, exists, bucket, fileName)
 	return nil
 }
 
