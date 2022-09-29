@@ -38,11 +38,11 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 	return func(c *gin.Context) {
 		var input ProcessMediaForUserInput
 		if err := c.ShouldBindJSON(&input); err != nil {
-			util.ErrResponse(c, http.StatusBadRequest, err)
+			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 		if err := throttler.Lock(c, input.UserID.String()); err != nil {
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
+			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
