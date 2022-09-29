@@ -982,11 +982,10 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 }
 
 func contractToBadgeModel(ctx context.Context, contract db.Contract) *model.Badge {
-
 	return &model.Badge{
-		ContractID: &contract.ID,
-		Name:       &contract.Name.String,
-		ImageURL:   contract.BadgeUrl.String,
+		Contract: contractToModel(ctx, contract),
+		Name:     &contract.Name.String,
+		ImageURL: contract.BadgeUrl.String,
 	}
 }
 func collectionToModel(ctx context.Context, collection db.Collection) *model.Collection {
