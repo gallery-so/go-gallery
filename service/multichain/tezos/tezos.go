@@ -230,26 +230,26 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
 	resultTokens := []tzktBalanceToken{}
 
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s&limit=%d&offset=%d", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress, limit, offset), nil)
 		if err != nil {
-			return nil, nil, err
+			return nil, multichain.ChainAgnosticContract{}, err
 		}
 		resp, err := d.httpClient.Do(req)
 		if err != nil {
-			return nil, nil, err
+			return nil, multichain.ChainAgnosticContract{}, err
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return nil, nil, util.GetErrFromResp(resp)
+			return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
 		}
 		var tzktBalances []tzktBalanceToken
 		if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
-			return nil, nil, err
+			return nil, multichain.ChainAgnosticContract{}, err
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
@@ -262,7 +262,54 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 	}
 	logger.For(ctx).Info("tzktBalances: ", len(resultTokens))
 
-	return d.tzBalanceTokensToTokens(ctx, resultTokens, tokenIdentifiers.String())
+	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, resultTokens, tokenIdentifiers.String())
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	contract := multichain.ChainAgnosticContract{}
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+
+	return tokens, contract, nil
+
+}
+
+func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s&account=%s&limit=1", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress, ownerAddress), nil)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+	}
+	var tzktBalances []tzktBalanceToken
+	if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, tzktBalances, tokenIdentifiers.String())
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	contract := multichain.ChainAgnosticContract{}
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	token := multichain.ChainAgnosticToken{}
+	if len(tokens) > 0 {
+		token = tokens[0]
+	} else {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
+	}
+
+	return token, contract, nil
 }
 
 // GetContractByAddress retrieves an Tezos contract by address
@@ -429,7 +476,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			med := d.makeTempMedia(tid, tzToken.Token.Contract.Address, agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
+			med := d.makeTempMedia(ctx, tid, tzToken.Token.Contract.Address, agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
 
 			agnostic := multichain.ChainAgnosticToken{
 				TokenType:       persist.TokenTypeERC1155,
@@ -487,11 +534,11 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 	}
 }
 
-func (d *Provider) makeTempMedia(tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, name string) persist.Media {
+func (d *Provider) makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, name string) persist.Media {
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
-	img, anim := media.FindImageAndAnimationURLs(tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(multichain.TezAnimationKeywords), media.TezImageKeywords(multichain.TezImageKeywords), name)
+	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(multichain.TezAnimationKeywords), media.TezImageKeywords(multichain.TezImageKeywords), name, false)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
