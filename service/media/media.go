@@ -119,7 +119,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
 
-	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name)
+	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name, true)
 
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
@@ -329,7 +329,7 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords Keywords, name string) (imgURL string, vURL string) {
+func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords Keywords, name string, predict bool) (imgURL string, vURL string) {
 
 	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
 		logger.For(nil).Infof("found media metadata for %s: %s", name, metaMedia)
@@ -368,7 +368,11 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 		logger.For(nil).Infof("no image url found for %s - using token URI %s", name, turi)
 		imgURL = turi.String()
 	}
-	return predictTrueURLs(ctx, imgURL, vURL)
+	if predict {
+		return predictTrueURLs(ctx, imgURL, vURL)
+	} else {
+		return imgURL, vURL
+	}
 }
 
 func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
