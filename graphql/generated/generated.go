@@ -109,9 +109,9 @@ type ComplexityRoot struct {
 	}
 
 	Badge struct {
-		ContractID func(childComplexity int) int
-		ImageURL   func(childComplexity int) int
-		Name       func(childComplexity int) int
+		Contract func(childComplexity int) int
+		ImageURL func(childComplexity int) int
+		Name     func(childComplexity int) int
 	}
 
 	ChainAddress struct {
@@ -950,12 +950,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AuthNonce.UserExists(childComplexity), true
 
-	case "Badge.contractId":
-		if e.complexity.Badge.ContractID == nil {
+	case "Badge.contract":
+		if e.complexity.Badge.Contract == nil {
 			break
 		}
 
-		return e.complexity.Badge.ContractID(childComplexity), true
+		return e.complexity.Badge.Contract(childComplexity), true
 
 	case "Badge.imageURL":
 		if e.complexity.Badge.ImageURL == nil {
@@ -3429,7 +3429,7 @@ input ChainPubKeyInput {
 type Badge {
     name: String
     imageURL: String!
-    contractId: DBID
+    contract: Contract
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
@@ -5670,7 +5670,7 @@ func (ec *executionContext) _Badge_imageURL(ctx context.Context, field graphql.C
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Badge_contractId(ctx context.Context, field graphql.CollectedField, obj *model.Badge) (ret graphql.Marshaler) {
+func (ec *executionContext) _Badge_contract(ctx context.Context, field graphql.CollectedField, obj *model.Badge) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5688,7 +5688,7 @@ func (ec *executionContext) _Badge_contractId(ctx context.Context, field graphql
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ContractID, nil
+		return obj.Contract, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5697,9 +5697,9 @@ func (ec *executionContext) _Badge_contractId(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.DBID)
+	res := resTmp.(*model.Contract)
 	fc.Result = res
-	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ChainAddress_address(ctx context.Context, field graphql.CollectedField, obj *persist.ChainAddress) (ret graphql.Marshaler) {
@@ -19865,9 +19865,9 @@ func (ec *executionContext) _Badge(ctx context.Context, sel ast.SelectionSet, ob
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "contractId":
+		case "contract":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Badge_contractId(ctx, field, obj)
+				return ec._Badge_contract(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

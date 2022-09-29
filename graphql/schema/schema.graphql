@@ -109,7 +109,7 @@ input ChainPubKeyInput {
 type Badge {
     name: String
     imageURL: String!
-    contractId: DBID
+    contract: Contract
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
