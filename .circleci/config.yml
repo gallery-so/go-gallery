@@ -246,7 +246,7 @@ jobs:
     docker:
       - image: cimg/base:stable
     environment:
-      - HEALTH_URL: https://api.dev.gallery.so/glry/v1/health
+      - HEALTH_URL: https://api.dev.gallery.so/alive
       - GRACE: 20
       - TIMES: 8
       - INTERVAL: 10
