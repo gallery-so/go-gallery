@@ -857,10 +857,8 @@ func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Add
 	case hicEtNunc:
 		return []string{"displayUri", "image", "artifactUri"}
 		// fxhash
-	case fxHash:
-		return []string{"displayUri", "image", "artifactUri", "uri"}
-	case fxHash2:
-		return []string{"artifactUri", "displayUri", "image", "uri"}
+	case fxHash, fxHash2:
+		return []string{"displayUri", "artifactUri", "image", "uri"}
 	default:
 		return i
 	}
