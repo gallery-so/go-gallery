@@ -2,11 +2,11 @@ package mediaprocessing
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -39,7 +39,12 @@ func coreInitServer() *gin.Engine {
 	initLogger()
 
 	repos := newRepos()
-	s := media.NewStorageClient(ctx, "./_deploy/service-key-dev.json")
+	var s *storage.Client
+	if viper.GetString("ENV") == "local" {
+		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
+	} else {
+		s = media.NewStorageClient(context.Background())
+	}
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false, true)}
 	ipfsClient := rpc.NewIPFSShell()
@@ -79,37 +84,22 @@ func setDefaults() {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
-	viper.SetDefault("SELF_HOST", "http://localhost:6500")
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") == "local" {
-
-		filePath := "_local/app-local-mediaprocessing.yaml"
-		if len(os.Args) > 1 {
-			if os.Args[1] == "dev" {
-				filePath = "_local/app-dev-mediaprocessing.yaml"
-			} else if os.Args[1] == "prod" {
-				filePath = "_local/app-prod-mediaprocessing.yaml"
-			}
-		}
-
-		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-		path, err := util.FindFile(filePath, 3)
-		if err != nil {
-			panic(err)
-		}
-
-		viper.SetConfigFile(path)
-		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
+	envFile := "app-local-mediaprocessing.yaml"
+	if len(os.Args) > 1 {
+		if os.Args[1] == "dev" {
+			envFile = "app-dev-mediaprocessing.yaml"
+		} else if os.Args[1] == "prod" {
+			envFile = "app-prod-mediaprocessing.yaml"
 		}
 	}
+	util.LoadEnvFile(envFile, 3)
 
-	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
-		panic("SENTRY_DSN must be set")
+	if viper.GetString("ENV") != "local" {
+		util.EnvVarMustExist("SENTRY_DSN", "")
 	}
-
 }
 
 func newRepos() *persist.Repositories {
