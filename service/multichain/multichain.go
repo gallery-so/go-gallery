@@ -241,6 +241,8 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 							return
 						}
 
+						logger.For(ctx).Infof("got %d tokens and %d contracts for address %s on chain %s for priority %d", len(tokens), len(contracts), addr, chain, priority)
+
 						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
 					}(p, i)
@@ -293,17 +295,18 @@ outer:
 	if err != nil {
 		return err
 	}
-
 	newTokens, err := p.upsertTokens(ctx, allTokens, addressToContract, allUsersNFTs, user)
 	if err != nil {
 		return err
 	}
 
-	for chain, keywords := range allKeywordsForChain {
-		err = p.processMedialessTokens(ctx, userID, chain, keywords.imageKeywords, keywords.animationKeywords)
-		if err != nil {
-			logger.For(ctx).Errorf("error processing medialess tokens for user %s: %s", user.Username, err)
-			return err
+	for _, chain := range chains {
+		if keywords, ok := allKeywordsForChain[chain]; ok {
+			err = p.processMedialessTokens(ctx, userID, chain, keywords.imageKeywords, keywords.animationKeywords)
+			if err != nil {
+				logger.For(ctx).Errorf("error processing medialess tokens for user %s: %s", user.Username, err)
+				return err
+			}
 		}
 	}
 
@@ -884,6 +887,7 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 
 	res := make([]persist.TokenGallery, 0, len(seenTokens))
 	for _, t := range seenTokens {
+		logger.For(ctx).Debugf("token: %s", t.Name)
 		if !t.Media.IsServable() {
 			if dbToken, ok := dbSeen[persist.NewTokenIdentifiers(persist.Address(t.Contract), t.TokenID, t.Chain)]; ok && dbToken.Media.IsServable() {
 				res = append(res, dbToken)

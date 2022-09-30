@@ -58,7 +58,7 @@ const (
 	MediaTypeSyncing MediaType = "syncing"
 )
 
-var mediaTypePriorities = []MediaType{MediaTypeInvalid, MediaTypeUnknown, MediaTypeSyncing, MediaTypeText, MediaTypeBase64Text, MediaTypeJSON, MediaTypeImage, MediaTypeSVG, MediaTypeGIF, MediaTypeBase64BMP, MediaTypeVideo, MediaTypeAnimation, MediaTypeAudio, MediaTypeHTML}
+var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
 
 const (
 	// ChainETH represents the Ethereum blockchain
@@ -520,6 +520,11 @@ func (c Chain) MarshalGQL(w io.Writer) {
 // URL turns a token's URI into a URL
 func (uri TokenURI) URL() (*url.URL, error) {
 	return url.Parse(uri.String())
+}
+
+// IsPathPrefixed returns whether the URI is prefixed with a path to be parsed by a browser or decentralized storage service
+func (uri TokenURI) IsPathPrefixed() bool {
+	return strings.HasPrefix(uri.String(), "http") || strings.HasPrefix(uri.String(), "ipfs://") || strings.HasPrefix(uri.String(), "arweave") || strings.HasPrefix(uri.String(), "ar://")
 }
 
 func (uri TokenURI) String() string {

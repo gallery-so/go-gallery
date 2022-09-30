@@ -41,11 +41,7 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *db.Q
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker) {
 	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler))
-
-	if viper.GetString("ENV") != "production" {
-		// TODO: Consider completely disabling introspection in production
-		parent.GET("/playground", graphqlPlaygroundHandler())
-	}
+	parent.GET("/playground", graphqlPlaygroundHandler())
 }
 
 func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker) gin.HandlerFunc {
