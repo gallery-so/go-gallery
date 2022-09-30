@@ -124,7 +124,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
 
-	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 50), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata initial")
+	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 100), "imgURL": truncateString(imgURL, 100), "vURL": truncateString(vURL, 100), "name": name}).Debug("MakePreviewsForMetadata initial")
 
 	var res persist.Media
 	var mediaType persist.MediaType
@@ -315,17 +315,23 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 	return res
 }
 
-func remapIPFS(ipfs string) string {
-	if persist.TokenURI(ipfs).Type() != persist.URITypeIPFS {
-		return ipfs
+func remapPaths(mediaURL string) string {
+	switch persist.TokenURI(mediaURL).Type() {
+	case persist.URITypeIPFS:
+		path := util.GetIPFSPath(mediaURL, false)
+		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+	case persist.URITypeArweave:
+		// TODO
+		return mediaURL
+	default:
+		return mediaURL
 	}
-	path := util.GetIPFSPath(ipfs, false)
-	return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+
 }
 
 func remapMedia(media persist.Media) persist.Media {
-	media.MediaURL = persist.NullString(remapIPFS(media.MediaURL.String()))
-	media.ThumbnailURL = persist.NullString(remapIPFS(media.ThumbnailURL.String()))
+	media.MediaURL = persist.NullString(remapPaths(media.MediaURL.String()))
+	media.ThumbnailURL = persist.NullString(remapPaths(media.ThumbnailURL.String()))
 	return media
 }
 
@@ -350,7 +356,7 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range animationKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
-			logger.For(nil).Infof("found initial animation url for %s with keyword %s: %s", name, keyword, it)
+			logger.For(ctx).Infof("found initial animation url for %s with keyword %s: %s", name, keyword, it)
 			vURL = it
 			break
 		}
@@ -358,26 +364,35 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range imageKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
-			logger.For(nil).Infof("found initial image url for %s with keyword %s: %s", name, keyword, it)
+			logger.For(ctx).Infof("found initial image url for %s with keyword %s: %s", name, keyword, it)
 			imgURL = it
 			break
 		}
 	}
 
 	if imgURL == "" && vURL == "" {
-		logger.For(nil).Infof("no image url found for %s - using token URI %s", name, turi)
+		logger.For(ctx).Infof("no image url found for %s - using token URI %s", name, turi)
 		imgURL = turi.String()
 	}
+
+	logger.For(ctx).Infof("image: %s | video %s", imgURL, vURL)
+
 	if predict {
 		return predictTrueURLs(ctx, imgURL, vURL)
-	} else {
-		return imgURL, vURL
 	}
+	return imgURL, vURL
+
 }
 
 func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
-	imgMediaType, _, _, _ := PredictMediaType(ctx, curImg)
-	vMediaType, _, _, _ := PredictMediaType(ctx, curV)
+	imgMediaType, _, _, err := PredictMediaType(ctx, curImg)
+	if err != nil {
+		return curImg, curV
+	}
+	vMediaType, _, _, err := PredictMediaType(ctx, curV)
+	if err != nil {
+		return curImg, curV
+	}
 
 	if imgMediaType.IsAnimationLike() && !vMediaType.IsAnimationLike() {
 		return curV, curImg
@@ -644,7 +659,7 @@ outer:
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
 
-	if mediaType == persist.MediaTypeUnknown || mediaType == persist.MediaTypeInvalid || mediaType == persist.MediaTypeSyncing {
+	if !mediaType.IsValid() {
 		timeBeforeSniff := time.Now()
 		mediaType, contentType = persist.SniffMediaType(reader.Headers())
 		logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
@@ -694,7 +709,7 @@ outer:
 	default:
 		switch asURI.Type() {
 		case persist.URITypeIPFS, persist.URITypeArweave:
-			if mediaType == persist.MediaTypeHTML && strings.HasPrefix(mediaURL, "https://") {
+			if mediaType == persist.MediaTypeHTML && persist.TokenURI(mediaURL).IsPathPrefixed() {
 				return mediaType, nil
 			}
 			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
