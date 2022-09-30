@@ -21,24 +21,23 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
-  # Uncomment if you want to run mediaprocessing locally as a container
-  # postgres_indexer:
-  #   build:
-  #     context: "."
-  #     dockerfile: "docker/postgres_indexer/DOCKERFILE"
-  #     args:
-  #       - PGHOST=${PGHOST}
-  #       - PGPORT=${PGPORT}
-  #       - PGUSER=${PGUSER}
-  #       - PGPASSWORD=${PGPASSWORD}
-  #       - PGDATABASE=${PGDATABASE}
-  #       - PGTESTUSER=${PGTESTUSER}
-  #   ports:
-  #     - "5433:5432"
-  #   environment:
-  #     - POSTGRES_HOST_AUTH_METHOD=trust
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_DB=postgres
+  postgres_indexer:
+    build:
+      context: "."
+      dockerfile: "docker/postgres_indexer/DOCKERFILE"
+      args:
+        - PGHOST=${PGHOST}
+        - PGPORT=${PGPORT}
+        - PGUSER=${PGUSER}
+        - PGPASSWORD=${PGPASSWORD}
+        - PGDATABASE=${PGDATABASE}
+        - PGTESTUSER=${PGTESTUSER}
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
   # Used to proxy cloud tasks requests
   nginx:
     image: nginx
