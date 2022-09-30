@@ -82,8 +82,13 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	httpClient := &http.Client{Timeout: 10 * time.Minute}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-	storage := media.NewStorageClient(context.Background(), "./_deploy/service-key-dev.json")
-	taskClient := task.NewClient(context.Background(), "./_deploy/service-key-dev.json")
+	var storage *storage.Client
+	if viper.GetString("ENV") == "local" {
+		storage = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
+	} else {
+		storage = media.NewStorageClient(context.Background())
+	}
+	taskClient := task.NewClient(context.Background())
 	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, newMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient)
 }
 

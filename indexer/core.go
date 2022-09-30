@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -45,7 +46,12 @@ func coreInit() (*gin.Engine, *indexer) {
 	initLogger()
 
 	tokenRepo, contractRepo := newRepos()
-	s := media.NewStorageClient(context.Background(), "./_deploy/service-key-dev.json")
+	var s *storage.Client
+	if viper.GetString("ENV") == "local" {
+		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
+	} else {
+		s = media.NewStorageClient(context.Background())
+	}
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -97,11 +103,11 @@ func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
 	envFile := "app-local-indexer-server.yaml"
-	storageKeyPath := "./_deploy/service-key-dev.json"
+	localKeyPath := "./_deploy/service-key-dev.json"
 	if len(os.Args) > 1 {
 		if os.Args[1] == "prod" {
 			envFile = "app-prod-indexer-server.yaml"
-			storageKeyPath = "./_deploy/service-key.json"
+			localKeyPath = "./_deploy/service-key.json"
 		}
 	}
 	setDefaults(envFile)
@@ -109,7 +115,12 @@ func coreInitServer() *gin.Engine {
 	initLogger()
 
 	tokenRepo, contractRepo := newRepos()
-	s := media.NewStorageClient(ctx, storageKeyPath)
+	var s *storage.Client
+	if viper.GetString("ENV") == "local" {
+		s = media.NewLocalStorageClient(context.Background(), localKeyPath)
+	} else {
+		s = media.NewStorageClient(context.Background())
+	}
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()

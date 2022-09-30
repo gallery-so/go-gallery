@@ -77,16 +77,8 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 	"svg":  {persist.MediaTypeImage, "image/svg+xml"},
 }
 
-// NewStorageClient returns a GCP storage client with default settings.
-func NewStorageClient(ctx context.Context, keyPath string) *storage.Client {
+func NewLocalStorageClient(ctx context.Context, keyPath string) *storage.Client {
 	scopes := []string{storage.ScopeFullControl}
-	if viper.GetString("ENV") == "local" {
-		return newLocalClient(ctx, keyPath, scopes)
-	}
-	return newClient(ctx, scopes)
-}
-
-func newLocalClient(ctx context.Context, keyPath string, scopes []string) *storage.Client {
 	transport, err := htransport.NewTransport(ctx, http.DefaultTransport, option.WithCredentialsFile(keyPath), option.WithScopes(scopes...))
 	if err != nil {
 		panic(err)
@@ -100,7 +92,8 @@ func newLocalClient(ctx context.Context, keyPath string, scopes []string) *stora
 	return s
 }
 
-func newClient(ctx context.Context, scopes []string) *storage.Client {
+func NewStorageClient(ctx context.Context) *storage.Client {
+	scopes := []string{storage.ScopeFullControl}
 	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false, true), option.WithScopes(scopes...))
 	if err != nil {
 		panic(err)

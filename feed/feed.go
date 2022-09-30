@@ -37,7 +37,7 @@ func coreInit(pgx *pgxpool.Pool) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	return handlersInit(router, pgx, task.NewClient(context.Background(), "./_deploy/service-key-dev.json"))
+	return handlersInit(router, pgx, task.NewClient(context.Background()))
 }
 
 func setDefaults() {

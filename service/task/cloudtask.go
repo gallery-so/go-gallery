@@ -134,7 +134,7 @@ func CreateTaskForMediaProcessing(ctx context.Context, message MediaProcessingMe
 }
 
 // NewClient returns a new task client with tracing enabled.
-func NewClient(ctx context.Context, keyPath string) *gcptasks.Client {
+func NewClient(ctx context.Context) *gcptasks.Client {
 	trace := tracing.NewTracingInterceptor(true)
 
 	copts := []option.ClientOption{
@@ -155,7 +155,7 @@ func NewClient(ctx context.Context, keyPath string) *gcptasks.Client {
 		} else {
 			copts = append(
 				copts,
-				option.WithCredentialsFile(keyPath),
+				option.WithCredentialsFile("./_deploy/service-key-dev.json"),
 			)
 		}
 	}
