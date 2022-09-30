@@ -445,6 +445,16 @@ func (c Chain) NormalizeAddress(addr Address) string {
 	}
 }
 
+// BaseKeywords are the keywords that are default for discovering media for a given chain
+func (c Chain) BaseKeywords() ([]string, []string) {
+	switch c {
+	case ChainTezos:
+		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}
+	default:
+		return []string{"image"}, []string{"animation", "video"}
+	}
+}
+
 // Value implements the driver.Valuer interface for the Chain type
 func (c Chain) Value() (driver.Value, error) {
 	return c, nil

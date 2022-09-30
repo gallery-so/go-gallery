@@ -11,6 +11,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
@@ -18,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -63,11 +65,9 @@ func coreInitServer() *gin.Engine {
 	logger.For(ctx).Info("Registering handlers...")
 
 	t := newThrottler()
-	// mc := server.NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, storageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
-	// mediaQueue := make(chan ProcessMediaInput)
-	// collectionTokensQueue := make(chan ProcessCollectionTokensRefreshInput)
-	// startJobs(mediaQueue, repos, ipfsClient, arweaveClient, s, t, collectionTokensQueue, mc)
-	return handlersInitServer(router, repos, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	mc := server.NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), task.NewClient(context.Background()))
+
+	return handlersInitServer(router, mc, repos, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {

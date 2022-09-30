@@ -89,7 +89,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		storage = media.NewStorageClient(context.Background())
 	}
 	taskClient := task.NewClient(context.Background())
-	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, newMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient)
+	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient)
 }
 
 func newTasksClient() *cloudtasks.Client {
@@ -239,7 +239,7 @@ func initSentry() {
 	}
 }
 
-func newMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
+func NewMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient)

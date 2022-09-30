@@ -12,8 +12,8 @@ COPY go.mod go.sum /app/
 RUN go mod download
 
 COPY . /app
-RUN go build -o ./bin/mediaprocessing ./cmd/mediaprocessing/main.go
+RUN go build -o ./bin/tokenprocessing ./cmd/tokenprocessing/main.go
 
 EXPOSE 6500
 USER nobody
-ENTRYPOINT ["./bin/mediaprocessing"]
+ENTRYPOINT ["./bin/tokenprocessing"]

@@ -5,7 +5,9 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/task"
 
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -19,6 +21,7 @@ type ContractAPI struct {
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	multichainProvider *multichain.Provider
+	taskClient         *gcptasks.Client
 }
 
 func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.DBID) (*db.Contract, error) {
@@ -92,6 +95,29 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 
 	return nil
 
+}
+
+func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	contract, err := api.loaders.ContractByContractId.Load(contractID)
+	if err != nil {
+		return err
+	}
+
+	im, anim := persist.Chain(contract.Chain.Int32).BaseKeywords()
+
+	in := task.TokenProcessingContractTokensMessage{
+		ContractID:        contractID,
+		Imagekeywords:     im,
+		Animationkeywords: anim,
+	}
+	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
 
 func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, onlyGalleryUsers bool) ([]multichain.TokenHolder, error) {

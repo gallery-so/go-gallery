@@ -13,6 +13,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -30,7 +31,7 @@ type ProcessMediaForTokenInput struct {
 
 func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input task.MediaProcessingMessage
+		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
@@ -155,6 +156,35 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 
 	logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTime))
 	return nil
+}
+
+func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persist.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input task.TokenProcessingContractTokensMessage
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+		contract, err := contractRepo.GetByID(c, input.ContractID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		key := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
+
+		if err := throttler.Lock(c, key); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+		}
+		defer throttler.Unlock(c, key)
+		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
+		if err := mc.RefreshTokensForCollection(c, contract.ContractIdentifiers()); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", key)
+
+		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
+	}
 }
 
 // func processTokensInCollectionRefreshes(queue <-chan ProcessCollectionTokensRefreshInput, mc *multichain.Provider, throttler *throttle.Locker) {

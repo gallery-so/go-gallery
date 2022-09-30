@@ -24,23 +24,6 @@ import (
 
 const staleCommunityTime = time.Hour * 2
 
-var (
-	TezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
-	TezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
-)
-
-type keywordsForChain struct {
-	imageKeywords     []string
-	animationKeywords []string
-}
-
-var allKeywordsForChain = map[persist.Chain]keywordsForChain{
-	persist.ChainTezos: {
-		imageKeywords:     TezImageKeywords,
-		animationKeywords: TezAnimationKeywords,
-	},
-}
-
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
 	Repos  *persist.Repositories
@@ -240,8 +223,6 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 							return
 						}
 
-						logger.For(ctx).Infof("got %d tokens and %d contracts for address %s on chain %d for priority %d", len(tokens), len(contracts), addr, chain, priority)
-
 						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
 					}(p, i)
@@ -300,13 +281,13 @@ outer:
 	}
 
 	for _, chain := range chains {
-		if keywords, ok := allKeywordsForChain[chain]; ok {
-			err = p.processMedialessTokens(ctx, userID, chain, keywords.imageKeywords, keywords.animationKeywords)
-			if err != nil {
-				logger.For(ctx).Errorf("error processing medialess tokens for user %s: %s", user.Username, err)
-				return err
-			}
+		image, anim := chain.BaseKeywords()
+		err = p.processMedialessTokens(ctx, userID, chain, image, anim)
+		if err != nil {
+			logger.For(ctx).Errorf("error processing medialess tokens for user %s: %s", user.Username, err)
+			return err
 		}
+
 	}
 
 	logger.For(ctx).Warn("preparing to delete old tokens")
@@ -334,7 +315,7 @@ outer:
 }
 
 func (p *Provider) processMedialessTokens(ctx context.Context, userID persist.DBID, chain persist.Chain, imageKeywords, animationKeywords []string) error {
-	processMediaInput := task.MediaProcessingMessage{
+	processMediaInput := task.TokenProcessingUserMessage{
 		UserID:            userID,
 		Chain:             chain,
 		ImageKeywords:     imageKeywords,
@@ -538,11 +519,10 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 				if !token.Media.IsServable() {
-					if keywords, ok := allKeywordsForChain[ti.Chain]; ok {
-						err = d.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, keywords.imageKeywords, keywords.animationKeywords)
-						if err != nil {
-							return err
-						}
+					image, anim := ti.Chain.BaseKeywords()
+					err = d.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, image, anim)
+					if err != nil {
+						return err
 					}
 				}
 

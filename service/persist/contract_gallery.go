@@ -40,6 +40,10 @@ type ContractGalleryRepository interface {
 	GetOwnersByAddress(context.Context, Address, Chain) ([]TokenHolder, error)
 }
 
+func (c ContractGallery) ContractIdentifiers() ContractIdentifiers {
+	return NewContractIdentifiers(c.Address, c.Chain)
+}
+
 func (e ErrGalleryContractNotFound) Error() string {
 	return fmt.Sprintf("contract not found by address: %s-%d", e.Address, e.Chain)
 }

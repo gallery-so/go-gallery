@@ -5,17 +5,13 @@ package graphql
 // helper functions without interfering with code generation.
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 
@@ -397,32 +393,7 @@ func resolveTokensByContractIDWithPagination(ctx context.Context, contractID per
 }
 
 func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID) error {
-	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
-	if err != nil {
-		return err
-	}
-
-	in := map[string]interface{}{
-		"key":                  contractID,
-		"contract_identifiers": persist.NewContractIdentifiers(contract.Address, persist.Chain(contract.Chain.Int32)),
-	}
-	asJSON, err := json.Marshal(in)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/collection/tokens/refresh", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
-	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		logger.For(ctx).Errorf("failed to refresh tokens in collection: %s", util.GetErrFromResp(resp))
-	}
-	return nil
+	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID)
 }
 
 func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
