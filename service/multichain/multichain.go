@@ -238,7 +238,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 							return
 						}
 
-						logger.For(ctx).Infof("got %d tokens and %d contracts for address %s on chain %s for priority %d", len(tokens), len(contracts), addr, chain, priority)
+						logger.For(ctx).Infof("got %d tokens and %d contracts for address %s on chain %d for priority %d", len(tokens), len(contracts), addr, chain, priority)
 
 						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
