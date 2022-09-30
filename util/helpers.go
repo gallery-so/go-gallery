@@ -51,6 +51,10 @@ func NewFileHeaderReader(reader io.Reader) (FileHeaderReader, error) {
 	}
 	_, err := io.CopyN(fi.headers, reader, 512)
 	if err != nil {
+		if err == io.EOF {
+			fi.reader = fi.headers
+			return fi, nil
+		}
 		return FileHeaderReader{}, err
 	}
 	fi.reader = io.MultiReader(fi.headers, reader)
