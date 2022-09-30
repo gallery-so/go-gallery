@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/spf13/viper"
 )
 
@@ -319,5 +320,26 @@ func FindFirstFieldFromMap(it map[string]interface{}, fields ...string) interfac
 func EnvVarMustExist(envVar, emptyVal string) {
 	if viper.GetString(envVar) == emptyVal {
 		panic(fmt.Sprintf("%s must be set", envVar))
+	}
+}
+
+// LoadEnvFile configures the environment with the configured input file.
+func LoadEnvFile(fileName string, depth int) {
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+		return
+	}
+
+	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+	filePath := filepath.Join("_local", fileName)
+	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
+	path, err := FindFile(filePath, depth)
+	if err != nil {
+		panic(err)
+	}
+
+	viper.SetConfigFile(path)
+	if err := viper.ReadInConfig(); err != nil {
+		panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
 	}
 }

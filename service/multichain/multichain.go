@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/big"
 	"net/http"
-	"os"
 	"sort"
 	"sync"
 	"time"
@@ -18,9 +17,9 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
-	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 )
 
 const staleCommunityTime = time.Hour * 2
@@ -241,7 +240,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 							return
 						}
 
-						logger.For(ctx).Infof("got %d tokens and %d contracts for address %s on chain %s for priority %d", len(tokens), len(contracts), addr, chain, priority)
+						logger.For(ctx).Infof("got %d tokens and %d contracts for address %s on chain %d for priority %d", len(tokens), len(contracts), addr, chain, priority)
 
 						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
@@ -335,21 +334,13 @@ outer:
 }
 
 func (p *Provider) processMedialessTokens(ctx context.Context, userID persist.DBID, chain persist.Chain, imageKeywords, animationKeywords []string) error {
-	processMediaInput := map[string]interface{}{
-		"user_id":            userID,
-		"chain":              persist.ChainTezos,
-		"image_keywords":     imageKeywords,
-		"animation_keywords": animationKeywords,
+	processMediaInput := task.MediaProcessingMessage{
+		UserID:            userID,
+		Chain:             chain,
+		ImageKeywords:     imageKeywords,
+		AnimationKeywords: animationKeywords,
 	}
-	asJSON, err := json.Marshal(processMediaInput)
-	if err != nil {
-		return err
-	}
-	_, err = p.createTaskForProcessingTokens(ctx, asJSON)
-	if err != nil {
-		return err
-	}
-	return nil
+	return task.CreateTaskForMediaProcessing(ctx, processMediaInput, p.TasksClient)
 }
 
 func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
@@ -379,33 +370,6 @@ func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.To
 		return util.GetErrFromResp(resp)
 	}
 	return nil
-}
-
-func (p *Provider) createTaskForProcessingTokens(ctx context.Context, message []byte) (*taskspb.Task, error) {
-
-	queuePath := fmt.Sprintf("projects/%s/locations/us-west2/queues/%s", os.Getenv("GOOGLE_CLOUD_PROJECT"), viper.GetString("TOKEN_PROCESSING_QUEUE"))
-
-	fmt.Println("queue path ", queuePath)
-	req := &taskspb.CreateTaskRequest{
-		Parent: queuePath,
-		Task: &taskspb.Task{
-			MessageType: &taskspb.Task_HttpRequest{
-				HttpRequest: &taskspb.HttpRequest{
-					HttpMethod: taskspb.HttpMethod_POST,
-					Url:        fmt.Sprintf("%s/process", viper.GetString("MEDIA_PROCESSING_URL")),
-				},
-			},
-		},
-	}
-
-	req.Task.GetHttpRequest().Body = message
-
-	createdTask, err := p.TasksClient.CreateTask(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("cloudtasks.CreateTask: %v", err)
-	}
-
-	return createdTask, nil
 }
 
 func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]TokenHolder, error) {

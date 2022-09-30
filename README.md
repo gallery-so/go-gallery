@@ -152,8 +152,13 @@ See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targetin
                                             |
                                             |              +------------+
                                             +-------------->  feedbot   |
-                                                           |  (:4123)   |
-                                                           +------------+
+                                            |              |  (:4123)   |
+                                            |              +------------+
+                                            |
+                                            |              +-------------------+
+                                            +-------------->  mediaprocessing  |
+                                                           |      (:6500)      |
+                                                           +-------------------+
 ```
 
 To get started:

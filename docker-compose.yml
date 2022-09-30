@@ -45,3 +45,16 @@ services:
       - "8080:80"
     volumes:
       - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
+  # Uncomment if you want to run mediaprocessing locally as a container
+  # mediaprocessing:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/mediaprocessing/Dockerfile"
+  #   ports:
+  #     - "6500:6500"
+  #   volumes:
+  #     - ${PWD}/_local:/app/_local
+  #     - ${PWD}/_deploy:/app/_deploy
+  #   depends_on:
+  #     - postgres
+  #     - redis

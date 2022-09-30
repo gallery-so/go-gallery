@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
@@ -10,6 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -35,7 +37,7 @@ func coreInit(pgx *pgxpool.Pool) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	return handlersInit(router, pgx)
+	return handlersInit(router, pgx, task.NewClient(context.Background()))
 }
 
 func setDefaults() {
