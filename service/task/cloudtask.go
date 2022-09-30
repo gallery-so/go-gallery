@@ -102,7 +102,7 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 	return submitAppEngineTask(ctx, client, queue, task, body)
 }
 
-func CreateTaskForMediaProcessing(ctx context.Context, message MediaProcessingTokensMsg, client *gcptasks.Client) error {
+func CreateTaskForMediaProcessing(ctx context.Context, message MediaProcessingMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForMediaProcessing")
 	defer tracing.FinishSpan(span)
 
