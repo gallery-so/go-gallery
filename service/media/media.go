@@ -867,7 +867,7 @@ func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Add
 func (a TezAnimationKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
 	switch contract {
 	case fxHash, fxHash2:
-		return []string{}
+		return []string{"artifactUri", "displayUri"}
 	default:
 		return a
 	}
