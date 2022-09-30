@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 
-## Build image
-FROM golang:1.16-buster AS build
+FROM golang:1.16-buster
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
@@ -9,29 +8,12 @@ RUN apt-get update && apt-get install -y \
 
 # Install deps
 WORKDIR /app
-COPY go.mod go.sum /app
+COPY go.mod go.sum /app/
 RUN go mod download
 
-# Copy source
 COPY . /app
-RUN go build -o /usr/local/bin/mediaprocessing ./cmd/mediaprocessing/main.go
-
-## Deploy image
-FROM gcr.io/distroless/base-debian11
-
-WORKDIR /
-COPY --from=build /usr/local/bin/mediaprocessing /
-
-# Copy ffmpeg and its package dependencies
-COPY --from=build /usr/bin/ffmpeg /usr/bin
-COPY --from=build \
-    /usr/lib/x86_64-linux-gnu/libavdevice.so.58 /usr/lib/x86_64-linux-gnu/ \
-    /usr/lib/x86_64-linux-gnu/libavfilter.so.7 /usr/lib/x86_64-linux-gnu/ \
-    /lib/x86_64-linux-gnu/libbz2.so.1.0 /lib/x86_64-linux-gnu/ \
-    /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/ \
-    /usr/lib/x86_64-linux-gnu/pulseaudio/libpulsecommon-12.2.so /usr/lib/x86_64-linux-gnu/
+RUN go build -o ./bin/mediaprocessing ./cmd/mediaprocessing/main.go
 
 EXPOSE 6500
-
 USER nobody
-ENTRYPOINT ["./mediaprocessing"]
+ENTRYPOINT ["./bin/mediaprocessing"]

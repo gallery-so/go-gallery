@@ -14,16 +14,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
 )
-
-type ProcessMediaForUserInput struct {
-	UserID            persist.DBID  `json:"user_id" binding:"required"`
-	Chain             persist.Chain `json:"chain" binding:"required"`
-	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
-	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
-}
 
 type ProcessMediaForTokenInput struct {
 	TokenID           persist.TokenID `json:"token_id" binding:"required"`
@@ -36,7 +30,7 @@ type ProcessMediaForTokenInput struct {
 
 func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input ProcessMediaForUserInput
+		var input task.MediaProcessingMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return

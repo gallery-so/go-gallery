@@ -41,7 +41,7 @@ func InitServer() {
 
 func coreInit() (*gin.Engine, *indexer) {
 
-	setDefaults("_local/app-local-indexer.yaml")
+	setDefaults("app-local-indexer.yaml")
 	initSentry()
 	initLogger()
 
@@ -97,15 +97,15 @@ func getBlockRangeFromArgs() (*uint64, *uint64) {
 func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
-	path := "_local/app-local-indexer-server.yaml"
+	envFile := "app-local-indexer-server.yaml"
 	storageKeyPath := "./_deploy/service-key-dev.json"
-	if len(os.Args) > 0 {
-		if os.Args[0] == "prod" {
-			path = "_local/app-prod-indexer-server.yaml"
+	if len(os.Args) > 1 {
+		envFile = fmt.Sprintf("app-%s-indexer-server.yaml", os.Args[1])
+		if os.Args[1] == "prod" {
 			storageKeyPath = "./_deploy/service-key.json"
 		}
 	}
-	setDefaults(path)
+	setDefaults(envFile)
 	initSentry()
 	initLogger()
 
@@ -134,7 +134,7 @@ func coreInitServer() *gin.Engine {
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
-func setDefaults(envFilePath string) {
+func setDefaults(fileName string) {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -156,18 +156,7 @@ func setDefaults(envFilePath string) {
 	viper.SetDefault("GAE_VERSION", "")
 
 	viper.AutomaticEnv()
-
-	if viper.GetString("ENV") == "local" {
-		path, err := util.FindFile(envFilePath, 3)
-		if err != nil {
-			panic(err)
-		}
-
-		viper.SetConfigFile(path)
-		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
-		}
-	}
+	util.LoadEnvFile(fileName, 3)
 
 	util.EnvVarMustExist("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {

@@ -27,19 +27,20 @@ type FeedbotMessage struct {
 	Action      persist.Action `json:"action" binding:"required"`
 }
 
-func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage) error {
+type MediaProcessingMessage struct {
+	UserID            persist.DBID  `json:"user_id" binding:"required"`
+	Chain             persist.Chain `json:"chain" binding:"required"`
+	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
+	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
+}
+
+func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeed")
 	defer tracing.FinishSpan(span)
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{
 		"Event ID": message.ID,
 	})
-
-	client, err := newClient(ctx)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
 
 	queue := viper.GetString("GCLOUD_FEED_QUEUE")
 	task := &taskspb.Task{
@@ -64,22 +65,16 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 		return err
 	}
 
-	return submitTask(ctx, client, queue, task, body)
+	return submitAppEngineTask(ctx, client, queue, task, body)
 }
 
-func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message FeedbotMessage) error {
+func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message FeedbotMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeedbot")
 	defer tracing.FinishSpan(span)
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{
 		"Event ID": message.FeedEventID,
 	})
-
-	client, err := newClient(ctx)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
 
 	queue := viper.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	task := &taskspb.Task{
@@ -104,10 +99,42 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 		return err
 	}
 
-	return submitTask(ctx, client, queue, task, body)
+	return submitAppEngineTask(ctx, client, queue, task, body)
 }
 
-func newClient(ctx context.Context) (*gcptasks.Client, error) {
+func CreateTaskForMediaProcessing(ctx context.Context, message MediaProcessingTokensMsg, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForMediaProcessing")
+	defer tracing.FinishSpan(span)
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{
+		"User ID": message.UserID,
+		"Chain":   message.Chain,
+	})
+
+	queue := viper.GetString("TOKEN_PROCESSING_QUEUE")
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/process", viper.GetString("MEDIA_PROCESSING_URL")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
+// NewClient returns a new task client with tracing enabled.
+func NewClient(ctx context.Context, keyPath string) *gcptasks.Client {
 	trace := tracing.NewTracingInterceptor(true)
 
 	copts := []option.ClientOption{
@@ -115,21 +142,42 @@ func newClient(ctx context.Context) (*gcptasks.Client, error) {
 		option.WithGRPCDialOption(grpc.WithTimeout(time.Duration(2) * time.Second)),
 	}
 
+	// Configure the client depending on whether or not
+	// the cloud task emulator is used.
 	if viper.GetString("ENV") == "local" {
-		copts = append(
-			copts,
-			option.WithEndpoint(viper.GetString("TASK_QUEUE_HOST")),
-			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-			option.WithoutAuthentication(),
-		)
+		if viper.GetString("TASK_QUEUE_HOST") == "" {
+			copts = append(
+				copts,
+				option.WithCredentialsFile(keyPath),
+			)
+		} else {
+			copts = append(
+				copts,
+				option.WithEndpoint(viper.GetString("TASK_QUEUE_HOST")),
+				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+				option.WithoutAuthentication(),
+			)
+		}
 	}
 
-	return gcptasks.NewClient(ctx, copts...)
+	client, err := gcptasks.NewClient(ctx, copts...)
+	if err != nil {
+		panic(err)
+	}
+
+	return client
 }
 
-func submitTask(ctx context.Context, client *gcptasks.Client, queue string, task *taskspb.Task, messageBody []byte) error {
+func submitAppEngineTask(ctx context.Context, client *gcptasks.Client, queue string, task *taskspb.Task, messageBody []byte) error {
 	req := &taskspb.CreateTaskRequest{Parent: queue, Task: task}
 	req.Task.GetAppEngineHttpRequest().Body = messageBody
+	_, err := client.CreateTask(ctx, req)
+	return err
+}
+
+func submitHttpTask(ctx context.Context, client *gcptasks.Client, queue string, task *taskspb.Task, messageBody []byte) error {
+	req := &taskspb.CreateTaskRequest{Parent: queue, Task: task}
+	req.Task.GetHttpRequest().Body = messageBody
 	_, err := client.CreateTask(ctx, req)
 	return err
 }

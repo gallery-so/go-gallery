@@ -79,37 +79,19 @@ func setDefaults() {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
-	viper.SetDefault("SELF_HOST", "http://localhost:6500")
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") == "local" {
-
-		filePath := "_local/app-local-mediaprocessing.yaml"
-		if len(os.Args) > 1 {
-			if os.Args[1] == "dev" {
-				filePath = "_local/app-dev-mediaprocessing.yaml"
-			} else if os.Args[1] == "prod" {
-				filePath = "_local/app-prod-mediaprocessing.yaml"
-			}
-		}
-
-		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-		path, err := util.FindFile(filePath, 3)
-		if err != nil {
-			panic(err)
-		}
-
-		viper.SetConfigFile(path)
-		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
-		}
+	envFile := "app-local-mediaprocessing.yaml"
+	if len(os.Args) > 1 {
+		envFile = fmt.Sprintf("app-%s-mediaprocessing.yaml", os.Args[1])
 	}
 
-	if viper.GetString("ENV") != "local" && viper.GetString("SENTRY_DSN") == "" {
-		panic("SENTRY_DSN must be set")
-	}
+	util.LoadEnvFile(envFile, 3)
 
+	if viper.GetString("ENV") != "local" {
+		util.EnvVarMustExist("SENTRY_DSN", "")
+	}
 }
 
 func newRepos() *persist.Repositories {

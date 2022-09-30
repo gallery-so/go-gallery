@@ -26,6 +26,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -37,6 +38,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/spf13/viper"
 )
@@ -81,22 +83,9 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	httpClient := &http.Client{Timeout: 10 * time.Minute}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-	storage := newStorageClient()
-	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, newStorageClient(), newMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")), newThrottler())
-}
-
-func newStorageClient() *storage.Client {
-	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(context.Background())
-	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
-	}
-	if err != nil {
-		logger.For(nil).Errorf("error creating storage client: %v", err)
-	}
-	return s
+	storage := media.NewStorageClient(context.Background(), "./_deploy/service-key-dev.json")
+	taskClient := task.NewClient(context.Background(), "./_deploy/service-key-dev.json")
+	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, newMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient)
 }
 
 func newTasksClient() *cloudtasks.Client {
@@ -142,7 +131,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_SERVICE_KEY", "")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:6000")
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
-	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
+	viper.SetDefault("TASK_QUEUE_HOST", "")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
@@ -152,32 +141,16 @@ func setDefaults() {
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
-	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "dev-token-processing")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/feed-event")
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") == "local" {
-
-		filePath := "_local/app-local-backend.yaml"
-		if len(os.Args) > 1 {
-			if os.Args[1] == "dev" {
-				filePath = "_local/app-dev-backend.yaml"
-			} else if os.Args[1] == "prod" {
-				filePath = "_local/app-prod-backend.yaml"
-			}
-		}
-
-		// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-		path, err := util.FindFile(filePath, 3)
-		if err != nil {
-			panic(err)
-		}
-
-		viper.SetConfigFile(path)
-		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
-		}
+	envFile := "app-local-backend.yaml"
+	if len(os.Args) > 1 {
+		envFile = fmt.Sprintf("app-%s-backend.yaml", os.Args[1])
 	}
+
+	util.LoadEnvFile(envFile, 3)
 
 	util.EnvVarMustExist("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {
@@ -259,10 +232,21 @@ func initSentry() {
 	}
 }
 
-func newMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *multichain.Provider {
+func newMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
 	ethChain := persist.ChainETH
+	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
+	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient)
+	openseaProvider := opensea.NewProvider(ethClient, httpClient)
+	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
 
-	return multichain.NewMultiChainDataRetriever(context.Background(), repos, cache, newTasksClient(), multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}, eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient), opensea.NewProvider(ethClient, httpClient), tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket), poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN")))
+	return multichain.NewMultiChainDataRetriever(context.Background(), repos, cache, taskClient,
+		overrides,
+		ethProvider,
+		openseaProvider,
+		tezosProvider,
+		poapProvider,
+	)
 }
 
 func newThrottler() *throttle.Locker {
