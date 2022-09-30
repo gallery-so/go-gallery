@@ -45,20 +45,13 @@ services:
       - "8080:80"
     volumes:
       - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
-  # If you're making changes to the mediaprocessing image, you'll want
-  # to uncomment the lines below so that you can test your changes made
-  # to the container.
-  #
-  # Most of the time, you'll probably just want to run mediaprocessing
-  # on your host i.e. `go run cmd/mediaprocessing/main.go`
+  # Uncomment if you want to run mediaprocessing locally as a container
   # mediaprocessing:
   #   build:
   #     context: "."
   #     dockerfile: "docker/mediaprocessing/Dockerfile"
   #   ports:
   #     - "6500:6500"
-  #   env_file:
-  #     - _local/app-docker-mediaprocessing.env
   #   volumes:
   #     - ${PWD}/_local:/app/_local
   #     - ${PWD}/_deploy:/app/_deploy

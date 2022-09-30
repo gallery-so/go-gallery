@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -133,7 +132,7 @@ func setDefaults() {
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
+	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/feed-event")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("MEDIA_PROCESSING_URL", "http://localhost:6500")
@@ -141,15 +140,18 @@ func setDefaults() {
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
-	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/feed-event")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
 
 	viper.AutomaticEnv()
 
 	envFile := "app-local-backend.yaml"
 	if len(os.Args) > 1 {
-		envFile = fmt.Sprintf("app-%s-backend.yaml", os.Args[1])
+		if os.Args[1] == "dev" {
+			envFile = "app-dev-backend.yaml"
+		} else if os.Args[1] == "prod" {
+			envFile = "app-prod-backend.yaml"
+		}
 	}
-
 	util.LoadEnvFile(envFile, 3)
 
 	util.EnvVarMustExist("IMGIX_SECRET", "")
@@ -239,7 +241,6 @@ func newMultichainProvider(repos *persist.Repositories, cache memstore.Cache, et
 	openseaProvider := opensea.NewProvider(ethClient, httpClient)
 	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
-
 	return multichain.NewMultiChainDataRetriever(context.Background(), repos, cache, taskClient,
 		overrides,
 		ethProvider,

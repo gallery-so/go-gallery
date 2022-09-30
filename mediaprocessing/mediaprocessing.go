@@ -2,7 +2,6 @@ package mediaprocessing
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -84,9 +83,12 @@ func setDefaults() {
 
 	envFile := "app-local-mediaprocessing.yaml"
 	if len(os.Args) > 1 {
-		envFile = fmt.Sprintf("app-%s-mediaprocessing.yaml", os.Args[1])
+		if os.Args[1] == "dev" {
+			envFile = "app-dev-mediaprocessing.yaml"
+		} else if os.Args[1] == "prod" {
+			envFile = "app-prod-mediaprocessing.yaml"
+		}
 	}
-
 	util.LoadEnvFile(envFile, 3)
 
 	if viper.GetString("ENV") != "local" {

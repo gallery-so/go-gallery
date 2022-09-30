@@ -73,7 +73,6 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 	})
 
 	return func(c *gin.Context) {
-
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
 			sentryutil.SetAuthContext(hub.Scope(), c)
 

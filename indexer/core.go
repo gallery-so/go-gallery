@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -100,8 +99,8 @@ func coreInitServer() *gin.Engine {
 	envFile := "app-local-indexer-server.yaml"
 	storageKeyPath := "./_deploy/service-key-dev.json"
 	if len(os.Args) > 1 {
-		envFile = fmt.Sprintf("app-%s-indexer-server.yaml", os.Args[1])
 		if os.Args[1] == "prod" {
+			envFile = "app-prod-indexer-server.yaml"
 			storageKeyPath = "./_deploy/service-key.json"
 		}
 	}
@@ -134,7 +133,7 @@ func coreInitServer() *gin.Engine {
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
-func setDefaults(fileName string) {
+func setDefaults(envFile string) {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -156,7 +155,7 @@ func setDefaults(fileName string) {
 	viper.SetDefault("GAE_VERSION", "")
 
 	viper.AutomaticEnv()
-	util.LoadEnvFile(fileName, 3)
+	util.LoadEnvFile(envFile, 3)
 
 	util.EnvVarMustExist("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
