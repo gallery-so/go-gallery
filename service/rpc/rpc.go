@@ -252,7 +252,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		}
 
 		return util.RemoveBOM(decoded), nil
-	case persist.URITypeIPFS:
+	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
 		path := util.GetIPFSPath(asString, true)
 
 		bs, err := GetIPFSData(ctx, ipfsClient, path)
@@ -269,7 +269,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 			return nil, err
 		}
 		return util.RemoveBOM(bs), nil
-	case persist.URITypeHTTP, persist.URITypeIPFSGateway:
+	case persist.URITypeHTTP:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 		if err != nil {
@@ -355,7 +355,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		buf := bytes.NewBuffer(util.RemoveBOM(decoded))
 
 		return util.NewFileHeaderReader(buf)
-	case persist.URITypeIPFS:
+	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
 		path := util.GetIPFSPath(asString, true)
 
 		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
@@ -373,7 +373,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		}
 		buf := bytes.NewBuffer(util.RemoveBOM(bs))
 		return util.NewFileHeaderReader(buf)
-	case persist.URITypeHTTP, persist.URITypeIPFSGateway:
+	case persist.URITypeHTTP:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 		if err != nil {
@@ -460,12 +460,9 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		}
 		into = &persist.TokenMetadata{"image": string(decoded)}
 		return nil
-	case persist.URITypeIPFS:
-		path := strings.ReplaceAll(asString, "ipfs://", "")
-		path = strings.ReplaceAll(path, "ipfs/", "")
-		path = strings.Split(path, "?")[0]
+	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
 
-		bs, err := GetIPFSData(ctx, ipfsClient, path)
+		bs, err := GetIPFSData(ctx, ipfsClient, util.GetIPFSPath(asString, false))
 		if err != nil {
 			return err
 		}
@@ -478,7 +475,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 			return err
 		}
 		return json.Unmarshal(result, into)
-	case persist.URITypeHTTP, persist.URITypeIPFSGateway:
+	case persist.URITypeHTTP:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 		if err != nil {
