@@ -379,7 +379,7 @@ func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.To
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/process/token", viper.GetString("MEDIA_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/process/token", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}
