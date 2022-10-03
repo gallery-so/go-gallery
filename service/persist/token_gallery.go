@@ -43,6 +43,11 @@ type TokenGallery struct {
 	IsProviderMarkedSpam *bool       `json:"is_provider_marked_spam"`
 }
 
+// TokenIdentifiers returns the unique identifier for a token
+func (t TokenGallery) TokenIdentifiers() TokenIdentifiers {
+	return NewTokenIdentifiers(Address(t.Contract), t.TokenID, t.Chain)
+}
+
 // AddressAtBlock represents an address at a specific block
 type AddressAtBlock struct {
 	Address Address     `json:"address"`

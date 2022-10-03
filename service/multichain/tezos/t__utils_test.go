@@ -40,7 +40,7 @@ func setDefaults() {
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:6000")
-	viper.SetDefault("MEDIA_PROCESSING_URL", "http://localhost:6500")
+	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 
 	viper.AutomaticEnv()
