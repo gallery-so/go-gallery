@@ -114,6 +114,8 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 
 	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name, true)
 
+	logger.For(pCtx).Infof("imgURL: %s, vURL: %s", imgURL, vURL)
+
 	imgAsURI := persist.TokenURI(imgURL)
 	videoAsURI := persist.TokenURI(vURL)
 
@@ -310,7 +312,7 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 
 func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
-	case persist.URITypeIPFS:
+	case persist.URITypeIPFS, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
 		path := util.GetIPFSPath(mediaURL, false)
 		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 	case persist.URITypeArweave:
@@ -749,7 +751,7 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 		return persist.MediaTypeSVG, "image/svg", int64(len(asURI.String())), nil
 	case persist.URITypeBase64BMP:
 		return persist.MediaTypeBase64BMP, "image/bmp", int64(len(asURI.String())), nil
-	case persist.URITypeHTTP, persist.URITypeIPFSAPI:
+	case persist.URITypeHTTP, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
 		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 		if err != nil {
 			return persist.MediaTypeUnknown, "", 0, err
