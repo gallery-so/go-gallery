@@ -5,10 +5,10 @@ go 1.16
 require (
 	blockwatch.cc/tzgo v1.13.2
 	cloud.google.com/go/cloudtasks v1.3.0
-	cloud.google.com/go/iam v0.3.0 // indirect
+	cloud.google.com/go/profiler v0.3.0
 	cloud.google.com/go/pubsub v1.19.0
 	cloud.google.com/go/secretmanager v1.3.0
-	cloud.google.com/go/storage v1.21.0
+	cloud.google.com/go/storage v1.22.1
 	github.com/99designs/gqlgen v0.17.1
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
@@ -72,13 +72,12 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
-	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65
-	google.golang.org/api v0.72.0
+	google.golang.org/api v0.78.0
 	google.golang.org/appengine v1.6.7
-	google.golang.org/genproto v0.0.0-20220314164441-57ef72a4c106
-	google.golang.org/grpc v1.45.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/genproto v0.0.0-20220518221133-4f43b3371335
+	google.golang.org/grpc v1.46.0
+	google.golang.org/protobuf v1.28.0
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	lukechampine.com/blake3 v1.1.7 // indirect

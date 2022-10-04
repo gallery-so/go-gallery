@@ -106,6 +106,7 @@ type TokenUpdateMediaInput struct {
 type TokenGalleryRepository interface {
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
 	GetByTokenIdentifiers(context.Context, TokenID, Address, Chain, int64, int64) ([]TokenGallery, error)
+	GetByFullIdentifiers(context.Context, TokenID, Address, Chain, DBID) (TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	BulkUpsert(context.Context, []TokenGallery) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error

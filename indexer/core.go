@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -22,7 +22,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 // Init initializes the indexer
@@ -42,20 +41,16 @@ func InitServer() {
 
 func coreInit() (*gin.Engine, *indexer) {
 
-	setDefaults("_local/app-local-indexer.yaml")
+	setDefaults("app-local-indexer.yaml")
 	initSentry()
 	initLogger()
 
 	tokenRepo, contractRepo := newRepos()
 	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(context.Background())
+	if viper.GetString("ENV") == "local" {
+		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
 	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
-	}
-	if err != nil {
-		panic(err)
+		s = media.NewStorageClient(context.Background())
 	}
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
@@ -65,6 +60,11 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	// overrides for where the indexer starts and stops
 	startingBlock, maxBlock := getBlockRangeFromArgs()
+
+	if viper.GetString("ENV") == "production" {
+		rpcEnabled = true
+	}
+
 	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events, nil, startingBlock, maxBlock)
 
 	router := gin.Default()
@@ -102,28 +102,24 @@ func getBlockRangeFromArgs() (*uint64, *uint64) {
 func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
-	path := "_local/app-local-indexer-server.yaml"
-	storageKeyPath := "./_deploy/service-key-dev.json"
-	if len(os.Args) > 0 {
-		if os.Args[0] == "prod" {
-			path = "_local/app-prod-indexer-server.yaml"
-			storageKeyPath = "./_deploy/service-key.json"
+	envFile := "app-local-indexer-server.yaml"
+	localKeyPath := "./_deploy/service-key-dev.json"
+	if len(os.Args) > 1 {
+		if os.Args[1] == "prod" {
+			envFile = "app-prod-indexer-server.yaml"
+			localKeyPath = "./_deploy/service-key.json"
 		}
 	}
-	setDefaults(path)
+	setDefaults(envFile)
 	initSentry()
 	initLogger()
 
 	tokenRepo, contractRepo := newRepos()
 	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(ctx)
+	if viper.GetString("ENV") == "local" {
+		s = media.NewLocalStorageClient(context.Background(), localKeyPath)
 	} else {
-		s, err = storage.NewClient(ctx, option.WithCredentialsFile(storageKeyPath))
-	}
-	if err != nil {
-		panic(err)
+		s = media.NewStorageClient(context.Background())
 	}
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
@@ -148,7 +144,7 @@ func coreInitServer() *gin.Engine {
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
-func setDefaults(envFilePath string) {
+func setDefaults(envFile string) {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -170,18 +166,7 @@ func setDefaults(envFilePath string) {
 	viper.SetDefault("GAE_VERSION", "")
 
 	viper.AutomaticEnv()
-
-	if viper.GetString("ENV") == "local" {
-		path, err := util.FindFile(envFilePath, 3)
-		if err != nil {
-			panic(err)
-		}
-
-		viper.SetConfigFile(path)
-		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
-		}
-	}
+	util.LoadEnvFile(envFile, 3)
 
 	util.EnvVarMustExist("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {

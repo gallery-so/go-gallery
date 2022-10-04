@@ -23,6 +23,7 @@ type TokenGalleryRepository struct {
 	getByTokenIDPaginateStmt                *sql.Stmt
 	getByTokenIdentifiersStmt               *sql.Stmt
 	getByTokenIdentifiersPaginateStmt       *sql.Stmt
+	getByFullIdentifiersStmt                *sql.Stmt
 	updateInfoStmt                          *sql.Stmt
 	updateMediaStmt                         *sql.Stmt
 	updateInfoByTokenIdentifiersUnsafeStmt  *sql.Stmt
@@ -58,6 +59,9 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 	checkNoErr(err)
 
 	getByTokenIdentifiersPaginateStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT = $2 AND DELETED = false ORDER BY BLOCK_NUMBER DESC LIMIT $3 OFFSET $4;`)
+	checkNoErr(err)
+
+	getByFullIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT = $2 AND OWNER_USER_ID = $3 AND DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
 
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4;`)
@@ -105,6 +109,7 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 		getContractByAddressStmt:                getContractByAddressStmt,
 		setTokensAsUserMarkedSpamStmt:           setTokensAsUserMarkedSpamStmt,
 		checkOwnTokensStmt:                      checkOwnTokensStmt,
+		getByFullIdentifiersStmt:                getByFullIdentifiersStmt,
 	}
 
 }
@@ -140,14 +145,20 @@ func (t *TokenGalleryRepository) GetByUserID(pCtx context.Context, pUserID persi
 
 }
 
-// GetByTokenIdentifiers gets a token by its token ID and contract address
+// GetByTokenIdentifiers gets a token by its token ID and contract address and chain
 func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pChain persist.Chain, limit int64, page int64) ([]persist.TokenGallery, error) {
+
+	var contractID persist.DBID
+	err := t.getContractByAddressStmt.QueryRowContext(pCtx, pContractAddress, pChain).Scan(&contractID)
+	if err != nil {
+		return nil, err
+	}
+
 	var rows *sql.Rows
-	var err error
 	if limit > 0 {
-		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, pChain, limit, page*limit)
+		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, contractID, limit, page*limit)
 	} else {
-		rows, err = t.getByTokenIdentifiersStmt.QueryContext(pCtx, pTokenID, pContractAddress, pChain)
+		rows, err = t.getByTokenIdentifiersStmt.QueryContext(pCtx, pTokenID, contractID)
 	}
 	if err != nil {
 		return nil, err
@@ -172,6 +183,24 @@ func (t *TokenGalleryRepository) GetByTokenIdentifiers(pCtx context.Context, pTo
 	}
 
 	return tokens, nil
+}
+
+// GetByFullIdentifiers gets a token by its token ID and contract address and chain and owner user ID
+func (t *TokenGalleryRepository) GetByFullIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.Address, pChain persist.Chain, pUserID persist.DBID) (persist.TokenGallery, error) {
+
+	var contractID persist.DBID
+	err := t.getContractByAddressStmt.QueryRowContext(pCtx, pContractAddress, pChain).Scan(&contractID)
+	if err != nil {
+		return persist.TokenGallery{}, err
+	}
+
+	token := persist.TokenGallery{}
+	err = t.getByFullIdentifiersStmt.QueryRowContext(pCtx, pTokenID, contractID, pUserID).Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam)
+	if err != nil {
+		return persist.TokenGallery{}, err
+	}
+
+	return token, nil
 }
 
 // GetByTokenID retrieves all tokens associated with a contract

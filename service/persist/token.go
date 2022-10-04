@@ -58,6 +58,8 @@ const (
 	MediaTypeSyncing MediaType = "syncing"
 )
 
+var mediaTypePriorities = []MediaType{MediaTypeHTML, MediaTypeAudio, MediaTypeAnimation, MediaTypeVideo, MediaTypeBase64BMP, MediaTypeGIF, MediaTypeSVG, MediaTypeImage, MediaTypeJSON, MediaTypeBase64Text, MediaTypeText, MediaTypeSyncing, MediaTypeUnknown, MediaTypeInvalid}
+
 const (
 	// ChainETH represents the Ethereum blockchain
 	ChainETH Chain = iota
@@ -124,6 +126,8 @@ const InvalidTokenURI TokenURI = "INVALID"
 
 // ZeroAddress is the all-zero Ethereum address
 const ZeroAddress EthereumAddress = "0x0000000000000000000000000000000000000000"
+
+var gltfFields = []string{"scene", "scenes", "nodes", "meshes", "accessors", "bufferViews", "buffers", "materials", "textures", "images", "samplers", "cameras", "skins", "animations", "extensions", "extras"}
 
 // EthereumAddress represents an Ethereum address
 type EthereumAddress string
@@ -363,6 +367,16 @@ func SniffMediaType(buf []byte) (MediaType, string) {
 	if whereCharset != -1 {
 		contentType = contentType[:whereCharset]
 	}
+	if contentType == "application/octet-stream" || contentType == "text/plain" {
+		// fallback of http.DetectContentType
+		if strings.EqualFold(string(buf[:4]), "glTF") {
+			return MediaTypeAnimation, "model/gltf+binary"
+		}
+
+		if strings.HasPrefix(strings.TrimSpace(string(buf[:20])), "{") && util.ContainsAnyString(strings.TrimSpace(string(buf)), gltfFields...) {
+			return MediaTypeAnimation, "model/gltf+json"
+		}
+	}
 	return MediaFromContentType(contentType), contentType
 }
 
@@ -506,6 +520,11 @@ func (c Chain) MarshalGQL(w io.Writer) {
 // URL turns a token's URI into a URL
 func (uri TokenURI) URL() (*url.URL, error) {
 	return url.Parse(uri.String())
+}
+
+// IsPathPrefixed returns whether the URI is prefixed with a path to be parsed by a browser or decentralized storage service
+func (uri TokenURI) IsPathPrefixed() bool {
+	return strings.HasPrefix(uri.String(), "http") || strings.HasPrefix(uri.String(), "ipfs://") || strings.HasPrefix(uri.String(), "arweave") || strings.HasPrefix(uri.String(), "ar://")
 }
 
 func (uri TokenURI) String() string {
@@ -800,6 +819,34 @@ func (a *EthereumAddressAtBlock) Scan(src interface{}) error {
 // Value implements the database/sql/driver Valuer interface for the AddressAtBlock type
 func (a EthereumAddressAtBlock) Value() (driver.Value, error) {
 	return json.Marshal(a)
+}
+
+// IsValid returns true if the media type is not unknown, syncing, or invalid
+func (m MediaType) IsValid() bool {
+	return m != MediaTypeUnknown && m != MediaTypeInvalid && m != MediaTypeSyncing
+}
+
+// IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
+func (m MediaType) IsImageLike() bool {
+	return m == MediaTypeImage || m == MediaTypeGIF || m == MediaTypeBase64BMP || m == MediaTypeSVG
+}
+
+// IsAnimationLike returns true if the media type is a type that is expected to be like an animation and live render
+func (m MediaType) IsAnimationLike() bool {
+	return m == MediaTypeVideo || m == MediaTypeHTML || m == MediaTypeAudio || m == MediaTypeAnimation
+}
+
+// IsMorePriorityThan returns true if the media type is more important than the other media type
+func (m MediaType) IsMorePriorityThan(other MediaType) bool {
+	for _, t := range mediaTypePriorities {
+		if t == m {
+			return true
+		}
+		if t == other {
+			return false
+		}
+	}
+	return true
 }
 
 // Value implements the database/sql/driver Valuer interface for the MediaType type
