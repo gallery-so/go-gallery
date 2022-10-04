@@ -45,11 +45,11 @@ services:
       - "8080:80"
     volumes:
       - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
-  # Uncomment if you want to run mediaprocessing locally as a container
-  # mediaprocessing:
+  # Uncomment if you want to run tokenprocessing locally as a container
+  # tokenprocessing:
   #   build:
   #     context: "."
-  #     dockerfile: "docker/mediaprocessing/Dockerfile"
+  #     dockerfile: "docker/tokenprocessing/Dockerfile"
   #   ports:
   #     - "6500:6500"
   #   volumes:
