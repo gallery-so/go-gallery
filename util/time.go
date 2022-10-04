@@ -1,8 +1,9 @@
 package util
 
 import (
-	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 )
 
 // Track the time it takes to execute a function

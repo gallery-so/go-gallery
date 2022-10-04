@@ -136,6 +136,7 @@ type ChainProvider interface {
 	GetOwnedTokensByContract(context.Context, persist.Address, persist.Address, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
 	GetCommunityOwners(context.Context, persist.Address, int, int) ([]ChainAgnosticCommunityOwner, error)
+	GetDisplayNameByAddress(context.Context, persist.Address) string
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
 	RefreshContract(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
@@ -566,6 +567,10 @@ func (d *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 	seenTokens := map[tokenUniqueIdentifiers]bool{}
 	seenAddresses := map[persist.Address]persist.User{}
 	for _, token := range tokens {
+		providers, err := d.getProvidersForChain(token.chain)
+		if err != nil {
+			return nil, nil, err
+		}
 		for _, t := range token.tokens {
 			if seenTokens[tokenUniqueIdentifiers{chain: token.chain, contract: t.ContractAddress, tokenID: t.TokenID, ownerAddresses: t.OwnerAddress}] {
 				continue
@@ -573,14 +578,22 @@ func (d *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 			seenTokens[tokenUniqueIdentifiers{chain: token.chain, contract: t.ContractAddress, tokenID: t.TokenID, ownerAddresses: t.OwnerAddress}] = true
 			user, ok := seenAddresses[t.OwnerAddress]
 			if !ok {
+				username := t.OwnerAddress.String()
+				for _, provider := range providers {
+					display := provider.GetDisplayNameByAddress(ctx, t.OwnerAddress)
+					if display != "" {
+						username = display
+						break
+					}
+				}
 				userID, err := d.Repos.UserRepository.Create(ctx, persist.CreateUserInput{
-					Username:     t.OwnerAddress.String(),
+					Username:     username,
 					ChainAddress: persist.NewChainAddress(t.OwnerAddress, token.chain),
 					Universal:    true,
 				})
 				if err != nil {
 					if _, ok := err.(persist.ErrUsernameNotAvailable); ok {
-						user, err = d.Repos.UserRepository.GetByUsername(ctx, t.OwnerAddress.String())
+						user, err = d.Repos.UserRepository.GetByUsername(ctx, username)
 						if err != nil {
 							return nil, nil, err
 						}

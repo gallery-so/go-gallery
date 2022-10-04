@@ -2,16 +2,17 @@ package gqlidgen
 
 import (
 	"fmt"
-	"github.com/99designs/gqlgen/codegen"
-	"github.com/99designs/gqlgen/codegen/config"
-	"github.com/99designs/gqlgen/codegen/templates"
-	"github.com/99designs/gqlgen/plugin"
 	"io/ioutil"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
+
+	"github.com/99designs/gqlgen/codegen"
+	"github.com/99designs/gqlgen/codegen/config"
+	"github.com/99designs/gqlgen/codegen/templates"
+	"github.com/99designs/gqlgen/plugin"
 )
 
 const outputFileName = "gqlidgen_gen.go"

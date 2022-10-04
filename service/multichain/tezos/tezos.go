@@ -16,6 +16,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/machinebox/graphql"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -26,6 +27,8 @@ import (
 )
 
 const maxRequestLimit = 1000
+
+const tezDomainsApiURL = "https://api.tezos.domains/graphql"
 
 type tokenStandard string
 
@@ -120,6 +123,7 @@ type Provider struct {
 	ipfsClient     *shell.Shell
 	arweaveClient  *goar.Client
 	storageClient  *storage.Client
+	graphQL        *graphql.Client
 	tokenBucket    string
 }
 
@@ -132,6 +136,7 @@ func NewProvider(tezosAPIUrl, mediaURL, ipfsGatewayURL string, httpClient *http.
 		httpClient:     httpClient,
 		ipfsClient:     ipfsClient,
 		arweaveClient:  arweaveClient,
+		graphQL:        graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
 		storageClient:  storageClient,
 		tokenBucket:    tokenBucket,
 	}
@@ -396,6 +401,109 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persi
 	}
 	return owners, nil
 
+}
+
+/*
+gql example
+{
+  reverseRecords(
+    where: {
+      address: {
+        in: [
+          "KT1Mqx5meQbhufngJnUAGEGpa4ZRxhPSiCgB"
+          "KT1GBZmSxmnKJXGMdMLbugPfLyUPmuLSMwKS"
+        ]
+      }
+    }
+  ) {
+    items {
+      address
+      owner
+      domain {
+        name
+      }
+    }
+  }
+}
+
+example response
+{
+  "data": {
+    "domains": {
+      "items": [
+        {
+          "address": "tz1VxMudmADssPp6FPDGRsvJXE41DD6i9g6n",
+          "name": "aaa.tez",
+          "owner": "tz1VxMudmADssPp6FPDGRsvJXE41DD6i9g6n",
+          "level": 2
+        },
+        {
+          "address": null,
+          "name": "a.aaa.tez",
+          "owner": "tz1VxMudmADssPp6FPDGRsvJXE41DD6i9g6n",
+          "level": 3
+        },
+        {
+          "address": null,
+          "name": "alice.tez",
+          "owner": "tz1Q4vimV3wsfp21o7Annt64X7Hs6MXg9Wix",
+          "level": 2
+        }
+      ]
+    }
+  },
+  "extensions": {}
+}
+*/
+
+type tezDomainResponse struct {
+	Data struct {
+		Domains struct {
+			Items []struct {
+				Address string `json:"address"`
+				Name    string `json:"name"`
+				Owner   string `json:"owner"`
+				Level   int    `json:"level"`
+			} `json:"items"`
+		} `json:"domains"`
+	} `json:"data"`
+}
+
+func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
+	req := graphql.NewRequest(fmt.Sprintf(`{
+	  "query": "query ($addresses: [String!]) {
+		reverseRecords(
+			where: {
+				address: {
+					in: $addresses
+				}
+			}
+		) {
+			items {
+				address
+				owner
+				domain {
+					name
+				}
+			}
+		}
+	}",
+	  "variables": {
+		"addresses": [
+			%s
+		]
+	  }
+	}`, addr.String()))
+
+	resp := tezDomainResponse{}
+	err := d.graphQL.Run(ctx, req, &resp)
+	if err != nil {
+		return addr.String()
+	}
+	if len(resp.Data.Domains.Items) == 0 {
+		return addr.String()
+	}
+	return resp.Data.Domains.Items[0].Name
 }
 
 // RefreshToken refreshes the metadata for a given token.

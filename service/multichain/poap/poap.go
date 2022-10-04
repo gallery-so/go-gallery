@@ -322,6 +322,10 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	return d.eventToContract(event), nil
 }
 
+func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
+	return addr.String()
+}
+
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
 	return nil

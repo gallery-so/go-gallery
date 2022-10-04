@@ -6,12 +6,13 @@ package tracing
 import (
 	"context"
 	"fmt"
-	"github.com/getsentry/sentry-go"
-	"github.com/go-redis/redis/v8"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/getsentry/sentry-go"
+	"github.com/go-redis/redis/v8"
 )
 
 func NewRedisHook(db int, dbName string, continueOnly bool) redis.Hook {

@@ -175,7 +175,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persis
 		if err := throttler.Lock(c, key); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 		}
-		defer throttler.Unlock(c, key)
+		// do not unlock, let expiry handle the unlock
 		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
 		if err := mc.RefreshTokensForCollection(c, contract.ContractIdentifiers()); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
@@ -186,27 +186,3 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persis
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
-
-// func processTokensInCollectionRefreshes(queue <-chan ProcessCollectionTokensRefreshInput, mc *multichain.Provider, throttler *throttle.Locker) {
-// 	wp := workerpool.New(10)
-// 	for processInput := range queue {
-// 		in := processInput
-// 		logger.For(nil).Infof("Processing Collection Tokens Refresh: %s", in.Key)
-// 		wp.Submit(func() {
-// 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-// 			defer cancel()
-// 			if err := throttler.Lock(ctx, in.Key); err != nil {
-// 				logger.For(ctx).Errorf("error locking: %v", err)
-// 				return
-// 			}
-// 			defer throttler.Unlock(ctx, in.Key)
-// 			logger.For(ctx).Infof("Processing: %s - Processing Collection Refresh", in.Key)
-// 			if err := mc.RefreshTokensForCollection(ctx, in.ContractIdentifiers); err != nil {
-// 				logger.For(ctx).Errorf("error processing media for %s: %v", in.Key, err)
-// 				return
-// 			}
-// 			logger.For(ctx).Infof("Processing: %s - Finished Processing Collection Refresh", in.Key)
-
-// 		})
-// 	}
-// }

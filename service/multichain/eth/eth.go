@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	ens "github.com/benny-conn/go-ens"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -250,6 +251,29 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 		contract = contracts[0]
 	}
 	return tokensToChainAgnostic(tokens.NFTs), contract, nil
+}
+
+func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
+
+	resultChan := make(chan string)
+	errChan := make(chan error)
+	go func() {
+		// no context? who do these guys think they are!? I had to add a goroutine to make sure this doesn't block forever
+		domain, err := ens.ReverseResolve(d.ethClient, persist.EthereumAddress(addr).Address())
+		if err != nil {
+			errChan <- err
+			return
+		}
+		resultChan <- domain
+	}()
+	select {
+	case result := <-resultChan:
+		return result
+	case <-errChan:
+		return addr.String()
+	case <-ctx.Done():
+		return addr.String()
+	}
 }
 
 // RefreshToken refreshes the metadata for a given token.
