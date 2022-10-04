@@ -269,9 +269,11 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	select {
 	case result := <-resultChan:
 		return result
-	case <-errChan:
+	case err := <-errChan:
+		logger.For(ctx).Error("error resolving ens domain: %s", err.Error())
 		return addr.String()
 	case <-ctx.Done():
+		logger.For(ctx).Error("error resolving ens domain: %s", ctx.Err().Error())
 		return addr.String()
 	}
 }

@@ -23,6 +23,7 @@ import (
 const staleCommunityTime = time.Hour * 2
 
 const maxCommunitySize = 10_000
+const defaultLimit = 50_000
 
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
@@ -218,7 +219,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				for i, p := range providers {
 					go func(provider ChainProvider, priority int) {
 						defer subWg.Done()
-						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr, 0, 0)
+						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr, defaultLimit, 0)
 						if err != nil {
 							errChan <- errWithPriority{err: err, priority: priority}
 							return
@@ -485,6 +486,7 @@ func (d *Provider) RefreshTokensForCollection(ctx context.Context, ci persist.Co
 	tokensReceive := make(chan chainTokens)
 	contractsReceive := make(chan chainContracts)
 	errChan := make(chan errWithPriority)
+	done := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	wg.Add(len(providers))
 	for i, provider := range providers {
@@ -501,8 +503,7 @@ func (d *Provider) RefreshTokensForCollection(ctx context.Context, ci persist.Co
 		}(i, provider)
 	}
 	go func() {
-		defer close(tokensReceive)
-		defer close(contractsReceive)
+		defer close(done)
 		wg.Wait()
 	}()
 
@@ -515,33 +516,43 @@ outer:
 			}
 		case tokens := <-tokensReceive:
 			allTokens = append(allTokens, tokens)
-		case contract, ok := <-contractsReceive:
-			if !ok {
-				break outer
-			}
+		case contract := <-contractsReceive:
 			allContracts = append(allContracts, contract)
+		case <-done:
+			logger.For(ctx).Info("done refreshing tokens for collection")
+			break outer
 		}
 	}
+
+	logger.For(ctx).Info("creating contracts")
 
 	addressToContract, err := d.upsertContracts(ctx, allContracts)
 	if err != nil {
 		return err
 	}
 
+	logger.For(ctx).Info("creating users")
+
 	chainTokensForUsers, users, err := d.createUsersForTokens(ctx, allTokens)
 	if err != nil {
 		return err
 	}
+
+	logger.For(ctx).Info("creating tokens")
+
 	for _, user := range users {
 		allUserTokens, err := d.Repos.TokenRepository.GetByUserID(ctx, user.ID, -1, 0)
 		if err != nil {
 			return err
 		}
 
+		logger.For(ctx).Info("creating tokens for user")
 		_, err = d.upsertTokens(ctx, chainTokensForUsers[user.ID], addressToContract, allUserTokens, user)
 		if err != nil {
 			return err
 		}
+
+		logger.For(ctx).Info("creating tokens for user done")
 	}
 	return nil
 }
@@ -578,11 +589,14 @@ func (d *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 			seenTokens[tokenUniqueIdentifiers{chain: token.chain, contract: t.ContractAddress, tokenID: t.TokenID, ownerAddresses: t.OwnerAddress}] = true
 			user, ok := seenAddresses[t.OwnerAddress]
 			if !ok {
+				logger.For(ctx).Infof("creating user for address %s", t.OwnerAddress)
 				username := t.OwnerAddress.String()
 				for _, provider := range providers {
+					logger.For(ctx).Infof("getting username for address %s", t.OwnerAddress)
 					display := provider.GetDisplayNameByAddress(ctx, t.OwnerAddress)
 					if display != "" {
 						username = display
+						logger.For(ctx).Infof("got username %s for address %s", username, t.OwnerAddress)
 						break
 					}
 				}
@@ -624,6 +638,7 @@ func (d *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 			tokensInChainTokens.tokens = append(tokensInChainTokens.tokens, t)
 			chainTokensForUser[token.priority] = tokensInChainTokens
 			userTokens[user.ID] = chainTokensForUser
+			logger.For(ctx).Infof("created user %s for address %s", user.Username, t.OwnerAddress)
 		}
 	}
 	chainTokensForUser := map[persist.DBID][]chainTokens{}

@@ -68,11 +68,10 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 				}
 			})
 		}
-		func() {
-			defer throttler.Unlock(c, input.UserID.String())
-			innerWp.StopWait()
-			logger.For(nil).Infof("Processing Media: %s - Finished", input.UserID)
-		}()
+
+		innerWp.StopWait()
+		logger.For(nil).Infof("Processing Media: %s - Finished", input.UserID)
+
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
 }
