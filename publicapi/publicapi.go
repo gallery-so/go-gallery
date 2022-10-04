@@ -46,7 +46,7 @@ type PublicAPI struct {
 
 func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, throttler *throttle.Locker) {
 	// Use the request context so dataloaders will add their traces to the request span
-	loaders := dataloader.NewLoaders(ctx.Request.Context(), queries)
+	loaders := dataloader.NewLoaders(ctx.Request.Context(), queries, false)
 	validator := newValidator()
 
 	api := &PublicAPI{
