@@ -132,14 +132,19 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, l, off)
 }
 
-func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error) {
+func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.TokenHolder, error) {
+	l := 100
+	off := 0
+	if limit != nil {
+		l = *limit
+	}
+	if offset != nil {
+		off = *offset
+	}
+
 	refresh := false
-	onlyGallery := true
 	if obj.HelperCommunityData.ForceRefresh != nil {
 		refresh = *obj.HelperCommunityData.ForceRefresh
-	}
-	if obj.HelperCommunityData.OnlyGalleryUsers != nil {
-		onlyGallery = *obj.HelperCommunityData.OnlyGalleryUsers
 	}
 
 	err := refreshTokensInContractAsync(ctx, obj.Dbid)
@@ -147,7 +152,7 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([
 		return nil, err
 	}
 
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, l, off)
 }
 
 func (r *feedConnectionResolver) PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error) {
@@ -804,8 +809,8 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error) {
-	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh, onlyGalleryUsers)
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {

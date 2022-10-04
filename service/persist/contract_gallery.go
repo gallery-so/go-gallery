@@ -37,7 +37,7 @@ type ContractGalleryRepository interface {
 	GetByAddresses(context.Context, []Address, Chain) ([]ContractGallery, error)
 	UpsertByAddress(context.Context, Address, Chain, ContractGallery) error
 	BulkUpsert(context.Context, []ContractGallery) error
-	GetOwnersByAddress(context.Context, Address, Chain) ([]TokenHolder, error)
+	GetOwnersByAddress(context.Context, Address, Chain, int, int) ([]TokenHolder, error)
 }
 
 func (c ContractGallery) ContractIdentifiers() ContractIdentifiers {

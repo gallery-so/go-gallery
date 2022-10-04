@@ -55,6 +55,7 @@ type GalleryUser implements Node {
     username: String
     bio: String
     traits: String
+    universal: Boolean
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -374,7 +375,7 @@ type Community implements Node
 
   tokensInCommunity(limit: Int, offset: Int): [Token] @goField(forceResolver: true)
 
-  owners: [TokenHolder] @goField(forceResolver: true)
+  owners(limit: Int, offset: Int): [TokenHolder] @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -570,7 +571,7 @@ type Query {
     collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
     tokenById(id: DBID!): TokenByIdOrError
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean, onlyGalleryUsers: Boolean): CommunityByAddressOrError
+    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection

@@ -45,7 +45,7 @@ func NewContractGalleryRepository(db *sql.DB) *ContractGalleryRepository {
 	FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord)
 	LEFT JOIN collections c ON c.ID = coll
 	LEFT JOIN LATERAL (SELECT n.*,nft,nft_ord FROM tokens n, unnest(c.NFTS) WITH ORDINALITY AS x(nft, nft_ord)) n ON n.ID = n.nft
-	WHERE n.CONTRACT = $1 AND g.DELETED = false AND c.DELETED = false AND n.DELETED = false ORDER BY coll_ord,n.nft_ord;`,
+	WHERE n.CONTRACT = $1 AND g.DELETED = false AND c.DELETED = false AND n.DELETED = false ORDER BY coll_ord,n.nft_ord LIMIT $2 OFFSET $3;`,
 	)
 	checkNoErr(err)
 
@@ -137,14 +137,14 @@ func (c *ContractGalleryRepository) BulkUpsert(pCtx context.Context, pContracts 
 	return nil
 }
 
-func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, contractAddr persist.Address, chain persist.Chain) ([]persist.TokenHolder, error) {
+func (c *ContractGalleryRepository) GetOwnersByAddress(ctx context.Context, contractAddr persist.Address, chain persist.Chain, limit, offset int) ([]persist.TokenHolder, error) {
 	contract, err := c.GetByAddress(ctx, contractAddr, chain)
 	if err != nil {
 		return nil, err
 	}
 
 	walletIDs := make([]persist.DBID, 0, 20)
-	rows, err := c.getOwnersStmt.QueryContext(ctx, contract.ID)
+	rows, err := c.getOwnersStmt.QueryContext(ctx, contract.ID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("error getting owners: %w", err)
 	}

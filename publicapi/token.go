@@ -2,6 +2,8 @@ package publicapi
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -250,18 +252,21 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 
 	token, err := api.loaders.TokenByTokenID.Load(tokenDBID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load token: %w", err)
 	}
 	contract, err := api.loaders.ContractByContractId.Load(token.Contract)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load contract for token: %w", err)
 	}
 
 	addresses := []persist.Address{}
 	for _, walletID := range token.OwnedByWallets {
 		wa, err := api.loaders.WalletByWalletId.Load(walletID)
 		if err != nil {
-			return err
+			if strings.Contains(err.Error(), "no rows in result set") {
+				continue
+			}
+			return fmt.Errorf("failed to load wallet %s: %w", walletID, err)
 		}
 		addresses = append(addresses, wa.Address)
 	}

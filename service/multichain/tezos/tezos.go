@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
 	"strings"
@@ -24,7 +25,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
-const limit = 1000
+const maxRequestLimit = 1000
 
 type tokenStandard string
 
@@ -145,12 +146,13 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, maxLimit, startingOffset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tzAddr, err := toTzAddress(addr)
 	if err != nil {
 		return nil, nil, err
 	}
-	offset := 0
+	limit := int(math.Min(float64(maxLimit), float64(maxRequestLimit)))
+	offset := startingOffset
 	resultTokens := []tzktBalanceToken{}
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
@@ -172,13 +174,13 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
 		offset += limit
 
-		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
+		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), maxRequestLimit, offset)
 	}
 
 	return d.tzBalanceTokensToTokens(ctx, resultTokens, addr.String())
@@ -186,9 +188,10 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Tezos Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 
-	offset := 0
+	offset := startOffset
+	limit := int(math.Min(float64(maxLimit), float64(maxRequestLimit)))
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -210,7 +213,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
@@ -230,12 +233,13 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	offset := 0
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	offset := startOffset
+	limit := int(math.Min(float64(maxLimit), float64(maxRequestLimit)))
 	resultTokens := []tzktBalanceToken{}
 
 	for {
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s&limit=%d&offset=%d", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress, limit, offset), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s&limit=%d&offset=%d", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress, maxRequestLimit, offset), nil)
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
@@ -253,7 +257,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
@@ -335,8 +339,9 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
-func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
+	limit := int(math.Min(float64(maxLimit), float64(maxRequestLimit)))
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -358,7 +363,7 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
@@ -378,8 +383,8 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 	return tokens, contract, nil
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress)
+func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, maxLimit, maxOffset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress, maxLimit, maxOffset)
 	if err != nil {
 		return nil, err
 	}

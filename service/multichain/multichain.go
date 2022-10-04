@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"net/http"
 	"sort"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
-	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -23,6 +21,8 @@ import (
 )
 
 const staleCommunityTime = time.Hour * 2
+
+const maxCommunitySize = 10_000
 
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
@@ -129,13 +129,13 @@ type errWithPriority struct {
 // ChainProvider is an interface for retrieving data from a chain
 type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
-	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
-	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByWalletAddress(context.Context, persist.Address, int, int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByContractAddress(context.Context, persist.Address, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
-	GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetOwnedTokensByContract(context.Context, persist.Address, persist.Address, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
-	GetCommunityOwners(context.Context, persist.Address) ([]ChainAgnosticCommunityOwner, error)
+	GetCommunityOwners(context.Context, persist.Address, int, int) ([]ChainAgnosticCommunityOwner, error)
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
 	RefreshContract(context.Context, persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
@@ -217,7 +217,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				for i, p := range providers {
 					go func(provider ChainProvider, priority int) {
 						defer subWg.Done()
-						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr)
+						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr, 0, 0)
 						if err != nil {
 							errChan <- errWithPriority{err: err, priority: priority}
 							return
@@ -353,9 +353,9 @@ func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.To
 	return nil
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, onlyGalleryUsers bool, forceRefresh bool) ([]TokenHolder, error) {
+func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers persist.ChainAddress, forceRefresh bool, limit, offset int) ([]TokenHolder, error) {
 
-	cacheKey := fmt.Sprintf("%s-%t", communityIdentifiers.String(), onlyGalleryUsers)
+	cacheKey := fmt.Sprintf("%s-%d-%d", communityIdentifiers.String(), limit, offset)
 	if !forceRefresh {
 		bs, err := d.Cache.Get(ctx, cacheKey)
 		if err == nil && len(bs) > 0 {
@@ -367,99 +367,15 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 			return owners, nil
 		}
 	}
-	providers, err := d.getProvidersForChain(communityIdentifiers.Chain())
-	if err != nil {
-		return nil, err
-	}
 
-	dbHolders, err := d.Repos.ContractRepository.GetOwnersByAddress(ctx, communityIdentifiers.Address(), communityIdentifiers.Chain())
+	dbHolders, err := d.Repos.ContractRepository.GetOwnersByAddress(ctx, communityIdentifiers.Address(), communityIdentifiers.Chain(), limit, offset)
 	if err != nil {
 		return nil, err
 	}
 
 	holders, err := tokenHoldersToTokenHolders(ctx, dbHolders, d.Repos.UserRepository)
-
-	if !onlyGalleryUsers {
-		// look for other holders from the provider directly
-		var nonGalleryOwners []ChainAgnosticCommunityOwner
-		for _, p := range providers {
-			owners, err := p.GetCommunityOwners(ctx, communityIdentifiers.Address())
-			if err != nil {
-				return nil, err
-			}
-			nonGalleryOwners = append(nonGalleryOwners, owners...)
-		}
-		asHolders := communityOwnersToTokenHolders(nonGalleryOwners)
-		seenAddresses := map[persist.Address]bool{}
-		for _, h := range holders {
-			for _, w := range h.WalletIDs {
-				wallet, err := d.Repos.WalletRepository.GetByID(ctx, w)
-				if err == nil {
-					seenAddresses[wallet.Address] = true
-				}
-			}
-		}
-		wp := workerpool.New(10)
-		holderChan := make(chan TokenHolder)
-		for _, holder := range asHolders {
-			if !seenAddresses[holder.Address] {
-				h := holder
-				wp.Submit(func() {
-					innerCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-					defer cancel()
-					timeHere := time.Now()
-					userID, err := d.Repos.UserRepository.Create(innerCtx, persist.CreateUserInput{
-						// TODO get ENS here with a ChainProvider.GetDisplayNameForAddress func
-						Username:     h.Address.String(),
-						ChainAddress: persist.NewChainAddress(h.Address, communityIdentifiers.Chain()),
-						Universal:    true,
-					})
-					user, err := d.Repos.UserRepository.GetByID(innerCtx, userID)
-					if err != nil {
-						logger.For(ctx).Errorf("error getting user: %s", err)
-						return
-					}
-
-					// TODO do some limiting here or this will take forever (get only enough for previews)
-					tokens, contracts, err := providers[0].GetOwnedTokensByContract(innerCtx, communityIdentifiers.Address(), persist.Address(h.Address))
-					if err != nil {
-						logger.For(ctx).Errorf("error getting tokens for contract %s and address %s: %s", communityIdentifiers.Address(), h.Address, err)
-						return
-					}
-					cToken := chainTokens{chain: communityIdentifiers.Chain(), tokens: tokens, priority: 0}
-					cContract := chainContracts{chain: communityIdentifiers.Chain(), contracts: []ChainAgnosticContract{contracts}, priority: 0}
-					addressToContract, err := d.upsertContracts(innerCtx, []chainContracts{cContract})
-					if err != nil {
-						logger.For(ctx).Errorf("error upserting contracts: %s", err)
-						return
-					}
-					_, err = d.upsertTokens(innerCtx, []chainTokens{cToken}, addressToContract, []persist.TokenGallery{}, user)
-					if err != nil {
-						logger.For(ctx).Errorf("error upserting tokens: %s", err)
-						return
-					}
-					if len(tokens) > 0 {
-						previews := make([]string, int(math.Min(3, float64(len(tokens)))))
-						for i, t := range tokens {
-							if i > 2 {
-								break
-							}
-							previews[i] = t.Media.MediaURL.String()
-						}
-						h.PreviewTokens = previews
-					}
-					holderChan <- h
-					logger.For(ctx).Infof("appended owner with previews in %s", time.Since(timeHere))
-				})
-			}
-		}
-		go func() {
-			defer close(holderChan)
-			wp.StopWait()
-		}()
-		for h := range holderChan {
-			holders = append(holders, h)
-		}
+	if err != nil {
+		return nil, err
 	}
 
 	bs, err := json.Marshal(holders)
@@ -573,13 +489,14 @@ func (d *Provider) RefreshTokensForCollection(ctx context.Context, ci persist.Co
 	for i, provider := range providers {
 		go func(priority int, p ChainProvider) {
 			defer wg.Done()
-			tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress)
+			tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress, maxCommunitySize, 0)
 			if err != nil {
 				errChan <- errWithPriority{priority: priority, err: err}
 				return
 			}
 			tokensReceive <- chainTokens{chain: ci.Chain, tokens: tokens, priority: priority}
 			contractsReceive <- chainContracts{chain: ci.Chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
+
 		}(i, provider)
 	}
 	go func() {

@@ -281,6 +281,10 @@ func (u *UserRepository) GetByIDs(pCtx context.Context, pIDs []persist.DBID) ([]
 			wallet := persist.Wallet{ID: walletID}
 			err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated)
 			if err != nil {
+				if err == sql.ErrNoRows {
+					i--
+					continue
+				}
 				return nil, fmt.Errorf("failed to get wallet: %w", err)
 			}
 			wallets[i] = wallet

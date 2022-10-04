@@ -51,8 +51,12 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Ethereum Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?address=%s", d.indexerBaseURL, addr), nil)
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	page := 0
+	if limit > 0 {
+		page = offset / limit
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?address=%s&limit=%d&page=%d", d.indexerBaseURL, addr, limit, page), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,8 +81,12 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&limit=-1", d.indexerBaseURL, contractAddress), nil)
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	page := 0
+	if limit > 0 {
+		page = offset / limit
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&limit=%d&page=%d", d.indexerBaseURL, contractAddress, limit, page), nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -106,8 +114,12 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&limit=-1", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID), nil)
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	page := 0
+	if limit > 0 {
+		page = offset / limit
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&limit=%d&page=%d", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID, limit, page), nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -192,8 +204,8 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	return contractToChainAgnostic(contract.Contract), nil
 
 }
-func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress)
+func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -206,8 +218,12 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persi
 	return owners, nil
 }
 
-func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&address=%s&limit=-1", d.indexerBaseURL, contractAddress, ownerAddress), nil)
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	page := 0
+	if limit > 0 {
+		page = offset / limit
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&address=%s&limit=%d&page=%d", d.indexerBaseURL, contractAddress, ownerAddress, limit, page), nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}

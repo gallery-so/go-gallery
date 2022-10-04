@@ -636,6 +636,7 @@ type GalleryUser struct {
 	Username            *string        `json:"username"`
 	Bio                 *string        `json:"bio"`
 	Traits              *string        `json:"traits"`
+	Universal           *bool          `json:"universal"`
 	Tokens              []*Token       `json:"tokens"`
 	TokensByChain       *ChainTokens   `json:"tokensByChain"`
 	Wallets             []*Wallet      `json:"wallets"`

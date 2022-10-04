@@ -153,8 +153,9 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Poap Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
+	// DOES NOT SUPPORT PAGINATION
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/actions/scan/%s", d.apiURL, addr.String()), nil)
 	if err != nil {
 		return nil, nil, err
@@ -173,16 +174,16 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 		return nil, nil, err
 	}
 
-	resultTokens, resultContracts := d.poapsToTokens(tokens)
+	resultTokens, resultContracts := d.poapsToTokens(tokens, limit, offset)
 	return resultTokens, resultContracts, nil
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Poap Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
+func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/events/%s", d.apiURL, contractAddress), nil)
 	if err != nil {
 		return nil, err
@@ -200,7 +201,7 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persi
 	if err := json.NewDecoder(resp.Body).Decode(&event); err != nil {
 		return nil, err
 	}
-	nextReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/events/%d/poaps", d.apiURL, event.ID), nil)
+	nextReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/events/%d/poaps&limit=%d&offset=%d", d.apiURL, event.ID, limit, offset), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +229,7 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persi
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Poap Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/tokens/%s", d.apiURL, tid), nil)
 	if err != nil {
@@ -275,7 +276,7 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	return d.poapToToken(token), d.poapToContract(token), nil
 }
 
-func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contract persist.Address, addr persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contract persist.Address, addr persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/actions/scan/%s/%s", d.apiURL, addr.String(), contract), nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
@@ -347,12 +348,18 @@ func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey,
 	return true, nil
 }
 
-func (d *Provider) poapsToTokens(pPoap []poapToken) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
+func (d *Provider) poapsToTokens(pPoap []poapToken, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	tokens := make([]multichain.ChainAgnosticToken, 0, len(pPoap))
 	contracts := make([]multichain.ChainAgnosticContract, 0, len(pPoap))
-	for _, poap := range pPoap {
+	for i, poap := range pPoap {
+		if i < offset || i >= (offset+limit) {
+			continue
+		}
 		tokens = append(tokens, d.poapToToken(poap))
 		contracts = append(contracts, d.poapToContract(poap))
+		if i >= limit {
+			break
+		}
 	}
 	return tokens, contracts
 }

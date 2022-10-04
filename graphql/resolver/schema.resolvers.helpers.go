@@ -45,7 +45,7 @@ var nodeFetcher = model.NodeFetcher{
 
 	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
 		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.BoolToPointer(false), util.BoolToPointer(true))
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.BoolToPointer(false))
 		} else {
 			return nil, err
 		}
@@ -384,7 +384,7 @@ func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]
 
 func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, limit int, offset int) ([]*model.Token, error) {
 
-	tokens, err := publicapi.For(ctx).Token.GetTokensByContractId(ctx, contractID)
+	tokens, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -477,22 +477,22 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (*model.Community, error) {
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {
 	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return communityToModel(ctx, *community, forceRefresh, onlyGalleryUsers), nil
+	return communityToModel(ctx, *community, forceRefresh), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, onlyGalleryUsers bool) ([]*model.TokenHolder, error) {
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, limit, offset int) ([]*model.TokenHolder, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	owners, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, onlyGalleryUsers)
+	owners, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -914,10 +914,11 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
-		Dbid:     user.ID,
-		Username: &user.Username.String,
-		Bio:      &user.Bio.String,
-		Wallets:  wallets,
+		Dbid:      user.ID,
+		Username:  &user.Username.String,
+		Bio:       &user.Bio.String,
+		Wallets:   wallets,
+		Universal: &user.Universal,
 
 		// each handled by dedicated resolver
 		Galleries: nil,
@@ -1153,15 +1154,14 @@ func tokensToModel(ctx context.Context, token []db.Token) []*model.Token {
 	return res
 }
 
-func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool, onlyGalleryUsers *bool) *model.Community {
+func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
 	lastUpdated := community.LastUpdated
 	contractAddress := persist.NewChainAddress(community.Address, persist.Chain(community.Chain.Int32))
 	creatorAddress := persist.NewChainAddress(community.CreatorAddress, persist.Chain(community.Chain.Int32))
 	chain := persist.Chain(community.Chain.Int32)
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{
-			ForceRefresh:     forceRefresh,
-			OnlyGalleryUsers: onlyGalleryUsers,
+			ForceRefresh: forceRefresh,
 		},
 		Dbid:            community.ID,
 		LastUpdated:     &lastUpdated,

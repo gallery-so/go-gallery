@@ -24,7 +24,7 @@ func TestGetTokensForWallet_Success(t *testing.T) {
 	powerUsers := []persist.Address{"tz1hyNv7RBzNPGLpKfdwHRc6NhLW6VbzXP3N", "tz1YHsinBJHMj1YFN7UrCsVAgTcaJCH86PjK", "tz1bPMztWzs449CuEmVTY3BprhHMtm4NUQPJ"}
 
 	for _, addr := range powerUsers {
-		tokens, _, err := p.GetTokensByWalletAddress(ctx, addr)
+		tokens, _, err := p.GetTokensByWalletAddress(ctx, addr, 50, 0)
 		a.NoError(err)
 		a.NotEmpty(tokens)
 	}

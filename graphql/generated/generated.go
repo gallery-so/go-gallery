@@ -213,7 +213,7 @@ type ComplexityRoot struct {
 		ID                func(childComplexity int) int
 		LastUpdated       func(childComplexity int) int
 		Name              func(childComplexity int) int
-		Owners            func(childComplexity int) int
+		Owners            func(childComplexity int, limit *int, offset *int) int
 		PreviewImage      func(childComplexity int) int
 		ProfileBannerURL  func(childComplexity int) int
 		ProfileImageURL   func(childComplexity int) int
@@ -361,6 +361,7 @@ type ComplexityRoot struct {
 		Tokens              func(childComplexity int) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
 		Traits              func(childComplexity int) int
+		Universal           func(childComplexity int) int
 		Username            func(childComplexity int) int
 		Wallets             func(childComplexity int) int
 	}
@@ -472,7 +473,7 @@ type ComplexityRoot struct {
 		CollectionByID          func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
-		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) int
+		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
 		FeedEventByID           func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners func(childComplexity int) int
 		GeneralAllowlist        func(childComplexity int) int
@@ -703,7 +704,7 @@ type CommentOnFeedEventPayloadResolver interface {
 }
 type CommunityResolver interface {
 	TokensInCommunity(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.Token, error)
-	Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error)
+	Owners(ctx context.Context, obj *model.Community, limit *int, offset *int) ([]*model.TokenHolder, error)
 }
 type FeedConnectionResolver interface {
 	PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error)
@@ -774,7 +775,7 @@ type QueryResolver interface {
 	CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
-	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error)
+	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
@@ -1391,7 +1392,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Community.Owners(childComplexity), true
+		args, err := ec.field_Community_owners_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.Owners(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Community.previewImage":
 		if e.complexity.Community.PreviewImage == nil {
@@ -1864,6 +1870,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Traits(childComplexity), true
+
+	case "GalleryUser.universal":
+		if e.complexity.GalleryUser.Universal == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Universal(childComplexity), true
 
 	case "GalleryUser.username":
 		if e.complexity.GalleryUser.Username == nil {
@@ -2514,7 +2527,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool), args["onlyGalleryUsers"].(*bool)), true
+		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
@@ -3389,6 +3402,7 @@ type GalleryUser implements Node {
     username: String
     bio: String
     traits: String
+    universal: Boolean
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -3708,7 +3722,7 @@ type Community implements Node
 
   tokensInCommunity(limit: Int, offset: Int): [Token] @goField(forceResolver: true)
 
-  owners: [TokenHolder] @goField(forceResolver: true)
+  owners(limit: Int, offset: Int): [TokenHolder] @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -3904,7 +3918,7 @@ type Query {
     collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
     tokenById(id: DBID!): TokenByIdOrError
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean, onlyGalleryUsers: Boolean): CommunityByAddressOrError
+    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
@@ -4372,6 +4386,30 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 		}
 	}
 	args["allowed"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_owners_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg0, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["offset"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["offset"] = arg1
 	return args, nil
 }
 
@@ -4918,15 +4956,6 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 		}
 	}
 	args["forceRefresh"] = arg1
-	var arg2 *bool
-	if tmp, ok := rawArgs["onlyGalleryUsers"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onlyGalleryUsers"))
-		arg2, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["onlyGalleryUsers"] = arg2
 	return args, nil
 }
 
@@ -7802,9 +7831,16 @@ func (ec *executionContext) _Community_owners(ctx context.Context, field graphql
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Community_owners_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Community().Owners(rctx, obj)
+		return ec.resolvers.Community().Owners(rctx, obj, args["limit"].(*int), args["offset"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9695,6 +9731,38 @@ func (ec *executionContext) _GalleryUser_traits(ctx context.Context, field graph
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_universal(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Universal, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -13081,7 +13149,7 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CommunityByAddress(rctx, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool), args["onlyGalleryUsers"].(*bool))
+		return ec.resolvers.Query().CommunityByAddress(rctx, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -22006,6 +22074,13 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 		case "traits":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._GalleryUser_traits(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "universal":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GalleryUser_universal(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

@@ -120,7 +120,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
 
-func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, onlyGalleryUsers bool) ([]multichain.TokenHolder, error) {
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, limit, offset int) ([]multichain.TokenHolder, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required"},
@@ -128,7 +128,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, err
 	}
 
-	owners, err := api.multichainProvider.GetCommunityOwners(ctx, contractAddress, onlyGalleryUsers, forceRefresh)
+	owners, err := api.multichainProvider.GetCommunityOwners(ctx, contractAddress, forceRefresh, limit, offset)
 	if err != nil {
 		return nil, err
 	}
