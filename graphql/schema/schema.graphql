@@ -1077,6 +1077,7 @@ type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node{
     count: Int
 
     # Don't need a `who` here since the `comment` can provide that
+    # Do we want this comment to be the latest comment
     comment: Comment
     feedEvent: FeedEvent
 
