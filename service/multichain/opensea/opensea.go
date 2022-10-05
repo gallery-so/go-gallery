@@ -185,14 +185,43 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 }
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
 		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
 	}()
 	// TODO: Fill in this address or change something else
-	return assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	contract := multichain.ChainAgnosticContract{}
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	return tokens, contract, nil
+}
+
+func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	assetsChan := make(chan assetsReceieved)
+	go func() {
+		defer close(assetsChan)
+		FetchAssets(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
+	}()
+	// TODO: Fill in this address or change something else
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	contract := multichain.ChainAgnosticContract{}
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	if len(tokens) > 0 {
+		return tokens[0], contract, nil
+	}
+	return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for %s", ti)
 }
 
 // GetContractByAddress returns a contract for a contract address
@@ -619,23 +648,23 @@ func assetsToTokens(ctx context.Context, address persist.Address, assetsChan <-c
 					switch {
 					case nft.AnimationURL != "":
 						med.MediaURL = persist.NullString(nft.AnimationURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.AnimationURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationURL)
 
 					case nft.AnimationOriginalURL != "":
 						med.MediaURL = persist.NullString(nft.AnimationOriginalURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.AnimationOriginalURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.AnimationOriginalURL)
 
 					case nft.ImageURL != "":
 						med.MediaURL = persist.NullString(nft.ImageURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.ImageURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageURL)
 
 					case nft.ImageOriginalURL != "":
 						med.MediaURL = persist.NullString(nft.ImageOriginalURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.ImageOriginalURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageOriginalURL)
 
 					default:
 						med.MediaURL = persist.NullString(nft.ImageThumbnailURL)
-						med.MediaType, _, err = media.PredictMediaType(innerCtx, nft.ImageThumbnailURL)
+						med.MediaType, _, _, err = media.PredictMediaType(innerCtx, nft.ImageThumbnailURL)
 					}
 
 					if err != nil {

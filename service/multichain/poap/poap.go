@@ -228,27 +228,51 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persi
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Poap Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	tid := tokenIdentifiers.TokenID
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/tokens/%s", d.apiURL, tid), nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	req.Header.Set("X-API-KEY", d.apiKey)
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, util.GetErrFromResp(resp)
+		return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
 	}
 	var token poapToken
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return nil, nil, err
+		return nil, multichain.ChainAgnosticContract{}, err
 	}
 
-	return []multichain.ChainAgnosticToken{d.poapToToken(token)}, []multichain.ChainAgnosticContract{d.poapToContract(token)}, nil
+	return []multichain.ChainAgnosticToken{d.poapToToken(token)}, d.poapToContract(token), nil
+}
+
+// GetTokensByTokenIdentifiersAndOwner retrieves tokens for a token identifiers and owner address
+func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	tid := tokenIdentifiers.TokenID
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/tokens/%s", d.apiURL, tid), nil)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	req.Header.Set("X-API-KEY", d.apiKey)
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+	}
+	var token poapToken
+	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
+	}
+
+	return d.poapToToken(token), d.poapToContract(token), nil
 }
 
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contract persist.Address, addr persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {

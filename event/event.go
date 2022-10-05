@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -21,9 +22,9 @@ type EventHandlers struct {
 }
 
 // Register specific event handlers
-func AddTo(ctx *gin.Context, queries *db.Queries) {
+func AddTo(ctx *gin.Context, queries *db.Queries, taskClient *cloudtasks.Client) {
 	eventDispatcher := eventDispatcher{handlers: map[persist.Action]eventHandler{}}
-	feedHandler := feedHandler{postgres.EventRepository{Queries: queries}}
+	feedHandler := feedHandler{eventRepo: postgres.EventRepository{Queries: queries}, tc: taskClient}
 
 	eventDispatcher.AddHandler(persist.ActionUserCreated, feedHandler)
 	eventDispatcher.AddHandler(persist.ActionUserFollowedUsers, feedHandler)
@@ -68,6 +69,7 @@ func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
 
 type feedHandler struct {
 	eventRepo postgres.EventRepository
+	tc        *cloudtasks.Client
 }
 
 func (h feedHandler) Handle(ctx context.Context, event db.Event) error {
@@ -78,5 +80,5 @@ func (h feedHandler) Handle(ctx context.Context, event db.Event) error {
 	}
 
 	scheduleOn := persisted.CreatedAt.Add(time.Duration(viper.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second)
-	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persisted.ID})
+	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persisted.ID}, h.tc)
 }

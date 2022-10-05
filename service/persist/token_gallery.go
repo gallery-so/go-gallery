@@ -43,6 +43,11 @@ type TokenGallery struct {
 	IsProviderMarkedSpam *bool       `json:"is_provider_marked_spam"`
 }
 
+// TokenIdentifiers returns the unique identifier for a token
+func (t TokenGallery) TokenIdentifiers() TokenIdentifiers {
+	return NewTokenIdentifiers(Address(t.Contract), t.TokenID, t.Chain)
+}
+
 // AddressAtBlock represents an address at a specific block
 type AddressAtBlock struct {
 	Address Address     `json:"address"`
@@ -106,6 +111,7 @@ type TokenUpdateMediaInput struct {
 type TokenGalleryRepository interface {
 	GetByUserID(context.Context, DBID, int64, int64) ([]TokenGallery, error)
 	GetByTokenIdentifiers(context.Context, TokenID, Address, Chain, int64, int64) ([]TokenGallery, error)
+	GetByFullIdentifiers(context.Context, TokenID, Address, Chain, DBID) (TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	BulkUpsert(context.Context, []TokenGallery) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error

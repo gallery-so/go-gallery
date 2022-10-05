@@ -109,9 +109,9 @@ type ComplexityRoot struct {
 	}
 
 	Badge struct {
-		ContractID func(childComplexity int) int
-		ImageURL   func(childComplexity int) int
-		Name       func(childComplexity int) int
+		Contract func(childComplexity int) int
+		ImageURL func(childComplexity int) int
+		Name     func(childComplexity int) int
 	}
 
 	ChainAddress struct {
@@ -476,6 +476,7 @@ type ComplexityRoot struct {
 	Query struct {
 		CollectionByID          func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
+		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
 		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) int
 		FeedEventByID           func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners func(childComplexity int) int
@@ -775,6 +776,7 @@ type QueryResolver interface {
 	UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
+	CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
 	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error)
@@ -955,12 +957,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.AuthNonce.UserExists(childComplexity), true
 
-	case "Badge.contractId":
-		if e.complexity.Badge.ContractID == nil {
+	case "Badge.contract":
+		if e.complexity.Badge.Contract == nil {
 			break
 		}
 
-		return e.complexity.Badge.ContractID(childComplexity), true
+		return e.complexity.Badge.Contract(childComplexity), true
 
 	case "Badge.imageURL":
 		if e.complexity.Badge.ImageURL == nil {
@@ -2509,6 +2511,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.CollectionTokenByID(childComplexity, args["tokenId"].(persist.DBID), args["collectionId"].(persist.DBID)), true
 
+	case "Query.collectionsByIds":
+		if e.complexity.Query.CollectionsByIds == nil {
+			break
+		}
+
+		args, err := ec.field_Query_collectionsByIds_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CollectionsByIds(childComplexity, args["ids"].([]persist.DBID)), true
+
 	case "Query.communityByAddress":
 		if e.complexity.Query.CommunityByAddress == nil {
 			break
@@ -3448,7 +3462,7 @@ input ChainPubKeyInput {
 type Badge {
     name: String
     imageURL: String!
-    contractId: DBID
+    contract: Contract
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
@@ -3756,7 +3770,7 @@ type ErrTokenNotFound implements Error {
     message: String!
 }
 
-union CollectionByIdOrError = Collection | ErrCollectionNotFound
+union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInput
 
 union CollectionTokenByIdOrError =
     CollectionToken
@@ -3904,6 +3918,7 @@ type Query {
     usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
+    collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
     tokenById(id: DBID!): TokenByIdOrError
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
     communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean, onlyGalleryUsers: Boolean): CommunityByAddressOrError
@@ -4889,6 +4904,21 @@ func (ec *executionContext) field_Query_collectionTokenById_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_collectionsByIds_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 []persist.DBID
+	if tmp, ok := rawArgs["ids"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ids"))
+		arg0, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["ids"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -5702,7 +5732,7 @@ func (ec *executionContext) _Badge_imageURL(ctx context.Context, field graphql.C
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Badge_contractId(ctx context.Context, field graphql.CollectedField, obj *model.Badge) (ret graphql.Marshaler) {
+func (ec *executionContext) _Badge_contract(ctx context.Context, field graphql.CollectedField, obj *model.Badge) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -5720,7 +5750,7 @@ func (ec *executionContext) _Badge_contractId(ctx context.Context, field graphql
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ContractID, nil
+		return obj.Contract, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5729,9 +5759,9 @@ func (ec *executionContext) _Badge_contractId(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*persist.DBID)
+	res := resTmp.(*model.Contract)
 	fc.Result = res
-	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
+	return ec.marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ChainAddress_address(ctx context.Context, field graphql.CollectedField, obj *persist.ChainAddress) (ret graphql.Marshaler) {
@@ -13015,6 +13045,45 @@ func (ec *executionContext) _Query_collectionById(ctx context.Context, field gra
 	return ec.marshalOCollectionByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_collectionsByIds(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_collectionsByIds_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().CollectionsByIds(rctx, args["ids"].([]persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]model.CollectionByIDOrError)
+	fc.Result = res
+	return ec.marshalOCollectionByIdOrError2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_tokenById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -18299,6 +18368,13 @@ func (ec *executionContext) _CollectionByIdOrError(ctx context.Context, sel ast.
 			return graphql.Null
 		}
 		return ec._ErrCollectionNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -20020,9 +20096,9 @@ func (ec *executionContext) _Badge(ctx context.Context, sel ast.SelectionSet, ob
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "contractId":
+		case "contract":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Badge_contractId(ctx, field, obj)
+				return ec._Badge_contract(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -21370,7 +21446,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -23158,6 +23234,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_collectionById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "collectionsByIds":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_collectionsByIds(ctx, field)
 				return res
 			}
 
@@ -26209,6 +26305,47 @@ func (ec *executionContext) marshalOCollectionByIdOrError2githubᚗcomᚋmikeydu
 		return graphql.Null
 	}
 	return ec._CollectionByIdOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCollectionByIdOrError2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx context.Context, sel ast.SelectionSet, v []model.CollectionByIDOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOCollectionByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionByIDOrError(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
 }
 
 func (ec *executionContext) marshalOCollectionLayout2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionLayout(ctx context.Context, sel ast.SelectionSet, v *model.CollectionLayout) graphql.Marshaler {

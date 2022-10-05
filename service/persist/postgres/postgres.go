@@ -25,6 +25,9 @@ func getSqlConnectionString() string {
 	dbName := viper.GetString("POSTGRES_DB")
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
+	if dbPort == 0 {
+		dbPort = 5432
+	}
 
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
 

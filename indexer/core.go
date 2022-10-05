@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -23,7 +23,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"google.golang.org/api/option"
 )
 
 // Init initializes the indexer
@@ -43,7 +42,7 @@ func InitServer() {
 
 func coreInit() (*gin.Engine, *indexer) {
 
-	setDefaults("_local/app-local-indexer.yaml")
+	setDefaults("indexer")
 	initSentry()
 	initLogger()
 
@@ -51,14 +50,10 @@ func coreInit() (*gin.Engine, *indexer) {
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
 
 	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(context.Background())
+	if viper.GetString("ENV") == "local" {
+		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
 	} else {
-		s, err = storage.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
-	}
-	if err != nil {
-		panic(err)
+		s = media.NewStorageClient(context.Background())
 	}
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
@@ -108,15 +103,13 @@ func getBlockRangeFromArgs() (*uint64, *uint64) {
 func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
-	path := "_local/app-local-indexer-server.yaml"
-	storageKeyPath := "./_deploy/service-key-dev.json"
-	if len(os.Args) > 0 {
-		if os.Args[0] == "prod" {
-			path = "_local/app-prod-indexer-server.yaml"
-			storageKeyPath = "./_deploy/service-key.json"
+	localKeyPath := "./_deploy/service-key-dev.json"
+	if len(os.Args) > 1 {
+		if os.Args[1] == "prod" {
+			localKeyPath = "./_deploy/service-key.json"
 		}
 	}
-	setDefaults(path)
+	setDefaults("indexer-server")
 	initSentry()
 	initLogger()
 
@@ -124,14 +117,10 @@ func coreInitServer() *gin.Engine {
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
 
 	var s *storage.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		s, err = storage.NewClient(ctx)
+	if viper.GetString("ENV") == "local" {
+		s = media.NewLocalStorageClient(context.Background(), localKeyPath)
 	} else {
-		s, err = storage.NewClient(ctx, option.WithCredentialsFile(storageKeyPath))
-	}
-	if err != nil {
-		panic(err)
+		s = media.NewStorageClient(context.Background())
 	}
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
@@ -162,7 +151,7 @@ func coreInitServer() *gin.Engine {
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, refreshQueue)
 }
 
-func setDefaults(envFilePath string) {
+func setDefaults(service string) {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -181,26 +170,21 @@ func setDefaults(envFilePath string) {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
-	viper.SetDefault("GAE_VERSION", "")
+	viper.SetDefault("VERSION", "")
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") == "local" {
-		path, err := util.FindFile(envFilePath, 3)
-		if err != nil {
-			panic(err)
-		}
-
-		viper.SetConfigFile(path)
-		if err := viper.ReadInConfig(); err != nil {
-			panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
-		}
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+	} else {
+		envFile := util.ResolveEnvFile(service)
+		util.LoadEnvFile(envFile)
 	}
 
 	util.EnvVarMustExist("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
 		util.EnvVarMustExist("SENTRY_DSN", "")
-		util.EnvVarMustExist("GAE_VERSION", "")
+		util.EnvVarMustExist("VERSION", "")
 	}
 }
 
@@ -225,6 +209,7 @@ func initSentry() {
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Release:          viper.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)

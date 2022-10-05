@@ -151,7 +151,7 @@ func HandleCORS() gin.HandlerFunc {
 		requestOrigin := c.Request.Header.Get("Origin")
 		allowedOrigins := strings.Split(viper.GetString("ALLOWED_ORIGINS"), ",")
 
-		if util.Contains(allowedOrigins, requestOrigin) || (util.Contains([]string{"development", "sandbox-backend"}, strings.ToLower(viper.GetString("ENV"))) && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
+		if util.ContainsString(allowedOrigins, requestOrigin) || (util.ContainsString([]string{"development", "sandbox-backend"}, strings.ToLower(viper.GetString("ENV"))) && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
 		}
 
@@ -226,7 +226,7 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 
 func Tracing() gin.HandlerFunc {
 	// Trace outgoing HTTP requests
-	http.DefaultTransport = tracing.NewTracingTransport(http.DefaultTransport, true)
+	http.DefaultTransport = tracing.NewTracingTransport(http.DefaultTransport, true, false)
 	http.DefaultClient = &http.Client{Transport: http.DefaultTransport}
 
 	return func(c *gin.Context) {

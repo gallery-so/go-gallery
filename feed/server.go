@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -13,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func handleEvent(pgx *pgxpool.Pool) gin.HandlerFunc {
+func handleEvent(pgx *pgxpool.Pool, taskClient *cloudtasks.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		message := task.FeedMessage{}
 
@@ -39,7 +40,7 @@ func handleEvent(pgx *pgxpool.Pool) gin.HandlerFunc {
 
 		// Send event to feedbot
 		err = task.CreateTaskForFeedbot(c.Request.Context(),
-			time.Now(), task.FeedbotMessage{FeedEventID: event.ID, Action: event.Action},
+			time.Now(), task.FeedbotMessage{FeedEventID: event.ID, Action: event.Action}, taskClient,
 		)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)

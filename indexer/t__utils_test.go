@@ -42,16 +42,12 @@ var allLogs = func() []types.Log {
 }()
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
-	fi, err := util.FindFile("_local/app-local-indexer-server.yaml", 4)
-	if err != nil {
-		panic(err)
-	}
-	setDefaults(fi)
+	setDefaults("indexer-server")
 	pg, pgUnpatch := docker.InitPostgresIndexer()
 
 	db := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
-	err = migrate.RunMigration(db, "./db/migrations/indexer")
+	err := migrate.RunMigration(db, "./db/migrations/indexer")
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
 	}
