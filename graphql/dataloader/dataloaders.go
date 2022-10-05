@@ -47,9 +47,6 @@ type IDAndChain struct {
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
 type Loaders struct {
-
-	// Every entry here must have a corresponding entry in the Clear___Caches methods below
-
 	UserByUserId             *UserLoaderByID
 	UserByUsername           *UserLoaderByString
 	UsersWithTrait           *UsersLoaderByString
@@ -96,6 +93,37 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		subscriptionRegistry: &subscriptionRegistry,
 		mutexRegistry:        &mutexRegistry,
 	}
+
+	//---------------------------------------------------------------------------------------------------
+	// HOW TO ADD A NEW DATALOADER
+	//---------------------------------------------------------------------------------------------------
+	// 1) If you need a new loader type, add it to the top of the file and use the "go generate" command
+	//    to generate it. The convention is to name your loader <ValueType>LoaderBy<KeyType>, where
+	//    <ValueType> should be plural if your loader returns a slice. Note that a loader type can be
+	//    used by multiple dataloaders: UserLoaderByID is the correct generated type for both a
+	//    "UserByUserID" dataloader and a "UserByGalleryID" dataloader.
+	//
+	// 2) Add your dataloader to the Loaders struct above
+	//
+	// 3) Initialize your loader below. Dataloaders that don't return slices can subscribe to automatic
+	//    cache priming by specifying an AutoCacheWithKey function (which should return the key to use
+	//    when caching). If your dataloader needs to cache a single value with multiple keys (e.g. a
+	//    GalleryByCollectionID wants to cache a single Gallery by many collection IDs), you can use
+	//    AutoCacheWithKeys instead. When other dataloaders return the type you've subscribed to, your
+	//    dataloader will automatically cache those results.
+	//
+	//    Note: dataloaders that return slices can't subscribe to automatic caching, because it's
+	//          unlikely that the grouping of results returned by one dataloader will make sense for
+	//          another. E.g. the results of TokensByWalletID have little to do with the results
+	//			of TokensByCollectionID, even though they both return slices of Tokens.
+	//
+	// 4) The "defaults" struct has sufficient settings for most use cases, but if you need to override
+	//	  any default settings, all NewLoader methods accept these option args:
+	//		- withMaxBatch(batchSize int)		<-- set the max batch size for a loader
+	//		- withMaxWait(wait time.Duration)	<-- set the max wait time for a loader
+	//		- withPublishResults(publish bool)  <-- whether this loader should publish its results for
+	//  											other loaders to subscribe to and cache
+	//---------------------------------------------------------------------------------------------------
 
 	loaders := &Loaders{}
 
