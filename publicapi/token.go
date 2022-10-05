@@ -197,14 +197,14 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	if err != nil {
 		return err
 	}
-	contract, err := api.loaders.ContractByContractId.Load(token.Contract)
+	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
 	if err != nil {
 		return err
 	}
 
 	addresses := []persist.Address{}
 	for _, walletID := range token.OwnedByWallets {
-		wa, err := api.loaders.WalletByWalletId.Load(walletID)
+		wa, err := api.loaders.WalletByWalletID.Load(walletID)
 		if err != nil {
 			return err
 		}
@@ -235,7 +235,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	for _, token := range tokens {
 		token := token
 		wp.Submit(func() {
-			contract, err := api.loaders.ContractByContractId.Load(token.Contract)
+			contract, err := api.loaders.ContractByContractID.Load(token.Contract)
 			if err != nil {
 				errChan <- err
 				return
@@ -243,7 +243,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 
 			addresses := []persist.Address{}
 			for _, walletID := range token.OwnedByWallets {
-				wa, err := api.loaders.WalletByWalletId.Load(walletID)
+				wa, err := api.loaders.WalletByWalletID.Load(walletID)
 				if err != nil {
 					errChan <- err
 					return

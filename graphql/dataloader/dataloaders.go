@@ -47,16 +47,16 @@ type IDAndChain struct {
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
 type Loaders struct {
-	UserByUserId             *UserLoaderByID
+	UserByUserID             *UserLoaderByID
 	UserByUsername           *UserLoaderByString
 	UsersWithTrait           *UsersLoaderByString
-	GalleryByGalleryId       *GalleryLoaderByID
-	GalleryByCollectionId    *GalleryLoaderByID
-	GalleriesByUserId        *GalleriesLoaderByID
-	CollectionByCollectionId *CollectionLoaderByID
-	CollectionsByGalleryId   *CollectionsLoaderByID
-	MembershipByMembershipId *MembershipLoaderById
-	WalletByWalletId         *WalletLoaderById
+	GalleryByGalleryID       *GalleryLoaderByID
+	GalleryByCollectionID    *GalleryLoaderByID
+	GalleriesByUserID        *GalleriesLoaderByID
+	CollectionByCollectionID *CollectionLoaderByID
+	CollectionsByGalleryID   *CollectionsLoaderByID
+	MembershipByMembershipID *MembershipLoaderById
+	WalletByWalletID         *WalletLoaderById
 	WalletsByUserID          *WalletsLoaderByID
 	WalletByChainAddress     *WalletLoaderByChainAddress
 	TokenByTokenID           *TokenLoaderByID
@@ -65,18 +65,18 @@ type Loaders struct {
 	TokensByUserID           *TokensLoaderByID
 	TokensByUserIDAndChain   *TokensLoaderByIDAndChain
 	NewTokensByFeedEventID   *TokensLoaderByID
-	ContractByContractId     *ContractLoaderByID
+	ContractByContractID     *ContractLoaderByID
 	ContractsByUserID        *ContractsLoaderByID
 	ContractByChainAddress   *ContractLoaderByChainAddress
-	FollowersByUserId        *UsersLoaderByID
-	FollowingByUserId        *UsersLoaderByID
+	FollowersByUserID        *UsersLoaderByID
+	FollowingByUserID        *UsersLoaderByID
 	GlobalFeed               *GlobalFeedLoader
-	FeedByUserId             *UserFeedLoader
-	EventByEventId           *EventLoaderByID
-	AdmireByAdmireId         *AdmireLoaderByID
-	AdmiresByFeedEventId     *AdmiresLoaderByID
-	CommentByCommentId       *CommentLoaderByID
-	CommentsByFeedEventId    *CommentsLoaderByID
+	FeedByUserID             *UserFeedLoader
+	EventByEventID           *EventLoaderByID
+	AdmireByAdmireID         *AdmireLoaderByID
+	AdmiresByFeedEventID     *AdmiresLoaderByID
+	CommentByCommentID       *CommentLoaderByID
+	CommentsByFeedEventID    *CommentsLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -127,7 +127,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders := &Loaders{}
 
-	loaders.UserByUserId = NewUserLoaderByID(defaults, loadUserByUserId(q), UserLoaderByIDCacheSubscriptions{
+	loaders.UserByUserID = NewUserLoaderByID(defaults, loadUserByUserId(q), UserLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(user db.User) persist.DBID { return user.ID },
 	})
 
@@ -137,27 +137,27 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.UsersWithTrait = NewUsersLoaderByString(defaults, loadUsersWithTrait(q))
 
-	loaders.GalleryByGalleryId = NewGalleryLoaderByID(defaults, loadGalleryByGalleryId(q), GalleryLoaderByIDCacheSubscriptions{
+	loaders.GalleryByGalleryID = NewGalleryLoaderByID(defaults, loadGalleryByGalleryId(q), GalleryLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(gallery db.Gallery) persist.DBID { return gallery.ID },
 	})
 
-	loaders.GalleryByCollectionId = NewGalleryLoaderByID(defaults, loadGalleryByCollectionId(q), GalleryLoaderByIDCacheSubscriptions{
+	loaders.GalleryByCollectionID = NewGalleryLoaderByID(defaults, loadGalleryByCollectionId(q), GalleryLoaderByIDCacheSubscriptions{
 		AutoCacheWithKeys: func(gallery db.Gallery) []persist.DBID { return gallery.Collections },
 	})
 
-	loaders.GalleriesByUserId = NewGalleriesLoaderByID(defaults, loadGalleriesByUserId(q))
+	loaders.GalleriesByUserID = NewGalleriesLoaderByID(defaults, loadGalleriesByUserId(q))
 
-	loaders.CollectionByCollectionId = NewCollectionLoaderByID(defaults, loadCollectionByCollectionId(q), CollectionLoaderByIDCacheSubscriptions{
+	loaders.CollectionByCollectionID = NewCollectionLoaderByID(defaults, loadCollectionByCollectionId(q), CollectionLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(collection db.Collection) persist.DBID { return collection.ID },
 	})
 
-	loaders.CollectionsByGalleryId = NewCollectionsLoaderByID(defaults, loadCollectionsByGalleryId(q))
+	loaders.CollectionsByGalleryID = NewCollectionsLoaderByID(defaults, loadCollectionsByGalleryId(q))
 
-	loaders.MembershipByMembershipId = NewMembershipLoaderById(defaults, loadMembershipByMembershipId(q), MembershipLoaderByIdCacheSubscriptions{
+	loaders.MembershipByMembershipID = NewMembershipLoaderById(defaults, loadMembershipByMembershipId(q), MembershipLoaderByIdCacheSubscriptions{
 		AutoCacheWithKey: func(membership db.Membership) persist.DBID { return membership.ID },
 	})
 
-	loaders.WalletByWalletId = NewWalletLoaderById(defaults, loadWalletByWalletId(q), WalletLoaderByIdCacheSubscriptions{
+	loaders.WalletByWalletID = NewWalletLoaderById(defaults, loadWalletByWalletId(q), WalletLoaderByIdCacheSubscriptions{
 		AutoCacheWithKey: func(wallet db.Wallet) persist.DBID { return wallet.ID },
 	})
 
@@ -169,9 +169,9 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		},
 	})
 
-	loaders.FollowersByUserId = NewUsersLoaderByID(defaults, loadFollowersByUserId(q))
+	loaders.FollowersByUserID = NewUsersLoaderByID(defaults, loadFollowersByUserId(q))
 
-	loaders.FollowingByUserId = NewUsersLoaderByID(defaults, loadFollowingByUserId(q))
+	loaders.FollowingByUserID = NewUsersLoaderByID(defaults, loadFollowingByUserId(q))
 
 	loaders.TokenByTokenID = NewTokenLoaderByID(defaults, loadTokenByTokenID(q), TokenLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(token db.Token) persist.DBID { return token.ID },
@@ -187,7 +187,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.NewTokensByFeedEventID = NewTokensLoaderByID(defaults, loadNewTokensByFeedEventID(q))
 
-	loaders.ContractByContractId = NewContractLoaderByID(defaults, loadContractByContractID(q), ContractLoaderByIDCacheSubscriptions{
+	loaders.ContractByContractID = NewContractLoaderByID(defaults, loadContractByContractID(q), ContractLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(contract db.Contract) persist.DBID { return contract.ID },
 	})
 
@@ -199,25 +199,25 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.ContractsByUserID = NewContractsLoaderByID(defaults, loadContractsByUserID(q))
 
-	loaders.EventByEventId = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
+	loaders.EventByEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
 	})
 
-	loaders.FeedByUserId = NewUserFeedLoader(defaults, loadUserFeed(q))
+	loaders.FeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
 
 	loaders.GlobalFeed = NewGlobalFeedLoader(defaults, loadGlobalFeed(q))
 
-	loaders.AdmireByAdmireId = NewAdmireLoaderByID(defaults, loadAdmireById(q), AdmireLoaderByIDCacheSubscriptions{
+	loaders.AdmireByAdmireID = NewAdmireLoaderByID(defaults, loadAdmireById(q), AdmireLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(admire db.Admire) persist.DBID { return admire.ID },
 	})
 
-	loaders.AdmiresByFeedEventId = NewAdmiresLoaderByID(defaults, loadAdmiresByFeedEventId(q))
+	loaders.AdmiresByFeedEventID = NewAdmiresLoaderByID(defaults, loadAdmiresByFeedEventId(q))
 
-	loaders.CommentByCommentId = NewCommentLoaderByID(defaults, loadCommentById(q), CommentLoaderByIDCacheSubscriptions{
+	loaders.CommentByCommentID = NewCommentLoaderByID(defaults, loadCommentById(q), CommentLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(comment db.Comment) persist.DBID { return comment.ID },
 	})
 
-	loaders.CommentsByFeedEventId = NewCommentsLoaderByID(defaults, loadCommentsByFeedEventId(q))
+	loaders.CommentsByFeedEventID = NewCommentsLoaderByID(defaults, loadCommentsByFeedEventId(q))
 
 	return loaders
 }
