@@ -13,7 +13,7 @@ RUN go mod download
 COPY . /app
 RUN go build -o /indexer-api ./cmd/indexer/server/main.go
 
-FROM gcr.io/distroless/base-debian11:debug
+FROM gcr.io/distroless/base-debian11
 
 WORKDIR /
 COPY --from=build /indexer-api /indexer-api

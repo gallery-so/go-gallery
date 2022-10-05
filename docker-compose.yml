@@ -59,16 +59,16 @@ services:
   #     - postgres
   #     - redis
   # Uncomment if you want to run indexer-api locally as a container
-  indexer-api:
-    build:
-      context: "."
-      dockerfile: "docker/indexer_api/Dockerfile"
-    ports:
-      - "6000:6000"
-    volumes:
-      - ${PWD}/_local:/_local
-      - ${PWD}/_deploy:/_deploy
-    depends_on:
-      - postgres
-      - postgres_indexer
-      - redis
+  # indexer-api:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/indexer_api/Dockerfile"
+  #   ports:
+  #     - "6000:6000"
+  #   volumes:
+  #     - ${PWD}/_local:/_local
+  #     - ${PWD}/_deploy:/_deploy
+  #   depends_on:
+  #     - postgres
+  #     - postgres_indexer
+  #     - redis
