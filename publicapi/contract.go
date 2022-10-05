@@ -88,8 +88,6 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 
-	api.loaders.ClearAllCaches()
-
 	return nil
 
 }

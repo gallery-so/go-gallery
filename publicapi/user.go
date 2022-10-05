@@ -108,7 +108,6 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
 	return nil
 }
 
@@ -130,7 +129,6 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
 	return nil
 }
 
@@ -179,8 +177,6 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	if err != nil {
 		return err
 	}
-
-	api.loaders.ClearAllCaches()
 
 	return nil
 }

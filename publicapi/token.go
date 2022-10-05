@@ -183,8 +183,6 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain, asUs
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 
-	api.loaders.ClearAllCaches()
-
 	return nil
 }
 
@@ -217,8 +215,6 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-
-	api.loaders.ClearAllCaches()
 
 	return nil
 }
@@ -270,8 +266,6 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
-
 	return nil
 }
 
@@ -300,8 +294,6 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	if err != nil {
 		return err
 	}
-
-	api.loaders.ClearAllCaches()
 
 	// Send event
 	dispatchEventToFeed(ctx, db.Event{

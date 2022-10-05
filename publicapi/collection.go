@@ -154,8 +154,6 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, err
 	}
 
-	api.loaders.ClearAllCaches()
-
 	createdCollection, err := api.loaders.CollectionByCollectionId.Load(collectionID)
 	if err != nil {
 		return nil, err
@@ -195,8 +193,6 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
-
 	return nil
 }
 
@@ -228,8 +224,6 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	if err != nil {
 		return err
 	}
-
-	api.loaders.ClearAllCaches()
 
 	// Send event
 	dispatchEventToFeed(ctx, db.Event{
@@ -288,7 +282,6 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
@@ -323,8 +316,6 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 	if err != nil {
 		return err
 	}
-
-	api.loaders.ClearAllCaches()
 
 	return nil
 }

@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
@@ -10,7 +11,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
-	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -44,12 +44,13 @@ type PublicAPI struct {
 	Comment    *CommentAPI
 }
 
-func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, throttler *throttle.Locker) {
-	// Use the request context so dataloaders will add their traces to the request span
-	loaders := dataloader.NewLoaders(ctx.Request.Context(), queries, false)
+func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, throttler *throttle.Locker) *PublicAPI {
+
+	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := newValidator()
 
-	api := &PublicAPI{
+	return &PublicAPI{
 		repos:      repos,
 		queries:    queries,
 		loaders:    loaders,
@@ -66,11 +67,25 @@ func AddTo(ctx *gin.Context, repos *persist.Repositories, queries *db.Queries, e
 		Admire:     &AdmireAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Comment:    &CommentAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 	}
+}
 
+// AddTo adds the specified PublicAPI to a gin context
+func AddTo(ctx *gin.Context, api *PublicAPI) {
 	ctx.Set(apiContextKey, api)
 }
 
+// PushTo pushes the specified PublicAPI onto the context stack and returns the new context
+func PushTo(ctx context.Context, api *PublicAPI) context.Context {
+	return context.WithValue(ctx, apiContextKey, api)
+}
+
 func For(ctx context.Context) *PublicAPI {
+	// See if a newer PublicAPI instance has been pushed to the context stack
+	if api, ok := ctx.Value(apiContextKey).(*PublicAPI); ok {
+		return api
+	}
+
+	// If not, fall back to the one added to the gin context
 	gc := util.GinContextFromContext(ctx)
 	return gc.Value(apiContextKey).(*PublicAPI)
 }
