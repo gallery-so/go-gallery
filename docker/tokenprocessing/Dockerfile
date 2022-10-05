@@ -14,6 +14,9 @@ RUN go mod download
 COPY . /app
 RUN go build -o ./bin/mediaprocessing ./cmd/mediaprocessing/main.go
 
+ARG VERSION
+ENV VERSION=$VERSION
+
 EXPOSE 6500
 USER nobody
 ENTRYPOINT ["./bin/mediaprocessing"]

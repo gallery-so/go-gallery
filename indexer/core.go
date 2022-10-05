@@ -41,7 +41,7 @@ func InitServer() {
 
 func coreInit() (*gin.Engine, *indexer) {
 
-	setDefaults("app-local-indexer.yaml")
+	setDefaults("indexer")
 	initSentry()
 	initLogger()
 
@@ -102,15 +102,13 @@ func getBlockRangeFromArgs() (*uint64, *uint64) {
 func coreInitServer() *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 
-	envFile := "app-local-indexer-server.yaml"
 	localKeyPath := "./_deploy/service-key-dev.json"
 	if len(os.Args) > 1 {
 		if os.Args[1] == "prod" {
-			envFile = "app-prod-indexer-server.yaml"
 			localKeyPath = "./_deploy/service-key.json"
 		}
 	}
-	setDefaults(envFile)
+	setDefaults("indexer-server")
 	initSentry()
 	initLogger()
 
@@ -144,7 +142,7 @@ func coreInitServer() *gin.Engine {
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
 }
 
-func setDefaults(envFile string) {
+func setDefaults(service string) {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -163,15 +161,21 @@ func setDefaults(envFile string) {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
-	viper.SetDefault("GAE_VERSION", "")
+	viper.SetDefault("VERSION", "")
 
 	viper.AutomaticEnv()
-	util.LoadEnvFile(envFile, 3)
+
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+	} else {
+		envFile := util.ResolveEnvFile(service)
+		util.LoadEnvFile(envFile)
+	}
 
 	util.EnvVarMustExist("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
 		util.EnvVarMustExist("SENTRY_DSN", "")
-		util.EnvVarMustExist("GAE_VERSION", "")
+		util.EnvVarMustExist("VERSION", "")
 	}
 }
 
@@ -196,6 +200,7 @@ func initSentry() {
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Release:          viper.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)

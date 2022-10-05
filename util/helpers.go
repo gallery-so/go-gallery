@@ -335,8 +335,35 @@ func EnvVarMustExist(envVar, emptyVal string) {
 	}
 }
 
+// InDocker returns true if the service is running as a container.
+func InDocker() bool {
+	if _, err := os.Stat("./.dockerenv"); err == nil {
+		return true
+	}
+	return false
+}
+
+// ResolveEnvFile finds the appropriate env file to use for the service.
+func ResolveEnvFile(service string) string {
+	format := "app-%s-%s.yaml"
+	if InDocker() {
+		return fmt.Sprintf(format, "docker", service)
+	}
+	if len(os.Args) > 1 {
+		switch env := os.Args[1]; env {
+		case "local":
+			return fmt.Sprintf(format, "local", service)
+		case "dev":
+			return fmt.Sprintf(format, "dev", service)
+		case "prod":
+			return fmt.Sprintf(format, "prod", service)
+		}
+	}
+	return fmt.Sprintf("app-local-%s.yaml", service)
+}
+
 // LoadEnvFile configures the environment with the configured input file.
-func LoadEnvFile(fileName string, depth int) {
+func LoadEnvFile(fileName string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
@@ -345,7 +372,7 @@ func LoadEnvFile(fileName string, depth int) {
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
 	filePath := filepath.Join("_local", fileName)
 	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
-	path, err := FindFile(filePath, depth)
+	path, err := FindFile(filePath, 5)
 	if err != nil {
 		panic(err)
 	}
