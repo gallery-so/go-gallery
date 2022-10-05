@@ -70,6 +70,39 @@ func (r *MembershipTier) ID() GqlID {
 	return GqlID(fmt.Sprintf("MembershipTier:%s", r.Dbid))
 }
 
+func (r *NotificationSettings) ID() GqlID {
+	//-----------------------------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------------------------
+	// Some fields specified by @goGqlId require manual binding because one of the following is true:
+	// (a) the field does not exist on the NotificationSettings type, or
+	// (b) the field exists but is not a string type
+	//-----------------------------------------------------------------------------------------------
+	// Please create binding methods on the NotificationSettings type with the following signatures:
+	// func (r *NotificationSettings) GetGqlIDField_UserID() string
+	//-----------------------------------------------------------------------------------------------
+	return GqlID(fmt.Sprintf("NotificationSettings:%s", r.GetGqlIDField_UserID()))
+}
+
+func (r *SomeoneAdmiredYourFeedEventNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneAdmiredYourFeedEventNotification:%s", r.Dbid))
+}
+
+func (r *SomeoneCommentedOnYourFeedEventNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneCommentedOnYourFeedEventNotification:%s", r.Dbid))
+}
+
+func (r *SomeoneFollowedYouBackNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneFollowedYouBackNotification:%s", r.Dbid))
+}
+
+func (r *SomeoneFollowedYouNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneFollowedYouNotification:%s", r.Dbid))
+}
+
+func (r *SomeoneViewedYourGalleryNotification) ID() GqlID {
+	return GqlID(fmt.Sprintf("SomeoneViewedYourGalleryNotification:%s", r.Dbid))
+}
+
 func (r *Token) ID() GqlID {
 	return GqlID(fmt.Sprintf("Token:%s", r.Dbid))
 }
@@ -79,18 +112,24 @@ func (r *Wallet) ID() GqlID {
 }
 
 type NodeFetcher struct {
-	OnAdmire          func(ctx context.Context, dbid persist.DBID) (*Admire, error)
-	OnCollection      func(ctx context.Context, dbid persist.DBID) (*Collection, error)
-	OnCollectionToken func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
-	OnComment         func(ctx context.Context, dbid persist.DBID) (*Comment, error)
-	OnCommunity       func(ctx context.Context, contractAddress string, chain string) (*Community, error)
-	OnContract        func(ctx context.Context, dbid persist.DBID) (*Contract, error)
-	OnFeedEvent       func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
-	OnGallery         func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
-	OnGalleryUser     func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
-	OnMembershipTier  func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
-	OnToken           func(ctx context.Context, dbid persist.DBID) (*Token, error)
-	OnWallet          func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
+	OnAdmire                                      func(ctx context.Context, dbid persist.DBID) (*Admire, error)
+	OnCollection                                  func(ctx context.Context, dbid persist.DBID) (*Collection, error)
+	OnCollectionToken                             func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
+	OnComment                                     func(ctx context.Context, dbid persist.DBID) (*Comment, error)
+	OnCommunity                                   func(ctx context.Context, contractAddress string, chain string) (*Community, error)
+	OnContract                                    func(ctx context.Context, dbid persist.DBID) (*Contract, error)
+	OnFeedEvent                                   func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
+	OnGallery                                     func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
+	OnGalleryUser                                 func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
+	OnMembershipTier                              func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
+	OnNotificationSettings                        func(ctx context.Context, userId string) (*NotificationSettings, error)
+	OnSomeoneAdmiredYourFeedEventNotification     func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourFeedEventNotification, error)
+	OnSomeoneCommentedOnYourFeedEventNotification func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourFeedEventNotification, error)
+	OnSomeoneFollowedYouBackNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouBackNotification, error)
+	OnSomeoneFollowedYouNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
+	OnSomeoneViewedYourGalleryNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
+	OnToken                                       func(ctx context.Context, dbid persist.DBID) (*Token, error)
+	OnWallet                                      func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
 }
 
 func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error) {
@@ -153,6 +192,36 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipTier' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnMembershipTier(ctx, persist.DBID(ids[0]))
+	case "NotificationSettings":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'NotificationSettings' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnNotificationSettings(ctx, string(ids[0]))
+	case "SomeoneAdmiredYourFeedEventNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneAdmiredYourFeedEventNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneAdmiredYourFeedEventNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneCommentedOnYourFeedEventNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneCommentedOnYourFeedEventNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneCommentedOnYourFeedEventNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneFollowedYouBackNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneFollowedYouBackNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneFollowedYouBackNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneFollowedYouNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneFollowedYouNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneFollowedYouNotification(ctx, persist.DBID(ids[0]))
+	case "SomeoneViewedYourGalleryNotification":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneViewedYourGalleryNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnSomeoneViewedYourGalleryNotification(ctx, persist.DBID(ids[0]))
 	case "Token":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Token' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -190,6 +259,18 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryUser")
 	case n.OnMembershipTier == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipTier")
+	case n.OnNotificationSettings == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnNotificationSettings")
+	case n.OnSomeoneAdmiredYourFeedEventNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneAdmiredYourFeedEventNotification")
+	case n.OnSomeoneCommentedOnYourFeedEventNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneCommentedOnYourFeedEventNotification")
+	case n.OnSomeoneFollowedYouBackNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneFollowedYouBackNotification")
+	case n.OnSomeoneFollowedYouNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneFollowedYouNotification")
+	case n.OnSomeoneViewedYourGalleryNotification == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneViewedYourGalleryNotification")
 	case n.OnToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnToken")
 	case n.OnWallet == nil:

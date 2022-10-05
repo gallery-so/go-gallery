@@ -83,6 +83,12 @@ type GetAuthNoncePayloadOrError interface {
 	IsGetAuthNoncePayloadOrError()
 }
 
+type GroupedNotification interface {
+	Notification
+	Node
+	IsGroupedNotification()
+}
+
 type LoginPayloadOrError interface {
 	IsLoginPayloadOrError()
 }
@@ -97,6 +103,11 @@ type MediaSubtype interface {
 
 type Node interface {
 	IsNode()
+}
+
+type Notification interface {
+	Node
+	IsNotification()
 }
 
 type RefreshCollectionPayloadOrError interface {
@@ -230,6 +241,10 @@ type Badge struct {
 type ChainTokens struct {
 	Chain  *persist.Chain `json:"chain"`
 	Tokens []*Token       `json:"tokens"`
+}
+
+type ClearAllNotificationsPayload struct {
+	Notifications []Notification `json:"notifications"`
 }
 
 type Collection struct {
@@ -666,6 +681,15 @@ type GnosisSafeAuth struct {
 	Nonce   string          `json:"nonce"`
 }
 
+type GroupNotificationUserEdge struct {
+	Node *GalleryUser `json:"node"`
+}
+
+type GroupNotificationUsersConnection struct {
+	Edges    []*GroupNotificationUserEdge `json:"edges"`
+	PageInfo *PageInfo                    `json:"pageInfo"`
+}
+
 type HTMLMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
 	MediaURL         *string        `json:"mediaURL"`
@@ -727,12 +751,41 @@ type MembershipTier struct {
 
 func (MembershipTier) IsNode() {}
 
+type NotificationEdge struct {
+	Node Notification `json:"node"`
+}
+
+type NotificationSettings struct {
+	HelperNotificationSettingsData
+	User                         *GalleryUser `json:"user"`
+	SomeoneFollowedYou           *bool        `json:"someoneFollowedYou"`
+	SomeoneAdmiredYourUpdate     *bool        `json:"someoneAdmiredYourUpdate"`
+	SomeoneCommentedOnYourUpdate *bool        `json:"someoneCommentedOnYourUpdate"`
+	SomeoneViewedYourGallery     *bool        `json:"someoneViewedYourGallery"`
+}
+
+func (NotificationSettings) IsNode() {}
+
+type NotificationSettingsInput struct {
+	SomeoneFollowedYou           *bool `json:"someoneFollowedYou"`
+	SomeoneAdmiredYourUpdate     *bool `json:"someoneAdmiredYourUpdate"`
+	SomeoneCommentedOnYourUpdate *bool `json:"someoneCommentedOnYourUpdate"`
+	SomeoneViewedYourGallery     *bool `json:"someoneViewedYourGallery"`
+}
+
+type NotificationsConnection struct {
+	Edges       []*NotificationEdge `json:"edges"`
+	UnseenCount *int                `json:"unseenCount"`
+	PageInfo    *PageInfo           `json:"pageInfo"`
+}
+
 type OwnerAtBlock struct {
 	Owner       GalleryUserOrAddress `json:"owner"`
 	BlockNumber *string              `json:"blockNumber"`
 }
 
 type PageInfo struct {
+	Total           *int   `json:"total"`
 	Size            int    `json:"size"`
 	HasPreviousPage bool   `json:"hasPreviousPage"`
 	HasNextPage     bool   `json:"hasNextPage"`
@@ -797,6 +850,73 @@ type SetSpamPreferencePayload struct {
 }
 
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
+
+type SomeoneAdmiredYourFeedEventNotification struct {
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	FeedEvent    *FeedEvent                        `json:"feedEvent"`
+	Admirers     *GroupNotificationUsersConnection `json:"admirers"`
+}
+
+func (SomeoneAdmiredYourFeedEventNotification) IsNotification()        {}
+func (SomeoneAdmiredYourFeedEventNotification) IsNode()                {}
+func (SomeoneAdmiredYourFeedEventNotification) IsGroupedNotification() {}
+
+type SomeoneCommentedOnYourFeedEventNotification struct {
+	Dbid         persist.DBID `json:"dbid"`
+	Seen         *bool        `json:"seen"`
+	CreationTime *time.Time   `json:"creationTime"`
+	UpdatedTime  *time.Time   `json:"updatedTime"`
+	Count        *int         `json:"count"`
+	Comment      *Comment     `json:"comment"`
+	FeedEvent    *FeedEvent   `json:"feedEvent"`
+}
+
+func (SomeoneCommentedOnYourFeedEventNotification) IsNotification() {}
+func (SomeoneCommentedOnYourFeedEventNotification) IsNode()         {}
+
+type SomeoneFollowedYouBackNotification struct {
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Followers    *GroupNotificationUsersConnection `json:"followers"`
+}
+
+func (SomeoneFollowedYouBackNotification) IsNotification()        {}
+func (SomeoneFollowedYouBackNotification) IsNode()                {}
+func (SomeoneFollowedYouBackNotification) IsGroupedNotification() {}
+
+type SomeoneFollowedYouNotification struct {
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Followers    *GroupNotificationUsersConnection `json:"followers"`
+}
+
+func (SomeoneFollowedYouNotification) IsNotification()        {}
+func (SomeoneFollowedYouNotification) IsNode()                {}
+func (SomeoneFollowedYouNotification) IsGroupedNotification() {}
+
+type SomeoneViewedYourGalleryNotification struct {
+	Dbid         persist.DBID   `json:"dbid"`
+	Seen         *bool          `json:"seen"`
+	CreationTime *time.Time     `json:"creationTime"`
+	UpdatedTime  *time.Time     `json:"updatedTime"`
+	Count        *int           `json:"count"`
+	Viewers      []*GalleryUser `json:"viewers"`
+	Gallery      *Gallery       `json:"gallery"`
+}
+
+func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
+func (SomeoneViewedYourGalleryNotification) IsNode()                {}
+func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
 
 type SyncTokensPayload struct {
 	Viewer *Viewer `json:"viewer"`
@@ -999,6 +1119,10 @@ type Viewer struct {
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 	Feed            *FeedConnection  `json:"feed"`
+	// Returns a list of notifications in reverse chronological order.
+	// Seen notifications come after unseen notifications
+	Notifications        *NotificationsConnection `json:"notifications"`
+	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
 }
 
 func (Viewer) IsViewerOrError() {}

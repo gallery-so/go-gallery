@@ -700,6 +700,14 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 	return output, nil
 }
 
+func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -840,6 +848,14 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 	return tokensToModel(ctx, tokens), nil
 }
 
+func (r *subscriptionResolver) NewNotification(ctx context.Context) (<-chan model.Notification, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan model.Notification, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
 }
@@ -930,6 +946,14 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 
 func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
 	return resolveViewerFeed(ctx, before, after, first, last)
+}
+
+func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
@@ -1040,6 +1064,9 @@ func (r *Resolver) SetSpamPreferencePayload() generated.SetSpamPreferencePayload
 	return &setSpamPreferencePayloadResolver{r}
 }
 
+// Subscription returns generated.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
+
 // Token returns generated.TokenResolver implementation.
 func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 
@@ -1104,6 +1131,7 @@ type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }
 type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }

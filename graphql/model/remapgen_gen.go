@@ -93,6 +93,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GroupedNotification": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GroupedNotification)
+		return obj, ok
+	},
+
 	"LoginPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(LoginPayloadOrError)
 		return obj, ok
@@ -110,6 +115,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"Node": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Node)
+		return obj, ok
+	},
+
+	"Notification": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(Notification)
 		return obj, ok
 	},
 

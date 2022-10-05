@@ -415,13 +415,15 @@ type Viewer {
     Returns a list of notifications in reverse chronological order.
     Seen notifications come after unseen notifications
     """
-    notifications(before: String, after: String, first: Int, last: Int): NotificationsConnection
+    notifications(before: String, after: String, first: Int, last: Int): NotificationsConnection @goField(forceResolver: true)
 
-    notificationSettings: NotificationSettings
+    notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
 
-type NotificationSettings implements Node {
+type NotificationSettings implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     id: ID!
+
+    user: GalleryUser
 
     someoneFollowedYou: Boolean
     someoneAdmiredYourUpdate: Boolean
@@ -1041,6 +1043,7 @@ type GroupNotificationUsersConnection {
 
 type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification {
     id: ID!
+    dbid: DBID!
     seen: Boolean
     creationTime: Time
     updatedTime: Time
@@ -1049,8 +1052,9 @@ type SomeoneFollowedYouNotification implements Notification & Node & GroupedNoti
     followers: GroupNotificationUsersConnection
 }
 
-type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification{
+type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification {
     id: ID!
+    dbid: DBID!
     seen: Boolean
     creationTime: Time
     updatedTime: Time
@@ -1059,8 +1063,9 @@ type SomeoneFollowedYouBackNotification implements Notification & Node & Grouped
     followers: GroupNotificationUsersConnection
 }
 
-type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification{
+type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification {
     id: ID!
+    dbid: DBID!
     seen: Boolean
     creationTime: Time
     updatedTime: Time
@@ -1070,8 +1075,9 @@ type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & Gr
     admirers: GroupNotificationUsersConnection
 }
 
-type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node{
+type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node {
     id: ID!
+    dbid: DBID!
     seen: Boolean
     creationTime: Time
     updatedTime: Time
@@ -1084,8 +1090,9 @@ type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node{
 
 }
 
-type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification{
+type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification {
     id: ID!
+    dbid: DBID!
     seen: Boolean
     creationTime: Time
     updatedTime: Time
