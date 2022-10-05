@@ -1,0 +1,22 @@
+# ignore everything
+**
+
+# ...except source and deps
+!go.mod
+!go.sum
+!cmd
+!contracts
+!db
+!event
+!feed
+!feedbot
+!graphql
+!indexer
+!mediaprocessing
+!middleware
+!publicapi
+!server
+!service
+!util
+!validate
+!docker

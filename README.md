@@ -119,10 +119,16 @@ migrate -path db/migrations/indexer -database "postgresql://postgres@localhost:5
 
 ### Healthcheck
 
-Verify that the server is running by calling the `/v1/health` endpoint.
+Verify that the server is running:
 
 ```bash
-$ curl localhost:4000/glry/v1/health
+$ curl localhost:4000/alive
+```
+
+This is available for live environments:
+
+```bash
+$ curl api.gallery.so/alive
 ```
 
 ## Testing services via Cloud Tasks
@@ -146,8 +152,13 @@ See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targetin
                                             |
                                             |              +------------+
                                             +-------------->  feedbot   |
-                                                           |  (:4123)   |
-                                                           +------------+
+                                            |              |  (:4123)   |
+                                            |              +------------+
+                                            |
+                                            |              +-------------------+
+                                            +-------------->  mediaprocessing  |
+                                                           |      (:6500)      |
+                                                           +-------------------+
 ```
 
 To get started:

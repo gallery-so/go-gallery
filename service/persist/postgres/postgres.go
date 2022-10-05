@@ -25,8 +25,35 @@ func getSqlConnectionString() string {
 	dbName := viper.GetString("POSTGRES_DB")
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetInt("POSTGRES_PORT")
+	if dbPort == 0 {
+		dbPort = 5432
+	}
 
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+
+	dbServerCa := viper.GetString("POSTGRES_SERVER_CA")
+	dbClientKey := viper.GetString("POSTGRES_CLIENT_KEY")
+	dbClientCert := viper.GetString("POSTGRES_CLIENT_CERT")
+
+	numSSLParams := countNonEmptyStrings(dbServerCa, dbClientKey, dbClientCert)
+	if numSSLParams == 0 {
+		return connStr
+	} else if numSSLParams == 3 {
+		return connStr + fmt.Sprintf(" sslmode=verify-ca sslrootcert=%s sslcert=%s sslkey=%s", dbServerCa, dbClientCert, dbClientKey)
+	}
+
+	panic(fmt.Errorf("POSTGRES_SERVER_CA, POSTGRES_CLIENT_KEY, and POSTGRES_CLIENT_CERT must be set together (all must have values or all must be empty)"))
+}
+
+func countNonEmptyStrings(str ...string) int {
+	numNotEmpty := 0
+	for _, s := range str {
+		if s != "" {
+			numNotEmpty++
+		}
+	}
+
+	return numNotEmpty
 }
 
 // NewClient creates a new postgres client

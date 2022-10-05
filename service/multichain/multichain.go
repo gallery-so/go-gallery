@@ -1,21 +1,44 @@
 package multichain
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 )
 
 const staleCommunityTime = time.Hour * 2
+
+var (
+	TezImageKeywords     = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
+	TezAnimationKeywords = []string{"artifactUri", "displayUri", "uri", "image"}
+)
+
+type keywordsForChain struct {
+	imageKeywords     []string
+	animationKeywords []string
+}
+
+var allKeywordsForChain = map[persist.Chain]keywordsForChain{
+	persist.ChainTezos: {
+		imageKeywords:     TezImageKeywords,
+		animationKeywords: TezAnimationKeywords,
+	},
+}
 
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
@@ -24,6 +47,7 @@ type Provider struct {
 	Chains map[persist.Chain][]ChainProvider
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	ChainAddressOverrides ChainOverrideMap
+	TasksClient           *cloudtasks.Client
 }
 
 // BlockchainInfo retrieves blockchain info from all chains
@@ -122,7 +146,8 @@ type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
 	GetTokensByWalletAddress(context.Context, persist.Address) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(context.Context, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 	GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
 	GetCommunityOwners(context.Context, persist.Address) ([]ChainAgnosticCommunityOwner, error)
@@ -140,7 +165,7 @@ type ChainProvider interface {
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
 // NewMultiChainDataRetriever creates a new MultiChainDataRetriever
-func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
+func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
@@ -150,8 +175,9 @@ func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories
 		c[info.Chain] = append(c[info.Chain], chain)
 	}
 	return &Provider{
-		Repos: repos,
-		Cache: cache,
+		Repos:       repos,
+		Cache:       cache,
+		TasksClient: taskClient,
 
 		Chains:                c,
 		ChainAddressOverrides: chainOverrides,
@@ -160,8 +186,8 @@ func NewMultiChainDataRetriever(ctx context.Context, repos *persist.Repositories
 
 // SyncTokens updates the media for all tokens for a user
 // TODO consider updating contracts as well
-func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
-	user, err := d.Repos.UserRepository.GetByID(ctx, userID)
+func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains []persist.Chain) error {
+	user, err := p.Repos.UserRepository.GetByID(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -178,7 +204,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 	for _, chain := range chains {
 		for _, wallet := range user.Wallets {
-			override := d.ChainAddressOverrides[chain]
+			override := p.ChainAddressOverrides[chain]
 
 			if wallet.Chain == chain || (override != nil && *override == wallet.Chain) {
 				chainsToAddresses[chain] = append(chainsToAddresses[chain], wallet.Address)
@@ -196,7 +222,7 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 			go func(addr persist.Address, chain persist.Chain) {
 				defer wg.Done()
 				start := time.Now()
-				providers, ok := d.Chains[chain]
+				providers, ok := p.Chains[chain]
 				if !ok {
 					errChan <- ErrChainNotFound{Chain: chain}
 					return
@@ -211,6 +237,8 @@ func (d *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 							errChan <- errWithPriority{err: err, priority: priority}
 							return
 						}
+
+						logger.For(ctx).Infof("got %d tokens and %d contracts for address %s on chain %d for priority %d", len(tokens), len(contracts), addr, chain, priority)
 
 						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
@@ -246,9 +274,9 @@ outer:
 		case err := <-errChan:
 			if err, ok := err.(errWithPriority); ok {
 				if err.priority == 0 {
-					return err.err
+					return err
 				}
-				logger.For(ctx).Errorf("error updating fallback media for user %s: %s", user.Username, err.err)
+				logger.For(ctx).Errorf("error updating fallback media for user %s: %s", user.Username, err)
 			} else {
 				return err
 			}
@@ -256,7 +284,7 @@ outer:
 	}
 
 	newContracts, err := contractsToNewDedupedContracts(ctx, allContracts)
-	if err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
+	if err := p.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
 		return fmt.Errorf("error upserting contracts: %s", err)
 	}
 	contractsForChain := map[persist.Chain][]persist.Address{}
@@ -269,7 +297,7 @@ outer:
 
 	addressesToContracts := map[string]persist.DBID{}
 	for chain, addresses := range contractsForChain {
-		newContracts, err := d.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
+		newContracts, err := p.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
 		if err != nil {
 			return err
 		}
@@ -278,14 +306,30 @@ outer:
 		}
 	}
 
-	allUsersNFTs, err := d.Repos.TokenRepository.GetByUserID(ctx, userID, 0, 0)
+	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, userID, 0, 0)
 	if err != nil {
 		return err
 	}
 
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersNFTs, user)
-	if err := d.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
+	if err != nil {
+		return err
+	}
+	newTokens = addExistingMedia(ctx, newTokens, allUsersNFTs)
+
+	logger.For(ctx).Debugf("upserting %d tokens for user %s", len(newTokens), user.Username)
+	if err := p.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
+	}
+
+	for _, chain := range chains {
+		if keywords, ok := allKeywordsForChain[chain]; ok {
+			err = p.processMedialessTokens(ctx, userID, chain, keywords.imageKeywords, keywords.animationKeywords)
+			if err != nil {
+				logger.For(ctx).Errorf("error processing medialess tokens for user %s: %s", user.Username, err)
+				return err
+			}
+		}
 	}
 
 	logger.For(ctx).Warn("preparing to delete old tokens")
@@ -301,14 +345,53 @@ outer:
 			continue
 		}
 		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
-			logger.For(ctx).Warnf("deleting nft %s-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
-			err := d.Repos.TokenRepository.DeleteByID(ctx, nft.ID)
+			logger.For(ctx).Warnf("deleting nft %d-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
+			err := p.Repos.TokenRepository.DeleteByID(ctx, nft.ID)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
+	return nil
+}
+
+func (p *Provider) processMedialessTokens(ctx context.Context, userID persist.DBID, chain persist.Chain, imageKeywords, animationKeywords []string) error {
+	processMediaInput := task.MediaProcessingMessage{
+		UserID:            userID,
+		Chain:             chain,
+		ImageKeywords:     imageKeywords,
+		AnimationKeywords: animationKeywords,
+	}
+	return task.CreateTaskForMediaProcessing(ctx, processMediaInput, p.TasksClient)
+}
+
+func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+	input := map[string]interface{}{
+		"token_id":           tokenID,
+		"contract_address":   contractAddress,
+		"chain":              chain,
+		"owner_address":      ownerAddress,
+		"image_keywords":     imageKeywords,
+		"animation_keywords": animationKeywords,
+	}
+	asJSON, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/process/token", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return util.GetErrFromResp(resp)
+	}
 	return nil
 }
 
@@ -428,12 +511,13 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 			}
 		}
 
-		tokens, contracts, err := provider.GetTokensByTokenIdentifiers(ctx, id)
-		if err != nil {
-			return err
-		}
 		if i == 0 {
-			for _, token := range tokens {
+			for _, ownerAddress := range ownerAddresses {
+				token, contract, err := provider.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
+				if err != nil {
+					return err
+				}
+
 				if err := d.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
 					Media:       token.Media,
 					Metadata:    token.TokenMetadata,
@@ -444,8 +528,15 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}); err != nil {
 					return err
 				}
-			}
-			for _, contract := range contracts {
+				if !token.Media.IsServable() {
+					if keywords, ok := allKeywordsForChain[ti.Chain]; ok {
+						err = d.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, keywords.imageKeywords, keywords.animationKeywords)
+						if err != nil {
+							return err
+						}
+					}
+				}
+
 				if err := d.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
 					Chain:          ti.Chain,
 					Address:        persist.Address(ti.Chain.NormalizeAddress(ti.ContractAddress)),
@@ -456,6 +547,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 			}
+
 		}
 	}
 	return nil
@@ -475,8 +567,9 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return nil
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
+
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
 	seenQuantities := make(map[persist.TokenIdentifiers]persist.HexString)
 	addressToWallets := make(map[string]persist.Wallet)
@@ -552,23 +645,32 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 		}
 	}
 
-	dbSeen := make(map[persist.TokenIdentifiers]persist.TokenGallery)
-	for _, token := range dbTokens {
-		dbSeen[persist.NewTokenIdentifiers(persist.Address(token.Contract), token.TokenID, token.Chain)] = token
+	res := make([]persist.TokenGallery, len(seenTokens))
+	i := 0
+	for _, t := range seenTokens {
+		res[i] = t
+		i++
 	}
 
-	res := make([]persist.TokenGallery, 0, len(seenTokens))
-	for _, t := range seenTokens {
+	return res, nil
+}
+
+func addExistingMedia(ctx context.Context, providerTokens []persist.TokenGallery, dbTokens []persist.TokenGallery) []persist.TokenGallery {
+	savedMap := make(map[persist.TokenIdentifiers]persist.TokenGallery)
+	for _, token := range dbTokens {
+		savedMap[token.TokenIdentifiers()] = token
+	}
+	res := make([]persist.TokenGallery, len(providerTokens))
+	for i, t := range providerTokens {
+		logger.For(ctx).Debugf("token: %s", t.Name)
 		if !t.Media.IsServable() {
-			if dbToken, ok := dbSeen[persist.NewTokenIdentifiers(persist.Address(t.Contract), t.TokenID, t.Chain)]; ok && dbToken.Media.IsServable() {
-				res = append(res, dbToken)
-				continue
+			if dbToken, ok := savedMap[t.TokenIdentifiers()]; ok && dbToken.Media.IsServable() {
+				t.Media = dbToken.Media
 			}
 		}
-		res = append(res, t)
+		res[i] = t
 	}
-	return res, nil
-
+	return res
 }
 
 func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {
@@ -674,7 +776,7 @@ func (e ErrChainNotFound) Error() string {
 }
 
 func (e errWithPriority) Error() string {
-	return e.err.Error()
+	return fmt.Sprintf("error with priority %d: %s", e.priority, e.err)
 }
 
 func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {

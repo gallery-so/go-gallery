@@ -183,6 +183,64 @@ func InitPostgres() (resource *dockertest.Resource, callback func()) {
 	return pg, callback
 }
 
+func InitPostgresIndexer() (resource *dockertest.Resource, callback func()) {
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		log.Fatalf("could not connect to docker: %s", err)
+	}
+	pool.MaxWait = 3 * time.Minute
+
+	apps := loadComposeFile()
+	imgAndVer, err := getBuildImage(apps.Services["postgres_indexer"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	pg, err := pool.RunWithOptions(
+		&dockertest.RunOptions{
+			Repository: imgAndVer[0],
+			Tag:        imgAndVer[1],
+			Env:        apps.Services["postgres_indexer"].Environment,
+		}, configureContainerCleanup,
+	)
+	if err != nil {
+		log.Fatalf("could not start postgres: %s", err)
+	}
+
+	// Patch environment to use container
+	pgHost := viper.GetString("POSTGRES_HOST")
+	pgPort := viper.GetString("POSTGRES_PORT")
+	pgUser := viper.GetString("POSTGRES_USER")
+	pgPass := viper.GetString("POSTGRES_PASSWORD")
+	pgDb := viper.GetString("POSTGRES_DB")
+	env := viper.GetString("ENV")
+
+	hostAndPort := strings.Split(pg.GetHostPort("5432/tcp"), ":")
+	fmt.Println(hostAndPort)
+	viper.Set("POSTGRES_HOST", hostAndPort[0])
+	viper.Set("POSTGRES_PORT", hostAndPort[1])
+	viper.Set("POSTGRES_USER", "postgres")
+	viper.Set("POSTGRES_PASSWORD", "")
+	viper.Set("POSTGRES_DB", "postgres")
+	viper.Set("ENV", "local")
+
+	// Called to restore original environment
+	callback = func() {
+		viper.Set("POSTGRES_HOST", pgHost)
+		viper.Set("POSTGRES_PORT", pgPort)
+		viper.Set("POSTGRES_USER", pgUser)
+		viper.Set("POSTGRES_PASSWORD", pgPass)
+		viper.Set("POSTGRES_DB", pgDb)
+		viper.Set("ENV", env)
+	}
+
+	if err = pool.Retry(waitOnDB); err != nil {
+		log.Fatalf("could not connect to postgres: %s", err)
+	}
+
+	return pg, callback
+}
+
 func InitRedis() (resource *dockertest.Resource, callback func()) {
 	pool, err := dockertest.NewPool("")
 	if err != nil {

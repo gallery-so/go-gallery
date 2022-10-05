@@ -333,13 +333,17 @@ type graphResponse struct {
 }
 
 func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddress, tid persist.TokenID, ethCl *ethclient.Client, ipfs *shell.Shell, arweave *goar.Client) (persist.TokenURI, persist.TokenMetadata, error) {
+	// The TokenID type removes leading zeros, but we want the zeros for ENS because the token ID
+	// is a hash that is used to look up a label. Here, we convert the token ID to decimal then back to
+	// hexadecimal to get back the padding.
+	labelHash := common.BigToHash(tid.BigInt()).Hex()[2:]
 
 	gql := fmt.Sprintf(`
 	{
 	  domains(first:1, where:{labelhash:"%s"}){
 		labelName
 	  }
-	}`, tid)
+	}`, labelHash)
 
 	jsonData := map[string]interface{}{
 		"query": gql,
@@ -448,7 +452,7 @@ func zora(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddre
 	if ok {
 		mediaType = persist.MediaFromContentType(contentType)
 	} else {
-		mediaType, _, err = media.PredictMediaType(ctx, mediaURI)
+		mediaType, _, _, err = media.PredictMediaType(ctx, mediaURI)
 	}
 	switch mediaType {
 	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG, persist.MediaTypeBase64BMP:
