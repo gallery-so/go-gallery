@@ -398,9 +398,10 @@ type ViewerGallery {
 
 type NotificationEdge {
     node: Notification
+    cursor: String!
 }
 
-type NotificationsConnection {
+type NotificationsConnection @goEmbedHelper {
     edges: [NotificationEdge]
     unseenCount: Int
     pageInfo: PageInfo @goField(forceResolver: true)
@@ -1034,10 +1035,11 @@ interface GroupedNotification implements Notification & Node {
 
 type GroupNotificationUserEdge {
     node: GalleryUser
+    cursor: String!
 }
 
-type GroupNotificationUsersConnection {
-    edges:  [GroupNotificationUserEdge]
+type GroupNotificationUsersConnection @goEmbedHelper {
+    edges:  [GroupNotificationUserEdge] 
     pageInfo: PageInfo @goField(forceResolver: true)
 }
 
@@ -1050,7 +1052,7 @@ type SomeoneFollowedYouNotification implements Notification & Node & GroupedNoti
   updatedTime: Time
   count: Int
 
-  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
@@ -1062,7 +1064,7 @@ type SomeoneFollowedYouBackNotification implements Notification & Node & Grouped
   updatedTime: Time
   count: Int
 
-  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
@@ -1075,7 +1077,7 @@ type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & Gr
   count: Int
 
   feedEvent: FeedEvent @goField(forceResolver: true)
-  admirers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
@@ -1101,7 +1103,7 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   updatedTime: Time
   count: Int
 
-  viewers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  viewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
   gallery: Gallery @goField(forceResolver: true)
 }
 

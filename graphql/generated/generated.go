@@ -385,7 +385,8 @@ type ComplexityRoot struct {
 	}
 
 	GroupNotificationUserEdge struct {
-		Node func(childComplexity int) int
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
 	}
 
 	GroupNotificationUsersConnection struct {
@@ -470,7 +471,8 @@ type ComplexityRoot struct {
 	}
 
 	NotificationEdge struct {
-		Node func(childComplexity int) int
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
 	}
 
 	NotificationSettings struct {
@@ -560,7 +562,7 @@ type ComplexityRoot struct {
 	}
 
 	SomeoneAdmiredYourFeedEventNotification struct {
-		Admirers     func(childComplexity int) int
+		Admirers     func(childComplexity int, before *string, after *string, first *int, last *int) int
 		Count        func(childComplexity int) int
 		CreationTime func(childComplexity int) int
 		Dbid         func(childComplexity int) int
@@ -584,7 +586,7 @@ type ComplexityRoot struct {
 		Count        func(childComplexity int) int
 		CreationTime func(childComplexity int) int
 		Dbid         func(childComplexity int) int
-		Followers    func(childComplexity int) int
+		Followers    func(childComplexity int, before *string, after *string, first *int, last *int) int
 		ID           func(childComplexity int) int
 		Seen         func(childComplexity int) int
 		UpdatedTime  func(childComplexity int) int
@@ -594,7 +596,7 @@ type ComplexityRoot struct {
 		Count        func(childComplexity int) int
 		CreationTime func(childComplexity int) int
 		Dbid         func(childComplexity int) int
-		Followers    func(childComplexity int) int
+		Followers    func(childComplexity int, before *string, after *string, first *int, last *int) int
 		ID           func(childComplexity int) int
 		Seen         func(childComplexity int) int
 		UpdatedTime  func(childComplexity int) int
@@ -608,7 +610,7 @@ type ComplexityRoot struct {
 		ID           func(childComplexity int) int
 		Seen         func(childComplexity int) int
 		UpdatedTime  func(childComplexity int) int
-		Viewers      func(childComplexity int) int
+		Viewers      func(childComplexity int, before *string, after *string, first *int, last *int) int
 	}
 
 	Subscription struct {
@@ -900,20 +902,20 @@ type SetSpamPreferencePayloadResolver interface {
 }
 type SomeoneAdmiredYourFeedEventNotificationResolver interface {
 	FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error)
-	Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.GroupNotificationUsersConnection, error)
+	Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
 }
 type SomeoneCommentedOnYourFeedEventNotificationResolver interface {
 	Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error)
 	FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error)
 }
 type SomeoneFollowedYouBackNotificationResolver interface {
-	Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification) (*model.GroupNotificationUsersConnection, error)
+	Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
 }
 type SomeoneFollowedYouNotificationResolver interface {
-	Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification) (*model.GroupNotificationUsersConnection, error)
+	Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
 }
 type SomeoneViewedYourGalleryNotificationResolver interface {
-	Viewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.GroupNotificationUsersConnection, error)
+	Viewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
 	Gallery(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.Gallery, error)
 }
 type SubscriptionResolver interface {
@@ -2035,6 +2037,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GltfMedia.PreviewURLs(childComplexity), true
 
+	case "GroupNotificationUserEdge.cursor":
+		if e.complexity.GroupNotificationUserEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.GroupNotificationUserEdge.Cursor(childComplexity), true
+
 	case "GroupNotificationUserEdge.node":
 		if e.complexity.GroupNotificationUserEdge.Node == nil {
 			break
@@ -2545,6 +2554,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateUserInfo(childComplexity, args["input"].(model.UpdateUserInfoInput)), true
 
+	case "NotificationEdge.cursor":
+		if e.complexity.NotificationEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.NotificationEdge.Cursor(childComplexity), true
+
 	case "NotificationEdge.node":
 		if e.complexity.NotificationEdge.Node == nil {
 			break
@@ -2946,7 +2962,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.SomeoneAdmiredYourFeedEventNotification.Admirers(childComplexity), true
+		args, err := ec.field_SomeoneAdmiredYourFeedEventNotification_admirers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.SomeoneAdmiredYourFeedEventNotification.Admirers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "SomeoneAdmiredYourFeedEventNotification.count":
 		if e.complexity.SomeoneAdmiredYourFeedEventNotification.Count == nil {
@@ -3072,7 +3093,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.SomeoneFollowedYouBackNotification.Followers(childComplexity), true
+		args, err := ec.field_SomeoneFollowedYouBackNotification_followers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.SomeoneFollowedYouBackNotification.Followers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "SomeoneFollowedYouBackNotification.id":
 		if e.complexity.SomeoneFollowedYouBackNotification.ID == nil {
@@ -3121,7 +3147,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.SomeoneFollowedYouNotification.Followers(childComplexity), true
+		args, err := ec.field_SomeoneFollowedYouNotification_followers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.SomeoneFollowedYouNotification.Followers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "SomeoneFollowedYouNotification.id":
 		if e.complexity.SomeoneFollowedYouNotification.ID == nil {
@@ -3198,7 +3229,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.SomeoneViewedYourGalleryNotification.Viewers(childComplexity), true
+		args, err := ec.field_SomeoneViewedYourGalleryNotification_viewers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.SomeoneViewedYourGalleryNotification.Viewers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Subscription.newNotification":
 		if e.complexity.Subscription.NewNotification == nil {
@@ -4286,9 +4322,10 @@ type ViewerGallery {
 
 type NotificationEdge {
     node: Notification
+    cursor: String!
 }
 
-type NotificationsConnection {
+type NotificationsConnection @goEmbedHelper {
     edges: [NotificationEdge]
     unseenCount: Int
     pageInfo: PageInfo @goField(forceResolver: true)
@@ -4922,10 +4959,11 @@ interface GroupedNotification implements Notification & Node {
 
 type GroupNotificationUserEdge {
     node: GalleryUser
+    cursor: String!
 }
 
-type GroupNotificationUsersConnection {
-    edges:  [GroupNotificationUserEdge]
+type GroupNotificationUsersConnection @goEmbedHelper {
+    edges:  [GroupNotificationUserEdge] 
     pageInfo: PageInfo @goField(forceResolver: true)
 }
 
@@ -4938,7 +4976,7 @@ type SomeoneFollowedYouNotification implements Notification & Node & GroupedNoti
   updatedTime: Time
   count: Int
 
-  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
@@ -4950,7 +4988,7 @@ type SomeoneFollowedYouBackNotification implements Notification & Node & Grouped
   updatedTime: Time
   count: Int
 
-  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
@@ -4963,7 +5001,7 @@ type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & Gr
   count: Int
 
   feedEvent: FeedEvent @goField(forceResolver: true)
-  admirers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
@@ -4989,7 +5027,7 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   updatedTime: Time
   count: Int
 
-  viewers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  viewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
   gallery: Gallery @goField(forceResolver: true)
 }
 
@@ -5757,6 +5795,174 @@ func (ec *executionContext) field_Query_usersWithTrait_args(ctx context.Context,
 		}
 	}
 	args["trait"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_SomeoneAdmiredYourFeedEventNotification_admirers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_SomeoneFollowedYouBackNotification_followers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_SomeoneFollowedYouNotification_followers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_SomeoneViewedYourGalleryNotification_viewers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -10838,6 +11044,41 @@ func (ec *executionContext) _GroupNotificationUserEdge_node(ctx context.Context,
 	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _GroupNotificationUserEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationUserEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GroupNotificationUserEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _GroupNotificationUsersConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.GroupNotificationUsersConnection) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -13139,6 +13380,41 @@ func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field gr
 	return ec.marshalONotification2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNotification(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _NotificationEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "NotificationEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _NotificationSettings_id(ctx context.Context, field graphql.CollectedField, obj *model.NotificationSettings) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -15082,9 +15358,16 @@ func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification_admirers(ct
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_SomeoneAdmiredYourFeedEventNotification_admirers_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.SomeoneAdmiredYourFeedEventNotification().Admirers(rctx, obj)
+		return ec.resolvers.SomeoneAdmiredYourFeedEventNotification().Admirers(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15542,9 +15825,16 @@ func (ec *executionContext) _SomeoneFollowedYouBackNotification_followers(ctx co
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_SomeoneFollowedYouBackNotification_followers_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.SomeoneFollowedYouBackNotification().Followers(rctx, obj)
+		return ec.resolvers.SomeoneFollowedYouBackNotification().Followers(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15772,9 +16062,16 @@ func (ec *executionContext) _SomeoneFollowedYouNotification_followers(ctx contex
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_SomeoneFollowedYouNotification_followers_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.SomeoneFollowedYouNotification().Followers(rctx, obj)
+		return ec.resolvers.SomeoneFollowedYouNotification().Followers(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16002,9 +16299,16 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_viewers(ctx co
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_SomeoneViewedYourGalleryNotification_viewers_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.SomeoneViewedYourGalleryNotification().Viewers(rctx, obj)
+		return ec.resolvers.SomeoneViewedYourGalleryNotification().Viewers(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -25018,6 +25322,16 @@ func (ec *executionContext) _GroupNotificationUserEdge(ctx context.Context, sel 
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "cursor":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GroupNotificationUserEdge_cursor(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -25638,6 +25952,16 @@ func (ec *executionContext) _NotificationEdge(ctx context.Context, sel ast.Selec
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "cursor":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._NotificationEdge_cursor(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

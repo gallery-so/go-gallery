@@ -132,13 +132,15 @@ type groupedNotificationHandler struct {
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	notifID := notif.ID
+	var createdAtTime time.Time
 	if notifID != "" {
 		curNotif, _ := h.queries.GetNotificationByID(ctx, notif.ID)
 		if curNotif.ID != "" {
 			notifID = curNotif.ID
+			createdAtTime = curNotif.CreatedAt
 		}
 	}
-	if notifID != "" {
+	if notifID != "" && time.Since(createdAtTime) < window {
 		err := h.queries.UpdateNotification(ctx, db.UpdateNotificationParams{
 			ID:     notifID,
 			Data:   notif.Data,
@@ -155,7 +157,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 			select {
 			case sub <- curNotif:
 			default:
-				logger.For(ctx).Warnf("notification channel not open for user: %d", notif.OwnerID)
+				logger.For(ctx).Warnf("notification update channel not open for user: %d", notif.OwnerID)
 				h.updated[curNotif.OwnerID] = nil
 			}
 		}
@@ -174,7 +176,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 			select {
 			case sub <- newNotif:
 			default:
-				logger.For(ctx).Warnf("notification channel not open for user: %d", notif.OwnerID)
+				logger.For(ctx).Warnf("notification create channel not open for user: %d", notif.OwnerID)
 				h.new[newNotif.OwnerID] = nil
 			}
 		}

@@ -60,24 +60,39 @@ type HelperFeedConnectionData struct {
 	ByFirst bool
 }
 
+type HelperGroupNotificationUsersConnectionData struct {
+	UserIDs persist.DBIDList
+	ByFirst bool
+}
+
 type HelperNotificationSettingsData struct {
 	UserId persist.DBID
 }
 
 type HelperSomeoneFollowedYouNotificationData struct {
+	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
 }
 type HelperSomeoneViewedYourGalleryNotificationData struct {
+	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
 }
 type HelperSomeoneFollowedYouBackNotificationData struct {
+	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
 }
 type HelperSomeoneCommentedOnYourFeedEventNotificationData struct {
+	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
 }
 type HelperSomeoneAdmiredYourFeedEventNotificationData struct {
+	OwnerID          persist.DBID
 	NotificationData persist.NotificationData
+}
+
+type HelperNotificationsConnectionData struct {
+	UserId  persist.DBID
+	ByFirst bool
 }
 
 type ErrInvalidIDFormat struct {

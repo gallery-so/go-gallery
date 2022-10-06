@@ -682,10 +682,12 @@ type GnosisSafeAuth struct {
 }
 
 type GroupNotificationUserEdge struct {
-	Node *GalleryUser `json:"node"`
+	Node   *GalleryUser `json:"node"`
+	Cursor string       `json:"cursor"`
 }
 
 type GroupNotificationUsersConnection struct {
+	HelperGroupNotificationUsersConnectionData
 	Edges    []*GroupNotificationUserEdge `json:"edges"`
 	PageInfo *PageInfo                    `json:"pageInfo"`
 }
@@ -752,7 +754,8 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type NotificationEdge struct {
-	Node Notification `json:"node"`
+	Node   Notification `json:"node"`
+	Cursor string       `json:"cursor"`
 }
 
 type NotificationSettings struct {
@@ -774,6 +777,7 @@ type NotificationSettingsInput struct {
 }
 
 type NotificationsConnection struct {
+	HelperNotificationsConnectionData
 	Edges       []*NotificationEdge `json:"edges"`
 	UnseenCount *int                `json:"unseenCount"`
 	PageInfo    *PageInfo           `json:"pageInfo"`

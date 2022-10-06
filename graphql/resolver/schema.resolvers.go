@@ -203,7 +203,7 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 }
 
 func (r *groupNotificationUsersConnectionResolver) PageInfo(ctx context.Context, obj *model.GroupNotificationUsersConnection) (*model.PageInfo, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveGroupedUserNotificationPageInfo(ctx, obj)
 }
 
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
@@ -713,7 +713,7 @@ func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, setti
 }
 
 func (r *notificationsConnectionResolver) PageInfo(ctx context.Context, obj *model.NotificationsConnection) (*model.PageInfo, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveNotificationPageInfo(ctx, obj)
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
@@ -857,31 +857,31 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 }
 
 func (r *someoneAdmiredYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error) {
-	return resolveFeedEventByEventID(ctx, obj.HelperSomeoneAdmiredYourFeedEventNotificationData.NotificationData.FeedEventID)
+	return resolveFeedEventByEventID(ctx, obj.NotificationData.FeedEventID)
 }
 
-func (r *someoneAdmiredYourFeedEventNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.GroupNotificationUsersConnection, error) {
-	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.HelperSomeoneAdmiredYourFeedEventNotificationData.NotificationData.AdmirerIDs)
+func (r *someoneAdmiredYourFeedEventNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
 }
 
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error) {
-	return resolveCommentByCommentID(ctx, obj.HelperSomeoneCommentedOnYourFeedEventNotificationData.NotificationData.CommentID)
+	return resolveCommentByCommentID(ctx, obj.NotificationData.CommentID)
 }
 
 func (r *someoneCommentedOnYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error) {
-	return resolveFeedEventByEventID(ctx, obj.HelperSomeoneCommentedOnYourFeedEventNotificationData.NotificationData.FeedEventID)
+	return resolveFeedEventByEventID(ctx, obj.NotificationData.FeedEventID)
 }
 
-func (r *someoneFollowedYouBackNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification) (*model.GroupNotificationUsersConnection, error) {
-	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.HelperSomeoneFollowedYouBackNotificationData.NotificationData.FollowerIDs)
+func (r *someoneFollowedYouBackNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
 }
 
-func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification) (*model.GroupNotificationUsersConnection, error) {
-	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.HelperSomeoneFollowedYouNotificationData.NotificationData.FollowerIDs)
+func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
 }
 
-func (r *someoneViewedYourGalleryNotificationResolver) Viewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.GroupNotificationUsersConnection, error) {
-	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.HelperSomeoneViewedYourGalleryNotificationData.NotificationData.ViewerIDs)
+func (r *someoneViewedYourGalleryNotificationResolver) Viewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.ViewerIDs, before, after, first, last)
 }
 
 func (r *someoneViewedYourGalleryNotificationResolver) Gallery(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.Gallery, error) {

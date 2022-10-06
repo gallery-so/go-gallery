@@ -733,7 +733,7 @@ func resolveUpdatedNotificationSubscription(ctx context.Context) <-chan model.No
 	return result
 }
 
-func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userIDs persist.DBIDList) (*model.GroupNotificationUsersConnection, error) {
+func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userIDs persist.DBIDList, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
 	users, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, userIDs)
 	if err != nil {
 		return nil, err
@@ -743,13 +743,18 @@ func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userI
 
 	for i, user := range users {
 		edges[i] = &model.GroupNotificationUserEdge{
-			Node: userToModel(ctx, user),
+			Node:   userToModel(ctx, user),
+			Cursor: model.Cursor.DBIDEncodeToCursor(user.ID),
 		}
 	}
 
 	return &model.GroupNotificationUsersConnection{
 		Edges:    edges,
 		PageInfo: nil, // handled by dedicated resolver
+		HelperGroupNotificationUsersConnectionData: model.HelperGroupNotificationUsersConnectionData{
+			UserIDs: userIDs,
+			ByFirst: first != nil,
+		},
 	}, nil
 }
 
@@ -837,6 +842,83 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 		pageInfo.HasNextPage = hasPage
 	} else {
 		pageInfo.HasPreviousPage = hasPage
+	}
+
+	return &pageInfo, nil
+}
+
+func resolveNotificationPageInfo(ctx context.Context, notificationConn *model.NotificationsConnection) (*model.PageInfo, error) {
+	pageInfo := model.PageInfo{Size: len(notificationConn.Edges)}
+
+	if len(notificationConn.Edges) == 0 {
+		return &pageInfo, nil
+	}
+
+	pageInfo.StartCursor = notificationConn.Edges[0].Cursor
+	pageInfo.EndCursor = notificationConn.Edges[len(notificationConn.Edges)-1].Cursor
+
+	var cursor string
+
+	if notificationConn.ByFirst {
+		cursor = pageInfo.EndCursor
+	} else {
+		cursor = pageInfo.StartCursor
+	}
+
+	hasPage, err := publicapi.For(ctx).Notifications.HasPage(
+		ctx,
+		cursor,
+		notificationConn.UserId,
+		notificationConn.ByFirst,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if notificationConn.ByFirst {
+		pageInfo.HasNextPage = hasPage
+	} else {
+		pageInfo.HasPreviousPage = hasPage
+	}
+
+	return &pageInfo, nil
+}
+
+func resolveGroupedUserNotificationPageInfo(ctx context.Context, userConn *model.GroupNotificationUsersConnection) (*model.PageInfo, error) {
+	pageInfo := model.PageInfo{Size: len(userConn.Edges)}
+
+	if len(userConn.Edges) == 0 {
+		return &pageInfo, nil
+	}
+
+	pageInfo.StartCursor = userConn.Edges[0].Cursor
+	pageInfo.EndCursor = userConn.Edges[len(userConn.Edges)-1].Cursor
+
+	var cursor string
+
+	if userConn.ByFirst {
+		cursor = pageInfo.EndCursor
+	} else {
+		cursor = pageInfo.StartCursor
+	}
+
+	decodedCursor, err := model.Cursor.DecodeToDBID(&cursor)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := userConn.HelperGroupNotificationUsersConnectionData.UserIDs
+	var idxOfCursor int
+	for i, id := range ids {
+		if id == *decodedCursor {
+			idxOfCursor = i
+			break
+		}
+	}
+	if userConn.ByFirst {
+		pageInfo.HasNextPage = idxOfCursor+1 < len(ids)
+	} else {
+		pageInfo.HasPreviousPage = idxOfCursor > 0
 	}
 
 	return &pageInfo, nil

@@ -126,15 +126,15 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 	return api.loaders.GlobalFeed.Load(params)
 }
 
-func (api FeedAPI) HasPage(ctx context.Context, cursor string, userId persist.DBID, byFirst bool) (bool, error) {
+func (api FeedAPI) HasPage(ctx context.Context, cursor string, userID persist.DBID, byFirst bool) (bool, error) {
 	eventID, err := model.Cursor.DecodeToDBID(&cursor)
 	if err != nil {
 		return false, err
 	}
 
-	if userId != "" {
+	if userID != "" {
 		return api.queries.UserFeedHasMoreEvents(ctx, db.UserFeedHasMoreEventsParams{
-			Follower:  userId,
+			Follower:  userID,
 			ID:        *eventID,
 			FromFirst: byFirst,
 		})
