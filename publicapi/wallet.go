@@ -29,7 +29,7 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 		return nil, err
 	}
 
-	address, err := api.loaders.WalletByWalletId.Load(walletID)
+	address, err := api.loaders.WalletByWalletID.Load(walletID)
 	if err != nil {
 		return nil, err
 	}

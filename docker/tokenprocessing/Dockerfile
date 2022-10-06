@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.16-buster
+FROM golang:1.16-bullseye
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
@@ -13,6 +13,9 @@ RUN go mod download
 
 COPY . /app
 RUN go build -o ./bin/mediaprocessing ./cmd/mediaprocessing/main.go
+
+ARG VERSION
+ENV VERSION=$VERSION
 
 EXPOSE 6500
 USER nobody

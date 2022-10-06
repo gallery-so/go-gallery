@@ -29,7 +29,7 @@ func (api AdmireAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (
 		return nil, err
 	}
 
-	admire, err := api.loaders.AdmireByAdmireId.Load(admireID)
+	admire, err := api.loaders.AdmireByAdmireID.Load(admireID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (api AdmireAPI) GetAdmiresByFeedEventID(ctx context.Context, feedEventID pe
 		return nil, err
 	}
 
-	admires, err := api.loaders.AdmiresByFeedEventId.Load(feedEventID)
+	admires, err := api.loaders.AdmiresByFeedEventID.Load(feedEventID)
 	if err != nil {
 		return nil, err
 	}
