@@ -191,7 +191,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, cha
 	newWalletID := persist.GenerateID()
 	// At this point, we know there's no existing wallet in the database with this ChainAddress, so let's make a new one!
 	if _, err := tx.StmtContext(ctx, u.createWalletStmt).ExecContext(ctx, newWalletID, chainAddress.Address(), chainAddress.Chain(), walletType); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create wallet: %w", err)
 	}
 
 	return newWalletID, nil
