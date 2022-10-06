@@ -352,6 +352,7 @@ func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey,
 	return true, nil
 }
 
+// we should assume when using this function that the array is all of the tokens un paginated and we will need to paginate it with the offset and limit
 func (d *Provider) poapsToTokens(pPoap []poapToken, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	tokens := make([]multichain.ChainAgnosticToken, 0, len(pPoap))
 	contracts := make([]multichain.ChainAgnosticContract, 0, len(pPoap))

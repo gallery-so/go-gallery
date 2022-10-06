@@ -80,7 +80,7 @@ type getTokensInput struct {
 	WalletAddress   persist.EthereumAddress `form:"address"`
 	ContractAddress persist.EthereumAddress `form:"contract_address"`
 	TokenID         persist.TokenID         `form:"token_id"`
-	Page            int64                   `form:"page"`
+	Offset          int64                   `form:"offset"`
 	Limit           int64                   `form:"limit"`
 }
 
@@ -274,13 +274,13 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 			return []persist.Token{token}, []persist.Contract{contract}, nil
 
 		} else if input.ContractAddress != "" {
-			tokens, contract, err := tokenRepo.GetOwnedByContract(pCtx, input.ContractAddress, input.WalletAddress, input.Limit, input.Page)
+			tokens, contract, err := tokenRepo.GetOwnedByContract(pCtx, input.ContractAddress, input.WalletAddress, input.Limit, input.Offset)
 			if err != nil {
 				return nil, nil, err
 			}
 			return tokens, []persist.Contract{contract}, nil
 		}
-		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Page)
+		return tokenRepo.GetByWallet(pCtx, input.WalletAddress, input.Limit, input.Offset)
 	case input.TokenID != "" && input.ContractAddress != "":
 		if strings.HasPrefix(string(input.TokenID), "0x") {
 			input.TokenID = input.TokenID[2:]
@@ -288,7 +288,7 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 			input.TokenID = persist.TokenID(input.TokenID.BigInt().Text(16))
 		}
 
-		tokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Limit, input.Page)
+		tokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.Limit, input.Offset)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -298,7 +298,7 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 		}
 		return tokens, []persist.Contract{contract}, nil
 	case input.ContractAddress != "":
-		tokens, err := tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Limit, input.Page)
+		tokens, err := tokenRepo.GetByContract(pCtx, input.ContractAddress, input.Limit, input.Offset)
 		if err != nil {
 			return nil, nil, err
 		}
