@@ -356,12 +356,12 @@ func (d *Provider) poapsToTokens(pPoap []poapToken, limit, offset int) ([]multic
 	tokens := make([]multichain.ChainAgnosticToken, 0, len(pPoap))
 	contracts := make([]multichain.ChainAgnosticContract, 0, len(pPoap))
 	for i, poap := range pPoap {
-		if i < offset || i >= (offset+limit) {
+		if i < offset {
 			continue
 		}
 		tokens = append(tokens, d.poapToToken(poap))
 		contracts = append(contracts, d.poapToContract(poap))
-		if i >= limit {
+		if i >= (offset + limit) {
 			break
 		}
 	}
