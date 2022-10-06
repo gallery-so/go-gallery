@@ -267,16 +267,17 @@ type Token struct {
 }
 
 type User struct {
-	ID                 persist.DBID
-	Deleted            bool
-	Version            sql.NullInt32
-	LastUpdated        time.Time
-	CreatedAt          time.Time
-	Username           sql.NullString
-	UsernameIdempotent sql.NullString
-	Wallets            persist.WalletList
-	Bio                sql.NullString
-	Traits             pgtype.JSONB
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	NotificationSettings persist.UserNotificationSettings
 }
 
 type UserEvent struct {

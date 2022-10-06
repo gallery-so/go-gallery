@@ -644,6 +644,34 @@ func unseenNotifications(notifs []db.Notification) int {
 	return count
 }
 
+func resolveViewerNotificationSettings(ctx context.Context) (*model.NotificationSettings, error) {
+
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return notificationSettingsToModel(ctx, user), nil
+
+}
+
+func notificationSettingsToModel(ctx context.Context, user *db.User) *model.NotificationSettings {
+	settings := user.NotificationSettings
+	return &model.NotificationSettings{
+		HelperNotificationSettingsData: model.HelperNotificationSettingsData{
+			UserId: user.ID,
+		},
+		User:                         userToModel(ctx, *user),
+		SomeoneFollowedYou:           &settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     &settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: &settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     &settings.SomeoneViewedYourGallery,
+	}
+}
+
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
 

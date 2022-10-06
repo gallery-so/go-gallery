@@ -949,11 +949,11 @@ func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *st
 }
 
 func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveViewerNotifications(ctx, before, after, first, last)
 }
 
 func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveViewerNotificationSettings(ctx)
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {

@@ -415,3 +415,6 @@ SELECT
         LIMIT 1
     )
     END::bool;
+
+-- name: UpdateNotificationSettingsByID :exec
+UPDATE users SET notification_settings = $2 WHERE id = $1;
