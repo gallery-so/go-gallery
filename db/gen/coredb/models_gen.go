@@ -230,14 +230,14 @@ type Nonce struct {
 type Notification struct {
 	ID          persist.DBID
 	Deleted     bool
-	ActorID     sql.NullString
-	OwnerID     sql.NullString
+	ActorID     persist.DBID
+	OwnerID     persist.DBID
 	Version     sql.NullInt32
 	LastUpdated time.Time
 	CreatedAt   time.Time
-	Action      string
-	Data        pgtype.JSONB
-	Count       int32
+	Action      persist.Action
+	Data        persist.NotificationData
+	Seen        bool
 }
 
 type Token struct {

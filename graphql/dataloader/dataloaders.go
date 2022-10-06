@@ -19,6 +19,7 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/gallery-so/dataloaden UserNotificationsLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetUserNotificationsBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Notification
 //go:generate go run github.com/gallery-so/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
@@ -72,6 +73,7 @@ type Loaders struct {
 	FollowingByUserID        *UsersLoaderByID
 	GlobalFeed               *GlobalFeedLoader
 	FeedByUserID             *UserFeedLoader
+	NotificationsByUserID    *UserNotificationsLoader
 	EventByEventID           *EventLoaderByID
 	AdmireByAdmireID         *AdmireLoaderByID
 	AdmiresByFeedEventID     *AdmiresLoaderByID
@@ -206,6 +208,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.FeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
 
 	loaders.GlobalFeed = NewGlobalFeedLoader(defaults, loadGlobalFeed(q))
+
+	loaders.NotificationsByUserID = NewUserNotificationsLoader(defaults, loadUserNotifications(q))
 
 	loaders.AdmireByAdmireID = NewAdmireLoaderByID(defaults, loadAdmireById(q), AdmireLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(admire db.Admire) persist.DBID { return admire.ID },
@@ -727,6 +731,23 @@ func loadGlobalFeed(q *db.Queries) func(context.Context, []db.GetGlobalFeedViewB
 		})
 
 		return events, errors
+	}
+}
+
+func loadUserNotifications(q *db.Queries) func(context.Context, []db.GetUserNotificationsBatchParams) ([][]db.Notification, []error) {
+	return func(ctx context.Context, params []db.GetUserNotificationsBatchParams) ([][]db.Notification, []error) {
+		notifs := make([][]db.Notification, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserNotificationsBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, ntfs []db.Notification, err error) {
+			notifs[i] = ntfs
+			errors[i] = err
+		})
+
+		return notifs, errors
 	}
 }
 

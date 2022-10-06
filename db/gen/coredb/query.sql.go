@@ -1053,6 +1053,74 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserNotifications = `-- name: GetUserNotifications :many
+WITH cursors AS (
+    SELECT
+    (SELECT CASE WHEN $3::varchar = '' THEN now() ELSE (SELECT created_at FROM notifications n WHERE n.id = $3::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN $4::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT created_at FROM notifications n WHERE n.id = $4::varchar AND deleted = false) END) AS cur_after
+), edges AS (
+    SELECT notif.id FROM notifications notif
+    WHERE created_at > (SELECT cur_after FROM cursors)
+    AND created_at < (SELECT cur_before FROM cursors)
+    AND notif.owner_id = $1
+    AND notif.deleted = false
+), offsets AS (
+    SELECT
+        CASE WHEN NOT $5::bool AND count(id) - $2::int > 0
+        THEN count(id) - $2::int
+        ELSE 0 END pos
+    FROM edges
+)
+SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen FROM notifications WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY created_at ASC
+    LIMIT $2 OFFSET (SELECT pos FROM offsets)
+`
+
+type GetUserNotificationsParams struct {
+	OwnerID   persist.DBID
+	Limit     int32
+	CurBefore string
+	CurAfter  string
+	FromFirst bool
+}
+
+func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificationsParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, getUserNotifications,
+		arg.OwnerID,
+		arg.Limit,
+		arg.CurBefore,
+		arg.CurAfter,
+		arg.FromFirst,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.ActorID,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.Seen,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
@@ -1300,6 +1368,38 @@ type UserFeedHasMoreEventsParams struct {
 
 func (q *Queries) UserFeedHasMoreEvents(ctx context.Context, arg UserFeedHasMoreEventsParams) (bool, error) {
 	row := q.db.QueryRow(ctx, userFeedHasMoreEvents, arg.Follower, arg.ID, arg.FromFirst)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const userFeedHasMoreNotifications = `-- name: UserFeedHasMoreNotifications :one
+SELECT
+    CASE WHEN $3::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM notifications notif
+        WHERE created_at > (SELECT created_at FROM notifications n WHERE n.id = $2)
+        AND notif.deleted = false AND notif.owner_id = $1
+        LIMIT 1)
+    ELSE EXISTS(
+        SELECT 1
+        FROM notifications notif
+        WHERE event_time < (SELECT created_at FROM notifications n WHERE n.id = $2)
+        AND notif.deleted = false AND notif.owner_id = $1
+        LIMIT 1
+    )
+    END::bool
+`
+
+type UserFeedHasMoreNotificationsParams struct {
+	OwnerID   persist.DBID
+	ID        persist.DBID
+	FromFirst bool
+}
+
+func (q *Queries) UserFeedHasMoreNotifications(ctx context.Context, arg UserFeedHasMoreNotificationsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, userFeedHasMoreNotifications, arg.OwnerID, arg.ID, arg.FromFirst)
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err

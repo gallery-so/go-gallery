@@ -352,3 +352,66 @@ SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY cre
 
 -- name: GetCommentsByFeedEventIDBatch :batchmany
 SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
+
+
+-- name: GetUserNotifications :many
+WITH cursors AS (
+    SELECT
+    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_after::varchar AND deleted = false) END) AS cur_after
+), edges AS (
+    SELECT notif.id FROM notifications notif
+    WHERE created_at > (SELECT cur_after FROM cursors)
+    AND created_at < (SELECT cur_before FROM cursors)
+    AND notif.owner_id = $1
+    AND notif.deleted = false
+), offsets AS (
+    SELECT
+        CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
+        THEN count(id) - $2::int
+        ELSE 0 END pos
+    FROM edges
+)
+SELECT * FROM notifications WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY created_at ASC
+    LIMIT $2 OFFSET (SELECT pos FROM offsets);
+
+-- name: GetUserNotificationsBatch :batchmany
+WITH cursors AS (
+    SELECT
+    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_after::varchar AND deleted = false) END) AS cur_after
+), edges AS (
+    SELECT notif.id FROM notifications notif
+    WHERE created_at > (SELECT cur_after FROM cursors)
+    AND created_at < (SELECT cur_before FROM cursors)
+    AND notif.owner_id = $1
+    AND notif.deleted = false
+), offsets AS (
+    SELECT
+        CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
+        THEN count(id) - $2::int
+        ELSE 0 END pos
+    FROM edges
+)
+SELECT * FROM notifications WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY created_at ASC
+    LIMIT $2 OFFSET (SELECT pos FROM offsets);
+
+-- name: UserFeedHasMoreNotifications :one
+SELECT
+    CASE WHEN @from_first::bool
+    THEN EXISTS(
+        SELECT 1
+        FROM notifications notif
+        WHERE created_at > (SELECT created_at FROM notifications n WHERE n.id = $2)
+        AND notif.deleted = false AND notif.owner_id = $1
+        LIMIT 1)
+    ELSE EXISTS(
+        SELECT 1
+        FROM notifications notif
+        WHERE event_time < (SELECT created_at FROM notifications n WHERE n.id = $2)
+        AND notif.deleted = false AND notif.owner_id = $1
+        LIMIT 1
+    )
+    END::bool;

@@ -584,6 +584,66 @@ func resolveGlobalFeed(ctx context.Context, before *string, after *string, first
 	}, nil
 }
 
+func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
+	beforeToken, err := model.Cursor.DecodeToDBID(before)
+	if err != nil {
+		return nil, err
+	}
+
+	afterToken, err := model.Cursor.DecodeToDBID(after)
+	if err != nil {
+		return nil, err
+	}
+
+	notifs, err := publicapi.For(ctx).Notifications.GetViewerNotifications(ctx, beforeToken, afterToken, first, last)
+
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := notificationsToEdges(notifs)
+
+	if err != nil {
+		return nil, err
+	}
+
+	unseen := unseenNotifications(notifs)
+
+	return &model.NotificationsConnection{
+		Edges:       edges,
+		PageInfo:    nil, // handled by dedicated resolver,
+		UnseenCount: &unseen,
+	}, nil
+}
+
+func notificationsToEdges(notifs []db.Notification) ([]*model.NotificationEdge, error) {
+	edges := make([]*model.NotificationEdge, len(notifs))
+
+	for i, _ := range notifs {
+
+		var node model.Notification
+
+		// TODO fill out notification using event data from DB
+
+		edges[i] = &model.NotificationEdge{
+			Node: node,
+		}
+	}
+
+	return edges, nil
+}
+
+func unseenNotifications(notifs []db.Notification) int {
+	count := 0
+	for _, notif := range notifs {
+		if !notif.Seen {
+			count++
+		}
+	}
+
+	return count
+}
+
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
 

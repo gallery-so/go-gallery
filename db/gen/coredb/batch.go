@@ -1686,6 +1686,96 @@ func (b *GetUserFeedViewBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getUserNotificationsBatch = `-- name: GetUserNotificationsBatch :batchmany
+WITH cursors AS (
+    SELECT
+    (SELECT CASE WHEN $3::varchar = '' THEN now() ELSE (SELECT created_at FROM notifications n WHERE n.id = $3::varchar AND deleted = false) END) AS cur_before,
+    (SELECT CASE WHEN $4::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT created_at FROM notifications n WHERE n.id = $4::varchar AND deleted = false) END) AS cur_after
+), edges AS (
+    SELECT notif.id FROM notifications notif
+    WHERE created_at > (SELECT cur_after FROM cursors)
+    AND created_at < (SELECT cur_before FROM cursors)
+    AND notif.owner_id = $1
+    AND notif.deleted = false
+), offsets AS (
+    SELECT
+        CASE WHEN NOT $5::bool AND count(id) - $2::int > 0
+        THEN count(id) - $2::int
+        ELSE 0 END pos
+    FROM edges
+)
+SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen FROM notifications WHERE id = ANY(SELECT id FROM edges)
+    ORDER BY created_at ASC
+    LIMIT $2 OFFSET (SELECT pos FROM offsets)
+`
+
+type GetUserNotificationsBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetUserNotificationsBatchParams struct {
+	OwnerID   persist.DBID
+	Limit     int32
+	CurBefore string
+	CurAfter  string
+	FromFirst bool
+}
+
+func (q *Queries) GetUserNotificationsBatch(ctx context.Context, arg []GetUserNotificationsBatchParams) *GetUserNotificationsBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.OwnerID,
+			a.Limit,
+			a.CurBefore,
+			a.CurAfter,
+			a.FromFirst,
+		}
+		batch.Queue(getUserNotificationsBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUserNotificationsBatchBatchResults{br, 0}
+}
+
+func (b *GetUserNotificationsBatchBatchResults) Query(f func(int, []Notification, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Notification
+		for rows.Next() {
+			var i Notification
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.ActorID,
+				&i.OwnerID,
+				&i.Version,
+				&i.LastUpdated,
+				&i.CreatedAt,
+				&i.Action,
+				&i.Data,
+				&i.Seen,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetUserNotificationsBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
