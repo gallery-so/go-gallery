@@ -8,5 +8,5 @@ package util
 
 import (
 	_ "github.com/99designs/gqlgen"
-	_ "github.com/vektah/dataloaden"
+	_ "github.com/gallery-so/dataloaden"
 )

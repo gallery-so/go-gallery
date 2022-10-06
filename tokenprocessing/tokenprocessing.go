@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -27,7 +26,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// InitServer initializes the indexer server
+// InitServer initializes the mediaprocessing server
 func InitServer() {
 	router := coreInitServer()
 	logger.For(nil).Info("Starting tokenprocessing server...")
@@ -88,21 +87,20 @@ func setDefaults() {
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
+	viper.SetDefault("VERSION", "")
 
 	viper.AutomaticEnv()
 
-	envFile := "app-local-mediaprocessing.yaml"
-	if len(os.Args) > 1 {
-		if os.Args[1] == "dev" {
-			envFile = "app-dev-mediaprocessing.yaml"
-		} else if os.Args[1] == "prod" {
-			envFile = "app-prod-mediaprocessing.yaml"
-		}
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+	} else {
+		envFile := util.ResolveEnvFile("mediaprocessing")
+		util.LoadEnvFile(envFile)
 	}
-	util.LoadEnvFile(envFile, 3)
 
 	if viper.GetString("ENV") != "local" {
 		util.EnvVarMustExist("SENTRY_DSN", "")
+		util.EnvVarMustExist("VERSION", "")
 	}
 }
 
@@ -122,6 +120,7 @@ func initSentry() {
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Release:          viper.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = sentryutil.ScrubEventCookies(event, hint)

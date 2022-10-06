@@ -29,7 +29,7 @@ func (api CommentAPI) GetCommentByID(ctx context.Context, commentID persist.DBID
 		return nil, err
 	}
 
-	comment, err := api.loaders.CommentByCommentId.Load(commentID)
+	comment, err := api.loaders.CommentByCommentID.Load(commentID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (api CommentAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID 
 		return nil, err
 	}
 
-	comments, err := api.loaders.CommentsByFeedEventId.Load(feedEventID)
+	comments, err := api.loaders.CommentsByFeedEventID.Load(feedEventID)
 	if err != nil {
 		return nil, err
 	}

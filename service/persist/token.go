@@ -813,8 +813,12 @@ func (m TokenMetadata) Value() (driver.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return []byte(strings.ToValidUTF8(strings.ReplaceAll(string(val), "\\u0000", ""), "")), nil
+	cleaned := strings.ToValidUTF8(string(val), "")
+	// Replace literal '\\u0000' with empty string (marshal to JSON escapes each backslash)
+	cleaned = strings.ReplaceAll(cleaned, "\\\\u0000", "")
+	// Replace unicode NULL char (u+0000) i.e. '\u0000' with empty string
+	cleaned = strings.ReplaceAll(cleaned, "\\u0000", "")
+	return []byte(cleaned), nil
 }
 
 // Scan implements the database/sql Scanner interface for the AddressAtBlock type
