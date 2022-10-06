@@ -21,6 +21,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.16
 	github.com/everFinance/goar v1.4.0
+	github.com/gallery-so/dataloaden v0.0.0-20221004141822-8e925e89cb9f // indirect
 	github.com/gammazero/deque v0.1.1 // indirect
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect

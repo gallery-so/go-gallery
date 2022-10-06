@@ -14,12 +14,6 @@ sql:
       overrides:
         # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
         # the override should come _before_ the * entry
-        # Block Filters
-        - column: "address_filters.from_block"
-          go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
-        - column: "address_filters.to_block"
-          go_type: "github.com/mikeydub/go-gallery/service/persist.BlockNumber"
-
         # Wildcards
         # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
         - column: "*.id"

@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
-	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
+	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -46,15 +46,13 @@ func coreInit() (*gin.Engine, *indexer) {
 	initSentry()
 	initLogger()
 
-	queries := db.New(postgres.NewPgxClient())
-	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
-
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
 		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
 	} else {
 		s = media.NewStorageClient(context.Background())
 	}
+	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -113,15 +111,13 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	queries := db.New(postgres.NewPgxClient())
-	tokenRepo, contractRepo, addressFilterRepo := newRepos(queries)
-
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
 		s = media.NewLocalStorageClient(context.Background(), localKeyPath)
 	} else {
 		s = media.NewStorageClient(context.Background())
 	}
+	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
@@ -147,7 +143,7 @@ func coreInitServer() *gin.Engine {
 	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 
 	go processMedialessTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i, queries)
+	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 
 func setDefaults(service string) {
@@ -187,9 +183,9 @@ func setDefaults(service string) {
 	}
 }
 
-func newRepos(q *db.Queries) (persist.TokenRepository, persist.ContractRepository, postgres.AddressFilterRepository) {
+func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository, refresh.AddressFilterRepository) {
 	pgClient := postgres.NewClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), postgres.AddressFilterRepository{Queries: q}
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))}
 }
 
 func newThrottler() *throttle.Locker {

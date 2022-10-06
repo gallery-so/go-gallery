@@ -20,7 +20,6 @@ import (
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
-	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -70,8 +69,6 @@ type UpdateTokenMediaInput struct {
 	TokenID         persist.TokenID         `json:"token_id,omitempty"`
 	ContractAddress persist.EthereumAddress `json:"contract_address,omitempty"`
 	UpdateAll       bool                    `json:"update_all"`
-	DeepRefresh     bool                    `json:"deep_refresh"`
-	RefreshRange    persist.BlockRange      `json:"deep_refresh_range"`
 }
 
 type tokenUpdate struct {
@@ -569,13 +566,12 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 	}
 }
 
-func processRefreshes(idxr *indexer, queries *db.Queries) gin.HandlerFunc {
-	events := make([]common.Hash, len(idxr.eventHashes))
-	for i, event := range idxr.eventHashes {
-		events[i] = common.HexToHash(string(event))
-	}
+func processRefreshes(idxr *indexer, storageClient *storage.Client) gin.HandlerFunc {
+	events := eventsToTopics(idxr.eventHashes)
 	return func(c *gin.Context) {
-		filterManager := refresh.NewBlockFilterManager(c, queries, blocksPerLogsCall)
+		filterManager := refresh.NewBlockFilterManager(c, storageClient)
+		defer filterManager.Close()
+
 		refreshPool := workerpool.New(refresh.DefaultConfig.DefaultPoolSize)
 
 		message := task.DeepRefreshMessage{}
@@ -598,10 +594,11 @@ func processRefreshes(idxr *indexer, queries *db.Queries) gin.HandlerFunc {
 			b := block
 			refreshPool.Submit(func() {
 				ctx := sentryutil.NewSentryHubContext(c)
+
 				exists, err := refresh.AddressExists(ctx, filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
 				if err != nil {
 					if err != refresh.ErrNoFilter {
-						logger.For(ctx).WithError(err).Warnf("failed to check address")
+						logger.For(ctx).WithError(err).Info("failed to fetch filter")
 					}
 					exists = true
 				}
@@ -615,7 +612,7 @@ func processRefreshes(idxr *indexer, queries *db.Queries) gin.HandlerFunc {
 					enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in}
 					go func() {
 						ctx := sentryutil.NewSentryHubContext(ctx)
-						logs := idxr.fetchLogs(ctx, b, [][]common.Hash{events})
+						logs := idxr.fetchLogs(ctx, b, events)
 						transfers := filterTransfers(ctx, message, logsToTransfers(ctx, logs))
 						transfersAtBlock := transfersToTransfersAtBlock(transfers)
 						batchTransfers(ctx, transferCh, transfersAtBlock)
@@ -627,7 +624,6 @@ func processRefreshes(idxr *indexer, queries *db.Queries) gin.HandlerFunc {
 			})
 		}
 		refreshPool.StopWait()
-		filterManager.Close()
 	}
 }
 

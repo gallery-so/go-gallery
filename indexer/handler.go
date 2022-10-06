@@ -6,7 +6,6 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
-	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
@@ -17,7 +16,7 @@ func handlersInit(router *gin.Engine, i *indexer, tokenRepository persist.TokenR
 	return router
 }
 
-func handlersInitServer(router *gin.Engine, queueChan chan processTokensInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, idxer *indexer, queries *db.Queries) *gin.Engine {
+func handlersInitServer(router *gin.Engine, queueChan chan processTokensInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, idxer *indexer) *gin.Engine {
 
 	nftsGroup := router.Group("/nfts")
 	nftsGroup.POST("/refresh", updateTokens(tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")))
@@ -29,7 +28,7 @@ func handlersInitServer(router *gin.Engine, queueChan chan processTokensInput, t
 	contractsGroup.POST("/refresh", updateContractMedia(contractRepository, ethClient))
 
 	tasksGroup := router.Group("/tasks")
-	tasksGroup.POST("refresh", processRefreshes(idxer, queries))
+	tasksGroup.POST("refresh", processRefreshes(idxer, storageClient))
 
 	return router
 }

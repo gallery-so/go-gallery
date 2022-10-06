@@ -12,21 +12,19 @@ type tracingTransport struct {
 	http.RoundTripper
 
 	continueOnly bool
-	errorsOnly   bool
 	opts         []sentry.SpanOption
 }
 
 // NewTracingTransport creates an http transport that will trace requests via Sentry. If continueOnly is true,
 // traces will only be generated if they'd contribute to an existing parent trace (e.g. if a trace is not in progress,
 // no new trace would be started). It errorsOnly is true, only requests that returned an error status code (400 and above) are reported.
-func NewTracingTransport(roundTripper http.RoundTripper, continueOnly, errorsOnly bool, spanOptions ...sentry.SpanOption) *tracingTransport {
+func NewTracingTransport(roundTripper http.RoundTripper, continueOnly bool, spanOptions ...sentry.SpanOption) *tracingTransport {
 	// If roundTripper is already a tracer, grab its underlying RoundTripper instead
 	if existingTracer, ok := roundTripper.(*tracingTransport); ok {
 		return &tracingTransport{
 			RoundTripper: existingTracer.RoundTripper,
 			continueOnly: continueOnly,
 			opts:         spanOptions,
-			errorsOnly:   errorsOnly,
 		}
 	}
 
@@ -34,7 +32,6 @@ func NewTracingTransport(roundTripper http.RoundTripper, continueOnly, errorsOnl
 		RoundTripper: roundTripper,
 		continueOnly: continueOnly,
 		opts:         spanOptions,
-		errorsOnly:   errorsOnly,
 	}
 }
 
@@ -52,16 +49,11 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	req.Header.Add("sentry-trace", span.TraceID.String())
 
 	response, err := t.RoundTripper.RoundTrip(req)
+	defer FinishSpan(span)
 
-	if err == nil {
-		if t.errorsOnly && response.StatusCode < 400 {
-			return response, err
-		}
-		AddEventDataToSpan(span, map[string]interface{}{
-			"HTTP Status Code": response.StatusCode,
-		})
-		FinishSpan(span)
-	}
+	AddEventDataToSpan(span, map[string]interface{}{
+		"HTTP Status Code": response.StatusCode,
+	})
 
 	return response, err
 }

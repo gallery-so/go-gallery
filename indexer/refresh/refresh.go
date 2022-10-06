@@ -1,5 +1,3 @@
-//go:generate go run github.com/vektah/dataloaden AddressFilterLoader github.com/mikeydub/go-gallery/db/gen/indexerdb.GetAddressFilterBatchParams github.com/mikeydub/go-gallery/db/gen/indexerdb.AddressFilter
-
 package refresh
 
 import (
@@ -9,43 +7,42 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/bits-and-blooms/bloom"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/jackc/pgx/v4"
-	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
 	"github.com/mikeydub/go-gallery/service/persist"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 )
 
+const addressFilterFormat = "filters/addresses/%d-%d.bf"
+
 // config configures how deep refreshes are ran.
 type config struct {
-	TaskSize                  int                 // The range of blocks will are chunked into tasks of this size which are run concurrently
-	DefaultPoolSize           int                 // Number of workers to allocate to a refresh
-	LookbackWindow            int                 // Refreshes will start this many blocks before the last indexer block processed
-	ChunkSize                 int                 // The number of filters to download per chunk
-	CacheSize                 int                 // The number of chunks to keep on disk at a time
-	ChunkWorkerSize           int                 // The number of workers used to download a chunk
-	DataloaderDefaultMaxBatch int                 // The max batch size before submitting a batch
-	DataloaderDefaultWaitTime time.Duration       // Max time to wait before submitting a batch
-	MaxConcurrentRuns         int                 // The number of refreshes that can run concurrently
-	MinStartingBlock          persist.BlockNumber // The earliest block that can be handled
-	BlocksPerCachedLog        int                 // How many blocks the indexer stores per cached log file
+	TaskSize           persist.BlockNumber // The range of blocks will are chunked into tasks of this size which are run concurrently
+	DefaultPoolSize    int                 // Number of workers to allocate to a refresh
+	LookbackWindow     int                 // Refreshes will start this many blocks before the last indexer block processed
+	ChunkSize          int                 // The number of filters to download per chunk
+	CacheSize          int                 // The number of chunks to keep on disk at a time
+	ChunkWorkerSize    int                 // The number of workers used to download a chunk
+	MaxConcurrentRuns  int                 // The number of refreshes that can run concurrently
+	MinStartingBlock   persist.BlockNumber // The earliest block that can be handled
+	BlocksPerCachedLog int                 // How many blocks the indexer stores per cached log file
 }
 
+// DefaultConfig is the config used for refreshes
 var DefaultConfig config = config{
-	TaskSize:                  240000,
-	DefaultPoolSize:           3,
-	ChunkSize:                 10000,
-	CacheSize:                 8,
-	ChunkWorkerSize:           128,
-	LookbackWindow:            5000000,
-	DataloaderDefaultMaxBatch: 1000,
-	DataloaderDefaultWaitTime: 2 * time.Millisecond,
-	MaxConcurrentRuns:         24,
-	MinStartingBlock:          5000000,
-	BlocksPerCachedLog:        50,
+	TaskSize:           25000,
+	DefaultPoolSize:    3,
+	ChunkSize:          10000,
+	CacheSize:          8,
+	ChunkWorkerSize:    128,
+	LookbackWindow:     5000000,
+	MaxConcurrentRuns:  24,
+	MinStartingBlock:   5000000,
+	BlocksPerCachedLog: 50,
 }
 
 // ErrNoFilter is returned when a filter does not exist.
@@ -66,10 +63,11 @@ func AddressExists(ctx context.Context, fm *BlockFilterManager, address persist.
 // ResolveRange standardizes the refresh input range.
 func ResolveRange(r persist.BlockRange) (persist.BlockRange, error) {
 	out := r
-	from, to := out[0], out[1]
+	from, to := out[0], out[1]-(out[1]%persist.BlockNumber(DefaultConfig.BlocksPerCachedLog))
 	if from > to {
 		return out, ErrInvalidRefreshRange
 	}
+
 	if out[0] < DefaultConfig.MinStartingBlock {
 		out[0] = DefaultConfig.MinStartingBlock
 	}
@@ -84,7 +82,7 @@ type BlockFilterManager struct {
 	blocksPerLogFile int
 	chunkSize        int
 	fetchWorkerSize  int
-	loader           *AddressFilterLoader
+	repo             *AddressFilterRepository
 	lru              *lru.Cache
 	fetchers         map[persist.BlockNumber]*filterFetcher
 	baseDir          string
@@ -92,7 +90,7 @@ type BlockFilterManager struct {
 }
 
 // NewBlockFilterManager returns a new instance of a BlockFilterManager.
-func NewBlockFilterManager(ctx context.Context, q *db.Queries, blocksPerLogFile int) *BlockFilterManager {
+func NewBlockFilterManager(ctx context.Context, sc *storage.Client) *BlockFilterManager {
 	var mu sync.Mutex
 	baseDir, err := os.MkdirTemp("", "*")
 	if err != nil {
@@ -111,18 +109,14 @@ func NewBlockFilterManager(ctx context.Context, q *db.Queries, blocksPerLogFile 
 	}
 
 	return &BlockFilterManager{
-		blocksPerLogFile: blocksPerLogFile,
+		blocksPerLogFile: DefaultConfig.BlocksPerCachedLog,
 		chunkSize:        DefaultConfig.ChunkSize,
 		fetchWorkerSize:  DefaultConfig.ChunkWorkerSize,
-		loader: &AddressFilterLoader{
-			maxBatch: DefaultConfig.DataloaderDefaultMaxBatch,
-			wait:     DefaultConfig.DataloaderDefaultWaitTime,
-			fetch:    loadBlockFilter(ctx, q),
-		},
-		fetchers: make(map[persist.BlockNumber]*filterFetcher),
-		baseDir:  baseDir,
-		mu:       &mu,
-		lru:      lru,
+		repo:             &AddressFilterRepository{sc.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))},
+		fetchers:         make(map[persist.BlockNumber]*filterFetcher),
+		baseDir:          baseDir,
+		mu:               &mu,
+		lru:              lru,
 	}
 }
 
@@ -144,7 +138,9 @@ func (b *BlockFilterManager) Get(ctx context.Context, from, to persist.BlockNumb
 
 // Clear removes the filter from it's cache.
 func (b *BlockFilterManager) Clear(ctx context.Context, from, to persist.BlockNumber) {
-	b.loader.Clear(db.GetAddressFilterBatchParams{FromBlock: from, ToBlock: to})
+	if fetcher, ok := b.fetchers[from]; ok {
+		fetcher.deleteFilter(from, to)
+	}
 }
 
 // Close deletes filters that have been loaded.
@@ -157,7 +153,7 @@ func (b *BlockFilterManager) prime(ctx context.Context, chunkStart persist.Block
 	defer b.mu.Unlock()
 
 	if _, ok := b.fetchers[chunkStart]; !ok {
-		b.fetchers[chunkStart] = newFilterFetcher(b.chunkSize, b.fetchWorkerSize, b.loader, b.baseDir)
+		b.fetchers[chunkStart] = newFilterFetcher(b.chunkSize, b.fetchWorkerSize, b.repo, b.baseDir)
 	}
 
 	f := b.fetchers[chunkStart]
@@ -175,16 +171,63 @@ func (b *BlockFilterManager) prime(ctx context.Context, chunkStart persist.Block
 	return nil
 }
 
+// AddressFilterRepository manages the storage of address filters.
+type AddressFilterRepository struct {
+	Bucket *storage.BucketHandle
+}
+
+// Add stores an address filter to storage.
+func (r *AddressFilterRepository) Add(ctx context.Context, from, to persist.BlockNumber, bf *bloom.BloomFilter) error {
+	writer := r.Bucket.Object(addressFilterName(from, to)).NewWriter(ctx)
+	defer writer.Close()
+	_, err := bf.WriteTo(writer)
+	return err
+}
+
+// Load loads a bloom filter from storage.
+func (r *AddressFilterRepository) Load(ctx context.Context, from, to persist.BlockNumber) (*bloom.BloomFilter, error) {
+	reader, err := r.Bucket.Object(addressFilterName(from, to)).NewReader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	var bf bloom.BloomFilter
+	if _, err := bf.ReadFrom(reader); err != nil {
+		return nil, err
+	}
+
+	return &bf, nil
+}
+
+func addressFilterName(from, to persist.BlockNumber) string {
+	return fmt.Sprintf(addressFilterFormat, from, to)
+}
+
+// BulkUpsert loads many filters to storage at once.
+func (r *AddressFilterRepository) BulkUpsert(ctx context.Context, filters map[persist.BlockRange]*bloom.BloomFilter) error {
+	eg := new(errgroup.Group)
+	for rng, bf := range filters {
+		rng := rng
+		bf := bf
+		eg.Go(func() error {
+			ctx := sentryutil.NewSentryHubContext(ctx)
+			return r.Add(ctx, rng[0], rng[1], bf)
+		})
+	}
+	return eg.Wait()
+}
+
 // filterFetcher is an unexported type that handles downloading a chunk of filter objects.
 type filterFetcher struct {
 	chunkSize  int
 	workerSize int
-	loader     *AddressFilterLoader
+	repo       *AddressFilterRepository
 	outDir     string
 	done       chan struct{}
 }
 
-func newFilterFetcher(chunkSize, workerSize int, addressFilterLoader *AddressFilterLoader, baseDir string) *filterFetcher {
+func newFilterFetcher(chunkSize, workerSize int, repo *AddressFilterRepository, baseDir string) *filterFetcher {
 	outDir, err := os.MkdirTemp(baseDir, "*")
 	if err != nil {
 		panic(err)
@@ -192,7 +235,7 @@ func newFilterFetcher(chunkSize, workerSize int, addressFilterLoader *AddressFil
 	return &filterFetcher{
 		chunkSize:  chunkSize,
 		workerSize: workerSize,
-		loader:     addressFilterLoader,
+		repo:       repo,
 		outDir:     outDir,
 	}
 }
@@ -208,7 +251,7 @@ func (f *filterFetcher) loadChunk(ctx context.Context, chunkStart persist.BlockN
 		filterEnd := filterStart + persist.BlockNumber(blocksPerLogFile)
 
 		eg.Go(func() error {
-			bf, err := loadFromRepo(ctx, filterStart, filterEnd, f.loader)
+			bf, err := loadFromRepo(ctx, filterStart, filterEnd, f.repo)
 			if err == ErrNoFilter {
 				return nil
 			}
@@ -243,6 +286,10 @@ func (f *filterFetcher) deleteChunk() error {
 	return os.RemoveAll(f.outDir)
 }
 
+func (f *filterFetcher) deleteFilter(from, to persist.BlockNumber) {
+	os.Remove(f.logFileName(from, to))
+}
+
 func (f *filterFetcher) logFileName(from, to persist.BlockNumber) string {
 	return filepath.Join(f.outDir, fmt.Sprintf("%s-%s", from, to))
 }
@@ -264,24 +311,15 @@ func loadFromFile(path string) (*bloom.BloomFilter, error) {
 	return &bf, nil
 }
 
-func loadFromRepo(ctx context.Context, from, to persist.BlockNumber, addressFilterLoader *AddressFilterLoader) (*bloom.BloomFilter, error) {
-	data, err := addressFilterLoader.Load(db.GetAddressFilterBatchParams{
-		FromBlock: from,
-		ToBlock:   to,
-	})
-	if err != nil && err.Error() == pgx.ErrNoRows.Error() {
-		return nil, ErrNoFilter
-	}
+func loadFromRepo(ctx context.Context, from, to persist.BlockNumber, repo *AddressFilterRepository) (*bloom.BloomFilter, error) {
+	bf, err := repo.Load(ctx, from, to)
 	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			return nil, ErrNoFilter
+		}
 		return nil, err
 	}
-
-	var bf bloom.BloomFilter
-	if err := bf.UnmarshalJSON(data.BloomFilter); err != nil {
-		return nil, err
-	}
-
-	return &bf, nil
+	return bf, nil
 }
 
 func saveToFile(path string, bf *bloom.BloomFilter) error {
@@ -294,20 +332,4 @@ func saveToFile(path string, bf *bloom.BloomFilter) error {
 
 	_, err = bf.WriteTo(f)
 	return err
-}
-
-func loadBlockFilter(ctx context.Context, q *db.Queries) func([]db.GetAddressFilterBatchParams) ([]db.AddressFilter, []error) {
-	return func(params []db.GetAddressFilterBatchParams) ([]db.AddressFilter, []error) {
-		filters := make([]db.AddressFilter, len(params))
-		errs := make([]error, len(params))
-
-		b := q.GetAddressFilterBatch(ctx, params)
-		defer b.Close()
-
-		b.QueryRow(func(i int, bf db.AddressFilter, err error) {
-			filters[i], errs[i] = bf, err
-		})
-
-		return filters, errs
-	}
 }

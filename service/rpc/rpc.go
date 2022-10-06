@@ -48,7 +48,7 @@ const (
 )
 
 var (
-	defaultHTTPClient     = newHTTPClientForRPC(true, true)
+	defaultHTTPClient     = newHTTPClientForRPC(true)
 	defaultMetricsHandler = metricsHandler{}
 )
 
@@ -121,7 +121,7 @@ func NewEthHTTPClient() *ethclient.Client {
 		return NewEthClient()
 	}
 
-	httpClient := newHTTPClientForRPC(false, true, sentryutil.TransactionNameSafe("gethRPC"))
+	httpClient := newHTTPClientForRPC(false, sentryutil.TransactionNameSafe("gethRPC"))
 	rpcClient, err := rpc.DialHTTPWithClient(viper.GetString("RPC_URL"), httpClient)
 	if err != nil {
 		panic(err)
@@ -173,16 +173,16 @@ func (h metricsHandler) Log(r *log.Record) error {
 
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
-	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), newClientForIPFS(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET"), false, true))
+	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), newClientForIPFS(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET"), false))
 	sh.SetTimeout(time.Minute * 2)
 	return sh
 }
 
 // newHTTPClientForIPFS returns an http.Client configured with default settings intended for IPFS calls.
-func newClientForIPFS(projectID, projectSecret string, continueOnly, errorsOnly bool) *http.Client {
+func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.Client {
 	return &http.Client{
 		Transport: authTransport{
-			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly, errorsOnly),
+			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly),
 			ProjectID:     projectID,
 			ProjectSecret: projectSecret,
 		},
@@ -190,14 +190,14 @@ func newClientForIPFS(projectID, projectSecret string, continueOnly, errorsOnly 
 }
 
 // newHTTPClientForRPC returns an http.Client configured with default settings intended for RPC calls.
-func newHTTPClientForRPC(continueTrace, errorsOnly bool, spanOptions ...sentry.SpanOption) *http.Client {
+func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *http.Client {
 	return &http.Client{
 		Timeout: time.Second * defaultHTTPTimeout,
 		Transport: tracing.NewTracingTransport(&http.Transport{
 			Dial:                (&net.Dialer{KeepAlive: defaultHTTPKeepAlive * time.Second}).Dial,
 			MaxIdleConns:        defaultHTTPMaxIdleConns,
 			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,
-		}, continueTrace, errorsOnly, spanOptions...),
+		}, continueTrace, spanOptions...),
 	}
 }
 
