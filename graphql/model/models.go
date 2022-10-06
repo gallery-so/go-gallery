@@ -64,6 +64,22 @@ type HelperNotificationSettingsData struct {
 	UserId persist.DBID
 }
 
+type HelperSomeoneFollowedYouNotificationData struct {
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneViewedYourGalleryNotificationData struct {
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneFollowedYouBackNotificationData struct {
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneCommentedOnYourFeedEventNotificationData struct {
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneAdmiredYourFeedEventNotificationData struct {
+	NotificationData persist.NotificationData
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

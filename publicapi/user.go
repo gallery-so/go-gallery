@@ -57,6 +57,22 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 	return &user, nil
 }
 
+func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID) ([]db.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userIDs": {userIDs, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	users, err := api.queries.GetUsersByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{

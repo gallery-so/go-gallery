@@ -61,7 +61,14 @@ func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persis
 		return "", err
 	}
 
-	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx), replyToID, comment)
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx), replyToID, comment)
+	if err != nil {
+		return "", err
+	}
+	dispatchNotification(ctx, db.Notification{
+		Action: persist.ActionCommentedOnFeedEvent,
+	})
+	return commentID, nil
 }
 
 func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {

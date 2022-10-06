@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ACTION varchar(255) NOT NULL,
     DATA JSONB,
-    SEEN boolean NOT NULL DEFAULT false
+    SEEN boolean NOT NULL DEFAULT false,
+    AMOUNT int NOT NULL DEFAULT 1
 );
 
 

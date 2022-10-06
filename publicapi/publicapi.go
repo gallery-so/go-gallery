@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -166,6 +167,24 @@ func pushFeedEvent(ctx context.Context, evt db.Event) {
 	}
 
 	err := event.DispatchEventToFeed(ctx, evt)
+
+	if err != nil {
+		logger.For(ctx).Error(err)
+		sentryutil.ReportError(ctx, err)
+	}
+}
+
+func dispatchNotification(ctx context.Context, notif db.Notification) {
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
+	go pushNotification(ctx, notif)
+}
+
+func pushNotification(ctx context.Context, notif db.Notification) {
+	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
+		sentryutil.SetEventContext(hub.Scope(), notif.ActorID, notif.OwnerID, notif.Action)
+	}
+
+	err := notifications.DispatchNotificationToUser(ctx, notif)
 
 	if err != nil {
 		logger.For(ctx).Error(err)

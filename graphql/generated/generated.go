@@ -55,12 +55,19 @@ type ResolverRoot interface {
 	FollowUserPayload() FollowUserPayloadResolver
 	Gallery() GalleryResolver
 	GalleryUser() GalleryUserResolver
+	GroupNotificationUsersConnection() GroupNotificationUsersConnectionResolver
 	Mutation() MutationResolver
+	NotificationsConnection() NotificationsConnectionResolver
 	OwnerAtBlock() OwnerAtBlockResolver
 	Query() QueryResolver
 	RemoveAdmirePayload() RemoveAdmirePayloadResolver
 	RemoveCommentPayload() RemoveCommentPayloadResolver
 	SetSpamPreferencePayload() SetSpamPreferencePayloadResolver
+	SomeoneAdmiredYourFeedEventNotification() SomeoneAdmiredYourFeedEventNotificationResolver
+	SomeoneCommentedOnYourFeedEventNotification() SomeoneCommentedOnYourFeedEventNotificationResolver
+	SomeoneFollowedYouBackNotification() SomeoneFollowedYouBackNotificationResolver
+	SomeoneFollowedYouNotification() SomeoneFollowedYouNotificationResolver
+	SomeoneViewedYourGalleryNotification() SomeoneViewedYourGalleryNotificationResolver
 	Subscription() SubscriptionResolver
 	Token() TokenResolver
 	TokenHolder() TokenHolderResolver
@@ -565,7 +572,6 @@ type ComplexityRoot struct {
 
 	SomeoneCommentedOnYourFeedEventNotification struct {
 		Comment      func(childComplexity int) int
-		Count        func(childComplexity int) int
 		CreationTime func(childComplexity int) int
 		Dbid         func(childComplexity int) int
 		FeedEvent    func(childComplexity int) int
@@ -828,6 +834,9 @@ type GalleryUserResolver interface {
 	Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 }
+type GroupNotificationUsersConnectionResolver interface {
+	PageInfo(ctx context.Context, obj *model.GroupNotificationUsersConnection) (*model.PageInfo, error)
+}
 type MutationResolver interface {
 	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
 	RemoveUserWallets(ctx context.Context, walletIds []persist.DBID) (model.RemoveUserWalletsPayloadOrError, error)
@@ -857,6 +866,9 @@ type MutationResolver interface {
 	ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error)
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
 }
+type NotificationsConnectionResolver interface {
+	PageInfo(ctx context.Context, obj *model.NotificationsConnection) (*model.PageInfo, error)
+}
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
 }
@@ -885,6 +897,24 @@ type RemoveCommentPayloadResolver interface {
 }
 type SetSpamPreferencePayloadResolver interface {
 	Tokens(ctx context.Context, obj *model.SetSpamPreferencePayload) ([]*model.Token, error)
+}
+type SomeoneAdmiredYourFeedEventNotificationResolver interface {
+	FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error)
+	Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.GroupNotificationUsersConnection, error)
+}
+type SomeoneCommentedOnYourFeedEventNotificationResolver interface {
+	Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error)
+	FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error)
+}
+type SomeoneFollowedYouBackNotificationResolver interface {
+	Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification) (*model.GroupNotificationUsersConnection, error)
+}
+type SomeoneFollowedYouNotificationResolver interface {
+	Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification) (*model.GroupNotificationUsersConnection, error)
+}
+type SomeoneViewedYourGalleryNotificationResolver interface {
+	Viewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.GroupNotificationUsersConnection, error)
+	Gallery(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.Gallery, error)
 }
 type SubscriptionResolver interface {
 	NewNotification(ctx context.Context) (<-chan model.Notification, error)
@@ -2974,13 +3004,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneCommentedOnYourFeedEventNotification.Comment(childComplexity), true
 
-	case "SomeoneCommentedOnYourFeedEventNotification.count":
-		if e.complexity.SomeoneCommentedOnYourFeedEventNotification.Count == nil {
-			break
-		}
-
-		return e.complexity.SomeoneCommentedOnYourFeedEventNotification.Count(childComplexity), true
-
 	case "SomeoneCommentedOnYourFeedEventNotification.creationTime":
 		if e.complexity.SomeoneCommentedOnYourFeedEventNotification.CreationTime == nil {
 			break
@@ -4268,7 +4291,7 @@ type NotificationEdge {
 type NotificationsConnection {
     edges: [NotificationEdge]
     unseenCount: Int
-    pageInfo: PageInfo
+    pageInfo: PageInfo @goField(forceResolver: true)
 }
 
 type Viewer {
@@ -4903,68 +4926,71 @@ type GroupNotificationUserEdge {
 
 type GroupNotificationUsersConnection {
     edges:  [GroupNotificationUserEdge]
-    pageInfo: PageInfo
+    pageInfo: PageInfo @goField(forceResolver: true)
 }
 
-type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    followers: GroupNotificationUsersConnection
+  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
-type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    followers: GroupNotificationUsersConnection
+  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
-type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    feedEvent: FeedEvent
-    admirers: GroupNotificationUsersConnection
+  feedEvent: FeedEvent @goField(forceResolver: true)
+  admirers: GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
-type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
 
-    # Don't need a ` + "`" + `who` + "`" + ` here since the ` + "`" + `comment` + "`" + ` can provide that
-    # Do we want this comment to be the latest comment
-    comment: Comment
-    feedEvent: FeedEvent
-
+  # Don't need a ` + "`" + `who` + "`" + ` here since the ` + "`" + `comment` + "`" + ` can provide that
+  # Do we want this comment to be the latest comment
+  comment: Comment @goField(forceResolver: true)
+  feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
-type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    viewers: [GalleryUser]
-    gallery: Gallery
+  viewers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  gallery: Gallery @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {
@@ -10855,14 +10881,14 @@ func (ec *executionContext) _GroupNotificationUsersConnection_pageInfo(ctx conte
 		Object:     "GroupNotificationUsersConnection",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PageInfo, nil
+		return ec.resolvers.GroupNotificationUsersConnection().PageInfo(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -13383,14 +13409,14 @@ func (ec *executionContext) _NotificationsConnection_pageInfo(ctx context.Contex
 		Object:     "NotificationsConnection",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PageInfo, nil
+		return ec.resolvers.NotificationsConnection().PageInfo(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15019,14 +15045,14 @@ func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification_feedEvent(c
 		Object:     "SomeoneAdmiredYourFeedEventNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.FeedEvent, nil
+		return ec.resolvers.SomeoneAdmiredYourFeedEventNotification().FeedEvent(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15051,14 +15077,14 @@ func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification_admirers(ct
 		Object:     "SomeoneAdmiredYourFeedEventNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Admirers, nil
+		return ec.resolvers.SomeoneAdmiredYourFeedEventNotification().Admirers(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15238,38 +15264,6 @@ func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification_updated
 	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification_count(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourFeedEventNotification) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "SomeoneCommentedOnYourFeedEventNotification",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Count, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification_comment(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneCommentedOnYourFeedEventNotification) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -15281,14 +15275,14 @@ func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification_comment
 		Object:     "SomeoneCommentedOnYourFeedEventNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Comment, nil
+		return ec.resolvers.SomeoneCommentedOnYourFeedEventNotification().Comment(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15313,14 +15307,14 @@ func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification_feedEve
 		Object:     "SomeoneCommentedOnYourFeedEventNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.FeedEvent, nil
+		return ec.resolvers.SomeoneCommentedOnYourFeedEventNotification().FeedEvent(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15543,14 +15537,14 @@ func (ec *executionContext) _SomeoneFollowedYouBackNotification_followers(ctx co
 		Object:     "SomeoneFollowedYouBackNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Followers, nil
+		return ec.resolvers.SomeoneFollowedYouBackNotification().Followers(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15773,14 +15767,14 @@ func (ec *executionContext) _SomeoneFollowedYouNotification_followers(ctx contex
 		Object:     "SomeoneFollowedYouNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Followers, nil
+		return ec.resolvers.SomeoneFollowedYouNotification().Followers(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16003,14 +15997,14 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_viewers(ctx co
 		Object:     "SomeoneViewedYourGalleryNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Viewers, nil
+		return ec.resolvers.SomeoneViewedYourGalleryNotification().Viewers(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16019,9 +16013,9 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_viewers(ctx co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.GalleryUser)
+	res := resTmp.(*model.GroupNotificationUsersConnection)
 	fc.Result = res
-	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+	return ec.marshalOGroupNotificationUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationUsersConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _SomeoneViewedYourGalleryNotification_gallery(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneViewedYourGalleryNotification) (ret graphql.Marshaler) {
@@ -16035,14 +16029,14 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_gallery(ctx co
 		Object:     "SomeoneViewedYourGalleryNotification",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Gallery, nil
+		return ec.resolvers.SomeoneViewedYourGalleryNotification().Gallery(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -25053,12 +25047,22 @@ func (ec *executionContext) _GroupNotificationUsersConnection(ctx context.Contex
 			out.Values[i] = innerFunc(ctx)
 
 		case "pageInfo":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GroupNotificationUsersConnection_pageInfo(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GroupNotificationUsersConnection_pageInfo(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -25736,12 +25740,22 @@ func (ec *executionContext) _NotificationsConnection(ctx context.Context, sel as
 			out.Values[i] = innerFunc(ctx)
 
 		case "pageInfo":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._NotificationsConnection_pageInfo(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._NotificationsConnection_pageInfo(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26541,7 +26555,7 @@ func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification(ctx context
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "dbid":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26551,7 +26565,7 @@ func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification(ctx context
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "seen":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26582,19 +26596,39 @@ func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification(ctx context
 			out.Values[i] = innerFunc(ctx)
 
 		case "feedEvent":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneAdmiredYourFeedEventNotification_feedEvent(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneAdmiredYourFeedEventNotification_feedEvent(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "admirers":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneAdmiredYourFeedEventNotification_admirers(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneAdmiredYourFeedEventNotification_admirers(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26624,7 +26658,7 @@ func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification(ctx con
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "dbid":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26634,7 +26668,7 @@ func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification(ctx con
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "seen":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26657,27 +26691,40 @@ func (ec *executionContext) _SomeoneCommentedOnYourFeedEventNotification(ctx con
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "count":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneCommentedOnYourFeedEventNotification_count(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		case "comment":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneCommentedOnYourFeedEventNotification_comment(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneCommentedOnYourFeedEventNotification_comment(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "feedEvent":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneCommentedOnYourFeedEventNotification_feedEvent(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneCommentedOnYourFeedEventNotification_feedEvent(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26707,7 +26754,7 @@ func (ec *executionContext) _SomeoneFollowedYouBackNotification(ctx context.Cont
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "dbid":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26717,7 +26764,7 @@ func (ec *executionContext) _SomeoneFollowedYouBackNotification(ctx context.Cont
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "seen":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26748,12 +26795,22 @@ func (ec *executionContext) _SomeoneFollowedYouBackNotification(ctx context.Cont
 			out.Values[i] = innerFunc(ctx)
 
 		case "followers":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneFollowedYouBackNotification_followers(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneFollowedYouBackNotification_followers(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26783,7 +26840,7 @@ func (ec *executionContext) _SomeoneFollowedYouNotification(ctx context.Context,
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "dbid":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26793,7 +26850,7 @@ func (ec *executionContext) _SomeoneFollowedYouNotification(ctx context.Context,
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "seen":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26824,12 +26881,22 @@ func (ec *executionContext) _SomeoneFollowedYouNotification(ctx context.Context,
 			out.Values[i] = innerFunc(ctx)
 
 		case "followers":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneFollowedYouNotification_followers(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneFollowedYouNotification_followers(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26859,7 +26926,7 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Co
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "dbid":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26869,7 +26936,7 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Co
 			out.Values[i] = innerFunc(ctx)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "seen":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -26900,19 +26967,39 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Co
 			out.Values[i] = innerFunc(ctx)
 
 		case "viewers":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneViewedYourGalleryNotification_viewers(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneViewedYourGalleryNotification_viewers(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "gallery":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._SomeoneViewedYourGalleryNotification_gallery(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SomeoneViewedYourGalleryNotification_gallery(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

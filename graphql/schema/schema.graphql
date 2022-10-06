@@ -403,7 +403,7 @@ type NotificationEdge {
 type NotificationsConnection {
     edges: [NotificationEdge]
     unseenCount: Int
-    pageInfo: PageInfo
+    pageInfo: PageInfo @goField(forceResolver: true)
 }
 
 type Viewer {
@@ -1038,68 +1038,71 @@ type GroupNotificationUserEdge {
 
 type GroupNotificationUsersConnection {
     edges:  [GroupNotificationUserEdge]
-    pageInfo: PageInfo
+    pageInfo: PageInfo @goField(forceResolver: true)
 }
 
-type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    followers: GroupNotificationUsersConnection
+  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
-type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    followers: GroupNotificationUsersConnection
+  followers: GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
-type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    feedEvent: FeedEvent
-    admirers: GroupNotificationUsersConnection
+  feedEvent: FeedEvent @goField(forceResolver: true)
+  admirers: GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
-type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
 
-    # Don't need a `who` here since the `comment` can provide that
-    # Do we want this comment to be the latest comment
-    comment: Comment
-    feedEvent: FeedEvent
-
+  # Don't need a `who` here since the `comment` can provide that
+  # Do we want this comment to be the latest comment
+  comment: Comment @goField(forceResolver: true)
+  feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
-type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification {
-    id: ID!
-    dbid: DBID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
-    count: Int
+type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
 
-    viewers: [GalleryUser]
-    gallery: Gallery
+  viewers: GroupNotificationUsersConnection @goField(forceResolver: true)
+  gallery: Gallery @goField(forceResolver: true)
 }
 
 type ClearAllNotificationsPayload {

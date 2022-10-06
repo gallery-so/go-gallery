@@ -238,6 +238,7 @@ type Notification struct {
 	Action      persist.Action
 	Data        persist.NotificationData
 	Seen        bool
+	Amount      int32
 }
 
 type Token struct {

@@ -852,6 +852,7 @@ type SetSpamPreferencePayload struct {
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
 type SomeoneAdmiredYourFeedEventNotification struct {
+	HelperSomeoneAdmiredYourFeedEventNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
 	Seen         *bool                             `json:"seen"`
 	CreationTime *time.Time                        `json:"creationTime"`
@@ -866,11 +867,11 @@ func (SomeoneAdmiredYourFeedEventNotification) IsNode()                {}
 func (SomeoneAdmiredYourFeedEventNotification) IsGroupedNotification() {}
 
 type SomeoneCommentedOnYourFeedEventNotification struct {
+	HelperSomeoneCommentedOnYourFeedEventNotificationData
 	Dbid         persist.DBID `json:"dbid"`
 	Seen         *bool        `json:"seen"`
 	CreationTime *time.Time   `json:"creationTime"`
 	UpdatedTime  *time.Time   `json:"updatedTime"`
-	Count        *int         `json:"count"`
 	Comment      *Comment     `json:"comment"`
 	FeedEvent    *FeedEvent   `json:"feedEvent"`
 }
@@ -879,6 +880,7 @@ func (SomeoneCommentedOnYourFeedEventNotification) IsNotification() {}
 func (SomeoneCommentedOnYourFeedEventNotification) IsNode()         {}
 
 type SomeoneFollowedYouBackNotification struct {
+	HelperSomeoneFollowedYouBackNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
 	Seen         *bool                             `json:"seen"`
 	CreationTime *time.Time                        `json:"creationTime"`
@@ -892,6 +894,7 @@ func (SomeoneFollowedYouBackNotification) IsNode()                {}
 func (SomeoneFollowedYouBackNotification) IsGroupedNotification() {}
 
 type SomeoneFollowedYouNotification struct {
+	HelperSomeoneFollowedYouNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
 	Seen         *bool                             `json:"seen"`
 	CreationTime *time.Time                        `json:"creationTime"`
@@ -905,13 +908,14 @@ func (SomeoneFollowedYouNotification) IsNode()                {}
 func (SomeoneFollowedYouNotification) IsGroupedNotification() {}
 
 type SomeoneViewedYourGalleryNotification struct {
-	Dbid         persist.DBID   `json:"dbid"`
-	Seen         *bool          `json:"seen"`
-	CreationTime *time.Time     `json:"creationTime"`
-	UpdatedTime  *time.Time     `json:"updatedTime"`
-	Count        *int           `json:"count"`
-	Viewers      []*GalleryUser `json:"viewers"`
-	Gallery      *Gallery       `json:"gallery"`
+	HelperSomeoneViewedYourGalleryNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Viewers      *GroupNotificationUsersConnection `json:"viewers"`
+	Gallery      *Gallery                          `json:"gallery"`
 }
 
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}

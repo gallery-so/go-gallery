@@ -1124,6 +1124,58 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getNotificationByIDBatch = `-- name: GetNotificationByIDBatch :batchone
+SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = $1 AND deleted = false
+`
+
+type GetNotificationByIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetNotificationByIDBatch(ctx context.Context, id []persist.DBID) *GetNotificationByIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getNotificationByIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetNotificationByIDBatchBatchResults{br, 0}
+}
+
+func (b *GetNotificationByIDBatchBatchResults) QueryRow(f func(int, Notification, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Notification
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.ActorID,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.Seen,
+			&i.Amount,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetNotificationByIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getTokenByIdBatch = `-- name: GetTokenByIdBatch :batchone
 SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam FROM tokens WHERE id = $1 AND deleted = false
 `
@@ -1708,7 +1760,7 @@ WITH cursors AS (
         ELSE 0 END pos
     FROM edges
 )
-SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen FROM notifications WHERE id = ANY(SELECT id FROM edges)
+SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = ANY(SELECT id FROM edges)
     ORDER BY created_at ASC
     LIMIT $2 OFFSET (SELECT pos FROM offsets)
 `
@@ -1763,6 +1815,7 @@ func (b *GetUserNotificationsBatchBatchResults) Query(f func(int, []Notification
 				&i.Action,
 				&i.Data,
 				&i.Seen,
+				&i.Amount,
 			); err != nil {
 				break
 			}

@@ -12,8 +12,10 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/notifications"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -633,6 +635,13 @@ func notificationsToEdges(notifs []db.Notification) ([]*model.NotificationEdge, 
 	return edges, nil
 }
 
+func notificationToModel(notif db.Notification) (model.Notification, error) {
+	switch notif.Action {
+	default:
+		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
+	}
+}
+
 func unseenNotifications(notifs []db.Notification) int {
 	count := 0
 	for _, notif := range notifs {
@@ -670,6 +679,78 @@ func notificationSettingsToModel(ctx context.Context, user *db.User) *model.Noti
 		SomeoneCommentedOnYourUpdate: &settings.SomeoneCommentedOnYourUpdate,
 		SomeoneViewedYourGallery:     &settings.SomeoneViewedYourGallery,
 	}
+}
+
+func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notification {
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	notifDispatcher := notifications.For(ctx)
+	notifs := notifDispatcher.GetNewNotificationsForUser(userID)
+
+	result := make(chan model.Notification)
+
+	go func() {
+		for notif := range notifs {
+			asModel, err := notificationToModel(notif)
+			if err != nil {
+				logger.For(ctx).Errorf("error converting notification to model: %v", err)
+				continue
+			}
+			select {
+			case result <- asModel:
+			default:
+				logger.For(ctx).Errorf("notification subscription channel full, dropping notification")
+				notifDispatcher.UnscubscribeNewNotificationsForUser(userID)
+			}
+		}
+	}()
+
+	return result
+}
+
+func resolveUpdatedNotificationSubscription(ctx context.Context) <-chan model.Notification {
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	notifDispatcher := notifications.For(ctx)
+	notifs := notifDispatcher.GetUpdatedNotificationsForUser(userID)
+
+	result := make(chan model.Notification)
+
+	go func() {
+		for notif := range notifs {
+			asModel, err := notificationToModel(notif)
+			if err != nil {
+				logger.For(ctx).Errorf("error converting notification to model: %v", err)
+				continue
+			}
+			select {
+			case result <- asModel:
+			default:
+				logger.For(ctx).Errorf("notification subscription channel full, dropping notification")
+				notifDispatcher.UnsubscribeUpdatedNotificationsForUser(userID)
+			}
+		}
+	}()
+
+	return result
+}
+
+func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userIDs persist.DBIDList) (*model.GroupNotificationUsersConnection, error) {
+	users, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.GroupNotificationUserEdge, len(users))
+
+	for i, user := range users {
+		edges[i] = &model.GroupNotificationUserEdge{
+			Node: userToModel(ctx, user),
+		}
+	}
+
+	return &model.GroupNotificationUsersConnection{
+		Edges:    edges,
+		PageInfo: nil, // handled by dedicated resolver
+	}, nil
 }
 
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {

@@ -4,6 +4,9 @@ SELECT * FROM users WHERE id = $1 AND deleted = false;
 -- name: GetUserByIdBatch :batchone
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
+-- name: GetUsersByIDs :many
+SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false;
+
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND deleted = false;
 
@@ -415,6 +418,18 @@ SELECT
         LIMIT 1
     )
     END::bool;
+
+-- name: GetNotificationByID :one
+SELECT * FROM notifications WHERE id = $1 AND deleted = false;
+
+-- name: GetNotificationByIDBatch :batchone
+SELECT * FROM notifications WHERE id = $1 AND deleted = false;
+
+-- name: CreateNotification :one
+INSERT INTO notifications (id, owner_id, actor_id, action, data) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: UpdateNotification :exec
+UPDATE notifications SET data = $2, amount = $3 WHERE id = $1;
 
 -- name: UpdateNotificationSettingsByID :exec
 UPDATE users SET notification_settings = $2 WHERE id = $1;

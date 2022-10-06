@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/storage"
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
@@ -22,6 +23,7 @@ import (
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -52,6 +54,8 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 
 	schema := generated.NewExecutableSchema(config)
 	h := handler.NewDefaultServer(schema)
+
+	h.AddTransport(&transport.Websocket{})
 
 	// Request/response logging is spammy in a local environment and can typically be better handled via browser debug tools.
 	// It might be worth logging top-level queries and mutations in a single log line, though.
@@ -92,6 +96,7 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 
 		mediamapper.AddTo(c)
 		event.AddTo(c, queries, taskClient)
+		notifications.AddTo(c, queries)
 
 		// Use the request context so dataloaders will add their traces to the request span
 		publicapi.AddTo(c, newPublicAPI(c.Request.Context(), false))
