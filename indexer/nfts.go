@@ -17,20 +17,19 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
-	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
 	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
+	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
-	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
@@ -553,7 +552,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	return nil
 }
 
-func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, refreshQueue *RefreshQueue) gin.HandlerFunc {
+func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := UpdateTokenMediaInput{}
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -561,13 +560,7 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 			return
 		}
 
-		var err error
-		if input.DeepRefresh {
-			err = refreshQueue.Add(c, input)
-		} else {
-			err = refreshToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
-		}
-
+		err := refreshToken(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -576,66 +569,38 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 	}
 }
 
-func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refreshLock *RefreshLock, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, contractRepository persist.ContractRepository, chain persist.Chain, addressFilterRepository postgres.AddressFilterRepository, queries *db.Queries) {
-	idxr := newIndexer(ethClient, ipfsClient, arweaveClient, storageClient, tokenRepository, contractRepository, addressFilterRepository, chain, defaultTransferEvents, nil, nil, nil)
-
+func processRefreshes(idxr *indexer, queries *db.Queries) gin.HandlerFunc {
 	events := make([]common.Hash, len(idxr.eventHashes))
 	for i, event := range idxr.eventHashes {
 		events[i] = common.HexToHash(string(event))
 	}
+	return func(c *gin.Context) {
+		filterManager := refresh.NewBlockFilterManager(c, queries, blocksPerLogsCall)
+		refreshPool := workerpool.New(refresh.DefaultConfig.DefaultPoolSize)
 
-	for {
-		message, err := refreshQueue.Get(ctx)
-		if err == ErrNoMessage {
-			time.Sleep(defaultRefreshConfig.DefaultNoMessageWaitTime)
-			continue
+		message := task.DeepRefreshMessage{}
+		if err := c.ShouldBindJSON(&message); err != nil {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
+		}
+
+		refreshRange, err := refresh.ResolveRange(message.RefreshRange)
+		if err != nil && errors.Is(err, refresh.ErrInvalidRefreshRange) {
+			util.ErrResponse(c, http.StatusOK, err)
+			return
 		}
 		if err != nil {
-			panic(err)
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
 		}
 
-		// Figure out the range
-		indexerBlock, err := idxr.tokenRepo.MostRecentBlock(ctx)
-		if err != nil {
-			panic(err)
-		}
-		refreshRange, err := resolveRange(message.RefreshRange, indexerBlock)
-		if err != nil {
-			if err := refreshQueue.Ack(ctx); err != nil {
-				panic(err)
-			}
-		}
-
-		acquired, err := refreshLock.Acquire(ctx)
-		if err != nil {
-			logger.For(ctx).WithError(err).Errorf("error occurred acquiring lock")
-			if err := refreshQueue.ReAdd(ctx); err != nil {
-				panic(err)
-			}
-			panic(err)
-		}
-		if !acquired {
-			logger.For(ctx).Errorf("too many refreshes runnning, waiting")
-			if err := refreshQueue.ReAdd(ctx); err != nil {
-				panic(err)
-			}
-			time.Sleep(defaultRefreshConfig.DefaultNoMessageWaitTime)
-			continue
-		}
-
-		span, ctx := tracing.StartSpan(ctx, "indexer.deepRefresh", "handleMessage", sentry.TransactionName("indexer-server:deepRefresh"))
-
-		filterManager := NewBlockFilterManager(ctx, queries, blocksPerLogsCall)
-
-		refreshPool := workerpool.New(defaultRefreshConfig.DefaultPoolSize)
 		for block := refreshRange[0]; block < refreshRange[1]; block += blocksPerLogsCall {
 			b := block
 			refreshPool.Submit(func() {
-				ctx := sentryutil.NewSentryHubContext(ctx)
-
-				exists, err := AddressExists(ctx, filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
+				ctx := sentryutil.NewSentryHubContext(c)
+				exists, err := refresh.AddressExists(ctx, filterManager, message.OwnerAddress, b, b+persist.BlockNumber(blocksPerLogsCall))
 				if err != nil {
-					if err != ErrNoFilter {
+					if err != refresh.ErrNoFilter {
 						logger.For(ctx).WithError(err).Warnf("failed to check address")
 					}
 					exists = true
@@ -648,7 +613,6 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 					transferCh := make(chan []transfersAtBlock)
 					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.addressFilterRepo, idxr.storageClient)
 					enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in}
-
 					go func() {
 						ctx := sentryutil.NewSentryHubContext(ctx)
 						logs := idxr.fetchLogs(ctx, b, [][]common.Hash{events})
@@ -657,107 +621,41 @@ func processDeepRefreshes(ctx context.Context, refreshQueue *RefreshQueue, refre
 						batchTransfers(ctx, transferCh, transfersAtBlock)
 						close(transferCh)
 					}()
-
 					go idxr.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
 					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, nil)
-
-					refreshed, err := refreshLock.Refresh(ctx)
-					if err != nil || !refreshed {
-						if err := refreshQueue.ReAdd(ctx); err != nil {
-							panic(err)
-						}
-						panic(ErrRefreshTimedOut)
-					}
 				}
 			})
 		}
-
 		refreshPool.StopWait()
-
-		// Finish the message
-		if err := refreshQueue.Ack(ctx); err != nil {
-			panic(err)
-		}
-
-		// Release lock
-		released, err := refreshLock.Release(ctx)
-		if err != nil {
-			logger.For(ctx).WithError(err).Error("failed to release refresh")
-		}
-		if !released {
-			logger.For(ctx).Error("refresh had already timed out")
-		}
-
-		// Delete filters
 		filterManager.Close()
-
-		span.Finish()
-
-		// Cleanup dangling jobs
-		err = refreshQueue.Prune(ctx, refreshLock.s)
-		if err != nil {
-			panic(err)
-		}
 	}
-}
-
-// resolveRange standardizes the refresh input range.
-func resolveRange(r persist.BlockRange, indexerBlock persist.BlockNumber) (persist.BlockRange, error) {
-	out := r
-	from, to := out[0], out[1]
-
-	if (from == 0 || to == 0) && !(from == 0 && to == 0) {
-		return out, ErrInvalidRefreshRange
-	}
-	if from > to {
-		return out, ErrInvalidRefreshRange
-	}
-
-	if out[0] == 0 && out[1] == 0 {
-		out[1] = indexerBlock - (indexerBlock % blocksPerLogsCall)
-		out[0] = out[1] - persist.BlockNumber(defaultRefreshConfig.LookbackWindow)
-	}
-	if out[0] < defaultStartingBlock {
-		out[0] = defaultStartingBlock
-	}
-	if out[1] > indexerBlock {
-		out[1] = indexerBlock
-	}
-	if out[1] < out[0] {
-		out[1] = out[0]
-	}
-
-	return out, nil
 }
 
 // filterTransfers checks each transfer against the input and returns ones that match the criteria.
-func filterTransfers(ctx context.Context, input UpdateTokenMediaInput, transfers []rpc.Transfer) []rpc.Transfer {
-	// Filters transfers matching the input address
-	ownerFilter := func(t rpc.Transfer) bool {
-		return t.To.String() == input.OwnerAddress.String() || t.From.String() == input.OwnerAddress.String()
+func filterTransfers(ctx context.Context, m task.DeepRefreshMessage, transfers []rpc.Transfer) []rpc.Transfer {
+	hasOwner := func(t rpc.Transfer) bool {
+		return t.To.String() == m.OwnerAddress.String() || t.From.String() == m.OwnerAddress.String()
 	}
-	// Filters transfers matching the input contract
-	contractFilter := func(t rpc.Transfer) bool {
-		return t.ContractAddress.String() == input.ContractAddress.String()
+	hasContract := func(t rpc.Transfer) bool {
+		return t.ContractAddress.String() == m.ContractAddress.String()
 	}
-	// Filters transfers matching the input contract and token
-	tokenFilter := func(t rpc.Transfer) bool {
-		return contractFilter(t) && (t.TokenID.String() == input.TokenID.String())
+	hasToken := func(t rpc.Transfer) bool {
+		return hasContract(t) && (t.TokenID.String() == m.TokenID.String())
 	}
 
 	var criteria func(transfer rpc.Transfer) bool
 
 	switch {
-	case input.OwnerAddress != "" && input.TokenID != "" && input.ContractAddress != "":
-		criteria = func(t rpc.Transfer) bool { return ownerFilter(t) && tokenFilter(t) }
-	case input.OwnerAddress != "" && input.ContractAddress != "":
-		criteria = func(t rpc.Transfer) bool { return ownerFilter(t) && contractFilter(t) }
-	case input.OwnerAddress != "":
-		criteria = ownerFilter
-	case input.ContractAddress != "" && input.TokenID != "":
-		criteria = tokenFilter
-	case input.ContractAddress != "":
-		criteria = contractFilter
+	case m.OwnerAddress != "" && m.TokenID != "" && m.ContractAddress != "":
+		criteria = func(t rpc.Transfer) bool { return hasOwner(t) && hasToken(t) }
+	case m.OwnerAddress != "" && m.ContractAddress != "":
+		criteria = func(t rpc.Transfer) bool { return hasOwner(t) && hasContract(t) }
+	case m.OwnerAddress != "":
+		criteria = hasOwner
+	case m.ContractAddress != "" && m.TokenID != "":
+		criteria = hasToken
+	case m.ContractAddress != "":
+		criteria = hasContract
 	default:
 		return []rpc.Transfer{}
 	}

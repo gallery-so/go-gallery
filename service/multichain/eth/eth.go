@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,10 +18,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/indexer"
+	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 )
 
@@ -31,14 +35,16 @@ type Provider struct {
 	indexerBaseURL string
 	httpClient     *http.Client
 	ethClient      *ethclient.Client
+	taskClient     *cloudtasks.Client
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client) *Provider {
+func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client, tc *cloudtasks.Client) *Provider {
 	return &Provider{
 		indexerBaseURL: indexerBaseURL,
 		httpClient:     httpClient,
 		ethClient:      ec,
+		taskClient:     tc,
 	}
 }
 
@@ -270,33 +276,19 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 
 // DeepRefresh re-indexes a wallet address.
 func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address) error {
-	input := indexer.UpdateTokenMediaInput{
-		OwnerAddress: persist.EthereumAddress(ownerAddress.String()),
-		DeepRefresh:  true,
-	}
-
-	m, err := json.Marshal(input)
+	toBlock, err := rpc.RetryGetBlockNumber(ctx, d.ethClient, rpc.DefaultRetry)
 	if err != nil {
 		return err
 	}
-
-	buf := bytes.NewBuffer(m)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", d.indexerBaseURL), buf)
-	if err != nil {
-		return err
+	fromBlock := toBlock - refresh.DefaultConfig.MinStartingBlock.Uint64()
+	for b := fromBlock; b < toBlock; b += uint64(refresh.DefaultConfig.TaskSize) {
+		b := persist.BlockNumber(b)
+		r := persist.BlockRange{b, b + persist.BlockNumber(refresh.DefaultConfig.TaskSize) - 1}
+		msg := task.DeepRefreshMessage{OwnerAddress: persist.EthereumAddress(ownerAddress.String()), RefreshRange: r}
+		if err := task.CreateTaskForDeepRefresh(ctx, msg, d.taskClient); err != nil {
+			return err
+		}
 	}
-
-	res, err := d.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		return util.GetErrFromResp(res)
-	}
-
 	return nil
 }
 

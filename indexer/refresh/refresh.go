@@ -1,10 +1,9 @@
 //go:generate go run github.com/vektah/dataloaden AddressFilterLoader github.com/mikeydub/go-gallery/db/gen/indexerdb.GetAddressFilterBatchParams github.com/mikeydub/go-gallery/db/gen/indexerdb.AddressFilter
 
-package indexer
+package refresh
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,166 +15,44 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/jackc/pgx/v4"
 	db "github.com/mikeydub/go-gallery/db/gen/indexerdb"
-	"github.com/mikeydub/go-gallery/service/logger"
-	memstore "github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/go-redis/redis/v8"
 )
 
-// RefreshConfig configures how deep refreshes are ran.
-type RefreshConfig struct {
-	DefaultNoMessageWaitTime  time.Duration // How long to wait before polling for a message
-	DefaultPoolSize           int           // Number of workers to allocate to a refresh
-	LookbackWindow            int           // Refreshes will start this many blocks before the last indexer block processed
-	ChunkSize                 int           // The number of filters to download per chunk
-	CacheSize                 int           // The number of chunks to keep on disk at a time
-	ChunkWorkerSize           int           // The number of workers used to download a chunk
-	DataloaderDefaultMaxBatch int           // The max batch size before submitting a batch
-	DataloaderDefaultWaitTime time.Duration // Max time to wait before submitting a batch
-	RefreshQueueName          string        // The name of the queue to buffer refreshes
-	RefreshLockName           string        // The name of the lock which grants permission to run a refresh
-	MaxConcurrentRuns         int           // The number of refreshes that can run concurrently
-	Liveness                  int           // How frequently a consumer needs to refresh its lock
-	TimeoutDuration           time.Duration // Jobs that take longer than this are considered to be inactive
+// config configures how deep refreshes are ran.
+type config struct {
+	TaskSize                  int                 // The range of blocks will are chunked into tasks of this size which are run concurrently
+	DefaultPoolSize           int                 // Number of workers to allocate to a refresh
+	LookbackWindow            int                 // Refreshes will start this many blocks before the last indexer block processed
+	ChunkSize                 int                 // The number of filters to download per chunk
+	CacheSize                 int                 // The number of chunks to keep on disk at a time
+	ChunkWorkerSize           int                 // The number of workers used to download a chunk
+	DataloaderDefaultMaxBatch int                 // The max batch size before submitting a batch
+	DataloaderDefaultWaitTime time.Duration       // Max time to wait before submitting a batch
+	MaxConcurrentRuns         int                 // The number of refreshes that can run concurrently
+	MinStartingBlock          persist.BlockNumber // The earliest block that can be handled
+	BlocksPerCachedLog        int                 // How many blocks the indexer stores per cached log file
 }
 
-var defaultRefreshConfig RefreshConfig = RefreshConfig{
-	DefaultNoMessageWaitTime:  3 * time.Minute,
-	DefaultPoolSize:           defaultWorkerPoolSize,
+var DefaultConfig config = config{
+	TaskSize:                  240000,
+	DefaultPoolSize:           3,
 	ChunkSize:                 10000,
 	CacheSize:                 8,
 	ChunkWorkerSize:           128,
 	LookbackWindow:            5000000,
 	DataloaderDefaultMaxBatch: 1000,
 	DataloaderDefaultWaitTime: 2 * time.Millisecond,
-	RefreshQueueName:          "deepRefresh:addressQueue",
-	RefreshLockName:           "deepRefresh:addressLock",
 	MaxConcurrentRuns:         24,
-	Liveness:                  5 * 60,
-	TimeoutDuration:           2 * time.Hour,
+	MinStartingBlock:          5000000,
+	BlocksPerCachedLog:        50,
 }
 
 // ErrNoFilter is returned when a filter does not exist.
 var ErrNoFilter = errors.New("no filter")
 
-// ErrRefreshTimedOut is returned when a consumer no longer holds a lock.
-var ErrRefreshTimedOut = errors.New("refresh timed out")
-
-// ErrNoMessage is returned when there are no messages to work on.
-var ErrNoMessage = errors.New("no queued messages")
-
-// ErrPopFromEmpty is returned when a pop from the processing queue returns no result.
-var ErrPopFromEmpty = errors.New("processing queue is empty; expected one message")
-
-// ErrUnexpectedMessage is returned when the message that was handled is not the same message that is in the consumer's processing queue.
-var ErrUnexpectedMessage = errors.New("message in processing queue is not the message that was handled")
-
-// ErrInvalidRefreshRange is returned when the message inputs are invalid.
+// ErrInvalidRefreshRange is returned when the refresh range input is invalid.
 var ErrInvalidRefreshRange = errors.New("refresh range is invalid")
-
-// RefreshQueue buffers refresh requests.
-type RefreshQueue struct {
-	q *memstore.FifoQueue
-}
-
-// NewRefreshQueue returns a connection to the refresh queue.
-func NewRefreshQueue() *RefreshQueue {
-	return &RefreshQueue{memstore.NewFifoQueue(memstore.IndexerServerThrottleDB, defaultRefreshConfig.RefreshQueueName)}
-}
-
-// Add adds a message to the queue.
-func (r *RefreshQueue) Add(ctx context.Context, input UpdateTokenMediaInput) error {
-	message, err := json.Marshal(input)
-	if err != nil {
-		return err
-	}
-	added, err := r.q.Push(ctx, message)
-	if err != nil {
-		return err
-	}
-	if !added {
-		logger.For(ctx).Info("refresh already exists, skipping")
-	}
-
-	return nil
-}
-
-// Get gets a message from the queue.
-func (r *RefreshQueue) Get(ctx context.Context) (UpdateTokenMediaInput, error) {
-	queued, err := r.q.Pop(ctx)
-	if err == redis.Nil {
-		return UpdateTokenMediaInput{}, ErrNoMessage
-	}
-	if err != nil {
-		return UpdateTokenMediaInput{}, err
-	}
-
-	var msg UpdateTokenMediaInput
-	err = json.Unmarshal([]byte(queued), &msg)
-	if err != nil {
-		return UpdateTokenMediaInput{}, err
-	}
-
-	return msg, nil
-}
-
-// Ack completes a message by removing it from the processing queue.
-func (r *RefreshQueue) Ack(ctx context.Context) error {
-	_, err := r.q.Ack(ctx)
-	if err == redis.Nil {
-		return ErrPopFromEmpty
-	}
-	return nil
-}
-
-// ReAdd puts a message back in the queue.
-func (r *RefreshQueue) ReAdd(ctx context.Context) error {
-	msg, err := r.q.Ack(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = r.q.Push(ctx, msg)
-	return err
-}
-
-// Prune finds refreshes that were dropped and re-enqueues them.
-func (r *RefreshQueue) Prune(ctx context.Context, sem *memstore.Semaphore) error {
-	return r.q.Reprocess(ctx, defaultRefreshConfig.TimeoutDuration, sem)
-}
-
-// RefreshLock manages the number of concurrent refreshes allowed.
-type RefreshLock struct {
-	s *memstore.Semaphore
-}
-
-// NewRefreshLock returns a connection to the fresh lock.
-func NewRefreshLock() *RefreshLock {
-	return &RefreshLock{
-		s: memstore.NewSemaphore(
-			memstore.IndexerServerThrottleDB,
-			defaultRefreshConfig.RefreshLockName,
-			defaultRefreshConfig.MaxConcurrentRuns,
-			defaultRefreshConfig.Liveness,
-		),
-	}
-}
-
-// Acquire attempts to acquire permission to run a refresh.
-func (r *RefreshLock) Acquire(ctx context.Context) (bool, error) {
-	return r.s.Acquire(ctx)
-}
-
-// Release removes a refresh from the running jobs.
-func (r *RefreshLock) Release(ctx context.Context) (bool, error) {
-	return r.s.Release(ctx)
-}
-
-// Refresh updates the lease on a running job.
-func (r *RefreshLock) Refresh(ctx context.Context) (bool, error) {
-	return r.s.Refresh(ctx)
-}
 
 // AddressExists checks if an address transacted in a block range.
 func AddressExists(ctx context.Context, fm *BlockFilterManager, address persist.EthereumAddress, from, to persist.BlockNumber) (bool, error) {
@@ -184,6 +61,22 @@ func AddressExists(ctx context.Context, fm *BlockFilterManager, address persist.
 		return false, err
 	}
 	return bf.TestString(address.String()), nil
+}
+
+// ResolveRange standardizes the refresh input range.
+func ResolveRange(r persist.BlockRange) (persist.BlockRange, error) {
+	out := r
+	from, to := out[0], out[1]
+	if from > to {
+		return out, ErrInvalidRefreshRange
+	}
+	if out[0] < DefaultConfig.MinStartingBlock {
+		out[0] = DefaultConfig.MinStartingBlock
+	}
+	if out[1] < out[0] {
+		out[1] = out[0]
+	}
+	return out, nil
 }
 
 // BlockFilterManager handles the downloading and removing of block filters.
@@ -206,7 +99,7 @@ func NewBlockFilterManager(ctx context.Context, q *db.Queries, blocksPerLogFile 
 		panic(err)
 	}
 
-	lru, err := lru.NewWithEvict(defaultRefreshConfig.CacheSize, func(key, value interface{}) {
+	lru, err := lru.NewWithEvict(DefaultConfig.CacheSize, func(key, value interface{}) {
 		fetcher := value.(*filterFetcher)
 		err := fetcher.deleteChunk()
 		if err != nil {
@@ -219,11 +112,11 @@ func NewBlockFilterManager(ctx context.Context, q *db.Queries, blocksPerLogFile 
 
 	return &BlockFilterManager{
 		blocksPerLogFile: blocksPerLogFile,
-		chunkSize:        defaultRefreshConfig.ChunkSize,
-		fetchWorkerSize:  defaultRefreshConfig.ChunkWorkerSize,
+		chunkSize:        DefaultConfig.ChunkSize,
+		fetchWorkerSize:  DefaultConfig.ChunkWorkerSize,
 		loader: &AddressFilterLoader{
-			maxBatch: defaultRefreshConfig.DataloaderDefaultMaxBatch,
-			wait:     defaultRefreshConfig.DataloaderDefaultWaitTime,
+			maxBatch: DefaultConfig.DataloaderDefaultMaxBatch,
+			wait:     DefaultConfig.DataloaderDefaultWaitTime,
 			fetch:    loadBlockFilter(ctx, q),
 		},
 		fetchers: make(map[persist.BlockNumber]*filterFetcher),

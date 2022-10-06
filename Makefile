@@ -61,4 +61,5 @@ cloud-tasks:
 	@cd ./cloud-tasks-emulator && go run ./ -port 8123 \
 		-queue projects/gallery-local/locations/here/queues/feedbot \
 		-queue projects/gallery-local/locations/here/queues/feed-event \
-		-queue projects/gallery-local/locations/here/queues/token-processing
+		-queue projects/gallery-local/locations/here/queues/token-processing \
+		-queue projects/gallery-local/locations/here/queues/indexer-refreshes
