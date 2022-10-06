@@ -189,12 +189,28 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 		return err
 	}
 
-	err = user.UpdateUser(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
+	err = user.UpdateUserInfo(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (api UserAPI) UpdateUserNotificationSettings(ctx context.Context, notificationSettings persist.UserNotificationSettings) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"notification_settings": {notificationSettings, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.queries.UpdateNotificationSettingsByID(ctx, db.UpdateNotificationSettingsByIDParams{ID: userID, NotificationSettings: notificationSettings})
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {

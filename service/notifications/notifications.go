@@ -117,7 +117,7 @@ func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		select {
 		case sub <- newNotif:
 		default:
-			logger.For(ctx).Warnf("notification channel not open for user: %d", notif.OwnerID)
+			logger.For(ctx).Warnf("notification channel not open for user: %s", notif.OwnerID)
 			h.new[newNotif.OwnerID] = nil
 		}
 	}
@@ -157,7 +157,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 			select {
 			case sub <- curNotif:
 			default:
-				logger.For(ctx).Warnf("notification update channel not open for user: %d", notif.OwnerID)
+				logger.For(ctx).Warnf("notification update channel not open for user: %s", notif.OwnerID)
 				h.updated[curNotif.OwnerID] = nil
 			}
 		}
@@ -176,7 +176,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 			select {
 			case sub <- newNotif:
 			default:
-				logger.For(ctx).Warnf("notification create channel not open for user: %d", notif.OwnerID)
+				logger.For(ctx).Warnf("notification create channel not open for user: %s", notif.OwnerID)
 				h.new[newNotif.OwnerID] = nil
 			}
 		}

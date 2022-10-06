@@ -79,3 +79,7 @@ func (api NotificationsAPI) HasPage(ctx context.Context, cursor string, userId p
 	})
 
 }
+
+func (api NotificationsAPI) ClearUserNotifications(ctx context.Context, userId persist.DBID) ([]db.Notification, error) {
+	return api.queries.ClearNotificationsForUser(ctx, userId)
+}

@@ -705,11 +705,38 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 }
 
 func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error) {
-	panic(fmt.Errorf("not implemented"))
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	notifications, err := publicapi.For(ctx).Notifications.ClearUserNotifications(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]model.Notification, len(notifications))
+	for i, n := range notifications {
+		model, err := notificationToModel(n)
+		if err != nil {
+			return nil, err
+		}
+		models[i] = model
+	}
+
+	output := &model.ClearAllNotificationsPayload{
+		Notifications: models,
+	}
+	return output, nil
 }
 
 func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error) {
-	panic(fmt.Errorf("not implemented"))
+	err := publicapi.For(ctx).User.UpdateUserNotificationSettings(ctx, persist.UserNotificationSettings{
+		SomeoneFollowedYou:           *settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     *settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: *settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     *settings.SomeoneViewedYourGallery,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resolveViewerNotificationSettings(ctx)
 }
 
 func (r *notificationsConnectionResolver) PageInfo(ctx context.Context, obj *model.NotificationsConnection) (*model.PageInfo, error) {
