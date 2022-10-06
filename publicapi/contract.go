@@ -29,7 +29,7 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 		return nil, err
 	}
 
-	contract, err := api.loaders.ContractByContractId.Load(contractID)
+	contract, err := api.loaders.ContractByContractID.Load(contractID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 		return err
 	}
 
-	contract, err := api.loaders.ContractByContractId.Load(contractID)
+	contract, err := api.loaders.ContractByContractID.Load(contractID)
 	if err != nil {
 		return err
 	}
@@ -87,8 +87,6 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-
-	api.loaders.ClearAllCaches()
 
 	return nil
 
