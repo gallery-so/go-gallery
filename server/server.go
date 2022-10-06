@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/everFinance/goar"
@@ -149,15 +148,12 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	envFile := "app-local-backend.yaml"
-	if len(os.Args) > 1 {
-		if os.Args[1] == "dev" {
-			envFile = "app-dev-backend.yaml"
-		} else if os.Args[1] == "prod" {
-			envFile = "app-prod-backend.yaml"
-		}
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+	} else {
+		envFile := util.ResolveEnvFile("backend")
+		util.LoadEnvFile(envFile)
 	}
-	util.LoadEnvFile(envFile, 3)
 
 	util.EnvVarMustExist("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {

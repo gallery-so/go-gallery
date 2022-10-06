@@ -49,7 +49,7 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 		return nil, err
 	}
 
-	user, err := api.loaders.UserByUserId.Load(userID)
+	user, err := api.loaders.UserByUserID.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,6 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
 	return nil
 }
 
@@ -130,7 +129,6 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
 	return nil
 }
 
@@ -180,8 +178,6 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
-
 	return nil
 }
 
@@ -198,7 +194,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 		return nil, err
 	}
 
-	membership, err := api.loaders.MembershipByMembershipId.Load(membershipID)
+	membership, err := api.loaders.MembershipByMembershipID.Load(membershipID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +214,7 @@ func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID
 		return nil, err
 	}
 
-	followers, err := api.loaders.FollowersByUserId.Load(userID)
+	followers, err := api.loaders.FollowersByUserID.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +234,7 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 		return nil, err
 	}
 
-	following, err := api.loaders.FollowingByUserId.Load(userID)
+	following, err := api.loaders.FollowingByUserID.Load(userID)
 	if err != nil {
 		return nil, err
 	}

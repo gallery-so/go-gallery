@@ -28,7 +28,7 @@ func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*db.
 		return nil, err
 	}
 
-	event, err := api.loaders.EventByEventId.Load(eventID)
+	event, err := api.loaders.EventByEventID.Load(eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, afte
 		params.CurAfter = string(*after)
 	}
 
-	events, err := api.loaders.FeedByUserId.Load(params)
+	events, err := api.loaders.FeedByUserID.Load(params)
 
 	return userID, events, err
 }

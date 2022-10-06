@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/publicapi"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/getsentry/sentry-go"
@@ -30,6 +31,7 @@ const scrubText = "<scrubbed>"
 const scrubDirectiveName = "scrub"
 
 const gqlRequestIdContextKey = "graphql.gqlRequestId"
+const noCachePublicAPIContextKey = "graphql.noCachePublicAPI"
 const maxSentryDataLength = 8 * 1024
 
 func getFieldName(fc *gqlgen.FieldContext) string {
@@ -46,6 +48,50 @@ func getOperationName(oc *gqlgen.OperationContext) string {
 	}
 
 	return oc.Operation.Name
+}
+
+func MutationCachingHandler(newPublicAPI func(context.Context, bool) *publicapi.PublicAPI) func(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
+	return func(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
+		fc := gqlgen.GetFieldContext(ctx)
+
+		// If the current field isn't a top-level mutation, no handling is necessary
+		if fc == nil || fc.Field.ObjectDefinition == nil || fc.Field.ObjectDefinition.Name != "Mutation" {
+			return next(ctx)
+		}
+
+		// Get the request context so dataloaders will add their traces to the request span
+		gc := util.GinContextFromContext(ctx)
+		requestContext := gc.Request.Context()
+
+		// Get or create a new public API with caching disabled, and push it to our context
+		newAPI := new(publicapi.PublicAPI)
+		if existingAPI, ok := gc.Value(noCachePublicAPIContextKey).(*publicapi.PublicAPI); ok {
+			// Multiple mutations can share an instance of the PublicAPI with caching disabled, so see
+			// if we've already created one for this request
+			*newAPI = *existingAPI
+		} else {
+			noCacheAPI := newPublicAPI(requestContext, true)
+			gc.Set(noCachePublicAPIContextKey, noCacheAPI)
+			*newAPI = *noCacheAPI
+		}
+
+		ctx = publicapi.PushTo(ctx, newAPI)
+
+		// Invoke next() with the new context so our mutation will run with caching disabled
+		res, err = next(ctx)
+
+		// Now that the mutation has run, we want to replace its no-caching PublicAPI with a new
+		// version that has caching enabled again, such that any child fields returned by the
+		// mutation will benefit from caching. Our options here are limited by gqlgen; child
+		// fields are going to receive the context we passed to the next() function above, so
+		// the best way to make sure those fields benefit from caching is to replace the PublicAPI
+		// their context points to. This is safe to do because child fields won't be resolved
+		// until this middleware returns, so it's safe to modify the PublicAPI on the context
+		// here without a lock.
+		*newAPI = *newPublicAPI(requestContext, false)
+
+		return res, err
+	}
 }
 
 func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {

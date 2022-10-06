@@ -64,6 +64,12 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 	// Should happen after FieldReporter, so Sentry trace context is set up prior to error reporting
 	h.AroundFields(graphql.RemapAndReportErrors)
 
+	newPublicAPI := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
+		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, throttler)
+	}
+
+	h.AroundFields(graphql.MutationCachingHandler(newPublicAPI))
+
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
 		if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 			hub.Recover(err)
@@ -86,7 +92,10 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 
 		mediamapper.AddTo(c)
 		event.AddTo(c, queries, taskClient)
-		publicapi.AddTo(c, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, throttler)
+
+		// Use the request context so dataloaders will add their traces to the request span
+		publicapi.AddTo(c, newPublicAPI(c.Request.Context(), false))
+
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }
