@@ -45,11 +45,11 @@ services:
       - "8080:80"
     volumes:
       - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
-  # Uncomment if you want to run mediaprocessing locally as a container
-  # mediaprocessing:
+  # Uncomment if you want to run tokenprocessing locally as a container
+  # tokenprocessing:
   #   build:
   #     context: "."
-  #     dockerfile: "docker/mediaprocessing/Dockerfile"
+  #     dockerfile: "docker/tokenprocessing/Dockerfile"
   #   ports:
   #     - "6500:6500"
   #   volumes:
@@ -57,4 +57,18 @@ services:
   #     - ${PWD}/_deploy:/app/_deploy
   #   depends_on:
   #     - postgres
+  #     - redis
+  # Uncomment if you want to run indexer-api locally as a container
+  # indexer-api:
+  #   build:
+  #     context: "."
+  #     dockerfile: "docker/indexer_api/Dockerfile"
+  #   ports:
+  #     - "6000:6000"
+  #   volumes:
+  #     - ${PWD}/_local:/_local
+  #     - ${PWD}/_deploy:/_deploy
+  #   depends_on:
+  #     - postgres
+  #     - postgres_indexer
   #     - redis

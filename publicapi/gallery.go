@@ -30,7 +30,7 @@ func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID
 		return nil, err
 	}
 
-	gallery, err := api.loaders.GalleryByGalleryId.Load(galleryID)
+	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID
 		return nil, err
 	}
 
-	gallery, err := api.loaders.GalleryByCollectionId.Load(collectionID)
+	gallery, err := api.loaders.GalleryByCollectionID.Load(collectionID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 		return nil, err
 	}
 
-	galleries, err := api.loaders.GalleriesByUserId.Load(userID)
+	galleries, err := api.loaders.GalleriesByUserID.Load(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,6 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
-	api.loaders.ClearAllCaches()
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	return nil

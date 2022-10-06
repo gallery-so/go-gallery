@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/everFinance/goar"
@@ -140,7 +139,7 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/feed-event")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
-	viper.SetDefault("MEDIA_PROCESSING_URL", "http://localhost:6500")
+	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
@@ -149,15 +148,12 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	envFile := "app-local-backend.yaml"
-	if len(os.Args) > 1 {
-		if os.Args[1] == "dev" {
-			envFile = "app-dev-backend.yaml"
-		} else if os.Args[1] == "prod" {
-			envFile = "app-prod-backend.yaml"
-		}
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+	} else {
+		envFile := util.ResolveEnvFile("backend")
+		util.LoadEnvFile(envFile)
 	}
-	util.LoadEnvFile(envFile, 3)
 
 	util.EnvVarMustExist("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {
@@ -244,7 +240,7 @@ func newMultichainProvider(repos *persist.Repositories, cache memstore.Cache, et
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient)
 	openseaProvider := opensea.NewProvider(ethClient, httpClient)
-	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("MEDIA_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
 	return multichain.NewMultiChainDataRetriever(context.Background(), repos, cache, taskClient,
 		overrides,

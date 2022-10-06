@@ -311,10 +311,12 @@ outer:
 		return err
 	}
 
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersNFTs, user)
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
 	if err != nil {
 		return err
 	}
+	newTokens = addExistingMedia(ctx, newTokens, allUsersNFTs)
+
 	logger.For(ctx).Debugf("upserting %d tokens for user %s", len(newTokens), user.Username)
 	if err := p.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
 		return fmt.Errorf("error upserting tokens: %s", err)
@@ -377,7 +379,7 @@ func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.To
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/process/token", viper.GetString("MEDIA_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/process/token", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}
@@ -565,7 +567,7 @@ func (d *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return nil
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
@@ -643,24 +645,32 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 		}
 	}
 
-	dbSeen := make(map[persist.TokenIdentifiers]persist.TokenGallery)
-	for _, token := range dbTokens {
-		dbSeen[persist.NewTokenIdentifiers(persist.Address(token.Contract), token.TokenID, token.Chain)] = token
+	res := make([]persist.TokenGallery, len(seenTokens))
+	i := 0
+	for _, t := range seenTokens {
+		res[i] = t
+		i++
 	}
 
-	res := make([]persist.TokenGallery, 0, len(seenTokens))
-	for _, t := range seenTokens {
+	return res, nil
+}
+
+func addExistingMedia(ctx context.Context, providerTokens []persist.TokenGallery, dbTokens []persist.TokenGallery) []persist.TokenGallery {
+	savedMap := make(map[persist.TokenIdentifiers]persist.TokenGallery)
+	for _, token := range dbTokens {
+		savedMap[token.TokenIdentifiers()] = token
+	}
+	res := make([]persist.TokenGallery, len(providerTokens))
+	for i, t := range providerTokens {
 		logger.For(ctx).Debugf("token: %s", t.Name)
 		if !t.Media.IsServable() {
-			if dbToken, ok := dbSeen[persist.NewTokenIdentifiers(persist.Address(t.Contract), t.TokenID, t.Chain)]; ok && dbToken.Media.IsServable() {
-				res = append(res, dbToken)
-				continue
+			if dbToken, ok := savedMap[t.TokenIdentifiers()]; ok && dbToken.Media.IsServable() {
+				t.Media = dbToken.Media
 			}
 		}
-		res = append(res, t)
+		res[i] = t
 	}
-	return res, nil
-
+	return res
 }
 
 func contractsToNewDedupedContracts(ctx context.Context, contracts []chainContracts) ([]persist.ContractGallery, error) {

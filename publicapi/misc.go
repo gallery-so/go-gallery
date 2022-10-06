@@ -71,7 +71,7 @@ func (api MiscAPI) GetGalleryOfTheWeekWinners(ctx context.Context) ([]db.User, e
 		"29oheBA67Mv3Rs6m7z8jEdK0ALs",
 	}
 
-	possibleWinners, errors := api.loaders.UserByUserId.LoadAll(winnerUserIds)
+	possibleWinners, errors := api.loaders.UserByUserID.LoadAll(winnerUserIds)
 
 	winners := []db.User{}
 	for i, err := range errors {

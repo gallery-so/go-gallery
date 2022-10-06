@@ -116,7 +116,7 @@ func CreateTaskForMediaProcessing(ctx context.Context, message MediaProcessingMe
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/process", viper.GetString("MEDIA_PROCESSING_URL")),
+				Url:        fmt.Sprintf("%s/process", viper.GetString("TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
