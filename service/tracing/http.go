@@ -51,9 +51,11 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	response, err := t.RoundTripper.RoundTrip(req)
 	defer FinishSpan(span)
 
-	AddEventDataToSpan(span, map[string]interface{}{
-		"HTTP Status Code": response.StatusCode,
-	})
+	if err == nil {
+		AddEventDataToSpan(span, map[string]interface{}{
+			"HTTP Status Code": response.StatusCode,
+		})
+	}
 
 	return response, err
 }
