@@ -621,11 +621,12 @@ func resolveViewerNotifications(ctx context.Context, before *string, after *stri
 func notificationsToEdges(notifs []db.Notification) ([]*model.NotificationEdge, error) {
 	edges := make([]*model.NotificationEdge, len(notifs))
 
-	for i, _ := range notifs {
+	for i, notif := range notifs {
 
-		var node model.Notification
-
-		// TODO fill out notification using event data from DB
+		node, err := notificationToModel(notif)
+		if err != nil {
+			return nil, err
+		}
 
 		edges[i] = &model.NotificationEdge{
 			Node: node,
@@ -636,7 +637,75 @@ func notificationsToEdges(notifs []db.Notification) ([]*model.NotificationEdge, 
 }
 
 func notificationToModel(notif db.Notification) (model.Notification, error) {
+	amount := int(notif.Amount)
 	switch notif.Action {
+	case persist.ActionAdmiredFeedEvent:
+		return model.SomeoneAdmiredYourFeedEventNotification{
+			HelperSomeoneAdmiredYourFeedEventNotificationData: model.HelperSomeoneAdmiredYourFeedEventNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			FeedEvent:    nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionCommentedOnFeedEvent:
+		return model.SomeoneCommentedOnYourFeedEventNotification{
+			HelperSomeoneCommentedOnYourFeedEventNotificationData: model.HelperSomeoneCommentedOnYourFeedEventNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			FeedEvent:    nil, // handled by dedicated resolver
+			Comment:      nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserFollowedUsers:
+		return model.SomeoneFollowedYouNotification{
+			HelperSomeoneFollowedYouNotificationData: model.HelperSomeoneFollowedYouNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Followers:    nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserFollowedUserBack:
+		return model.SomeoneFollowedYouBackNotification{
+			HelperSomeoneFollowedYouBackNotificationData: model.HelperSomeoneFollowedYouBackNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Followers:    nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionViewedGallery:
+		return model.SomeoneViewedYourGalleryNotification{
+			HelperSomeoneViewedYourGalleryNotificationData: model.HelperSomeoneViewedYourGalleryNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Viewers:      nil, // handled by dedicated resolver
+			Gallery:      nil, // handled by dedicated resolver
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}

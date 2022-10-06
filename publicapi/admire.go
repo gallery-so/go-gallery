@@ -61,7 +61,29 @@ func (api AdmireAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DB
 		return "", err
 	}
 
-	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx))
+	actorID := For(ctx).User.GetLoggedInUserId(ctx)
+
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, actorID)
+	if err != nil {
+		return "", err
+	}
+
+	feedEvent, err := api.queries.GetEvent(ctx, feedEventID)
+	if err != nil {
+		return "", err
+	}
+
+	dispatchNotification(ctx, db.Notification{
+		ActorID: actorID,
+		OwnerID: feedEvent.UserID,
+		Action:  persist.ActionAdmiredFeedEvent,
+		Data: persist.NotificationData{
+			// TODO this has to concat with what is in the DB
+			AdmirerIDs:  []persist.DBID{actorID},
+			FeedEventID: feedEventID,
+		},
+	})
+	return admireID, nil
 }
 
 func (api AdmireAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
