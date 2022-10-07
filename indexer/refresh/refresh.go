@@ -36,8 +36,8 @@ type config struct {
 var DefaultConfig config = config{
 	TaskSize:           25000,
 	DefaultPoolSize:    3,
-	ChunkSize:          10000,
-	CacheSize:          8,
+	ChunkSize:          1000,
+	CacheSize:          10,
 	ChunkWorkerSize:    128,
 	LookbackWindow:     5000000,
 	MaxConcurrentRuns:  24,

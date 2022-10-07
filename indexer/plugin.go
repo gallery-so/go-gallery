@@ -263,6 +263,7 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilt
 
 			filters[key] = filters[key].AddString(msg.transfer.From.String())
 			filters[key] = filters[key].AddString(msg.transfer.To.String())
+			filters[key] = filters[key].AddString(msg.transfer.ContractAddress.String())
 
 			tracing.FinishSpan(child)
 		}
