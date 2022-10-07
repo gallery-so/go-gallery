@@ -13,6 +13,28 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const countAdmiresByFeedEventID = `-- name: CountAdmiresByFeedEventID :one
+SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdmiresByFeedEventID, feedEventID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countCommentsByFeedEventID = `-- name: CountCommentsByFeedEventID :one
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCommentsByFeedEventID, feedEventID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -225,6 +247,38 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 	return items, nil
 }
 
+const getAdmiresByAdmireIDs = `-- name: GetAdmiresByAdmireIDs :many
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated from admires WHERE id = ANY($1) AND deleted = false
+`
+
+func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.DBIDList) ([]Admire, error) {
+	rows, err := q.db.Query(ctx, getAdmiresByAdmireIDs, admireIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Admire
+	for rows.Next() {
+		var i Admire
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAdmiresByFeedEventID = `-- name: GetAdmiresByFeedEventID :many
 SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
 `
@@ -348,6 +402,40 @@ SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created
 
 func (q *Queries) GetCommentsByActorID(ctx context.Context, actorID persist.DBID) ([]Comment, error) {
 	rows, err := q.db.Query(ctx, getCommentsByActorID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Comment
+	for rows.Next() {
+		var i Comment
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.ReplyTo,
+			&i.Comment,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCommentsByCommentIDs = `-- name: GetCommentsByCommentIDs :many
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated from comments WHERE id = ANY($1) AND deleted = false
+`
+
+func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {
+	rows, err := q.db.Query(ctx, getCommentsByCommentIDs, commentIds)
 	if err != nil {
 		return nil, err
 	}
@@ -1269,6 +1357,212 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const paginateAdmiresByFeedEventIDBackward = `-- name: PaginateAdmiresByFeedEventIDBackward :many
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4) AND (created_at, id) > ($5, $6)
+    ORDER BY (created_at, id) DESC LIMIT $2
+`
+
+type PaginateAdmiresByFeedEventIDBackwardParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+}
+
+func (q *Queries) PaginateAdmiresByFeedEventIDBackward(ctx context.Context, arg PaginateAdmiresByFeedEventIDBackwardParams) ([]Admire, error) {
+	rows, err := q.db.Query(ctx, paginateAdmiresByFeedEventIDBackward,
+		arg.FeedEventID,
+		arg.Limit,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Admire
+	for rows.Next() {
+		var i Admire
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const paginateAdmiresByFeedEventIDForward = `-- name: PaginateAdmiresByFeedEventIDForward :many
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4) AND (created_at, id) > ($5, $6)
+    ORDER BY (created_at, id) ASC LIMIT $2
+`
+
+type PaginateAdmiresByFeedEventIDForwardParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+}
+
+func (q *Queries) PaginateAdmiresByFeedEventIDForward(ctx context.Context, arg PaginateAdmiresByFeedEventIDForwardParams) ([]Admire, error) {
+	rows, err := q.db.Query(ctx, paginateAdmiresByFeedEventIDForward,
+		arg.FeedEventID,
+		arg.Limit,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Admire
+	for rows.Next() {
+		var i Admire
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const paginateCommentsByFeedEventIDBackward = `-- name: PaginateCommentsByFeedEventIDBackward :many
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY (created_at, id) DESC LIMIT $2
+`
+
+type PaginateCommentsByFeedEventIDBackwardParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+}
+
+func (q *Queries) PaginateCommentsByFeedEventIDBackward(ctx context.Context, arg PaginateCommentsByFeedEventIDBackwardParams) ([]Comment, error) {
+	rows, err := q.db.Query(ctx, paginateCommentsByFeedEventIDBackward,
+		arg.FeedEventID,
+		arg.Limit,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Comment
+	for rows.Next() {
+		var i Comment
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.ReplyTo,
+			&i.Comment,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const paginateCommentsByFeedEventIDForward = `-- name: PaginateCommentsByFeedEventIDForward :many
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY (created_at, id) ASC LIMIT $2
+`
+
+type PaginateCommentsByFeedEventIDForwardParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+}
+
+func (q *Queries) PaginateCommentsByFeedEventIDForward(ctx context.Context, arg PaginateCommentsByFeedEventIDForwardParams) ([]Comment, error) {
+	rows, err := q.db.Query(ctx, paginateCommentsByFeedEventIDForward,
+		arg.FeedEventID,
+		arg.Limit,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Comment
+	for rows.Next() {
+		var i Comment
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.ReplyTo,
+			&i.Comment,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const userFeedHasMoreEvents = `-- name: UserFeedHasMoreEvents :one

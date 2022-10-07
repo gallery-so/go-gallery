@@ -13,11 +13,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"AdmireOrComment": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(AdmireOrComment)
-		return obj, ok
-	},
-
 	"AuthorizationError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AuthorizationError)
 		return obj, ok
@@ -95,6 +90,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"GetAuthNoncePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(GetAuthNoncePayloadOrError)
+		return obj, ok
+	},
+
+	"Interaction": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(Interaction)
 		return obj, ok
 	},
 

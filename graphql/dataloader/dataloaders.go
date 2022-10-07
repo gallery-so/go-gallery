@@ -731,21 +731,28 @@ func loadGlobalFeed(q *db.Queries) func(context.Context, []db.GetGlobalFeedViewB
 }
 
 func loadAdmireById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Admire, []error) {
-	return func(ctx context.Context, admireIds []persist.DBID) ([]db.Admire, []error) {
-		admires := make([]db.Admire, len(admireIds))
-		errors := make([]error, len(admireIds))
+	return func(ctx context.Context, admireIDs []persist.DBID) ([]db.Admire, []error) {
+		admires := make([]db.Admire, len(admireIDs))
+		errors := make([]error, len(admireIDs))
 
-		b := q.GetAdmireByAdmireIDBatch(ctx, admireIds)
-		defer b.Close()
+		rows, err := q.GetAdmiresByAdmireIDs(ctx, admireIDs)
+		if err != nil {
+			fillErrors(errors, err)
+			return admires, errors
+		}
 
-		b.QueryRow(func(i int, a db.Admire, err error) {
-			admires[i] = a
-			errors[i] = err
+		admiresByID := make(map[persist.DBID]db.Admire)
+		for _, row := range rows {
+			admiresByID[row.ID] = row
+		}
 
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrAdmireNotFound{ID: admireIds[i]}
+		for i, id := range admireIDs {
+			if admire, ok := admiresByID[id]; ok {
+				admires[i] = admire
+			} else {
+				errors[i] = persist.ErrAdmireNotFound{ID: id}
 			}
-		})
+		}
 
 		return admires, errors
 	}
@@ -769,21 +776,28 @@ func loadAdmiresByFeedEventId(q *db.Queries) func(context.Context, []persist.DBI
 }
 
 func loadCommentById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Comment, []error) {
-	return func(ctx context.Context, commentIds []persist.DBID) ([]db.Comment, []error) {
-		comments := make([]db.Comment, len(commentIds))
-		errors := make([]error, len(commentIds))
+	return func(ctx context.Context, commentIDs []persist.DBID) ([]db.Comment, []error) {
+		comments := make([]db.Comment, len(commentIDs))
+		errors := make([]error, len(commentIDs))
 
-		b := q.GetCommentByCommentIDBatch(ctx, commentIds)
-		defer b.Close()
+		rows, err := q.GetCommentsByCommentIDs(ctx, commentIDs)
+		if err != nil {
+			fillErrors(errors, err)
+			return comments, errors
+		}
 
-		b.QueryRow(func(i int, c db.Comment, err error) {
-			comments[i] = c
-			errors[i] = err
+		commentsByID := make(map[persist.DBID]db.Comment)
+		for _, row := range rows {
+			commentsByID[row.ID] = row
+		}
 
-			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrCommentNotFound{ID: commentIds[i]}
+		for i, id := range commentIDs {
+			if comment, ok := commentsByID[id]; ok {
+				comments[i] = comment
+			} else {
+				errors[i] = persist.ErrCommentNotFound{ID: id}
 			}
-		})
+		}
 
 		return comments, errors
 	}

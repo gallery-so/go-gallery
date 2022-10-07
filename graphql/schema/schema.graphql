@@ -464,7 +464,7 @@ type FollowInfo {
 type FeedEventAdmireEdge {
     node: Admire
     event: FeedEvent
-    cursor: ID!
+    cursor: String!
 }
 
 type FeedEventAdmiresConnection {
@@ -474,9 +474,9 @@ type FeedEventAdmiresConnection {
 }
 
 type FeedEventCommentEdge {
-    node:Comment
+    node: Comment
     event: FeedEvent
-    cursor: ID!
+    cursor: String!
 }
 
 type FeedEventCommentsConnection {
@@ -484,16 +484,16 @@ type FeedEventCommentsConnection {
     pageInfo: PageInfo!
 }
 
-union AdmireOrComment = Admire | Comment
+union Interaction = Admire | Comment
 
-type FeedEventAdmiresAndCommentEdge {
-    node: AdmireOrComment
+type FeedEventInteractionsEdge {
+    node: Interaction
     event: FeedEvent
-    cursor: ID!
+    cursor: String!
 }
 
-type FeedEventAdmiresAndCommentsConnection {
-     edges: [FeedEventAdmiresAndCommentEdge]
+type FeedEventInteractionsConnection {
+    edges: [FeedEventInteractionsEdge]
     pageInfo: PageInfo!
 }
 
@@ -510,7 +510,7 @@ type FeedEvent implements Node {
     eventData: FeedEventData @goField(forceResolver: true)
     admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
     comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
-    admiresAndComments(before: String, after: String, first: Int, last: Int): FeedEventAdmiresAndCommentsConnection @goField(forceResolver: true)
+    interactions(before: String, after: String, first: Int, last: Int): FeedEventInteractionsConnection @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {

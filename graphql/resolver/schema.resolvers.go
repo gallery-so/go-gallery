@@ -24,7 +24,7 @@ func (r *admireFeedEventPayloadResolver) Admire(ctx context.Context, obj *model.
 }
 
 func (r *admireFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.FeedEvent, error) {
-	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, obj.Admire.Dbid)
+	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, obj.Admire.Dbid)
 	if err != nil {
 		return nil, err
 	}
@@ -137,99 +137,69 @@ func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent)
 }
 
 func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error) {
-	admires, err := resolveAdmiresByFeedEventID(ctx, obj.Dbid)
-
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByFeedEventID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
 	var edges []*model.FeedEventAdmireEdge
 	for _, admire := range admires {
-		edges = append(edges, &model.FeedEventAdmireEdge{Event: obj, Node: admire, Cursor: model.GqlID(admire.Dbid)})
+		edges = append(edges, &model.FeedEventAdmireEdge{
+			Node:   admireToModel(ctx, admire),
+			Event:  obj,
+			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+		})
 	}
 
-	total := len(admires)
+	// TODO: pageInfoToModel
+	pageInfoModel := &model.PageInfo{
+		Total:           pageInfo.Total,
+		Size:            pageInfo.Size,
+		HasPreviousPage: pageInfo.HasPreviousPage,
+		HasNextPage:     pageInfo.HasNextPage,
+		StartCursor:     pageInfo.StartCursor,
+		EndCursor:       pageInfo.EndCursor,
+	}
 
-	// TODO(Ezra): Write professional golang
-	return &model.FeedEventAdmiresConnection{Edges: edges, PageInfo: &model.PageInfo{
-		Total:           &total,
-		Size:            total,
-		HasPreviousPage: false,
-		HasNextPage:     false,
-		StartCursor:     "",
-		EndCursor:       "",
-	}}, nil
+	return &model.FeedEventAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoModel,
+	}, nil
 }
 
 func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error) {
-	comments, err := resolveCommentsByFeedEventID(ctx, obj.Dbid)
-
+	comments, pageInfo, err := publicapi.For(ctx).Interaction.PaginateCommentsByFeedEventID(ctx, obj.Dbid, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
 	var edges []*model.FeedEventCommentEdge
 	for _, comment := range comments {
-		edges = append(edges, &model.FeedEventCommentEdge{Event: obj, Node: comment, Cursor: model.GqlID(comment.Dbid)})
+		edges = append(edges, &model.FeedEventCommentEdge{
+			Node:   commentToModel(ctx, comment),
+			Event:  obj,
+			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+		})
 	}
 
-	total := len(comments)
+	// TODO: pageInfoToModel
+	pageInfoModel := &model.PageInfo{
+		Total:           pageInfo.Total,
+		Size:            pageInfo.Size,
+		HasPreviousPage: pageInfo.HasPreviousPage,
+		HasNextPage:     pageInfo.HasNextPage,
+		StartCursor:     pageInfo.StartCursor,
+		EndCursor:       pageInfo.EndCursor,
+	}
 
-	// TODO(Ezra): Write professional golang
-	return &model.FeedEventCommentsConnection{Edges: edges, PageInfo: &model.PageInfo{
-		Total:           &total,
-		Size:            total,
-		HasPreviousPage: false,
-		HasNextPage:     false,
-		StartCursor:     "",
-		EndCursor:       "",
-	}}, nil
+	return &model.FeedEventCommentsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoModel,
+	}, nil
 }
 
-func (r *feedEventResolver) AdmiresAndComments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresAndCommentsConnection, error) {
-	var err error
-
-	comments, err := resolveCommentsByFeedEventID(ctx, obj.Dbid)
-
-	if err != nil {
-		return nil, err
-	}
-
-	admires, err := resolveAdmiresByFeedEventID(ctx, obj.Dbid)
-
-	if err != nil {
-		return nil, err
-	}
-
-	var admiresAndComments []*model.FeedEventAdmiresAndCommentEdge
-
-	for _, comment := range comments {
-		admiresAndComments = append(admiresAndComments, &model.FeedEventAdmiresAndCommentEdge{
-			Event:  obj,
-			Node:   comment,
-			Cursor: model.GqlID(comment.Dbid),
-		})
-	}
-
-	for _, admire := range admires {
-		admiresAndComments = append(admiresAndComments, &model.FeedEventAdmiresAndCommentEdge{
-			Event:  obj,
-			Node:   admire,
-			Cursor: model.GqlID(admire.Dbid),
-		})
-	}
-
-	total := len(admiresAndComments)
-
-	// TODO(Ezra): Write professional golang
-	return &model.FeedEventAdmiresAndCommentsConnection{Edges: admiresAndComments, PageInfo: &model.PageInfo{
-		Total:           &total,
-		Size:            total,
-		HasPreviousPage: false,
-		HasNextPage:     false,
-		StartCursor:     "",
-		EndCursor:       "",
-	}}, nil
+func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventInteractionsConnection, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -724,7 +694,7 @@ func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID
 }
 
 func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Admire.AdmireFeedEvent(ctx, feedEventID)
+	id, err := publicapi.For(ctx).Interaction.AdmireFeedEvent(ctx, feedEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -737,7 +707,7 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 }
 
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Admire.RemoveAdmire(ctx, admireID)
+	feedEvent, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
 	if err != nil {
 		return nil, err
 	}
@@ -752,7 +722,7 @@ func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DB
 }
 
 func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, replyToID, comment)
+	id, err := publicapi.For(ctx).Interaction.CommentOnFeedEvent(ctx, feedEventID, replyToID, comment)
 	if err != nil {
 		return nil, err
 	}
@@ -775,7 +745,7 @@ func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID p
 }
 
 func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Comment.RemoveComment(ctx, commentID)
+	feedEvent, err := publicapi.For(ctx).Interaction.RemoveComment(ctx, commentID)
 	if err != nil {
 		return nil, err
 	}
@@ -1202,13 +1172,3 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//     it when you're done.
-//   - You have helper methods in this file. Move them out to keep these resolver files clean.
-type feedEventAdmiresAndCommentsConnectionResolver struct{ *Resolver }
-type feedEventAdmiresConnectionResolver struct{ *Resolver }
-type feedEventCommentsConnectionResolver struct{ *Resolver }

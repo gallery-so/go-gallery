@@ -320,6 +320,9 @@ SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AN
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
+-- name: GetAdmiresByAdmireIDs :many
+SELECT * from admires WHERE id = ANY(@admire_ids) AND deleted = false;
+
 -- name: GetAdmireByAdmireIDBatch :batchone
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
@@ -328,6 +331,19 @@ SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_a
 
 -- name: GetAdmiresByActorIDBatch :batchmany
 SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
+
+-- name: PaginateAdmiresByFeedEventIDForward :many
+SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id) AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY (created_at, id) ASC LIMIT $2;
+
+-- name: PaginateAdmiresByFeedEventIDBackward :many
+SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id) AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY (created_at, id) DESC LIMIT $2;
+
+-- name: CountAdmiresByFeedEventID :one
+SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false;
 
 -- name: GetAdmiresByFeedEventID :many
 SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
@@ -338,8 +354,26 @@ SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY crea
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
+-- name: GetCommentsByCommentIDs :many
+SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
+
 -- name: GetCommentByCommentIDBatch :batchone
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
+
+-- name: PaginateCommentsByFeedEventIDForward :many
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY (created_at, id) ASC LIMIT $2;
+
+-- name: PaginateCommentsByFeedEventIDBackward :many
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY (created_at, id) DESC LIMIT $2;
+
+-- name: CountCommentsByFeedEventID :one
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
 
 -- name: GetCommentsByActorID :many
 SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
