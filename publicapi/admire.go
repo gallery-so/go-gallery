@@ -79,7 +79,6 @@ func (api AdmireAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DB
 		Action:  persist.ActionAdmiredFeedEvent,
 		Amount:  1,
 		Data: persist.NotificationData{
-			// TODO this has to concat with what is in the DB
 			AdmirerIDs:  []persist.DBID{actorID},
 			FeedEventID: feedEventID,
 		},
