@@ -18,7 +18,7 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
-//go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetPersonalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
@@ -77,7 +77,7 @@ type Loaders struct {
 	FollowersByUserID             *UsersLoaderByID
 	FollowingByUserID             *UsersLoaderByID
 	GlobalFeed                    *GlobalFeedLoader
-	FeedByUserID                  *UserFeedLoader
+	PersonalFeedByUserID          *PersonalFeedLoader
 	EventByEventID                *EventLoaderByID
 	AdmireByAdmireID              *AdmireLoaderByID
 	AdmireCountByFeedEventID      *IntLoaderByID
@@ -214,7 +214,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
 	})
 
-	loaders.FeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
+	loaders.PersonalFeedByUserID = NewPersonalFeedLoader(defaults, loadPersonalFeed(q))
 
 	loaders.GlobalFeed = NewGlobalFeedLoader(defaults, loadGlobalFeed(q))
 
@@ -717,12 +717,12 @@ func loadEventById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Fe
 	}
 }
 
-func loadUserFeed(q *db.Queries) func(context.Context, []db.GetUserFeedViewBatchParams) ([][]db.FeedEvent, []error) {
-	return func(ctx context.Context, params []db.GetUserFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+func loadPersonalFeed(q *db.Queries) func(context.Context, []db.GetPersonalFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+	return func(ctx context.Context, params []db.GetPersonalFeedViewBatchParams) ([][]db.FeedEvent, []error) {
 		events := make([][]db.FeedEvent, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetUserFeedViewBatch(ctx, params)
+		b := q.GetPersonalFeedViewBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, evts []db.FeedEvent, err error) {

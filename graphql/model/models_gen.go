@@ -688,18 +688,19 @@ type Gallery struct {
 func (Gallery) IsNode() {}
 
 type GalleryUser struct {
-	Dbid                persist.DBID   `json:"dbid"`
-	Username            *string        `json:"username"`
-	Bio                 *string        `json:"bio"`
-	Traits              *string        `json:"traits"`
-	Tokens              []*Token       `json:"tokens"`
-	TokensByChain       *ChainTokens   `json:"tokensByChain"`
-	Wallets             []*Wallet      `json:"wallets"`
-	Galleries           []*Gallery     `json:"galleries"`
-	Badges              []*Badge       `json:"badges"`
-	IsAuthenticatedUser *bool          `json:"isAuthenticatedUser"`
-	Followers           []*GalleryUser `json:"followers"`
-	Following           []*GalleryUser `json:"following"`
+	Dbid                persist.DBID    `json:"dbid"`
+	Username            *string         `json:"username"`
+	Bio                 *string         `json:"bio"`
+	Traits              *string         `json:"traits"`
+	Tokens              []*Token        `json:"tokens"`
+	TokensByChain       *ChainTokens    `json:"tokensByChain"`
+	Wallets             []*Wallet       `json:"wallets"`
+	Galleries           []*Gallery      `json:"galleries"`
+	Badges              []*Badge        `json:"badges"`
+	IsAuthenticatedUser *bool           `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser  `json:"followers"`
+	Following           []*GalleryUser  `json:"following"`
+	Feed                *FeedConnection `json:"feed"`
 }
 
 func (GalleryUser) IsNode()                  {}

@@ -274,6 +274,33 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 	return resolveFollowingByUserID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeedByEventID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: pageInfoToModel
+	pageInfoModel := &model.PageInfo{
+		Total:           pageInfo.Total,
+		Size:            pageInfo.Size,
+		HasPreviousPage: pageInfo.HasPreviousPage,
+		HasNextPage:     pageInfo.HasNextPage,
+		StartCursor:     pageInfo.StartCursor,
+		EndCursor:       pageInfo.EndCursor,
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoModel,
+	}, nil
+}
+
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)
 

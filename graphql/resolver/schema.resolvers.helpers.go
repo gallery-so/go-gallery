@@ -519,7 +519,7 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
 }
 
-func resolveViewerFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+func resolveViewerFeed(ctx context.Context, before, after *string, first, last *int) (*model.FeedConnection, error) {
 	beforeToken, err := model.Cursor.DecodeToDBID(before)
 	if err != nil {
 		return nil, err
@@ -552,7 +552,7 @@ func resolveViewerFeed(ctx context.Context, before *string, after *string, first
 	}, nil
 }
 
-func resolveGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+func resolveGlobalFeed(ctx context.Context, before, after *string, first, last *int) (*model.FeedConnection, error) {
 	beforeToken, err := model.Cursor.DecodeToDBID(before)
 	if err != nil {
 		return nil, err
