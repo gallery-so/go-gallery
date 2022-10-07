@@ -94,7 +94,7 @@ func NewLocalStorageClient(ctx context.Context, keyPath string) *storage.Client 
 
 func NewStorageClient(ctx context.Context) *storage.Client {
 	scopes := []string{storage.ScopeFullControl}
-	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false, true), option.WithScopes(scopes...))
+	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false), option.WithScopes(scopes...))
 	if err != nil {
 		panic(err)
 	}

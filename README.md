@@ -157,8 +157,13 @@ See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targetin
                                             |
                                             |              +-------------------+
                                             +-------------->  mediaprocessing  |
-                                                           |      (:6500)      |
-                                                           +-------------------+
+                                            |              |      (:6500)      |
+                                            |              +-------------------+
+                                            |
+                                            |              +---------------+
+                                            +-------------->  indexer-api  |
+                                                           |    (:6000)    |
+                                                           +---------------+
 ```
 
 To get started:

@@ -147,6 +147,9 @@ func (l *EthereumAddressList) Scan(value interface{}) error {
 // BlockNumber represents an Ethereum block number
 type BlockNumber uint64
 
+// BlockRange represents an inclusive block range
+type BlockRange [2]BlockNumber
+
 // TokenType represents the contract specification of the token
 type TokenType string
 

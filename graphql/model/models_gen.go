@@ -47,6 +47,10 @@ type CreateUserPayloadOrError interface {
 	IsCreateUserPayloadOrError()
 }
 
+type DeepRefreshPayloadOrError interface {
+	IsDeepRefreshPayloadOrError()
+}
+
 type DeleteCollectionPayloadOrError interface {
 	IsDeleteCollectionPayloadOrError()
 }
@@ -398,6 +402,17 @@ type DebugAuth struct {
 	ChainAddresses []*persist.ChainAddress `json:"chainAddresses"`
 }
 
+type DeepRefreshInput struct {
+	Chain persist.Chain `json:"chain"`
+}
+
+type DeepRefreshPayload struct {
+	Chain     *persist.Chain `json:"chain"`
+	Submitted *bool          `json:"submitted"`
+}
+
+func (DeepRefreshPayload) IsDeepRefreshPayloadOrError() {}
+
 type DeleteCollectionPayload struct {
 	Gallery *Gallery `json:"gallery"`
 }
@@ -535,6 +550,7 @@ func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
 func (ErrNotAuthorized) IsError()                                  {}
+func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
