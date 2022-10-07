@@ -13,7 +13,7 @@ import (
 
 var ErrOnlyRemoveOwnComment = errors.New("only the actor who created the comment can remove it")
 
-type CommentAPI struct {
+type InteractionAPI struct {
 	repos     *persist.Repositories
 	queries   *db.Queries
 	loaders   *dataloader.Loaders
@@ -21,7 +21,7 @@ type CommentAPI struct {
 	ethClient *ethclient.Client
 }
 
-func (api CommentAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {
+func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"commentID": {commentID, "required"},
@@ -37,7 +37,7 @@ func (api CommentAPI) GetCommentByID(ctx context.Context, commentID persist.DBID
 	return &comment, nil
 }
 
-func (api CommentAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]db.Comment, error) {
+func (api InteractionAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]db.Comment, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
@@ -53,7 +53,7 @@ func (api CommentAPI) GetCommentsByFeedEventID(ctx context.Context, feedEventID 
 	return comments, nil
 }
 
-func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
@@ -64,7 +64,7 @@ func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persis
 	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx), replyToID, comment)
 }
 
-func (api CommentAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {
+func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"commentID": {commentID, "required"},
