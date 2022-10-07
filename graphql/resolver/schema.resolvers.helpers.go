@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
@@ -757,20 +758,27 @@ func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notifi
 
 	result := make(chan model.Notification)
 
+	wp := workerpool.New(10)
+
 	go func() {
 		for notif := range notifs {
-			asModel, err := notificationToModel(notif)
-			if err != nil {
-				logger.For(ctx).Errorf("error converting notification to model: %v", err)
-				continue
-			}
-			select {
-			case result <- asModel:
-			default:
-				logger.For(ctx).Errorf("notification subscription channel full, dropping notification")
-				notifDispatcher.UnscubscribeNewNotificationsForUser(userID)
-			}
+			n := notif
+			// use async to prevent blocking the dispatcher
+			wp.Submit(func() {
+				asModel, err := notificationToModel(n)
+				if err != nil {
+					logger.For(ctx).Errorf("error converting notification to model: %v", err)
+					return
+				}
+				select {
+				case result <- asModel:
+				default:
+					logger.For(ctx).Errorf("notification subscription channel full, dropping notification")
+					notifDispatcher.UnscubscribeNewNotificationsForUser(userID)
+				}
+			})
 		}
+		wp.StopWait()
 	}()
 
 	return result

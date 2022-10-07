@@ -2,33 +2,36 @@ package notifications
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
+	"cloud.google.com/go/pubsub"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 )
 
 const window = 10 * time.Minute
-
+const notificationTimeout = 10 * time.Second
 const NotificationHandlerContextKey = "notification.notificationHandlers"
 
 type NotificationHandlers struct {
 	Notifications            *notifcationDispatcher
 	UserNewNotifications     map[persist.DBID]chan db.Notification
 	UserUpdatedNotifications map[persist.DBID]chan db.Notification
+	pubSub                   *pubsub.Client
 }
 
 // Register specific notification handlers
-func AddTo(ctx *gin.Context, queries *db.Queries) {
+func AddTo(ctx *gin.Context, queries *db.Queries, pub *pubsub.Client) {
 	notifDispatcher := notifcationDispatcher{handlers: map[persist.Action]notificationHandler{}}
-	new := map[persist.DBID]chan db.Notification{}
-	updated := map[persist.DBID]chan db.Notification{}
-	def := defaultNotificationHandler{queries: queries, new: new}
-	group := groupedNotificationHandler{queries: queries, new: new, updated: updated}
+
+	def := defaultNotificationHandler{queries: queries, pubSub: pub}
+	group := groupedNotificationHandler{queries: queries, pubSub: pub}
 
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUserBack, group)
@@ -36,8 +39,13 @@ func AddTo(ctx *gin.Context, queries *db.Queries) {
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
 	notifDispatcher.AddHandler(persist.ActionViewedGallery, group)
 
-	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher}
+	new := map[persist.DBID]chan db.Notification{}
+	updated := map[persist.DBID]chan db.Notification{}
+
+	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher, UserNewNotifications: new, UserUpdatedNotifications: updated, pubSub: pub}
 	ctx.Set(NotificationHandlerContextKey, notificationHandlers)
+	go notificationHandlers.receiveNewNotificationsFromPubSub()
+	go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
 }
 
 func DispatchNotificationToUser(ctx context.Context, notif db.Notification) error {
@@ -98,7 +106,7 @@ func (d *notifcationDispatcher) Dispatch(ctx context.Context, notif db.Notificat
 
 type defaultNotificationHandler struct {
 	queries *coredb.Queries
-	new     map[persist.DBID]chan db.Notification
+	pubSub  *pubsub.Client
 }
 
 func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
@@ -113,21 +121,25 @@ func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		return err
 	}
 
-	if sub, ok := h.new[newNotif.OwnerID]; ok {
-		select {
-		case sub <- newNotif:
-		default:
-			logger.For(ctx).Warnf("notification channel not open for user: %s", notif.OwnerID)
-			h.new[newNotif.OwnerID] = nil
-		}
+	marshalled, err := json.Marshal(newNotif)
+	if err != nil {
+		return err
+	}
+	t := h.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
+	result := t.Publish(ctx, &pubsub.Message{
+		Data: marshalled,
+	})
+
+	_, err = result.Get(ctx)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 type groupedNotificationHandler struct {
 	queries *coredb.Queries
-	new     map[persist.DBID]chan db.Notification
-	updated map[persist.DBID]chan db.Notification
+	pubSub  *pubsub.Client
 }
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
@@ -153,13 +165,17 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		if err != nil {
 			return err
 		}
-		if sub, ok := h.updated[curNotif.OwnerID]; ok {
-			select {
-			case sub <- curNotif:
-			default:
-				logger.For(ctx).Warnf("notification update channel not open for user: %s", notif.OwnerID)
-				h.updated[curNotif.OwnerID] = nil
-			}
+		marshalled, err := json.Marshal(curNotif)
+		if err != nil {
+			return err
+		}
+		t := h.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
+		result := t.Publish(ctx, &pubsub.Message{
+			Data: marshalled,
+		})
+		_, err = result.Get(ctx)
+		if err != nil {
+			return err
 		}
 	} else {
 		newNotif, err := h.queries.CreateNotification(ctx, db.CreateNotificationParams{
@@ -172,15 +188,73 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		if err != nil {
 			return err
 		}
-		if sub, ok := h.new[newNotif.OwnerID]; ok {
-			select {
-			case sub <- newNotif:
-			default:
-				logger.For(ctx).Warnf("notification create channel not open for user: %s", notif.OwnerID)
-				h.new[newNotif.OwnerID] = nil
-			}
+		marshalled, err := json.Marshal(newNotif)
+		if err != nil {
+			return err
 		}
+
+		t := h.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
+		result := t.Publish(ctx, &pubsub.Message{
+			Data: marshalled,
+		})
+		_, err = result.Get(ctx)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
+}
+
+func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
+	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_SUB_NEW_NOTIFICATIONS"))
+
+	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+		defer msg.Ack()
+		notif := db.Notification{}
+		err := json.Unmarshal(msg.Data, &notif)
+		if err != nil {
+			logger.For(ctx).Warnf("failed to unmarshal pubsub message: %s", err)
+			return
+		}
+		if sub, ok := n.UserNewNotifications[notif.OwnerID]; ok {
+			select {
+			case sub <- notif:
+			case <-time.After(notificationTimeout):
+				logger.For(ctx).Warnf("notification create channel not open for user: %s", notif.OwnerID)
+				n.UserNewNotifications[notif.OwnerID] = nil
+			}
+		}
+	})
+	if err != nil {
+		logger.For(nil).Errorf("error receiving new notifications from pubsub: %s", err)
+		panic(err)
+	}
+}
+
+func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
+	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_UPDATED_NOTIFICATIONS_SUBSCRIPTION"))
+
+	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+		defer msg.Ack()
+		notif := db.Notification{}
+		err := json.Unmarshal(msg.Data, &notif)
+		if err != nil {
+			logger.For(ctx).Warnf("failed to unmarshal pubsub message: %s", err)
+			return
+		}
+		if sub, ok := n.UserUpdatedNotifications[notif.OwnerID]; ok {
+			select {
+			case sub <- notif:
+			case <-time.After(notificationTimeout):
+				logger.For(ctx).Warnf("notification create channel not open for user: %s", notif.OwnerID)
+				n.UserUpdatedNotifications[notif.OwnerID] = nil
+			}
+		}
+	})
+	if err != nil {
+		logger.For(nil).Errorf("error receiving new notifications from pubsub: %s", err)
+		panic(err)
+	}
 }
