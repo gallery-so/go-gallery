@@ -446,7 +446,7 @@ func (c Chain) NormalizeAddress(addr Address) string {
 }
 
 // BaseKeywords are the keywords that are default for discovering media for a given chain
-func (c Chain) BaseKeywords() ([]string, []string) {
+func (c Chain) BaseKeywords() (image []string, anim []string) {
 	switch c {
 	case ChainTezos:
 		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}

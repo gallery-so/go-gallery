@@ -24,7 +24,6 @@ import (
 const staleCommunityTime = time.Hour * 2
 
 const maxCommunitySize = 10_000
-const defaultLimit = 50_000
 
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
@@ -220,7 +219,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				for i, p := range providers {
 					go func(provider ChainProvider, priority int) {
 						defer subWg.Done()
-						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr, defaultLimit, 0)
+						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr, 0, 0)
 						if err != nil {
 							errChan <- errWithPriority{err: err, priority: priority}
 							return
@@ -736,7 +735,7 @@ func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainCont
 		return nil, err
 	}
 	if err := d.Repos.ContractRepository.BulkUpsert(ctx, newContracts); err != nil {
-		return nil, fmt.Errorf("error upserting tokens: %s", err)
+		return nil, fmt.Errorf("error upserting contracts: %s", err)
 	}
 	contractsForChain := map[persist.Chain][]persist.Address{}
 	for _, c := range newContracts {

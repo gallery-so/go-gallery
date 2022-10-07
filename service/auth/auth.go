@@ -272,6 +272,8 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, user
 		logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
 	}
 
+	// delete user if they are universal because now they are attempting to convert their account from universal
+	// to non universal. This step is necessary before getting the nonce because universal accounts do not have nonces
 	if user.Universal == true {
 		userRepo.Delete(pCtx, user.ID)
 		user.ID = ""
