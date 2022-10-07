@@ -44,7 +44,8 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *db.Q
 }
 
 func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client) {
-	parent.POST("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub))
+
+	parent.Any("/query", middleware.AddAuthToContext(), graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub))
 	parent.GET("/playground", graphqlPlaygroundHandler())
 }
 
@@ -73,6 +74,8 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, throttler)
 	}
 
+	notificationsHandler := notifications.New(queries, pub)
+
 	h.AroundFields(graphql.MutationCachingHandler(newPublicAPI))
 
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
@@ -97,7 +100,7 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 
 		mediamapper.AddTo(c)
 		event.AddTo(c, queries, taskClient)
-		notifications.AddTo(c, queries, pub)
+		notifications.AddTo(c, notificationsHandler)
 
 		// Use the request context so dataloaders will add their traces to the request span
 		publicapi.AddTo(c, newPublicAPI(c.Request.Context(), false))

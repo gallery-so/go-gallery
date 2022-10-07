@@ -66,6 +66,10 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before *
 	return notifs, err
 }
 
+func (api NotificationsAPI) GetByID(ctx context.Context, id persist.DBID) (db.Notification, error) {
+	return api.loaders.NotificationByID.Load(id)
+}
+
 func (api NotificationsAPI) HasPage(ctx context.Context, cursor string, userId persist.DBID, byFirst bool) (bool, error) {
 	notifID, err := model.Cursor.DecodeToDBID(&cursor)
 	if err != nil {

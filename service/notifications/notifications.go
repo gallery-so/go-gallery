@@ -27,7 +27,7 @@ type NotificationHandlers struct {
 }
 
 // Register specific notification handlers
-func AddTo(ctx *gin.Context, queries *db.Queries, pub *pubsub.Client) {
+func New(queries *db.Queries, pub *pubsub.Client) *NotificationHandlers {
 	notifDispatcher := notifcationDispatcher{handlers: map[persist.Action]notificationHandler{}}
 
 	def := defaultNotificationHandler{queries: queries, pubSub: pub}
@@ -43,9 +43,15 @@ func AddTo(ctx *gin.Context, queries *db.Queries, pub *pubsub.Client) {
 	updated := map[persist.DBID]chan db.Notification{}
 
 	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher, UserNewNotifications: new, UserUpdatedNotifications: updated, pubSub: pub}
-	ctx.Set(NotificationHandlerContextKey, notificationHandlers)
 	go notificationHandlers.receiveNewNotificationsFromPubSub()
 	go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
+	return notificationHandlers
+}
+
+// Register specific notification handlers
+func AddTo(ctx *gin.Context, notificationHandlers *NotificationHandlers) {
+	ctx.Set(NotificationHandlerContextKey, notificationHandlers)
+
 }
 
 func DispatchNotificationToUser(ctx context.Context, notif db.Notification) error {
@@ -59,28 +65,34 @@ func For(ctx context.Context) *NotificationHandlers {
 }
 
 func (n *NotificationHandlers) GetNewNotificationsForUser(userID persist.DBID) chan db.Notification {
-	if sub, ok := n.UserNewNotifications[userID]; ok {
+	if sub, ok := n.UserNewNotifications[userID]; ok && sub != nil {
+		logger.For(context.Background()).Infof("returning existing new notification channel for user: %s", userID)
 		return sub
 	}
 	sub := make(chan db.Notification)
 	n.UserNewNotifications[userID] = sub
+	logger.For(context.Background()).Infof("created new new notification channel for user: %s", userID)
 	return sub
 }
 
 func (n *NotificationHandlers) GetUpdatedNotificationsForUser(userID persist.DBID) chan db.Notification {
-	if sub, ok := n.UserUpdatedNotifications[userID]; ok {
+	if sub, ok := n.UserUpdatedNotifications[userID]; ok && sub != nil {
+		logger.For(context.Background()).Infof("returning existing updated notification channel for user: %s", userID)
 		return sub
 	}
 	sub := make(chan db.Notification)
 	n.UserUpdatedNotifications[userID] = sub
+	logger.For(context.Background()).Infof("created new updated notification channel for user: %s", userID)
 	return sub
 }
 
 func (n *NotificationHandlers) UnscubscribeNewNotificationsForUser(userID persist.DBID) {
+	logger.For(context.Background()).Infof("unsubscribing new notifications for user: %s", userID)
 	n.UserNewNotifications[userID] = nil
 }
 
 func (n *NotificationHandlers) UnsubscribeUpdatedNotificationsForUser(userID persist.DBID) {
+	logger.For(context.Background()).Infof("unsubscribing updated notifications for user: %s", userID)
 	n.UserUpdatedNotifications[userID] = nil
 }
 
@@ -111,7 +123,7 @@ type defaultNotificationHandler struct {
 
 func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	newNotif, err := h.queries.CreateNotification(ctx, db.CreateNotificationParams{
-		ID:      notif.ID,
+		ID:      persist.GenerateID(),
 		OwnerID: notif.OwnerID,
 		ActorID: notif.ActorID,
 		Action:  notif.Action,
@@ -134,6 +146,8 @@ func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notific
 	if err != nil {
 		return err
 	}
+
+	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
 	return nil
 }
 
@@ -143,28 +157,29 @@ type groupedNotificationHandler struct {
 }
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-	notifID := notif.ID
-	var curNotif db.Notification
-	if notifID != "" {
-		curNotif, _ = h.queries.GetNotificationByID(ctx, notif.ID)
-		if curNotif.ID != "" {
-			notifID = curNotif.ID
+
+	curNotif, _ := h.queries.GetMostRecentNotifiactionByOwnerIDForAction(ctx, db.GetMostRecentNotifiactionByOwnerIDForActionParams{
+		OwnerID: notif.OwnerID,
+		Action:  notif.Action,
+	})
+	if time.Since(curNotif.CreatedAt) < window {
+		amount := notif.Amount
+		if amount < 1 {
+			amount = 1
 		}
-	}
-	if notifID != "" && time.Since(curNotif.CreatedAt) < window {
 		err := h.queries.UpdateNotification(ctx, db.UpdateNotificationParams{
-			ID:     notifID,
-			Data:   createNewData(curNotif.Data, notif.Data),
-			Amount: notif.Amount,
+			ID:     curNotif.ID,
+			Data:   curNotif.Data.Concat(notif.Data),
+			Amount: amount + curNotif.Amount,
 		})
 		if err != nil {
 			return err
 		}
-		curNotif, err := h.queries.GetNotificationByID(ctx, notif.ID)
+		updatedNotif, err := h.queries.GetNotificationByID(ctx, curNotif.ID)
 		if err != nil {
 			return err
 		}
-		marshalled, err := json.Marshal(curNotif)
+		marshalled, err := json.Marshal(updatedNotif)
 		if err != nil {
 			return err
 		}
@@ -176,9 +191,11 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		if err != nil {
 			return err
 		}
+
+		logger.For(ctx).Infof("pushed updated notification to pubsub: %s", updatedNotif.OwnerID)
 	} else {
 		newNotif, err := h.queries.CreateNotification(ctx, db.CreateNotificationParams{
-			ID:      notif.ID,
+			ID:      persist.GenerateID(),
 			OwnerID: notif.OwnerID,
 			ActorID: notif.ActorID,
 			Action:  notif.Action,
@@ -201,6 +218,8 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 			return err
 		}
 
+		logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
+
 	}
 
 	return nil
@@ -210,6 +229,7 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_SUB_NEW_NOTIFICATIONS"))
 
 	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+
 		defer msg.Ack()
 		notif := db.Notification{}
 		err := json.Unmarshal(msg.Data, &notif)
@@ -217,13 +237,19 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 			logger.For(ctx).Warnf("failed to unmarshal pubsub message: %s", err)
 			return
 		}
+
+		logger.For(ctx).Infof("received new notification from pubsub: %s", notif.OwnerID)
+
 		if sub, ok := n.UserNewNotifications[notif.OwnerID]; ok {
 			select {
 			case sub <- notif:
+				logger.For(ctx).Debugf("sent new notification to user: %s", notif.OwnerID)
 			case <-time.After(notificationTimeout):
-				logger.For(ctx).Warnf("notification create channel not open for user: %s", notif.OwnerID)
-				n.UserNewNotifications[notif.OwnerID] = nil
+				logger.For(ctx).Debugf("notification create channel not open for user: %s", notif.OwnerID)
+				n.UnscubscribeNewNotificationsForUser(notif.OwnerID)
 			}
+		} else {
+			logger.For(ctx).Debugf("no notification create channel open for user: %s", notif.OwnerID)
 		}
 	})
 	if err != nil {
@@ -233,9 +259,10 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 }
 
 func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
-	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_UPDATED_NOTIFICATIONS_SUBSCRIPTION"))
+	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_SUB_UPDATED_NOTIFICATIONS"))
 
 	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+
 		defer msg.Ack()
 		notif := db.Notification{}
 		err := json.Unmarshal(msg.Data, &notif)
@@ -243,27 +270,23 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 			logger.For(ctx).Warnf("failed to unmarshal pubsub message: %s", err)
 			return
 		}
+
+		logger.For(ctx).Infof("received updated notification from pubsub: %s", notif.OwnerID)
+
 		if sub, ok := n.UserUpdatedNotifications[notif.OwnerID]; ok {
 			select {
 			case sub <- notif:
+				logger.For(ctx).Debugf("sent updated notification to user: %s", notif.OwnerID)
 			case <-time.After(notificationTimeout):
-				logger.For(ctx).Warnf("notification create channel not open for user: %s", notif.OwnerID)
-				n.UserUpdatedNotifications[notif.OwnerID] = nil
+				logger.For(ctx).Debugf("notification update channel not open for user: %s", notif.OwnerID)
+				n.UnsubscribeUpdatedNotificationsForUser(notif.OwnerID)
 			}
+		} else {
+			logger.For(ctx).Debugf("no notification update channel open for user: %s", notif.OwnerID)
 		}
 	})
 	if err != nil {
 		logger.For(nil).Errorf("error receiving new notifications from pubsub: %s", err)
 		panic(err)
 	}
-}
-
-func createNewData(oldData persist.NotificationData, newData persist.NotificationData) persist.NotificationData {
-	// concat every array in newData to the corresponding array in oldData
-	result := persist.NotificationData{}
-	result.AdmirerIDs = append(oldData.AdmirerIDs, newData.AdmirerIDs...)
-	result.FollowerIDs = append(oldData.FollowerIDs, newData.FollowerIDs...)
-	result.ViewerIDs = append(oldData.ViewerIDs, newData.ViewerIDs...)
-
-	return result
 }

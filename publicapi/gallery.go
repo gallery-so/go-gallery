@@ -98,13 +98,13 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 
 func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
 	// Validate
-	if err := validateFields(nil, validationMap{
+	if err := validateFields(api.validator, validationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return db.Gallery{}, err
 	}
 
-	err := api.queries.IncrementGalleryViews(ctx, galleryID)
+	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -113,6 +113,24 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	if err != nil {
 		return db.Gallery{}, err
 	}
+
+	// if gallery.OwnerUserID != userID {
+	err = api.queries.IncrementGalleryViews(ctx, galleryID)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+	// }
+
+	dispatchNotification(ctx, db.Notification{
+		Action:  persist.ActionViewedGallery,
+		ActorID: userID,
+		OwnerID: gallery.OwnerUserID,
+		Amount:  1,
+		Data: persist.NotificationData{
+			GalleryID: galleryID,
+			ViewerIDs: []persist.DBID{userID},
+		},
+	})
 
 	return gallery, nil
 }

@@ -308,6 +308,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		ActorID: curUserID,
 		OwnerID: userID,
 		Action:  action,
+		Amount:  1,
 		Data: persist.NotificationData{
 			FollowerIDs: []persist.DBID{curUserID},
 		},

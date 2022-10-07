@@ -53,6 +53,44 @@ var nodeFetcher = model.NodeFetcher{
 			return nil, err
 		}
 	},
+	OnNotificationSettings: func(ctx context.Context, id string) (*model.NotificationSettings, error) {
+		return resolveViewerNotificationSettings(ctx)
+	},
+	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneAdmiredYourFeedEventNotification), nil
+	},
+	OnSomeoneCommentedOnYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourFeedEventNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneCommentedOnYourFeedEventNotification), nil
+	},
+	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneFollowedYouBackNotification), nil
+	},
+	OnSomeoneFollowedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneFollowedYouNotification), nil
+	},
+	OnSomeoneViewedYourGalleryNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneViewedYourGalleryNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneViewedYourGalleryNotification), nil
+	},
 }
 
 var defaultTokenSettings = persist.CollectionTokenSettings{}
@@ -755,6 +793,7 @@ func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notifi
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	notifDispatcher := notifications.For(ctx)
 	notifs := notifDispatcher.GetNewNotificationsForUser(userID)
+	logger.For(ctx).Info("new notification subscription for ", userID)
 
 	result := make(chan model.Notification)
 
@@ -767,13 +806,14 @@ func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notifi
 			wp.Submit(func() {
 				asModel, err := notificationToModel(n)
 				if err != nil {
-					logger.For(ctx).Errorf("error converting notification to model: %v", err)
+					logger.For(nil).Errorf("error converting notification to model: %v", err)
 					return
 				}
 				select {
 				case result <- asModel:
+					logger.For(nil).Debug("sent new notification to subscription")
 				default:
-					logger.For(ctx).Errorf("notification subscription channel full, dropping notification")
+					logger.For(nil).Errorf("notification subscription channel full, dropping notification")
 					notifDispatcher.UnscubscribeNewNotificationsForUser(userID)
 				}
 			})
@@ -791,20 +831,27 @@ func resolveUpdatedNotificationSubscription(ctx context.Context) <-chan model.No
 
 	result := make(chan model.Notification)
 
+	wp := workerpool.New(10)
+
 	go func() {
 		for notif := range notifs {
-			asModel, err := notificationToModel(notif)
-			if err != nil {
-				logger.For(ctx).Errorf("error converting notification to model: %v", err)
-				continue
-			}
-			select {
-			case result <- asModel:
-			default:
-				logger.For(ctx).Errorf("notification subscription channel full, dropping notification")
-				notifDispatcher.UnsubscribeUpdatedNotificationsForUser(userID)
-			}
+			n := notif
+			wp.Submit(func() {
+				asModel, err := notificationToModel(n)
+				if err != nil {
+					logger.For(nil).Errorf("error converting notification to model: %v", err)
+					return
+				}
+				select {
+				case result <- asModel:
+					logger.For(nil).Debug("sent updated notification to subscription")
+				default:
+					logger.For(nil).Errorf("notification subscription channel full, dropping notification")
+					notifDispatcher.UnsubscribeUpdatedNotificationsForUser(userID)
+				}
+			})
 		}
+		wp.StopWait()
 	}()
 
 	return result
@@ -999,6 +1046,16 @@ func resolveGroupedUserNotificationPageInfo(ctx context.Context, userConn *model
 	}
 
 	return &pageInfo, nil
+}
+
+func resolveNotificationByID(ctx context.Context, id persist.DBID) (model.Notification, error) {
+	notification, err := publicapi.For(ctx).Notifications.GetByID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return notificationToModel(notification)
 }
 
 func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {

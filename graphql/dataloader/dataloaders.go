@@ -25,6 +25,7 @@
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
+//go:generate go run github.com/gallery-so/dataloaden NotificationLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Notification
 
 package dataloader
 
@@ -79,6 +80,7 @@ type Loaders struct {
 	AdmiresByFeedEventID     *AdmiresLoaderByID
 	CommentByCommentID       *CommentLoaderByID
 	CommentsByFeedEventID    *CommentsLoaderByID
+	NotificationByID         *NotificationLoaderByID
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -223,6 +225,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.CommentsByFeedEventID = NewCommentsLoaderByID(defaults, loadCommentsByFeedEventId(q))
 
+	loaders.NotificationByID = NewNotificationLoaderByID(defaults, loadNotificationById(q), NotificationLoaderByIDCacheSubscriptions{
+		AutoCacheWithKey: func(notification db.Notification) persist.DBID { return notification.ID },
+	})
+
 	return loaders
 }
 
@@ -338,6 +344,23 @@ func loadGalleriesByUserId(q *db.Queries) func(context.Context, []persist.DBID) 
 		})
 
 		return galleries, errors
+	}
+}
+
+func loadNotificationById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Notification, []error) {
+	return func(ctx context.Context, ids []persist.DBID) ([]db.Notification, []error) {
+		notifs := make([]db.Notification, len(ids))
+		errors := make([]error, len(ids))
+
+		b := q.GetNotificationByIDBatch(ctx, ids)
+		defer b.Close()
+
+		b.QueryRow(func(i int, n db.Notification, err error) {
+			errors[i] = err
+			notifs[i] = n
+		})
+
+		return notifs, errors
 	}
 }
 

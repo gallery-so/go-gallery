@@ -897,6 +897,37 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
+const getMostRecentNotifiactionByOwnerIDForAction = `-- name: GetMostRecentNotifiactionByOwnerIDForAction :one
+SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false
+    ORDER BY created_at DESC
+    LIMIT 1
+`
+
+type GetMostRecentNotifiactionByOwnerIDForActionParams struct {
+	OwnerID persist.DBID
+	Action  persist.Action
+}
+
+func (q *Queries) GetMostRecentNotifiactionByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotifiactionByOwnerIDForActionParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, getMostRecentNotifiactionByOwnerIDForAction, arg.OwnerID, arg.Action)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.ActorID,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.Seen,
+		&i.Amount,
+	)
+	return i, err
+}
+
 const getNotificationByID = `-- name: GetNotificationByID :one
 SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = $1 AND deleted = false
 `

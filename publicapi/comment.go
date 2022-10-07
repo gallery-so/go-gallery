@@ -77,6 +77,7 @@ func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persis
 		Action:  persist.ActionCommentedOnFeedEvent,
 		ActorID: actor,
 		OwnerID: feedEvent.OwnerID,
+		Amount:  1,
 		Data: persist.NotificationData{
 			FeedEventID: feedEventID,
 			CommentID:   commentID,
