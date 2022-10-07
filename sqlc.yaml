@@ -14,6 +14,7 @@ sql:
       overrides:
         # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
         # the override should come _before_ the * entry
+
         # Wildcards
         # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
         - column: "*.id"
