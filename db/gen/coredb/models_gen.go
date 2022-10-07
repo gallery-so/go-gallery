@@ -174,6 +174,7 @@ type Gallery struct {
 	Version     sql.NullInt32
 	OwnerUserID persist.DBID
 	Collections persist.DBIDList
+	Views       int32
 }
 
 type LoginAttempt struct {

@@ -704,6 +704,19 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 	return output, nil
 }
 
+func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error) {
+	gallery, err := publicapi.For(ctx).Gallery.ViewGallery(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.ViewGalleryPayload{
+		Gallery: galleryToModel(ctx, gallery),
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error) {
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	notifications, err := publicapi.For(ctx).Notifications.ClearUserNotifications(ctx, userID)

@@ -759,7 +759,7 @@ func (b *GetFollowingByUserIdBatchBatchResults) Close() error {
 }
 
 const getGalleriesByUserIdBatch = `-- name: GetGalleriesByUserIdBatch :batchmany
-SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE owner_user_id = $1 AND deleted = false
+SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, views FROM galleries WHERE owner_user_id = $1 AND deleted = false
 `
 
 type GetGalleriesByUserIdBatchBatchResults struct {
@@ -797,6 +797,7 @@ func (b *GetGalleriesByUserIdBatchBatchResults) Query(f func(int, []Gallery, err
 				&i.Version,
 				&i.OwnerUserID,
 				&i.Collections,
+				&i.Views,
 			); err != nil {
 				break
 			}
@@ -815,7 +816,7 @@ func (b *GetGalleriesByUserIdBatchBatchResults) Close() error {
 }
 
 const getGalleryByCollectionIdBatch = `-- name: GetGalleryByCollectionIdBatch :batchone
-SELECT g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id, g.collections FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false AND $1 = ANY(g.collections) AND g.deleted = false
+SELECT g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id, g.collections, g.views FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false AND $1 = ANY(g.collections) AND g.deleted = false
 `
 
 type GetGalleryByCollectionIdBatchBatchResults struct {
@@ -847,6 +848,7 @@ func (b *GetGalleryByCollectionIdBatchBatchResults) QueryRow(f func(int, Gallery
 			&i.Version,
 			&i.OwnerUserID,
 			&i.Collections,
+			&i.Views,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -863,7 +865,7 @@ func (b *GetGalleryByCollectionIdBatchBatchResults) Close() error {
 }
 
 const getGalleryByIdBatch = `-- name: GetGalleryByIdBatch :batchone
-SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE id = $1 AND deleted = false
+SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, views FROM galleries WHERE id = $1 AND deleted = false
 `
 
 type GetGalleryByIdBatchBatchResults struct {
@@ -895,6 +897,7 @@ func (b *GetGalleryByIdBatchBatchResults) QueryRow(f func(int, Gallery, error)) 
 			&i.Version,
 			&i.OwnerUserID,
 			&i.Collections,
+			&i.Views,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break

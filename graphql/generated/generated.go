@@ -468,6 +468,7 @@ type ComplexityRoot struct {
 		UpdateNotificationSettings func(childComplexity int, settings *model.NotificationSettingsInput) int
 		UpdateTokenInfo            func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserInfo             func(childComplexity int, input model.UpdateUserInfoInput) int
+		ViewGallery                func(childComplexity int, galleryID persist.DBID) int
 	}
 
 	NotificationEdge struct {
@@ -743,6 +744,10 @@ type ComplexityRoot struct {
 		Small  func(childComplexity int) int
 	}
 
+	ViewGalleryPayload struct {
+		Gallery func(childComplexity int) int
+	}
+
 	Viewer struct {
 		Feed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
 		NotificationSettings func(childComplexity int) int
@@ -865,6 +870,7 @@ type MutationResolver interface {
 	RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error)
 	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error)
 	RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error)
+	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
 	ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error)
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
 }
@@ -2554,6 +2560,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateUserInfo(childComplexity, args["input"].(model.UpdateUserInfoInput)), true
 
+	case "Mutation.viewGallery":
+		if e.complexity.Mutation.ViewGallery == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_viewGallery_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ViewGallery(childComplexity, args["galleryId"].(persist.DBID)), true
+
 	case "NotificationEdge.cursor":
 		if e.complexity.NotificationEdge.Cursor == nil {
 			break
@@ -3746,6 +3764,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.VideoURLSet.Small(childComplexity), true
+
+	case "ViewGalleryPayload.gallery":
+		if e.complexity.ViewGalleryPayload.Gallery == nil {
+			break
+		}
+
+		return e.complexity.ViewGalleryPayload.Gallery(childComplexity), true
 
 	case "Viewer.feed":
 		if e.complexity.Viewer.Feed == nil {
@@ -5035,6 +5060,14 @@ type ClearAllNotificationsPayload {
     notifications: [Notification]
 }
 
+type ViewGalleryPayload {
+    gallery: Gallery
+}
+
+union ViewGalleryPayloadOrError =
+    ViewGalleryPayload
+    | ErrAuthenticationFailed
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -5072,6 +5105,8 @@ type Mutation {
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+    
+    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError @authRequired
 
     clearAllNotifications: ClearAllNotificationsPayload
 
@@ -5546,6 +5581,21 @@ func (ec *executionContext) field_Mutation_updateUserInfo_args(ctx context.Conte
 		}
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_viewGallery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["galleryId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["galleryId"] = arg0
 	return args, nil
 }
 
@@ -13277,6 +13327,65 @@ func (ec *executionContext) _Mutation_removeComment(ctx context.Context, field g
 	return ec.marshalORemoveCommentPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRemoveCommentPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_viewGallery(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_viewGallery_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ViewGallery(rctx, args["galleryId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.ViewGalleryPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ViewGalleryPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.ViewGalleryPayloadOrError)
+	fc.Result = res
+	return ec.marshalOViewGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewGalleryPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_clearAllNotifications(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -18716,6 +18825,38 @@ func (ec *executionContext) _VideoURLSet_large(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ViewGalleryPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.ViewGalleryPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ViewGalleryPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -22742,6 +22883,29 @@ func (ec *executionContext) _UserByUsernameOrError(ctx context.Context, sel ast.
 	}
 }
 
+func (ec *executionContext) _ViewGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ViewGalleryPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ViewGalleryPayload:
+		return ec._ViewGalleryPayload(ctx, sel, &obj)
+	case *model.ViewGalleryPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ViewGalleryPayload(ctx, sel, obj)
+	case model.ErrAuthenticationFailed:
+		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
+	case *model.ErrAuthenticationFailed:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _ViewerOrError(ctx context.Context, sel ast.SelectionSet, obj model.ViewerOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -24230,7 +24394,7 @@ func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.
 	return out
 }
 
-var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
+var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "ViewGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAuthenticationFailedImplementors)
@@ -25906,6 +26070,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "removeComment":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeComment(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "viewGallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_viewGallery(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -28333,6 +28504,34 @@ func (ec *executionContext) _VideoURLSet(ctx context.Context, sel ast.SelectionS
 		case "large":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._VideoURLSet_large(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var viewGalleryPayloadImplementors = []string{"ViewGalleryPayload", "ViewGalleryPayloadOrError"}
+
+func (ec *executionContext) _ViewGalleryPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ViewGalleryPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, viewGalleryPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ViewGalleryPayload")
+		case "gallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ViewGalleryPayload_gallery(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -31298,6 +31497,13 @@ func (ec *executionContext) marshalOVideoURLSet2ᚖgithubᚗcomᚋmikeydubᚋgo�
 		return graphql.Null
 	}
 	return ec._VideoURLSet(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOViewGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ViewGalleryPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ViewGalleryPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx context.Context, sel ast.SelectionSet, v *model.Viewer) graphql.Marshaler {

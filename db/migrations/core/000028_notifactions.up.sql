@@ -16,3 +16,4 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS notification_owner_id_idx ON notifications (owner_id);
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_settings JSONB;
+ALTER TABLE galleries ADD COLUMN IF NOT EXISTS views int NOT NULL DEFAULT 0;

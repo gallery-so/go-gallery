@@ -182,6 +182,10 @@ type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
 
+type ViewGalleryPayloadOrError interface {
+	IsViewGalleryPayloadOrError()
+}
+
 type ViewerOrError interface {
 	IsViewerOrError()
 }
@@ -446,6 +450,7 @@ func (ErrAuthenticationFailed) IsAdmireFeedEventPayloadOrError()    {}
 func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
+func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -1122,6 +1127,12 @@ type VideoURLSet struct {
 	Medium *string `json:"medium"`
 	Large  *string `json:"large"`
 }
+
+type ViewGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`

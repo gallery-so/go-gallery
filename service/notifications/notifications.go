@@ -144,18 +144,17 @@ type groupedNotificationHandler struct {
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	notifID := notif.ID
-	var createdAtTime time.Time
+	var curNotif db.Notification
 	if notifID != "" {
-		curNotif, _ := h.queries.GetNotificationByID(ctx, notif.ID)
+		curNotif, _ = h.queries.GetNotificationByID(ctx, notif.ID)
 		if curNotif.ID != "" {
 			notifID = curNotif.ID
-			createdAtTime = curNotif.CreatedAt
 		}
 	}
-	if notifID != "" && time.Since(createdAtTime) < window {
+	if notifID != "" && time.Since(curNotif.CreatedAt) < window {
 		err := h.queries.UpdateNotification(ctx, db.UpdateNotificationParams{
 			ID:     notifID,
-			Data:   notif.Data,
+			Data:   createNewData(curNotif.Data, notif.Data),
 			Amount: notif.Amount,
 		})
 		if err != nil {
@@ -257,4 +256,14 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 		logger.For(nil).Errorf("error receiving new notifications from pubsub: %s", err)
 		panic(err)
 	}
+}
+
+func createNewData(oldData persist.NotificationData, newData persist.NotificationData) persist.NotificationData {
+	// concat every array in newData to the corresponding array in oldData
+	result := persist.NotificationData{}
+	result.AdmirerIDs = append(oldData.AdmirerIDs, newData.AdmirerIDs...)
+	result.FollowerIDs = append(oldData.FollowerIDs, newData.FollowerIDs...)
+	result.ViewerIDs = append(oldData.ViewerIDs, newData.ViewerIDs...)
+
+	return result
 }

@@ -96,6 +96,27 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 	return nil
 }
 
+func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
+	// Validate
+	if err := validateFields(nil, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return db.Gallery{}, err
+	}
+
+	err := api.queries.IncrementGalleryViews(ctx, galleryID)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	return gallery, nil
+}
+
 func backupGalleriesForUser(ctx context.Context, userID persist.DBID, repos *persist.Repositories) {
 	ctxCopy := util.GinContextFromContext(ctx).Copy()
 

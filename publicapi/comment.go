@@ -61,12 +61,26 @@ func (api CommentAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persis
 		return "", err
 	}
 
-	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx), replyToID, comment)
+	actor := For(ctx).User.GetLoggedInUserId(ctx)
+
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, actor, replyToID, comment)
 	if err != nil {
 		return "", err
 	}
+
+	feedEvent, err := api.loaders.EventByEventID.Load(feedEventID)
+	if err != nil {
+		return "", err
+	}
+
 	dispatchNotification(ctx, db.Notification{
-		Action: persist.ActionCommentedOnFeedEvent,
+		Action:  persist.ActionCommentedOnFeedEvent,
+		ActorID: actor,
+		OwnerID: feedEvent.OwnerID,
+		Data: persist.NotificationData{
+			FeedEventID: feedEventID,
+			CommentID:   commentID,
+		},
 	})
 	return commentID, nil
 }

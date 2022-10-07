@@ -1111,6 +1111,14 @@ type ClearAllNotificationsPayload {
     notifications: [Notification]
 }
 
+type ViewGalleryPayload {
+    gallery: Gallery
+}
+
+union ViewGalleryPayloadOrError =
+    ViewGalleryPayload
+    | ErrAuthenticationFailed
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1148,6 +1156,8 @@ type Mutation {
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+    
+    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError @authRequired
 
     clearAllNotifications: ClearAllNotificationsPayload
 

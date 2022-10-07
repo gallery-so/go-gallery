@@ -436,3 +436,6 @@ UPDATE users SET notification_settings = $2 WHERE id = $1;
 
 -- name: ClearNotificationsForUser :many
 UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING *;
+
+-- name: IncrementGalleryViews :exec
+UPDATE galleries SET views = views + 1 WHERE id = $1;

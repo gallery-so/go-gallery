@@ -299,6 +299,20 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	// Send event
 	go dispatchFollowEventToFeed(sentryutil.NewSentryHubGinContext(ctx), api, curUserID, userID, refollowed)
 
+	action := persist.ActionUserFollowedUsers
+	if refollowed {
+		action = persist.ActionUserFollowedUserBack
+	}
+
+	dispatchNotification(ctx, db.Notification{
+		ActorID: curUserID,
+		OwnerID: userID,
+		Action:  action,
+		Data: persist.NotificationData{
+			FollowerIDs: []persist.DBID{curUserID},
+		},
+	})
+
 	return nil
 }
 
