@@ -45,10 +45,10 @@ type UserUpdateNotificationSettings struct {
     someoneViewedYourGallery: Boolean
 */
 type UserNotificationSettings struct {
-	SomeoneFollowedYou           bool `json:"someone_followed_you"`
-	SomeoneAdmiredYourUpdate     bool `json:"someone_admired_your_update"`
-	SomeoneCommentedOnYourUpdate bool `json:"someone_commented_on_your_update"`
-	SomeoneViewedYourGallery     bool `json:"someone_viewed_your_gallery"`
+	SomeoneFollowedYou           *bool `json:"someone_followed_you,omitempty"`
+	SomeoneAdmiredYourUpdate     *bool `json:"someone_admired_your_update,omitempty"`
+	SomeoneCommentedOnYourUpdate *bool `json:"someone_commented_on_your_update,omitempty"`
+	SomeoneViewedYourGallery     *bool `json:"someone_viewed_your_gallery,omitempty"`
 }
 
 type CreateUserInput struct {

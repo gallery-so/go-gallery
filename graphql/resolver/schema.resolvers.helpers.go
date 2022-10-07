@@ -782,10 +782,10 @@ func notificationSettingsToModel(ctx context.Context, user *db.User) *model.Noti
 			UserId: user.ID,
 		},
 		User:                         userToModel(ctx, *user),
-		SomeoneFollowedYou:           &settings.SomeoneFollowedYou,
-		SomeoneAdmiredYourUpdate:     &settings.SomeoneAdmiredYourUpdate,
-		SomeoneCommentedOnYourUpdate: &settings.SomeoneCommentedOnYourUpdate,
-		SomeoneViewedYourGallery:     &settings.SomeoneViewedYourGallery,
+		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     settings.SomeoneViewedYourGallery,
 	}
 }
 

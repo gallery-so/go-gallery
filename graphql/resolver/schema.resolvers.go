@@ -741,10 +741,10 @@ func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.Cl
 
 func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error) {
 	err := publicapi.For(ctx).User.UpdateUserNotificationSettings(ctx, persist.UserNotificationSettings{
-		SomeoneFollowedYou:           *settings.SomeoneFollowedYou,
-		SomeoneAdmiredYourUpdate:     *settings.SomeoneAdmiredYourUpdate,
-		SomeoneCommentedOnYourUpdate: *settings.SomeoneCommentedOnYourUpdate,
-		SomeoneViewedYourGallery:     *settings.SomeoneViewedYourGallery,
+		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     settings.SomeoneViewedYourGallery,
 	})
 	if err != nil {
 		return nil, err
