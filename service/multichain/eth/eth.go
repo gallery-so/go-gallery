@@ -297,11 +297,7 @@ func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address
 		eg.Go(func() error {
 			ctx := sentryutil.NewSentryHubContext(ctx)
 			msg := task.DeepRefreshMessage{OwnerAddress: persist.EthereumAddress(ownerAddress.String()), RefreshRange: rng}
-			err := task.CreateTaskForDeepRefresh(ctx, msg, d.taskClient)
-			if err != nil {
-				panic(err)
-			}
-			return err
+			return task.CreateTaskForDeepRefresh(ctx, msg, d.taskClient)
 		})
 
 		if rng[1] == toBlock {
