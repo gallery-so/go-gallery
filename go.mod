@@ -21,7 +21,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.16
 	github.com/everFinance/goar v1.4.0
-	github.com/gallery-so/dataloaden v0.0.0-20221004141822-8e925e89cb9f // indirect
+	github.com/gallery-so/dataloaden v0.0.0-20221004141822-8e925e89cb9f
 	github.com/gammazero/deque v0.1.1 // indirect
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
@@ -69,7 +69,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/ugorji/go v1.2.7 // indirect
-	github.com/vektah/dataloaden v0.3.0
 	github.com/vektah/gqlparser/v2 v2.4.1
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect

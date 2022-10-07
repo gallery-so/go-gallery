@@ -183,8 +183,6 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain, asUs
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 
-	api.loaders.ClearAllCaches()
-
 	return nil
 }
 
@@ -199,14 +197,14 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	if err != nil {
 		return err
 	}
-	contract, err := api.loaders.ContractByContractId.Load(token.Contract)
+	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
 	if err != nil {
 		return err
 	}
 
 	addresses := []persist.Address{}
 	for _, walletID := range token.OwnedByWallets {
-		wa, err := api.loaders.WalletByWalletId.Load(walletID)
+		wa, err := api.loaders.WalletByWalletID.Load(walletID)
 		if err != nil {
 			return err
 		}
@@ -217,8 +215,6 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
-
-	api.loaders.ClearAllCaches()
 
 	return nil
 }
@@ -239,7 +235,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	for _, token := range tokens {
 		token := token
 		wp.Submit(func() {
-			contract, err := api.loaders.ContractByContractId.Load(token.Contract)
+			contract, err := api.loaders.ContractByContractID.Load(token.Contract)
 			if err != nil {
 				errChan <- err
 				return
@@ -247,7 +243,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 
 			addresses := []persist.Address{}
 			for _, walletID := range token.OwnedByWallets {
-				wa, err := api.loaders.WalletByWalletId.Load(walletID)
+				wa, err := api.loaders.WalletByWalletID.Load(walletID)
 				if err != nil {
 					errChan <- err
 					return
@@ -269,8 +265,6 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 	if err := <-errChan; err != nil {
 		return err
 	}
-
-	api.loaders.ClearAllCaches()
 
 	return nil
 }
@@ -300,8 +294,6 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	if err != nil {
 		return err
 	}
-
-	api.loaders.ClearAllCaches()
 
 	// Send event
 	dispatchEventToFeed(ctx, db.Event{
