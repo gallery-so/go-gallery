@@ -6,6 +6,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/graphql/generated"
@@ -199,7 +200,39 @@ func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, 
 }
 
 func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventInteractionsConnection, error) {
-	panic(fmt.Errorf("not implemented"))
+	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByFeedEventID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.FeedEventInteractionsEdge
+	for _, interaction := range interactions {
+		edge := &model.FeedEventInteractionsEdge{
+			Event:  obj,
+			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+		}
+		if admire, ok := interaction.(db.Admire); ok {
+			edge.Node = admireToModel(ctx, admire)
+		} else if comment, ok := interaction.(db.Comment); ok {
+			edge.Node = commentToModel(ctx, comment)
+		}
+		edges = append(edges, edge)
+	}
+
+	// TODO: pageInfoToModel
+	pageInfoModel := &model.PageInfo{
+		Total:           pageInfo.Total,
+		Size:            pageInfo.Size,
+		HasPreviousPage: pageInfo.HasPreviousPage,
+		HasNextPage:     pageInfo.HasNextPage,
+		StartCursor:     pageInfo.StartCursor,
+		EndCursor:       pageInfo.EndCursor,
+	}
+
+	return &model.FeedEventInteractionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoModel,
+	}, nil
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {

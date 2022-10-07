@@ -30,6 +30,197 @@ type InteractionAPI struct {
 	ethClient *ethclient.Client
 }
 
+func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
+	first *int, last *int) ([]interface{}, PageInfo, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"feedEventID": {feedEventID, "required"},
+		"first":       {first, "omitempty,gte=0"},
+		"last":        {last, "omitempty,gte=0"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := api.validator.Struct(validate.ConnectionPaginationParams{
+		Before: before,
+		After:  after,
+		First:  first,
+		Last:   last,
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	curBeforeTime := defaultCursorBeforeTime
+	curBeforeID := persist.DBID("")
+	curAfterTime := defaultCursorAfterTime
+	curAfterID := persist.DBID("")
+
+	// Limit is intentionally 1 more than requested, so we can see if there are additional pages
+	limit := 1
+	if first != nil {
+		limit += *first
+	} else {
+		limit += *last
+	}
+
+	var err error
+	if before != nil {
+		curBeforeTime, curBeforeID, err = decodeTimestampDBIDCursor(*before)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	}
+
+	if after != nil {
+		curAfterTime, curAfterID, err = decodeTimestampDBIDCursor(*after)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	}
+
+	type interactionKey struct {
+		ID        persist.DBID
+		CreatedAt time.Time
+		Tag       int
+	}
+	var orderedKeys []interactionKey
+	typeToIDs := make(map[int][]persist.DBID)
+
+	if first != nil {
+		rows, err := api.queries.PaginateInteractionsByFeedEventIDForward(ctx, db.PaginateInteractionsByFeedEventIDForwardParams{
+			FeedEventID:   feedEventID,
+			Limit:         int32(limit),
+			CurBeforeTime: curBeforeTime,
+			CurBeforeID:   curBeforeID,
+			CurAfterTime:  curAfterTime,
+			CurAfterID:    curAfterID,
+			AdmireTag:     1,
+			CommentTag:    2,
+		})
+
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		for _, row := range rows {
+			orderedKeys = append(orderedKeys, interactionKey{ID: row.ID, CreatedAt: row.CreatedAt, Tag: int(row.Tag)})
+			typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
+		}
+	} else {
+		rows, err := api.queries.PaginateInteractionsByFeedEventIDBackward(ctx, db.PaginateInteractionsByFeedEventIDBackwardParams{
+			FeedEventID:   feedEventID,
+			Limit:         int32(limit),
+			CurBeforeTime: curBeforeTime,
+			CurBeforeID:   curBeforeID,
+			CurAfterTime:  curAfterTime,
+			CurAfterID:    curAfterID,
+			AdmireTag:     1,
+			CommentTag:    2,
+		})
+
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		for _, row := range rows {
+			orderedKeys = append(orderedKeys, interactionKey{ID: row.ID, CreatedAt: row.CreatedAt, Tag: int(row.Tag)})
+			typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
+		}
+	}
+
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	pageInfo := PageInfo{}
+
+	// Since limit is actually 1 more than requested, if len(comments) == limit, there must be additional pages
+	if len(orderedKeys) == limit {
+		orderedKeys = orderedKeys[:len(orderedKeys)-1]
+		if first != nil {
+			pageInfo.HasNextPage = true
+		} else {
+			pageInfo.HasPreviousPage = true
+		}
+	}
+
+	if last != nil {
+		// Reverse the slice if we're paginating backwards, since forward and backward
+		// pagination are supposed to have elements in the same order.
+		for i, j := 0, len(orderedKeys)-1; i < j; i, j = i+1, j-1 {
+			orderedKeys[i], orderedKeys[j] = orderedKeys[j], orderedKeys[i]
+		}
+	}
+
+	// If this is the first query (i.e. no cursors have been supplied), return the total count too
+	if before == nil && after == nil {
+		total, err := api.queries.CountInteractionsByFeedEventID(ctx, db.CountInteractionsByFeedEventIDParams{
+			FeedEventID: feedEventID,
+			AdmireTag:   1,
+			CommentTag:  2,
+		})
+
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+		totalInt := int(total)
+		pageInfo.Total = &totalInt
+	}
+
+	pageInfo.Size = len(orderedKeys)
+
+	if len(orderedKeys) > 0 {
+		firstNode := orderedKeys[0]
+		lastNode := orderedKeys[len(orderedKeys)-1]
+
+		pageInfo.StartCursor, err = encodeTimestampDBIDCursor(firstNode.CreatedAt, firstNode.ID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		pageInfo.EndCursor, err = encodeTimestampDBIDCursor(lastNode.CreatedAt, lastNode.ID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	}
+
+	var results []interface{}
+	resultsByID := make(map[persist.DBID]interface{})
+
+	// TODO: Execute these queries in parallel
+	admireIDs := typeToIDs[1]
+	if len(admireIDs) > 0 {
+		admires, err := api.queries.GetAdmiresByAdmireIDs(ctx, admireIDs)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		for _, admire := range admires {
+			resultsByID[admire.ID] = admire
+		}
+	}
+
+	commentIDs := typeToIDs[2]
+	if len(commentIDs) > 0 {
+		comments, err := api.queries.GetCommentsByCommentIDs(ctx, commentIDs)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		for _, comment := range comments {
+			resultsByID[comment.ID] = comment
+		}
+	}
+
+	for _, key := range orderedKeys {
+		if result, ok := resultsByID[key.ID]; ok {
+			results = append(results, result)
+		}
+	}
+
+	return results, pageInfo, err
+}
+
 func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]db.Comment, PageInfo, error) {
 	// Validate

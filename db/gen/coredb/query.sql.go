@@ -35,6 +35,27 @@ func (q *Queries) CountCommentsByFeedEventID(ctx context.Context, feedEventID pe
 	return count, err
 }
 
+const countInteractionsByFeedEventID = `-- name: CountInteractionsByFeedEventID :one
+SELECT sum(counts.count) FROM (
+    SELECT count(*) FROM admires t WHERE $2::int != 0 AND t.feed_event_id = $1 AND t.deleted = false
+                                                    UNION
+    SELECT count(*) FROM comments t WHERE $3::int != 0 AND t.feed_event_id = $1 AND t.deleted = false)
+as counts
+`
+
+type CountInteractionsByFeedEventIDParams struct {
+	FeedEventID persist.DBID
+	AdmireTag   int32
+	CommentTag  int32
+}
+
+func (q *Queries) CountInteractionsByFeedEventID(ctx context.Context, arg CountInteractionsByFeedEventIDParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countInteractionsByFeedEventID, arg.FeedEventID, arg.AdmireTag, arg.CommentTag)
+	var sum int64
+	err := row.Scan(&sum)
+	return sum, err
+}
+
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -1555,6 +1576,118 @@ func (q *Queries) PaginateCommentsByFeedEventIDForward(ctx context.Context, arg 
 			&i.CreatedAt,
 			&i.LastUpdated,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const paginateInteractionsByFeedEventIDBackward = `-- name: PaginateInteractionsByFeedEventIDBackward :many
+SELECT t.created_at, t.id, $3::int as tag FROM admires t WHERE $3 != 0 AND t.feed_event_id = $1 AND t.deleted = false
+    AND (t.created_at, t.id) < ($4, $5) AND (t.created_at, t.id) > ($6, $7)
+                                                        UNION
+SELECT t.created_at, t.id, $8::int as tag FROM comments t WHERE $8 != 0 AND t.feed_event_id = $1 AND t.deleted = false
+    AND (t.created_at, t.id) < ($4, $5) AND (t.created_at, t.id) > ($6, $7)
+
+ORDER BY created_at, id DESC LIMIT $2
+`
+
+type PaginateInteractionsByFeedEventIDBackwardParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	AdmireTag     int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	CommentTag    int32
+}
+
+type PaginateInteractionsByFeedEventIDBackwardRow struct {
+	CreatedAt time.Time
+	ID        persist.DBID
+	Tag       int32
+}
+
+func (q *Queries) PaginateInteractionsByFeedEventIDBackward(ctx context.Context, arg PaginateInteractionsByFeedEventIDBackwardParams) ([]PaginateInteractionsByFeedEventIDBackwardRow, error) {
+	rows, err := q.db.Query(ctx, paginateInteractionsByFeedEventIDBackward,
+		arg.FeedEventID,
+		arg.Limit,
+		arg.AdmireTag,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.CommentTag,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaginateInteractionsByFeedEventIDBackwardRow
+	for rows.Next() {
+		var i PaginateInteractionsByFeedEventIDBackwardRow
+		if err := rows.Scan(&i.CreatedAt, &i.ID, &i.Tag); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const paginateInteractionsByFeedEventIDForward = `-- name: PaginateInteractionsByFeedEventIDForward :many
+SELECT t.created_at, t.id, $3::int as tag FROM admires t WHERE $3 != 0 AND t.feed_event_id = $1 AND t.deleted = false
+    AND (t.created_at, t.id) < ($4, $5) AND (t.created_at, t.id) > ($6, $7)
+                                                        UNION
+SELECT t.created_at, t.id, $8::int as tag FROM comments t WHERE $8 != 0 AND t.feed_event_id = $1 AND t.deleted = false
+    AND (t.created_at, t.id) < ($4, $5) AND (t.created_at, t.id) > ($6, $7)
+
+ORDER BY created_at, id ASC LIMIT $2
+`
+
+type PaginateInteractionsByFeedEventIDForwardParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	AdmireTag     int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	CommentTag    int32
+}
+
+type PaginateInteractionsByFeedEventIDForwardRow struct {
+	CreatedAt time.Time
+	ID        persist.DBID
+	Tag       int32
+}
+
+func (q *Queries) PaginateInteractionsByFeedEventIDForward(ctx context.Context, arg PaginateInteractionsByFeedEventIDForwardParams) ([]PaginateInteractionsByFeedEventIDForwardRow, error) {
+	rows, err := q.db.Query(ctx, paginateInteractionsByFeedEventIDForward,
+		arg.FeedEventID,
+		arg.Limit,
+		arg.AdmireTag,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.CommentTag,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaginateInteractionsByFeedEventIDForwardRow
+	for rows.Next() {
+		var i PaginateInteractionsByFeedEventIDForwardRow
+		if err := rows.Scan(&i.CreatedAt, &i.ID, &i.Tag); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
