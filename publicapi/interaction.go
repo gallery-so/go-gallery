@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/mikeydub/go-gallery/validate"
 	"time"
 
@@ -30,162 +31,92 @@ type InteractionAPI struct {
 	ethClient *ethclient.Client
 }
 
+// timeIDPagingParams are the parameters used to paginate with a time+DBID cursor
+type timeIDPagingParams struct {
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+// timeIDPagedQuery returns paginated results for the given paging parameters
+type timeIDPagedQuery func(params timeIDPagingParams) ([]interface{}, error)
+
+// timeIDTotalCount returns the total number of items that can be paginated
+type timeIDTotalCount func() (int, error)
+
+// timeIDCursorComponents returns a time and DBID that will be used to encode an opaque cursor string
+type timeIDCursorComponents func(interface{}) (time.Time, persist.DBID, error)
+
 func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]interface{}, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
-		"first":       {first, "omitempty,gte=0"},
-		"last":        {last, "omitempty,gte=0"},
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
 
-	if err := api.validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
-		First:  first,
-		Last:   last,
-	}); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	curBeforeTime := defaultCursorBeforeTime
-	curBeforeID := persist.DBID("")
-	curAfterTime := defaultCursorAfterTime
-	curAfterID := persist.DBID("")
-
-	// Limit is intentionally 1 more than requested, so we can see if there are additional pages
-	limit := 1
-	if first != nil {
-		limit += *first
-	} else {
-		limit += *last
-	}
-
-	var err error
-	if before != nil {
-		curBeforeTime, curBeforeID, err = decodeTimestampDBIDCursor(*before)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-	}
-
-	if after != nil {
-		curAfterTime, curAfterID, err = decodeTimestampDBIDCursor(*after)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-	}
-
-	type interactionKey struct {
-		ID        persist.DBID
-		CreatedAt time.Time
-		Tag       int
-	}
-	var orderedKeys []interactionKey
-	typeToIDs := make(map[int][]persist.DBID)
-
-	if first != nil {
-		rows, err := api.queries.PaginateInteractionsByFeedEventIDForward(ctx, db.PaginateInteractionsByFeedEventIDForwardParams{
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+		keys, err := api.queries.PaginateInteractionsByFeedEventID(ctx, db.PaginateInteractionsByFeedEventIDParams{
 			FeedEventID:   feedEventID,
-			Limit:         int32(limit),
-			CurBeforeTime: curBeforeTime,
-			CurBeforeID:   curBeforeID,
-			CurAfterTime:  curAfterTime,
-			CurAfterID:    curAfterID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CurBeforeTime,
+			CurBeforeID:   params.CurBeforeID,
+			CurAfterTime:  params.CurAfterTime,
+			CurAfterID:    params.CurAfterID,
+			PagingForward: params.PagingForward,
 			AdmireTag:     1,
 			CommentTag:    2,
 		})
 
 		if err != nil {
-			return nil, PageInfo{}, err
+			return nil, err
 		}
 
-		for _, row := range rows {
-			orderedKeys = append(orderedKeys, interactionKey{ID: row.ID, CreatedAt: row.CreatedAt, Tag: int(row.Tag)})
-			typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
-		}
-	} else {
-		rows, err := api.queries.PaginateInteractionsByFeedEventIDBackward(ctx, db.PaginateInteractionsByFeedEventIDBackwardParams{
-			FeedEventID:   feedEventID,
-			Limit:         int32(limit),
-			CurBeforeTime: curBeforeTime,
-			CurBeforeID:   curBeforeID,
-			CurAfterTime:  curAfterTime,
-			CurAfterID:    curAfterID,
-			AdmireTag:     1,
-			CommentTag:    2,
-		})
-
-		if err != nil {
-			return nil, PageInfo{}, err
+		results := make([]interface{}, len(keys))
+		for i, key := range keys {
+			results[i] = key
 		}
 
-		for _, row := range rows {
-			orderedKeys = append(orderedKeys, interactionKey{ID: row.ID, CreatedAt: row.CreatedAt, Tag: int(row.Tag)})
-			typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
-		}
+		return results, nil
 	}
 
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	pageInfo := PageInfo{}
-
-	// Since limit is actually 1 more than requested, if len(comments) == limit, there must be additional pages
-	if len(orderedKeys) == limit {
-		orderedKeys = orderedKeys[:len(orderedKeys)-1]
-		if first != nil {
-			pageInfo.HasNextPage = true
-		} else {
-			pageInfo.HasPreviousPage = true
-		}
-	}
-
-	if last != nil {
-		// Reverse the slice if we're paginating backwards, since forward and backward
-		// pagination are supposed to have elements in the same order.
-		for i, j := 0, len(orderedKeys)-1; i < j; i, j = i+1, j-1 {
-			orderedKeys[i], orderedKeys[j] = orderedKeys[j], orderedKeys[i]
-		}
-	}
-
-	// If this is the first query (i.e. no cursors have been supplied), return the total count too
-	if before == nil && after == nil {
+	countFunc := func() (int, error) {
 		total, err := api.queries.CountInteractionsByFeedEventID(ctx, db.CountInteractionsByFeedEventIDParams{
 			FeedEventID: feedEventID,
 			AdmireTag:   1,
 			CommentTag:  2,
 		})
-
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-		totalInt := int(total)
-		pageInfo.Total = &totalInt
+		return int(total), err
 	}
 
-	pageInfo.Size = len(orderedKeys)
-
-	if len(orderedKeys) > 0 {
-		firstNode := orderedKeys[0]
-		lastNode := orderedKeys[len(orderedKeys)-1]
-
-		pageInfo.StartCursor, err = encodeTimestampDBIDCursor(firstNode.CreatedAt, firstNode.ID)
-		if err != nil {
-			return nil, PageInfo{}, err
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if row, ok := i.(db.PaginateInteractionsByFeedEventIDRow); ok {
+			return row.CreatedAt, row.ID, nil
 		}
-
-		pageInfo.EndCursor, err = encodeTimestampDBIDCursor(lastNode.CreatedAt, lastNode.ID)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
 	}
 
-	var results []interface{}
-	resultsByID := make(map[persist.DBID]interface{})
+	results, pageInfo, err := api.paginateWithTimeIDCursor(ctx, before, after, first, last, queryFunc, countFunc, cursorFunc)
+
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	orderedKeys := make([]db.PaginateInteractionsByFeedEventIDRow, len(results))
+	typeToIDs := make(map[int][]persist.DBID)
+
+	for i, result := range results {
+		row := result.(db.PaginateInteractionsByFeedEventIDRow)
+		orderedKeys[i] = row
+		typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
+	}
+
+	var interactions []interface{}
+	interactionsByID := make(map[persist.DBID]interface{})
 
 	// TODO: Execute these queries in parallel
 	admireIDs := typeToIDs[1]
@@ -196,7 +127,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		}
 
 		for _, admire := range admires {
-			resultsByID[admire.ID] = admire
+			interactionsByID[admire.ID] = admire
 		}
 	}
 
@@ -208,141 +139,17 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		}
 
 		for _, comment := range comments {
-			resultsByID[comment.ID] = comment
+			interactionsByID[comment.ID] = comment
 		}
 	}
 
 	for _, key := range orderedKeys {
-		if result, ok := resultsByID[key.ID]; ok {
-			results = append(results, result)
+		if interaction, ok := interactionsByID[key.ID]; ok {
+			interactions = append(interactions, interaction)
 		}
 	}
 
-	return results, pageInfo, err
-}
-
-func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]db.Comment, PageInfo, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"feedEventID": {feedEventID, "required"},
-		"first":       {first, "omitempty,gte=0"},
-		"last":        {last, "omitempty,gte=0"},
-	}); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	if err := api.validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
-		First:  first,
-		Last:   last,
-	}); err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	curBeforeTime := defaultCursorBeforeTime
-	curBeforeID := persist.DBID("")
-	curAfterTime := defaultCursorAfterTime
-	curAfterID := persist.DBID("")
-
-	// Limit is intentionally 1 more than requested, so we can see if there are additional pages
-	limit := 1
-	if first != nil {
-		limit += *first
-	} else {
-		limit += *last
-	}
-
-	var err error
-	if before != nil {
-		curBeforeTime, curBeforeID, err = decodeTimestampDBIDCursor(*before)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-	}
-
-	if after != nil {
-		curAfterTime, curAfterID, err = decodeTimestampDBIDCursor(*after)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-	}
-
-	var comments []db.Comment
-
-	if first != nil {
-		comments, err = api.queries.PaginateCommentsByFeedEventIDForward(ctx, db.PaginateCommentsByFeedEventIDForwardParams{
-			FeedEventID:   feedEventID,
-			Limit:         int32(limit),
-			CurBeforeTime: curBeforeTime,
-			CurBeforeID:   curBeforeID,
-			CurAfterTime:  curAfterTime,
-			CurAfterID:    curAfterID,
-		})
-	} else {
-		comments, err = api.queries.PaginateCommentsByFeedEventIDBackward(ctx, db.PaginateCommentsByFeedEventIDBackwardParams{
-			FeedEventID:   feedEventID,
-			Limit:         int32(limit),
-			CurBeforeTime: curBeforeTime,
-			CurBeforeID:   curBeforeID,
-			CurAfterTime:  curAfterTime,
-			CurAfterID:    curAfterID,
-		})
-	}
-
-	if err != nil {
-		return nil, PageInfo{}, err
-	}
-
-	pageInfo := PageInfo{}
-
-	// Since limit is actually 1 more than requested, if len(comments) == limit, there must be additional pages
-	if len(comments) == limit {
-		comments = comments[:len(comments)-1]
-		if first != nil {
-			pageInfo.HasNextPage = true
-		} else {
-			pageInfo.HasPreviousPage = true
-		}
-	}
-
-	if last != nil {
-		// Reverse the slice if we're paginating backwards, since forward and backward
-		// pagination are supposed to have elements in the same order.
-		for i, j := 0, len(comments)-1; i < j; i, j = i+1, j-1 {
-			comments[i], comments[j] = comments[j], comments[i]
-		}
-	}
-
-	// If this is the first query (i.e. no cursors have been supplied), return the total count too
-	if before == nil && after == nil {
-		total, err := api.queries.CountAdmiresByFeedEventID(ctx, feedEventID)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-		totalInt := int(total)
-		pageInfo.Total = &totalInt
-	}
-
-	pageInfo.Size = len(comments)
-
-	if len(comments) > 0 {
-		firstNode := comments[0]
-		lastNode := comments[len(comments)-1]
-
-		pageInfo.StartCursor, err = encodeTimestampDBIDCursor(firstNode.CreatedAt, firstNode.ID)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-
-		pageInfo.EndCursor, err = encodeTimestampDBIDCursor(lastNode.CreatedAt, lastNode.ID)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-	}
-
-	return comments, pageInfo, err
+	return interactions, pageInfo, err
 }
 
 func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
@@ -350,8 +157,115 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
-		"first":       {first, "omitempty,gte=0"},
-		"last":        {last, "omitempty,gte=0"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+		admires, err := api.queries.PaginateAdmiresByFeedEventID(ctx, db.PaginateAdmiresByFeedEventIDParams{
+			FeedEventID:   feedEventID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CurBeforeTime,
+			CurBeforeID:   params.CurBeforeID,
+			CurAfterTime:  params.CurAfterTime,
+			CurAfterID:    params.CurAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(admires))
+		for i, admire := range admires {
+			results[i] = admire
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountAdmiresByFeedEventID(ctx, feedEventID)
+		return int(total), err
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if admire, ok := i.(db.Admire); ok {
+			return admire.CreatedAt, admire.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")
+	}
+
+	results, pageInfo, err := api.paginateWithTimeIDCursor(ctx, before, after, first, last, queryFunc, countFunc, cursorFunc)
+
+	admires := make([]db.Admire, len(results))
+	for i, result := range results {
+		admires[i] = result.(db.Admire)
+	}
+
+	return admires, pageInfo, err
+}
+
+func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
+	first *int, last *int) ([]db.Comment, PageInfo, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"feedEventID": {feedEventID, "required"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+		comments, err := api.queries.PaginateCommentsByFeedEventID(ctx, db.PaginateCommentsByFeedEventIDParams{
+			FeedEventID:   feedEventID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CurBeforeTime,
+			CurBeforeID:   params.CurBeforeID,
+			CurAfterTime:  params.CurAfterTime,
+			CurAfterID:    params.CurAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(comments))
+		for i, comment := range comments {
+			results[i] = comment
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountCommentsByFeedEventID(ctx, feedEventID)
+		return int(total), err
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if comment, ok := i.(db.Comment); ok {
+			return comment.CreatedAt, comment.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an comment")
+	}
+
+	results, pageInfo, err := api.paginateWithTimeIDCursor(ctx, before, after, first, last, queryFunc, countFunc, cursorFunc)
+
+	comments := make([]db.Comment, len(results))
+	for i, result := range results {
+		comments[i] = result.(db.Comment)
+	}
+
+	return comments, pageInfo, err
+}
+
+func (api InteractionAPI) paginateWithTimeIDCursor(ctx context.Context, before *string, after *string,
+	first *int, last *int, queryFunc timeIDPagedQuery, countFunc timeIDTotalCount, cursorFunc timeIDCursorComponents) ([]interface{}, PageInfo, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"first": {first, "omitempty,gte=0"},
+		"last":  {last, "omitempty,gte=0"},
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -393,27 +307,16 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		}
 	}
 
-	var admires []db.Admire
-
-	if first != nil {
-		admires, err = api.queries.PaginateAdmiresByFeedEventIDForward(ctx, db.PaginateAdmiresByFeedEventIDForwardParams{
-			FeedEventID:   feedEventID,
-			Limit:         int32(limit),
-			CurBeforeTime: curBeforeTime,
-			CurBeforeID:   curBeforeID,
-			CurAfterTime:  curAfterTime,
-			CurAfterID:    curAfterID,
-		})
-	} else {
-		admires, err = api.queries.PaginateAdmiresByFeedEventIDBackward(ctx, db.PaginateAdmiresByFeedEventIDBackwardParams{
-			FeedEventID:   feedEventID,
-			Limit:         int32(limit),
-			CurBeforeTime: curBeforeTime,
-			CurBeforeID:   curBeforeID,
-			CurAfterTime:  curAfterTime,
-			CurAfterID:    curAfterID,
-		})
+	queryParams := timeIDPagingParams{
+		Limit:         int32(limit),
+		CurBeforeTime: curBeforeTime,
+		CurBeforeID:   curBeforeID,
+		CurAfterTime:  curAfterTime,
+		CurAfterID:    curAfterID,
+		PagingForward: first != nil,
 	}
+
+	results, err := queryFunc(queryParams)
 
 	if err != nil {
 		return nil, PageInfo{}, err
@@ -421,9 +324,9 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 
 	pageInfo := PageInfo{}
 
-	// Since limit is actually 1 more than requested, if len(admires) == limit, there must be additional pages
-	if len(admires) == limit {
-		admires = admires[:len(admires)-1]
+	// Since limit is actually 1 more than requested, if len(results) == limit, there must be additional pages
+	if len(results) == limit {
+		results = results[:len(results)-1]
 		if first != nil {
 			pageInfo.HasNextPage = true
 		} else {
@@ -434,14 +337,14 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	if last != nil {
 		// Reverse the slice if we're paginating backwards, since forward and backward
 		// pagination are supposed to have elements in the same order.
-		for i, j := 0, len(admires)-1; i < j; i, j = i+1, j-1 {
-			admires[i], admires[j] = admires[j], admires[i]
+		for i, j := 0, len(results)-1; i < j; i, j = i+1, j-1 {
+			results[i], results[j] = results[j], results[i]
 		}
 	}
 
 	// If this is the first query (i.e. no cursors have been supplied), return the total count too
 	if before == nil && after == nil {
-		total, err := api.queries.CountAdmiresByFeedEventID(ctx, feedEventID)
+		total, err := countFunc()
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -449,24 +352,34 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		pageInfo.Total = &totalInt
 	}
 
-	pageInfo.Size = len(admires)
+	pageInfo.Size = len(results)
 
-	if len(admires) > 0 {
-		firstNode := admires[0]
-		lastNode := admires[len(admires)-1]
+	if len(results) > 0 {
+		firstNode := results[0]
+		lastNode := results[len(results)-1]
 
-		pageInfo.StartCursor, err = encodeTimestampDBIDCursor(firstNode.CreatedAt, firstNode.ID)
+		firstTime, firstID, err := cursorFunc(firstNode)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		pageInfo.EndCursor, err = encodeTimestampDBIDCursor(lastNode.CreatedAt, lastNode.ID)
+		lastTime, lastID, err := cursorFunc(lastNode)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		pageInfo.StartCursor, err = encodeTimestampDBIDCursor(firstTime, firstID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		pageInfo.EndCursor, err = encodeTimestampDBIDCursor(lastTime, lastID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
 
-	return admires, pageInfo, err
+	return results, pageInfo, err
 }
 
 func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*db.Admire, error) {

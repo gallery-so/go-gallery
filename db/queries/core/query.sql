@@ -332,15 +332,12 @@ SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_a
 -- name: GetAdmiresByActorIDBatch :batchmany
 SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
--- name: PaginateAdmiresByFeedEventIDForward :many
+-- name: PaginateAdmiresByFeedEventID :many
 SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < (@cur_before_time, @cur_before_id) AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY (created_at, id) ASC LIMIT $2;
-
--- name: PaginateAdmiresByFeedEventIDBackward :many
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id) AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY (created_at, id) DESC LIMIT $2;
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
 
 -- name: CountAdmiresByFeedEventID :one
 SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false;
@@ -360,17 +357,13 @@ SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
 -- name: GetCommentByCommentIDBatch :batchone
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
--- name: PaginateCommentsByFeedEventIDForward :many
+-- name: PaginateCommentsByFeedEventID :many
 SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < (@cur_before_time, @cur_before_id)
     AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY (created_at, id) ASC LIMIT $2;
-
--- name: PaginateCommentsByFeedEventIDBackward :many
-SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY (created_at, id) DESC LIMIT $2;
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
 
 -- name: CountCommentsByFeedEventID :one
 SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
@@ -387,23 +380,18 @@ SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY cre
 -- name: GetCommentsByFeedEventIDBatch :batchmany
 SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
 
--- name: PaginateInteractionsByFeedEventIDForward :many
-SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
-    AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
-                                                        UNION
-SELECT t.created_at, t.id, @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
-    AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
+-- name: PaginateInteractionsByFeedEventID :many
+SELECT interactions.created_At, interactions.id, interactions.tag FROM (
+    SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
+        AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
+                                                                    UNION
+    SELECT t.created_at, t.id, @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
+        AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
+) as interactions
 
-ORDER BY created_at, id ASC LIMIT $2;
-
--- name: PaginateInteractionsByFeedEventIDBackward :many
-SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
-    AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
-                                                        UNION
-SELECT t.created_at, t.id, @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
-    AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
-
-ORDER BY created_at, id DESC LIMIT $2;
+ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+         CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+LIMIT $2;
 
 -- name: CountInteractionsByFeedEventID :one
 SELECT sum(counts.count) FROM (
