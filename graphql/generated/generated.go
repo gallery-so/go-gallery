@@ -3743,9 +3743,15 @@ enum Chain {
     Tezos
     POAP
 }
+
 enum WalletType {
     EOA
     GnosisSafe
+}
+
+enum InteractionType {
+    Admire
+    Comment
 }
 
 type Token implements Node {

@@ -294,14 +294,14 @@ func (api InteractionAPI) paginateWithTimeIDCursor(ctx context.Context, before *
 
 	var err error
 	if before != nil {
-		curBeforeTime, curBeforeID, err = decodeTimestampDBIDCursor(*before)
+		curBeforeTime, curBeforeID, err = decodeTimeIDCursor(*before)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 	}
 
 	if after != nil {
-		curAfterTime, curAfterID, err = decodeTimestampDBIDCursor(*after)
+		curAfterTime, curAfterID, err = decodeTimeIDCursor(*after)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -368,12 +368,12 @@ func (api InteractionAPI) paginateWithTimeIDCursor(ctx context.Context, before *
 			return nil, PageInfo{}, err
 		}
 
-		pageInfo.StartCursor, err = encodeTimestampDBIDCursor(firstTime, firstID)
+		pageInfo.StartCursor, err = encodeTimeIDCursor(firstTime, firstID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		pageInfo.EndCursor, err = encodeTimestampDBIDCursor(lastTime, lastID)
+		pageInfo.EndCursor, err = encodeTimeIDCursor(lastTime, lastID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}

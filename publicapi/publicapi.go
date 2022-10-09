@@ -2,10 +2,10 @@ package publicapi
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"strings"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -173,28 +173,51 @@ func pushFeedEvent(ctx context.Context, evt db.Event) {
 	}
 }
 
-// TODO: Hex encode these
-func encodeTimestampDBIDCursor(timestamp time.Time, dbid persist.DBID) (string, error) {
-	timeStr, err := timestamp.MarshalText()
+func encodeTimeIDCursor(t time.Time, id persist.DBID) (string, error) {
+	timeBytes, err := t.MarshalBinary()
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s&&%s", timeStr, dbid), nil
+	idBytes := []byte(id)
+
+	bytes := make([]byte, 0, 1+len(timeBytes)+len(idBytes))
+
+	// The first byte declares how many bytes the time.Time is
+	bytes = append(bytes, byte(len(timeBytes)))
+
+	bytes = append(bytes, timeBytes...)
+	bytes = append(bytes, idBytes...)
+
+	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
-func decodeTimestampDBIDCursor(cursor string) (time.Time, persist.DBID, error) {
-	components := strings.Split(cursor, "&&")
-	if len(components) != 2 {
+func decodeTimeIDCursor(cursor string) (time.Time, persist.DBID, error) {
+	bytes, err := base64.StdEncoding.DecodeString(cursor)
+	if err != nil || len(bytes) == 0 {
 		return time.Time{}, "", errBadCursorFormat
 	}
 
-	timestamp := time.Time{}
-	if err := timestamp.UnmarshalText([]byte(components[0])); err != nil {
+	// The first byte declares how many bytes the time.Time is
+	timeLen := int(bytes[0])
+	if timeLen > len(bytes)-1 {
 		return time.Time{}, "", errBadCursorFormat
 	}
 
-	return timestamp, persist.DBID(components[1]), nil
+	t := time.Time{}
+	err = t.UnmarshalBinary(bytes[1 : timeLen+1])
+	if err != nil {
+		return time.Time{}, "", err
+	}
+
+	id := persist.DBID("")
+
+	// It's okay for the ID to be empty
+	if len(bytes) > (timeLen + 1) {
+		id = persist.DBID(bytes[timeLen+1:])
+	}
+
+	return t, id, nil
 }
 
 type PageInfo struct {

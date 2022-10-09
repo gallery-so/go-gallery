@@ -6,9 +6,9 @@ package graphql
 import (
 	"context"
 	"fmt"
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -211,9 +211,9 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 			Event:  obj,
 			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
 		}
-		if admire, ok := interaction.(db.Admire); ok {
+		if admire, ok := interaction.(coredb.Admire); ok {
 			edge.Node = admireToModel(ctx, admire)
-		} else if comment, ok := interaction.(db.Comment); ok {
+		} else if comment, ok := interaction.(coredb.Comment); ok {
 			edge.Node = commentToModel(ctx, comment)
 		}
 		edges = append(edges, edge)
