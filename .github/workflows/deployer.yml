@@ -1,4 +1,4 @@
-name: ci
+name: deployer
 on:
   push:
     branches:
@@ -48,9 +48,6 @@ jobs:
         run: |
           cd _deploy
           make deploy-dev-backend
-  post-deploy:
-    runs-on: ubuntu-latest
-    steps:
       - name: "Ping backend"
         run: |
           echo "-------------------------------"
