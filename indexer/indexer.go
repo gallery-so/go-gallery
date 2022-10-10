@@ -286,7 +286,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	startTime := time.Now()
 	i.isListening = false
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
 
 	go func() {
@@ -313,7 +313,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 
 	i.isListening = true
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
@@ -423,10 +423,21 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 	transfers := logsToTransfers(ctx, logsTo)
 
 	logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
+
 	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
 
+	batchTransfers(ctx, transfersChan, transfersAtBlocks)
+}
+
+func batchTransfers(ctx context.Context, transfersChan chan<- []transfersAtBlock, transfersAtBlocks []transfersAtBlock) {
 	logger.For(ctx).Infof("Sending %d total transfers to transfers channel", len(transfersAtBlocks))
-	transfersChan <- transfersAtBlocks
+	for j := 0; j < len(transfersAtBlocks); j += 10 {
+		to := j + 10
+		if to > len(transfersAtBlocks) {
+			to = len(transfersAtBlocks)
+		}
+		transfersChan <- transfersAtBlocks[j:to]
+	}
 	logger.For(ctx).Infof("Finished processing logs, closing transfers channel...")
 }
 

@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"sync"
 
-	"cloud.google.com/go/storage"
 	"github.com/bits-and-blooms/bloom"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
@@ -49,10 +48,10 @@ func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Co
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
-func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, addressFilterRepo refresh.AddressFilterRepository, storageClient *storage.Client) TransferPlugins {
+func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, addressFilterRepo refresh.AddressFilterRepository) TransferPlugins {
 	return TransferPlugins{
-		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
-		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
+		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
+		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
 		owners:   newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
 		refresh:  newRefreshPlugin(sentryutil.NewSentryHubContext(ctx), addressFilterRepo),
 	}
@@ -95,7 +94,7 @@ type urisPlugin struct {
 	out chan tokenURI
 }
 
-func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, storageClient *storage.Client) urisPlugin {
+func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository) urisPlugin {
 	in := make(chan PluginMsg)
 	out := make(chan tokenURI)
 
@@ -107,9 +106,9 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 		wp := workerpool.New(pluginPoolSize)
 
 		for msg := range in {
+			msg := msg
 			wp.Submit(func() {
 				child := span.StartChild("handleMessage")
-				ctx := sentryutil.NewSentryHubContext(ctx)
 
 				var uri persist.TokenURI
 
@@ -154,7 +153,7 @@ type balancesPlugin struct {
 	out chan tokenBalances
 }
 
-func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, storageClient *storage.Client) balancesPlugin {
+func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository) balancesPlugin {
 	in := make(chan PluginMsg)
 	out := make(chan tokenBalances)
 
@@ -166,9 +165,9 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 		wp := workerpool.New(pluginPoolSize)
 
 		for msg := range in {
+			msg := msg
 			wp.Submit(func() {
 				child := span.StartChild("handleMessage")
-				ctx := sentryutil.NewSentryHubContext(ctx)
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
 					if rpcEnabled {
@@ -225,6 +224,7 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 		wp := workerpool.New(pluginPoolSize)
 
 		for msg := range in {
+			msg := msg
 			wp.Submit(func() {
 				child := span.StartChild("handleMessage")
 
@@ -278,6 +278,7 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilt
 		wp := workerpool.New(pluginPoolSize)
 
 		for msg := range in {
+			msg := msg
 			wp.Submit(func() {
 				child := span.StartChild("handleMessage")
 

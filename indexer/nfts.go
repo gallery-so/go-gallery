@@ -608,14 +608,14 @@ func processRefreshes(idxr *indexer, storageClient *storage.Client) gin.HandlerF
 
 				if exists {
 					transferCh := make(chan []transfersAtBlock)
-					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.addressFilterRepo, idxr.storageClient)
+					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.addressFilterRepo)
 					enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in}
 					go func() {
 						ctx := sentryutil.NewSentryHubContext(ctx)
 						logs := idxr.fetchLogs(ctx, b, events)
 						transfers := filterTransfers(ctx, message, logsToTransfers(ctx, logs))
 						transfersAtBlock := transfersToTransfersAtBlock(transfers)
-						transferCh <- transfersAtBlock
+						batchTransfers(ctx, transferCh, transfersAtBlock)
 						close(transferCh)
 					}()
 					go idxr.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)

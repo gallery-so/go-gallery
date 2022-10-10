@@ -281,8 +281,6 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 	contract := address.Address()
 	instance, err := contracts.NewIERC721MetadataCaller(contract, ethClient)
 	if err != nil {
-		// XXX
-		panic(err)
 		return nil, err
 	}
 
@@ -290,16 +288,12 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 		Context: ctx,
 	})
 	if err != nil {
-		// XXX
-		panic(err)
 		return nil, err
 	}
 	symbol, err := instance.Symbol(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
-		// XXX
-		panic(err)
 		return nil, err
 	}
 

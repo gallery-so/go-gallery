@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/ory/dockertest"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
@@ -43,8 +44,7 @@ var allLogs = func() []types.Log {
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	setDefaults("indexer-server")
-	// XXX: pg, pgUnpatch := docker.InitPostgresIndexer()
-	_, pgUnpatch := docker.InitPostgresIndexer()
+	pg, pgUnpatch := docker.InitPostgresIndexer()
 
 	db := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
@@ -57,11 +57,11 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 		defer db.Close()
 		defer pgUnpatch()
 		defer pgx.Close()
-		// XXX: for _, r := range []*dockertest.Resource{pg} {
-		// XXX: 	if err := r.Close(); err != nil {
-		// XXX: 		t.Fatalf("could not purge resource: %s", err)
-		// XXX: 	}
-		// XXX: }
+		for _, r := range []*dockertest.Resource{pg} {
+			if err := r.Close(); err != nil {
+				t.Fatalf("could not purge resource: %s", err)
+			}
+		}
 	})
 
 	return assert.New(t), db, pgx
