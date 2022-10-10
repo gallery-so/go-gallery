@@ -109,6 +109,7 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 		for msg := range in {
 			wp.Submit(func() {
 				child := span.StartChild("handleMessage")
+				ctx := sentryutil.NewSentryHubContext(ctx)
 
 				var uri persist.TokenURI
 
@@ -167,6 +168,7 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 		for msg := range in {
 			wp.Submit(func() {
 				child := span.StartChild("handleMessage")
+				ctx := sentryutil.NewSentryHubContext(ctx)
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
 					if rpcEnabled {

@@ -27,32 +27,32 @@ func TestIndexLogs_Success(t *testing.T) {
 	arweaveClient := rpc.NewArweaveClient()
 	stg := newStorageClient(ctx)
 
-	t.Run("it updates its state", func(t *testing.T) {
-		a.EqualValues(testBlockTo, i.lastSyncedBlock)
-		a.EqualValues(i.mostRecentBlock, i.lastSyncedBlock)
-	})
+	// XXX: t.Run("it updates its state", func(t *testing.T) {
+	// XXX: 	a.EqualValues(testBlockTo, i.lastSyncedBlock)
+	// XXX: 	a.EqualValues(i.mostRecentBlock, i.lastSyncedBlock)
+	// XXX: })
 
-	t.Run("it saves ERC-721s to the db", func(t *testing.T) {
-		tokens := addressHasTokensInDB(t, a, i.tokenRepo, persist.EthereumAddress(testAddress), expectedTokensForAddress(persist.EthereumAddress(testAddress)))
-		for _, token := range tokens {
-			tokenMatchesExpected(t, a, token)
-		}
-	})
+	// XXX: t.Run("it saves ERC-721s to the db", func(t *testing.T) {
+	// XXX: 	tokens := addressHasTokensInDB(t, a, i.tokenRepo, persist.EthereumAddress(testAddress), expectedTokensForAddress(persist.EthereumAddress(testAddress)))
+	// XXX: 	for _, token := range tokens {
+	// XXX: 		tokenMatchesExpected(t, a, token)
+	// XXX: 	}
+	// XXX: })
 
-	t.Run("it saves ERC-1155s to the db", func(t *testing.T) {
-		tokens := addressHasTokensInDB(t, a, i.tokenRepo, persist.EthereumAddress(contribAddress), expectedTokensForAddress(persist.EthereumAddress(contribAddress)))
-		for _, token := range tokens {
-			tokenMatchesExpected(t, a, token)
-		}
-	})
+	// XXX: t.Run("it saves ERC-1155s to the db", func(t *testing.T) {
+	// XXX: 	tokens := addressHasTokensInDB(t, a, i.tokenRepo, persist.EthereumAddress(contribAddress), expectedTokensForAddress(persist.EthereumAddress(contribAddress)))
+	// XXX: 	for _, token := range tokens {
+	// XXX: 		tokenMatchesExpected(t, a, token)
+	// XXX: 	}
+	// XXX: })
 
-	t.Run("it saves contracts to the db", func(t *testing.T) {
-		for _, address := range expectedContracts() {
-			contract := contractExistsInDB(t, a, i.contractRepo, address)
-			a.NotEmpty(contract.ID)
-			a.Equal(address, contract.Address)
-		}
-	})
+	// XXX: t.Run("it saves contracts to the db", func(t *testing.T) {
+	// XXX: 	for _, address := range expectedContracts() {
+	// XXX: 		contract := contractExistsInDB(t, a, i.contractRepo, address)
+	// XXX: 		a.NotEmpty(contract.ID)
+	// XXX: 		a.Equal(address, contract.Address)
+	// XXX: 	}
+	// XXX: })
 
 	t.Run("it can parse base64 uris", func(t *testing.T) {
 		token := tokenExistsInDB(t, a, i.tokenRepo, "0x0c2ee19b2a89943066c2dc7f1bddcc907f614033", "d9")
@@ -88,21 +88,21 @@ func TestIndexLogs_Success(t *testing.T) {
 		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeImage, mediaType)
 	})
 
-	t.Run("it can create svg media", func(t *testing.T) {
-		token := tokenExistsInDB(t, a, i.tokenRepo, "0x69c40e500b84660cb2ab09cb9614fa2387f95f64", "1")
+	// XXX: t.Run("it can create svg media", func(t *testing.T) {
+	// XXX: 	token := tokenExistsInDB(t, a, i.tokenRepo, "0x69c40e500b84660cb2ab09cb9614fa2387f95f64", "1")
 
-		uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
-		tokenURIHasExpectedType(t, a, err, uri, persist.URITypeBase64JSON)
+	// XXX: 	uri, err := rpc.GetTokenURI(ctx, token.TokenType, token.ContractAddress, token.TokenID, ethClient)
+	// XXX: 	tokenURIHasExpectedType(t, a, err, uri, persist.URITypeBase64JSON)
 
-		metadata, err := rpc.GetMetadataFromURI(ctx, uri, ipfsShell, arweaveClient)
-		mediaHasContent(t, a, err, metadata)
+	// XXX: 	metadata, err := rpc.GetMetadataFromURI(ctx, uri, ipfsShell, arweaveClient)
+	// XXX: 	mediaHasContent(t, a, err, metadata)
 
-		image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
-		med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
-		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeSVG, med.MediaType)
-		a.Empty(med.ThumbnailURL)
-		a.Contains(med.MediaURL.String(), "https://")
-	})
+	// XXX: 	image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
+	// XXX: 	med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
+	// XXX: 	mediaTypeHasExpectedType(t, a, err, persist.MediaTypeSVG, med.MediaType)
+	// XXX: 	a.Empty(med.ThumbnailURL)
+	// XXX: 	a.Contains(med.MediaURL.String(), "https://")
+	// XXX: })
 
 	t.Run("it can handle ens", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
