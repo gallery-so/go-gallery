@@ -295,9 +295,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 		defer tracing.FinishSpan(span)
 
 		logs := i.fetchLogs(ctx, start, topics)
-		if logs != nil {
-			i.processLogs(ctx, transfers, logs)
-		}
+		i.processLogs(ctx, transfers, logs)
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, plugins.refresh.out)
@@ -424,21 +422,7 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 
 	logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
-	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
-
-	batchTransfers(ctx, transfersChan, transfersAtBlocks)
-}
-
-func batchTransfers(ctx context.Context, transfersChan chan<- []transfersAtBlock, transfersAtBlocks []transfersAtBlock) {
-	logger.For(ctx).Infof("Sending %d total transfers to transfers channel", len(transfersAtBlocks))
-	for j := 0; j < len(transfersAtBlocks); j += 10 {
-		to := j + 10
-		if to > len(transfersAtBlocks) {
-			to = len(transfersAtBlocks)
-		}
-		transfersChan <- transfersAtBlocks[j:to]
-	}
-	logger.For(ctx).Infof("Finished processing logs, closing transfers channel...")
+	transfersChan <- transfersToTransfersAtBlock(transfers)
 }
 
 func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
