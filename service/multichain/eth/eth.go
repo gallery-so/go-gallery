@@ -10,7 +10,11 @@ import (
 	"strings"
 	"time"
 
+<<<<<<< HEAD
 	ens "github.com/benny-conn/go-ens"
+=======
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+>>>>>>> main
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -18,11 +22,16 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/indexer"
+	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/rpc"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
+	"golang.org/x/sync/errgroup"
 )
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
@@ -32,14 +41,16 @@ type Provider struct {
 	indexerBaseURL string
 	httpClient     *http.Client
 	ethClient      *ethclient.Client
+	taskClient     *cloudtasks.Client
 }
 
 // NewProvider creates a new ethereum Provider
-func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client) *Provider {
+func NewProvider(indexerBaseURL string, httpClient *http.Client, ec *ethclient.Client, tc *cloudtasks.Client) *Provider {
 	return &Provider{
 		indexerBaseURL: indexerBaseURL,
 		httpClient:     httpClient,
 		ethClient:      ec,
+		taskClient:     tc,
 	}
 }
 
@@ -295,6 +306,38 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	}
 
 	return nil
+}
+
+// DeepRefresh re-indexes a wallet address.
+func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address) error {
+	height, err := rpc.RetryGetBlockNumber(ctx, d.ethClient, rpc.DefaultRetry)
+	if err != nil {
+		return err
+	}
+
+	toBlock := persist.BlockNumber(height)
+	fromBlock := toBlock - refresh.DefaultConfig.MinStartingBlock
+
+	eg := new(errgroup.Group)
+
+	for b := fromBlock; b < toBlock; b += refresh.DefaultConfig.TaskSize {
+		rng := persist.BlockRange{b, b + refresh.DefaultConfig.TaskSize - 1}
+		if rng[1] > toBlock {
+			rng[1] = toBlock
+		}
+
+		eg.Go(func() error {
+			ctx := sentryutil.NewSentryHubContext(ctx)
+			msg := task.DeepRefreshMessage{OwnerAddress: persist.EthereumAddress(ownerAddress.String()), RefreshRange: rng}
+			return task.CreateTaskForDeepRefresh(ctx, msg, d.taskClient)
+		})
+
+		if rng[1] == toBlock {
+			break
+		}
+	}
+
+	return eg.Wait()
 }
 
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain

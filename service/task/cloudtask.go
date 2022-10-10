@@ -18,26 +18,42 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// FeedMessage is the input message to the feed service
 type FeedMessage struct {
 	ID persist.DBID `json:"id" binding:"required"`
 }
 
+// FeedbotMessage is the input message to the feedbot service
 type FeedbotMessage struct {
 	FeedEventID persist.DBID   `json:"id" binding:"required"`
 	Action      persist.Action `json:"action" binding:"required"`
 }
 
+<<<<<<< HEAD
 type TokenProcessingUserMessage struct {
+=======
+// MediaProcessingMessage is the input message to the mediaprocessing service
+type MediaProcessingMessage struct {
+>>>>>>> main
 	UserID            persist.DBID  `json:"user_id" binding:"required"`
 	Chain             persist.Chain `json:"chain" binding:"required"`
 	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
 	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
 }
 
+<<<<<<< HEAD
 type TokenProcessingContractTokensMessage struct {
 	ContractID        persist.DBID `json:"contract_id" binding:"required"`
 	Imagekeywords     []string     `json:"image_keywords" binding:"required"`
 	Animationkeywords []string     `json:"animation_keywords" binding:"required"`
+=======
+// DeepRefreshMessage is the input message to the indexer-api for deep refreshes
+type DeepRefreshMessage struct {
+	OwnerAddress    persist.EthereumAddress `json:"owner_address"`
+	TokenID         persist.TokenID         `json:"token_id"`
+	ContractAddress persist.EthereumAddress `json:"contract_address"`
+	RefreshRange    persist.BlockRange      `json:"refresh_range"`
+>>>>>>> main
 }
 
 func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
@@ -153,6 +169,32 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        fmt.Sprintf("%s/owners/process/contract", viper.GetString("TOKEN_PROCESSING_URL")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
+func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForDeepRefresh")
+	defer tracing.FinishSpan(span)
+
+	queue := viper.GetString("GCLOUD_REFRESH_TASK_QUEUE")
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/tasks/refresh", viper.GetString("INDEXER_HOST")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
