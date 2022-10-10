@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"sync"
 
-	"cloud.google.com/go/storage"
 	"github.com/bits-and-blooms/bloom"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/gammazero/workerpool"
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	pluginPoolSize    = 32
 	bloomFilterSize   = 100000
 	falsePositiveRate = 0.01
 )
@@ -47,10 +48,10 @@ func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Co
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
 // The `in` channel is used to submit a transfer to a plugin, and the `out` channel is used to receive results from a plugin, if any.
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
-func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, addressFilterRepo refresh.AddressFilterRepository, storageClient *storage.Client) TransferPlugins {
+func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, addressFilterRepo refresh.AddressFilterRepository) TransferPlugins {
 	return TransferPlugins{
-		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
-		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo, storageClient),
+		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
+		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
 		owners:   newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
 		refresh:  newRefreshPlugin(sentryutil.NewSentryHubContext(ctx), addressFilterRepo),
 	}
@@ -93,7 +94,7 @@ type urisPlugin struct {
 	out chan tokenURI
 }
 
-func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, storageClient *storage.Client) urisPlugin {
+func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository) urisPlugin {
 	in := make(chan PluginMsg)
 	out := make(chan tokenURI)
 
@@ -102,34 +103,42 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
+		wp := workerpool.New(pluginPoolSize)
+
 		for msg := range in {
-			child := span.StartChild("handleMessage")
+			msg := msg
+			wp.Submit(func() {
+				child := span.StartChild("handleMessage")
 
-			var uri persist.TokenURI
+				var uri persist.TokenURI
 
-			ct, tid, err := msg.key.GetParts()
-			if err != nil {
-				panic(err)
-			}
-
-			dbURI, _, _, err := tokenRepo.GetMetadataByTokenIdentifiers(ctx, tid, ct)
-			if err == nil {
-				if dbURI != "" {
-					uri = dbURI
+				ct, tid, err := msg.key.GetParts()
+				if err != nil {
+					panic(err)
 				}
-			}
 
-			if uri == "" && rpcEnabled {
-				uri = getURI(ctx, msg.transfer.ContractAddress, msg.transfer.TokenID, msg.transfer.TokenType, ethClient)
-			}
+				dbURI, _, _, err := tokenRepo.GetMetadataByTokenIdentifiers(ctx, tid, ct)
+				if err == nil {
+					if dbURI != "" {
+						uri = dbURI
+					}
+				}
 
-			out <- tokenURI{
-				ti:  msg.key,
-				uri: uri,
-			}
+				if uri == "" && rpcEnabled {
+					uri = getURI(ctx, msg.transfer.ContractAddress, msg.transfer.TokenID, msg.transfer.TokenType, ethClient)
+				}
 
-			tracing.FinishSpan(child)
+				out <- tokenURI{
+					ti:  msg.key,
+					uri: uri,
+				}
+
+				tracing.FinishSpan(child)
+
+			})
 		}
+
+		wp.StopWait()
 	}()
 
 	return urisPlugin{
@@ -144,7 +153,7 @@ type balancesPlugin struct {
 	out chan tokenBalances
 }
 
-func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, storageClient *storage.Client) balancesPlugin {
+func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository) balancesPlugin {
 	in := make(chan PluginMsg)
 	out := make(chan tokenBalances)
 
@@ -153,29 +162,36 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
-		for msg := range in {
-			child := span.StartChild("handleMessage")
+		wp := workerpool.New(pluginPoolSize)
 
-			if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
-				if rpcEnabled {
-					bals, err := getBalances(ctx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
-					if err != nil {
-						logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-							"fromAddress":     msg.transfer.From,
-							"tokenIdentifier": msg.key,
-							"block":           msg.transfer.BlockNumber,
-						}).Errorf("error getting balance of %s for %s", msg.transfer.From, msg.key)
+		for msg := range in {
+			msg := msg
+			wp.Submit(func() {
+				child := span.StartChild("handleMessage")
+
+				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
+					if rpcEnabled {
+						bals, err := getBalances(ctx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
+						if err != nil {
+							logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+								"fromAddress":     msg.transfer.From,
+								"tokenIdentifier": msg.key,
+								"block":           msg.transfer.BlockNumber,
+							}).Errorf("error getting balance of %s for %s", msg.transfer.From, msg.key)
+						} else {
+							out <- bals
+						}
 					} else {
+						bals := balancesFromRepo(ctx, tokenRepo, msg)
 						out <- bals
 					}
-				} else {
-					bals := balancesFromRepo(ctx, tokenRepo, msg)
-					out <- bals
 				}
-			}
 
-			tracing.FinishSpan(child)
+				tracing.FinishSpan(child)
+			})
 		}
+
+		wp.StopWait()
 	}()
 
 	return balancesPlugin{
@@ -205,26 +221,33 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
+		wp := workerpool.New(pluginPoolSize)
+
 		for msg := range in {
-			child := span.StartChild("handleMessage")
+			msg := msg
+			wp.Submit(func() {
+				child := span.StartChild("handleMessage")
 
-			if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
-				out <- ownersPluginResult{
-					currentOwner: ownerAtBlock{
-						ti:    msg.key,
-						owner: msg.transfer.To,
-						block: msg.transfer.BlockNumber,
-					},
-					previousOwner: ownerAtBlock{
-						ti:    msg.key,
-						owner: msg.transfer.From,
-						block: msg.transfer.BlockNumber,
-					},
+				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
+					out <- ownersPluginResult{
+						currentOwner: ownerAtBlock{
+							ti:    msg.key,
+							owner: msg.transfer.To,
+							block: msg.transfer.BlockNumber,
+						},
+						previousOwner: ownerAtBlock{
+							ti:    msg.key,
+							owner: msg.transfer.From,
+							block: msg.transfer.BlockNumber,
+						},
+					}
 				}
-			}
 
-			tracing.FinishSpan(child)
+				tracing.FinishSpan(child)
+			})
 		}
+
+		wp.StopWait()
 	}()
 
 	return ownersPlugin{
@@ -248,25 +271,36 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilt
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
+		var lock sync.Mutex
+
 		filters := make(map[persist.BlockRange]*bloom.BloomFilter)
 
+		wp := workerpool.New(pluginPoolSize)
+
 		for msg := range in {
-			child := span.StartChild("handleMessage")
+			msg := msg
+			wp.Submit(func() {
+				child := span.StartChild("handleMessage")
 
-			fromBlock := msg.transfer.BlockNumber - (msg.transfer.BlockNumber % blocksPerLogsCall)
-			toBlock := fromBlock + blocksPerLogsCall
-			key := persist.BlockRange{fromBlock, toBlock}
+				fromBlock := msg.transfer.BlockNumber - (msg.transfer.BlockNumber % blocksPerLogsCall)
+				toBlock := fromBlock + blocksPerLogsCall
+				key := persist.BlockRange{fromBlock, toBlock}
 
-			if _, ok := filters[key]; !ok {
-				filters[key] = bloom.NewWithEstimates(bloomFilterSize, falsePositiveRate)
-			}
+				lock.Lock()
+				if _, ok := filters[key]; !ok {
+					filters[key] = bloom.NewWithEstimates(bloomFilterSize, falsePositiveRate)
+				}
+				filters[key] = filters[key].AddString(msg.transfer.From.String())
+				filters[key] = filters[key].AddString(msg.transfer.To.String())
+				filters[key] = filters[key].AddString(msg.transfer.ContractAddress.String())
+				lock.Unlock()
 
-			filters[key] = filters[key].AddString(msg.transfer.From.String())
-			filters[key] = filters[key].AddString(msg.transfer.To.String())
-			filters[key] = filters[key].AddString(msg.transfer.ContractAddress.String())
+				tracing.FinishSpan(child)
 
-			tracing.FinishSpan(child)
+			})
 		}
+
+		wp.StopWait()
 
 		out <- addressFilterRepo.BulkUpsert(ctx, filters)
 	}()

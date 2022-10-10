@@ -608,7 +608,7 @@ func processRefreshes(idxr *indexer, storageClient *storage.Client) gin.HandlerF
 
 				if exists {
 					transferCh := make(chan []transfersAtBlock)
-					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.addressFilterRepo, idxr.storageClient)
+					plugins := NewTransferPlugins(ctx, idxr.ethClient, idxr.tokenRepo, idxr.addressFilterRepo)
 					enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in}
 					go func() {
 						ctx := sentryutil.NewSentryHubContext(ctx)
