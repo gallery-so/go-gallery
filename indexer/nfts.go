@@ -615,7 +615,7 @@ func processRefreshes(idxr *indexer, storageClient *storage.Client) gin.HandlerF
 						logs := idxr.fetchLogs(ctx, b, events)
 						transfers := filterTransfers(ctx, message, logsToTransfers(ctx, logs))
 						transfersAtBlock := transfersToTransfersAtBlock(transfers)
-						batchTransfers(ctx, transferCh, transfersAtBlock)
+						transferCh <- transfersAtBlock
 						close(transferCh)
 					}()
 					go idxr.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
