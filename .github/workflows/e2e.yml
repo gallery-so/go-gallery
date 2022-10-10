@@ -8,7 +8,7 @@ jobs:
         run: echo "$GITHUB_CONTEXT"
         env:
           GITHUB_CONTEXT: ${{ toJson(github) }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
@@ -31,11 +31,9 @@ jobs:
           KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
           KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
       - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_internal -o _internal.zip
+        run: keybase decrypt -i ./_encrypted_deploy -o ./_deploy.zip
       - name: "Unzip"
-        run: echo "A" | unzip _internal.zip -d _internal
-      - name: Build
-        run: go build -v ./...
+        run: echo "A" | unzip ./_deploy.zip -d ./_deploy
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
