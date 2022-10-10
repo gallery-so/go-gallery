@@ -505,8 +505,8 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 	return nil
 }
 
-// RefreshTokensForCollection refreshes all tokens in a given collection
-func (p *Provider) RefreshTokensForCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
+// RefreshTokensForContract refreshes all tokens in a given contract
+func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.ContractIdentifiers) error {
 	providers, err := p.getProvidersForChain(ci.Chain)
 	if err != nil {
 		return err

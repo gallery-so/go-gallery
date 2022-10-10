@@ -284,7 +284,7 @@ func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.Co
 		return err
 	}
 
-	err := api.multichainProvider.RefreshTokensForCollection(ctx, ci)
+	err := api.multichainProvider.RefreshTokensForContract(ctx, ci)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}

@@ -177,7 +177,7 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persis
 		}
 		// do not unlock, let expiry handle the unlock
 		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
-		if err := mc.RefreshTokensForCollection(c, contract.ContractIdentifiers()); err != nil {
+		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
