@@ -44,28 +44,3 @@ jobs:
         run: |
           cd _deploy
           make deploy-dev-backend
-      - name: "Ping backend"
-        run: |
-          echo "-------------------------------"
-          echo " INFO: letting backend startup "
-          echo "-------------------------------"
-          sleep $GRACE
-
-          for ((i=0; i<$TIMES; i++)); do
-          if [[ -z $(curl -XGET -Is $HEALTH_URL | head -n1 | grep 200) ]]; then
-            echo "-------------------------------"
-            echo " INFO: [attempt $i] waiting... "
-            echo "-------------------------------"
-            sleep $INTERVAL
-          else
-            echo "-------------------------------"
-            echo " INFO: backend is operational! "
-            echo "-------------------------------"
-            exit 0
-          fi
-          done
-
-          echo "-------------------------------"
-          echo " ERROR: failed to hit backend! "
-          echo "-------------------------------"
-          exit 1
