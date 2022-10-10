@@ -300,38 +300,6 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 	return items, nil
 }
 
-const getAdmiresByFeedEventID = `-- name: GetAdmiresByFeedEventID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
-`
-
-func (q *Queries) GetAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]Admire, error) {
-	rows, err := q.db.Query(ctx, getAdmiresByFeedEventID, feedEventID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Admire
-	for rows.Next() {
-		var i Admire
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.FeedEventID,
-			&i.ActorID,
-			&i.Deleted,
-			&i.CreatedAt,
-			&i.LastUpdated,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getCollectionById = `-- name: GetCollectionById :one
 SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings FROM collections WHERE id = $1 AND deleted = false
 `
@@ -457,40 +425,6 @@ SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created
 
 func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {
 	rows, err := q.db.Query(ctx, getCommentsByCommentIDs, commentIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Comment
-	for rows.Next() {
-		var i Comment
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.FeedEventID,
-			&i.ActorID,
-			&i.ReplyTo,
-			&i.Comment,
-			&i.Deleted,
-			&i.CreatedAt,
-			&i.LastUpdated,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getCommentsByFeedEventID = `-- name: GetCommentsByFeedEventID :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
-`
-
-func (q *Queries) GetCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]Comment, error) {
-	rows, err := q.db.Query(ctx, getCommentsByFeedEventID, feedEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -1378,117 +1312,6 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
-}
-
-const paginateAdmiresByFeedEventID = `-- name: PaginateAdmiresByFeedEventID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false
-    AND (created_at, id) < ($3, $4) AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-    LIMIT $2
-`
-
-type PaginateAdmiresByFeedEventIDParams struct {
-	FeedEventID   persist.DBID
-	Limit         int32
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-}
-
-func (q *Queries) PaginateAdmiresByFeedEventID(ctx context.Context, arg PaginateAdmiresByFeedEventIDParams) ([]Admire, error) {
-	rows, err := q.db.Query(ctx, paginateAdmiresByFeedEventID,
-		arg.FeedEventID,
-		arg.Limit,
-		arg.CurBeforeTime,
-		arg.CurBeforeID,
-		arg.CurAfterTime,
-		arg.CurAfterID,
-		arg.PagingForward,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Admire
-	for rows.Next() {
-		var i Admire
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.FeedEventID,
-			&i.ActorID,
-			&i.Deleted,
-			&i.CreatedAt,
-			&i.LastUpdated,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const paginateCommentsByFeedEventID = `-- name: PaginateCommentsByFeedEventID :many
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false
-    AND (created_at, id) < ($3, $4)
-    AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-    LIMIT $2
-`
-
-type PaginateCommentsByFeedEventIDParams struct {
-	FeedEventID   persist.DBID
-	Limit         int32
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-}
-
-func (q *Queries) PaginateCommentsByFeedEventID(ctx context.Context, arg PaginateCommentsByFeedEventIDParams) ([]Comment, error) {
-	rows, err := q.db.Query(ctx, paginateCommentsByFeedEventID,
-		arg.FeedEventID,
-		arg.Limit,
-		arg.CurBeforeTime,
-		arg.CurBeforeID,
-		arg.CurAfterTime,
-		arg.CurAfterID,
-		arg.PagingForward,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Comment
-	for rows.Next() {
-		var i Comment
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.FeedEventID,
-			&i.ActorID,
-			&i.ReplyTo,
-			&i.Comment,
-			&i.Deleted,
-			&i.CreatedAt,
-			&i.LastUpdated,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const paginateInteractionsByFeedEventID = `-- name: PaginateInteractionsByFeedEventID :many

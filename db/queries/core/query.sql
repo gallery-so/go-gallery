@@ -332,7 +332,7 @@ SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_a
 -- name: GetAdmiresByActorIDBatch :batchmany
 SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
--- name: PaginateAdmiresByFeedEventID :many
+-- name: PaginateAdmiresByFeedEventIDBatch :batchmany
 SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < (@cur_before_time, @cur_before_id) AND (created_at, id) > (@cur_after_time, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
@@ -341,12 +341,6 @@ SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
 
 -- name: CountAdmiresByFeedEventID :one
 SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false;
-
--- name: GetAdmiresByFeedEventID :many
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
-
--- name: GetAdmiresByFeedEventIDBatch :batchmany
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
@@ -357,7 +351,7 @@ SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
 -- name: GetCommentByCommentIDBatch :batchone
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
--- name: PaginateCommentsByFeedEventID :many
+-- name: PaginateCommentsByFeedEventIDBatch :batchmany
 SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
     AND (created_at, id) < (@cur_before_time, @cur_before_id)
     AND (created_at, id) > (@cur_after_time, @cur_after_id)
@@ -373,12 +367,6 @@ SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_
 
 -- name: GetCommentsByActorIDBatch :batchmany
 SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
-
--- name: GetCommentsByFeedEventID :many
-SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
-
--- name: GetCommentsByFeedEventIDBatch :batchmany
-SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: PaginateInteractionsByFeedEventID :many
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (

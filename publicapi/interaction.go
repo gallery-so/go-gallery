@@ -121,25 +121,23 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	// TODO: Execute these queries in parallel
 	admireIDs := typeToIDs[1]
 	if len(admireIDs) > 0 {
-		admires, err := api.queries.GetAdmiresByAdmireIDs(ctx, admireIDs)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
+		admires, errs := api.loaders.AdmireByAdmireID.LoadAll(admireIDs)
 
-		for _, admire := range admires {
-			interactionsByID[admire.ID] = admire
+		for i, admire := range admires {
+			if errs[i] == nil {
+				interactionsByID[admire.ID] = admire
+			}
 		}
 	}
 
 	commentIDs := typeToIDs[2]
 	if len(commentIDs) > 0 {
-		comments, err := api.queries.GetCommentsByCommentIDs(ctx, commentIDs)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
+		comments, errs := api.loaders.CommentByCommentID.LoadAll(commentIDs)
 
-		for _, comment := range comments {
-			interactionsByID[comment.ID] = comment
+		for i, comment := range comments {
+			if errs[i] == nil {
+				interactionsByID[comment.ID] = comment
+			}
 		}
 	}
 
@@ -162,7 +160,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.queries.PaginateAdmiresByFeedEventID(ctx, db.PaginateAdmiresByFeedEventIDParams{
+		admires, err := api.loaders.FeedEventAdmires.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CurBeforeTime,
@@ -216,7 +214,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		comments, err := api.queries.PaginateCommentsByFeedEventID(ctx, db.PaginateCommentsByFeedEventIDParams{
+		comments, err := api.loaders.FeedEventComments.Load(db.PaginateCommentsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CurBeforeTime,
@@ -396,22 +394,6 @@ func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DB
 	}
 
 	return &admire, nil
-}
-
-func (api InteractionAPI) GetAdmiresByFeedEventIDOld(ctx context.Context, feedEventID persist.DBID) ([]db.Admire, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"feedEventID": {feedEventID, "required"},
-	}); err != nil {
-		return nil, err
-	}
-
-	admires, err := api.loaders.AdmiresByFeedEventID.Load(feedEventID)
-	if err != nil {
-		return nil, err
-	}
-
-	return admires, nil
 }
 
 func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (persist.DBID, error) {
