@@ -149,9 +149,8 @@ func RateLimited() gin.HandlerFunc {
 func HandleCORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestOrigin := c.Request.Header.Get("Origin")
-		allowedOrigins := strings.Split(viper.GetString("ALLOWED_ORIGINS"), ",")
 
-		if util.ContainsString(allowedOrigins, requestOrigin) || (util.ContainsString([]string{"development", "sandbox-backend"}, strings.ToLower(viper.GetString("ENV"))) && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
+		if IsOriginAllowed(requestOrigin) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
 		}
 
