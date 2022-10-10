@@ -263,14 +263,13 @@ func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, pe
 	return []multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, nil
 }
 
-<<<<<<< HEAD
 func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
 	return addr.String()
-=======
+}
+
 // DeepRefresh re-indexes a wallet address. Because this isn't possible through OS, this is a no-op.
 func (p *Provider) DeepRefresh(context.Context, persist.Address) error {
 	return nil
->>>>>>> main
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)

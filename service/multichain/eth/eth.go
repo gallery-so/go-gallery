@@ -10,11 +10,8 @@ import (
 	"strings"
 	"time"
 
-<<<<<<< HEAD
-	ens "github.com/benny-conn/go-ens"
-=======
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
->>>>>>> main
+	ens "github.com/benny-conn/go-ens"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

@@ -29,31 +29,25 @@ type FeedbotMessage struct {
 	Action      persist.Action `json:"action" binding:"required"`
 }
 
-<<<<<<< HEAD
 type TokenProcessingUserMessage struct {
-=======
-// MediaProcessingMessage is the input message to the mediaprocessing service
-type MediaProcessingMessage struct {
->>>>>>> main
 	UserID            persist.DBID  `json:"user_id" binding:"required"`
 	Chain             persist.Chain `json:"chain" binding:"required"`
 	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
 	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
 }
 
-<<<<<<< HEAD
 type TokenProcessingContractTokensMessage struct {
 	ContractID        persist.DBID `json:"contract_id" binding:"required"`
 	Imagekeywords     []string     `json:"image_keywords" binding:"required"`
 	Animationkeywords []string     `json:"animation_keywords" binding:"required"`
-=======
+}
+
 // DeepRefreshMessage is the input message to the indexer-api for deep refreshes
 type DeepRefreshMessage struct {
 	OwnerAddress    persist.EthereumAddress `json:"owner_address"`
 	TokenID         persist.TokenID         `json:"token_id"`
 	ContractAddress persist.EthereumAddress `json:"contract_address"`
 	RefreshRange    persist.BlockRange      `json:"refresh_range"`
->>>>>>> main
 }
 
 func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
