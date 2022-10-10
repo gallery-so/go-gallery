@@ -1,0 +1,75 @@
+name: ci
+on:
+  push:
+    branches:
+      - main
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump GitHub context
+        run: echo "$GITHUB_CONTEXT"
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16.13
+      - name: "Install Dependencies"
+        run: go mod download
+      - name: "Update apt"
+        run: sudo apt-get update
+      - name: "Download Keybase"
+        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
+      - name: "Install Keybase"
+        run: sudo apt-get install ./keybase_amd64.deb unzip
+      - name: "Run keybase globally"
+        run: run_keybase -g
+      - name: "Oneshot Keybase"
+        run: keybase oneshot
+        env:
+          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
+          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Decrypt secrets"
+        run: keybase decrypt -i _encrypted_internal -o _internal.zip
+      - name: "Unzip"
+        run: echo "A" | unzip _internal.zip -d _internal
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+      - name: "Install gcloud cli"
+        uses: google-github-actions/setup-gcloud@master
+      - name: "Deploy"
+        run: |
+          cd _deploy
+          make deploy-dev-backend
+  post-deploy:
+    runs_on: ubuntu-latest
+    steps:
+      - name: "Ping backend"
+        run: |
+          echo "-------------------------------"
+          echo " INFO: letting backend startup "
+          echo "-------------------------------"
+          sleep $GRACE
+
+          for ((i=0; i<$TIMES; i++)); do
+          if [[ -z $(curl -XGET -Is $HEALTH_URL | head -n1 | grep 200) ]]; then
+            echo "-------------------------------"
+            echo " INFO: [attempt $i] waiting... "
+            echo "-------------------------------"
+            sleep $INTERVAL
+          else
+            echo "-------------------------------"
+            echo " INFO: backend is operational! "
+            echo "-------------------------------"
+            exit 0
+          fi
+          done
+
+          echo "-------------------------------"
+          echo " ERROR: failed to hit backend! "
+          echo "-------------------------------"
+          exit 1

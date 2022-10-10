@@ -1,0 +1,46 @@
+name: ci
+on: [push]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump GitHub context
+        run: echo "$GITHUB_CONTEXT"
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16.13
+      - name: "Install Dependencies"
+        run: |
+          go mod download
+          go get gotest.tools/gotestsum@v1.7.0
+      - name: "Update apt"
+        run: sudo apt-get update
+      - name: "Download Keybase"
+        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
+      - name: "Install Keybase"
+        run: sudo apt-get install ./keybase_amd64.deb unzip
+      - name: "Run keybase globally"
+        run: run_keybase -g
+      - name: "Oneshot Keybase"
+        run: keybase oneshot
+        env:
+          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
+          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Decrypt secrets"
+        run: keybase decrypt -i _encrypted_internal -o _internal.zip
+      - name: "Unzip"
+        run: echo "A" | unzip _internal.zip -d _internal
+      - name: Build
+        run: go build -v ./...
+      - name: Test
+        run: |
+          mkdir -p /tmp/test-reports
+          gotestsum --junitfile /tmp/test-reports/integration-tests.xml -- -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
+      - name: "Run indexer tests"
+        run: |
+          mkdir -p /tmp/test-reports
+          gotestsum --junitfile /tmp/test-reports/indexer-integration-tests.xml -- ./indexer/...
