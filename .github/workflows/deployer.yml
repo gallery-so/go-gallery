@@ -49,7 +49,7 @@ jobs:
           cd _deploy
           make deploy-dev-backend
   post-deploy:
-    runs_on: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: "Ping backend"
         run: |
