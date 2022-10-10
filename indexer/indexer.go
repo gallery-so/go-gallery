@@ -423,21 +423,10 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 	transfers := logsToTransfers(ctx, logsTo)
 
 	logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
-
 	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
 
-	batchTransfers(ctx, transfersChan, transfersAtBlocks)
-}
-
-func batchTransfers(ctx context.Context, transfersChan chan<- []transfersAtBlock, transfersAtBlocks []transfersAtBlock) {
 	logger.For(ctx).Infof("Sending %d total transfers to transfers channel", len(transfersAtBlocks))
-	for j := 0; j < len(transfersAtBlocks); j += 10 {
-		to := j + 10
-		if to > len(transfersAtBlocks) {
-			to = len(transfersAtBlocks)
-		}
-		transfersChan <- transfersAtBlocks[j:to]
-	}
+	transfersChan <- transfersAtBlocks
 	logger.For(ctx).Infof("Finished processing logs, closing transfers channel...")
 }
 
