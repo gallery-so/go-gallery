@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mikeydub/go-gallery/validate"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -117,29 +118,47 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 
 	var interactions []interface{}
 	interactionsByID := make(map[persist.DBID]interface{})
+	var interactionsByIDMutex sync.Mutex
+	var wg sync.WaitGroup
 
-	// TODO: Execute these queries in parallel
 	admireIDs := typeToIDs[1]
-	if len(admireIDs) > 0 {
-		admires, errs := api.loaders.AdmireByAdmireID.LoadAll(admireIDs)
-
-		for i, admire := range admires {
-			if errs[i] == nil {
-				interactionsByID[admire.ID] = admire
-			}
-		}
-	}
-
 	commentIDs := typeToIDs[2]
-	if len(commentIDs) > 0 {
-		comments, errs := api.loaders.CommentByCommentID.LoadAll(commentIDs)
 
-		for i, comment := range comments {
-			if errs[i] == nil {
-				interactionsByID[comment.ID] = comment
+	if len(admireIDs) > 0 {
+		wg.Add(1)
+		go func() {
+			admires, errs := api.loaders.AdmireByAdmireID.LoadAll(admireIDs)
+
+			interactionsByIDMutex.Lock()
+			defer interactionsByIDMutex.Unlock()
+
+			for i, admire := range admires {
+				if errs[i] == nil {
+					interactionsByID[admire.ID] = admire
+				}
 			}
-		}
+			wg.Done()
+		}()
 	}
+
+	if len(commentIDs) > 0 {
+		wg.Add(1)
+		go func() {
+			comments, errs := api.loaders.CommentByCommentID.LoadAll(commentIDs)
+
+			interactionsByIDMutex.Lock()
+			defer interactionsByIDMutex.Unlock()
+
+			for i, comment := range comments {
+				if errs[i] == nil {
+					interactionsByID[comment.ID] = comment
+				}
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
 
 	for _, key := range orderedKeys {
 		if interaction, ok := interactionsByID[key.ID]; ok {
