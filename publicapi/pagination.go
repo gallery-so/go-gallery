@@ -17,7 +17,7 @@ type PageInfo struct {
 	EndCursor       string
 }
 
-func validatePaginationParams(validator *validator.Validate, before *string, after *string, first *int, last *int) error {
+func validatePaginationParams(validator *validator.Validate, first *int, last *int) error {
 	if err := validateFields(validator, validationMap{
 		"first": {first, "omitempty,gte=0"},
 		"last":  {last, "omitempty,gte=0"},
@@ -26,10 +26,8 @@ func validatePaginationParams(validator *validator.Validate, before *string, aft
 	}
 
 	if err := validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
-		First:  first,
-		Last:   last,
+		First: first,
+		Last:  last,
 	}); err != nil {
 		return err
 	}

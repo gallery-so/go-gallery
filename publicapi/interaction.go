@@ -40,7 +40,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		return nil, PageInfo{}, err
 	}
 
-	if err := validatePaginationParams(api.validator, before, after, first, last); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
@@ -168,7 +168,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		return nil, PageInfo{}, err
 	}
 
-	if err := validatePaginationParams(api.validator, before, after, first, last); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
@@ -232,7 +232,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 		return nil, PageInfo{}, err
 	}
 
-	if err := validatePaginationParams(api.validator, before, after, first, last); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
