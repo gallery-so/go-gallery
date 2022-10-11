@@ -52,8 +52,8 @@ func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, afte
 	}
 
 	if err := api.validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
+		Before: nil,
+		After:  nil,
 		First:  first,
 		Last:   last,
 	}); err != nil {
@@ -95,8 +95,8 @@ func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *
 	}
 
 	if err := api.validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
+		Before: nil,
+		After:  nil,
 		First:  first,
 		Last:   last,
 	}); err != nil {

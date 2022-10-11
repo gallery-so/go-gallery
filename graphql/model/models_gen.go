@@ -87,6 +87,10 @@ type GetAuthNoncePayloadOrError interface {
 	IsGetAuthNoncePayloadOrError()
 }
 
+type Interaction interface {
+	IsInteraction()
+}
+
 type LoginPayloadOrError interface {
 	IsLoginPayloadOrError()
 }
@@ -192,7 +196,8 @@ type Admire struct {
 	Admirer      *GalleryUser `json:"admirer"`
 }
 
-func (Admire) IsNode() {}
+func (Admire) IsNode()        {}
+func (Admire) IsInteraction() {}
 
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
@@ -329,7 +334,8 @@ type Comment struct {
 	Comment      *string      `json:"comment"`
 }
 
-func (Comment) IsNode() {}
+func (Comment) IsNode()        {}
+func (Comment) IsInteraction() {}
 
 type CommentOnFeedEventPayload struct {
 	Viewer         *Viewer    `json:"viewer"`
@@ -616,15 +622,49 @@ type FeedEdge struct {
 }
 
 type FeedEvent struct {
-	Dbid      persist.DBID  `json:"dbid"`
-	EventData FeedEventData `json:"eventData"`
-	Admires   []*Admire     `json:"admires"`
-	Comments  []*Comment    `json:"comments"`
+	Dbid         persist.DBID                     `json:"dbid"`
+	EventData    FeedEventData                    `json:"eventData"`
+	Admires      *FeedEventAdmiresConnection      `json:"admires"`
+	Comments     *FeedEventCommentsConnection     `json:"comments"`
+	Interactions *FeedEventInteractionsConnection `json:"interactions"`
 }
 
 func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
+
+type FeedEventAdmireEdge struct {
+	Node   *Admire    `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor string     `json:"cursor"`
+}
+
+type FeedEventAdmiresConnection struct {
+	Edges    []*FeedEventAdmireEdge `json:"edges"`
+	PageInfo *PageInfo              `json:"pageInfo"`
+}
+
+type FeedEventCommentEdge struct {
+	Node   *Comment   `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor string     `json:"cursor"`
+}
+
+type FeedEventCommentsConnection struct {
+	Edges    []*FeedEventCommentEdge `json:"edges"`
+	PageInfo *PageInfo               `json:"pageInfo"`
+}
+
+type FeedEventInteractionsConnection struct {
+	Edges    []*FeedEventInteractionsEdge `json:"edges"`
+	PageInfo *PageInfo                    `json:"pageInfo"`
+}
+
+type FeedEventInteractionsEdge struct {
+	Node   Interaction `json:"node"`
+	Event  *FeedEvent  `json:"event"`
+	Cursor string      `json:"cursor"`
+}
 
 type FollowInfo struct {
 	User         *GalleryUser `json:"user"`
@@ -749,6 +789,7 @@ type OwnerAtBlock struct {
 }
 
 type PageInfo struct {
+	Total           *int   `json:"total"`
 	Size            int    `json:"size"`
 	HasPreviousPage bool   `json:"hasPreviousPage"`
 	HasNextPage     bool   `json:"hasNextPage"`
@@ -1033,6 +1074,47 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
+
+type InteractionType string
+
+const (
+	InteractionTypeAdmire  InteractionType = "Admire"
+	InteractionTypeComment InteractionType = "Comment"
+)
+
+var AllInteractionType = []InteractionType{
+	InteractionTypeAdmire,
+	InteractionTypeComment,
+}
+
+func (e InteractionType) IsValid() bool {
+	switch e {
+	case InteractionTypeAdmire, InteractionTypeComment:
+		return true
+	}
+	return false
+}
+
+func (e InteractionType) String() string {
+	return string(e)
+}
+
+func (e *InteractionType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = InteractionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid InteractionType", str)
+	}
+	return nil
+}
+
+func (e InteractionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
 
 type TokenType string
 

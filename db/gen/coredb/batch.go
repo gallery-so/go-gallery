@@ -7,6 +7,7 @@ package coredb
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -113,62 +114,6 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Query(f func(int, []Admire, error
 }
 
 func (b *GetAdmiresByActorIDBatchBatchResults) Close() error {
-	return b.br.Close()
-}
-
-const getAdmiresByFeedEventIDBatch = `-- name: GetAdmiresByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
-`
-
-type GetAdmiresByFeedEventIDBatchBatchResults struct {
-	br  pgx.BatchResults
-	ind int
-}
-
-func (q *Queries) GetAdmiresByFeedEventIDBatch(ctx context.Context, feedEventID []persist.DBID) *GetAdmiresByFeedEventIDBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range feedEventID {
-		vals := []interface{}{
-			a,
-		}
-		batch.Queue(getAdmiresByFeedEventIDBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetAdmiresByFeedEventIDBatchBatchResults{br, 0}
-}
-
-func (b *GetAdmiresByFeedEventIDBatchBatchResults) Query(f func(int, []Admire, error)) {
-	for {
-		rows, err := b.br.Query()
-		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
-			break
-		}
-		defer rows.Close()
-		var items []Admire
-		for rows.Next() {
-			var i Admire
-			if err := rows.Scan(
-				&i.ID,
-				&i.Version,
-				&i.FeedEventID,
-				&i.ActorID,
-				&i.Deleted,
-				&i.CreatedAt,
-				&i.LastUpdated,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-		}
-
-		if f != nil {
-			f(b.ind, items, rows.Err())
-		}
-		b.ind++
-	}
-}
-
-func (b *GetAdmiresByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
@@ -394,64 +339,6 @@ func (b *GetCommentsByActorIDBatchBatchResults) Query(f func(int, []Comment, err
 }
 
 func (b *GetCommentsByActorIDBatchBatchResults) Close() error {
-	return b.br.Close()
-}
-
-const getCommentsByFeedEventIDBatch = `-- name: GetCommentsByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
-`
-
-type GetCommentsByFeedEventIDBatchBatchResults struct {
-	br  pgx.BatchResults
-	ind int
-}
-
-func (q *Queries) GetCommentsByFeedEventIDBatch(ctx context.Context, feedEventID []persist.DBID) *GetCommentsByFeedEventIDBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range feedEventID {
-		vals := []interface{}{
-			a,
-		}
-		batch.Queue(getCommentsByFeedEventIDBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetCommentsByFeedEventIDBatchBatchResults{br, 0}
-}
-
-func (b *GetCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []Comment, error)) {
-	for {
-		rows, err := b.br.Query()
-		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
-			break
-		}
-		defer rows.Close()
-		var items []Comment
-		for rows.Next() {
-			var i Comment
-			if err := rows.Scan(
-				&i.ID,
-				&i.Version,
-				&i.FeedEventID,
-				&i.ActorID,
-				&i.ReplyTo,
-				&i.Comment,
-				&i.Deleted,
-				&i.CreatedAt,
-				&i.LastUpdated,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-		}
-
-		if f != nil {
-			f(b.ind, items, rows.Err())
-		}
-		b.ind++
-	}
-}
-
-func (b *GetCommentsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
@@ -1903,5 +1790,160 @@ func (b *GetWalletsByUserIDBatchBatchResults) Query(f func(int, []Wallet, error)
 }
 
 func (b *GetWalletsByUserIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const paginateAdmiresByFeedEventIDBatch = `-- name: PaginateAdmiresByFeedEventIDBatch :batchmany
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4) AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $2
+`
+
+type PaginateAdmiresByFeedEventIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type PaginateAdmiresByFeedEventIDBatchParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) PaginateAdmiresByFeedEventIDBatch(ctx context.Context, arg []PaginateAdmiresByFeedEventIDBatchParams) *PaginateAdmiresByFeedEventIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.FeedEventID,
+			a.Limit,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+		}
+		batch.Queue(paginateAdmiresByFeedEventIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateAdmiresByFeedEventIDBatchBatchResults{br, 0}
+}
+
+func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Query(f func(int, []Admire, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Admire
+		for rows.Next() {
+			var i Admire
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.FeedEventID,
+				&i.ActorID,
+				&i.Deleted,
+				&i.CreatedAt,
+				&i.LastUpdated,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *PaginateAdmiresByFeedEventIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const paginateCommentsByFeedEventIDBatch = `-- name: PaginateCommentsByFeedEventIDBatch :batchmany
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $2
+`
+
+type PaginateCommentsByFeedEventIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type PaginateCommentsByFeedEventIDBatchParams struct {
+	FeedEventID   persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) PaginateCommentsByFeedEventIDBatch(ctx context.Context, arg []PaginateCommentsByFeedEventIDBatchParams) *PaginateCommentsByFeedEventIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.FeedEventID,
+			a.Limit,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+		}
+		batch.Queue(paginateCommentsByFeedEventIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateCommentsByFeedEventIDBatchBatchResults{br, 0}
+}
+
+func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []Comment, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Comment
+		for rows.Next() {
+			var i Comment
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.FeedEventID,
+				&i.ActorID,
+				&i.ReplyTo,
+				&i.Comment,
+				&i.Deleted,
+				&i.CreatedAt,
+				&i.LastUpdated,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }

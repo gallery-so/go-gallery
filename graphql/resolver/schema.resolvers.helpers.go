@@ -674,7 +674,7 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 }
 
 func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
-	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, admireID)
+	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, admireID)
 
 	if err != nil {
 		return nil, err
@@ -683,33 +683,14 @@ func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model
 	return admireToModel(ctx, *admire), nil
 }
 
-func resolveAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Admire, error) {
-	admires, err := publicapi.For(ctx).Admire.GetAdmiresByFeedEventID(ctx, feedEventID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return admiresToModels(ctx, admires), nil
-}
-
 func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*model.Comment, error) {
-	comment, err := publicapi.For(ctx).Comment.GetCommentByID(ctx, commentID)
+	comment, err := publicapi.For(ctx).Interaction.GetCommentByID(ctx, commentID)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return commentToModel(ctx, *comment), nil
-}
-func resolveCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Comment, error) {
-	comments, err := publicapi.For(ctx).Comment.GetCommentsByFeedEventID(ctx, feedEventID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return commentsToModels(ctx, comments), nil
 }
 
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
