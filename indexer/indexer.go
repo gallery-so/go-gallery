@@ -355,16 +355,14 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 	var logsTo []types.Log
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
-	if err == nil {
-		func() {
-			defer reader.Close()
-			err = json.NewDecoder(reader).Decode(&logsTo)
-			if err != nil {
-				panic(err)
-			}
-		}()
-	} else {
+	if err != nil {
 		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
+	} else {
+		defer reader.Close()
+		err = json.NewDecoder(reader).Decode(&logsTo)
+		if err != nil {
+			panic(err)
+		}
 	}
 	if len(logsTo) > 0 {
 		lastLog := logsTo[len(logsTo)-1]
@@ -374,7 +372,7 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 		}
 	}
 	if len(logsTo) == 0 && rpcEnabled {
-		logsTo, err := rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
+		logsTo, err = rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
@@ -403,12 +401,9 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 			if err != nil {
 				return nil, err
 			}
-			return logsTo, nil
+			return []types.Log{}, nil
 		}
-
 		saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
-	} else {
-		logger.For(ctx).Info("Found logs in cache...")
 	}
 	logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 	return logsTo, nil
