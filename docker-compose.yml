@@ -66,8 +66,8 @@ services:
   #   ports:
   #     - "6000:6000"
   #   volumes:
-  #     - ${PWD}/_local:/_local
-  #     - ${PWD}/_deploy:/_deploy
+  #     - ${PWD}/_local:/app/_local
+  #     - ${PWD}/_deploy:/app/_deploy
   #   depends_on:
   #     - postgres
   #     - postgres_indexer

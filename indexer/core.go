@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -45,18 +46,16 @@ func coreInit() (*gin.Engine, *indexer) {
 	initSentry()
 	initLogger()
 
-	tokenRepo, contractRepo := newRepos()
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
 		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
 	} else {
 		s = media.NewStorageClient(context.Background())
 	}
+	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
-
-	events := []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}
 
 	// overrides for where the indexer starts and stops
 	startingBlock, maxBlock := getBlockRangeFromArgs()
@@ -65,7 +64,7 @@ func coreInit() (*gin.Engine, *indexer) {
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, persist.Chain(viper.GetInt("CHAIN")), events, nil, startingBlock, maxBlock)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, startingBlock, maxBlock)
 
 	router := gin.Default()
 
@@ -112,16 +111,20 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	tokenRepo, contractRepo := newRepos()
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
 		s = media.NewLocalStorageClient(context.Background(), localKeyPath)
 	} else {
 		s = media.NewStorageClient(context.Background())
 	}
+	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
+
+	if viper.GetString("ENV") == "production" {
+		rpcEnabled = true
+	}
 
 	router := gin.Default()
 
@@ -135,11 +138,12 @@ func coreInitServer() *gin.Engine {
 	logger.For(ctx).Info("Registering handlers...")
 
 	queueChan := make(chan processTokensInput)
-
 	t := newThrottler()
 
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+
 	go processMedialessTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
-	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s)
+	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 
 func setDefaults(service string) {
@@ -175,13 +179,12 @@ func setDefaults(service string) {
 	util.EnvVarMustExist("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
 		util.EnvVarMustExist("SENTRY_DSN", "")
-		util.EnvVarMustExist("VERSION", "")
 	}
 }
 
-func newRepos() (persist.TokenRepository, persist.ContractRepository) {
+func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository, refresh.AddressFilterRepository) {
 	pgClient := postgres.NewClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient)
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))}
 }
 
 func newThrottler() *throttle.Locker {
@@ -237,7 +240,7 @@ func initLogger() {
 func configureRootContext() context.Context {
 	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
 	if viper.GetString("ENV") != "production" {
-		logger.For(ctx).Logger.SetLevel((logrus.DebugLevel))
+		logger.For(ctx).Logger.SetLevel(logrus.DebugLevel)
 	}
 	logger.For(ctx).Logger.SetReportCaller(true)
 	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)

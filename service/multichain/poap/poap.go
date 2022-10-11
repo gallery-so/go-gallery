@@ -326,6 +326,11 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	return nil
 }
 
+// DeepRefresh re-indexes a wallet address. Because we don't index POAP ourselves, this is a no-op.
+func (p *Provider) DeepRefresh(context.Context, persist.Address) error {
+	return nil
+}
+
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Poap Blockchain
 func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 	return nil

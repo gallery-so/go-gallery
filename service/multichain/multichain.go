@@ -153,6 +153,7 @@ type ChainProvider interface {
 	GetCommunityOwners(context.Context, persist.Address) ([]ChainAgnosticCommunityOwner, error)
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
 	RefreshContract(context.Context, persist.Address) error
+	DeepRefresh(ctx context.Context, address persist.Address) error
 	// bool is whether or not to update all media content, including the tokens that already have media content
 	UpdateMediaForWallet(context.Context, persist.Address, bool) error
 	// do we want to return the tokens we validate?
@@ -481,6 +482,36 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 		return nil, err
 	}
 	return holders, nil
+}
+
+// DeepRefresh re-indexes a user's wallets.
+func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, chain persist.Chain) error {
+	if _, ok := d.Chains[chain]; !ok {
+		return nil
+	}
+
+	// User doesn't exist
+	user, err := d.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	addresses := make([]persist.Address, 0)
+	for _, wallet := range user.Wallets {
+		if wallet.Chain == chain {
+			addresses = append(addresses, wallet.Address)
+		}
+	}
+
+	for _, provider := range d.Chains[chain] {
+		for _, wallet := range addresses {
+			if err := provider.DeepRefresh(ctx, wallet); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // VerifySignature verifies a signature for a wallet address
