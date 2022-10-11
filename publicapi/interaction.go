@@ -94,8 +94,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
-		CountFunc:  countFunc,
 		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -216,8 +216,8 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
-		CountFunc:  countFunc,
 		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -280,8 +280,8 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
-		CountFunc:  countFunc,
 		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)

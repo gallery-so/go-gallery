@@ -39,9 +39,15 @@ func validatePaginationParams(validator *validator.Validate, first *int, last *i
 // use a cursor-specific helper like timeIDPaginator.
 // For reasons to favor keyset pagination, see: https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/
 type keysetPaginator struct {
-	QueryFunc  func(int32, bool) ([]interface{}, error)
-	CursorFunc func(interface{}) (string, error)
-	CountFunc  func() (int, error)
+	// QueryFunc returns paginated results for the given paging parameters
+	QueryFunc func(limit int32, pagingForward bool) (nodes []interface{}, err error)
+
+	// CursorFunc returns a cursor string for the given node value
+	CursorFunc func(node interface{}) (cursor string, err error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
 }
 
 func (p *keysetPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
@@ -84,14 +90,13 @@ func (p *keysetPaginator) paginate(before *string, after *string, first *int, la
 		}
 	}
 
-	// If this is the first query (i.e. no cursors have been supplied), return the total count too
-	if before == nil && after == nil {
+	// If a count function is supplied, fill in pageInfo.Total
+	if p.CountFunc != nil {
 		total, err := p.CountFunc()
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
-		totalInt := int(total)
-		pageInfo.Total = &totalInt
+		pageInfo.Total = &total
 	}
 
 	pageInfo.Size = len(results)
@@ -123,11 +128,12 @@ type timeIDPaginator struct {
 	// QueryFunc returns paginated results for the given paging parameters
 	QueryFunc func(params timeIDPagingParams) ([]interface{}, error)
 
-	// CountFunc returns the total number of items that can be paginated
-	CountFunc func() (count int, err error)
-
 	// CursorFunc returns a time and DBID that will be encoded into a cursor string
 	CursorFunc func(node interface{}) (time.Time, persist.DBID, error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
 }
 
 // timeIDPagingParams are the parameters used to paginate with a time+DBID cursor
