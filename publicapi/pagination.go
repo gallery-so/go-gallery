@@ -37,15 +37,16 @@ func validatePaginationParams(validator *validator.Validate, before *string, aft
 	return nil
 }
 
-// basePaginator is the base pagination struct. You probably don't want to use this directly; use
-// a cursor-specific helper like timeIDPaginator.
-type basePaginator struct {
+// keysetPaginator is the base keyset pagination struct. You probably don't want to use this directly;
+// use a cursor-specific helper like timeIDPaginator.
+// For reasons to favor keyset pagination, see: https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/
+type keysetPaginator struct {
 	QueryFunc  func(int32, bool) ([]interface{}, error)
 	CursorFunc func(interface{}) (string, error)
 	CountFunc  func() (int, error)
 }
 
-func (p *basePaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+func (p *keysetPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	// Limit is intentionally 1 more than requested, so we can see if there are additional pages
 	limit := 1
 	if first != nil {
@@ -116,7 +117,10 @@ func (p *basePaginator) paginate(before *string, after *string, first *int, last
 	return results, pageInfo, err
 }
 
-// timeIDPaginator paginates results using a cursor with time.Time and persist.DBID components
+// timeIDPaginator paginates results using a cursor with a time.Time and a persist.DBID.
+// By using the combination of a timestamp and a unique DBID for our ORDER BY clause,
+// we can achieve fast keyset pagination results while avoiding edge cases when multiple
+// rows have the same timestamp.
 type timeIDPaginator struct {
 	// QueryFunc returns paginated results for the given paging parameters
 	QueryFunc func(params timeIDPagingParams) ([]interface{}, error)
@@ -228,7 +232,7 @@ func (p *timeIDPaginator) paginate(before *string, after *string, first *int, la
 		return p.encodeTimeIDCursor(nodeTime, nodeID)
 	}
 
-	paginator := basePaginator{
+	paginator := keysetPaginator{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  p.CountFunc,
