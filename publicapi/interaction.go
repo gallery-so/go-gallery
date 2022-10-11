@@ -45,7 +45,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.queries.PaginateInteractionsByFeedEventID(ctx, db.PaginateInteractionsByFeedEventIDParams{
+		keys, err := api.loaders.InteractionsByFeedEventID.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -70,16 +70,23 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountInteractionsByFeedEventID(ctx, db.CountInteractionsByFeedEventIDParams{
+		counts, err := api.loaders.InteractionCountByFeedEventID.Load(db.CountInteractionsByFeedEventIDBatchParams{
 			FeedEventID: feedEventID,
 			AdmireTag:   1,
 			CommentTag:  2,
 		})
-		return int(total), err
+
+		total := 0
+
+		for _, count := range counts {
+			total += int(count.Count)
+		}
+
+		return total, err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if row, ok := i.(db.PaginateInteractionsByFeedEventIDRow); ok {
+		if row, ok := i.(db.PaginateInteractionsByFeedEventIDBatchRow); ok {
 			return row.CreatedAt, row.ID, nil
 		}
 		return time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
@@ -97,11 +104,11 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		return nil, PageInfo{}, err
 	}
 
-	orderedKeys := make([]db.PaginateInteractionsByFeedEventIDRow, len(results))
+	orderedKeys := make([]db.PaginateInteractionsByFeedEventIDBatchRow, len(results))
 	typeToIDs := make(map[int][]persist.DBID)
 
 	for i, result := range results {
-		row := result.(db.PaginateInteractionsByFeedEventIDRow)
+		row := result.(db.PaginateInteractionsByFeedEventIDBatchRow)
 		orderedKeys[i] = row
 		typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
 	}
@@ -173,7 +180,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.FeedEventAdmires.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
+		admires, err := api.loaders.AdmiresByFeedEventID.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -196,8 +203,8 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountAdmiresByFeedEventID(ctx, feedEventID)
-		return int(total), err
+		total, err := api.loaders.AdmireCountByFeedEventID.Load(feedEventID)
+		return total, err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -237,7 +244,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		comments, err := api.loaders.FeedEventComments.Load(db.PaginateCommentsByFeedEventIDBatchParams{
+		comments, err := api.loaders.CommentsByFeedEventID.Load(db.PaginateCommentsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -260,8 +267,8 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountCommentsByFeedEventID(ctx, feedEventID)
-		return int(total), err
+		total, err := api.loaders.CommentCountByFeedEventID.Load(feedEventID)
+		return total, err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
