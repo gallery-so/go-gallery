@@ -153,19 +153,9 @@ func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, b
 		})
 	}
 
-	// TODO: pageInfoToModel
-	pageInfoModel := &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
-	}
-
 	return &model.FeedEventAdmiresConnection{
 		Edges:    edges,
-		PageInfo: pageInfoModel,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
@@ -184,19 +174,9 @@ func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, 
 		})
 	}
 
-	// TODO: pageInfoToModel
-	pageInfoModel := &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
-	}
-
 	return &model.FeedEventCommentsConnection{
 		Edges:    edges,
-		PageInfo: pageInfoModel,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
@@ -220,19 +200,9 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 		edges = append(edges, edge)
 	}
 
-	// TODO: pageInfoToModel
-	pageInfoModel := &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
-	}
-
 	return &model.FeedEventInteractionsConnection{
 		Edges:    edges,
-		PageInfo: pageInfoModel,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
