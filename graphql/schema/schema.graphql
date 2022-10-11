@@ -473,6 +473,8 @@ type FeedEvent implements Node {
     eventData: FeedEventData @goField(forceResolver: true)
     admires: [Admire!] @goField(forceResolver: true)
     comments: [Comment!] @goField(forceResolver: true)
+
+    hasViewerAdmiredEvent: Boolean
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
