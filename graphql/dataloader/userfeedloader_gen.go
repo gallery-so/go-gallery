@@ -10,7 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
-type PersonalFeedLoaderSettings interface {
+type UserFeedLoaderSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -21,29 +21,29 @@ type PersonalFeedLoaderSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *PersonalFeedLoader) setContext(ctx context.Context) {
+func (l *UserFeedLoader) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *PersonalFeedLoader) setWait(wait time.Duration) {
+func (l *UserFeedLoader) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *PersonalFeedLoader) setMaxBatch(maxBatch int) {
+func (l *UserFeedLoader) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *PersonalFeedLoader) setDisableCaching(disableCaching bool) {
+func (l *UserFeedLoader) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *PersonalFeedLoader) setPublishResults(publishResults bool) {
+func (l *UserFeedLoader) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-// NewPersonalFeedLoader creates a new PersonalFeedLoader with the given settings, functions, and options
-func NewPersonalFeedLoader(
-	settings PersonalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginatePersonalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error),
+// NewUserFeedLoader creates a new UserFeedLoader with the given settings, functions, and options
+func NewUserFeedLoader(
+	settings UserFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -51,8 +51,8 @@ func NewPersonalFeedLoader(
 		setDisableCaching(bool)
 		setPublishResults(bool)
 	}),
-) *PersonalFeedLoader {
-	loader := &PersonalFeedLoader{
+) *UserFeedLoader {
+	loader := &UserFeedLoader{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -67,7 +67,7 @@ func NewPersonalFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginatePersonalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
+	loader.fetch = func(keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
 		return fetch(loader.ctx, keys)
 	}
 
@@ -85,13 +85,13 @@ func NewPersonalFeedLoader(
 	return loader
 }
 
-// PersonalFeedLoader batches and caches requests
-type PersonalFeedLoader struct {
+// UserFeedLoader batches and caches requests
+type UserFeedLoader struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginatePersonalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error)
+	fetch func(keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -116,18 +116,18 @@ type PersonalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginatePersonalFeedByFeedEventIDParams][]coredb.FeedEvent
+	cache map[coredb.PaginateUserFeedByFeedEventIDParams][]coredb.FeedEvent
 
 	// typed cache functions
 	//subscribers []func([]coredb.FeedEvent)
-	subscribers []personalFeedLoaderSubscriber
+	subscribers []userFeedLoaderSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *personalFeedLoaderBatch
+	batch *userFeedLoaderBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -136,8 +136,8 @@ type PersonalFeedLoader struct {
 	once sync.Once
 }
 
-type personalFeedLoaderBatch struct {
-	keys    []coredb.PaginatePersonalFeedByFeedEventIDParams
+type userFeedLoaderBatch struct {
+	keys    []coredb.PaginateUserFeedByFeedEventIDParams
 	data    [][]coredb.FeedEvent
 	error   []error
 	closing bool
@@ -145,14 +145,14 @@ type personalFeedLoaderBatch struct {
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *PersonalFeedLoader) Load(key coredb.PaginatePersonalFeedByFeedEventIDParams) ([]coredb.FeedEvent, error) {
+func (l *UserFeedLoader) Load(key coredb.PaginateUserFeedByFeedEventIDParams) ([]coredb.FeedEvent, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *PersonalFeedLoader) LoadThunk(key coredb.PaginatePersonalFeedByFeedEventIDParams) func() ([]coredb.FeedEvent, error) {
+func (l *UserFeedLoader) LoadThunk(key coredb.PaginateUserFeedByFeedEventIDParams) func() ([]coredb.FeedEvent, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -163,7 +163,7 @@ func (l *PersonalFeedLoader) LoadThunk(key coredb.PaginatePersonalFeedByFeedEven
 		}
 	}
 	if l.batch == nil {
-		l.batch = &personalFeedLoaderBatch{done: make(chan struct{})}
+		l.batch = &userFeedLoaderBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -203,7 +203,7 @@ func (l *PersonalFeedLoader) LoadThunk(key coredb.PaginatePersonalFeedByFeedEven
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *PersonalFeedLoader) LoadAll(keys []coredb.PaginatePersonalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
+func (l *UserFeedLoader) LoadAll(keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 
 	for i, key := range keys {
@@ -221,7 +221,7 @@ func (l *PersonalFeedLoader) LoadAll(keys []coredb.PaginatePersonalFeedByFeedEve
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *PersonalFeedLoader) LoadAllThunk(keys []coredb.PaginatePersonalFeedByFeedEventIDParams) func() ([][]coredb.FeedEvent, []error) {
+func (l *UserFeedLoader) LoadAllThunk(keys []coredb.PaginateUserFeedByFeedEventIDParams) func() ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -239,7 +239,7 @@ func (l *PersonalFeedLoader) LoadAllThunk(keys []coredb.PaginatePersonalFeedByFe
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *PersonalFeedLoader) Prime(key coredb.PaginatePersonalFeedByFeedEventIDParams, value []coredb.FeedEvent) bool {
+func (l *UserFeedLoader) Prime(key coredb.PaginateUserFeedByFeedEventIDParams, value []coredb.FeedEvent) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -257,7 +257,7 @@ func (l *PersonalFeedLoader) Prime(key coredb.PaginatePersonalFeedByFeedEventIDP
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *PersonalFeedLoader) Clear(key coredb.PaginatePersonalFeedByFeedEventIDParams) {
+func (l *UserFeedLoader) Clear(key coredb.PaginateUserFeedByFeedEventIDParams) {
 	if l.disableCaching {
 		return
 	}
@@ -266,16 +266,16 @@ func (l *PersonalFeedLoader) Clear(key coredb.PaginatePersonalFeedByFeedEventIDP
 	l.mu.Unlock()
 }
 
-func (l *PersonalFeedLoader) unsafeSet(key coredb.PaginatePersonalFeedByFeedEventIDParams, value []coredb.FeedEvent) {
+func (l *UserFeedLoader) unsafeSet(key coredb.PaginateUserFeedByFeedEventIDParams, value []coredb.FeedEvent) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginatePersonalFeedByFeedEventIDParams][]coredb.FeedEvent{}
+		l.cache = map[coredb.PaginateUserFeedByFeedEventIDParams][]coredb.FeedEvent{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *personalFeedLoaderBatch) keyIndex(l *PersonalFeedLoader, key coredb.PaginatePersonalFeedByFeedEventIDParams) int {
+func (b *userFeedLoaderBatch) keyIndex(l *UserFeedLoader, key coredb.PaginateUserFeedByFeedEventIDParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -299,7 +299,7 @@ func (b *personalFeedLoaderBatch) keyIndex(l *PersonalFeedLoader, key coredb.Pag
 	return pos
 }
 
-func (b *personalFeedLoaderBatch) startTimer(l *PersonalFeedLoader) {
+func (b *userFeedLoaderBatch) startTimer(l *UserFeedLoader) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -315,24 +315,24 @@ func (b *personalFeedLoaderBatch) startTimer(l *PersonalFeedLoader) {
 	b.end(l)
 }
 
-func (b *personalFeedLoaderBatch) end(l *PersonalFeedLoader) {
+func (b *userFeedLoaderBatch) end(l *UserFeedLoader) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type personalFeedLoaderSubscriber struct {
+type userFeedLoaderSubscriber struct {
 	cacheFunc func(coredb.FeedEvent)
 	mutex     *sync.Mutex
 }
 
-func (l *PersonalFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
+func (l *UserFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
 			if typedFunc, ok := subscription.(*func(coredb.FeedEvent)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, personalFeedLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, userFeedLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -350,13 +350,13 @@ func (l *PersonalFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
 	}
 }
 
-func (l *PersonalFeedLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *UserFeedLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *PersonalFeedLoader) ownsCacheFunc(f *func(coredb.FeedEvent)) bool {
+func (l *UserFeedLoader) ownsCacheFunc(f *func(coredb.FeedEvent)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

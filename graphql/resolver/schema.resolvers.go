@@ -130,10 +130,6 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
 }
 
-func (r *feedConnectionResolver) PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error) {
-	return resolveFeedPageInfo(ctx, obj)
-}
-
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
 }
@@ -285,19 +281,9 @@ func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, 
 		return nil, err
 	}
 
-	// TODO: pageInfoToModel
-	pageInfoModel := &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
-	}
-
 	return &model.FeedConnection{
 		Edges:    edges,
-		PageInfo: pageInfoModel,
+		PageInfo: pageInfoToModel(pageInfo), // TODO: Replace this
 	}, nil
 }
 
@@ -912,13 +898,20 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 }
 
 func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	feed, err := resolveGlobalFeed(ctx, before, after, first, last)
-
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateGlobalFeedByEventID(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	return feed, nil
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(pageInfo), // TODO: Replace this
+	}, nil
 }
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
@@ -1039,7 +1032,20 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	return resolveViewerFeed(ctx, before, after, first, last)
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginatePersonalFeedByEventID(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(pageInfo), // TODO: Replace this
+	}, nil
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
@@ -1103,11 +1109,6 @@ func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPaylo
 
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
-
-// FeedConnection returns generated.FeedConnectionResolver implementation.
-func (r *Resolver) FeedConnection() generated.FeedConnectionResolver {
-	return &feedConnectionResolver{r}
-}
 
 // FeedEvent returns generated.FeedEventResolver implementation.
 func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
@@ -1202,7 +1203,6 @@ type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
-type feedConnectionResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }

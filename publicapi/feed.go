@@ -3,14 +3,12 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -38,46 +36,65 @@ func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*db.
 	return &event, nil
 }
 
-func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) (persist.DBID, []db.FeedEvent, error) {
+func (api FeedAPI) PaginatePersonalFeedByEventID(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
-		return "", nil, err
+		return nil, PageInfo{}, err
 	}
 
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
-		return "", nil, err
+		return nil, PageInfo{}, err
 	}
 
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return "", nil, err
+		return nil, PageInfo{}, err
 	}
 
-	params := db.GetPersonalFeedViewBatchParams{Follower: userID}
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+		keys, err := api.loaders.PersonalFeedByUserID.Load(db.PaginatePersonalFeedByFeedEventIDParams{
+			Follower:      userID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
 
-	if first != nil {
-		params.FromFirst = true
-		params.Limit = int32(*first)
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
 	}
 
-	if last != nil {
-		params.FromFirst = false
-		params.Limit = int32(*last)
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountPersonalFeedEventsByFollowerID(ctx, userID)
+		return int(total), err
 	}
 
-	if before != nil {
-		params.CurBefore = string(*before)
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CountFunc:  countFunc,
+		CursorFunc: cursorFunc,
 	}
 
-	if after != nil {
-		params.CurAfter = string(*after)
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	feedEvents := make([]db.FeedEvent, len(results))
+	for i, result := range results {
+		feedEvents[i] = result.(db.FeedEvent)
 	}
 
-	events, err := api.loaders.PersonalFeedByUserID.Load(params)
-
-	return userID, events, err
+	return feedEvents, pageInfo, err
 }
 
 func (api FeedAPI) PaginateUserFeedByEventID(ctx context.Context, userID persist.DBID, before *string, after *string,
@@ -89,12 +106,12 @@ func (api FeedAPI) PaginateUserFeedByEventID(ctx context.Context, userID persist
 		return nil, PageInfo{}, err
 	}
 
-	if err := validatePaginationParams(api.validator, before, after, first, last); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.queries.PaginateUserFeedByFeedEventID(ctx, db.PaginateUserFeedByFeedEventIDParams{
+		keys, err := api.loaders.UserFeedByUserID.Load(db.PaginateUserFeedByFeedEventIDParams{
 			OwnerID:       userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -117,19 +134,8 @@ func (api FeedAPI) PaginateUserFeedByEventID(ctx context.Context, userID persist
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountInteractionsByFeedEventID(ctx, db.CountInteractionsByFeedEventIDParams{
-			FeedEventID: feedEventID,
-			AdmireTag:   1,
-			CommentTag:  2,
-		})
+		total, err := api.queries.CountFeedEventsByUserID(ctx, userID)
 		return int(total), err
-	}
-
-	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if row, ok := i.(db.PaginateInteractionsByFeedEventIDRow); ok {
-			return row.CreatedAt, row.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
 	}
 
 	paginator := timeIDPaginator{
@@ -140,117 +146,66 @@ func (api FeedAPI) PaginateUserFeedByEventID(ctx context.Context, userID persist
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
-	if err != nil {
+	feedEvents := make([]db.FeedEvent, len(results))
+	for i, result := range results {
+		feedEvents[i] = result.(db.FeedEvent)
+	}
+
+	return feedEvents, pageInfo, err
+}
+
+func (api FeedAPI) PaginateGlobalFeedByEventID(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
+	// Validate
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
-	orderedKeys := make([]db.PaginateInteractionsByFeedEventIDRow, len(results))
-	typeToIDs := make(map[int][]persist.DBID)
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+		keys, err := api.loaders.GlobalFeed.Load(db.PaginateGlobalFeedByFeedEventIDParams{
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
 
-	for i, result := range results {
-		row := result.(db.PaginateInteractionsByFeedEventIDRow)
-		orderedKeys[i] = row
-		typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
-	}
-
-	var interactions []interface{}
-	interactionsByID := make(map[persist.DBID]interface{})
-	var interactionsByIDMutex sync.Mutex
-	var wg sync.WaitGroup
-
-	admireIDs := typeToIDs[1]
-	commentIDs := typeToIDs[2]
-
-	if len(admireIDs) > 0 {
-		wg.Add(1)
-		go func() {
-			admires, errs := api.loaders.AdmireByAdmireID.LoadAll(admireIDs)
-
-			interactionsByIDMutex.Lock()
-			defer interactionsByIDMutex.Unlock()
-
-			for i, admire := range admires {
-				if errs[i] == nil {
-					interactionsByID[admire.ID] = admire
-				}
-			}
-			wg.Done()
-		}()
-	}
-
-	if len(commentIDs) > 0 {
-		wg.Add(1)
-		go func() {
-			comments, errs := api.loaders.CommentByCommentID.LoadAll(commentIDs)
-
-			interactionsByIDMutex.Lock()
-			defer interactionsByIDMutex.Unlock()
-
-			for i, comment := range comments {
-				if errs[i] == nil {
-					interactionsByID[comment.ID] = comment
-				}
-			}
-			wg.Done()
-		}()
-	}
-
-	wg.Wait()
-
-	for _, key := range orderedKeys {
-		if interaction, ok := interactionsByID[key.ID]; ok {
-			interactions = append(interactions, interaction)
+		if err != nil {
+			return nil, err
 		}
+
+		results := make([]interface{}, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
 	}
 
-	return interactions, pageInfo, err
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountGlobalFeedEvents(ctx)
+		return int(total), err
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CountFunc:  countFunc,
+		CursorFunc: cursorFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	feedEvents := make([]db.FeedEvent, len(results))
+	for i, result := range results {
+		feedEvents[i] = result.(db.FeedEvent)
+	}
+
+	return feedEvents, pageInfo, err
 }
 
-func (api FeedAPI) GetGlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]db.FeedEvent, error) {
-	// Validate
-	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, err
+func cursorFunc(i interface{}) (time.Time, persist.DBID, error) {
+	if row, ok := i.(db.FeedEvent); ok {
+		return row.CreatedAt, row.ID, nil
 	}
-
-	params := db.GetGlobalFeedViewBatchParams{}
-
-	if first != nil {
-		params.FromFirst = true
-		params.Limit = int32(*first)
-	}
-
-	if last != nil {
-		params.FromFirst = false
-		params.Limit = int32(*last)
-	}
-
-	if before != nil {
-		params.CurBefore = string(*before)
-	}
-
-	if after != nil {
-		params.CurAfter = string(*after)
-	}
-
-	return api.loaders.GlobalFeed.Load(params)
-}
-
-func (api FeedAPI) HasPage(ctx context.Context, cursor string, userId persist.DBID, byFirst bool) (bool, error) {
-	eventID, err := model.Cursor.DecodeToDBID(&cursor)
-	if err != nil {
-		return false, err
-	}
-
-	if userId != "" {
-		return api.queries.PersonalFeedHasMoreEvents(ctx, db.PersonalFeedHasMoreEventsParams{
-			Follower:  userId,
-			ID:        *eventID,
-			FromFirst: byFirst,
-		})
-	} else {
-		return api.queries.GlobalFeedHasMoreEvents(ctx, db.GlobalFeedHasMoreEventsParams{
-			ID:        *eventID,
-			FromFirst: byFirst,
-		})
-	}
+	return time.Time{}, "", fmt.Errorf("interface{} is not a feed event")
 }

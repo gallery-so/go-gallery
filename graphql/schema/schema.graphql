@@ -603,9 +603,9 @@ type FeedEdge {
     cursor: String!
 }
 
-type FeedConnection @goEmbedHelper {
+type FeedConnection {
     edges: [FeedEdge]
-    pageInfo: PageInfo! @goField(forceResolver: true)
+    pageInfo: PageInfo!
 }
 
 type Query {

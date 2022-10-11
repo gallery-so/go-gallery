@@ -48,7 +48,6 @@ type ResolverRoot interface {
 	Comment() CommentResolver
 	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
 	Community() CommunityResolver
-	FeedConnection() FeedConnectionResolver
 	FeedEvent() FeedEventResolver
 	FollowInfo() FollowInfoResolver
 	FollowUserPayload() FollowUserPayloadResolver
@@ -745,9 +744,6 @@ type CommentOnFeedEventPayloadResolver interface {
 }
 type CommunityResolver interface {
 	Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error)
-}
-type FeedConnectionResolver interface {
-	PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error)
 }
 type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
@@ -4149,9 +4145,9 @@ type FeedEdge {
     cursor: String!
 }
 
-type FeedConnection @goEmbedHelper {
+type FeedConnection {
     edges: [FeedEdge]
-    pageInfo: PageInfo! @goField(forceResolver: true)
+    pageInfo: PageInfo!
 }
 
 type Query {
@@ -9480,14 +9476,14 @@ func (ec *executionContext) _FeedConnection_pageInfo(ctx context.Context, field 
 		Object:     "FeedConnection",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FeedConnection().PageInfo(rctx, obj)
+		return obj.PageInfo, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -22893,25 +22889,15 @@ func (ec *executionContext) _FeedConnection(ctx context.Context, sel ast.Selecti
 			out.Values[i] = innerFunc(ctx)
 
 		case "pageInfo":
-			field := field
-
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FeedConnection_pageInfo(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
+				return ec._FeedConnection_pageInfo(ctx, field, obj)
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
+			out.Values[i] = innerFunc(ctx)
 
-			})
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26918,10 +26904,6 @@ func (ec *executionContext) unmarshalNInteractionType2githubᚗcomᚋmikeydubᚋ
 
 func (ec *executionContext) marshalNInteractionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionType(ctx context.Context, sel ast.SelectionSet, v persist.InteractionType) graphql.Marshaler {
 	return v
-}
-
-func (ec *executionContext) marshalNPageInfo2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v model.PageInfo) graphql.Marshaler {
-	return ec._PageInfo(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {

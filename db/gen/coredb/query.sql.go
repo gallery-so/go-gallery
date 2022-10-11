@@ -24,6 +24,28 @@ func (q *Queries) CountFeedEventsByUserID(ctx context.Context, ownerID persist.D
 	return count, err
 }
 
+const countGlobalFeedEvents = `-- name: CountGlobalFeedEvents :one
+SELECT count(*) FROM feed_events WHERE deleted = false
+`
+
+func (q *Queries) CountGlobalFeedEvents(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countGlobalFeedEvents)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPersonalFeedEventsByFollowerID = `-- name: CountPersonalFeedEventsByFollowerID :one
+SELECT count(*) FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false AND fe.owner_id = fl.followee AND fl.follower = $1
+`
+
+func (q *Queries) CountPersonalFeedEventsByFollowerID(ctx context.Context, follower persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPersonalFeedEventsByFollowerID, follower)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -1177,38 +1199,6 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 	return items, nil
 }
 
-const globalFeedHasMoreEvents = `-- name: GlobalFeedHasMoreEvents :one
-SELECT
-    CASE WHEN $2::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM feed_events
-        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
-        AND deleted = false
-        LIMIT 1
-    )
-    ELSE EXISTS(
-        SELECT 1
-        FROM feed_events
-        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
-        AND deleted = false
-        LIMIT 1
-    )
-    END::bool
-`
-
-type GlobalFeedHasMoreEventsParams struct {
-	ID        persist.DBID
-	FromFirst bool
-}
-
-func (q *Queries) GlobalFeedHasMoreEvents(ctx context.Context, arg GlobalFeedHasMoreEventsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, globalFeedHasMoreEvents, arg.ID, arg.FromFirst)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false)
 `
@@ -1281,97 +1271,4 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
-}
-
-const paginateUserFeedByFeedEventID = `-- name: PaginateUserFeedByFeedEventID :many
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < ($3, $4)
-    AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-            CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-    LIMIT $2
-`
-
-type PaginateUserFeedByFeedEventIDParams struct {
-	OwnerID       persist.DBID
-	Limit         int32
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	PagingForward bool
-}
-
-func (q *Queries) PaginateUserFeedByFeedEventID(ctx context.Context, arg PaginateUserFeedByFeedEventIDParams) ([]FeedEvent, error) {
-	rows, err := q.db.Query(ctx, paginateUserFeedByFeedEventID,
-		arg.OwnerID,
-		arg.Limit,
-		arg.CurBeforeTime,
-		arg.CurBeforeID,
-		arg.CurAfterTime,
-		arg.CurAfterID,
-		arg.PagingForward,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []FeedEvent
-	for rows.Next() {
-		var i FeedEvent
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.OwnerID,
-			&i.Action,
-			&i.Data,
-			&i.EventTime,
-			&i.EventIds,
-			&i.Deleted,
-			&i.LastUpdated,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const personalFeedHasMoreEvents = `-- name: PersonalFeedHasMoreEvents :one
-SELECT
-    CASE WHEN $3::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM feed_events fe
-        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1
-    )
-    ELSE EXISTS(
-        SELECT 1
-        FROM feed_events fe
-        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1
-    )
-    END::bool
-`
-
-type PersonalFeedHasMoreEventsParams struct {
-	Follower  persist.DBID
-	ID        persist.DBID
-	FromFirst bool
-}
-
-func (q *Queries) PersonalFeedHasMoreEvents(ctx context.Context, arg PersonalFeedHasMoreEventsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, personalFeedHasMoreEvents, arg.Follower, arg.ID, arg.FromFirst)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
 }
