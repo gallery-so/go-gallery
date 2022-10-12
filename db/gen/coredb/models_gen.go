@@ -279,7 +279,7 @@ type User struct {
 	Wallets              persist.WalletList
 	Bio                  sql.NullString
 	Traits               pgtype.JSONB
-	NotificationSettings persist.NotificationSettings
+	NotificationSettings persist.UserNotificationSettings
 }
 
 type UserEvent struct {

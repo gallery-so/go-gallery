@@ -1574,7 +1574,7 @@ UPDATE users SET notification_settings = $2 WHERE id = $1
 
 type UpdateNotificationSettingsByIDParams struct {
 	ID                   persist.DBID
-	NotificationSettings persist.NotificationSettings
+	NotificationSettings persist.UserNotificationSettings
 }
 
 func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {
