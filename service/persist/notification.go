@@ -23,6 +23,9 @@ func (n NotificationData) Concat(other NotificationData) NotificationData {
 	result.AdmirerIDs = append(n.AdmirerIDs, other.AdmirerIDs...)
 	result.FollowerIDs = append(n.FollowerIDs, other.FollowerIDs...)
 	result.ViewerIDs = append(n.ViewerIDs, other.ViewerIDs...)
+	result.FeedEventID = other.FeedEventID
+	result.CommentID = other.CommentID
+	result.GalleryID = other.GalleryID
 
 	return result.Validate()
 }

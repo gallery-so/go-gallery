@@ -718,8 +718,7 @@ func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DB
 }
 
 func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error) {
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-	notifications, err := publicapi.For(ctx).Notifications.ClearUserNotifications(ctx, userID)
+	notifications, err := publicapi.For(ctx).Notifications.ClearUserNotifications(ctx)
 	if err != nil {
 		return nil, err
 	}

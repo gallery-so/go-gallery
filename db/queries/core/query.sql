@@ -425,7 +425,7 @@ SELECT * FROM notifications WHERE id = $1 AND deleted = false;
 -- name: GetNotificationByIDBatch :batchone
 SELECT * FROM notifications WHERE id = $1 AND deleted = false;
 
--- name: GetMostRecentNotifiactionByOwnerIDForAction :one
+-- name: GetMostRecentNotificationByOwnerIDForAction :one
 SELECT * FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false
     ORDER BY created_at DESC
@@ -435,7 +435,7 @@ SELECT * FROM notifications
 INSERT INTO notifications (id, owner_id, actor_id, action, data) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: UpdateNotification :exec
-UPDATE notifications SET data = $2, amount = $3 WHERE id = $1;
+UPDATE notifications SET data = $2, amount = amount + $3 WHERE id = $1;
 
 -- name: UpdateNotificationSettingsByID :exec
 UPDATE users SET notification_settings = $2 WHERE id = $1;

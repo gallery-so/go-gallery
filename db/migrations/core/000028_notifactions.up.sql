@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     DELETED boolean NOT NULL DEFAULT false,
     ACTOR_ID varchar(255),
     OWNER_ID varchar(255),
-    VERSION int,
+    VERSION int DEFAULT 0,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ACTION varchar(255) NOT NULL,

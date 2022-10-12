@@ -114,12 +114,12 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		return db.Gallery{}, err
 	}
 
-	// if gallery.OwnerUserID != userID {
-	err = api.queries.IncrementGalleryViews(ctx, galleryID)
-	if err != nil {
-		return db.Gallery{}, err
+	if gallery.OwnerUserID != userID {
+		err = api.queries.IncrementGalleryViews(ctx, galleryID)
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
-	// }
 
 	dispatchNotification(ctx, db.Notification{
 		Action:  persist.ActionViewedGallery,

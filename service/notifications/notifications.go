@@ -20,7 +20,7 @@ const notificationTimeout = 10 * time.Second
 const NotificationHandlerContextKey = "notification.notificationHandlers"
 
 type NotificationHandlers struct {
-	Notifications            *notifcationDispatcher
+	Notifications            *notificationDispatcher
 	UserNewNotifications     map[persist.DBID]chan db.Notification
 	UserUpdatedNotifications map[persist.DBID]chan db.Notification
 	pubSub                   *pubsub.Client
@@ -28,7 +28,7 @@ type NotificationHandlers struct {
 
 // Register specific notification handlers
 func New(queries *db.Queries, pub *pubsub.Client) *NotificationHandlers {
-	notifDispatcher := notifcationDispatcher{handlers: map[persist.Action]notificationHandler{}}
+	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}}
 
 	def := defaultNotificationHandler{queries: queries, pubSub: pub}
 	group := groupedNotificationHandler{queries: queries, pubSub: pub}
@@ -86,29 +86,29 @@ func (n *NotificationHandlers) GetUpdatedNotificationsForUser(userID persist.DBI
 	return sub
 }
 
-func (n *NotificationHandlers) UnscubscribeNewNotificationsForUser(userID persist.DBID) {
+func (n *NotificationHandlers) UnsubscribeNewNotificationsForUser(userID persist.DBID) {
 	logger.For(context.Background()).Infof("unsubscribing new notifications for user: %s", userID)
-	n.UserNewNotifications[userID] = nil
+	delete(n.UserNewNotifications, userID)
 }
 
 func (n *NotificationHandlers) UnsubscribeUpdatedNotificationsForUser(userID persist.DBID) {
 	logger.For(context.Background()).Infof("unsubscribing updated notifications for user: %s", userID)
-	n.UserUpdatedNotifications[userID] = nil
+	delete(n.UserUpdatedNotifications, userID)
 }
 
 type notificationHandler interface {
 	Handle(context.Context, db.Notification) error
 }
 
-type notifcationDispatcher struct {
+type notificationDispatcher struct {
 	handlers map[persist.Action]notificationHandler
 }
 
-func (d *notifcationDispatcher) AddHandler(action persist.Action, handler notificationHandler) {
+func (d *notificationDispatcher) AddHandler(action persist.Action, handler notificationHandler) {
 	d.handlers[action] = handler
 }
 
-func (d *notifcationDispatcher) Dispatch(ctx context.Context, notif db.Notification) error {
+func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notification) error {
 	if handler, ok := d.handlers[notif.Action]; ok {
 		return handler.Handle(ctx, notif)
 	}
@@ -158,7 +158,7 @@ type groupedNotificationHandler struct {
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 
-	curNotif, _ := h.queries.GetMostRecentNotifiactionByOwnerIDForAction(ctx, db.GetMostRecentNotifiactionByOwnerIDForActionParams{
+	curNotif, _ := h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
 		OwnerID: notif.OwnerID,
 		Action:  notif.Action,
 	})
@@ -170,7 +170,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		err := h.queries.UpdateNotification(ctx, db.UpdateNotificationParams{
 			ID:     curNotif.ID,
 			Data:   curNotif.Data.Concat(notif.Data),
-			Amount: amount + curNotif.Amount,
+			Amount: amount,
 		})
 		if err != nil {
 			return err
@@ -240,13 +240,13 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 
 		logger.For(ctx).Infof("received new notification from pubsub: %s", notif.OwnerID)
 
-		if sub, ok := n.UserNewNotifications[notif.OwnerID]; ok {
+		if sub, ok := n.UserNewNotifications[notif.OwnerID]; ok && sub != nil {
 			select {
 			case sub <- notif:
 				logger.For(ctx).Debugf("sent new notification to user: %s", notif.OwnerID)
 			case <-time.After(notificationTimeout):
 				logger.For(ctx).Debugf("notification create channel not open for user: %s", notif.OwnerID)
-				n.UnscubscribeNewNotificationsForUser(notif.OwnerID)
+				n.UnsubscribeNewNotificationsForUser(notif.OwnerID)
 			}
 		} else {
 			logger.For(ctx).Debugf("no notification create channel open for user: %s", notif.OwnerID)

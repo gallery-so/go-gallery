@@ -1159,7 +1159,7 @@ type Mutation {
     
     viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError @authRequired
 
-    clearAllNotifications: ClearAllNotificationsPayload
+    clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 }

@@ -897,20 +897,20 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
-const getMostRecentNotifiactionByOwnerIDForAction = `-- name: GetMostRecentNotifiactionByOwnerIDForAction :one
+const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false
     ORDER BY created_at DESC
     LIMIT 1
 `
 
-type GetMostRecentNotifiactionByOwnerIDForActionParams struct {
+type GetMostRecentNotificationByOwnerIDForActionParams struct {
 	OwnerID persist.DBID
 	Action  persist.Action
 }
 
-func (q *Queries) GetMostRecentNotifiactionByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotifiactionByOwnerIDForActionParams) (Notification, error) {
-	row := q.db.QueryRow(ctx, getMostRecentNotifiactionByOwnerIDForAction, arg.OwnerID, arg.Action)
+func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, getMostRecentNotificationByOwnerIDForAction, arg.OwnerID, arg.Action)
 	var i Notification
 	err := row.Scan(
 		&i.ID,
@@ -1519,7 +1519,7 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 }
 
 const updateNotification = `-- name: UpdateNotification :exec
-UPDATE notifications SET data = $2, amount = $3 WHERE id = $1
+UPDATE notifications SET data = $2, amount = amount + $3 WHERE id = $1
 `
 
 type UpdateNotificationParams struct {

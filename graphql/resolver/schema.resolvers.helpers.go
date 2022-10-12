@@ -814,7 +814,7 @@ func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notifi
 					logger.For(nil).Debug("sent new notification to subscription")
 				default:
 					logger.For(nil).Errorf("notification subscription channel full, dropping notification")
-					notifDispatcher.UnscubscribeNewNotificationsForUser(userID)
+					notifDispatcher.UnsubscribeNewNotificationsForUser(userID)
 				}
 			})
 		}
