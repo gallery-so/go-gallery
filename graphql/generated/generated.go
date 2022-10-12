@@ -48,7 +48,6 @@ type ResolverRoot interface {
 	Comment() CommentResolver
 	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
 	Community() CommunityResolver
-	FeedConnection() FeedConnectionResolver
 	FeedEvent() FeedEventResolver
 	FollowInfo() FollowInfoResolver
 	FollowUserPayload() FollowUserPayloadResolver
@@ -392,6 +391,7 @@ type ComplexityRoot struct {
 		Badges              func(childComplexity int) int
 		Bio                 func(childComplexity int) int
 		Dbid                func(childComplexity int) int
+		Feed                func(childComplexity int, before *string, after *string, first *int, last *int) int
 		Followers           func(childComplexity int) int
 		Following           func(childComplexity int) int
 		Galleries           func(childComplexity int) int
@@ -745,9 +745,6 @@ type CommentOnFeedEventPayloadResolver interface {
 type CommunityResolver interface {
 	Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error)
 }
-type FeedConnectionResolver interface {
-	PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error)
-}
 type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
 	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
@@ -774,6 +771,7 @@ type GalleryUserResolver interface {
 
 	Followers(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
 	Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error)
+	Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 }
 type MutationResolver interface {
 	AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error)
@@ -1982,6 +1980,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Dbid(childComplexity), true
+
+	case "GalleryUser.feed":
+		if e.complexity.GalleryUser.Feed == nil {
+			break
+		}
+
+		args, err := ec.field_GalleryUser_feed_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.GalleryUser.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "GalleryUser.followers":
 		if e.complexity.GalleryUser.Followers == nil {
@@ -3600,6 +3610,7 @@ type GalleryUser implements Node {
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
+    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -4131,12 +4142,12 @@ type PageInfo {
 
 type FeedEdge {
     node: FeedEventOrError
-    cursor: String!
+    cursor: String
 }
 
-type FeedConnection @goEmbedHelper {
+type FeedConnection {
     edges: [FeedEdge]
-    pageInfo: PageInfo! @goField(forceResolver: true)
+    pageInfo: PageInfo!
 }
 
 type Query {
@@ -4767,6 +4778,48 @@ func (ec *executionContext) field_FeedEvent_interactions_args(ctx context.Contex
 		}
 	}
 	args["typeFilter"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_GalleryUser_feed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -9423,14 +9476,14 @@ func (ec *executionContext) _FeedConnection_pageInfo(ctx context.Context, field 
 		Object:     "FeedConnection",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FeedConnection().PageInfo(rctx, obj)
+		return obj.PageInfo, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9504,14 +9557,11 @@ func (ec *executionContext) _FeedEdge_cursor(ctx context.Context, field graphql.
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FeedEvent_id(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
@@ -10943,6 +10993,45 @@ func (ec *executionContext) _GalleryUser_following(ctx context.Context, field gr
 	res := resTmp.([]*model.GalleryUser)
 	fc.Result = res
 	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_feed(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_GalleryUser_feed_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().Feed(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedConnection)
+	fc.Result = res
+	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GltfMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.GltfMedia) (ret graphql.Marshaler) {
@@ -22797,25 +22886,15 @@ func (ec *executionContext) _FeedConnection(ctx context.Context, sel ast.Selecti
 			out.Values[i] = innerFunc(ctx)
 
 		case "pageInfo":
-			field := field
-
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FeedConnection_pageInfo(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
+				return ec._FeedConnection_pageInfo(ctx, field, obj)
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
+			out.Values[i] = innerFunc(ctx)
 
-			})
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -22851,9 +22930,6 @@ func (ec *executionContext) _FeedEdge(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -23566,6 +23642,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._GalleryUser_following(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "feed":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_feed(ctx, field, obj)
 				return res
 			}
 
@@ -26805,10 +26898,6 @@ func (ec *executionContext) unmarshalNInteractionType2githubᚗcomᚋmikeydubᚋ
 
 func (ec *executionContext) marshalNInteractionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐInteractionType(ctx context.Context, sel ast.SelectionSet, v persist.InteractionType) graphql.Marshaler {
 	return v
-}
-
-func (ec *executionContext) marshalNPageInfo2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v model.PageInfo) graphql.Marshaler {
-	return ec._PageInfo(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {

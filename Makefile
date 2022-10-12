@@ -63,3 +63,9 @@ cloud-tasks:
 		-queue projects/gallery-local/locations/here/queues/feed-event \
 		-queue projects/gallery-local/locations/here/queues/token-processing \
 		-queue projects/gallery-local/locations/here/queues/indexer-refreshes
+
+migrate-coredb:
+	migrate -path db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
+
+migrate-indexerdb:
+	migrate -path db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
