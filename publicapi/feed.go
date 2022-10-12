@@ -84,7 +84,7 @@ func (api FeedAPI) PaginatePersonalFeedByEventID(ctx context.Context, before *st
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
 		CountFunc:  countFunc,
-		CursorFunc: cursorFunc,
+		CursorFunc: feedCursor,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -141,7 +141,7 @@ func (api FeedAPI) PaginateUserFeedByEventID(ctx context.Context, userID persist
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
 		CountFunc:  countFunc,
-		CursorFunc: cursorFunc,
+		CursorFunc: feedCursor,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -190,7 +190,7 @@ func (api FeedAPI) PaginateGlobalFeedByEventID(ctx context.Context, before *stri
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
 		CountFunc:  countFunc,
-		CursorFunc: cursorFunc,
+		CursorFunc: feedCursor,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -203,7 +203,7 @@ func (api FeedAPI) PaginateGlobalFeedByEventID(ctx context.Context, before *stri
 	return feedEvents, pageInfo, err
 }
 
-func cursorFunc(i interface{}) (time.Time, persist.DBID, error) {
+func feedCursor(i interface{}) (time.Time, persist.DBID, error) {
 	if row, ok := i.(db.FeedEvent); ok {
 		return row.CreatedAt, row.ID, nil
 	}
