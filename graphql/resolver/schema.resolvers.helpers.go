@@ -1125,6 +1125,17 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 	}
 }
 
+func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.PageInfo {
+	return &model.PageInfo{
+		Total:           pageInfo.Total,
+		Size:            pageInfo.Size,
+		HasPreviousPage: pageInfo.HasPreviousPage,
+		HasNextPage:     pageInfo.HasNextPage,
+		StartCursor:     pageInfo.StartCursor,
+		EndCursor:       pageInfo.EndCursor,
+	}
+}
+
 func getUrlExtension(url string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(url), "."))
 }

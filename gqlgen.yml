@@ -73,6 +73,9 @@ models:
   EthereumAddress:
     model:
       - github.com/mikeydub/go-gallery/service/persist.EthereumAddress
+  InteractionType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.InteractionType
   ID:
     model:
       - github.com/mikeydub/go-gallery/graphql/model.GqlID

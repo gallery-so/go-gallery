@@ -17,7 +17,7 @@ type PageInfo struct {
 	EndCursor       string
 }
 
-func validatePaginationParams(validator *validator.Validate, before *string, after *string, first *int, last *int) error {
+func validatePaginationParams(validator *validator.Validate, first *int, last *int) error {
 	if err := validateFields(validator, validationMap{
 		"first": {first, "omitempty,gte=0"},
 		"last":  {last, "omitempty,gte=0"},
@@ -26,10 +26,8 @@ func validatePaginationParams(validator *validator.Validate, before *string, aft
 	}
 
 	if err := validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
-		First:  first,
-		Last:   last,
+		First: first,
+		Last:  last,
 	}); err != nil {
 		return err
 	}
@@ -41,9 +39,20 @@ func validatePaginationParams(validator *validator.Validate, before *string, aft
 // use a cursor-specific helper like timeIDPaginator.
 // For reasons to favor keyset pagination, see: https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/
 type keysetPaginator struct {
-	QueryFunc  func(int32, bool) ([]interface{}, error)
-	CursorFunc func(interface{}) (string, error)
-	CountFunc  func() (int, error)
+	// QueryFunc returns paginated results for the given paging parameters
+	QueryFunc func(limit int32, pagingForward bool) (nodes []interface{}, err error)
+
+	// CursorFunc returns a cursor string for the given node value
+	CursorFunc func(node interface{}) (cursor string, err error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
+
+	// SortPagesAscending determines whether the sort order within a page should be ascending
+	// or descending. Defaults to false (descending), since our clients are typically paginating
+	// backward.
+	SortPagesAscending bool
 }
 
 func (p *keysetPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
@@ -76,24 +85,26 @@ func (p *keysetPaginator) paginate(before *string, after *string, first *int, la
 		}
 	}
 
-	// Reverse the slice if we're paginating backward. Keyset pagination requires our SQL queries to
-	// ORDER BY ASC for forward paging and ORDER BY DESC for backward paging, but the Relay pagination
-	// spec requires that returned elements should always be in the same order, regardless of whether
-	// we're paging forward or backward.
-	if last != nil {
+	// Keyset pagination requires our SQL queries to ORDER BY ASC for forward paging and ORDER BY DESC
+	// for backward paging, but the Relay pagination spec requires that returned elements should always
+	// be in the same order, regardless of whether we're paging forward or backward. The SortPagesAscending
+	// parameter determines whether this paginator sorts ascending or descending within a page.
+	// Reverse the results if:
+	//   - we're sorting ascending within a page but paginating backward
+	//   - we're sorting descending within a page but paginating forward
+	if (p.SortPagesAscending && last != nil) || (!p.SortPagesAscending && first != nil) {
 		for i, j := 0, len(results)-1; i < j; i, j = i+1, j-1 {
 			results[i], results[j] = results[j], results[i]
 		}
 	}
 
-	// If this is the first query (i.e. no cursors have been supplied), return the total count too
-	if before == nil && after == nil {
+	// If a count function is supplied, fill in pageInfo.Total
+	if p.CountFunc != nil {
 		total, err := p.CountFunc()
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
-		totalInt := int(total)
-		pageInfo.Total = &totalInt
+		pageInfo.Total = &total
 	}
 
 	pageInfo.Size = len(results)
@@ -125,11 +136,17 @@ type timeIDPaginator struct {
 	// QueryFunc returns paginated results for the given paging parameters
 	QueryFunc func(params timeIDPagingParams) ([]interface{}, error)
 
-	// CountFunc returns the total number of items that can be paginated
-	CountFunc func() (count int, err error)
-
 	// CursorFunc returns a time and DBID that will be encoded into a cursor string
 	CursorFunc func(node interface{}) (time.Time, persist.DBID, error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
+
+	// SortPagesAscending determines whether the sort order within a page should be ascending
+	// or descending. Defaults to false (descending), since our clients are typically paginating
+	// backward.
+	SortPagesAscending bool
 }
 
 // timeIDPagingParams are the parameters used to paginate with a time+DBID cursor
@@ -233,9 +250,10 @@ func (p *timeIDPaginator) paginate(before *string, after *string, first *int, la
 	}
 
 	paginator := keysetPaginator{
-		QueryFunc:  queryFunc,
-		CursorFunc: cursorFunc,
-		CountFunc:  p.CountFunc,
+		QueryFunc:          queryFunc,
+		CursorFunc:         cursorFunc,
+		CountFunc:          p.CountFunc,
+		SortPagesAscending: p.SortPagesAscending,
 	}
 
 	return paginator.paginate(before, after, first, last)

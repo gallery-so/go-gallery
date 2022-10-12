@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS admires_created_at_id_feed_event_id_idx;
+DROP INDEX IF EXISTS comments_created_at_id_feed_event_id_idx;

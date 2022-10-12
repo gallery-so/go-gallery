@@ -14,10 +14,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// Some date that comes before any created/updated timestamps in our database
+// Some date that comes before any other valid timestamps in our database
 var defaultCursorAfterTime = time.Date(1970, 1, 1, 1, 1, 1, 1, time.UTC)
 
-// Some date that comes after any created/updated timestamps in our database
+// Some date that comes after any other valid timestamps in our database
 var defaultCursorBeforeTime = time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC)
 
 var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire can remove it")
@@ -31,21 +31,40 @@ type InteractionAPI struct {
 	ethClient *ethclient.Client
 }
 
+func (api InteractionAPI) makeTagMap(typeFilter []persist.InteractionType) map[persist.InteractionType]int32 {
+	tags := make(map[persist.InteractionType]int32)
+
+	if len(typeFilter) > 0 {
+		for _, t := range typeFilter {
+			tags[t] = int32(t)
+		}
+	} else {
+		for i := int32(persist.MinInteractionTypeValue); i <= int32(persist.MaxInteractionTypeValue); i++ {
+			tags[persist.InteractionType(i)] = i
+		}
+	}
+
+	return tags
+}
+
 func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]interface{}, PageInfo, error) {
+	first *int, last *int, typeFilter []persist.InteractionType) ([]interface{}, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
+		"typeFilter":  {typeFilter, fmt.Sprintf("omitempty,min=1,unique,dive,gte=%d,lte=%d", persist.MinInteractionTypeValue, persist.MaxInteractionTypeValue)},
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
 
-	if err := validatePaginationParams(api.validator, before, after, first, last); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
+	tags := api.makeTagMap(typeFilter)
+
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		keys, err := api.queries.PaginateInteractionsByFeedEventID(ctx, db.PaginateInteractionsByFeedEventIDParams{
+		keys, err := api.loaders.InteractionsByFeedEventID.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -53,8 +72,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
-			AdmireTag:     1,
-			CommentTag:    2,
+			AdmireTag:     tags[persist.InteractionTypeAdmire],
+			CommentTag:    tags[persist.InteractionTypeComment],
 		})
 
 		if err != nil {
@@ -70,16 +89,23 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountInteractionsByFeedEventID(ctx, db.CountInteractionsByFeedEventIDParams{
+		counts, err := api.loaders.InteractionCountByFeedEventID.Load(db.CountInteractionsByFeedEventIDBatchParams{
 			FeedEventID: feedEventID,
-			AdmireTag:   1,
-			CommentTag:  2,
+			AdmireTag:   tags[persist.InteractionTypeAdmire],
+			CommentTag:  tags[persist.InteractionTypeComment],
 		})
-		return int(total), err
+
+		total := 0
+
+		for _, count := range counts {
+			total += int(count.Count)
+		}
+
+		return total, err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if row, ok := i.(db.PaginateInteractionsByFeedEventIDRow); ok {
+		if row, ok := i.(db.PaginateInteractionsByFeedEventIDBatchRow); ok {
 			return row.CreatedAt, row.ID, nil
 		}
 		return time.Time{}, "", fmt.Errorf("interface{} is not the correct type")
@@ -87,8 +113,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
-		CountFunc:  countFunc,
 		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -97,13 +123,13 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 		return nil, PageInfo{}, err
 	}
 
-	orderedKeys := make([]db.PaginateInteractionsByFeedEventIDRow, len(results))
-	typeToIDs := make(map[int][]persist.DBID)
+	orderedKeys := make([]db.PaginateInteractionsByFeedEventIDBatchRow, len(results))
+	typeToIDs := make(map[int32][]persist.DBID)
 
 	for i, result := range results {
-		row := result.(db.PaginateInteractionsByFeedEventIDRow)
+		row := result.(db.PaginateInteractionsByFeedEventIDBatchRow)
 		orderedKeys[i] = row
-		typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
+		typeToIDs[row.Tag] = append(typeToIDs[row.Tag], row.ID)
 	}
 
 	var interactions []interface{}
@@ -111,8 +137,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	var interactionsByIDMutex sync.Mutex
 	var wg sync.WaitGroup
 
-	admireIDs := typeToIDs[1]
-	commentIDs := typeToIDs[2]
+	admireIDs := typeToIDs[tags[persist.InteractionTypeAdmire]]
+	commentIDs := typeToIDs[tags[persist.InteractionTypeComment]]
 
 	if len(admireIDs) > 0 {
 		wg.Add(1)
@@ -168,12 +194,12 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 		return nil, PageInfo{}, err
 	}
 
-	if err := validatePaginationParams(api.validator, before, after, first, last); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.FeedEventAdmires.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
+		admires, err := api.loaders.AdmiresByFeedEventID.Load(db.PaginateAdmiresByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -196,8 +222,8 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountAdmiresByFeedEventID(ctx, feedEventID)
-		return int(total), err
+		total, err := api.loaders.AdmireCountByFeedEventID.Load(feedEventID)
+		return total, err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -209,8 +235,8 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
-		CountFunc:  countFunc,
 		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -232,12 +258,12 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 		return nil, PageInfo{}, err
 	}
 
-	if err := validatePaginationParams(api.validator, before, after, first, last); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		comments, err := api.loaders.FeedEventComments.Load(db.PaginateCommentsByFeedEventIDBatchParams{
+		comments, err := api.loaders.CommentsByFeedEventID.Load(db.PaginateCommentsByFeedEventIDBatchParams{
 			FeedEventID:   feedEventID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -260,8 +286,8 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountCommentsByFeedEventID(ctx, feedEventID)
-		return int(total), err
+		total, err := api.loaders.CommentCountByFeedEventID.Load(feedEventID)
+		return total, err
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
@@ -273,8 +299,8 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 
 	paginator := timeIDPaginator{
 		QueryFunc:  queryFunc,
-		CountFunc:  countFunc,
 		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)

@@ -470,7 +470,7 @@ type FollowInfo {
 type FeedEventAdmireEdge {
     node: Admire
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventAdmiresConnection {
@@ -482,7 +482,7 @@ type FeedEventAdmiresConnection {
 type FeedEventCommentEdge {
     node: Comment
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventCommentsConnection {
@@ -495,14 +495,13 @@ union Interaction = Admire | Comment
 type FeedEventInteractionsEdge {
     node: Interaction
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventInteractionsConnection {
     edges: [FeedEventInteractionsEdge]
     pageInfo: PageInfo!
 }
-
 
 interface FeedEventData {
     eventTime: Time
@@ -517,7 +516,10 @@ type FeedEvent implements Node {
     eventData: FeedEventData @goField(forceResolver: true)
     admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
     comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
-    interactions(before: String, after: String, first: Int, last: Int): FeedEventInteractionsConnection @goField(forceResolver: true)
+
+    # If supplied, typeFilter will only query for the requested interaction types.
+    # If typeFilter is omitted, all interaction types will be queried.
+    interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
 
     hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }

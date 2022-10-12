@@ -339,7 +339,7 @@ SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
     LIMIT $2;
 
--- name: CountAdmiresByFeedEventID :one
+-- name: CountAdmiresByFeedEventIDBatch :batchone
 SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false;
 
 -- name: GetCommentByCommentID :one
@@ -359,7 +359,7 @@ SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
     LIMIT $2;
 
--- name: CountCommentsByFeedEventID :one
+-- name: CountCommentsByFeedEventIDBatch :batchone
 SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
 
 -- name: GetCommentsByActorID :many
@@ -368,7 +368,7 @@ SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_
 -- name: GetCommentsByActorIDBatch :batchmany
 SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
--- name: PaginateInteractionsByFeedEventID :many
+-- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
         AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
@@ -381,12 +381,10 @@ ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
          CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
 LIMIT $2;
 
--- name: CountInteractionsByFeedEventID :one
-SELECT sum(counts.count) FROM (
-    SELECT count(*) FROM admires t WHERE @admire_tag::int != 0 AND t.feed_event_id = $1 AND t.deleted = false
-                                                    UNION
-    SELECT count(*) FROM comments t WHERE @comment_tag::int != 0 AND t.feed_event_id = $1 AND t.deleted = false)
-as counts;
+-- name: CountInteractionsByFeedEventIDBatch :batchmany
+SELECT count(*), @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
+                                                        UNION
+SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false;
 
 -- name: GetUserAdmiredFeedEvent :batchone
 SELECT exists(
