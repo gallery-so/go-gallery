@@ -14,10 +14,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// Some date that comes before any created/updated timestamps in our database
+// Some date that comes before any other valid timestamps in our database
 var defaultCursorAfterTime = time.Date(1970, 1, 1, 1, 1, 1, 1, time.UTC)
 
-// Some date that comes after any created/updated timestamps in our database
+// Some date that comes after any other valid timestamps in our database
 var defaultCursorBeforeTime = time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC)
 
 var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire can remove it")
