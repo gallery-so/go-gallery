@@ -1381,6 +1381,55 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getUserAdmiredFeedEvent = `-- name: GetUserAdmiredFeedEvent :batchone
+SELECT exists(
+    SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires
+    WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
+)
+`
+
+type GetUserAdmiredFeedEventBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetUserAdmiredFeedEventParams struct {
+	ActorID     persist.DBID
+	FeedEventID persist.DBID
+}
+
+func (q *Queries) GetUserAdmiredFeedEvent(ctx context.Context, arg []GetUserAdmiredFeedEventParams) *GetUserAdmiredFeedEventBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ActorID,
+			a.FeedEventID,
+		}
+		batch.Queue(getUserAdmiredFeedEvent, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUserAdmiredFeedEventBatchResults{br, 0}
+}
+
+func (b *GetUserAdmiredFeedEventBatchResults) QueryRow(f func(int, bool, error)) {
+	for {
+		row := b.br.QueryRow()
+		var exists bool
+		err := row.Scan(&exists)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, exists, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetUserAdmiredFeedEventBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getUserByIdBatch = `-- name: GetUserByIdBatch :batchone
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE id = $1 AND deleted = false
 `

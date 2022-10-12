@@ -388,3 +388,8 @@ SELECT sum(counts.count) FROM (
     SELECT count(*) FROM comments t WHERE @comment_tag::int != 0 AND t.feed_event_id = $1 AND t.deleted = false)
 as counts;
 
+-- name: GetUserAdmiredFeedEvent :batchone
+SELECT exists(
+    SELECT * FROM admires
+    WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
+);

@@ -26,6 +26,7 @@
 //go:generate go run github.com/gallery-so/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden FeedEventCommentsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateCommentsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden FeedEventAdmiresLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateAdmiresByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
+//go:generate go run github.com/gallery-so/dataloaden UserAdmiredFeedEventLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetUserAdmiredFeedEventParams bool
 
 package dataloader
 
@@ -81,6 +82,7 @@ type Loaders struct {
 	CommentsByFeedEventID    *CommentsLoaderByID
 	FeedEventComments        *FeedEventCommentsLoader
 	FeedEventAdmires         *FeedEventAdmiresLoader
+	UserAdmiredFeedEvent     *UserAdmiredFeedEventLoader
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -222,6 +224,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.FeedEventComments = NewFeedEventCommentsLoader(defaults, loadFeedEventComments(q))
 
 	loaders.FeedEventAdmires = NewFeedEventAdmiresLoader(defaults, loadFeedEventAdmires(q))
+
+	loaders.UserAdmiredFeedEvent = NewUserAdmiredFeedEventLoader(defaults, loadUserAdmiredFeedEvent(q), UserAdmiredFeedEventLoaderCacheSubscriptions{})
 
 	return loaders
 }
@@ -821,5 +825,21 @@ func loadFeedEventComments(q *db.Queries) func(context.Context, []db.PaginateCom
 		})
 
 		return comments, errors
+	}
+}
+
+func loadUserAdmiredFeedEvent(q *db.Queries) func(context.Context, []db.GetUserAdmiredFeedEventParams) ([]bool, []error) {
+	return func(ctx context.Context, params []db.GetUserAdmiredFeedEventParams) ([]bool, []error) {
+		results := make([]bool, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserAdmiredFeedEvent(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, b bool, err error) {
+			results[i], errors[i] = b, err
+		})
+
+		return results, errors
 	}
 }

@@ -236,6 +236,19 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 	}, nil
 }
 
+func (r *feedEventResolver) HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		f := false
+		return &f, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+	return api.Interaction.HasUserAdmiredFeedEvent(ctx, userID, obj.Dbid)
+}
+
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
 }

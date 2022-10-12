@@ -622,11 +622,12 @@ type FeedEdge struct {
 }
 
 type FeedEvent struct {
-	Dbid         persist.DBID                     `json:"dbid"`
-	EventData    FeedEventData                    `json:"eventData"`
-	Admires      *FeedEventAdmiresConnection      `json:"admires"`
-	Comments     *FeedEventCommentsConnection     `json:"comments"`
-	Interactions *FeedEventInteractionsConnection `json:"interactions"`
+	Dbid                  persist.DBID                     `json:"dbid"`
+	EventData             FeedEventData                    `json:"eventData"`
+	Admires               *FeedEventAdmiresConnection      `json:"admires"`
+	Comments              *FeedEventCommentsConnection     `json:"comments"`
+	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
+	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
 }
 
 func (FeedEvent) IsNode()                 {}
