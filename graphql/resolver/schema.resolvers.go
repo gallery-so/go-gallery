@@ -127,7 +127,6 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 }
 
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
-
 	refresh := false
 	if obj.HelperCommunityData.ForceRefresh != nil {
 		refresh = *obj.HelperCommunityData.ForceRefresh

@@ -1102,7 +1102,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 
 func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
-	metadata, _ := token.TokenMetadata.MarshalJSON()
+	metadata, _ := token.TokenMetadata.MarshallJSON()
 	metadataString := string(metadata)
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
 	tokenType := model.TokenType(token.TokenType.String)
@@ -1193,12 +1193,7 @@ func getUrlExtension(url string) string {
 }
 
 func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
-	var med persist.Media
-	err := token.Media.AssignTo(&med)
-	if err != nil {
-		return getInvalidMedia(ctx, med)
-	}
-
+	med := token.Media
 	switch med.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
 		return getImageMedia(ctx, med)

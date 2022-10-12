@@ -3,6 +3,7 @@
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/gallery-so/dataloaden UsersLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.GetOwnersByContractIdBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Gallery
 //go:generate go run github.com/gallery-so/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Gallery
 //go:generate go run github.com/gallery-so/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Collection
@@ -13,7 +14,7 @@
 //go:generate go run github.com/gallery-so/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/gallery-so/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
-//go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDWithPagination github.com/mikeydub/go-gallery/graphql/dataloader.IDWithPagination []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/gallery-so/dataloaden TokensLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByContractIdBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByContractIdBatchPaginateRow
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDTuple github.com/mikeydub/go-gallery/service/persist.DBIDTuple []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
@@ -51,12 +52,6 @@ type IDAndChain struct {
 	Chain persist.Chain
 }
 
-type IDWithPagination struct {
-	ID     persist.DBID
-	Limit  int
-	Offset int
-}
-
 // Loaders will cache and batch lookups. They are short-lived and should never persist beyond
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
@@ -64,6 +59,7 @@ type Loaders struct {
 	UserByUserID                     *UserLoaderByID
 	UserByUsername                   *UserLoaderByString
 	UsersWithTrait                   *UsersLoaderByString
+	OwnersByContractID               *UsersLoaderByContractID
 	GalleryByGalleryID               *GalleryLoaderByID
 	GalleryByCollectionID            *GalleryLoaderByID
 	GalleriesByUserID                *GalleriesLoaderByID
@@ -79,7 +75,7 @@ type Loaders struct {
 	TokensByUserID                   *TokensLoaderByID
 	TokensByUserIDAndChain           *TokensLoaderByIDAndChain
 	TokensByContractID               *TokensLoaderByID
-	TokensByContractIDWithPagination *TokensLoaderByIDWithPagination
+	TokensByContractIDWithPagination *TokensLoaderByContractID
 	TokensByUserIDAndContractID      *TokensLoaderByIDTuple
 	NewTokensByFeedEventID           *TokensLoaderByID
 	ContractByContractID             *ContractLoaderByID
@@ -159,6 +155,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.UsersWithTrait = NewUsersLoaderByString(defaults, loadUsersWithTrait(q))
 
+	loaders.OwnersByContractID = NewUsersLoaderByContractID(defaults, loadOwnersByContractIDs(q))
+
 	loaders.GalleryByGalleryID = NewGalleryLoaderByID(defaults, loadGalleryByGalleryId(q), GalleryLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(gallery db.Gallery) persist.DBID { return gallery.ID },
 	})
@@ -205,7 +203,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.TokensByContractID = NewTokensLoaderByID(defaults, loadTokensByContractID(q))
 
-	loaders.TokensByContractIDWithPagination = NewTokensLoaderByIDWithPagination(defaults, loadTokensByContractIDWithPagination(q))
+	loaders.TokensByContractIDWithPagination = NewTokensLoaderByContractID(defaults, loadTokensByContractIDWithPagination(q))
 
 	loaders.TokensByUserID = NewTokensLoaderByID(defaults, loadTokensByUserID(q))
 
@@ -295,6 +293,37 @@ func loadUserByUsername(q *db.Queries) func(context.Context, []string) ([]db.Use
 				err = persist.ErrUserNotFound{Username: usernames[i]}
 			}
 
+			users[i], errors[i] = user, err
+		})
+
+		return users, errors
+	}
+}
+
+func loadOwnersByContractIDs(q *db.Queries) func(context.Context, []db.GetOwnersByContractIdBatchPaginateParams) ([][]db.User, []error) {
+	return func(ctx context.Context, contractIDs []db.GetOwnersByContractIdBatchPaginateParams) ([][]db.User, []error) {
+		users := make([][]db.User, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		params := make([]db.GetOwnersByContractIdBatchPaginateParams, len(contractIDs))
+		for i, id := range contractIDs {
+			params[i] = db.GetOwnersByContractIdBatchPaginateParams{
+				Contract:           id.Contract,
+				Limit:              id.Limit,
+				CurBeforeUniversal: id.CurAfterUniversal,
+				CurBeforeTime:      id.CurAfterTime,
+				CurBeforeID:        id.CurAfterID,
+				CurAfterUniversal:  id.CurBeforeUniversal,
+				CurAfterTime:       id.CurBeforeTime,
+				CurAfterID:         id.CurBeforeID,
+				PagingForward:      id.PagingForward,
+			}
+		}
+
+		b := q.GetOwnersByContractIdBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, user []db.User, err error) {
 			users[i], errors[i] = user, err
 		})
 
@@ -583,25 +612,31 @@ func loadTokensByContractID(q *db.Queries) func(context.Context, []persist.DBID)
 	}
 }
 
-func loadTokensByContractIDWithPagination(q *db.Queries) func(context.Context, []IDWithPagination) ([][]db.Token, []error) {
-	return func(ctx context.Context, contractIDs []IDWithPagination) ([][]db.Token, []error) {
-		tokens := make([][]db.Token, len(contractIDs))
+func loadTokensByContractIDWithPagination(q *db.Queries) func(context.Context, []db.GetTokensByContractIdBatchPaginateParams) ([][]db.GetTokensByContractIdBatchPaginateRow, []error) {
+	return func(ctx context.Context, contractIDs []db.GetTokensByContractIdBatchPaginateParams) ([][]db.GetTokensByContractIdBatchPaginateRow, []error) {
+		tokens := make([][]db.GetTokensByContractIdBatchPaginateRow, len(contractIDs))
 		errors := make([]error, len(contractIDs))
 
-		params := make([]db.GetTokensByContractIdPaginateBatchParams, len(contractIDs))
+		params := make([]db.GetTokensByContractIdBatchPaginateParams, len(contractIDs))
 		for i, id := range contractIDs {
-			params[i] = db.GetTokensByContractIdPaginateBatchParams{
-				Contract: id.ID,
-				Limit:    int32(id.Limit),
-				Offset:   int32(id.Offset),
+			params[i] = db.GetTokensByContractIdBatchPaginateParams{
+				Contract:           id.Contract,
+				Limit:              id.Limit,
+				CurBeforeUniversal: id.CurAfterUniversal,
+				CurBeforeTime:      id.CurAfterTime,
+				CurBeforeID:        id.CurAfterID,
+				CurAfterUniversal:  id.CurBeforeUniversal,
+				CurAfterTime:       id.CurBeforeTime,
+				CurAfterID:         id.CurBeforeID,
+				PagingForward:      id.PagingForward,
 			}
 		}
 
-		b := q.GetTokensByContractIdPaginateBatch(ctx, params)
+		b := q.GetTokensByContractIdBatchPaginate(ctx, params)
 		defer b.Close()
 
-		b.Query(func(i int, t []db.Token, err error) {
-			tokens[i], errors[i] = t, err
+		b.Query(func(i int, gtbcibpr []db.GetTokensByContractIdBatchPaginateRow, err error) {
+			tokens[i], errors[i] = gtbcibpr, err
 		})
 
 		return tokens, errors

@@ -812,6 +812,11 @@ func (m *TokenMetadata) Scan(src interface{}) error {
 
 // Value implements the database/sql/driver Valuer interface for the TokenMetadata type
 func (m TokenMetadata) Value() (driver.Value, error) {
+	return m.MarshallJSON()
+}
+
+// MarshallJSON implements the json.Marshaller interface for the TokenMetadata type
+func (m TokenMetadata) MarshallJSON() ([]byte, error) {
 	val, err := json.Marshal(m)
 	if err != nil {
 		return nil, err

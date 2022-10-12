@@ -10,7 +10,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -846,7 +845,7 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
-const getOwnersByContractId = `-- name: GetOwnersByContractId :many
+const getOwnersByContractIdPaginate = `-- name: GetOwnersByContractIdPaginate :many
 SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
@@ -857,7 +856,7 @@ SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last
     LIMIT $2
 `
 
-type GetOwnersByContractIdParams struct {
+type GetOwnersByContractIdPaginateParams struct {
 	Contract           persist.DBID
 	Limit              int32
 	CurBeforeUniversal bool
@@ -869,8 +868,8 @@ type GetOwnersByContractIdParams struct {
 	PagingForward      bool
 }
 
-func (q *Queries) GetOwnersByContractId(ctx context.Context, arg GetOwnersByContractIdParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getOwnersByContractId,
+func (q *Queries) GetOwnersByContractIdPaginate(ctx context.Context, arg GetOwnersByContractIdPaginateParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getOwnersByContractIdPaginate,
 		arg.Contract,
 		arg.Limit,
 		arg.CurBeforeUniversal,
@@ -1113,8 +1112,8 @@ type GetTokensByContractIdPaginateRow struct {
 	TokenType            sql.NullString
 	TokenID              sql.NullString
 	Quantity             sql.NullString
-	OwnershipHistory     []pgtype.JSONB
-	TokenMetadata        pgtype.JSONB
+	OwnershipHistory     persist.AddressAtBlockList
+	TokenMetadata        persist.TokenMetadata
 	ExternalUrl          sql.NullString
 	BlockNumber          sql.NullInt64
 	OwnerUserID          persist.DBID

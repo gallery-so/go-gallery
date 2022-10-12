@@ -139,7 +139,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	}
 
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
-		owners, err := api.queries.GetOwnersByContractId(ctx, db.GetOwnersByContractIdParams{
+		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			Contract:           contract.ID,
 			Limit:              params.Limit,
 			CurBeforeUniversal: params.CursorBeforeBool,

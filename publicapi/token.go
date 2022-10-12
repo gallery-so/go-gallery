@@ -99,7 +99,7 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	}
 
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
-		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
+		tokens, err := api.loaders.TokensByContractIDWithPagination.Load(db.GetTokensByContractIdBatchPaginateParams{
 			Contract:           contractID,
 			Limit:              params.Limit,
 			CurBeforeUniversal: params.CursorBeforeBool,

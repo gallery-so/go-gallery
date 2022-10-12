@@ -241,8 +241,8 @@ type Token struct {
 	TokenType            sql.NullString
 	TokenID              sql.NullString
 	Quantity             sql.NullString
-	OwnershipHistory     []pgtype.JSONB
-	TokenMetadata        pgtype.JSONB
+	OwnershipHistory     persist.AddressAtBlockList
+	TokenMetadata        persist.TokenMetadata
 	ExternalUrl          sql.NullString
 	BlockNumber          sql.NullInt64
 	OwnerUserID          persist.DBID

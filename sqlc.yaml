@@ -62,6 +62,10 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "tokens.media"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
+          - column: "tokens.ownership_history"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
+          - column: "tokens.token_metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
 
           # Contracts
           - column: "contracts.address"

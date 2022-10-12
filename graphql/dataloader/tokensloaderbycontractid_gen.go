@@ -10,7 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
-type TokensLoaderByIDWithPaginationSettings interface {
+type TokensLoaderByContractIDSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -21,29 +21,29 @@ type TokensLoaderByIDWithPaginationSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *TokensLoaderByIDWithPagination) setContext(ctx context.Context) {
+func (l *TokensLoaderByContractID) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *TokensLoaderByIDWithPagination) setWait(wait time.Duration) {
+func (l *TokensLoaderByContractID) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *TokensLoaderByIDWithPagination) setMaxBatch(maxBatch int) {
+func (l *TokensLoaderByContractID) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *TokensLoaderByIDWithPagination) setDisableCaching(disableCaching bool) {
+func (l *TokensLoaderByContractID) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *TokensLoaderByIDWithPagination) setPublishResults(publishResults bool) {
+func (l *TokensLoaderByContractID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-// NewTokensLoaderByIDWithPagination creates a new TokensLoaderByIDWithPagination with the given settings, functions, and options
-func NewTokensLoaderByIDWithPagination(
-	settings TokensLoaderByIDWithPaginationSettings, fetch func(ctx context.Context, keys []IDWithPagination) ([][]coredb.Token, []error),
+// NewTokensLoaderByContractID creates a new TokensLoaderByContractID with the given settings, functions, and options
+func NewTokensLoaderByContractID(
+	settings TokensLoaderByContractIDSettings, fetch func(ctx context.Context, keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.GetTokensByContractIdBatchPaginateRow, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -51,8 +51,8 @@ func NewTokensLoaderByIDWithPagination(
 		setDisableCaching(bool)
 		setPublishResults(bool)
 	}),
-) *TokensLoaderByIDWithPagination {
-	loader := &TokensLoaderByIDWithPagination{
+) *TokensLoaderByContractID {
+	loader := &TokensLoaderByContractID{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -67,7 +67,9 @@ func NewTokensLoaderByIDWithPagination(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []IDWithPagination) ([][]coredb.Token, []error) { return fetch(loader.ctx, keys) }
+	loader.fetch = func(keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.GetTokensByContractIdBatchPaginateRow, []error) {
+		return fetch(loader.ctx, keys)
+	}
 
 	if loader.subscriptionRegistry == nil {
 		panic("subscriptionRegistry may not be nil")
@@ -83,13 +85,13 @@ func NewTokensLoaderByIDWithPagination(
 	return loader
 }
 
-// TokensLoaderByIDWithPagination batches and caches requests
-type TokensLoaderByIDWithPagination struct {
+// TokensLoaderByContractID batches and caches requests
+type TokensLoaderByContractID struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []IDWithPagination) ([][]coredb.Token, []error)
+	fetch func(keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.GetTokensByContractIdBatchPaginateRow, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -114,18 +116,18 @@ type TokensLoaderByIDWithPagination struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[IDWithPagination][]coredb.Token
+	cache map[coredb.GetTokensByContractIdBatchPaginateParams][]coredb.GetTokensByContractIdBatchPaginateRow
 
 	// typed cache functions
-	//subscribers []func([]coredb.Token)
-	subscribers []tokensLoaderByIDWithPaginationSubscriber
+	//subscribers []func([]coredb.GetTokensByContractIdBatchPaginateRow)
+	subscribers []tokensLoaderByContractIDSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *tokensLoaderByIDWithPaginationBatch
+	batch *tokensLoaderByContractIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -134,43 +136,43 @@ type TokensLoaderByIDWithPagination struct {
 	once sync.Once
 }
 
-type tokensLoaderByIDWithPaginationBatch struct {
-	keys    []IDWithPagination
-	data    [][]coredb.Token
+type tokensLoaderByContractIDBatch struct {
+	keys    []coredb.GetTokensByContractIdBatchPaginateParams
+	data    [][]coredb.GetTokensByContractIdBatchPaginateRow
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a Token by key, batching and caching will be applied automatically
-func (l *TokensLoaderByIDWithPagination) Load(key IDWithPagination) ([]coredb.Token, error) {
+// Load a GetTokensByContractIdBatchPaginateRow by key, batching and caching will be applied automatically
+func (l *TokensLoaderByContractID) Load(key coredb.GetTokensByContractIdBatchPaginateParams) ([]coredb.GetTokensByContractIdBatchPaginateRow, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a Token.
+// LoadThunk returns a function that when called will block waiting for a GetTokensByContractIdBatchPaginateRow.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokensLoaderByIDWithPagination) LoadThunk(key IDWithPagination) func() ([]coredb.Token, error) {
+func (l *TokensLoaderByContractID) LoadThunk(key coredb.GetTokensByContractIdBatchPaginateParams) func() ([]coredb.GetTokensByContractIdBatchPaginateRow, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() ([]coredb.Token, error) {
+			return func() ([]coredb.GetTokensByContractIdBatchPaginateRow, error) {
 				return it, nil
 			}
 		}
 	}
 	if l.batch == nil {
-		l.batch = &tokensLoaderByIDWithPaginationBatch{done: make(chan struct{})}
+		l.batch = &tokensLoaderByContractIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coredb.Token, error) {
+	return func() ([]coredb.GetTokensByContractIdBatchPaginateRow, error) {
 		<-batch.done
 
-		var data []coredb.Token
+		var data []coredb.GetTokensByContractIdBatchPaginateRow
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -201,43 +203,43 @@ func (l *TokensLoaderByIDWithPagination) LoadThunk(key IDWithPagination) func() 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *TokensLoaderByIDWithPagination) LoadAll(keys []IDWithPagination) ([][]coredb.Token, []error) {
-	results := make([]func() ([]coredb.Token, error), len(keys))
+func (l *TokensLoaderByContractID) LoadAll(keys []coredb.GetTokensByContractIdBatchPaginateParams) ([][]coredb.GetTokensByContractIdBatchPaginateRow, []error) {
+	results := make([]func() ([]coredb.GetTokensByContractIdBatchPaginateRow, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	tokens := make([][]coredb.Token, len(keys))
+	getTokensByContractIdBatchPaginateRows := make([][]coredb.GetTokensByContractIdBatchPaginateRow, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		tokens[i], errors[i] = thunk()
+		getTokensByContractIdBatchPaginateRows[i], errors[i] = thunk()
 	}
-	return tokens, errors
+	return getTokensByContractIdBatchPaginateRows, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a Tokens.
+// LoadAllThunk returns a function that when called will block waiting for a GetTokensByContractIdBatchPaginateRows.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *TokensLoaderByIDWithPagination) LoadAllThunk(keys []IDWithPagination) func() ([][]coredb.Token, []error) {
-	results := make([]func() ([]coredb.Token, error), len(keys))
+func (l *TokensLoaderByContractID) LoadAllThunk(keys []coredb.GetTokensByContractIdBatchPaginateParams) func() ([][]coredb.GetTokensByContractIdBatchPaginateRow, []error) {
+	results := make([]func() ([]coredb.GetTokensByContractIdBatchPaginateRow, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coredb.Token, []error) {
-		tokens := make([][]coredb.Token, len(keys))
+	return func() ([][]coredb.GetTokensByContractIdBatchPaginateRow, []error) {
+		getTokensByContractIdBatchPaginateRows := make([][]coredb.GetTokensByContractIdBatchPaginateRow, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			tokens[i], errors[i] = thunk()
+			getTokensByContractIdBatchPaginateRows[i], errors[i] = thunk()
 		}
-		return tokens, errors
+		return getTokensByContractIdBatchPaginateRows, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *TokensLoaderByIDWithPagination) Prime(key IDWithPagination, value []coredb.Token) bool {
+func (l *TokensLoaderByContractID) Prime(key coredb.GetTokensByContractIdBatchPaginateParams, value []coredb.GetTokensByContractIdBatchPaginateRow) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -246,7 +248,7 @@ func (l *TokensLoaderByIDWithPagination) Prime(key IDWithPagination, value []cor
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coredb.Token, len(value))
+		cpy := make([]coredb.GetTokensByContractIdBatchPaginateRow, len(value))
 		copy(cpy, value)
 		l.unsafeSet(key, cpy)
 	}
@@ -255,7 +257,7 @@ func (l *TokensLoaderByIDWithPagination) Prime(key IDWithPagination, value []cor
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *TokensLoaderByIDWithPagination) Clear(key IDWithPagination) {
+func (l *TokensLoaderByContractID) Clear(key coredb.GetTokensByContractIdBatchPaginateParams) {
 	if l.disableCaching {
 		return
 	}
@@ -264,16 +266,16 @@ func (l *TokensLoaderByIDWithPagination) Clear(key IDWithPagination) {
 	l.mu.Unlock()
 }
 
-func (l *TokensLoaderByIDWithPagination) unsafeSet(key IDWithPagination, value []coredb.Token) {
+func (l *TokensLoaderByContractID) unsafeSet(key coredb.GetTokensByContractIdBatchPaginateParams, value []coredb.GetTokensByContractIdBatchPaginateRow) {
 	if l.cache == nil {
-		l.cache = map[IDWithPagination][]coredb.Token{}
+		l.cache = map[coredb.GetTokensByContractIdBatchPaginateParams][]coredb.GetTokensByContractIdBatchPaginateRow{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *tokensLoaderByIDWithPaginationBatch) keyIndex(l *TokensLoaderByIDWithPagination, key IDWithPagination) int {
+func (b *tokensLoaderByContractIDBatch) keyIndex(l *TokensLoaderByContractID, key coredb.GetTokensByContractIdBatchPaginateParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -297,7 +299,7 @@ func (b *tokensLoaderByIDWithPaginationBatch) keyIndex(l *TokensLoaderByIDWithPa
 	return pos
 }
 
-func (b *tokensLoaderByIDWithPaginationBatch) startTimer(l *TokensLoaderByIDWithPagination) {
+func (b *tokensLoaderByContractIDBatch) startTimer(l *TokensLoaderByContractID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -313,24 +315,24 @@ func (b *tokensLoaderByIDWithPaginationBatch) startTimer(l *TokensLoaderByIDWith
 	b.end(l)
 }
 
-func (b *tokensLoaderByIDWithPaginationBatch) end(l *TokensLoaderByIDWithPagination) {
+func (b *tokensLoaderByContractIDBatch) end(l *TokensLoaderByContractID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type tokensLoaderByIDWithPaginationSubscriber struct {
-	cacheFunc func(coredb.Token)
+type tokensLoaderByContractIDSubscriber struct {
+	cacheFunc func(coredb.GetTokensByContractIdBatchPaginateRow)
 	mutex     *sync.Mutex
 }
 
-func (l *TokensLoaderByIDWithPagination) publishToSubscribers(value []coredb.Token) {
+func (l *TokensLoaderByContractID) publishToSubscribers(value []coredb.GetTokensByContractIdBatchPaginateRow) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(coredb.Token)); ok {
+			if typedFunc, ok := subscription.(*func(coredb.GetTokensByContractIdBatchPaginateRow)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, tokensLoaderByIDWithPaginationSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, tokensLoaderByContractIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -348,13 +350,13 @@ func (l *TokensLoaderByIDWithPagination) publishToSubscribers(value []coredb.Tok
 	}
 }
 
-func (l *TokensLoaderByIDWithPagination) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *TokensLoaderByContractID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *TokensLoaderByIDWithPagination) ownsCacheFunc(f *func(coredb.Token)) bool {
+func (l *TokensLoaderByContractID) ownsCacheFunc(f *func(coredb.GetTokensByContractIdBatchPaginateRow)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true
