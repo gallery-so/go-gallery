@@ -138,7 +138,8 @@ func UpdateErrorFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentr
 func UpdateLogErrorEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	if wrapped, ok := hint.OriginalException.(logger.LoggedError); ok {
 		if wrapped.Err != nil {
-			event.Fingerprint = []string{"{{ default }}", wrapped.Err.Error()}
+			// Group first by the LoggedError type and further group by the actual wrapped error.
+			event.Fingerprint = []string{"{{ type }}", fmt.Sprintf("%T", wrapped.Err)}
 			mostRecent := len(event.Exception) - 1
 			event.Exception[mostRecent].Type = reflect.TypeOf(wrapped.Err).String()
 
