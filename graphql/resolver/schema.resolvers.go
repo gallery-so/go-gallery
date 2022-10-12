@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -25,7 +26,7 @@ func (r *admireFeedEventPayloadResolver) Admire(ctx context.Context, obj *model.
 }
 
 func (r *admireFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.AdmireFeedEventPayload) (*model.FeedEvent, error) {
-	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, obj.Admire.Dbid)
+	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, obj.Admire.Dbid)
 	if err != nil {
 		return nil, err
 	}
@@ -129,20 +130,86 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
 }
 
-func (r *feedConnectionResolver) PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error) {
-	return resolveFeedPageInfo(ctx, obj)
-}
-
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
 }
 
-func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent) ([]*model.Admire, error) {
-	return resolveAdmiresByFeedEventID(ctx, obj.Dbid)
+func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error) {
+	admires, pageInfo, err := publicapi.For(ctx).Interaction.PaginateAdmiresByFeedEventID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.FeedEventAdmireEdge
+	for _, admire := range admires {
+		edges = append(edges, &model.FeedEventAdmireEdge{
+			Node:  admireToModel(ctx, admire),
+			Event: obj,
+		})
+	}
+
+	return &model.FeedEventAdmiresConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
-func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent) ([]*model.Comment, error) {
-	return resolveCommentsByFeedEventID(ctx, obj.Dbid)
+func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error) {
+	comments, pageInfo, err := publicapi.For(ctx).Interaction.PaginateCommentsByFeedEventID(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.FeedEventCommentEdge
+	for _, comment := range comments {
+		edges = append(edges, &model.FeedEventCommentEdge{
+			Node:  commentToModel(ctx, comment),
+			Event: obj,
+		})
+	}
+
+	return &model.FeedEventCommentsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) (*model.FeedEventInteractionsConnection, error) {
+	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByFeedEventID(ctx, obj.Dbid, before, after, first, last, typeFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	var edges []*model.FeedEventInteractionsEdge
+	for _, interaction := range interactions {
+		edge := &model.FeedEventInteractionsEdge{
+			Event: obj,
+		}
+		if admire, ok := interaction.(coredb.Admire); ok {
+			edge.Node = admireToModel(ctx, admire)
+		} else if comment, ok := interaction.(coredb.Comment); ok {
+			edge.Node = commentToModel(ctx, comment)
+		}
+		edges = append(edges, edge)
+	}
+
+	return &model.FeedEventInteractionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+func (r *feedEventResolver) HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error) {
+	api := publicapi.For(ctx)
+
+	// If the user isn't logged in, there is no viewer
+	if !api.User.IsUserLoggedIn(ctx) {
+		f := false
+		return &f, nil
+	}
+
+	userID := api.User.GetLoggedInUserId(ctx)
+	return api.Interaction.HasUserAdmiredFeedEvent(ctx, userID, obj.Dbid)
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -201,6 +268,23 @@ func (r *galleryUserResolver) Followers(ctx context.Context, obj *model.GalleryU
 
 func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryUser) ([]*model.GalleryUser, error) {
 	return resolveFollowingByUserID(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
@@ -648,7 +732,7 @@ func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID
 }
 
 func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Admire.AdmireFeedEvent(ctx, feedEventID)
+	id, err := publicapi.For(ctx).Interaction.AdmireFeedEvent(ctx, feedEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -661,7 +745,7 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 }
 
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Admire.RemoveAdmire(ctx, admireID)
+	feedEvent, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +760,7 @@ func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DB
 }
 
 func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error) {
-	id, err := publicapi.For(ctx).Comment.CommentOnFeedEvent(ctx, feedEventID, replyToID, comment)
+	id, err := publicapi.For(ctx).Interaction.CommentOnFeedEvent(ctx, feedEventID, replyToID, comment)
 	if err != nil {
 		return nil, err
 	}
@@ -699,7 +783,7 @@ func (r *mutationResolver) CommentOnFeedEvent(ctx context.Context, feedEventID p
 }
 
 func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Comment.RemoveComment(ctx, commentID)
+	feedEvent, err := publicapi.For(ctx).Interaction.RemoveComment(ctx, commentID)
 	if err != nil {
 		return nil, err
 	}
@@ -814,13 +898,20 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 }
 
 func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	feed, err := resolveGlobalFeed(ctx, before, after, first, last)
-
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateGlobalFeed(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	return feed, nil
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
@@ -941,7 +1032,20 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	return resolveViewerFeed(ctx, before, after, first, last)
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginatePersonalFeed(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
@@ -1005,11 +1109,6 @@ func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPaylo
 
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
-
-// FeedConnection returns generated.FeedConnectionResolver implementation.
-func (r *Resolver) FeedConnection() generated.FeedConnectionResolver {
-	return &feedConnectionResolver{r}
-}
 
 // FeedEvent returns generated.FeedEventResolver implementation.
 func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
@@ -1104,7 +1203,6 @@ type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
-type feedConnectionResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }

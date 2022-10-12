@@ -98,6 +98,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"Interaction": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(Interaction)
+		return obj, ok
+	},
+
 	"LoginPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(LoginPayloadOrError)
 		return obj, ok

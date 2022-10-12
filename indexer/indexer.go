@@ -286,7 +286,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	startTime := time.Now()
 	i.isListening = false
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
 
 	go func() {
@@ -295,9 +295,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 		defer tracing.FinishSpan(span)
 
 		logs := i.fetchLogs(ctx, start, topics)
-		if logs != nil {
-			i.processLogs(ctx, transfers, logs)
-		}
+		i.processLogs(ctx, transfers, logs)
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, plugins.refresh.out)
@@ -313,7 +311,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 
 	i.isListening = true
 	transfers := make(chan []transfersAtBlock)
-	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo, i.storageClient)
+	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
@@ -357,16 +355,14 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 	var logsTo []types.Log
 	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
-	if err == nil {
-		func() {
-			defer reader.Close()
-			err = json.NewDecoder(reader).Decode(&logsTo)
-			if err != nil {
-				panic(err)
-			}
-		}()
-	} else {
+	if err != nil {
 		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
+	} else {
+		defer reader.Close()
+		err = json.NewDecoder(reader).Decode(&logsTo)
+		if err != nil {
+			panic(err)
+		}
 	}
 	if len(logsTo) > 0 {
 		lastLog := logsTo[len(logsTo)-1]
@@ -376,21 +372,12 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 		}
 	}
 	if len(logsTo) == 0 && rpcEnabled {
-		logsTo, err := rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
+		logsTo, err = rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
 		}, rpc.DefaultRetry)
 		if err != nil {
-			ctx, cancel := context.WithTimeout(ctx, time.Minute)
-			defer cancel()
-			storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-%s-%s", curBlock.String(), nextBlock.String())).NewWriter(ctx)
-			defer storageWriter.Close()
-			errData := map[string]interface{}{
-				"from": curBlock.String(),
-				"to":   nextBlock.String(),
-				"err":  err.Error(),
-			}
 			logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
 				"fromBlock": curBlock.String(),
 				"toBlock":   nextBlock.String(),
@@ -400,17 +387,9 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 				logEntry = logEntry.WithFields(logrus.Fields{"rpcErrorCode": strconv.Itoa(rpcErr.ErrorCode())})
 			}
 			logEntry.Error("failed to fetch logs")
-
-			err = json.NewEncoder(storageWriter).Encode(errData)
-			if err != nil {
-				return nil, err
-			}
-			return logsTo, nil
+			return []types.Log{}, nil
 		}
-
 		saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
-	} else {
-		logger.For(ctx).Info("Found logs in cache...")
 	}
 	logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 	return logsTo, nil
@@ -424,21 +403,7 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 
 	logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
 
-	transfersAtBlocks := transfersToTransfersAtBlock(transfers)
-
-	batchTransfers(ctx, transfersChan, transfersAtBlocks)
-}
-
-func batchTransfers(ctx context.Context, transfersChan chan<- []transfersAtBlock, transfersAtBlocks []transfersAtBlock) {
-	logger.For(ctx).Infof("Sending %d total transfers to transfers channel", len(transfersAtBlocks))
-	for j := 0; j < len(transfersAtBlocks); j += 10 {
-		to := j + 10
-		if to > len(transfersAtBlocks) {
-			to = len(transfersAtBlocks)
-		}
-		transfersChan <- transfersAtBlocks[j:to]
-	}
-	logger.For(ctx).Infof("Finished processing logs, closing transfers channel...")
+	transfersChan <- transfersToTransfersAtBlock(transfers)
 }
 
 func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
@@ -580,20 +545,12 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 					Topics:    topics,
 				}, rpc.DefaultRetry)
 				if err != nil {
-					ctx, cancel := context.WithTimeout(ctx, time.Minute)
-					defer cancel()
-					storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("ERR-%d-%d", i.lastSyncedBlock, mostRecentBlock)).NewWriter(ctx)
-					defer storageWriter.Close()
 					errData := map[string]interface{}{
 						"from": curBlock,
 						"to":   nextBlock,
 						"err":  err.Error(),
 					}
 					logger.For(ctx).WithError(err).Error(errData)
-					err = json.NewEncoder(storageWriter).Encode(errData)
-					if err != nil {
-						panic(err)
-					}
 					return
 				}
 
@@ -834,21 +791,7 @@ func (i *indexer) createTokens(ctx context.Context,
 	defer cancel()
 	err := upsertTokensAndContracts(ctx, tokens, i.tokenRepo, i.contractRepo, i.ethClient, i.dbMu)
 	if err != nil {
-		logger.For(ctx).WithError(err).Error("error upserting tokens and contracts")
-		randKey := util.RandStringBytes(24)
-		ctx, cancel = context.WithTimeout(ctx, time.Minute)
-		defer cancel()
-		storageWriter := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("DB-ERR-%s", randKey)).NewWriter(ctx)
-		defer storageWriter.Close()
-		errData := map[string]interface{}{
-			"tokens": tokens,
-		}
-		logger.For(ctx).WithError(err).Error(errData)
-		newErr := json.NewEncoder(storageWriter).Encode(errData)
-		if newErr != nil {
-			panic(newErr)
-		}
-		panic(fmt.Sprintf("error upserting tokens and contracts: %s - error key: %s", err, randKey))
+		panic(fmt.Sprintf("error upserting tokens and contracts: %s", err))
 	}
 
 	logger.For(ctx).Info("Done upserting tokens and contracts")

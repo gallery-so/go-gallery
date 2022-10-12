@@ -87,6 +87,10 @@ type GetAuthNoncePayloadOrError interface {
 	IsGetAuthNoncePayloadOrError()
 }
 
+type Interaction interface {
+	IsInteraction()
+}
+
 type LoginPayloadOrError interface {
 	IsLoginPayloadOrError()
 }
@@ -192,7 +196,8 @@ type Admire struct {
 	Admirer      *GalleryUser `json:"admirer"`
 }
 
-func (Admire) IsNode() {}
+func (Admire) IsNode()        {}
+func (Admire) IsInteraction() {}
 
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
@@ -329,7 +334,8 @@ type Comment struct {
 	Comment      *string      `json:"comment"`
 }
 
-func (Comment) IsNode() {}
+func (Comment) IsNode()        {}
+func (Comment) IsInteraction() {}
 
 type CommentOnFeedEventPayload struct {
 	Viewer         *Viewer    `json:"viewer"`
@@ -605,26 +611,60 @@ func (ErrUsernameNotAvailable) IsError()                        {}
 func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
 
 type FeedConnection struct {
-	HelperFeedConnectionData
 	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
 }
 
 type FeedEdge struct {
 	Node   FeedEventOrError `json:"node"`
-	Cursor string           `json:"cursor"`
+	Cursor *string          `json:"cursor"`
 }
 
 type FeedEvent struct {
-	Dbid      persist.DBID  `json:"dbid"`
-	EventData FeedEventData `json:"eventData"`
-	Admires   []*Admire     `json:"admires"`
-	Comments  []*Comment    `json:"comments"`
+	Dbid                  persist.DBID                     `json:"dbid"`
+	EventData             FeedEventData                    `json:"eventData"`
+	Admires               *FeedEventAdmiresConnection      `json:"admires"`
+	Comments              *FeedEventCommentsConnection     `json:"comments"`
+	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
+	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
 }
 
 func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
+
+type FeedEventAdmireEdge struct {
+	Node   *Admire    `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor *string    `json:"cursor"`
+}
+
+type FeedEventAdmiresConnection struct {
+	Edges    []*FeedEventAdmireEdge `json:"edges"`
+	PageInfo *PageInfo              `json:"pageInfo"`
+}
+
+type FeedEventCommentEdge struct {
+	Node   *Comment   `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor *string    `json:"cursor"`
+}
+
+type FeedEventCommentsConnection struct {
+	Edges    []*FeedEventCommentEdge `json:"edges"`
+	PageInfo *PageInfo               `json:"pageInfo"`
+}
+
+type FeedEventInteractionsConnection struct {
+	Edges    []*FeedEventInteractionsEdge `json:"edges"`
+	PageInfo *PageInfo                    `json:"pageInfo"`
+}
+
+type FeedEventInteractionsEdge struct {
+	Node   Interaction `json:"node"`
+	Event  *FeedEvent  `json:"event"`
+	Cursor *string     `json:"cursor"`
+}
 
 type FollowInfo struct {
 	User         *GalleryUser `json:"user"`
@@ -647,18 +687,19 @@ type Gallery struct {
 func (Gallery) IsNode() {}
 
 type GalleryUser struct {
-	Dbid                persist.DBID   `json:"dbid"`
-	Username            *string        `json:"username"`
-	Bio                 *string        `json:"bio"`
-	Traits              *string        `json:"traits"`
-	Tokens              []*Token       `json:"tokens"`
-	TokensByChain       *ChainTokens   `json:"tokensByChain"`
-	Wallets             []*Wallet      `json:"wallets"`
-	Galleries           []*Gallery     `json:"galleries"`
-	Badges              []*Badge       `json:"badges"`
-	IsAuthenticatedUser *bool          `json:"isAuthenticatedUser"`
-	Followers           []*GalleryUser `json:"followers"`
-	Following           []*GalleryUser `json:"following"`
+	Dbid                persist.DBID    `json:"dbid"`
+	Username            *string         `json:"username"`
+	Bio                 *string         `json:"bio"`
+	Traits              *string         `json:"traits"`
+	Tokens              []*Token        `json:"tokens"`
+	TokensByChain       *ChainTokens    `json:"tokensByChain"`
+	Wallets             []*Wallet       `json:"wallets"`
+	Galleries           []*Gallery      `json:"galleries"`
+	Badges              []*Badge        `json:"badges"`
+	IsAuthenticatedUser *bool           `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser  `json:"followers"`
+	Following           []*GalleryUser  `json:"following"`
+	Feed                *FeedConnection `json:"feed"`
 }
 
 func (GalleryUser) IsNode()                  {}
@@ -749,6 +790,7 @@ type OwnerAtBlock struct {
 }
 
 type PageInfo struct {
+	Total           *int   `json:"total"`
 	Size            int    `json:"size"`
 	HasPreviousPage bool   `json:"hasPreviousPage"`
 	HasNextPage     bool   `json:"hasNextPage"`

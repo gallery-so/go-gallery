@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type GlobalFeedLoaderSettings interface {
+type IntLoaderByIDSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -21,29 +21,55 @@ type GlobalFeedLoaderSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *GlobalFeedLoader) setContext(ctx context.Context) {
+// IntLoaderByIDCacheSubscriptions
+type IntLoaderByIDCacheSubscriptions struct {
+	// AutoCacheWithKey is a function that returns the persist.DBID cache key for a int.
+	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
+	// that return a int. Loaders that return pointers or slices of int
+	// will be dereferenced/iterated automatically, invoking this function with the base int type.
+	AutoCacheWithKey func(int) persist.DBID
+
+	// AutoCacheWithKeys is a function that returns the []persist.DBID cache keys for a int.
+	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
+	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
+	// that return a int. Loaders that return pointers or slices of int
+	// will be dereferenced/iterated automatically, invoking this function with the base int type.
+	AutoCacheWithKeys func(int) []persist.DBID
+
+	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
+	// would be messy and error-prone. A non-generic implementation might look something like:
+	//
+	//   CustomCacheFuncs []func(primeFunc func(key, value)) func(typeToRegisterFor interface{})
+	//
+	// where each CustomCacheFunc is a closure that receives this loader's unsafePrime method and returns a
+	// function that accepts the type it's registering for and uses that type and the unsafePrime method
+	// to prime the cache.
+}
+
+func (l *IntLoaderByID) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *GlobalFeedLoader) setWait(wait time.Duration) {
+func (l *IntLoaderByID) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *GlobalFeedLoader) setMaxBatch(maxBatch int) {
+func (l *IntLoaderByID) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *GlobalFeedLoader) setDisableCaching(disableCaching bool) {
+func (l *IntLoaderByID) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *GlobalFeedLoader) setPublishResults(publishResults bool) {
+func (l *IntLoaderByID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-// NewGlobalFeedLoader creates a new GlobalFeedLoader with the given settings, functions, and options
-func NewGlobalFeedLoader(
-	settings GlobalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error),
+// NewIntLoaderByID creates a new IntLoaderByID with the given settings, functions, and options
+func NewIntLoaderByID(
+	settings IntLoaderByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]int, []error),
+	funcs IntLoaderByIDCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -51,15 +77,15 @@ func NewGlobalFeedLoader(
 		setDisableCaching(bool)
 		setPublishResults(bool)
 	}),
-) *GlobalFeedLoader {
-	loader := &GlobalFeedLoader{
+) *IntLoaderByID {
+	loader := &IntLoaderByID{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
 		publishResults:       settings.getPublishResults(),
 		subscriptionRegistry: settings.getSubscriptionRegistry(),
 		mutexRegistry:        settings.getMutexRegistry(),
-		maxBatch:             settings.getMaxBatchMany(),
+		maxBatch:             settings.getMaxBatchOne(),
 	}
 
 	for _, opt := range opts {
@@ -67,9 +93,7 @@ func NewGlobalFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error) {
-		return fetch(loader.ctx, keys)
-	}
+	loader.fetch = func(keys []persist.DBID) ([]int, []error) { return fetch(loader.ctx, keys) }
 
 	if loader.subscriptionRegistry == nil {
 		panic("subscriptionRegistry may not be nil")
@@ -79,19 +103,37 @@ func NewGlobalFeedLoader(
 		panic("mutexRegistry may not be nil")
 	}
 
-	// No cache functions here; caching isn't very useful for dataloaders that return slices. This dataloader can
-	// still send its results to other cache-priming receivers, but it won't register its own cache-priming function.
+	if !loader.disableCaching {
+		// One-to-one mappings: cache one value with one key
+		if funcs.AutoCacheWithKey != nil {
+			cacheFunc := func(t int) {
+				loader.unsafePrime(funcs.AutoCacheWithKey(t), t)
+			}
+			loader.registerCacheFunc(&cacheFunc, &loader.mu)
+		}
+
+		// One-to-many mappings: cache one value with many keys
+		if funcs.AutoCacheWithKeys != nil {
+			cacheFunc := func(t int) {
+				keys := funcs.AutoCacheWithKeys(t)
+				for _, key := range keys {
+					loader.unsafePrime(key, t)
+				}
+			}
+			loader.registerCacheFunc(&cacheFunc, &loader.mu)
+		}
+	}
 
 	return loader
 }
 
-// GlobalFeedLoader batches and caches requests
-type GlobalFeedLoader struct {
+// IntLoaderByID batches and caches requests
+type IntLoaderByID struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error)
+	fetch func(keys []persist.DBID) ([]int, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -116,18 +158,18 @@ type GlobalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginateGlobalFeedParams][]coredb.FeedEvent
+	cache map[persist.DBID]int
 
 	// typed cache functions
-	//subscribers []func([]coredb.FeedEvent)
-	subscribers []globalFeedLoaderSubscriber
+	//subscribers []func(int)
+	subscribers []intLoaderByIDSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *globalFeedLoaderBatch
+	batch *intLoaderByIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -136,43 +178,43 @@ type GlobalFeedLoader struct {
 	once sync.Once
 }
 
-type globalFeedLoaderBatch struct {
-	keys    []coredb.PaginateGlobalFeedParams
-	data    [][]coredb.FeedEvent
+type intLoaderByIDBatch struct {
+	keys    []persist.DBID
+	data    []int
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *GlobalFeedLoader) Load(key coredb.PaginateGlobalFeedParams) ([]coredb.FeedEvent, error) {
+// Load a int by key, batching and caching will be applied automatically
+func (l *IntLoaderByID) Load(key persist.DBID) (int, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a FeedEvent.
+// LoadThunk returns a function that when called will block waiting for a int.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func() ([]coredb.FeedEvent, error) {
+func (l *IntLoaderByID) LoadThunk(key persist.DBID) func() (int, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() ([]coredb.FeedEvent, error) {
+			return func() (int, error) {
 				return it, nil
 			}
 		}
 	}
 	if l.batch == nil {
-		l.batch = &globalFeedLoaderBatch{done: make(chan struct{})}
+		l.batch = &intLoaderByIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() ([]coredb.FeedEvent, error) {
+	return func() (int, error) {
 		<-batch.done
 
-		var data []coredb.FeedEvent
+		var data int
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -203,61 +245,69 @@ func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func()
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GlobalFeedLoader) LoadAll(keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error) {
-	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
+func (l *IntLoaderByID) LoadAll(keys []persist.DBID) ([]int, []error) {
+	results := make([]func() (int, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	feedEvents := make([][]coredb.FeedEvent, len(keys))
+	ints := make([]int, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		feedEvents[i], errors[i] = thunk()
+		ints[i], errors[i] = thunk()
 	}
-	return feedEvents, errors
+	return ints, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
+// LoadAllThunk returns a function that when called will block waiting for a ints.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.PaginateGlobalFeedParams) func() ([][]coredb.FeedEvent, []error) {
-	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
+func (l *IntLoaderByID) LoadAllThunk(keys []persist.DBID) func() ([]int, []error) {
+	results := make([]func() (int, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([][]coredb.FeedEvent, []error) {
-		feedEvents := make([][]coredb.FeedEvent, len(keys))
+	return func() ([]int, []error) {
+		ints := make([]int, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			feedEvents[i], errors[i] = thunk()
+			ints[i], errors[i] = thunk()
 		}
-		return feedEvents, errors
+		return ints, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []coredb.FeedEvent) bool {
+func (l *IntLoaderByID) Prime(key persist.DBID, value int) bool {
 	if l.disableCaching {
 		return false
 	}
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
-		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
-		// and end up with the whole cache pointing to the same value.
-		cpy := make([]coredb.FeedEvent, len(value))
-		copy(cpy, value)
-		l.unsafeSet(key, cpy)
+		l.unsafeSet(key, value)
 	}
 	l.mu.Unlock()
 	return !found
 }
 
+// Prime the cache without acquiring locks. Should only be used when the lock is already held.
+func (l *IntLoaderByID) unsafePrime(key persist.DBID, value int) bool {
+	if l.disableCaching {
+		return false
+	}
+	var found bool
+	if _, found = l.cache[key]; !found {
+		l.unsafeSet(key, value)
+	}
+	return !found
+}
+
 // Clear the value at key from the cache, if it exists
-func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedParams) {
+func (l *IntLoaderByID) Clear(key persist.DBID) {
 	if l.disableCaching {
 		return
 	}
@@ -266,16 +316,16 @@ func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedParams) {
 	l.mu.Unlock()
 }
 
-func (l *GlobalFeedLoader) unsafeSet(key coredb.PaginateGlobalFeedParams, value []coredb.FeedEvent) {
+func (l *IntLoaderByID) unsafeSet(key persist.DBID, value int) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginateGlobalFeedParams][]coredb.FeedEvent{}
+		l.cache = map[persist.DBID]int{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coredb.PaginateGlobalFeedParams) int {
+func (b *intLoaderByIDBatch) keyIndex(l *IntLoaderByID, key persist.DBID) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -299,7 +349,7 @@ func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coredb.Paginat
 	return pos
 }
 
-func (b *globalFeedLoaderBatch) startTimer(l *GlobalFeedLoader) {
+func (b *intLoaderByIDBatch) startTimer(l *IntLoaderByID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -315,24 +365,24 @@ func (b *globalFeedLoaderBatch) startTimer(l *GlobalFeedLoader) {
 	b.end(l)
 }
 
-func (b *globalFeedLoaderBatch) end(l *GlobalFeedLoader) {
+func (b *intLoaderByIDBatch) end(l *IntLoaderByID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type globalFeedLoaderSubscriber struct {
-	cacheFunc func(coredb.FeedEvent)
+type intLoaderByIDSubscriber struct {
+	cacheFunc func(int)
 	mutex     *sync.Mutex
 }
 
-func (l *GlobalFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
+func (l *IntLoaderByID) publishToSubscribers(value int) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(coredb.FeedEvent)); ok {
+			if typedFunc, ok := subscription.(*func(int)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, globalFeedLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, intLoaderByIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -343,20 +393,18 @@ func (l *GlobalFeedLoader) publishToSubscribers(value []coredb.FeedEvent) {
 	// without having to acquire the lock many times.
 	for _, s := range l.subscribers {
 		s.mutex.Lock()
-		for _, v := range value {
-			s.cacheFunc(v)
-		}
+		s.cacheFunc(value)
 		s.mutex.Unlock()
 	}
 }
 
-func (l *GlobalFeedLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *IntLoaderByID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *GlobalFeedLoader) ownsCacheFunc(f *func(coredb.FeedEvent)) bool {
+func (l *IntLoaderByID) ownsCacheFunc(f *func(int)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true
