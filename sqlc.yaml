@@ -38,7 +38,7 @@ sql:
           - column: "users.wallets"
             go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
           - column: "users.notification_settings"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NotificationSettings"
 
           # Galleries
           - column: "galleries.collections"
@@ -127,6 +127,12 @@ sql:
           - column: "feed_events.data"
             go_type: "github.com/mikeydub/go-gallery/service/persist.FeedEventData"
 
+          # Feed Blocklist
+          - column: "feed_blocklist.user_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "feed_blocklist.action"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
+
           # Notifications
           - column: "notifications.owner_id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
@@ -137,23 +143,25 @@ sql:
           - column: "notifications.data"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NotificationData"
 
-          # Feed Blocklist
-          - column: "feed_blocklist.user_id"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
-          - column: "feed_blocklist.action"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
-
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
           - column: "*.id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "*.owner_user_id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.cur_before_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.cur_after_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "*.owner_address"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
           - column: "*.creator_address"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
           - column: "*.contract_ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.admire_ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.comment_ids"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "*.user_ids"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"

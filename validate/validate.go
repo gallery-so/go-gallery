@@ -100,10 +100,10 @@ func ChainAddressValidator(sl validator.StructLevel) {
 }
 
 type ConnectionPaginationParams struct {
-	Before *persist.DBID
-	After  *persist.DBID
 	First  *int
 	Last   *int
+	Before *string
+	After  *string
 }
 
 func ConnectionPaginationParamsValidator(sl validator.StructLevel) {

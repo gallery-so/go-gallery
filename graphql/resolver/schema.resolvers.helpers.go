@@ -626,17 +626,8 @@ func resolveGlobalFeed(ctx context.Context, before *string, after *string, first
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
-	beforeToken, err := model.Cursor.DecodeToDBID(before)
-	if err != nil {
-		return nil, err
-	}
 
-	afterToken, err := model.Cursor.DecodeToDBID(after)
-	if err != nil {
-		return nil, err
-	}
-
-	notifs, err := publicapi.For(ctx).Notifications.GetViewerNotifications(ctx, beforeToken, afterToken, first, last)
+	notifs, pageInfo, err := publicapi.For(ctx).Notifications.GetViewerNotifications(ctx, before, after, first, last)
 
 	if err != nil {
 		return nil, err
@@ -652,7 +643,7 @@ func resolveViewerNotifications(ctx context.Context, before *string, after *stri
 
 	return &model.NotificationsConnection{
 		Edges:       edges,
-		PageInfo:    nil, // handled by dedicated resolver,
+		PageInfo:    pageInfoToModel(ctx, pageInfo), // handled by dedicated resolver,
 		UnseenCount: &unseen,
 	}, nil
 }
@@ -1059,7 +1050,7 @@ func resolveNotificationByID(ctx context.Context, id persist.DBID) (model.Notifi
 }
 
 func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
-	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, admireID)
+	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, admireID)
 
 	if err != nil {
 		return nil, err
@@ -1068,33 +1059,14 @@ func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model
 	return admireToModel(ctx, *admire), nil
 }
 
-func resolveAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Admire, error) {
-	admires, err := publicapi.For(ctx).Admire.GetAdmiresByFeedEventID(ctx, feedEventID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return admiresToModels(ctx, admires), nil
-}
-
 func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*model.Comment, error) {
-	comment, err := publicapi.For(ctx).Comment.GetCommentByID(ctx, commentID)
+	comment, err := publicapi.For(ctx).Interaction.GetCommentByID(ctx, commentID)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return commentToModel(ctx, *comment), nil
-}
-func resolveCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Comment, error) {
-	comments, err := publicapi.For(ctx).Comment.GetCommentsByFeedEventID(ctx, feedEventID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return commentsToModels(ctx, comments), nil
 }
 
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
@@ -1526,6 +1498,17 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		ProfileBannerURL: util.StringToPointer(community.ProfileBannerUrl.String),
 		BadgeURL:         util.StringToPointer(community.BadgeUrl.String),
 		Owners:           nil, // handled by dedicated resolver
+	}
+}
+
+func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.PageInfo {
+	return &model.PageInfo{
+		Total:           pageInfo.Total,
+		Size:            pageInfo.Size,
+		HasPreviousPage: pageInfo.HasPreviousPage,
+		HasNextPage:     pageInfo.HasNextPage,
+		StartCursor:     pageInfo.StartCursor,
+		EndCursor:       pageInfo.EndCursor,
 	}
 }
 

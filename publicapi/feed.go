@@ -9,7 +9,6 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/validate"
 )
 
 type FeedAPI struct {
@@ -45,18 +44,11 @@ func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, afte
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
-		"first":  {first, "omitempty,gte=0"},
-		"last":   {last, "omitempty,gte=0"},
 	}); err != nil {
 		return "", nil, err
 	}
 
-	if err := api.validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
-		First:  first,
-		Last:   last,
-	}); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return "", nil, err
 	}
 
@@ -87,19 +79,7 @@ func (api FeedAPI) GetViewerFeed(ctx context.Context, before *persist.DBID, afte
 
 func (api FeedAPI) GlobalFeed(ctx context.Context, before *persist.DBID, after *persist.DBID, first *int, last *int) ([]db.FeedEvent, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"first": {first, "omitempty,gte=0"},
-		"last":  {last, "omitempty,gte=0"},
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := api.validator.Struct(validate.ConnectionPaginationParams{
-		Before: before,
-		After:  after,
-		First:  first,
-		Last:   last,
-	}); err != nil {
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, err
 	}
 

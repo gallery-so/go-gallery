@@ -49,6 +49,17 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countUserNotifications = `-- name: CountUserNotifications :one
+SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false
+`
+
+func (q *Queries) CountUserNotifications(ctx context.Context, ownerID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countUserNotifications, ownerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -298,12 +309,12 @@ func (q *Queries) GetAdmiresByActorID(ctx context.Context, actorID persist.DBID)
 	return items, nil
 }
 
-const getAdmiresByFeedEventID = `-- name: GetAdmiresByFeedEventID :many
-SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
+const getAdmiresByAdmireIDs = `-- name: GetAdmiresByAdmireIDs :many
+SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated from admires WHERE id = ANY($1) AND deleted = false
 `
 
-func (q *Queries) GetAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]Admire, error) {
-	rows, err := q.db.Query(ctx, getAdmiresByFeedEventID, feedEventID)
+func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.DBIDList) ([]Admire, error) {
+	rows, err := q.db.Query(ctx, getAdmiresByAdmireIDs, admireIds)
 	if err != nil {
 		return nil, err
 	}
@@ -421,6 +432,40 @@ SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created
 
 func (q *Queries) GetCommentsByActorID(ctx context.Context, actorID persist.DBID) ([]Comment, error) {
 	rows, err := q.db.Query(ctx, getCommentsByActorID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Comment
+	for rows.Next() {
+		var i Comment
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.ReplyTo,
+			&i.Comment,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCommentsByCommentIDs = `-- name: GetCommentsByCommentIDs :many
+SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated from comments WHERE id = ANY($1) AND deleted = false
+`
+
+func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persist.DBIDList) ([]Comment, error) {
+	rows, err := q.db.Query(ctx, getCommentsByCommentIDs, commentIds)
 	if err != nil {
 		return nil, err
 	}
@@ -1186,43 +1231,33 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUserNotifications = `-- name: GetUserNotifications :many
-WITH cursors AS (
-    SELECT
-    (SELECT CASE WHEN $3::varchar = '' THEN now() ELSE (SELECT created_at FROM notifications n WHERE n.id = $3::varchar AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN $4::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT created_at FROM notifications n WHERE n.id = $4::varchar AND deleted = false) END) AS cur_after
-), edges AS (
-    SELECT notif.id FROM notifications notif
-    WHERE created_at > (SELECT cur_after FROM cursors)
-    AND created_at < (SELECT cur_before FROM cursors)
-    AND notif.owner_id = $1
-    AND notif.deleted = false
-), offsets AS (
-    SELECT
-        CASE WHEN NOT $5::bool AND count(id) - $2::int > 0
-        THEN count(id) - $2::int
-        ELSE 0 END pos
-    FROM edges
-)
-SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = ANY(SELECT id FROM edges)
-    ORDER BY created_at ASC
-    LIMIT $2 OFFSET (SELECT pos FROM offsets)
+SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $2
 `
 
 type GetUserNotificationsParams struct {
-	OwnerID   persist.DBID
-	Limit     int32
-	CurBefore string
-	CurAfter  string
-	FromFirst bool
+	OwnerID       persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
 }
 
 func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificationsParams) ([]Notification, error) {
 	rows, err := q.db.Query(ctx, getUserNotifications,
 		arg.OwnerID,
 		arg.Limit,
-		arg.CurBefore,
-		arg.CurAfter,
-		arg.FromFirst,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
 	)
 	if err != nil {
 		return nil, err
@@ -1539,7 +1574,7 @@ UPDATE users SET notification_settings = $2 WHERE id = $1
 
 type UpdateNotificationSettingsByIDParams struct {
 	ID                   persist.DBID
-	NotificationSettings persist.UserNotificationSettings
+	NotificationSettings persist.NotificationSettings
 }
 
 func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {

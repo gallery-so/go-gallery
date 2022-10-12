@@ -123,11 +123,7 @@ func UpdateErrorFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentr
 		return event
 	}
 
-	// This is a hacky way to do this -- we'd rather check the actual type than a string, but
-	// the errors.errorString type isn't exported and we'd really like a way to separate those
-	// errors on Sentry. It's not very useful to group every error created with errors.New().
-	exceptionType := fmt.Sprintf("%T", hint.OriginalException)
-	if exceptionType == "*errors.errorString" {
+	if isErrErrorString(hint.OriginalException) {
 		event.Fingerprint = []string{"{{ default }}", hint.OriginalException.Error()}
 	}
 
@@ -138,7 +134,13 @@ func UpdateErrorFingerprints(event *sentry.Event, hint *sentry.EventHint) *sentr
 func UpdateLogErrorEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	if wrapped, ok := hint.OriginalException.(logger.LoggedError); ok {
 		if wrapped.Err != nil {
-			event.Fingerprint = []string{"{{ default }}", wrapped.Err.Error()}
+			if isErrErrorString(wrapped.Err) {
+				// Group by the actual error string so those errors are better categorized on Sentry.
+				event.Fingerprint = []string{"{{ type }}", wrapped.Err.Error()}
+			} else {
+				// Group first by the LoggedError type and further group by the actual wrapped error.
+				event.Fingerprint = []string{"{{ type }}", fmt.Sprintf("%T", wrapped.Err)}
+			}
 			mostRecent := len(event.Exception) - 1
 			event.Exception[mostRecent].Type = reflect.TypeOf(wrapped.Err).String()
 
@@ -340,4 +342,14 @@ func TransactionNameSafe(name string) sentry.SpanOption {
 
 		sentry.TransactionName(name)(s)
 	}
+}
+
+// This is a hacky way to do this -- we'd rather check the actual type than a string, but
+// the errors.errorString type isn't exported and we'd really like a way to separate those
+// errors on Sentry. It's not very useful to group every error created with errors.New().
+func isErrErrorString(err error) bool {
+	if fmt.Sprintf("%T", err) == "*errors.errorString" {
+		return true
+	}
+	return false
 }

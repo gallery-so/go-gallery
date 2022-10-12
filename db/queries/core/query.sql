@@ -323,6 +323,9 @@ SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AN
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
+-- name: GetAdmiresByAdmireIDs :many
+SELECT * from admires WHERE id = ANY(@admire_ids) AND deleted = false;
+
 -- name: GetAdmireByAdmireIDBatch :batchone
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
@@ -332,17 +335,35 @@ SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_a
 -- name: GetAdmiresByActorIDBatch :batchmany
 SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
--- name: GetAdmiresByFeedEventID :many
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
+-- name: PaginateAdmiresByFeedEventIDBatch :batchmany
+SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id) AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
 
--- name: GetAdmiresByFeedEventIDBatch :batchmany
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
+-- name: CountAdmiresByFeedEventIDBatch :batchone
+SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false;
 
 -- name: GetCommentByCommentID :one
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
+-- name: GetCommentsByCommentIDs :many
+SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
+
 -- name: GetCommentByCommentIDBatch :batchone
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
+
+-- name: PaginateCommentsByFeedEventIDBatch :batchmany
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- name: CountCommentsByFeedEventIDBatch :batchone
+SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
 
 -- name: GetCommentsByActorID :many
 SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
@@ -358,48 +379,24 @@ SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY cre
 
 
 -- name: GetUserNotifications :many
-WITH cursors AS (
-    SELECT
-    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_after::varchar AND deleted = false) END) AS cur_after
-), edges AS (
-    SELECT notif.id FROM notifications notif
-    WHERE created_at > (SELECT cur_after FROM cursors)
-    AND created_at < (SELECT cur_before FROM cursors)
-    AND notif.owner_id = $1
-    AND notif.deleted = false
-), offsets AS (
-    SELECT
-        CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
-        THEN count(id) - $2::int
-        ELSE 0 END pos
-    FROM edges
-)
-SELECT * FROM notifications WHERE id = ANY(SELECT id FROM edges)
-    ORDER BY created_at ASC
-    LIMIT $2 OFFSET (SELECT pos FROM offsets);
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
 
 -- name: GetUserNotificationsBatch :batchmany
-WITH cursors AS (
-    SELECT
-    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT created_at FROM notifications n WHERE n.id = @cur_after::varchar AND deleted = false) END) AS cur_after
-), edges AS (
-    SELECT notif.id FROM notifications notif
-    WHERE created_at > (SELECT cur_after FROM cursors)
-    AND created_at < (SELECT cur_before FROM cursors)
-    AND notif.owner_id = $1
-    AND notif.deleted = false
-), offsets AS (
-    SELECT
-        CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
-        THEN count(id) - $2::int
-        ELSE 0 END pos
-    FROM edges
-)
-SELECT * FROM notifications WHERE id = ANY(SELECT id FROM edges)
-    ORDER BY created_at ASC
-    LIMIT $2 OFFSET (SELECT pos FROM offsets);
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- name: CountUserNotifications :one
+SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false;
+
 
 -- name: UserFeedHasMoreNotifications :one
 SELECT
@@ -445,3 +442,26 @@ UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURN
 
 -- name: IncrementGalleryViews :exec
 UPDATE galleries SET views = views + 1 WHERE id = $1;
+-- name: PaginateInteractionsByFeedEventIDBatch :batchmany
+SELECT interactions.created_At, interactions.id, interactions.tag FROM (
+    SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
+        AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
+                                                                    UNION
+    SELECT t.created_at, t.id, @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
+        AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
+) as interactions
+
+ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+         CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+LIMIT $2;
+
+-- name: CountInteractionsByFeedEventIDBatch :batchmany
+SELECT count(*), @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
+                                                        UNION
+SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false;
+
+-- name: GetUserAdmiredFeedEvent :batchone
+SELECT exists(
+    SELECT * FROM admires
+    WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
+);

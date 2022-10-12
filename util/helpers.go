@@ -337,7 +337,7 @@ func EnvVarMustExist(envVar, emptyVal string) {
 
 // InDocker returns true if the service is running as a container.
 func InDocker() bool {
-	if _, err := os.Stat("./.dockerenv"); err == nil {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
 		return true
 	}
 	return false

@@ -2,10 +2,10 @@ package publicapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
 
@@ -26,6 +26,8 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
+var errBadCursorFormat = errors.New("bad cursor format")
+
 const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
@@ -42,9 +44,8 @@ type PublicAPI struct {
 	Wallet        *WalletAPI
 	Misc          *MiscAPI
 	Feed          *FeedAPI
-	Admire        *AdmireAPI
-	Comment       *CommentAPI
 	Notifications *NotificationsAPI
+	Interaction   *InteractionAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
@@ -67,8 +68,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repo
 		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:          &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
 		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		Admire:        &AdmireAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		Comment:       &CommentAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 	}
 }
