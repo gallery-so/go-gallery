@@ -43,7 +43,7 @@ func (l *GlobalFeedLoader) setPublishResults(publishResults bool) {
 
 // NewGlobalFeedLoader creates a new GlobalFeedLoader with the given settings, functions, and options
 func NewGlobalFeedLoader(
-	settings GlobalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateGlobalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error),
+	settings GlobalFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -67,7 +67,7 @@ func NewGlobalFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginateGlobalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
+	loader.fetch = func(keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error) {
 		return fetch(loader.ctx, keys)
 	}
 
@@ -91,7 +91,7 @@ type GlobalFeedLoader struct {
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginateGlobalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error)
+	fetch func(keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -116,7 +116,7 @@ type GlobalFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginateGlobalFeedByFeedEventIDParams][]coredb.FeedEvent
+	cache map[coredb.PaginateGlobalFeedParams][]coredb.FeedEvent
 
 	// typed cache functions
 	//subscribers []func([]coredb.FeedEvent)
@@ -137,7 +137,7 @@ type GlobalFeedLoader struct {
 }
 
 type globalFeedLoaderBatch struct {
-	keys    []coredb.PaginateGlobalFeedByFeedEventIDParams
+	keys    []coredb.PaginateGlobalFeedParams
 	data    [][]coredb.FeedEvent
 	error   []error
 	closing bool
@@ -145,14 +145,14 @@ type globalFeedLoaderBatch struct {
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *GlobalFeedLoader) Load(key coredb.PaginateGlobalFeedByFeedEventIDParams) ([]coredb.FeedEvent, error) {
+func (l *GlobalFeedLoader) Load(key coredb.PaginateGlobalFeedParams) ([]coredb.FeedEvent, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedByFeedEventIDParams) func() ([]coredb.FeedEvent, error) {
+func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedParams) func() ([]coredb.FeedEvent, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -203,7 +203,7 @@ func (l *GlobalFeedLoader) LoadThunk(key coredb.PaginateGlobalFeedByFeedEventIDP
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *GlobalFeedLoader) LoadAll(keys []coredb.PaginateGlobalFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
+func (l *GlobalFeedLoader) LoadAll(keys []coredb.PaginateGlobalFeedParams) ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 
 	for i, key := range keys {
@@ -221,7 +221,7 @@ func (l *GlobalFeedLoader) LoadAll(keys []coredb.PaginateGlobalFeedByFeedEventID
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.PaginateGlobalFeedByFeedEventIDParams) func() ([][]coredb.FeedEvent, []error) {
+func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.PaginateGlobalFeedParams) func() ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -239,7 +239,7 @@ func (l *GlobalFeedLoader) LoadAllThunk(keys []coredb.PaginateGlobalFeedByFeedEv
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedByFeedEventIDParams, value []coredb.FeedEvent) bool {
+func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedParams, value []coredb.FeedEvent) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -257,7 +257,7 @@ func (l *GlobalFeedLoader) Prime(key coredb.PaginateGlobalFeedByFeedEventIDParam
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedByFeedEventIDParams) {
+func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedParams) {
 	if l.disableCaching {
 		return
 	}
@@ -266,16 +266,16 @@ func (l *GlobalFeedLoader) Clear(key coredb.PaginateGlobalFeedByFeedEventIDParam
 	l.mu.Unlock()
 }
 
-func (l *GlobalFeedLoader) unsafeSet(key coredb.PaginateGlobalFeedByFeedEventIDParams, value []coredb.FeedEvent) {
+func (l *GlobalFeedLoader) unsafeSet(key coredb.PaginateGlobalFeedParams, value []coredb.FeedEvent) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginateGlobalFeedByFeedEventIDParams][]coredb.FeedEvent{}
+		l.cache = map[coredb.PaginateGlobalFeedParams][]coredb.FeedEvent{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coredb.PaginateGlobalFeedByFeedEventIDParams) int {
+func (b *globalFeedLoaderBatch) keyIndex(l *GlobalFeedLoader, key coredb.PaginateGlobalFeedParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i

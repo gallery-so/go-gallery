@@ -519,17 +519,6 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
 }
 
-func pageInfoToModel(pageInfo publicapi.PageInfo) *model.PageInfo {
-	return &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
-	}
-}
-
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
 

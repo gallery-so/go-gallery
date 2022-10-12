@@ -208,7 +208,7 @@ SELECT EXISTS(
     LIMIT 1
 );
 
--- name: PaginateGlobalFeedByFeedEventID :batchmany
+-- name: PaginateGlobalFeed :batchmany
 SELECT * FROM feed_events WHERE deleted = false
     AND (event_time, id) < (@cur_before_time, @cur_before_id)
     AND (event_time, id) > (@cur_after_time, @cur_after_id)
@@ -219,7 +219,7 @@ SELECT * FROM feed_events WHERE deleted = false
 -- name: CountGlobalFeedEvents :one
 SELECT count(*) FROM feed_events WHERE deleted = false;
 
--- name: PaginatePersonalFeedByFeedEventID :batchmany
+-- name: PaginatePersonalFeedByUserID :batchmany
 SELECT fe.* FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
     AND fe.owner_id = fl.followee AND fl.follower = $1
     AND (fe.event_time, fe.id) < (@cur_before_time, @cur_before_id)
@@ -231,7 +231,7 @@ SELECT fe.* FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.dele
 -- name: CountPersonalFeedEventsByFollowerID :one
 SELECT count(*) FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false AND fe.owner_id = fl.followee AND fl.follower = $1;
 
--- name: PaginateUserFeedByFeedEventID :batchmany
+-- name: PaginateUserFeedByUserID :batchmany
 SELECT * FROM feed_events WHERE owner_id = $1 AND deleted = false
     AND (event_time, id) < (@cur_before_time, @cur_before_id)
     AND (event_time, id) > (@cur_after_time, @cur_after_id)

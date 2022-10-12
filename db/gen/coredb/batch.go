@@ -1962,7 +1962,7 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const paginateGlobalFeedByFeedEventID = `-- name: PaginateGlobalFeedByFeedEventID :batchmany
+const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE deleted = false
     AND (event_time, id) < ($2, $3)
     AND (event_time, id) > ($4, $5)
@@ -1971,12 +1971,12 @@ SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last
     LIMIT $1
 `
 
-type PaginateGlobalFeedByFeedEventIDBatchResults struct {
+type PaginateGlobalFeedBatchResults struct {
 	br  pgx.BatchResults
 	ind int
 }
 
-type PaginateGlobalFeedByFeedEventIDParams struct {
+type PaginateGlobalFeedParams struct {
 	Limit         int32
 	CurBeforeTime time.Time
 	CurBeforeID   persist.DBID
@@ -1985,7 +1985,7 @@ type PaginateGlobalFeedByFeedEventIDParams struct {
 	PagingForward bool
 }
 
-func (q *Queries) PaginateGlobalFeedByFeedEventID(ctx context.Context, arg []PaginateGlobalFeedByFeedEventIDParams) *PaginateGlobalFeedByFeedEventIDBatchResults {
+func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg []PaginateGlobalFeedParams) *PaginateGlobalFeedBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
@@ -1996,13 +1996,13 @@ func (q *Queries) PaginateGlobalFeedByFeedEventID(ctx context.Context, arg []Pag
 			a.CurAfterID,
 			a.PagingForward,
 		}
-		batch.Queue(paginateGlobalFeedByFeedEventID, vals...)
+		batch.Queue(paginateGlobalFeed, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &PaginateGlobalFeedByFeedEventIDBatchResults{br, 0}
+	return &PaginateGlobalFeedBatchResults{br, 0}
 }
 
-func (b *PaginateGlobalFeedByFeedEventIDBatchResults) Query(f func(int, []FeedEvent, error)) {
+func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []FeedEvent, error)) {
 	for {
 		rows, err := b.br.Query()
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
@@ -2036,7 +2036,7 @@ func (b *PaginateGlobalFeedByFeedEventIDBatchResults) Query(f func(int, []FeedEv
 	}
 }
 
-func (b *PaginateGlobalFeedByFeedEventIDBatchResults) Close() error {
+func (b *PaginateGlobalFeedBatchResults) Close() error {
 	return b.br.Close()
 }
 
@@ -2124,7 +2124,7 @@ func (b *PaginateInteractionsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const paginatePersonalFeedByFeedEventID = `-- name: PaginatePersonalFeedByFeedEventID :batchmany
+const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :batchmany
 SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
     AND fe.owner_id = fl.followee AND fl.follower = $1
     AND (fe.event_time, fe.id) < ($3, $4)
@@ -2134,12 +2134,12 @@ SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.eve
     LIMIT $2
 `
 
-type PaginatePersonalFeedByFeedEventIDBatchResults struct {
+type PaginatePersonalFeedByUserIDBatchResults struct {
 	br  pgx.BatchResults
 	ind int
 }
 
-type PaginatePersonalFeedByFeedEventIDParams struct {
+type PaginatePersonalFeedByUserIDParams struct {
 	Follower      persist.DBID
 	Limit         int32
 	CurBeforeTime time.Time
@@ -2149,7 +2149,7 @@ type PaginatePersonalFeedByFeedEventIDParams struct {
 	PagingForward bool
 }
 
-func (q *Queries) PaginatePersonalFeedByFeedEventID(ctx context.Context, arg []PaginatePersonalFeedByFeedEventIDParams) *PaginatePersonalFeedByFeedEventIDBatchResults {
+func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg []PaginatePersonalFeedByUserIDParams) *PaginatePersonalFeedByUserIDBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
@@ -2161,13 +2161,13 @@ func (q *Queries) PaginatePersonalFeedByFeedEventID(ctx context.Context, arg []P
 			a.CurAfterID,
 			a.PagingForward,
 		}
-		batch.Queue(paginatePersonalFeedByFeedEventID, vals...)
+		batch.Queue(paginatePersonalFeedByUserID, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &PaginatePersonalFeedByFeedEventIDBatchResults{br, 0}
+	return &PaginatePersonalFeedByUserIDBatchResults{br, 0}
 }
 
-func (b *PaginatePersonalFeedByFeedEventIDBatchResults) Query(f func(int, []FeedEvent, error)) {
+func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, error)) {
 	for {
 		rows, err := b.br.Query()
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
@@ -2201,11 +2201,11 @@ func (b *PaginatePersonalFeedByFeedEventIDBatchResults) Query(f func(int, []Feed
 	}
 }
 
-func (b *PaginatePersonalFeedByFeedEventIDBatchResults) Close() error {
+func (b *PaginatePersonalFeedByUserIDBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const paginateUserFeedByFeedEventID = `-- name: PaginateUserFeedByFeedEventID :batchmany
+const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE owner_id = $1 AND deleted = false
     AND (event_time, id) < ($3, $4)
     AND (event_time, id) > ($5, $6)
@@ -2214,12 +2214,12 @@ SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last
     LIMIT $2
 `
 
-type PaginateUserFeedByFeedEventIDBatchResults struct {
+type PaginateUserFeedByUserIDBatchResults struct {
 	br  pgx.BatchResults
 	ind int
 }
 
-type PaginateUserFeedByFeedEventIDParams struct {
+type PaginateUserFeedByUserIDParams struct {
 	OwnerID       persist.DBID
 	Limit         int32
 	CurBeforeTime time.Time
@@ -2229,7 +2229,7 @@ type PaginateUserFeedByFeedEventIDParams struct {
 	PagingForward bool
 }
 
-func (q *Queries) PaginateUserFeedByFeedEventID(ctx context.Context, arg []PaginateUserFeedByFeedEventIDParams) *PaginateUserFeedByFeedEventIDBatchResults {
+func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg []PaginateUserFeedByUserIDParams) *PaginateUserFeedByUserIDBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
@@ -2241,13 +2241,13 @@ func (q *Queries) PaginateUserFeedByFeedEventID(ctx context.Context, arg []Pagin
 			a.CurAfterID,
 			a.PagingForward,
 		}
-		batch.Queue(paginateUserFeedByFeedEventID, vals...)
+		batch.Queue(paginateUserFeedByUserID, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &PaginateUserFeedByFeedEventIDBatchResults{br, 0}
+	return &PaginateUserFeedByUserIDBatchResults{br, 0}
 }
 
-func (b *PaginateUserFeedByFeedEventIDBatchResults) Query(f func(int, []FeedEvent, error)) {
+func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, error)) {
 	for {
 		rows, err := b.br.Query()
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
@@ -2281,6 +2281,6 @@ func (b *PaginateUserFeedByFeedEventIDBatchResults) Query(f func(int, []FeedEven
 	}
 }
 
-func (b *PaginateUserFeedByFeedEventIDBatchResults) Close() error {
+func (b *PaginateUserFeedByUserIDBatchResults) Close() error {
 	return b.br.Close()
 }

@@ -43,7 +43,7 @@ func (l *UserFeedLoader) setPublishResults(publishResults bool) {
 
 // NewUserFeedLoader creates a new UserFeedLoader with the given settings, functions, and options
 func NewUserFeedLoader(
-	settings UserFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error),
+	settings UserFeedLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -67,7 +67,7 @@ func NewUserFeedLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
+	loader.fetch = func(keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error) {
 		return fetch(loader.ctx, keys)
 	}
 
@@ -91,7 +91,7 @@ type UserFeedLoader struct {
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error)
+	fetch func(keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -116,7 +116,7 @@ type UserFeedLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.PaginateUserFeedByFeedEventIDParams][]coredb.FeedEvent
+	cache map[coredb.PaginateUserFeedByUserIDParams][]coredb.FeedEvent
 
 	// typed cache functions
 	//subscribers []func([]coredb.FeedEvent)
@@ -137,7 +137,7 @@ type UserFeedLoader struct {
 }
 
 type userFeedLoaderBatch struct {
-	keys    []coredb.PaginateUserFeedByFeedEventIDParams
+	keys    []coredb.PaginateUserFeedByUserIDParams
 	data    [][]coredb.FeedEvent
 	error   []error
 	closing bool
@@ -145,14 +145,14 @@ type userFeedLoaderBatch struct {
 }
 
 // Load a FeedEvent by key, batching and caching will be applied automatically
-func (l *UserFeedLoader) Load(key coredb.PaginateUserFeedByFeedEventIDParams) ([]coredb.FeedEvent, error) {
+func (l *UserFeedLoader) Load(key coredb.PaginateUserFeedByUserIDParams) ([]coredb.FeedEvent, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a FeedEvent.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserFeedLoader) LoadThunk(key coredb.PaginateUserFeedByFeedEventIDParams) func() ([]coredb.FeedEvent, error) {
+func (l *UserFeedLoader) LoadThunk(key coredb.PaginateUserFeedByUserIDParams) func() ([]coredb.FeedEvent, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -203,7 +203,7 @@ func (l *UserFeedLoader) LoadThunk(key coredb.PaginateUserFeedByFeedEventIDParam
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UserFeedLoader) LoadAll(keys []coredb.PaginateUserFeedByFeedEventIDParams) ([][]coredb.FeedEvent, []error) {
+func (l *UserFeedLoader) LoadAll(keys []coredb.PaginateUserFeedByUserIDParams) ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 
 	for i, key := range keys {
@@ -221,7 +221,7 @@ func (l *UserFeedLoader) LoadAll(keys []coredb.PaginateUserFeedByFeedEventIDPara
 // LoadAllThunk returns a function that when called will block waiting for a FeedEvents.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserFeedLoader) LoadAllThunk(keys []coredb.PaginateUserFeedByFeedEventIDParams) func() ([][]coredb.FeedEvent, []error) {
+func (l *UserFeedLoader) LoadAllThunk(keys []coredb.PaginateUserFeedByUserIDParams) func() ([][]coredb.FeedEvent, []error) {
 	results := make([]func() ([]coredb.FeedEvent, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -239,7 +239,7 @@ func (l *UserFeedLoader) LoadAllThunk(keys []coredb.PaginateUserFeedByFeedEventI
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UserFeedLoader) Prime(key coredb.PaginateUserFeedByFeedEventIDParams, value []coredb.FeedEvent) bool {
+func (l *UserFeedLoader) Prime(key coredb.PaginateUserFeedByUserIDParams, value []coredb.FeedEvent) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -257,7 +257,7 @@ func (l *UserFeedLoader) Prime(key coredb.PaginateUserFeedByFeedEventIDParams, v
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *UserFeedLoader) Clear(key coredb.PaginateUserFeedByFeedEventIDParams) {
+func (l *UserFeedLoader) Clear(key coredb.PaginateUserFeedByUserIDParams) {
 	if l.disableCaching {
 		return
 	}
@@ -266,16 +266,16 @@ func (l *UserFeedLoader) Clear(key coredb.PaginateUserFeedByFeedEventIDParams) {
 	l.mu.Unlock()
 }
 
-func (l *UserFeedLoader) unsafeSet(key coredb.PaginateUserFeedByFeedEventIDParams, value []coredb.FeedEvent) {
+func (l *UserFeedLoader) unsafeSet(key coredb.PaginateUserFeedByUserIDParams, value []coredb.FeedEvent) {
 	if l.cache == nil {
-		l.cache = map[coredb.PaginateUserFeedByFeedEventIDParams][]coredb.FeedEvent{}
+		l.cache = map[coredb.PaginateUserFeedByUserIDParams][]coredb.FeedEvent{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *userFeedLoaderBatch) keyIndex(l *UserFeedLoader, key coredb.PaginateUserFeedByFeedEventIDParams) int {
+func (b *userFeedLoaderBatch) keyIndex(l *UserFeedLoader, key coredb.PaginateUserFeedByUserIDParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
