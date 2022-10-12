@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -85,24 +86,106 @@ func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persis
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, limit, offset int) ([]db.Token, error) {
+func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Token, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractID": {contractID, "required"},
 	}); err != nil {
-		return nil, err
+		return nil, PageInfo{}, err
 	}
 
-	tokens, err := api.loaders.TokensByContractIDWithPagination.Load(dataloader.IDWithPagination{
-		ID:     contractID,
-		Limit:  limit,
-		Offset: offset,
-	})
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
+			Contract:           contractID,
+			Limit:              params.Limit,
+			CurBeforeUniversal: params.CursorBeforeBool,
+			CurAfterUniversal:  params.CursorAfterBool,
+			CurBeforeTime:      params.CursorBeforeTime,
+			CurBeforeID:        params.CursorBeforeID,
+			CurAfterTime:       params.CursorAfterTime,
+			CurAfterID:         params.CursorAfterID,
+			PagingForward:      params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(tokens))
+		for i, token := range tokens {
+			results[i] = token
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountTokensByContractId(ctx, contractID)
+		return int(total), err
+	}
+
+	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
+		if token, ok := i.(db.GetTokensByContractIdPaginateRow); ok {
+			return token.Universal, token.CreatedAt, token.ID, nil
+		}
+		return false, time.Time{}, "", fmt.Errorf("interface{} is not a token")
+	}
+
+	paginator := boolTimeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
 	if err != nil {
-		return nil, err
+		return nil, PageInfo{}, err
 	}
 
-	return tokens, nil
+	tokens := make([]db.Token, len(results))
+	for i, result := range results {
+		if token, ok := result.(db.GetTokensByContractIdPaginateRow); ok {
+			tokens[i] = tokensByContractIdPaginateRowToToken(token)
+		} else {
+			return nil, PageInfo{}, fmt.Errorf("interface{} is not a token: %T", token)
+		}
+	}
+
+	return tokens, pageInfo, nil
+}
+
+func tokensByContractIdPaginateRowToToken(row db.GetTokensByContractIdPaginateRow) db.Token {
+	// needs to be updated whenever we add fields to the token *facepalm*
+	return db.Token{
+		ID:                   row.ID,
+		Deleted:              row.Deleted,
+		Version:              row.Version,
+		CreatedAt:            row.CreatedAt,
+		LastUpdated:          row.LastUpdated,
+		Name:                 row.Name,
+		Description:          row.Description,
+		CollectorsNote:       row.CollectorsNote,
+		Media:                row.Media,
+		TokenUri:             row.TokenUri,
+		TokenType:            row.TokenType,
+		TokenID:              row.TokenID,
+		Quantity:             row.Quantity,
+		OwnershipHistory:     row.OwnershipHistory,
+		TokenMetadata:        row.TokenMetadata,
+		ExternalUrl:          row.ExternalUrl,
+		BlockNumber:          row.BlockNumber,
+		OwnerUserID:          row.OwnerUserID,
+		OwnedByWallets:       row.OwnedByWallets,
+		Chain:                row.Chain,
+		Contract:             row.Contract,
+		IsUserMarkedSpam:     row.IsUserMarkedSpam,
+		IsProviderMarkedSpam: row.IsProviderMarkedSpam,
+	}
 }
 
 func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, []error) {

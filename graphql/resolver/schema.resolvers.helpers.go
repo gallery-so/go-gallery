@@ -382,14 +382,25 @@ func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]
 	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, limit int, offset int) ([]*model.Token, error) {
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.TokensConnection, error) {
 
-	tokens, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, limit, offset)
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	return tokensToModel(ctx, tokens), nil
+	edges := make([]*model.TokenEdge, len(tokens))
+	for i, token := range tokens {
+		edges[i] = &model.TokenEdge{
+			Node:   tokenToModel(ctx, token),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.TokensConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID) error {
@@ -487,21 +498,28 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community, forceRefresh), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, limit, offset int) ([]*model.TokenHolder, error) {
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, before, after *string, first, last *int) (*model.TokenHoldersConnection, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	owners, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, limit, offset)
+	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]*model.TokenHolder, len(owners))
+	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
-		result[i] = multichainTokenHolderToModel(ctx, owner, contractID)
+		edges[i] = &model.TokenHolderEdge{
+			Node:   owner,
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
 	}
 
-	return result, nil
+	return &model.TokenHoldersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+
 }
 
 func resolveGeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
@@ -708,7 +726,7 @@ func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*
 }
 
 func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
-	admire, err := publicapi.For(ctx).Admire.GetAdmireByID(ctx, admireID)
+	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, admireID)
 
 	if err != nil {
 		return nil, err
@@ -717,33 +735,14 @@ func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model
 	return admireToModel(ctx, *admire), nil
 }
 
-func resolveAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Admire, error) {
-	admires, err := publicapi.For(ctx).Admire.GetAdmiresByFeedEventID(ctx, feedEventID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return admiresToModels(ctx, admires), nil
-}
-
 func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*model.Comment, error) {
-	comment, err := publicapi.For(ctx).Comment.GetCommentByID(ctx, commentID)
+	comment, err := publicapi.For(ctx).Interaction.GetCommentByID(ctx, commentID)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return commentToModel(ctx, *comment), nil
-}
-func resolveCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.Comment, error) {
-	comments, err := publicapi.For(ctx).Comment.GetCommentsByFeedEventID(ctx, feedEventID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return commentsToModels(ctx, comments), nil
 }
 
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
@@ -1175,6 +1174,17 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		ProfileBannerURL: util.StringToPointer(community.ProfileBannerUrl.String),
 		BadgeURL:         util.StringToPointer(community.BadgeUrl.String),
 		Owners:           nil, // handled by dedicated resolver
+	}
+}
+
+func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.PageInfo {
+	return &model.PageInfo{
+		Total:           pageInfo.Total,
+		Size:            pageInfo.Size,
+		HasPreviousPage: pageInfo.HasPreviousPage,
+		HasNextPage:     pageInfo.HasNextPage,
+		StartCursor:     pageInfo.StartCursor,
+		EndCursor:       pageInfo.EndCursor,
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
 )
@@ -14,6 +15,7 @@ import (
 // ContractGalleryRepository represents a contract repository in the postgres database
 type ContractGalleryRepository struct {
 	db                    *sql.DB
+	queries               *db.Queries
 	getByIDStmt           *sql.Stmt
 	getByAddressStmt      *sql.Stmt
 	getByAddressesStmt    *sql.Stmt

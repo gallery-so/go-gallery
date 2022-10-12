@@ -87,6 +87,10 @@ type GetAuthNoncePayloadOrError interface {
 	IsGetAuthNoncePayloadOrError()
 }
 
+type Interaction interface {
+	IsInteraction()
+}
+
 type LoginPayloadOrError interface {
 	IsLoginPayloadOrError()
 }
@@ -192,7 +196,8 @@ type Admire struct {
 	Admirer      *GalleryUser `json:"admirer"`
 }
 
-func (Admire) IsNode() {}
+func (Admire) IsNode()        {}
+func (Admire) IsInteraction() {}
 
 type AdmireFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
@@ -329,7 +334,8 @@ type Comment struct {
 	Comment      *string      `json:"comment"`
 }
 
-func (Comment) IsNode() {}
+func (Comment) IsNode()        {}
+func (Comment) IsInteraction() {}
 
 type CommentOnFeedEventPayload struct {
 	Viewer         *Viewer    `json:"viewer"`
@@ -342,19 +348,19 @@ func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
 type Community struct {
 	HelperCommunityData
-	Dbid              persist.DBID          `json:"dbid"`
-	LastUpdated       *time.Time            `json:"lastUpdated"`
-	ContractAddress   *persist.ChainAddress `json:"contractAddress"`
-	CreatorAddress    *persist.ChainAddress `json:"creatorAddress"`
-	Chain             *persist.Chain        `json:"chain"`
-	Name              *string               `json:"name"`
-	Description       *string               `json:"description"`
-	PreviewImage      *string               `json:"previewImage"`
-	ProfileImageURL   *string               `json:"profileImageURL"`
-	ProfileBannerURL  *string               `json:"profileBannerURL"`
-	BadgeURL          *string               `json:"badgeURL"`
-	TokensInCommunity []*Token              `json:"tokensInCommunity"`
-	Owners            []*TokenHolder        `json:"owners"`
+	Dbid              persist.DBID            `json:"dbid"`
+	LastUpdated       *time.Time              `json:"lastUpdated"`
+	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
+	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Chain             *persist.Chain          `json:"chain"`
+	Name              *string                 `json:"name"`
+	Description       *string                 `json:"description"`
+	PreviewImage      *string                 `json:"previewImage"`
+	ProfileImageURL   *string                 `json:"profileImageURL"`
+	ProfileBannerURL  *string                 `json:"profileBannerURL"`
+	BadgeURL          *string                 `json:"badgeURL"`
+	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
+	Owners            *TokenHoldersConnection `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
@@ -617,15 +623,50 @@ type FeedEdge struct {
 }
 
 type FeedEvent struct {
-	Dbid      persist.DBID  `json:"dbid"`
-	EventData FeedEventData `json:"eventData"`
-	Admires   []*Admire     `json:"admires"`
-	Comments  []*Comment    `json:"comments"`
+	Dbid                  persist.DBID                     `json:"dbid"`
+	EventData             FeedEventData                    `json:"eventData"`
+	Admires               *FeedEventAdmiresConnection      `json:"admires"`
+	Comments              *FeedEventCommentsConnection     `json:"comments"`
+	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
+	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
 }
 
 func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
+
+type FeedEventAdmireEdge struct {
+	Node   *Admire    `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor *string    `json:"cursor"`
+}
+
+type FeedEventAdmiresConnection struct {
+	Edges    []*FeedEventAdmireEdge `json:"edges"`
+	PageInfo *PageInfo              `json:"pageInfo"`
+}
+
+type FeedEventCommentEdge struct {
+	Node   *Comment   `json:"node"`
+	Event  *FeedEvent `json:"event"`
+	Cursor *string    `json:"cursor"`
+}
+
+type FeedEventCommentsConnection struct {
+	Edges    []*FeedEventCommentEdge `json:"edges"`
+	PageInfo *PageInfo               `json:"pageInfo"`
+}
+
+type FeedEventInteractionsConnection struct {
+	Edges    []*FeedEventInteractionsEdge `json:"edges"`
+	PageInfo *PageInfo                    `json:"pageInfo"`
+}
+
+type FeedEventInteractionsEdge struct {
+	Node   Interaction `json:"node"`
+	Event  *FeedEvent  `json:"event"`
+	Cursor *string     `json:"cursor"`
+}
 
 type FollowInfo struct {
 	User         *GalleryUser `json:"user"`
@@ -751,6 +792,7 @@ type OwnerAtBlock struct {
 }
 
 type PageInfo struct {
+	Total           *int   `json:"total"`
 	Size            int    `json:"size"`
 	HasPreviousPage bool   `json:"hasPreviousPage"`
 	HasNextPage     bool   `json:"hasNextPage"`
@@ -872,12 +914,27 @@ type Token struct {
 func (Token) IsNode()             {}
 func (Token) IsTokenByIDOrError() {}
 
+type TokenEdge struct {
+	Node   *Token  `json:"node"`
+	Cursor *string `json:"cursor"`
+}
+
 type TokenHolder struct {
 	HelperTokenHolderData
 	DisplayName   *string      `json:"displayName"`
 	Wallets       []*Wallet    `json:"wallets"`
 	User          *GalleryUser `json:"user"`
 	PreviewTokens []*string    `json:"previewTokens"`
+}
+
+type TokenHolderEdge struct {
+	Node   *TokenHolder `json:"node"`
+	Cursor *string      `json:"cursor"`
+}
+
+type TokenHoldersConnection struct {
+	Edges    []*TokenHolderEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
 }
 
 type TokensAddedToCollectionFeedEventData struct {
@@ -891,6 +948,11 @@ type TokensAddedToCollectionFeedEventData struct {
 }
 
 func (TokensAddedToCollectionFeedEventData) IsFeedEventData() {}
+
+type TokensConnection struct {
+	Edges    []*TokenEdge `json:"edges"`
+	PageInfo *PageInfo    `json:"pageInfo"`
+}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
