@@ -470,7 +470,7 @@ type FollowInfo {
 type FeedEventAdmireEdge {
     node: Admire
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventAdmiresConnection {
@@ -482,7 +482,7 @@ type FeedEventAdmiresConnection {
 type FeedEventCommentEdge {
     node: Comment
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventCommentsConnection {
@@ -495,14 +495,13 @@ union Interaction = Admire | Comment
 type FeedEventInteractionsEdge {
     node: Interaction
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventInteractionsConnection {
     edges: [FeedEventInteractionsEdge]
     pageInfo: PageInfo!
 }
-
 
 interface FeedEventData {
     eventTime: Time

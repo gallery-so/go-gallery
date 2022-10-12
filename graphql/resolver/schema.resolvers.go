@@ -147,9 +147,8 @@ func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, b
 	var edges []*model.FeedEventAdmireEdge
 	for _, admire := range admires {
 		edges = append(edges, &model.FeedEventAdmireEdge{
-			Node:   admireToModel(ctx, admire),
-			Event:  obj,
-			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+			Node:  admireToModel(ctx, admire),
+			Event: obj,
 		})
 	}
 
@@ -168,9 +167,8 @@ func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, 
 	var edges []*model.FeedEventCommentEdge
 	for _, comment := range comments {
 		edges = append(edges, &model.FeedEventCommentEdge{
-			Node:   commentToModel(ctx, comment),
-			Event:  obj,
-			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+			Node:  commentToModel(ctx, comment),
+			Event: obj,
 		})
 	}
 
@@ -189,8 +187,7 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 	var edges []*model.FeedEventInteractionsEdge
 	for _, interaction := range interactions {
 		edge := &model.FeedEventInteractionsEdge{
-			Event:  obj,
-			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+			Event: obj,
 		}
 		if admire, ok := interaction.(coredb.Admire); ok {
 			edge.Node = admireToModel(ctx, admire)

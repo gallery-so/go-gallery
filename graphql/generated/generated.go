@@ -3993,7 +3993,7 @@ type FollowInfo {
 type FeedEventAdmireEdge {
     node: Admire
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventAdmiresConnection {
@@ -4005,7 +4005,7 @@ type FeedEventAdmiresConnection {
 type FeedEventCommentEdge {
     node: Comment
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventCommentsConnection {
@@ -4018,14 +4018,13 @@ union Interaction = Admire | Comment
 type FeedEventInteractionsEdge {
     node: Interaction
     event: FeedEvent
-    cursor: String!
+    cursor: String
 }
 
 type FeedEventInteractionsConnection {
     edges: [FeedEventInteractionsEdge]
     pageInfo: PageInfo!
 }
-
 
 interface FeedEventData {
     eventTime: Time
@@ -9811,14 +9810,11 @@ func (ec *executionContext) _FeedEventAdmireEdge_cursor(ctx context.Context, fie
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FeedEventAdmiresConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventAdmiresConnection) (ret graphql.Marshaler) {
@@ -9977,14 +9973,11 @@ func (ec *executionContext) _FeedEventCommentEdge_cursor(ctx context.Context, fi
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FeedEventCommentsConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventCommentsConnection) (ret graphql.Marshaler) {
@@ -10210,14 +10203,11 @@ func (ec *executionContext) _FeedEventInteractionsEdge_cursor(ctx context.Contex
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FollowInfo_user(ctx context.Context, field graphql.CollectedField, obj *model.FollowInfo) (ret graphql.Marshaler) {
@@ -22971,9 +22961,6 @@ func (ec *executionContext) _FeedEventAdmireEdge(ctx context.Context, sel ast.Se
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -23054,9 +23041,6 @@ func (ec *executionContext) _FeedEventCommentEdge(ctx context.Context, sel ast.S
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -23175,9 +23159,6 @@ func (ec *executionContext) _FeedEventInteractionsEdge(ctx context.Context, sel 
 
 			out.Values[i] = innerFunc(ctx)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

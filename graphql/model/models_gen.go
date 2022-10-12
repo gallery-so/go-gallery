@@ -636,7 +636,7 @@ func (FeedEvent) IsFeedEventByIDOrError() {}
 type FeedEventAdmireEdge struct {
 	Node   *Admire    `json:"node"`
 	Event  *FeedEvent `json:"event"`
-	Cursor string     `json:"cursor"`
+	Cursor *string    `json:"cursor"`
 }
 
 type FeedEventAdmiresConnection struct {
@@ -647,7 +647,7 @@ type FeedEventAdmiresConnection struct {
 type FeedEventCommentEdge struct {
 	Node   *Comment   `json:"node"`
 	Event  *FeedEvent `json:"event"`
-	Cursor string     `json:"cursor"`
+	Cursor *string    `json:"cursor"`
 }
 
 type FeedEventCommentsConnection struct {
@@ -663,7 +663,7 @@ type FeedEventInteractionsConnection struct {
 type FeedEventInteractionsEdge struct {
 	Node   Interaction `json:"node"`
 	Event  *FeedEvent  `json:"event"`
-	Cursor string      `json:"cursor"`
+	Cursor *string     `json:"cursor"`
 }
 
 type FollowInfo struct {
