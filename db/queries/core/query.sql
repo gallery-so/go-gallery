@@ -216,9 +216,6 @@ SELECT * FROM feed_events WHERE deleted = false
             CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
     LIMIT $1;
 
--- name: CountGlobalFeedEvents :one
-SELECT count(*) FROM feed_events WHERE deleted = false;
-
 -- name: PaginatePersonalFeedByUserID :batchmany
 SELECT fe.* FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
     AND fe.owner_id = fl.followee AND fl.follower = $1
@@ -228,9 +225,6 @@ SELECT fe.* FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.dele
             CASE WHEN NOT @paging_forward::bool THEN (fe.event_time, fe.id) END DESC
     LIMIT $2;
 
--- name: CountPersonalFeedEventsByFollowerID :one
-SELECT count(*) FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false AND fe.owner_id = fl.followee AND fl.follower = $1;
-
 -- name: PaginateUserFeedByUserID :batchmany
 SELECT * FROM feed_events WHERE owner_id = $1 AND deleted = false
     AND (event_time, id) < (@cur_before_time, @cur_before_id)
@@ -238,9 +232,6 @@ SELECT * FROM feed_events WHERE owner_id = $1 AND deleted = false
     ORDER BY CASE WHEN @paging_forward::bool THEN (event_time, id) END ASC,
             CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
     LIMIT $2;
-
--- name: CountFeedEventsByUserID :one
-SELECT count(*) FROM feed_events WHERE owner_id = $1 AND deleted = false;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

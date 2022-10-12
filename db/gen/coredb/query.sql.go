@@ -13,39 +13,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const countFeedEventsByUserID = `-- name: CountFeedEventsByUserID :one
-SELECT count(*) FROM feed_events WHERE owner_id = $1 AND deleted = false
-`
-
-func (q *Queries) CountFeedEventsByUserID(ctx context.Context, ownerID persist.DBID) (int64, error) {
-	row := q.db.QueryRow(ctx, countFeedEventsByUserID, ownerID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countGlobalFeedEvents = `-- name: CountGlobalFeedEvents :one
-SELECT count(*) FROM feed_events WHERE deleted = false
-`
-
-func (q *Queries) CountGlobalFeedEvents(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countGlobalFeedEvents)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countPersonalFeedEventsByFollowerID = `-- name: CountPersonalFeedEventsByFollowerID :one
-SELECT count(*) FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false AND fe.owner_id = fl.followee AND fl.follower = $1
-`
-
-func (q *Queries) CountPersonalFeedEventsByFollowerID(ctx context.Context, follower persist.DBID) (int64, error) {
-	row := q.db.QueryRow(ctx, countPersonalFeedEventsByFollowerID, follower)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
