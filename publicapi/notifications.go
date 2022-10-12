@@ -8,7 +8,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -96,20 +95,6 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 
 func (api NotificationsAPI) GetByID(ctx context.Context, id persist.DBID) (db.Notification, error) {
 	return api.loaders.NotificationByID.Load(id)
-}
-
-func (api NotificationsAPI) HasPage(ctx context.Context, cursor string, userId persist.DBID, byFirst bool) (bool, error) {
-	notifID, err := model.Cursor.DecodeToDBID(&cursor)
-	if err != nil {
-		return false, err
-	}
-
-	return api.queries.UserFeedHasMoreNotifications(ctx, db.UserFeedHasMoreNotificationsParams{
-		OwnerID:   userId,
-		ID:        *notifID,
-		FromFirst: byFirst,
-	})
-
 }
 
 func (api NotificationsAPI) ClearUserNotifications(ctx context.Context) ([]db.Notification, error) {

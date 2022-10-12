@@ -130,10 +130,6 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
 }
 
-func (r *feedConnectionResolver) PageInfo(ctx context.Context, obj *model.FeedConnection) (*model.PageInfo, error) {
-	return resolveFeedPageInfo(ctx, obj)
-}
-
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
 	return resolveFeedEventDataByEventID(ctx, obj.Dbid)
 }
@@ -274,8 +270,21 @@ func (r *galleryUserResolver) Following(ctx context.Context, obj *model.GalleryU
 	return resolveFollowingByUserID(ctx, obj.Dbid)
 }
 
-func (r *groupNotificationUsersConnectionResolver) PageInfo(ctx context.Context, obj *model.GroupNotificationUsersConnection) (*model.PageInfo, error) {
-	return resolveGroupedUserNotificationPageInfo(ctx, obj)
+func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateUserFeed(ctx, obj.Dbid, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
@@ -834,10 +843,6 @@ func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, setti
 	return resolveViewerNotificationSettings(ctx)
 }
 
-func (r *notificationsConnectionResolver) PageInfo(ctx context.Context, obj *model.NotificationsConnection) (*model.PageInfo, error) {
-	return resolveNotificationPageInfo(ctx, obj)
-}
-
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -940,13 +945,20 @@ func (r *queryResolver) GalleryOfTheWeekWinners(ctx context.Context) ([]*model.G
 }
 
 func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	feed, err := resolveGlobalFeed(ctx, before, after, first, last)
-
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateGlobalFeed(ctx, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
 
-	return feed, nil
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
@@ -1107,7 +1119,20 @@ func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer)
 }
 
 func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	return resolveViewerFeed(ctx, before, after, first, last)
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginatePersonalFeed(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -1180,11 +1205,6 @@ func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPaylo
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
 
-// FeedConnection returns generated.FeedConnectionResolver implementation.
-func (r *Resolver) FeedConnection() generated.FeedConnectionResolver {
-	return &feedConnectionResolver{r}
-}
-
 // FeedEvent returns generated.FeedEventResolver implementation.
 func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
 
@@ -1202,18 +1222,8 @@ func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
-// GroupNotificationUsersConnection returns generated.GroupNotificationUsersConnectionResolver implementation.
-func (r *Resolver) GroupNotificationUsersConnection() generated.GroupNotificationUsersConnectionResolver {
-	return &groupNotificationUsersConnectionResolver{r}
-}
-
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
-
-// NotificationsConnection returns generated.NotificationsConnectionResolver implementation.
-func (r *Resolver) NotificationsConnection() generated.NotificationsConnectionResolver {
-	return &notificationsConnectionResolver{r}
-}
 
 // OwnerAtBlock returns generated.OwnerAtBlockResolver implementation.
 func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &ownerAtBlockResolver{r} }
@@ -1316,15 +1326,12 @@ type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
-type feedConnectionResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
-type groupNotificationUsersConnectionResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
-type notificationsConnectionResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }

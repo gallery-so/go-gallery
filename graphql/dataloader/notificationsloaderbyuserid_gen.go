@@ -10,7 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
-type UserNotificationsLoaderSettings interface {
+type NotificationsLoaderByUserIDSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -21,29 +21,29 @@ type UserNotificationsLoaderSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-func (l *UserNotificationsLoader) setContext(ctx context.Context) {
+func (l *NotificationsLoaderByUserID) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *UserNotificationsLoader) setWait(wait time.Duration) {
+func (l *NotificationsLoaderByUserID) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *UserNotificationsLoader) setMaxBatch(maxBatch int) {
+func (l *NotificationsLoaderByUserID) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *UserNotificationsLoader) setDisableCaching(disableCaching bool) {
+func (l *NotificationsLoaderByUserID) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *UserNotificationsLoader) setPublishResults(publishResults bool) {
+func (l *NotificationsLoaderByUserID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-// NewUserNotificationsLoader creates a new UserNotificationsLoader with the given settings, functions, and options
-func NewUserNotificationsLoader(
-	settings UserNotificationsLoaderSettings, fetch func(ctx context.Context, keys []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error),
+// NewNotificationsLoaderByUserID creates a new NotificationsLoaderByUserID with the given settings, functions, and options
+func NewNotificationsLoaderByUserID(
+	settings NotificationsLoaderByUserIDSettings, fetch func(ctx context.Context, keys []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error),
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -51,8 +51,8 @@ func NewUserNotificationsLoader(
 		setDisableCaching(bool)
 		setPublishResults(bool)
 	}),
-) *UserNotificationsLoader {
-	loader := &UserNotificationsLoader{
+) *NotificationsLoaderByUserID {
+	loader := &NotificationsLoaderByUserID{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -85,8 +85,8 @@ func NewUserNotificationsLoader(
 	return loader
 }
 
-// UserNotificationsLoader batches and caches requests
-type UserNotificationsLoader struct {
+// NotificationsLoaderByUserID batches and caches requests
+type NotificationsLoaderByUserID struct {
 	// context passed to fetch functions
 	ctx context.Context
 
@@ -120,14 +120,14 @@ type UserNotificationsLoader struct {
 
 	// typed cache functions
 	//subscribers []func([]coredb.Notification)
-	subscribers []userNotificationsLoaderSubscriber
+	subscribers []notificationsLoaderByUserIDSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *userNotificationsLoaderBatch
+	batch *notificationsLoaderByUserIDBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -136,7 +136,7 @@ type UserNotificationsLoader struct {
 	once sync.Once
 }
 
-type userNotificationsLoaderBatch struct {
+type notificationsLoaderByUserIDBatch struct {
 	keys    []coredb.GetUserNotificationsBatchParams
 	data    [][]coredb.Notification
 	error   []error
@@ -145,14 +145,14 @@ type userNotificationsLoaderBatch struct {
 }
 
 // Load a Notification by key, batching and caching will be applied automatically
-func (l *UserNotificationsLoader) Load(key coredb.GetUserNotificationsBatchParams) ([]coredb.Notification, error) {
+func (l *NotificationsLoaderByUserID) Load(key coredb.GetUserNotificationsBatchParams) ([]coredb.Notification, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a Notification.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserNotificationsLoader) LoadThunk(key coredb.GetUserNotificationsBatchParams) func() ([]coredb.Notification, error) {
+func (l *NotificationsLoaderByUserID) LoadThunk(key coredb.GetUserNotificationsBatchParams) func() ([]coredb.Notification, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
@@ -163,7 +163,7 @@ func (l *UserNotificationsLoader) LoadThunk(key coredb.GetUserNotificationsBatch
 		}
 	}
 	if l.batch == nil {
-		l.batch = &userNotificationsLoaderBatch{done: make(chan struct{})}
+		l.batch = &notificationsLoaderByUserIDBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
@@ -203,7 +203,7 @@ func (l *UserNotificationsLoader) LoadThunk(key coredb.GetUserNotificationsBatch
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UserNotificationsLoader) LoadAll(keys []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error) {
+func (l *NotificationsLoaderByUserID) LoadAll(keys []coredb.GetUserNotificationsBatchParams) ([][]coredb.Notification, []error) {
 	results := make([]func() ([]coredb.Notification, error), len(keys))
 
 	for i, key := range keys {
@@ -221,7 +221,7 @@ func (l *UserNotificationsLoader) LoadAll(keys []coredb.GetUserNotificationsBatc
 // LoadAllThunk returns a function that when called will block waiting for a Notifications.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserNotificationsLoader) LoadAllThunk(keys []coredb.GetUserNotificationsBatchParams) func() ([][]coredb.Notification, []error) {
+func (l *NotificationsLoaderByUserID) LoadAllThunk(keys []coredb.GetUserNotificationsBatchParams) func() ([][]coredb.Notification, []error) {
 	results := make([]func() ([]coredb.Notification, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -239,7 +239,7 @@ func (l *UserNotificationsLoader) LoadAllThunk(keys []coredb.GetUserNotification
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UserNotificationsLoader) Prime(key coredb.GetUserNotificationsBatchParams, value []coredb.Notification) bool {
+func (l *NotificationsLoaderByUserID) Prime(key coredb.GetUserNotificationsBatchParams, value []coredb.Notification) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -257,7 +257,7 @@ func (l *UserNotificationsLoader) Prime(key coredb.GetUserNotificationsBatchPara
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *UserNotificationsLoader) Clear(key coredb.GetUserNotificationsBatchParams) {
+func (l *NotificationsLoaderByUserID) Clear(key coredb.GetUserNotificationsBatchParams) {
 	if l.disableCaching {
 		return
 	}
@@ -266,7 +266,7 @@ func (l *UserNotificationsLoader) Clear(key coredb.GetUserNotificationsBatchPara
 	l.mu.Unlock()
 }
 
-func (l *UserNotificationsLoader) unsafeSet(key coredb.GetUserNotificationsBatchParams, value []coredb.Notification) {
+func (l *NotificationsLoaderByUserID) unsafeSet(key coredb.GetUserNotificationsBatchParams, value []coredb.Notification) {
 	if l.cache == nil {
 		l.cache = map[coredb.GetUserNotificationsBatchParams][]coredb.Notification{}
 	}
@@ -275,7 +275,7 @@ func (l *UserNotificationsLoader) unsafeSet(key coredb.GetUserNotificationsBatch
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *userNotificationsLoaderBatch) keyIndex(l *UserNotificationsLoader, key coredb.GetUserNotificationsBatchParams) int {
+func (b *notificationsLoaderByUserIDBatch) keyIndex(l *NotificationsLoaderByUserID, key coredb.GetUserNotificationsBatchParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -299,7 +299,7 @@ func (b *userNotificationsLoaderBatch) keyIndex(l *UserNotificationsLoader, key 
 	return pos
 }
 
-func (b *userNotificationsLoaderBatch) startTimer(l *UserNotificationsLoader) {
+func (b *notificationsLoaderByUserIDBatch) startTimer(l *NotificationsLoaderByUserID) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -315,24 +315,24 @@ func (b *userNotificationsLoaderBatch) startTimer(l *UserNotificationsLoader) {
 	b.end(l)
 }
 
-func (b *userNotificationsLoaderBatch) end(l *UserNotificationsLoader) {
+func (b *notificationsLoaderByUserIDBatch) end(l *NotificationsLoaderByUserID) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type userNotificationsLoaderSubscriber struct {
+type notificationsLoaderByUserIDSubscriber struct {
 	cacheFunc func(coredb.Notification)
 	mutex     *sync.Mutex
 }
 
-func (l *UserNotificationsLoader) publishToSubscribers(value []coredb.Notification) {
+func (l *NotificationsLoaderByUserID) publishToSubscribers(value []coredb.Notification) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
 			if typedFunc, ok := subscription.(*func(coredb.Notification)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, userNotificationsLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, notificationsLoaderByUserIDSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -350,13 +350,13 @@ func (l *UserNotificationsLoader) publishToSubscribers(value []coredb.Notificati
 	}
 }
 
-func (l *UserNotificationsLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *NotificationsLoaderByUserID) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *UserNotificationsLoader) ownsCacheFunc(f *func(coredb.Notification)) bool {
+func (l *NotificationsLoaderByUserID) ownsCacheFunc(f *func(coredb.Notification)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

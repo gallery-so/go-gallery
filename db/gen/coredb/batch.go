@@ -1001,94 +1001,6 @@ func (b *GetGalleryByIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
-const getGlobalFeedViewBatch = `-- name: GetGlobalFeedViewBatch :batchmany
-WITH cursors AS (
-    SELECT
-    (SELECT CASE WHEN $2::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = $2::varchar AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN $3::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = $3::varchar AND deleted = false) END) AS cur_after
-), edges AS (
-    SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_after FROM cursors)
-    AND event_time < (SELECT cur_before FROM cursors)
-    AND deleted = false
-), offsets AS (
-    SELECT
-        CASE WHEN NOT $4::bool AND count(id) - $1::int > 0
-        THEN count(id) - $1::int
-        ELSE 0 END pos
-    FROM edges
-)
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
-    WHERE id = ANY(SELECT id FROM edges)
-    ORDER BY event_time ASC
-    LIMIT $1 OFFSET (SELECT pos FROM offsets)
-`
-
-type GetGlobalFeedViewBatchBatchResults struct {
-	br  pgx.BatchResults
-	ind int
-}
-
-type GetGlobalFeedViewBatchParams struct {
-	Limit     int32
-	CurBefore string
-	CurAfter  string
-	FromFirst bool
-}
-
-func (q *Queries) GetGlobalFeedViewBatch(ctx context.Context, arg []GetGlobalFeedViewBatchParams) *GetGlobalFeedViewBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.Limit,
-			a.CurBefore,
-			a.CurAfter,
-			a.FromFirst,
-		}
-		batch.Queue(getGlobalFeedViewBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetGlobalFeedViewBatchBatchResults{br, 0}
-}
-
-func (b *GetGlobalFeedViewBatchBatchResults) Query(f func(int, []FeedEvent, error)) {
-	for {
-		rows, err := b.br.Query()
-		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
-			break
-		}
-		defer rows.Close()
-		var items []FeedEvent
-		for rows.Next() {
-			var i FeedEvent
-			if err := rows.Scan(
-				&i.ID,
-				&i.Version,
-				&i.OwnerID,
-				&i.Action,
-				&i.Data,
-				&i.EventTime,
-				&i.EventIds,
-				&i.Deleted,
-				&i.LastUpdated,
-				&i.CreatedAt,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-		}
-
-		if f != nil {
-			f(b.ind, items, rows.Err())
-		}
-		b.ind++
-	}
-}
-
-func (b *GetGlobalFeedViewBatchBatchResults) Close() error {
-	return b.br.Close()
-}
-
 const getMembershipByMembershipIdBatch = `-- name: GetMembershipByMembershipIdBatch :batchone
 SELECT id, deleted, version, created_at, last_updated, token_id, name, asset_url, owners FROM membership WHERE id = $1 AND deleted = false
 `
@@ -2339,6 +2251,84 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE deleted = false
+    AND (event_time, id) < ($2, $3)
+    AND (event_time, id) > ($4, $5)
+    ORDER BY CASE WHEN $6::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT $6::bool THEN (event_time, id) END DESC
+    LIMIT $1
+`
+
+type PaginateGlobalFeedBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type PaginateGlobalFeedParams struct {
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) PaginateGlobalFeed(ctx context.Context, arg []PaginateGlobalFeedParams) *PaginateGlobalFeedBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Limit,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+		}
+		batch.Queue(paginateGlobalFeed, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateGlobalFeedBatchResults{br, 0}
+}
+
+func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []FeedEvent, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []FeedEvent
+		for rows.Next() {
+			var i FeedEvent
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.OwnerID,
+				&i.Action,
+				&i.Data,
+				&i.EventTime,
+				&i.EventIds,
+				&i.Deleted,
+				&i.LastUpdated,
+				&i.CreatedAt,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *PaginateGlobalFeedBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const paginateInteractionsByFeedEventIDBatch = `-- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, $3::int as tag FROM admires t WHERE $3 != 0 AND t.feed_event_id = $1 AND t.deleted = false
@@ -2420,5 +2410,166 @@ func (b *PaginateInteractionsByFeedEventIDBatchBatchResults) Query(f func(int, [
 }
 
 func (b *PaginateInteractionsByFeedEventIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :batchmany
+SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
+    AND fe.owner_id = fl.followee AND fl.follower = $1
+    AND (fe.event_time, fe.id) < ($3, $4)
+    AND (fe.event_time, fe.id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (fe.event_time, fe.id) END ASC,
+            CASE WHEN NOT $7::bool THEN (fe.event_time, fe.id) END DESC
+    LIMIT $2
+`
+
+type PaginatePersonalFeedByUserIDBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type PaginatePersonalFeedByUserIDParams struct {
+	Follower      persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) PaginatePersonalFeedByUserID(ctx context.Context, arg []PaginatePersonalFeedByUserIDParams) *PaginatePersonalFeedByUserIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Follower,
+			a.Limit,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+		}
+		batch.Queue(paginatePersonalFeedByUserID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginatePersonalFeedByUserIDBatchResults{br, 0}
+}
+
+func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []FeedEvent
+		for rows.Next() {
+			var i FeedEvent
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.OwnerID,
+				&i.Action,
+				&i.Data,
+				&i.EventTime,
+				&i.EventIds,
+				&i.Deleted,
+				&i.LastUpdated,
+				&i.CreatedAt,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *PaginatePersonalFeedByUserIDBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE owner_id = $1 AND deleted = false
+    AND (event_time, id) < ($3, $4)
+    AND (event_time, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT $7::bool THEN (event_time, id) END DESC
+    LIMIT $2
+`
+
+type PaginateUserFeedByUserIDBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type PaginateUserFeedByUserIDParams struct {
+	OwnerID       persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) PaginateUserFeedByUserID(ctx context.Context, arg []PaginateUserFeedByUserIDParams) *PaginateUserFeedByUserIDBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.OwnerID,
+			a.Limit,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+		}
+		batch.Queue(paginateUserFeedByUserID, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &PaginateUserFeedByUserIDBatchResults{br, 0}
+}
+
+func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []FeedEvent
+		for rows.Next() {
+			var i FeedEvent
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.OwnerID,
+				&i.Action,
+				&i.Data,
+				&i.EventTime,
+				&i.EventIds,
+				&i.Deleted,
+				&i.LastUpdated,
+				&i.CreatedAt,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *PaginateUserFeedByUserIDBatchResults) Close() error {
 	return b.br.Close()
 }
