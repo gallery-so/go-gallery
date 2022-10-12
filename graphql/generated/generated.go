@@ -329,12 +329,13 @@ type ComplexityRoot struct {
 	}
 
 	FeedEvent struct {
-		Admires      func(childComplexity int, before *string, after *string, first *int, last *int) int
-		Comments     func(childComplexity int, before *string, after *string, first *int, last *int) int
-		Dbid         func(childComplexity int) int
-		EventData    func(childComplexity int) int
-		ID           func(childComplexity int) int
-		Interactions func(childComplexity int, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) int
+		Admires               func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Comments              func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Dbid                  func(childComplexity int) int
+		EventData             func(childComplexity int) int
+		HasViewerAdmiredEvent func(childComplexity int) int
+		ID                    func(childComplexity int) int
+		Interactions          func(childComplexity int, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) int
 	}
 
 	FeedEventAdmireEdge struct {
@@ -752,6 +753,7 @@ type FeedEventResolver interface {
 	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
 	Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error)
 	Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) (*model.FeedEventInteractionsConnection, error)
+	HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error)
 }
 type FollowInfoResolver interface {
 	User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error)
@@ -1772,6 +1774,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FeedEvent.EventData(childComplexity), true
+
+	case "FeedEvent.hasViewerAdmiredEvent":
+		if e.complexity.FeedEvent.HasViewerAdmiredEvent == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.HasViewerAdmiredEvent(childComplexity), true
 
 	case "FeedEvent.id":
 		if e.complexity.FeedEvent.ID == nil {
@@ -4035,6 +4044,7 @@ interface FeedEventData {
 type FeedEvent implements Node {
     id: ID!
     dbid: DBID!
+
     eventData: FeedEventData @goField(forceResolver: true)
     admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
     comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
@@ -4042,6 +4052,8 @@ type FeedEvent implements Node {
     # If supplied, typeFilter will only query for the requested interaction types.
     # If typeFilter is omitted, all interaction types will be queried.
     interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
+
+    hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -9719,6 +9731,38 @@ func (ec *executionContext) _FeedEvent_interactions(ctx context.Context, field g
 	res := resTmp.(*model.FeedEventInteractionsConnection)
 	fc.Result = res
 	return ec.marshalOFeedEventInteractionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventInteractionsConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_hasViewerAdmiredEvent(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FeedEvent().HasViewerAdmiredEvent(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FeedEventAdmireEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.FeedEventAdmireEdge) (ret graphql.Marshaler) {
@@ -22912,6 +22956,23 @@ func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet
 					}
 				}()
 				res = ec._FeedEvent_interactions(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "hasViewerAdmiredEvent":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedEvent_hasViewerAdmiredEvent(ctx, field, obj)
 				return res
 			}
 

@@ -385,3 +385,9 @@ LIMIT $2;
 SELECT count(*), @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
                                                         UNION
 SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false;
+
+-- name: GetUserAdmiredFeedEvent :batchone
+SELECT exists(
+    SELECT * FROM admires
+    WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false
+);

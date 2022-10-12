@@ -360,6 +360,27 @@ func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBI
 	return admire.FeedEventID, api.repos.AdmireRepository.RemoveAdmire(ctx, admireID)
 }
 
+func (api InteractionAPI) HasUserAdmiredFeedEvent(ctx context.Context, userID persist.DBID, feedEventID persist.DBID) (*bool, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID":      {userID, "required"},
+		"feedEventID": {feedEventID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	hasAdmired, err := api.loaders.UserAdmiredFeedEvent.Load(db.GetUserAdmiredFeedEventParams{
+		ActorID:     userID,
+		FeedEventID: feedEventID,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &hasAdmired, nil
+}
+
 func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
