@@ -13,49 +13,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const countAdmiresByFeedEventID = `-- name: CountAdmiresByFeedEventID :one
-SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false
-`
-
-func (q *Queries) CountAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID) (int64, error) {
-	row := q.db.QueryRow(ctx, countAdmiresByFeedEventID, feedEventID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countCommentsByFeedEventID = `-- name: CountCommentsByFeedEventID :one
-SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false
-`
-
-func (q *Queries) CountCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID) (int64, error) {
-	row := q.db.QueryRow(ctx, countCommentsByFeedEventID, feedEventID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const countInteractionsByFeedEventID = `-- name: CountInteractionsByFeedEventID :one
-SELECT sum(counts.count) FROM (
-    SELECT count(*) FROM admires t WHERE $2::int != 0 AND t.feed_event_id = $1 AND t.deleted = false
-                                                    UNION
-    SELECT count(*) FROM comments t WHERE $3::int != 0 AND t.feed_event_id = $1 AND t.deleted = false)
-as counts
-`
-
-type CountInteractionsByFeedEventIDParams struct {
-	FeedEventID persist.DBID
-	AdmireTag   int32
-	CommentTag  int32
-}
-
-func (q *Queries) CountInteractionsByFeedEventID(ctx context.Context, arg CountInteractionsByFeedEventIDParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countInteractionsByFeedEventID, arg.FeedEventID, arg.AdmireTag, arg.CommentTag)
-	var sum int64
-	err := row.Scan(&sum)
-	return sum, err
-}
-
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -1312,68 +1269,6 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
-}
-
-const paginateInteractionsByFeedEventID = `-- name: PaginateInteractionsByFeedEventID :many
-SELECT interactions.created_At, interactions.id, interactions.tag FROM (
-    SELECT t.created_at, t.id, $3::int as tag FROM admires t WHERE $3 != 0 AND t.feed_event_id = $1 AND t.deleted = false
-        AND (t.created_at, t.id) < ($4, $5) AND (t.created_at, t.id) > ($6, $7)
-                                                                    UNION
-    SELECT t.created_at, t.id, $8::int as tag FROM comments t WHERE $8 != 0 AND t.feed_event_id = $1 AND t.deleted = false
-        AND (t.created_at, t.id) < ($4, $5) AND (t.created_at, t.id) > ($6, $7)
-) as interactions
-
-ORDER BY CASE WHEN $9::bool THEN (created_at, id) END ASC,
-         CASE WHEN NOT $9::bool THEN (created_at, id) END DESC
-LIMIT $2
-`
-
-type PaginateInteractionsByFeedEventIDParams struct {
-	FeedEventID   persist.DBID
-	Limit         int32
-	AdmireTag     int32
-	CurBeforeTime time.Time
-	CurBeforeID   persist.DBID
-	CurAfterTime  time.Time
-	CurAfterID    persist.DBID
-	CommentTag    int32
-	PagingForward bool
-}
-
-type PaginateInteractionsByFeedEventIDRow struct {
-	CreatedAt time.Time
-	ID        persist.DBID
-	Tag       int32
-}
-
-func (q *Queries) PaginateInteractionsByFeedEventID(ctx context.Context, arg PaginateInteractionsByFeedEventIDParams) ([]PaginateInteractionsByFeedEventIDRow, error) {
-	rows, err := q.db.Query(ctx, paginateInteractionsByFeedEventID,
-		arg.FeedEventID,
-		arg.Limit,
-		arg.AdmireTag,
-		arg.CurBeforeTime,
-		arg.CurBeforeID,
-		arg.CurAfterTime,
-		arg.CurAfterID,
-		arg.CommentTag,
-		arg.PagingForward,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []PaginateInteractionsByFeedEventIDRow
-	for rows.Next() {
-		var i PaginateInteractionsByFeedEventIDRow
-		if err := rows.Scan(&i.CreatedAt, &i.ID, &i.Tag); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const userFeedHasMoreEvents = `-- name: UserFeedHasMoreEvents :one

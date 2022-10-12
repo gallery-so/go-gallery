@@ -147,25 +147,14 @@ func (r *feedEventResolver) Admires(ctx context.Context, obj *model.FeedEvent, b
 	var edges []*model.FeedEventAdmireEdge
 	for _, admire := range admires {
 		edges = append(edges, &model.FeedEventAdmireEdge{
-			Node:   admireToModel(ctx, admire),
-			Event:  obj,
-			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+			Node:  admireToModel(ctx, admire),
+			Event: obj,
 		})
-	}
-
-	// TODO: pageInfoToModel
-	pageInfoModel := &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
 	}
 
 	return &model.FeedEventAdmiresConnection{
 		Edges:    edges,
-		PageInfo: pageInfoModel,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
@@ -178,30 +167,19 @@ func (r *feedEventResolver) Comments(ctx context.Context, obj *model.FeedEvent, 
 	var edges []*model.FeedEventCommentEdge
 	for _, comment := range comments {
 		edges = append(edges, &model.FeedEventCommentEdge{
-			Node:   commentToModel(ctx, comment),
-			Event:  obj,
-			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+			Node:  commentToModel(ctx, comment),
+			Event: obj,
 		})
-	}
-
-	// TODO: pageInfoToModel
-	pageInfoModel := &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
 	}
 
 	return &model.FeedEventCommentsConnection{
 		Edges:    edges,
-		PageInfo: pageInfoModel,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
-func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventInteractionsConnection, error) {
-	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByFeedEventID(ctx, obj.Dbid, before, after, first, last)
+func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) (*model.FeedEventInteractionsConnection, error) {
+	interactions, pageInfo, err := publicapi.For(ctx).Interaction.PaginateInteractionsByFeedEventID(ctx, obj.Dbid, before, after, first, last, typeFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -209,8 +187,7 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 	var edges []*model.FeedEventInteractionsEdge
 	for _, interaction := range interactions {
 		edge := &model.FeedEventInteractionsEdge{
-			Event:  obj,
-			Cursor: "", // TODO: Cursors should all be forced resolvers here, since we typically won't need to create them
+			Event: obj,
 		}
 		if admire, ok := interaction.(coredb.Admire); ok {
 			edge.Node = admireToModel(ctx, admire)
@@ -220,19 +197,9 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 		edges = append(edges, edge)
 	}
 
-	// TODO: pageInfoToModel
-	pageInfoModel := &model.PageInfo{
-		Total:           pageInfo.Total,
-		Size:            pageInfo.Size,
-		HasPreviousPage: pageInfo.HasPreviousPage,
-		HasNextPage:     pageInfo.HasNextPage,
-		StartCursor:     pageInfo.StartCursor,
-		EndCursor:       pageInfo.EndCursor,
-	}
-
 	return &model.FeedEventInteractionsConnection{
 		Edges:    edges,
-		PageInfo: pageInfoModel,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
 
