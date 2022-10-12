@@ -714,10 +714,7 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 			node = model.FeedEvent{Dbid: evt.ID, EventData: data}
 		}
 
-		edges[i] = &model.FeedEdge{
-			Node:   node,
-			Cursor: "", // TODO: Replace this
-		}
+		edges[i] = &model.FeedEdge{Node: node}
 	}
 
 	return edges, nil

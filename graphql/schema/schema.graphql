@@ -600,7 +600,7 @@ type PageInfo {
 
 type FeedEdge {
     node: FeedEventOrError
-    cursor: String!
+    cursor: String
 }
 
 type FeedConnection {

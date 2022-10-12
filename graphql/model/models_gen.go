@@ -617,7 +617,7 @@ type FeedConnection struct {
 
 type FeedEdge struct {
 	Node   FeedEventOrError `json:"node"`
-	Cursor string           `json:"cursor"`
+	Cursor *string          `json:"cursor"`
 }
 
 type FeedEvent struct {

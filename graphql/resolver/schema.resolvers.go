@@ -283,7 +283,7 @@ func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, 
 
 	return &model.FeedConnection{
 		Edges:    edges,
-		PageInfo: pageInfoToModel(pageInfo), // TODO: Replace this
+		PageInfo: pageInfoToModel(pageInfo),
 	}, nil
 }
 
@@ -910,7 +910,7 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 
 	return &model.FeedConnection{
 		Edges:    edges,
-		PageInfo: pageInfoToModel(pageInfo), // TODO: Replace this
+		PageInfo: pageInfoToModel(pageInfo),
 	}, nil
 }
 
@@ -1044,7 +1044,7 @@ func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *st
 
 	return &model.FeedConnection{
 		Edges:    edges,
-		PageInfo: pageInfoToModel(pageInfo), // TODO: Replace this
+		PageInfo: pageInfoToModel(pageInfo),
 	}, nil
 }
 
