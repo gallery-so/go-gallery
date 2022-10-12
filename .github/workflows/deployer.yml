@@ -6,6 +6,7 @@ on:
       - benny/github-actions
 env:
   CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 jobs:
   deploy-dev:
     runs-on: ubuntu-latest
