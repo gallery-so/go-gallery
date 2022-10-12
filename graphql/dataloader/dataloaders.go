@@ -220,7 +220,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.GlobalFeed = NewGlobalFeedLoader(defaults, loadGlobalFeed(q))
 
-	loaders.UserFeedByUserID = NewUserFeedLoader(defaults, loaderUserFeed(q))
+	loaders.UserFeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
 
 	loaders.AdmireByAdmireID = NewAdmireLoaderByID(defaults, loadAdmireById(q), AdmireLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(admire db.Admire) persist.DBID { return admire.ID },
@@ -755,7 +755,7 @@ func loadGlobalFeed(q *db.Queries) func(context.Context, []db.PaginateGlobalFeed
 	}
 }
 
-func loaderUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByFeedEventIDParams) ([][]db.FeedEvent, []error) {
+func loadUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByFeedEventIDParams) ([][]db.FeedEvent, []error) {
 	return func(ctx context.Context, params []db.PaginateUserFeedByFeedEventIDParams) ([][]db.FeedEvent, []error) {
 		events := make([][]db.FeedEvent, len(params))
 		errors := make([]error, len(params))
