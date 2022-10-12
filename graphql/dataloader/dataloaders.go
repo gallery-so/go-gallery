@@ -25,6 +25,8 @@
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden CommentLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden CommentsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
+//go:generate go run github.com/gallery-so/dataloaden NotificationLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Notification
+//go:generate go run github.com/gallery-so/dataloaden NotificationsLoaderByUserID github.com/mikeydub/go-gallery/db/gen/coredb.GetUserNotificationsBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Notification
 //go:generate go run github.com/gallery-so/dataloaden FeedEventCommentsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateCommentsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Comment
 //go:generate go run github.com/gallery-so/dataloaden FeedEventAdmiresLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateAdmiresByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchRow
@@ -87,6 +89,8 @@ type Loaders struct {
 	CommentByCommentID            *CommentLoaderByID
 	CommentCountByFeedEventID     *IntLoaderByID
 	CommentsByFeedEventID         *FeedEventCommentsLoader
+	NotificationByID              *NotificationLoaderByID
+	NotificationsByUserID         *NotificationsLoaderByUserID
 	InteractionCountByFeedEventID *FeedEventInteractionCountLoader
 	InteractionsByFeedEventID     *FeedEventInteractionsLoader
 	UserAdmiredFeedEvent          *UserAdmiredFeedEventLoader
@@ -220,7 +224,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.GlobalFeed = NewGlobalFeedLoader(defaults, loadGlobalFeed(q))
 
-	loaders.UserFeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
+	loaders.NotificationsByUserID = NewNotificationsLoaderByUserID(defaults, loadUserNotifications(q))
 
 	loaders.AdmireByAdmireID = NewAdmireLoaderByID(defaults, loadAdmireById(q), AdmireLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(admire db.Admire) persist.DBID { return admire.ID },
@@ -243,6 +247,10 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.InteractionsByFeedEventID = NewFeedEventInteractionsLoader(defaults, loadInteractionsByFeedEventID(q))
 
 	loaders.UserAdmiredFeedEvent = NewUserAdmiredFeedEventLoader(defaults, loadUserAdmiredFeedEvent(q), UserAdmiredFeedEventLoaderCacheSubscriptions{})
+
+	loaders.NotificationByID = NewNotificationLoaderByID(defaults, loadNotificationById(q), NotificationLoaderByIDCacheSubscriptions{
+		AutoCacheWithKey: func(notification db.Notification) persist.DBID { return notification.ID },
+	})
 
 	return loaders
 }
@@ -359,6 +367,23 @@ func loadGalleriesByUserId(q *db.Queries) func(context.Context, []persist.DBID) 
 		})
 
 		return galleries, errors
+	}
+}
+
+func loadNotificationById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Notification, []error) {
+	return func(ctx context.Context, ids []persist.DBID) ([]db.Notification, []error) {
+		notifs := make([]db.Notification, len(ids))
+		errors := make([]error, len(ids))
+
+		b := q.GetNotificationByIDBatch(ctx, ids)
+		defer b.Close()
+
+		b.QueryRow(func(i int, n db.Notification, err error) {
+			errors[i] = err
+			notifs[i] = n
+		})
+
+		return notifs, errors
 	}
 }
 
@@ -769,6 +794,23 @@ func loadUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByUs
 		})
 
 		return events, errors
+	}
+}
+
+func loadUserNotifications(q *db.Queries) func(context.Context, []db.GetUserNotificationsBatchParams) ([][]db.Notification, []error) {
+	return func(ctx context.Context, params []db.GetUserNotificationsBatchParams) ([][]db.Notification, []error) {
+		notifs := make([][]db.Notification, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserNotificationsBatch(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, ntfs []db.Notification, err error) {
+			notifs[i] = ntfs
+			errors[i] = err
+		})
+
+		return notifs, errors
 	}
 }
 

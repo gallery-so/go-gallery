@@ -4,6 +4,9 @@ SELECT * FROM users WHERE id = $1 AND deleted = false;
 -- name: GetUserByIdBatch :batchone
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
+-- name: GetUsersByIDs :many
+SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false;
+
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND deleted = false;
 
@@ -310,6 +313,56 @@ SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_
 
 -- name: GetCommentsByActorIDBatch :batchmany
 SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
+
+-- name: GetCommentsByFeedEventID :many
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
+
+-- name: GetCommentsByFeedEventIDBatch :batchmany
+SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
+
+
+-- name: GetUserNotifications :many
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- name: GetUserNotificationsBatch :batchmany
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- name: CountUserNotifications :one
+SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false;
+
+-- name: GetNotificationByID :one
+SELECT * FROM notifications WHERE id = $1 AND deleted = false;
+
+-- name: GetNotificationByIDBatch :batchone
+SELECT * FROM notifications WHERE id = $1 AND deleted = false;
+
+-- name: GetMostRecentNotificationByOwnerIDForAction :one
+SELECT * FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false
+    ORDER BY created_at DESC
+    LIMIT 1;
+
+-- name: CreateNotification :one
+INSERT INTO notifications (id, owner_id, actor_id, action, data) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: UpdateNotification :exec
+UPDATE notifications SET data = $2, amount = amount + $3 WHERE id = $1;
+
+-- name: UpdateNotificationSettingsByID :exec
+UPDATE users SET notification_settings = $2 WHERE id = $1;
+
+-- name: ClearNotificationsForUser :many
+UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING *;
 
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (

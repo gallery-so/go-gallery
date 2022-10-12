@@ -190,6 +190,10 @@ type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
 }
 
+type ViewGalleryPayloadOrError interface {
+	IsViewGalleryPayloadOrError()
+}
+
 type ViewerOrError interface {
 	IsViewerOrError()
 }
@@ -467,6 +471,7 @@ func (ErrAuthenticationFailed) IsAdmireFeedEventPayloadOrError()    {}
 func (ErrAuthenticationFailed) IsRemoveAdmirePayloadOrError()       {}
 func (ErrAuthenticationFailed) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrAuthenticationFailed) IsRemoveCommentPayloadOrError()      {}
+func (ErrAuthenticationFailed) IsViewGalleryPayloadOrError()        {}
 
 type ErrCollectionNotFound struct {
 	Message string `json:"message"`
@@ -739,10 +744,12 @@ type GnosisSafeAuth struct {
 }
 
 type GroupNotificationUserEdge struct {
-	Node *GalleryUser `json:"node"`
+	Node   *GalleryUser `json:"node"`
+	Cursor *string      `json:"cursor"`
 }
 
 type GroupNotificationUsersConnection struct {
+	HelperGroupNotificationUsersConnectionData
 	Edges    []*GroupNotificationUserEdge `json:"edges"`
 	PageInfo *PageInfo                    `json:"pageInfo"`
 }
@@ -809,7 +816,8 @@ type MembershipTier struct {
 func (MembershipTier) IsNode() {}
 
 type NotificationEdge struct {
-	Node Notification `json:"node"`
+	Node   Notification `json:"node"`
+	Cursor *string      `json:"cursor"`
 }
 
 type NotificationSettings struct {
@@ -831,6 +839,7 @@ type NotificationSettingsInput struct {
 }
 
 type NotificationsConnection struct {
+	HelperNotificationsConnectionData
 	Edges       []*NotificationEdge `json:"edges"`
 	UnseenCount *int                `json:"unseenCount"`
 	PageInfo    *PageInfo           `json:"pageInfo"`
@@ -909,6 +918,7 @@ type SetSpamPreferencePayload struct {
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
 type SomeoneAdmiredYourFeedEventNotification struct {
+	HelperSomeoneAdmiredYourFeedEventNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
 	Seen         *bool                             `json:"seen"`
 	CreationTime *time.Time                        `json:"creationTime"`
@@ -923,11 +933,11 @@ func (SomeoneAdmiredYourFeedEventNotification) IsNode()                {}
 func (SomeoneAdmiredYourFeedEventNotification) IsGroupedNotification() {}
 
 type SomeoneCommentedOnYourFeedEventNotification struct {
+	HelperSomeoneCommentedOnYourFeedEventNotificationData
 	Dbid         persist.DBID `json:"dbid"`
 	Seen         *bool        `json:"seen"`
 	CreationTime *time.Time   `json:"creationTime"`
 	UpdatedTime  *time.Time   `json:"updatedTime"`
-	Count        *int         `json:"count"`
 	Comment      *Comment     `json:"comment"`
 	FeedEvent    *FeedEvent   `json:"feedEvent"`
 }
@@ -936,6 +946,7 @@ func (SomeoneCommentedOnYourFeedEventNotification) IsNotification() {}
 func (SomeoneCommentedOnYourFeedEventNotification) IsNode()         {}
 
 type SomeoneFollowedYouBackNotification struct {
+	HelperSomeoneFollowedYouBackNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
 	Seen         *bool                             `json:"seen"`
 	CreationTime *time.Time                        `json:"creationTime"`
@@ -949,6 +960,7 @@ func (SomeoneFollowedYouBackNotification) IsNode()                {}
 func (SomeoneFollowedYouBackNotification) IsGroupedNotification() {}
 
 type SomeoneFollowedYouNotification struct {
+	HelperSomeoneFollowedYouNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
 	Seen         *bool                             `json:"seen"`
 	CreationTime *time.Time                        `json:"creationTime"`
@@ -962,13 +974,14 @@ func (SomeoneFollowedYouNotification) IsNode()                {}
 func (SomeoneFollowedYouNotification) IsGroupedNotification() {}
 
 type SomeoneViewedYourGalleryNotification struct {
-	Dbid         persist.DBID   `json:"dbid"`
-	Seen         *bool          `json:"seen"`
-	CreationTime *time.Time     `json:"creationTime"`
-	UpdatedTime  *time.Time     `json:"updatedTime"`
-	Count        *int           `json:"count"`
-	Viewers      []*GalleryUser `json:"viewers"`
-	Gallery      *Gallery       `json:"gallery"`
+	HelperSomeoneViewedYourGalleryNotificationData
+	Dbid         persist.DBID                      `json:"dbid"`
+	Seen         *bool                             `json:"seen"`
+	CreationTime *time.Time                        `json:"creationTime"`
+	UpdatedTime  *time.Time                        `json:"updatedTime"`
+	Count        *int                              `json:"count"`
+	Viewers      *GroupNotificationUsersConnection `json:"viewers"`
+	Gallery      *Gallery                          `json:"gallery"`
 }
 
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
@@ -1171,6 +1184,12 @@ type VideoURLSet struct {
 	Medium *string `json:"medium"`
 	Large  *string `json:"large"`
 }
+
+type ViewGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
 	User            *GalleryUser     `json:"user"`

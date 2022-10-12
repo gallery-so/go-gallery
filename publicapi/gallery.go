@@ -96,6 +96,50 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 	return nil
 }
 
+func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return db.Gallery{}, err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	if gallery.OwnerUserID != userID {
+		notif, _ := api.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
+			OwnerID: userID,
+			Action:  persist.ActionViewedGallery,
+		})
+		if notif.Data.ViewerIDs == nil {
+			notif.Data.ViewerIDs = []persist.DBID{}
+		}
+		// only view gallery if the user hasn't already viewed it in this most recent notification period
+		if !persist.ContainsDBID(notif.Data.ViewerIDs, userID) {
+			dispatchNotification(ctx, db.Notification{
+				Action:  persist.ActionViewedGallery,
+				ActorID: userID,
+				OwnerID: gallery.OwnerUserID,
+				Amount:  1,
+				Data: persist.NotificationData{
+					GalleryID: galleryID,
+					ViewerIDs: []persist.DBID{userID},
+				},
+			})
+		}
+	}
+
+	return gallery, nil
+}
+
 func backupGalleriesForUser(ctx context.Context, userID persist.DBID, repos *persist.Repositories) {
 	ctxCopy := util.GinContextFromContext(ctx).Copy()
 

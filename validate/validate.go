@@ -100,8 +100,10 @@ func ChainAddressValidator(sl validator.StructLevel) {
 }
 
 type ConnectionPaginationParams struct {
-	First *int
-	Last  *int
+	First  *int
+	Last   *int
+	Before *string
+	After  *string
 }
 
 func ConnectionPaginationParamsValidator(sl validator.StructLevel) {

@@ -227,6 +227,20 @@ type Nonce struct {
 	Chain       sql.NullInt32
 }
 
+type Notification struct {
+	ID          persist.DBID
+	Deleted     bool
+	ActorID     persist.DBID
+	OwnerID     persist.DBID
+	Version     sql.NullInt32
+	LastUpdated time.Time
+	CreatedAt   time.Time
+	Action      persist.Action
+	Data        persist.NotificationData
+	Seen        bool
+	Amount      int32
+}
+
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -254,16 +268,17 @@ type Token struct {
 }
 
 type User struct {
-	ID                 persist.DBID
-	Deleted            bool
-	Version            sql.NullInt32
-	LastUpdated        time.Time
-	CreatedAt          time.Time
-	Username           sql.NullString
-	UsernameIdempotent sql.NullString
-	Wallets            persist.WalletList
-	Bio                sql.NullString
-	Traits             pgtype.JSONB
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	NotificationSettings persist.UserNotificationSettings
 }
 
 type UserEvent struct {

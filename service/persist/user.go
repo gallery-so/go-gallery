@@ -32,6 +32,25 @@ type UserUpdateInfoInput struct {
 	Bio                NullString      `json:"bio"`
 }
 
+// UserUpdateNotificationSettings represents the data to be updated when updating a user's notification settings
+type UserUpdateNotificationSettings struct {
+	LastUpdated          LastUpdatedTime          `json:"last_updated"`
+	NotificationSettings UserNotificationSettings `json:"notification_settings"`
+}
+
+/*
+ 	someoneFollowedYou: Boolean
+    someoneAdmiredYourUpdate: Boolean
+    someoneCommentedOnYourUpdate: Boolean
+    someoneViewedYourGallery: Boolean
+*/
+type UserNotificationSettings struct {
+	SomeoneFollowedYou           *bool `json:"someone_followed_you,omitempty"`
+	SomeoneAdmiredYourUpdate     *bool `json:"someone_admired_your_update,omitempty"`
+	SomeoneCommentedOnYourUpdate *bool `json:"someone_commented_on_your_update,omitempty"`
+	SomeoneViewedYourGallery     *bool `json:"someone_viewed_your_gallery,omitempty"`
+}
+
 type CreateUserInput struct {
 	Username     string
 	Bio          string

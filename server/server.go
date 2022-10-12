@@ -15,6 +15,7 @@ import (
 	"google.golang.org/api/option"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
@@ -72,7 +73,8 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		validate.RegisterCustomValidators(v)
 	}
 
-	if err := redis.ClearCache(redis.GalleriesDB); err != nil {
+	err := redis.ClearCache(redis.GalleriesDB)
+	if err != nil {
 		panic(err)
 	}
 
@@ -82,13 +84,23 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 	var storage *storage.Client
+	var pub *pubsub.Client
 	if viper.GetString("ENV") == "local" {
 		storage = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		storage = media.NewStorageClient(context.Background())
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"))
+		if err != nil {
+			panic(err)
+		}
 	}
 	taskClient := task.NewClient(context.Background())
-	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, newMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient)
+
+	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, newMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub)
 }
 
 func newTasksClient() *cloudtasks.Client {
@@ -145,6 +157,11 @@ func setDefaults() {
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
+	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
+	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
+	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
+	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
+	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 
 	viper.AutomaticEnv()
 
