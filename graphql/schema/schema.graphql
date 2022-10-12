@@ -525,6 +525,35 @@ type FeedEvent implements Node {
     hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
+# FeedCollection represents a snapshot of a collection at a point in time.
+# Therefore, it's properties and its assets (i.e. its tokens) in the collection
+# may be stale and could no longer be owned by the user.
+type FeedCollection implements Node {
+    id: ID!
+    dbid: DBID!
+    deleted: Boolean
+    version: Int
+    name: String
+    collectorsNote: String
+    gallery: Gallery @goField(forceResolver: true)
+    layout: CollectionLayout
+    hidden: Boolean
+    tokens: [FeedToken] @goField(forceResolver: true)
+}
+
+# FeedToken represents a snapshot of a token at a point in time.
+# It's properties may be out of date and are no longer accurate.
+type FeedToken implements Node
+@goEmbedHelper
+@goGqlId(fields: ["tokenId", "collectionId"]) {
+    id: ID!
+    dbid: DBID!
+    deleted: Boolean
+    token: Token
+    collection: FeedCollection
+    tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
+}
+
 type UserCreatedFeedEventData implements FeedEventData {
     eventTime: Time
     owner: GalleryUser @goField(forceResolver: true)
@@ -543,6 +572,7 @@ type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
     owner: GalleryUser @goField(forceResolver: true)
     action: Action
     token: CollectionToken @goField(forceResolver: true)
+    feedToken: FeedToken @goField(forceResolver: true)
     newCollectorsNote: String
 }
 
@@ -552,6 +582,8 @@ type CollectionCreatedFeedEventData implements FeedEventData @goEmbedHelper {
     action: Action
     collection: Collection @goField(forceResolver: true)
     newTokens: [CollectionToken] @goField(forceResolver: true)
+    newFeedTokens: [FeedToken] @goField(forceResolver: true)
+    feedCollection: FeedCollection @goField(forceResolver: true)
 }
 
 type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
@@ -560,6 +592,7 @@ type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
     action: Action
     collection: Collection @goField(forceResolver: true)
     newCollectorsNote: String
+    feedCollection: FeedCollection @goField(forceResolver: true)
 }
 
 type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelper {
@@ -569,6 +602,8 @@ type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelpe
     action: Action
     newTokens: [CollectionToken] @goField(forceResolver: true)
     isPreFeed: Boolean
+    newFeedTokens: [FeedToken] @goField(forceResolver: true)
+    feedCollection: FeedCollection @goField(forceResolver: true)
 }
 
 type ErrUnknownAction implements Error {
