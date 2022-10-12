@@ -571,71 +571,6 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
 }
 
-func resolveViewerFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	beforeToken, err := model.Cursor.DecodeToDBID(before)
-	if err != nil {
-		return nil, err
-	}
-
-	afterToken, err := model.Cursor.DecodeToDBID(after)
-	if err != nil {
-		return nil, err
-	}
-
-	userID, events, err := publicapi.For(ctx).Feed.GetViewerFeed(ctx, beforeToken, afterToken, first, last)
-
-	if err != nil {
-		return nil, err
-	}
-
-	edges, err := eventsToFeedEdges(events)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &model.FeedConnection{
-		Edges:    edges,
-		PageInfo: nil, // handled by dedicated resolver,
-		HelperFeedConnectionData: model.HelperFeedConnectionData{
-			UserId:  userID,
-			ByFirst: first != nil,
-		},
-	}, nil
-}
-
-func resolveGlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
-	beforeToken, err := model.Cursor.DecodeToDBID(before)
-	if err != nil {
-		return nil, err
-	}
-
-	afterToken, err := model.Cursor.DecodeToDBID(after)
-	if err != nil {
-		return nil, err
-	}
-
-	events, err := publicapi.For(ctx).Feed.GlobalFeed(ctx, beforeToken, afterToken, first, last)
-	if err != nil {
-		return nil, err
-	}
-
-	edges, err := eventsToFeedEdges(events)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &model.FeedConnection{
-		Edges:    edges,
-		PageInfo: nil, // handled by dedicated resolver,
-		HelperFeedConnectionData: model.HelperFeedConnectionData{
-			UserId:  "",
-			ByFirst: first != nil,
-		},
-	}, nil
-}
-
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
 
@@ -686,43 +621,6 @@ func resolveTokenSettingsByIDs(ctx context.Context, tokenID, collectionID persis
 	}
 
 	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive}, nil
-}
-
-func resolveFeedPageInfo(ctx context.Context, feedConn *model.FeedConnection) (*model.PageInfo, error) {
-	pageInfo := model.PageInfo{Size: len(feedConn.Edges)}
-
-	if len(feedConn.Edges) == 0 {
-		return &pageInfo, nil
-	}
-
-	pageInfo.StartCursor = feedConn.Edges[0].Cursor
-	pageInfo.EndCursor = feedConn.Edges[len(feedConn.Edges)-1].Cursor
-
-	var cursor string
-
-	if feedConn.ByFirst {
-		cursor = pageInfo.EndCursor
-	} else {
-		cursor = pageInfo.StartCursor
-	}
-
-	hasPage, err := publicapi.For(ctx).Feed.HasPage(
-		ctx,
-		cursor,
-		feedConn.UserId,
-		feedConn.ByFirst,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if feedConn.ByFirst {
-		pageInfo.HasNextPage = hasPage
-	} else {
-		pageInfo.HasPreviousPage = hasPage
-	}
-
-	return &pageInfo, nil
 }
 
 func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
@@ -857,10 +755,7 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 			node = model.FeedEvent{Dbid: evt.ID, EventData: data}
 		}
 
-		edges[i] = &model.FeedEdge{
-			Node:   node,
-			Cursor: model.Cursor.DBIDEncodeToCursor(evt.ID),
-		}
+		edges[i] = &model.FeedEdge{Node: node}
 	}
 
 	return edges, nil

@@ -283,87 +283,30 @@ SELECT EXISTS(
     LIMIT 1
 );
 
--- name: GetGlobalFeedViewBatch :batchmany
-WITH cursors AS (
-    SELECT
-    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after::varchar AND deleted = false) END) AS cur_after
-), edges AS (
-    SELECT id FROM feed_events
-    WHERE event_time > (SELECT cur_after FROM cursors)
-    AND event_time < (SELECT cur_before FROM cursors)
-    AND deleted = false
-), offsets AS (
-    SELECT
-        CASE WHEN NOT @from_first::bool AND count(id) - $1::int > 0
-        THEN count(id) - $1::int
-        ELSE 0 END pos
-    FROM edges
-)
-SELECT * FROM feed_events
-    WHERE id = ANY(SELECT id FROM edges)
-    ORDER BY event_time ASC
-    LIMIT $1 OFFSET (SELECT pos FROM offsets);
+-- name: PaginateGlobalFeed :batchmany
+SELECT * FROM feed_events WHERE deleted = false
+    AND (event_time, id) < (@cur_before_time, @cur_before_id)
+    AND (event_time, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
+    LIMIT $1;
 
--- name: GlobalFeedHasMoreEvents :one
-SELECT
-    CASE WHEN @from_first::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM feed_events
-        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
-        AND deleted = false
-        LIMIT 1
-    )
-    ELSE EXISTS(
-        SELECT 1
-        FROM feed_events
-        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
-        AND deleted = false
-        LIMIT 1)
-    END::bool;
+-- name: PaginatePersonalFeedByUserID :batchmany
+SELECT fe.* FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
+    AND fe.owner_id = fl.followee AND fl.follower = $1
+    AND (fe.event_time, fe.id) < (@cur_before_time, @cur_before_id)
+    AND (fe.event_time, fe.id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (fe.event_time, fe.id) END ASC,
+            CASE WHEN NOT @paging_forward::bool THEN (fe.event_time, fe.id) END DESC
+    LIMIT $2;
 
--- name: GetUserFeedViewBatch :batchmany
-WITH cursors AS (
-    SELECT
-    (SELECT CASE WHEN @cur_before::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_before::varchar AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN @cur_after::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = @cur_after::varchar AND deleted = false) END) AS cur_after
-), edges AS (
-    SELECT fe.id FROM feed_events fe
-    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-    WHERE event_time > (SELECT cur_after FROM cursors)
-    AND event_time < (SELECT cur_before FROM cursors)
-    AND fe.deleted = false and fl.deleted = false
-), offsets AS (
-    SELECT
-        CASE WHEN NOT @from_first::bool AND count(id) - $2::int > 0
-        THEN count(id) - $2::int
-        ELSE 0 END pos
-    FROM edges
-)
-SELECT * FROM feed_events WHERE id = ANY(SELECT id FROM edges)
-    ORDER BY event_time ASC
-    LIMIT $2 OFFSET (SELECT pos FROM offsets);
-
--- name: UserFeedHasMoreEvents :one
-SELECT
-    CASE WHEN @from_first::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM feed_events fe
-        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1)
-    ELSE EXISTS(
-        SELECT 1
-        FROM feed_events fe
-        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1
-    )
-    END::bool;
+-- name: PaginateUserFeedByUserID :batchmany
+SELECT * FROM feed_events WHERE owner_id = $1 AND deleted = false
+    AND (event_time, id) < (@cur_before_time, @cur_before_id)
+    AND (event_time, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
+    LIMIT $2;
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;

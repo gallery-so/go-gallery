@@ -20,8 +20,9 @@
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByChainAddress github.com/mikeydub/go-gallery/service/persist.ChainAddress github.com/mikeydub/go-gallery/db/gen/coredb.Contract
-//go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetGlobalFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
-//go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetUserFeedViewBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/gallery-so/dataloaden GlobalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateGlobalFeedParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/gallery-so/dataloaden PersonalFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginatePersonalFeedByUserIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
+//go:generate go run github.com/gallery-so/dataloaden UserFeedLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateUserFeedByUserIDParams []github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden EventLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.FeedEvent
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden AdmiresLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Admire
@@ -95,6 +96,8 @@ type Loaders struct {
 	InteractionCountByFeedEventID    *FeedEventInteractionCountLoader
 	InteractionsByFeedEventID        *FeedEventInteractionsLoader
 	UserAdmiredFeedEvent             *UserAdmiredFeedEventLoader
+	PersonalFeedByUserID             *PersonalFeedLoader
+	UserFeedByUserID                 *UserFeedLoader
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -231,9 +234,11 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
 	})
 
-	loaders.FeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
+	loaders.PersonalFeedByUserID = NewPersonalFeedLoader(defaults, loadPersonalFeed(q))
 
 	loaders.GlobalFeed = NewGlobalFeedLoader(defaults, loadGlobalFeed(q))
+
+	loaders.UserFeedByUserID = NewUserFeedLoader(defaults, loadUserFeed(q))
 
 	loaders.AdmireByAdmireID = NewAdmireLoaderByID(defaults, loadAdmireById(q), AdmireLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(admire db.Admire) persist.DBID { return admire.ID },
@@ -836,12 +841,12 @@ func loadEventById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.Fe
 	}
 }
 
-func loadUserFeed(q *db.Queries) func(context.Context, []db.GetUserFeedViewBatchParams) ([][]db.FeedEvent, []error) {
-	return func(ctx context.Context, params []db.GetUserFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+func loadPersonalFeed(q *db.Queries) func(context.Context, []db.PaginatePersonalFeedByUserIDParams) ([][]db.FeedEvent, []error) {
+	return func(ctx context.Context, params []db.PaginatePersonalFeedByUserIDParams) ([][]db.FeedEvent, []error) {
 		events := make([][]db.FeedEvent, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetUserFeedViewBatch(ctx, params)
+		b := q.PaginatePersonalFeedByUserID(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, evts []db.FeedEvent, err error) {
@@ -853,12 +858,29 @@ func loadUserFeed(q *db.Queries) func(context.Context, []db.GetUserFeedViewBatch
 	}
 }
 
-func loadGlobalFeed(q *db.Queries) func(context.Context, []db.GetGlobalFeedViewBatchParams) ([][]db.FeedEvent, []error) {
-	return func(ctx context.Context, params []db.GetGlobalFeedViewBatchParams) ([][]db.FeedEvent, []error) {
+func loadGlobalFeed(q *db.Queries) func(context.Context, []db.PaginateGlobalFeedParams) ([][]db.FeedEvent, []error) {
+	return func(ctx context.Context, params []db.PaginateGlobalFeedParams) ([][]db.FeedEvent, []error) {
 		events := make([][]db.FeedEvent, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetGlobalFeedViewBatch(ctx, params)
+		b := q.PaginateGlobalFeed(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, evts []db.FeedEvent, err error) {
+			events[i] = evts
+			errors[i] = err
+		})
+
+		return events, errors
+	}
+}
+
+func loadUserFeed(q *db.Queries) func(context.Context, []db.PaginateUserFeedByUserIDParams) ([][]db.FeedEvent, []error) {
+	return func(ctx context.Context, params []db.PaginateUserFeedByUserIDParams) ([][]db.FeedEvent, []error) {
+		events := make([][]db.FeedEvent, len(params))
+		errors := make([]error, len(params))
+
+		b := q.PaginateUserFeedByUserID(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, evts []db.FeedEvent, err error) {

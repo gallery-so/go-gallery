@@ -69,6 +69,7 @@ type GalleryUser implements Node {
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
+    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -622,12 +623,12 @@ type PageInfo {
 
 type FeedEdge {
     node: FeedEventOrError
-    cursor: String!
+    cursor: String
 }
 
-type FeedConnection @goEmbedHelper {
+type FeedConnection {
     edges: [FeedEdge]
-    pageInfo: PageInfo! @goField(forceResolver: true)
+    pageInfo: PageInfo!
 }
 
 type Query {
