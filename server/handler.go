@@ -2,7 +2,11 @@ package server
 
 import (
 	"context"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
+	"github.com/gorilla/websocket"
 	"net/http"
+	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
@@ -55,9 +59,39 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
 
 	schema := generated.NewExecutableSchema(config)
-	h := handler.NewDefaultServer(schema)
+	h := handler.New(schema)
 
-	h.AddTransport(&transport.Websocket{})
+	// This code is ripped from ExecutableSchema.NewDefaultServer
+	// We're not using NewDefaultServer anymore because we need a custom
+	// WebSocket transport so we can modify the CheckOrigin function
+	h.AddTransport(transport.Options{})
+	h.AddTransport(transport.GET{})
+	h.AddTransport(transport.POST{})
+	h.AddTransport(transport.MultipartForm{})
+
+	h.SetQueryCache(lru.New(1000))
+
+	h.Use(extension.Introspection{})
+	h.Use(extension.AutomaticPersistedQuery{
+		Cache: lru.New(100),
+	})
+	// End code stolen from handler.NewDefaultServer
+
+	h.AddTransport(&transport.Websocket{
+		Upgrader: websocket.Upgrader{
+			// This is okay to blindly return true since our
+			// HandleCORS middleware function would block us
+			// before arriving at this code path.
+			CheckOrigin: func(r *http.Request) bool {
+				requestOrigin := r.Header.Get("Origin")
+
+				return middleware.IsOriginAllowed(requestOrigin)
+			},
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
+		KeepAlivePingInterval: 15 * time.Second,
+	})
 
 	// Request/response logging is spammy in a local environment and can typically be better handled via browser debug tools.
 	// It might be worth logging top-level queries and mutations in a single log line, though.
