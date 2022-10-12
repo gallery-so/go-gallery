@@ -1964,10 +1964,10 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 
 const paginateGlobalFeedByFeedEventID = `-- name: PaginateGlobalFeedByFeedEventID :batchmany
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE deleted = false
-    AND (created_at, id) < ($2, $3)
-    AND (created_at, id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
-            CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+    AND (event_time, id) < ($2, $3)
+    AND (event_time, id) > ($4, $5)
+    ORDER BY CASE WHEN $6::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT $6::bool THEN (event_time, id) END DESC
     LIMIT $1
 `
 
@@ -2127,10 +2127,10 @@ func (b *PaginateInteractionsByFeedEventIDBatchBatchResults) Close() error {
 const paginatePersonalFeedByFeedEventID = `-- name: PaginatePersonalFeedByFeedEventID :batchmany
 SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
     AND fe.owner_id = fl.followee AND fl.follower = $1
-    AND (fe.created_at, fe.id) < ($3, $4)
-    AND (fe.created_at, fe.id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (fe.created_at, fe.id) END ASC,
-            CASE WHEN NOT $7::bool THEN (fe.created_at, fe.id) END DESC
+    AND (fe.event_time, fe.id) < ($3, $4)
+    AND (fe.event_time, fe.id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (fe.event_time, fe.id) END ASC,
+            CASE WHEN NOT $7::bool THEN (fe.event_time, fe.id) END DESC
     LIMIT $2
 `
 
@@ -2207,10 +2207,10 @@ func (b *PaginatePersonalFeedByFeedEventIDBatchResults) Close() error {
 
 const paginateUserFeedByFeedEventID = `-- name: PaginateUserFeedByFeedEventID :batchmany
 SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < ($3, $4)
-    AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-            CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    AND (event_time, id) < ($3, $4)
+    AND (event_time, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT $7::bool THEN (event_time, id) END DESC
     LIMIT $2
 `
 

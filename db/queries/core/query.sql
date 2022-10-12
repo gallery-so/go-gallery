@@ -210,10 +210,10 @@ SELECT EXISTS(
 
 -- name: PaginateGlobalFeedByFeedEventID :batchmany
 SELECT * FROM feed_events WHERE deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-            CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    AND (event_time, id) < (@cur_before_time, @cur_before_id)
+    AND (event_time, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
     LIMIT $1;
 
 -- name: CountGlobalFeedEvents :one
@@ -222,10 +222,10 @@ SELECT count(*) FROM feed_events WHERE deleted = false;
 -- name: PaginatePersonalFeedByFeedEventID :batchmany
 SELECT fe.* FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
     AND fe.owner_id = fl.followee AND fl.follower = $1
-    AND (fe.created_at, fe.id) < (@cur_before_time, @cur_before_id)
-    AND (fe.created_at, fe.id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (fe.created_at, fe.id) END ASC,
-            CASE WHEN NOT @paging_forward::bool THEN (fe.created_at, fe.id) END DESC
+    AND (fe.event_time, fe.id) < (@cur_before_time, @cur_before_id)
+    AND (fe.event_time, fe.id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (fe.event_time, fe.id) END ASC,
+            CASE WHEN NOT @paging_forward::bool THEN (fe.event_time, fe.id) END DESC
     LIMIT $2;
 
 -- name: CountPersonalFeedEventsByFollowerID :one
@@ -233,10 +233,10 @@ SELECT count(*) FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.
 
 -- name: PaginateUserFeedByFeedEventID :batchmany
 SELECT * FROM feed_events WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-            CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    AND (event_time, id) < (@cur_before_time, @cur_before_id)
+    AND (event_time, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
     LIMIT $2;
 
 -- name: CountFeedEventsByUserID :one
