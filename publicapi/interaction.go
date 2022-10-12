@@ -31,11 +31,28 @@ type InteractionAPI struct {
 	ethClient *ethclient.Client
 }
 
+func (api InteractionAPI) makeTagMap(typeFilter []persist.InteractionType) map[persist.InteractionType]int32 {
+	tags := make(map[persist.InteractionType]int32)
+
+	if len(typeFilter) > 0 {
+		for _, t := range typeFilter {
+			tags[t] = int32(t)
+		}
+	} else {
+		for i := int32(persist.MinInteractionTypeValue); i <= int32(persist.MaxInteractionTypeValue); i++ {
+			tags[persist.InteractionType(i)] = i
+		}
+	}
+
+	return tags
+}
+
 func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
-	first *int, last *int) ([]interface{}, PageInfo, error) {
+	first *int, last *int, typeFilter []persist.InteractionType) ([]interface{}, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
+		"typeFilter":  {typeFilter, fmt.Sprintf("omitempty,min=1,unique,dive,gte=%d,lte=%d", persist.MinInteractionTypeValue, persist.MaxInteractionTypeValue)},
 	}); err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -43,6 +60,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
 		return nil, PageInfo{}, err
 	}
+
+	tags := api.makeTagMap(typeFilter)
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 		keys, err := api.loaders.InteractionsByFeedEventID.Load(db.PaginateInteractionsByFeedEventIDBatchParams{
@@ -53,8 +72,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 			CurAfterTime:  params.CursorAfterTime,
 			CurAfterID:    params.CursorAfterID,
 			PagingForward: params.PagingForward,
-			AdmireTag:     1,
-			CommentTag:    2,
+			AdmireTag:     tags[persist.InteractionTypeAdmire],
+			CommentTag:    tags[persist.InteractionTypeComment],
 		})
 
 		if err != nil {
@@ -72,8 +91,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	countFunc := func() (int, error) {
 		counts, err := api.loaders.InteractionCountByFeedEventID.Load(db.CountInteractionsByFeedEventIDBatchParams{
 			FeedEventID: feedEventID,
-			AdmireTag:   1,
-			CommentTag:  2,
+			AdmireTag:   tags[persist.InteractionTypeAdmire],
+			CommentTag:  tags[persist.InteractionTypeComment],
 		})
 
 		total := 0
@@ -105,12 +124,12 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	}
 
 	orderedKeys := make([]db.PaginateInteractionsByFeedEventIDBatchRow, len(results))
-	typeToIDs := make(map[int][]persist.DBID)
+	typeToIDs := make(map[int32][]persist.DBID)
 
 	for i, result := range results {
 		row := result.(db.PaginateInteractionsByFeedEventIDBatchRow)
 		orderedKeys[i] = row
-		typeToIDs[int(row.Tag)] = append(typeToIDs[int(row.Tag)], row.ID)
+		typeToIDs[row.Tag] = append(typeToIDs[row.Tag], row.ID)
 	}
 
 	var interactions []interface{}
@@ -118,8 +137,8 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 	var interactionsByIDMutex sync.Mutex
 	var wg sync.WaitGroup
 
-	admireIDs := typeToIDs[1]
-	commentIDs := typeToIDs[2]
+	admireIDs := typeToIDs[tags[persist.InteractionTypeAdmire]]
+	commentIDs := typeToIDs[tags[persist.InteractionTypeComment]]
 
 	if len(admireIDs) > 0 {
 		wg.Add(1)

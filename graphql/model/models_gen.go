@@ -1075,47 +1075,6 @@ type Wallet struct {
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
 
-type InteractionType string
-
-const (
-	InteractionTypeAdmire  InteractionType = "Admire"
-	InteractionTypeComment InteractionType = "Comment"
-)
-
-var AllInteractionType = []InteractionType{
-	InteractionTypeAdmire,
-	InteractionTypeComment,
-}
-
-func (e InteractionType) IsValid() bool {
-	switch e {
-	case InteractionTypeAdmire, InteractionTypeComment:
-		return true
-	}
-	return false
-}
-
-func (e InteractionType) String() string {
-	return string(e)
-}
-
-func (e *InteractionType) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = InteractionType(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid InteractionType", str)
-	}
-	return nil
-}
-
-func (e InteractionType) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
 type TokenType string
 
 const (

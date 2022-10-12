@@ -516,7 +516,10 @@ type FeedEvent implements Node {
     eventData: FeedEventData @goField(forceResolver: true)
     admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
     comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
-    interactions(before: String, after: String, first: Int, last: Int): FeedEventInteractionsConnection @goField(forceResolver: true)
+
+    # If supplied, typeFilter will only query for the requested interaction types.
+    # If typeFilter is omitted, all interaction types will be queried.
+    interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
