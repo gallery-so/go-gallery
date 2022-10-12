@@ -13,8 +13,8 @@ import (
 )
 
 func TestIndexLogs_Success(t *testing.T) {
-	a, db := setupTest(t)
-	i := newMockIndexer(db)
+	a, db, pgx := setupTest(t)
+	i := newMockIndexer(db, pgx)
 
 	// Run the Indexer
 	i.catchUp(configureRootContext(), eventsToTopics(i.eventHashes))

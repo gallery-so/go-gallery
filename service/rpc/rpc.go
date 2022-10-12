@@ -10,6 +10,7 @@ import (
 	"image/jpeg"
 	"io"
 	"math/big"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -22,6 +23,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -46,9 +48,19 @@ const (
 )
 
 var (
-	defaultHTTPClient     = newHTTPClientForRPC(true, true)
+	defaultHTTPClient     = newHTTPClientForRPC(true)
 	defaultMetricsHandler = metricsHandler{}
 )
+
+// rateLimited is the content returned from an RPC call when rate limited.
+var rateLimited = "429 Too Many Requests"
+
+// DefaultRetry is the default retry applied to RPC calls.
+var DefaultRetry = Retry{
+	Base:  4,
+	Cap:   64,
+	Tries: 8,
+}
 
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
@@ -76,6 +88,19 @@ type ErrHTTP struct {
 	Status int
 }
 
+// Retry configures retries for RPC calls.
+type Retry struct {
+	Base  int // min amount of time to sleep per iteration
+	Cap   int // max amount of time to sleep per iteration
+	Tries int // number of times to retry
+}
+
+// Sleep will sleep based on the current iteration.
+func (r Retry) Sleep(i int) {
+	sleep := rand.Intn(minInt(r.Cap, r.Base*powerInt(2, i)))
+	time.Sleep(time.Duration(sleep) * time.Second)
+}
+
 // NewEthClient returns an ethclient.Client
 func NewEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -96,7 +121,7 @@ func NewEthHTTPClient() *ethclient.Client {
 		return NewEthClient()
 	}
 
-	httpClient := newHTTPClientForRPC(false, true, sentryutil.TransactionNameSafe("gethRPC"))
+	httpClient := newHTTPClientForRPC(false, sentryutil.TransactionNameSafe("gethRPC"))
 	rpcClient, err := rpc.DialHTTPWithClient(viper.GetString("RPC_URL"), httpClient)
 	if err != nil {
 		panic(err)
@@ -148,16 +173,16 @@ func (h metricsHandler) Log(r *log.Record) error {
 
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
-	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), newClientForIPFS(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET"), false, true))
+	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), newClientForIPFS(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET"), false))
 	sh.SetTimeout(time.Minute * 2)
 	return sh
 }
 
 // newHTTPClientForIPFS returns an http.Client configured with default settings intended for IPFS calls.
-func newClientForIPFS(projectID, projectSecret string, continueOnly, errorsOnly bool) *http.Client {
+func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.Client {
 	return &http.Client{
 		Transport: authTransport{
-			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly, errorsOnly),
+			RoundTripper:  tracing.NewTracingTransport(http.DefaultTransport, continueOnly),
 			ProjectID:     projectID,
 			ProjectSecret: projectSecret,
 		},
@@ -165,14 +190,14 @@ func newClientForIPFS(projectID, projectSecret string, continueOnly, errorsOnly 
 }
 
 // newHTTPClientForRPC returns an http.Client configured with default settings intended for RPC calls.
-func newHTTPClientForRPC(continueTrace, errorsOnly bool, spanOptions ...sentry.SpanOption) *http.Client {
+func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *http.Client {
 	return &http.Client{
 		Timeout: time.Second * defaultHTTPTimeout,
 		Transport: tracing.NewTracingTransport(&http.Transport{
 			Dial:                (&net.Dialer{KeepAlive: defaultHTTPKeepAlive * time.Second}).Dial,
 			MaxIdleConns:        defaultHTTPMaxIdleConns,
 			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,
-		}, continueTrace, errorsOnly, spanOptions...),
+		}, continueTrace, spanOptions...),
 	}
 }
 
@@ -191,6 +216,64 @@ func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 // NewArweaveClient returns an Arweave client
 func NewArweaveClient() *goar.Client {
 	return goar.NewClient("https://arweave.net")
+}
+
+// GetBlockNumber returns the current block height.
+func GetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, error) {
+	return ethClient.BlockNumber(ctx)
+}
+
+// RetryGetBlockNumber calls GetBlockNumber with backoff.
+func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client, retry Retry) (uint64, error) {
+	var height uint64
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		height, err = GetBlockNumber(ctx, ethClient)
+		if !isRateLimitedError(err) {
+			break
+		}
+		retry.Sleep(i)
+	}
+	return height, err
+}
+
+// GetLogs returns log events for the given block range and query.
+func GetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery) ([]types.Log, error) {
+	return ethClient.FilterLogs(ctx, query)
+}
+
+// RetryGetLogs calls GetLogs with backoff.
+func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery, retry Retry) ([]types.Log, error) {
+	logs := make([]types.Log, 0)
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		logs, err = GetLogs(ctx, ethClient, query)
+		if !isRateLimitedError(err) {
+			break
+		}
+		retry.Sleep(i)
+	}
+	return logs, err
+}
+
+// GetTransaction returns the transaction of the given hash.
+func GetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash) (*types.Transaction, bool, error) {
+	return ethClient.TransactionByHash(ctx, txHash)
+}
+
+// RetryGetTransaction calls GetTransaction with backoff.
+func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, retry Retry) (*types.Transaction, bool, error) {
+	var tx *types.Transaction
+	var pending bool
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		tx, pending, err = GetTransaction(ctx, ethClient, txHash)
+		if !isRateLimitedError(err) {
+			break
+		}
+		retry.Sleep(i)
+	}
+	return tx, pending, err
 }
 
 // GetTokenContractMetadata returns the metadata for a given contract (without URI)
@@ -215,6 +298,20 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 	}
 
 	return &TokenContractMetadata{Name: name, Symbol: symbol}, nil
+}
+
+// RetryGetTokenContractMetaData calls GetTokenContractMetadata with backoff.
+func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client, retry Retry) (*TokenContractMetadata, error) {
+	var metadata *TokenContractMetadata
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		metadata, err = GetTokenContractMetadata(ctx, contractAddress, ethClient)
+		if !isRateLimitedError(err) {
+			break
+		}
+		retry.Sleep(i)
+	}
+	return metadata, err
 }
 
 // GetMetadataFromURI parses and returns the NFT metadata for a given token URI
@@ -642,8 +739,22 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 	}
 }
 
+// RetryGetTokenURI calls GetTokenURI with backoff.
+func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.TokenID, ethClient *ethclient.Client, retry Retry) (persist.TokenURI, error) {
+	var u persist.TokenURI
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		u, err = GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
+		if !isRateLimitedError(err) {
+			break
+		}
+		retry.Sleep(i)
+	}
+	return u, err
+}
+
 // GetBalanceOfERC1155Token returns the balance of an ERC1155 token
-func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
+func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
 	contract := common.HexToAddress(string(pContractAddress))
 	owner := common.HexToAddress(string(pOwnerAddress))
 	instance, err := contracts.NewIERC1155(contract, ethClient)
@@ -651,8 +762,6 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAd
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 	bal, err := instance.BalanceOf(&bind.CallOpts{
 		Context: ctx,
 	}, owner, pTokenID.BigInt())
@@ -661,6 +770,20 @@ func GetBalanceOfERC1155Token(pOwnerAddress, pContractAddress persist.EthereumAd
 	}
 
 	return bal, nil
+}
+
+// RetryGetBalanceOfERC1155Token calls GetBalanceOfERC1155Token with backoff.
+func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client, retry Retry) (*big.Int, error) {
+	var balance *big.Int
+	var err error
+	for i := 0; i < retry.Tries; i++ {
+		balance, err = GetBalanceOfERC1155Token(ctx, pOwnerAddress, pContractAddress, pTokenID, ethClient)
+		if !isRateLimitedError(err) {
+			break
+		}
+		retry.Sleep(i)
+	}
+	return balance, err
 }
 
 // GetContractCreator returns the address of the contract creator
@@ -841,4 +964,28 @@ func valFromSlice(s []interface{}, keyName string) interface{} {
 		}
 	}
 	return nil
+}
+
+// powerInt returns the base-x exponential of y.
+func powerInt(x, y int) int {
+	ret := 1
+	for i := 0; i < y; i++ {
+		ret *= x
+	}
+	return ret
+}
+
+// minInt returns the minimum of two ints.
+func minInt(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+func isRateLimitedError(err error) bool {
+	if err != nil && strings.Contains(err.Error(), rateLimited) {
+		return true
+	}
+	return false
 }

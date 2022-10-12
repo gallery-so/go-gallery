@@ -87,6 +87,16 @@ migrate create -ext sql -dir db/migrations/core -seq <name of migration>
 migrate create -ext sql -dir db/migrations/indexer -seq <name of migration>
 ```
 
+Run a migration locally:
+
+```bash
+# Run all migrations for the local backend db
+make migrate-coredb
+
+# Run all migrations for the local indexer db
+make migrate-indexerdb
+```
+
 Run a migration on dev backend db:
 
 ```bash
@@ -105,16 +115,6 @@ migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db
 
 # Undo the last migration to the indexer db
 migrate -path db/migrations/indexer -database "postgresql://postgres:<indexer db password here>@<indexer db ip>:5432/postgres" down 1
-```
-
-Run a migration locally:
-
-```bash
-# Run all migrations for the local backend db
-migrate -path db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
-
-# Run all migrations for the local indexer db
-migrate -path db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
 ```
 
 ### Healthcheck
@@ -157,8 +157,13 @@ See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targetin
                                             |
                                             |              +-------------------+
                                             +-------------->  mediaprocessing  |
-                                                           |      (:6500)      |
-                                                           +-------------------+
+                                            |              |      (:6500)      |
+                                            |              +-------------------+
+                                            |
+                                            |              +---------------+
+                                            +-------------->  indexer-api  |
+                                                           |    (:6000)    |
+                                                           +---------------+
 ```
 
 To get started:

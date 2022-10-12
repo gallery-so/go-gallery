@@ -9,13 +9,16 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/jackc/pgx/v4/pgxpool"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
+	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
 )
@@ -39,11 +42,12 @@ var allLogs = func() []types.Log {
 	return logs
 }()
 
-func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
+func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	setDefaults("indexer-server")
 	pg, pgUnpatch := docker.InitPostgresIndexer()
 
 	db := postgres.NewClient()
+	pgx := postgres.NewPgxClient()
 	err := migrate.RunMigration(db, "./db/migrations/indexer")
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
@@ -52,6 +56,7 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
 	t.Cleanup(func() {
 		defer db.Close()
 		defer pgUnpatch()
+		defer pgx.Close()
 		for _, r := range []*dockertest.Resource{pg} {
 			if err := r.Close(); err != nil {
 				t.Fatalf("could not purge resource: %s", err)
@@ -59,17 +64,18 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB) {
 		}
 	})
 
-	return assert.New(t), db
+	return assert.New(t), db, pgx
 }
 
-func newMockIndexer(db *sql.DB) *indexer {
+func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 	start := uint64(testBlockFrom)
 	end := uint64(testBlockTo)
-
 	rpcEnabled = true
 	ethClient := rpc.NewEthSocketClient()
+	storageClient := newStorageClient(context.Background())
+	bucket := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))
 
-	i := newIndexer(ethClient, nil, nil, nil, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), persist.ChainETH, []eventHash{transferBatchEventHash, transferEventHash, transferSingleEventHash}, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
+	i := newIndexer(ethClient, nil, nil, nil, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), refresh.AddressFilterRepository{Bucket: bucket}, persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 		transferAgainLogs := []types.Log{{
 			Address:     common.HexToAddress("0x0c2ee19b2a89943066c2dc7f1bddcc907f614033"),
 			Topics:      []common.Hash{common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"), common.HexToHash(testAddress), common.HexToHash("0x0000000000000000000000008914496dc01efcc49a2fa340331fb90969b6f1d2"), common.HexToHash("0x00000000000000000000000000000000000000000000000000000000000000d9")},

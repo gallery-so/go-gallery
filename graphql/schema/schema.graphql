@@ -68,6 +68,7 @@ type GalleryUser implements Node {
     isAuthenticatedUser: Boolean
     followers: [GalleryUser] @goField(forceResolver: true)
     following: [GalleryUser] @goField(forceResolver: true)
+    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -253,9 +254,15 @@ enum Chain {
     Tezos
     POAP
 }
+
 enum WalletType {
     EOA
     GnosisSafe
+}
+
+enum InteractionType {
+    Admire
+    Comment
 }
 
 type Token implements Node {
@@ -498,6 +505,42 @@ type FollowInfo {
     followedBack: Boolean
 }
 
+type FeedEventAdmireEdge {
+    node: Admire
+    event: FeedEvent
+    cursor: String
+}
+
+type FeedEventAdmiresConnection {
+    edges: [FeedEventAdmireEdge]
+    pageInfo: PageInfo!
+
+}
+
+type FeedEventCommentEdge {
+    node: Comment
+    event: FeedEvent
+    cursor: String
+}
+
+type FeedEventCommentsConnection {
+    edges: [FeedEventCommentEdge]
+    pageInfo: PageInfo!
+}
+
+union Interaction = Admire | Comment
+
+type FeedEventInteractionsEdge {
+    node: Interaction
+    event: FeedEvent
+    cursor: String
+}
+
+type FeedEventInteractionsConnection {
+    edges: [FeedEventInteractionsEdge]
+    pageInfo: PageInfo!
+}
+
 interface FeedEventData {
     eventTime: Time
     owner: GalleryUser
@@ -507,9 +550,16 @@ interface FeedEventData {
 type FeedEvent implements Node {
     id: ID!
     dbid: DBID!
+
     eventData: FeedEventData @goField(forceResolver: true)
-    admires: [Admire!] @goField(forceResolver: true)
-    comments: [Comment!] @goField(forceResolver: true)
+    admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
+    comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
+
+    # If supplied, typeFilter will only query for the requested interaction types.
+    # If typeFilter is omitted, all interaction types will be queried.
+    interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
+
+    hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
@@ -587,12 +637,12 @@ type PageInfo {
 
 type FeedEdge {
     node: FeedEventOrError
-    cursor: String!
+    cursor: String
 }
 
-type FeedConnection @goEmbedHelper {
+type FeedConnection {
     edges: [FeedEdge]
-    pageInfo: PageInfo! @goField(forceResolver: true)
+    pageInfo: PageInfo!
 }
 
 type Query {
@@ -916,6 +966,19 @@ input GnosisSafeAuth {
     nonce: String!
 }
 
+input DeepRefreshInput {
+    chain: Chain!
+}
+
+type DeepRefreshPayload {
+    chain: Chain
+    submitted: Boolean
+}
+
+union DeepRefreshPayloadOrError =
+    DeepRefreshPayload
+    | ErrNotAuthorized
+
 union LoginPayloadOrError =
     LoginPayload
     | ErrUserNotFound
@@ -1130,6 +1193,7 @@ type Mutation {
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
+    deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
