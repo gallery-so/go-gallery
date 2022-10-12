@@ -847,7 +847,7 @@ func (b *GetFollowingByUserIdBatchBatchResults) Close() error {
 }
 
 const getGalleriesByUserIdBatch = `-- name: GetGalleriesByUserIdBatch :batchmany
-SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, views FROM galleries WHERE owner_user_id = $1 AND deleted = false
+SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE owner_user_id = $1 AND deleted = false
 `
 
 type GetGalleriesByUserIdBatchBatchResults struct {
@@ -885,7 +885,6 @@ func (b *GetGalleriesByUserIdBatchBatchResults) Query(f func(int, []Gallery, err
 				&i.Version,
 				&i.OwnerUserID,
 				&i.Collections,
-				&i.Views,
 			); err != nil {
 				break
 			}
@@ -904,7 +903,7 @@ func (b *GetGalleriesByUserIdBatchBatchResults) Close() error {
 }
 
 const getGalleryByCollectionIdBatch = `-- name: GetGalleryByCollectionIdBatch :batchone
-SELECT g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id, g.collections, g.views FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false AND $1 = ANY(g.collections) AND g.deleted = false
+SELECT g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id, g.collections FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false AND $1 = ANY(g.collections) AND g.deleted = false
 `
 
 type GetGalleryByCollectionIdBatchBatchResults struct {
@@ -936,7 +935,6 @@ func (b *GetGalleryByCollectionIdBatchBatchResults) QueryRow(f func(int, Gallery
 			&i.Version,
 			&i.OwnerUserID,
 			&i.Collections,
-			&i.Views,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -953,7 +951,7 @@ func (b *GetGalleryByCollectionIdBatchBatchResults) Close() error {
 }
 
 const getGalleryByIdBatch = `-- name: GetGalleryByIdBatch :batchone
-SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, views FROM galleries WHERE id = $1 AND deleted = false
+SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE id = $1 AND deleted = false
 `
 
 type GetGalleryByIdBatchBatchResults struct {
@@ -985,7 +983,6 @@ func (b *GetGalleryByIdBatchBatchResults) QueryRow(f func(int, Gallery, error)) 
 			&i.Version,
 			&i.OwnerUserID,
 			&i.Collections,
-			&i.Views,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -1701,96 +1698,6 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 }
 
 func (b *GetUserByUsernameBatchBatchResults) Close() error {
-	return b.br.Close()
-}
-
-const getUserFeedViewBatch = `-- name: GetUserFeedViewBatch :batchmany
-WITH cursors AS (
-    SELECT
-    (SELECT CASE WHEN $3::varchar = '' THEN now() ELSE (SELECT event_time FROM feed_events f WHERE f.id = $3::varchar AND deleted = false) END) AS cur_before,
-    (SELECT CASE WHEN $4::varchar = '' THEN make_date(1970, 1, 1) ELSE (SELECT event_time FROM feed_events f WHERE f.id = $4::varchar AND deleted = false) END) AS cur_after
-), edges AS (
-    SELECT fe.id FROM feed_events fe
-    INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-    WHERE event_time > (SELECT cur_after FROM cursors)
-    AND event_time < (SELECT cur_before FROM cursors)
-    AND fe.deleted = false and fl.deleted = false
-), offsets AS (
-    SELECT
-        CASE WHEN NOT $5::bool AND count(id) - $2::int > 0
-        THEN count(id) - $2::int
-        ELSE 0 END pos
-    FROM edges
-)
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = ANY(SELECT id FROM edges)
-    ORDER BY event_time ASC
-    LIMIT $2 OFFSET (SELECT pos FROM offsets)
-`
-
-type GetUserFeedViewBatchBatchResults struct {
-	br  pgx.BatchResults
-	ind int
-}
-
-type GetUserFeedViewBatchParams struct {
-	Follower  persist.DBID
-	Limit     int32
-	CurBefore string
-	CurAfter  string
-	FromFirst bool
-}
-
-func (q *Queries) GetUserFeedViewBatch(ctx context.Context, arg []GetUserFeedViewBatchParams) *GetUserFeedViewBatchBatchResults {
-	batch := &pgx.Batch{}
-	for _, a := range arg {
-		vals := []interface{}{
-			a.Follower,
-			a.Limit,
-			a.CurBefore,
-			a.CurAfter,
-			a.FromFirst,
-		}
-		batch.Queue(getUserFeedViewBatch, vals...)
-	}
-	br := q.db.SendBatch(ctx, batch)
-	return &GetUserFeedViewBatchBatchResults{br, 0}
-}
-
-func (b *GetUserFeedViewBatchBatchResults) Query(f func(int, []FeedEvent, error)) {
-	for {
-		rows, err := b.br.Query()
-		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
-			break
-		}
-		defer rows.Close()
-		var items []FeedEvent
-		for rows.Next() {
-			var i FeedEvent
-			if err := rows.Scan(
-				&i.ID,
-				&i.Version,
-				&i.OwnerID,
-				&i.Action,
-				&i.Data,
-				&i.EventTime,
-				&i.EventIds,
-				&i.Deleted,
-				&i.LastUpdated,
-				&i.CreatedAt,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-		}
-
-		if f != nil {
-			f(b.ind, items, rows.Err())
-		}
-		b.ind++
-	}
-}
-
-func (b *GetUserFeedViewBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 

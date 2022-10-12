@@ -744,7 +744,7 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 }
 
 const getGalleriesByUserId = `-- name: GetGalleriesByUserId :many
-SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, views FROM galleries WHERE owner_user_id = $1 AND deleted = false
+SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE owner_user_id = $1 AND deleted = false
 `
 
 func (q *Queries) GetGalleriesByUserId(ctx context.Context, ownerUserID persist.DBID) ([]Gallery, error) {
@@ -764,7 +764,6 @@ func (q *Queries) GetGalleriesByUserId(ctx context.Context, ownerUserID persist.
 			&i.Version,
 			&i.OwnerUserID,
 			&i.Collections,
-			&i.Views,
 		); err != nil {
 			return nil, err
 		}
@@ -777,7 +776,7 @@ func (q *Queries) GetGalleriesByUserId(ctx context.Context, ownerUserID persist.
 }
 
 const getGalleryByCollectionId = `-- name: GetGalleryByCollectionId :one
-SELECT g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id, g.collections, g.views FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false AND $1 = ANY(g.collections) AND g.deleted = false
+SELECT g.id, g.deleted, g.last_updated, g.created_at, g.version, g.owner_user_id, g.collections FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false AND $1 = ANY(g.collections) AND g.deleted = false
 `
 
 func (q *Queries) GetGalleryByCollectionId(ctx context.Context, id persist.DBID) (Gallery, error) {
@@ -791,13 +790,12 @@ func (q *Queries) GetGalleryByCollectionId(ctx context.Context, id persist.DBID)
 		&i.Version,
 		&i.OwnerUserID,
 		&i.Collections,
-		&i.Views,
 	)
 	return i, err
 }
 
 const getGalleryById = `-- name: GetGalleryById :one
-SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections, views FROM galleries WHERE id = $1 AND deleted = false
+SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery, error) {
@@ -811,7 +809,6 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 		&i.Version,
 		&i.OwnerUserID,
 		&i.Collections,
-		&i.Views,
 	)
 	return i, err
 }
@@ -1439,46 +1436,6 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 	return items, nil
 }
 
-const globalFeedHasMoreEvents = `-- name: GlobalFeedHasMoreEvents :one
-SELECT
-    CASE WHEN $2::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM feed_events
-        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $1)
-        AND deleted = false
-        LIMIT 1
-    )
-    ELSE EXISTS(
-        SELECT 1
-        FROM feed_events
-        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $1)
-        AND deleted = false
-        LIMIT 1)
-    END::bool
-`
-
-type GlobalFeedHasMoreEventsParams struct {
-	ID        persist.DBID
-	FromFirst bool
-}
-
-func (q *Queries) GlobalFeedHasMoreEvents(ctx context.Context, arg GlobalFeedHasMoreEventsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, globalFeedHasMoreEvents, arg.ID, arg.FromFirst)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const incrementGalleryViews = `-- name: IncrementGalleryViews :exec
-UPDATE galleries SET views = views + 1 WHERE id = $1
-`
-
-func (q *Queries) IncrementGalleryViews(ctx context.Context, id persist.DBID) error {
-	_, err := q.db.Exec(ctx, incrementGalleryViews, id)
-	return err
-}
-
 const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false)
 `
@@ -1580,70 +1537,4 @@ type UpdateNotificationSettingsByIDParams struct {
 func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {
 	_, err := q.db.Exec(ctx, updateNotificationSettingsByID, arg.ID, arg.NotificationSettings)
 	return err
-}
-
-const userFeedHasMoreEvents = `-- name: UserFeedHasMoreEvents :one
-SELECT
-    CASE WHEN $3::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM feed_events fe
-        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-        WHERE event_time > (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1)
-    ELSE EXISTS(
-        SELECT 1
-        FROM feed_events fe
-        INNER JOIN follows fl ON fe.owner_id = fl.followee AND fl.follower = $1
-        WHERE event_time < (SELECT event_time FROM feed_events f WHERE f.id = $2)
-        AND fe.deleted = false AND fl.deleted = false
-        LIMIT 1
-    )
-    END::bool
-`
-
-type UserFeedHasMoreEventsParams struct {
-	Follower  persist.DBID
-	ID        persist.DBID
-	FromFirst bool
-}
-
-func (q *Queries) UserFeedHasMoreEvents(ctx context.Context, arg UserFeedHasMoreEventsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, userFeedHasMoreEvents, arg.Follower, arg.ID, arg.FromFirst)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const userFeedHasMoreNotifications = `-- name: UserFeedHasMoreNotifications :one
-SELECT
-    CASE WHEN $3::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM notifications notif
-        WHERE created_at > (SELECT created_at FROM notifications n WHERE n.id = $2)
-        AND notif.deleted = false AND notif.owner_id = $1
-        LIMIT 1)
-    ELSE EXISTS(
-        SELECT 1
-        FROM notifications notif
-        WHERE event_time < (SELECT created_at FROM notifications n WHERE n.id = $2)
-        AND notif.deleted = false AND notif.owner_id = $1
-        LIMIT 1
-    )
-    END::bool
-`
-
-type UserFeedHasMoreNotificationsParams struct {
-	OwnerID   persist.DBID
-	ID        persist.DBID
-	FromFirst bool
-}
-
-func (q *Queries) UserFeedHasMoreNotifications(ctx context.Context, arg UserFeedHasMoreNotificationsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, userFeedHasMoreNotifications, arg.OwnerID, arg.ID, arg.FromFirst)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
 }

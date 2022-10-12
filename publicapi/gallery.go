@@ -115,22 +115,27 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	}
 
 	if gallery.OwnerUserID != userID {
-		err = api.queries.IncrementGalleryViews(ctx, galleryID)
-		if err != nil {
-			return db.Gallery{}, err
+		notif, _ := api.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
+			OwnerID: userID,
+			Action:  persist.ActionViewedGallery,
+		})
+		if notif.Data.ViewerIDs == nil {
+			notif.Data.ViewerIDs = []persist.DBID{}
+		}
+		// only view gallery if the user hasn't already viewed it in this most recent notification period
+		if !persist.ContainsDBID(notif.Data.ViewerIDs, userID) {
+			dispatchNotification(ctx, db.Notification{
+				Action:  persist.ActionViewedGallery,
+				ActorID: userID,
+				OwnerID: gallery.OwnerUserID,
+				Amount:  1,
+				Data: persist.NotificationData{
+					GalleryID: galleryID,
+					ViewerIDs: []persist.DBID{userID},
+				},
+			})
 		}
 	}
-
-	dispatchNotification(ctx, db.Notification{
-		Action:  persist.ActionViewedGallery,
-		ActorID: userID,
-		OwnerID: gallery.OwnerUserID,
-		Amount:  1,
-		Data: persist.NotificationData{
-			GalleryID: galleryID,
-			ViewerIDs: []persist.DBID{userID},
-		},
-	})
 
 	return gallery, nil
 }

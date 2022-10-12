@@ -340,25 +340,6 @@ SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
 -- name: CountUserNotifications :one
 SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false;
 
-
--- name: UserFeedHasMoreNotifications :one
-SELECT
-    CASE WHEN @from_first::bool
-    THEN EXISTS(
-        SELECT 1
-        FROM notifications notif
-        WHERE created_at > (SELECT created_at FROM notifications n WHERE n.id = $2)
-        AND notif.deleted = false AND notif.owner_id = $1
-        LIMIT 1)
-    ELSE EXISTS(
-        SELECT 1
-        FROM notifications notif
-        WHERE event_time < (SELECT created_at FROM notifications n WHERE n.id = $2)
-        AND notif.deleted = false AND notif.owner_id = $1
-        LIMIT 1
-    )
-    END::bool;
-
 -- name: GetNotificationByID :one
 SELECT * FROM notifications WHERE id = $1 AND deleted = false;
 
@@ -383,8 +364,6 @@ UPDATE users SET notification_settings = $2 WHERE id = $1;
 -- name: ClearNotificationsForUser :many
 UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING *;
 
--- name: IncrementGalleryViews :exec
-UPDATE galleries SET views = views + 1 WHERE id = $1;
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
