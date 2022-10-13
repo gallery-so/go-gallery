@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mikeydub/go-gallery/validate"
+	"strings"
 	"sync"
 	"time"
 
@@ -399,6 +400,10 @@ func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.
 }
 
 func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (persist.DBID, error) {
+	// Trim whitespace first, so comments consisting only of whitespace will fail
+	// the "required" validation below
+	comment = strings.TrimSpace(comment)
+
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"feedEventID": {feedEventID, "required"},
