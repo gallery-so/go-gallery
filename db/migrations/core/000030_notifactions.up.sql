@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS notifications (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,
-    ACTOR_ID varchar(255),
     OWNER_ID varchar(255),
     VERSION int DEFAULT 0,
     LAST_UPDATED timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,

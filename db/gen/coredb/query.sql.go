@@ -14,7 +14,7 @@ import (
 )
 
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
-UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount
+UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount
 `
 
 func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist.DBID) ([]Notification, error) {
@@ -29,7 +29,6 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
-			&i.ActorID,
 			&i.OwnerID,
 			&i.Version,
 			&i.LastUpdated,
@@ -140,13 +139,12 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 }
 
 const createNotification = `-- name: CreateNotification :one
-INSERT INTO notifications (id, owner_id, actor_id, action, data) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount
+INSERT INTO notifications (id, owner_id, action, data) VALUES ($1, $2, $3, $4) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount
 `
 
 type CreateNotificationParams struct {
 	ID      persist.DBID
 	OwnerID persist.DBID
-	ActorID persist.DBID
 	Action  persist.Action
 	Data    persist.NotificationData
 }
@@ -155,7 +153,6 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	row := q.db.QueryRow(ctx, createNotification,
 		arg.ID,
 		arg.OwnerID,
-		arg.ActorID,
 		arg.Action,
 		arg.Data,
 	)
@@ -163,7 +160,6 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	err := row.Scan(
 		&i.ID,
 		&i.Deleted,
-		&i.ActorID,
 		&i.OwnerID,
 		&i.Version,
 		&i.LastUpdated,
@@ -940,7 +936,7 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 }
 
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
-SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false
     ORDER BY created_at DESC
     LIMIT 1
@@ -957,7 +953,6 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 	err := row.Scan(
 		&i.ID,
 		&i.Deleted,
-		&i.ActorID,
 		&i.OwnerID,
 		&i.Version,
 		&i.LastUpdated,
@@ -971,7 +966,7 @@ func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Contex
 }
 
 const getNotificationByID = `-- name: GetNotificationByID :one
-SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Notification, error) {
@@ -980,7 +975,6 @@ func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Not
 	err := row.Scan(
 		&i.ID,
 		&i.Deleted,
-		&i.ActorID,
 		&i.OwnerID,
 		&i.Version,
 		&i.LastUpdated,
@@ -991,6 +985,49 @@ func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Not
 		&i.Amount,
 	)
 	return i, err
+}
+
+const getNotificationsByOwnerIDForActionAfter = `-- name: GetNotificationsByOwnerIDForActionAfter :many
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > $3
+    ORDER BY created_at DESC
+`
+
+type GetNotificationsByOwnerIDForActionAfterParams struct {
+	OwnerID      persist.DBID
+	Action       persist.Action
+	CreatedAfter time.Time
+}
+
+func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, arg GetNotificationsByOwnerIDForActionAfterParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, getNotificationsByOwnerIDForActionAfter, arg.OwnerID, arg.Action, arg.CreatedAfter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.Seen,
+			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getTokenById = `-- name: GetTokenById :one
@@ -1228,7 +1265,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUserNotifications = `-- name: GetUserNotifications :many
-SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -1266,7 +1303,6 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
-			&i.ActorID,
 			&i.OwnerID,
 			&i.Version,
 			&i.LastUpdated,

@@ -352,8 +352,13 @@ SELECT * FROM notifications
     ORDER BY created_at DESC
     LIMIT 1;
 
+-- name: GetNotificationsByOwnerIDForActionAfter :many
+SELECT * FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > @created_after
+    ORDER BY created_at DESC;
+
 -- name: CreateNotification :one
-INSERT INTO notifications (id, owner_id, actor_id, action, data) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data) VALUES ($1, $2, $3, $4) RETURNING *;
 
 -- name: UpdateNotification :exec
 UPDATE notifications SET data = $2, amount = amount + $3 WHERE id = $1;

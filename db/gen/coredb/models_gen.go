@@ -230,7 +230,6 @@ type Nonce struct {
 type Notification struct {
 	ID          persist.DBID
 	Deleted     bool
-	ActorID     persist.DBID
 	OwnerID     persist.DBID
 	Version     sql.NullInt32
 	LastUpdated time.Time

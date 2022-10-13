@@ -305,14 +305,13 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	}
 
 	dispatchNotification(ctx, db.Notification{
-		ActorID: curUserID,
 		OwnerID: userID,
 		Action:  action,
 		Amount:  1,
 		Data: persist.NotificationData{
 			FollowerIDs: []persist.DBID{curUserID},
 		},
-	})
+	}, curUserID)
 
 	return nil
 }

@@ -26,18 +26,24 @@ type NotificationHandlers struct {
 	pubSub                   *pubsub.Client
 }
 
-// Register specific notification handlers
+// New registers specific notification handlers
 func New(queries *db.Queries, pub *pubsub.Client) *NotificationHandlers {
 	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}}
 
 	def := defaultNotificationHandler{queries: queries, pubSub: pub}
 	group := groupedNotificationHandler{queries: queries, pubSub: pub}
+	view := viewedNotificationHandler{queries: queries, pubSub: pub}
 
+	// grouped notification actions
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUserBack, group)
 	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, group)
+
+	// single notification actions (default)
 	notifDispatcher.AddHandler(persist.ActionCommentedOnFeedEvent, def)
-	notifDispatcher.AddHandler(persist.ActionViewedGallery, group)
+
+	// viewed notifications are handled separately
+	notifDispatcher.AddHandler(persist.ActionViewedGallery, view)
 
 	new := map[persist.DBID]chan db.Notification{}
 	updated := map[persist.DBID]chan db.Notification{}
@@ -122,33 +128,7 @@ type defaultNotificationHandler struct {
 }
 
 func (h defaultNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-	newNotif, err := h.queries.CreateNotification(ctx, db.CreateNotificationParams{
-		ID:      persist.GenerateID(),
-		OwnerID: notif.OwnerID,
-		ActorID: notif.ActorID,
-		Action:  notif.Action,
-		Data:    notif.Data,
-	})
-	if err != nil {
-		return err
-	}
-
-	marshalled, err := json.Marshal(newNotif)
-	if err != nil {
-		return err
-	}
-	t := h.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
-	result := t.Publish(ctx, &pubsub.Message{
-		Data: marshalled,
-	})
-
-	_, err = result.Get(ctx)
-	if err != nil {
-		return err
-	}
-
-	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
-	return nil
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 }
 
 type groupedNotificationHandler struct {
@@ -163,66 +143,76 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		Action:  notif.Action,
 	})
 	if time.Since(curNotif.CreatedAt) < window {
-		amount := notif.Amount
-		if amount < 1 {
-			amount = 1
-		}
-		err := h.queries.UpdateNotification(ctx, db.UpdateNotificationParams{
-			ID:     curNotif.ID,
-			Data:   curNotif.Data.Concat(notif.Data),
-			Amount: amount,
-		})
-		if err != nil {
-			return err
-		}
-		updatedNotif, err := h.queries.GetNotificationByID(ctx, curNotif.ID)
-		if err != nil {
-			return err
-		}
-		marshalled, err := json.Marshal(updatedNotif)
-		if err != nil {
-			return err
-		}
-		t := h.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
-		result := t.Publish(ctx, &pubsub.Message{
-			Data: marshalled,
-		})
-		_, err = result.Get(ctx)
-		if err != nil {
-			return err
-		}
+		return updateAndPublishNotif(ctx, curNotif, notif, h.queries, h.pubSub)
+	}
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 
-		logger.For(ctx).Infof("pushed updated notification to pubsub: %s", updatedNotif.OwnerID)
-	} else {
-		newNotif, err := h.queries.CreateNotification(ctx, db.CreateNotificationParams{
-			ID:      persist.GenerateID(),
-			OwnerID: notif.OwnerID,
-			ActorID: notif.ActorID,
-			Action:  notif.Action,
-			Data:    notif.Data,
-		})
-		if err != nil {
-			return err
-		}
-		marshalled, err := json.Marshal(newNotif)
-		if err != nil {
-			return err
-		}
+}
 
-		t := h.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
-		result := t.Publish(ctx, &pubsub.Message{
-			Data: marshalled,
-		})
-		_, err = result.Get(ctx)
-		if err != nil {
-			return err
-		}
+type viewedNotificationHandler struct {
+	queries *coredb.Queries
+	pubSub  *pubsub.Client
+}
 
-		logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
+func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 
+	notifs, _ := h.queries.GetNotificationsByOwnerIDForActionAfter(ctx, db.GetNotificationsByOwnerIDForActionAfterParams{
+		OwnerID:      notif.OwnerID,
+		Action:       notif.Action,
+		CreatedAfter: time.Now().Add(-(time.Hour * 24 * 7)),
+	})
+	if notifs == nil || len(notifs) == 0 {
+		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 	}
 
-	return nil
+	mostRecentNotif := notifs[0]
+
+	if notif.Data.ViewerIPs != nil && len(notif.Data.ViewerIPs) > 0 {
+		ipsToAdd := map[string]bool{}
+		for _, ip := range notif.Data.ViewerIPs {
+			ipsToAdd[ip] = true
+		}
+		for _, n := range notifs {
+			for _, ip := range n.Data.ViewerIPs {
+				if util.ContainsString(notif.Data.ViewerIPs, ip) {
+					ipsToAdd[ip] = false
+				}
+			}
+		}
+		resultIPs := []string{}
+		for ip, add := range ipsToAdd {
+			if add {
+				resultIPs = append(resultIPs, ip)
+			}
+		}
+		notif.Data.ViewerIPs = resultIPs
+	}
+
+	if notif.Data.ViewerIDs != nil && len(notif.Data.ViewerIDs) > 0 {
+		idsToAdd := map[persist.DBID]bool{}
+		for _, id := range notif.Data.ViewerIDs {
+			idsToAdd[id] = true
+		}
+		for _, n := range notifs {
+			for _, id := range n.Data.ViewerIDs {
+				if persist.ContainsDBID(notif.Data.ViewerIDs, id) {
+					idsToAdd[id] = false
+				}
+			}
+		}
+		resultIDs := []persist.DBID{}
+		for id, add := range idsToAdd {
+			if add {
+				resultIDs = append(resultIDs, id)
+			}
+		}
+		notif.Data.ViewerIDs = resultIDs
+	}
+
+	if time.Since(mostRecentNotif.CreatedAt) < window {
+		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub)
+	}
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 }
 
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
@@ -289,4 +279,68 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 		logger.For(nil).Errorf("error receiving new notifications from pubsub: %s", err)
 		panic(err)
 	}
+}
+
+func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client) error {
+	newNotif, err := queries.CreateNotification(ctx, db.CreateNotificationParams{
+		ID:      persist.GenerateID(),
+		OwnerID: notif.OwnerID,
+		Action:  notif.Action,
+		Data:    notif.Data,
+	})
+	if err != nil {
+		return err
+	}
+
+	marshalled, err := json.Marshal(newNotif)
+	if err != nil {
+		return err
+	}
+	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
+	result := t.Publish(ctx, &pubsub.Message{
+		Data: marshalled,
+	})
+
+	_, err = result.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
+	return nil
+}
+
+func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client) error {
+	amount := notif.Amount
+	if amount < 1 {
+		amount = 1
+	}
+	err := queries.UpdateNotification(ctx, db.UpdateNotificationParams{
+		ID: mostRecentNotif.ID,
+		// this concat will put the notif.Data values at the beginning of the array, sorted from most recently added to oldest added
+		Data:   mostRecentNotif.Data.Concat(notif.Data),
+		Amount: amount,
+	})
+	if err != nil {
+		return err
+	}
+	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
+	if err != nil {
+		return err
+	}
+	marshalled, err := json.Marshal(updatedNotif)
+	if err != nil {
+		return err
+	}
+	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
+	result := t.Publish(ctx, &pubsub.Message{
+		Data: marshalled,
+	})
+	_, err = result.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	logger.For(ctx).Infof("pushed updated notification to pubsub: %s", updatedNotif.OwnerID)
+	return nil
 }

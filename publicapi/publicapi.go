@@ -174,14 +174,14 @@ func pushFeedEvent(ctx context.Context, evt db.Event) {
 	}
 }
 
-func dispatchNotification(ctx context.Context, notif db.Notification) {
+func dispatchNotification(ctx context.Context, notif db.Notification, actor persist.DBID) {
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	go pushNotification(ctx, notif)
+	go pushNotification(ctx, notif, actor)
 }
 
-func pushNotification(ctx context.Context, notif db.Notification) {
+func pushNotification(ctx context.Context, notif db.Notification, actor persist.DBID) {
 	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-		sentryutil.SetEventContext(hub.Scope(), notif.ActorID, notif.OwnerID, notif.Action)
+		sentryutil.SetEventContext(hub.Scope(), actor, notif.OwnerID, notif.Action)
 	}
 
 	err := notifications.DispatchNotificationToUser(ctx, notif)

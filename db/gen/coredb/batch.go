@@ -1125,7 +1125,7 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
 }
 
 const getNotificationByIDBatch = `-- name: GetNotificationByIDBatch :batchone
-SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE id = $1 AND deleted = false
 `
 
 type GetNotificationByIDBatchBatchResults struct {
@@ -1152,7 +1152,6 @@ func (b *GetNotificationByIDBatchBatchResults) QueryRow(f func(int, Notification
 		err := row.Scan(
 			&i.ID,
 			&i.Deleted,
-			&i.ActorID,
 			&i.OwnerID,
 			&i.Version,
 			&i.LastUpdated,
@@ -1702,7 +1701,7 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 }
 
 const getUserNotificationsBatch = `-- name: GetUserNotificationsBatch :batchmany
-SELECT id, deleted, actor_id, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -1756,7 +1755,6 @@ func (b *GetUserNotificationsBatchBatchResults) Query(f func(int, []Notification
 			if err := rows.Scan(
 				&i.ID,
 				&i.Deleted,
-				&i.ActorID,
 				&i.OwnerID,
 				&i.Version,
 				&i.LastUpdated,
