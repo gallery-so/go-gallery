@@ -272,7 +272,7 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 
 		logger.For(ctx).Infof("received updated notification from pubsub: %s", notif.OwnerID)
 
-		if sub, ok := n.UserUpdatedNotifications[notif.OwnerID]; ok {
+		if sub, ok := n.UserUpdatedNotifications[notif.OwnerID]; ok && sub != nil {
 			select {
 			case sub <- notif:
 				logger.For(ctx).Debugf("sent updated notification to user: %s", notif.OwnerID)
