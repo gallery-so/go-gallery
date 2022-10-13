@@ -643,14 +643,15 @@ type ComplexityRoot struct {
 	}
 
 	SomeoneViewedYourGalleryNotification struct {
-		Count        func(childComplexity int) int
-		CreationTime func(childComplexity int) int
-		Dbid         func(childComplexity int) int
-		Gallery      func(childComplexity int) int
-		ID           func(childComplexity int) int
-		Seen         func(childComplexity int) int
-		UpdatedTime  func(childComplexity int) int
-		Viewers      func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Count              func(childComplexity int) int
+		CreationTime       func(childComplexity int) int
+		Dbid               func(childComplexity int) int
+		Gallery            func(childComplexity int) int
+		ID                 func(childComplexity int) int
+		NonUserViewerCount func(childComplexity int) int
+		Seen               func(childComplexity int) int
+		UpdatedTime        func(childComplexity int) int
+		UserViewers        func(childComplexity int, before *string, after *string, first *int, last *int) int
 	}
 
 	Subscription struct {
@@ -955,7 +956,8 @@ type SomeoneFollowedYouNotificationResolver interface {
 	Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
 }
 type SomeoneViewedYourGalleryNotificationResolver interface {
-	Viewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
+	UserViewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error)
+
 	Gallery(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.Gallery, error)
 }
 type SubscriptionResolver interface {
@@ -3434,6 +3436,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneViewedYourGalleryNotification.ID(childComplexity), true
 
+	case "SomeoneViewedYourGalleryNotification.nonUserViewerCount":
+		if e.complexity.SomeoneViewedYourGalleryNotification.NonUserViewerCount == nil {
+			break
+		}
+
+		return e.complexity.SomeoneViewedYourGalleryNotification.NonUserViewerCount(childComplexity), true
+
 	case "SomeoneViewedYourGalleryNotification.seen":
 		if e.complexity.SomeoneViewedYourGalleryNotification.Seen == nil {
 			break
@@ -3448,17 +3457,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SomeoneViewedYourGalleryNotification.UpdatedTime(childComplexity), true
 
-	case "SomeoneViewedYourGalleryNotification.viewers":
-		if e.complexity.SomeoneViewedYourGalleryNotification.Viewers == nil {
+	case "SomeoneViewedYourGalleryNotification.userViewers":
+		if e.complexity.SomeoneViewedYourGalleryNotification.UserViewers == nil {
 			break
 		}
 
-		args, err := ec.field_SomeoneViewedYourGalleryNotification_viewers_args(context.TODO(), rawArgs)
+		args, err := ec.field_SomeoneViewedYourGalleryNotification_userViewers_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.SomeoneViewedYourGalleryNotification.Viewers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.SomeoneViewedYourGalleryNotification.UserViewers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Subscription.newNotification":
 		if e.complexity.Subscription.NewNotification == nil {
@@ -5321,7 +5330,8 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   updatedTime: Time
   count: Int
 
-  viewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  userViewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  nonUserViewerCount: Int
   gallery: Gallery @goField(forceResolver: true)
 }
 
@@ -5376,7 +5386,7 @@ type Mutation {
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
     
-    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError @authRequired
+    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
@@ -6436,7 +6446,7 @@ func (ec *executionContext) field_SomeoneFollowedYouNotification_followers_args(
 	return args, nil
 }
 
-func (ec *executionContext) field_SomeoneViewedYourGalleryNotification_viewers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_SomeoneViewedYourGalleryNotification_userViewers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 *string
@@ -14543,28 +14553,8 @@ func (ec *executionContext) _Mutation_viewGallery(ctx context.Context, field gra
 	}
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().ViewGallery(rctx, args["galleryId"].(persist.DBID))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.AuthRequired == nil {
-				return nil, errors.New("directive authRequired is not implemented")
-			}
-			return ec.directives.AuthRequired(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(model.ViewGalleryPayloadOrError); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ViewGalleryPayloadOrError`, tmp)
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ViewGallery(rctx, args["galleryId"].(persist.DBID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -17601,7 +17591,7 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_count(ctx cont
 	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _SomeoneViewedYourGalleryNotification_viewers(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneViewedYourGalleryNotification) (ret graphql.Marshaler) {
+func (ec *executionContext) _SomeoneViewedYourGalleryNotification_userViewers(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneViewedYourGalleryNotification) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -17618,7 +17608,7 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_viewers(ctx co
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_SomeoneViewedYourGalleryNotification_viewers_args(ctx, rawArgs)
+	args, err := ec.field_SomeoneViewedYourGalleryNotification_userViewers_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -17626,7 +17616,7 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_viewers(ctx co
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.SomeoneViewedYourGalleryNotification().Viewers(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+		return ec.resolvers.SomeoneViewedYourGalleryNotification().UserViewers(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -17638,6 +17628,38 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification_viewers(ctx co
 	res := resTmp.(*model.GroupNotificationUsersConnection)
 	fc.Result = res
 	return ec.marshalOGroupNotificationUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGroupNotificationUsersConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _SomeoneViewedYourGalleryNotification_nonUserViewerCount(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneViewedYourGalleryNotification) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "SomeoneViewedYourGalleryNotification",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NonUserViewerCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _SomeoneViewedYourGalleryNotification_gallery(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneViewedYourGalleryNotification) (ret graphql.Marshaler) {
@@ -29033,7 +29055,7 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Co
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "viewers":
+		case "userViewers":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -29042,7 +29064,7 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Co
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._SomeoneViewedYourGalleryNotification_viewers(ctx, field, obj)
+				res = ec._SomeoneViewedYourGalleryNotification_userViewers(ctx, field, obj)
 				return res
 			}
 
@@ -29050,6 +29072,13 @@ func (ec *executionContext) _SomeoneViewedYourGalleryNotification(ctx context.Co
 				return innerFunc(ctx)
 
 			})
+		case "nonUserViewerCount":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._SomeoneViewedYourGalleryNotification_nonUserViewerCount(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		case "gallery":
 			field := field
 

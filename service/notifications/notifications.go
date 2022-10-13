@@ -154,12 +154,17 @@ type viewedNotificationHandler struct {
 	pubSub  *pubsub.Client
 }
 
+// one week
+const viewedNotificationUniqueViewerWindow = time.Hour * 24 * 7
+
+// this handler will still group notifications in the usual window, but it will also ensure that each viewer does
+// does not show up mutliple times in a week
 func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 
 	notifs, _ := h.queries.GetNotificationsByOwnerIDForActionAfter(ctx, db.GetNotificationsByOwnerIDForActionAfterParams{
 		OwnerID:      notif.OwnerID,
 		Action:       notif.Action,
-		CreatedAfter: time.Now().Add(-(time.Hour * 24 * 7)),
+		CreatedAfter: time.Now().Add(-viewedNotificationUniqueViewerWindow),
 	})
 	if notifs == nil || len(notifs) == 0 {
 		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)

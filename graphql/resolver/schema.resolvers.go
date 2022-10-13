@@ -1014,7 +1014,7 @@ func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, 
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
 }
 
-func (r *someoneViewedYourGalleryNotificationResolver) Viewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+func (r *someoneViewedYourGalleryNotificationResolver) UserViewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
 	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.ViewerIDs, before, after, first, last)
 }
 

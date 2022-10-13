@@ -1166,7 +1166,8 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   updatedTime: Time
   count: Int
 
-  viewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  userViewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  nonUserViewerCount: Int
   gallery: Gallery @goField(forceResolver: true)
 }
 

@@ -658,18 +658,20 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Followers:    nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionViewedGallery:
+		nonCount := len(notif.Data.ViewerIPs)
 		return model.SomeoneViewedYourGalleryNotification{
 			HelperSomeoneViewedYourGalleryNotificationData: model.HelperSomeoneViewedYourGalleryNotificationData{
 				OwnerID:          notif.OwnerID,
 				NotificationData: notif.Data,
 			},
-			Dbid:         notif.ID,
-			Seen:         &notif.Seen,
-			CreationTime: &notif.CreatedAt,
-			UpdatedTime:  &notif.LastUpdated,
-			Count:        &amount,
-			Viewers:      nil, // handled by dedicated resolver
-			Gallery:      nil, // handled by dedicated resolver
+			Dbid:               notif.ID,
+			Seen:               &notif.Seen,
+			CreationTime:       &notif.CreatedAt,
+			UpdatedTime:        &notif.LastUpdated,
+			Count:              &amount,
+			UserViewers:        nil, // handled by dedicated resolver
+			Gallery:            nil, // handled by dedicated resolver
+			NonUserViewerCount: &nonCount,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)

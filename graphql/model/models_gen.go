@@ -975,13 +975,14 @@ func (SomeoneFollowedYouNotification) IsGroupedNotification() {}
 
 type SomeoneViewedYourGalleryNotification struct {
 	HelperSomeoneViewedYourGalleryNotificationData
-	Dbid         persist.DBID                      `json:"dbid"`
-	Seen         *bool                             `json:"seen"`
-	CreationTime *time.Time                        `json:"creationTime"`
-	UpdatedTime  *time.Time                        `json:"updatedTime"`
-	Count        *int                              `json:"count"`
-	Viewers      *GroupNotificationUsersConnection `json:"viewers"`
-	Gallery      *Gallery                          `json:"gallery"`
+	Dbid               persist.DBID                      `json:"dbid"`
+	Seen               *bool                             `json:"seen"`
+	CreationTime       *time.Time                        `json:"creationTime"`
+	UpdatedTime        *time.Time                        `json:"updatedTime"`
+	Count              *int                              `json:"count"`
+	UserViewers        *GroupNotificationUsersConnection `json:"userViewers"`
+	NonUserViewerCount *int                              `json:"nonUserViewerCount"`
+	Gallery            *Gallery                          `json:"gallery"`
 }
 
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
