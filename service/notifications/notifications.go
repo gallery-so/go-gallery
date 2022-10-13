@@ -172,10 +172,12 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 		for _, ip := range notif.Data.ViewerIPs {
 			ipsToAdd[ip] = true
 		}
-		for _, n := range notifs {
-			for _, ip := range n.Data.ViewerIPs {
-				if util.ContainsString(notif.Data.ViewerIPs, ip) {
+		for _, ip := range notif.Data.ViewerIPs {
+		firstInner:
+			for _, n := range notifs {
+				if util.ContainsString(n.Data.ViewerIPs, ip) {
 					ipsToAdd[ip] = false
+					break firstInner
 				}
 			}
 		}
@@ -193,10 +195,12 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 		for _, id := range notif.Data.ViewerIDs {
 			idsToAdd[id] = true
 		}
-		for _, n := range notifs {
-			for _, id := range n.Data.ViewerIDs {
-				if persist.ContainsDBID(notif.Data.ViewerIDs, id) {
+		for _, id := range notif.Data.ViewerIDs {
+		secondInner:
+			for _, n := range notifs {
+				if persist.ContainsDBID(n.Data.ViewerIDs, id) {
 					idsToAdd[id] = false
+					break secondInner
 				}
 			}
 		}
