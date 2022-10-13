@@ -974,6 +974,31 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 	return i, err
 }
 
+const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
+`
+
+func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User, error) {
+	row := q.db.QueryRow(ctx, getTokenOwnerByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+	)
+	return i, err
+}
+
 const getTokensByCollectionId = `-- name: GetTokensByCollectionId :many
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
@@ -1076,7 +1101,7 @@ func (q *Queries) GetTokensByContractId(ctx context.Context, contract persist.DB
 }
 
 const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
-SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam,u.universal FROM tokens t
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
     AND (u.universal,t.created_at,t.id) < ($3, $4::timestamptz, $5)
@@ -1098,34 +1123,7 @@ type GetTokensByContractIdPaginateParams struct {
 	PagingForward      bool
 }
 
-type GetTokensByContractIdPaginateRow struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	CreatedAt            time.Time
-	LastUpdated          time.Time
-	Name                 sql.NullString
-	Description          sql.NullString
-	CollectorsNote       sql.NullString
-	Media                persist.Media
-	TokenUri             sql.NullString
-	TokenType            sql.NullString
-	TokenID              sql.NullString
-	Quantity             sql.NullString
-	OwnershipHistory     persist.AddressAtBlockList
-	TokenMetadata        persist.TokenMetadata
-	ExternalUrl          sql.NullString
-	BlockNumber          sql.NullInt64
-	OwnerUserID          persist.DBID
-	OwnedByWallets       persist.DBIDList
-	Chain                sql.NullInt32
-	Contract             persist.DBID
-	IsUserMarkedSpam     sql.NullBool
-	IsProviderMarkedSpam sql.NullBool
-	Universal            bool
-}
-
-func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetTokensByContractIdPaginateParams) ([]GetTokensByContractIdPaginateRow, error) {
+func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetTokensByContractIdPaginateParams) ([]Token, error) {
 	rows, err := q.db.Query(ctx, getTokensByContractIdPaginate,
 		arg.Contract,
 		arg.Limit,
@@ -1141,9 +1139,9 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetTokensByContractIdPaginateRow
+	var items []Token
 	for rows.Next() {
-		var i GetTokensByContractIdPaginateRow
+		var i Token
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
@@ -1168,7 +1166,6 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 			&i.Contract,
 			&i.IsUserMarkedSpam,
 			&i.IsProviderMarkedSpam,
-			&i.Universal,
 		); err != nil {
 			return nil, err
 		}

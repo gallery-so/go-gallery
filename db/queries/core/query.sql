@@ -154,7 +154,7 @@ SELECT * FROM tokens WHERE contract = $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
 -- name: GetTokensByContractIdPaginate :many
-SELECT t.*,u.universal FROM tokens t
+SELECT t.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
     AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
@@ -164,7 +164,7 @@ SELECT t.*,u.universal FROM tokens t
     LIMIT $2;
 
 -- name: GetTokensByContractIdBatchPaginate :batchmany
-SELECT t.*,u.universal FROM tokens t
+SELECT t.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
     AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
@@ -200,6 +200,16 @@ SELECT DISTINCT ON (users.id) users.* FROM users, tokens
 SELECT count(DISTINCT users.id) FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false;
+
+-- name: GetTokenOwnerByID :one
+SELECT u.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false;
+
+-- name: GetTokenOwnerByIDBatch :batchone
+SELECT u.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
 SELECT MEDIA->>'thumbnail_url'::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3;

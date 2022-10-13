@@ -129,8 +129,12 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	}
 
 	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
-		if token, ok := i.(db.GetTokensByContractIdPaginateRow); ok {
-			return token.Universal, token.CreatedAt, token.ID, nil
+		if token, ok := i.(db.Token); ok {
+			owner, err := api.loaders.OwnerByTokenID.Load(token.ID)
+			if err != nil {
+				return false, time.Time{}, "", err
+			}
+			return owner.Universal, token.CreatedAt, token.ID, nil
 		}
 		return false, time.Time{}, "", fmt.Errorf("interface{} is not a token")
 	}
@@ -149,43 +153,14 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 	tokens := make([]db.Token, len(results))
 	for i, result := range results {
-		if token, ok := result.(db.GetTokensByContractIdPaginateRow); ok {
-			tokens[i] = tokensByContractIdPaginateRowToToken(token)
+		if token, ok := result.(db.Token); ok {
+			tokens[i] = token
 		} else {
 			return nil, PageInfo{}, fmt.Errorf("interface{} is not a token: %T", token)
 		}
 	}
 
 	return tokens, pageInfo, nil
-}
-
-func tokensByContractIdPaginateRowToToken(row db.GetTokensByContractIdPaginateRow) db.Token {
-	// needs to be updated whenever we add fields to the token *facepalm*
-	return db.Token{
-		ID:                   row.ID,
-		Deleted:              row.Deleted,
-		Version:              row.Version,
-		CreatedAt:            row.CreatedAt,
-		LastUpdated:          row.LastUpdated,
-		Name:                 row.Name,
-		Description:          row.Description,
-		CollectorsNote:       row.CollectorsNote,
-		Media:                row.Media,
-		TokenUri:             row.TokenUri,
-		TokenType:            row.TokenType,
-		TokenID:              row.TokenID,
-		Quantity:             row.Quantity,
-		OwnershipHistory:     row.OwnershipHistory,
-		TokenMetadata:        row.TokenMetadata,
-		ExternalUrl:          row.ExternalUrl,
-		BlockNumber:          row.BlockNumber,
-		OwnerUserID:          row.OwnerUserID,
-		OwnedByWallets:       row.OwnedByWallets,
-		Chain:                row.Chain,
-		Contract:             row.Contract,
-		IsUserMarkedSpam:     row.IsUserMarkedSpam,
-		IsProviderMarkedSpam: row.IsProviderMarkedSpam,
-	}
 }
 
 func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, []error) {
