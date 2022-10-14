@@ -354,10 +354,9 @@ func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int
 	}
 
 	paginator := keysetPaginator{
-		QueryFunc:          queryFunc,
-		CursorFunc:         cursorFunc,
-		CountFunc:          p.CountFunc,
-		SortPagesAscending: p.SortPagesAscending,
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  p.CountFunc,
 	}
 
 	return paginator.paginate(before, after, first, last)

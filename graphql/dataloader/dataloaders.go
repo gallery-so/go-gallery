@@ -647,12 +647,12 @@ func loadTokensByContractIDWithPagination(q *db.Queries) func(context.Context, [
 			params[i] = db.GetTokensByContractIdBatchPaginateParams{
 				Contract:           id.Contract,
 				Limit:              id.Limit,
-				CurBeforeUniversal: id.CurAfterUniversal,
-				CurBeforeTime:      id.CurAfterTime,
-				CurBeforeID:        id.CurAfterID,
-				CurAfterUniversal:  id.CurBeforeUniversal,
-				CurAfterTime:       id.CurBeforeTime,
-				CurAfterID:         id.CurBeforeID,
+				CurBeforeUniversal: id.CurBeforeUniversal,
+				CurBeforeTime:      id.CurBeforeTime,
+				CurBeforeID:        id.CurBeforeID,
+				CurAfterUniversal:  id.CurAfterUniversal,
+				CurAfterTime:       id.CurAfterTime,
+				CurAfterID:         id.CurAfterID,
 				PagingForward:      id.PagingForward,
 			}
 		}
