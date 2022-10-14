@@ -160,7 +160,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -226,7 +226,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	}
 
 	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -285,7 +285,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/fingerprints"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -118,6 +119,11 @@ type Event struct {
 	Deleted        bool
 	LastUpdated    time.Time
 	CreatedAt      time.Time
+	GalleryID      persist.DBID
+	CommentID      persist.DBID
+	AdmireID       persist.DBID
+	FeedEventID    persist.DBID
+	Fingerprint    fingerprints.Fingerprint
 }
 
 type Feature struct {
@@ -236,6 +242,10 @@ type Notification struct {
 	CreatedAt   time.Time
 	Action      persist.Action
 	Data        persist.NotificationData
+	EventIds    persist.DBIDList
+	FeedEventID persist.DBID
+	CommentID   persist.DBID
+	GalleryID   persist.DBID
 	Seen        bool
 	Amount      int32
 }

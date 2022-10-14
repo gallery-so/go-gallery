@@ -82,7 +82,7 @@ type Loaders struct {
 	GlobalFeed                    *GlobalFeedLoader
 	PersonalFeedByUserID          *PersonalFeedLoader
 	UserFeedByUserID              *UserFeedLoader
-	EventByEventID                *EventLoaderByID
+	FeedEventByFeedEventID        *EventLoaderByID
 	AdmireByAdmireID              *AdmireLoaderByID
 	AdmireCountByFeedEventID      *IntLoaderByID
 	AdmiresByFeedEventID          *FeedEventAdmiresLoader
@@ -216,7 +216,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.ContractsByUserID = NewContractsLoaderByID(defaults, loadContractsByUserID(q))
 
-	loaders.EventByEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
+	loaders.FeedEventByFeedEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
 	})
 

@@ -578,6 +578,13 @@ func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
 func (ErrNotAuthorized) IsError()                                  {}
 func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
 
+type ErrNotFingerprinted struct {
+	Message string `json:"message"`
+}
+
+func (ErrNotFingerprinted) IsError()                     {}
+func (ErrNotFingerprinted) IsViewGalleryPayloadOrError() {}
+
 type ErrSyncFailed struct {
 	Message string `json:"message"`
 }

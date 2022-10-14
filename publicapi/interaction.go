@@ -337,7 +337,25 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx))
+	actor, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, actor)
+	if err != nil {
+		return "", err
+	}
+
+	go dispatchEvent(ctx, db.Event{
+		ActorID:        actor,
+		ResourceTypeID: persist.ResourceTypeFeedEvent,
+		SubjectID:      feedEventID,
+		FeedEventID:    feedEventID,
+		AdmireID:       admireID,
+	})
+
+	return admireID, nil
 }
 
 func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
@@ -405,7 +423,25 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
-	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx), replyToID, comment)
+	actor, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, actor, replyToID, comment)
+	if err != nil {
+		return "", err
+	}
+
+	go dispatchEvent(ctx, db.Event{
+		ActorID:        actor,
+		ResourceTypeID: persist.ResourceTypeFeedEvent,
+		SubjectID:      feedEventID,
+		FeedEventID:    feedEventID,
+		CommentID:      commentID,
+	})
+
+	return commentID, nil
 }
 
 func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {

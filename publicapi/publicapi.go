@@ -18,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
-	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -156,35 +155,17 @@ func (e ErrInvalidInput) Error() string {
 	return str
 }
 
-func dispatchEventToFeed(ctx context.Context, evt db.Event) {
+func dispatchEvent(ctx context.Context, evt db.Event) {
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	go pushFeedEvent(ctx, evt)
+	go pushEvent(ctx, evt)
 }
 
-func pushFeedEvent(ctx context.Context, evt db.Event) {
+func pushEvent(ctx context.Context, evt db.Event) {
 	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 		sentryutil.SetEventContext(hub.Scope(), evt.ActorID, evt.SubjectID, evt.Action)
 	}
 
-	err := event.DispatchEventToFeed(ctx, evt)
-
-	if err != nil {
-		logger.For(ctx).Error(err)
-		sentryutil.ReportError(ctx, err)
-	}
-}
-
-func dispatchNotification(ctx context.Context, notif db.Notification, actor persist.DBID) {
-	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	go pushNotification(ctx, notif, actor)
-}
-
-func pushNotification(ctx context.Context, notif db.Notification, actor persist.DBID) {
-	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
-		sentryutil.SetEventContext(hub.Scope(), actor, notif.OwnerID, notif.Action)
-	}
-
-	err := notifications.DispatchNotificationToUser(ctx, notif)
+	err := event.DispatchEvent(ctx, evt)
 
 	if err != nil {
 		logger.For(ctx).Error(err)

@@ -71,6 +71,7 @@ type HelperSomeoneFollowedYouNotificationData struct {
 }
 type HelperSomeoneViewedYourGalleryNotificationData struct {
 	OwnerID          persist.DBID
+	GalleryID        persist.DBID
 	NotificationData persist.NotificationData
 }
 type HelperSomeoneFollowedYouBackNotificationData struct {
@@ -79,10 +80,13 @@ type HelperSomeoneFollowedYouBackNotificationData struct {
 }
 type HelperSomeoneCommentedOnYourFeedEventNotificationData struct {
 	OwnerID          persist.DBID
+	FeedEventID      persist.DBID
+	CommentID        persist.DBID
 	NotificationData persist.NotificationData
 }
 type HelperSomeoneAdmiredYourFeedEventNotificationData struct {
 	OwnerID          persist.DBID
+	FeedEventID      persist.DBID
 	NotificationData persist.NotificationData
 }
 

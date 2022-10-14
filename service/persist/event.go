@@ -11,9 +11,12 @@ const (
 	ResourceTypeUser ResourceType = iota
 	ResourceTypeToken
 	ResourceTypeCollection
+	ResourceTypeGallery
+	ResourceTypeAdmire
+	ResourceTypeComment
+	ResourceTypeFeedEvent
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
-	ActionUserFollowedUserBack            Action = "UserFollowedUserBack"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
 	ActionCollectionCreated               Action = "CollectionCreated"
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"

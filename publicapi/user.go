@@ -160,7 +160,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, bio, api.repos.UserRepository, api.repos.GalleryRepository)
 
 	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
@@ -299,20 +299,6 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	// Send event
 	go dispatchFollowEventToFeed(sentryutil.NewSentryHubGinContext(ctx), api, curUserID, userID, refollowed)
 
-	action := persist.ActionUserFollowedUsers
-	if refollowed {
-		action = persist.ActionUserFollowedUserBack
-	}
-
-	dispatchNotification(ctx, db.Notification{
-		OwnerID: userID,
-		Action:  action,
-		Amount:  1,
-		Data: persist.NotificationData{
-			FollowerIDs: []persist.DBID{curUserID},
-		},
-	}, curUserID)
-
 	return nil
 }
 
@@ -340,7 +326,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		return
 	}
 
-	pushFeedEvent(ctx, db.Event{
+	pushEvent(ctx, db.Event{
 		ActorID:        curUserID,
 		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeUser,

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/fingerprints"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -36,7 +37,6 @@ func New(queries *db.Queries, pub *pubsub.Client) *NotificationHandlers {
 
 	// grouped notification actions
 	notifDispatcher.AddHandler(persist.ActionUserFollowedUsers, group)
-	notifDispatcher.AddHandler(persist.ActionUserFollowedUserBack, group)
 	notifDispatcher.AddHandler(persist.ActionAdmiredFeedEvent, group)
 
 	// single notification actions (default)
@@ -57,12 +57,6 @@ func New(queries *db.Queries, pub *pubsub.Client) *NotificationHandlers {
 // Register specific notification handlers
 func AddTo(ctx *gin.Context, notificationHandlers *NotificationHandlers) {
 	ctx.Set(NotificationHandlerContextKey, notificationHandlers)
-
-}
-
-func DispatchNotificationToUser(ctx context.Context, notif db.Notification) error {
-	gc := util.GinContextFromContext(ctx)
-	return For(gc).Notifications.Dispatch(ctx, notif)
 }
 
 func For(ctx context.Context) *NotificationHandlers {
@@ -154,8 +148,8 @@ type viewedNotificationHandler struct {
 	pubSub  *pubsub.Client
 }
 
-// one week
-const viewedNotificationUniqueViewerWindow = time.Hour * 24 * 7
+// one day
+const viewedNotificationUniqueViewerWindow = time.Hour * 24
 
 // this handler will still group notifications in the usual window, but it will also ensure that each viewer does
 // does not show up mutliple times in a week
@@ -172,38 +166,38 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 
 	mostRecentNotif := notifs[0]
 
-	if notif.Data.ViewerIPs != nil && len(notif.Data.ViewerIPs) > 0 {
-		ipsToAdd := map[string]bool{}
-		for _, ip := range notif.Data.ViewerIPs {
-			ipsToAdd[ip] = true
+	if notif.Data.UnauthedViewerFingerprints != nil && len(notif.Data.UnauthedViewerFingerprints) > 0 {
+		fingerprintsToAdd := map[fingerprints.Fingerprint]bool{}
+		for _, ip := range notif.Data.UnauthedViewerFingerprints {
+			fingerprintsToAdd[ip] = true
 		}
-		for _, ip := range notif.Data.ViewerIPs {
+		for _, ip := range notif.Data.UnauthedViewerFingerprints {
 		firstInner:
 			for _, n := range notifs {
-				if util.ContainsString(n.Data.ViewerIPs, ip) {
-					ipsToAdd[ip] = false
+				if fingerprints.ContainsFingerprint(n.Data.UnauthedViewerFingerprints, ip) {
+					fingerprintsToAdd[ip] = false
 					break firstInner
 				}
 			}
 		}
-		resultIPs := []string{}
-		for ip, add := range ipsToAdd {
+		resultIPs := []fingerprints.Fingerprint{}
+		for ip, add := range fingerprintsToAdd {
 			if add {
 				resultIPs = append(resultIPs, ip)
 			}
 		}
-		notif.Data.ViewerIPs = resultIPs
+		notif.Data.UnauthedViewerFingerprints = resultIPs
 	}
 
-	if notif.Data.ViewerIDs != nil && len(notif.Data.ViewerIDs) > 0 {
+	if notif.Data.AuthedViewerIDs != nil && len(notif.Data.AuthedViewerIDs) > 0 {
 		idsToAdd := map[persist.DBID]bool{}
-		for _, id := range notif.Data.ViewerIDs {
+		for _, id := range notif.Data.AuthedViewerIDs {
 			idsToAdd[id] = true
 		}
-		for _, id := range notif.Data.ViewerIDs {
+		for _, id := range notif.Data.AuthedViewerIDs {
 		secondInner:
 			for _, n := range notifs {
-				if persist.ContainsDBID(n.Data.ViewerIDs, id) {
+				if persist.ContainsDBID(n.Data.AuthedViewerIDs, id) {
 					idsToAdd[id] = false
 					break secondInner
 				}
@@ -215,7 +209,7 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 				resultIDs = append(resultIDs, id)
 			}
 		}
-		notif.Data.ViewerIDs = resultIDs
+		notif.Data.AuthedViewerIDs = resultIDs
 	}
 
 	if time.Since(mostRecentNotif.CreatedAt) < window {
@@ -292,10 +286,11 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 
 func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client) error {
 	newNotif, err := queries.CreateNotification(ctx, db.CreateNotificationParams{
-		ID:      persist.GenerateID(),
-		OwnerID: notif.OwnerID,
-		Action:  notif.Action,
-		Data:    notif.Data,
+		ID:       persist.GenerateID(),
+		OwnerID:  notif.OwnerID,
+		Action:   notif.Action,
+		Data:     notif.Data,
+		EventIds: notif.EventIds,
 	})
 	if err != nil {
 		return err
@@ -329,6 +324,8 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 		// this concat will put the notif.Data values at the beginning of the array, sorted from most recently added to oldest added
 		Data:   mostRecentNotif.Data.Concat(notif.Data),
 		Amount: amount,
+		// this will automatically concat the event ids
+		EventIds: notif.EventIds,
 	})
 	if err != nil {
 		return err

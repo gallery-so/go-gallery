@@ -242,6 +242,9 @@ SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 -- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 
+-- name: GeetFeedEventByID :one
+SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
+
 -- name: GetLastFeedEvent :one
 SELECT * FROM feed_events
     WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
@@ -358,10 +361,10 @@ SELECT * FROM notifications
     ORDER BY created_at DESC;
 
 -- name: CreateNotification :one
-INSERT INTO notifications (id, owner_id, action, data) VALUES ($1, $2, $3, $4) RETURNING *;
+INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: UpdateNotification :exec
-UPDATE notifications SET data = $2, amount = amount + $3 WHERE id = $1;
+UPDATE notifications SET amount = amount + $2, event_ids = event_ids || $3, gallery_id = $4, comment_id = $5, feed_event_id = $6, data = $7 WHERE id = $1;
 
 -- name: UpdateNotificationSettingsByID :exec
 UPDATE users SET notification_settings = $2 WHERE id = $1;

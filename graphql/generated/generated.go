@@ -79,8 +79,10 @@ type ResolverRoot interface {
 }
 
 type DirectiveRoot struct {
-	AuthRequired        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
-	RestrictEnvironment func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
+	AuthRequired              func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	FingerprintOrAuthRequired func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	FingerprintRequired       func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	RestrictEnvironment       func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -301,6 +303,10 @@ type ComplexityRoot struct {
 
 	ErrNotAuthorized struct {
 		Cause   func(childComplexity int) int
+		Message func(childComplexity int) int
+	}
+
+	ErrNotFingerprinted struct {
 		Message func(childComplexity int) int
 	}
 
@@ -1807,6 +1813,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrNotAuthorized.Message(childComplexity), true
+
+	case "ErrNotFingerprinted.message":
+		if e.complexity.ErrNotFingerprinted.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrNotFingerprinted.Message(childComplexity), true
 
 	case "ErrSyncFailed.message":
 		if e.complexity.ErrSyncFailed.Message == nil {
@@ -4176,6 +4189,12 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+# Add @fingerprintRequired to any field that requires a user to have a fingerprint cookie set.
+directive @fingerprintRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+# Add @fingerprintOrAuthRequired to any field that requires a user to have a fingerprint cookie set or be logged in.
+directive @fingerprintOrAuthRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -5073,6 +5092,10 @@ type ErrNotAuthorized implements Error {
     cause: AuthorizationError!
 }
 
+type ErrNotFingerprinted implements Error {
+  message: String!
+}
+
 type ErrInvalidInput implements Error {
     message: String!
     parameters: [String!]!
@@ -5346,6 +5369,7 @@ type ViewGalleryPayload {
 union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
+    | ErrNotFingerprinted
 
 type Mutation {
     # User Mutations
@@ -5386,7 +5410,7 @@ type Mutation {
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
     
-    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError @fingerprintOrAuthRequired
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
@@ -10269,6 +10293,41 @@ func (ec *executionContext) _ErrNotAuthorized_cause(ctx context.Context, field g
 	return ec.marshalNAuthorizationError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthorizationError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ErrNotFingerprinted_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNotFingerprinted) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrNotFingerprinted",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _ErrSyncFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrSyncFailed) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -14553,8 +14612,28 @@ func (ec *executionContext) _Mutation_viewGallery(ctx context.Context, field gra
 	}
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ViewGallery(rctx, args["galleryId"].(persist.DBID))
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ViewGallery(rctx, args["galleryId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.FingerprintOrAuthRequired == nil {
+				return nil, errors.New("directive fingerprintOrAuthRequired is not implemented")
+			}
+			return ec.directives.FingerprintOrAuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.ViewGalleryPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ViewGalleryPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -22925,6 +23004,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrNotFingerprinted:
+		return ec._ErrNotFingerprinted(ctx, sel, &obj)
+	case *model.ErrNotFingerprinted:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotFingerprinted(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -24201,6 +24287,13 @@ func (ec *executionContext) _ViewGalleryPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	case model.ErrNotFingerprinted:
+		return ec._ErrNotFingerprinted(ctx, sel, &obj)
+	case *model.ErrNotFingerprinted:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotFingerprinted(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -26020,6 +26113,37 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 		case "cause":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrNotAuthorized_cause(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errNotFingerprintedImplementors = []string{"ErrNotFingerprinted", "Error", "ViewGalleryPayloadOrError"}
+
+func (ec *executionContext) _ErrNotFingerprinted(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotFingerprinted) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errNotFingerprintedImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrNotFingerprinted")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrNotFingerprinted_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

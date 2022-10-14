@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/publicapi"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/fingerprints"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -166,6 +168,37 @@ func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, n
 			panic(fmt.Errorf("userID is empty, but no auth error occurred"))
 		}
 
+		return next(ctx)
+	}
+}
+
+func FingerprintRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+		gc := util.GinContextFromContext(ctx)
+		fingerprint, err := fingerprints.GetFingerprintFromCtx(gc)
+		if err != nil || fingerprint == "" {
+			switch {
+			case err == fingerprints.ErrNoFingerprint:
+				return model.ErrNotFingerprinted{Message: "fingerprinting is required"}, nil
+			case fingerprint == "" && err == nil:
+				return model.ErrNotFingerprinted{Message: "fingerprinting is required"}, nil
+			default:
+				return nil, err
+			}
+		}
+		return next(ctx)
+	}
+}
+
+func FingerprintOrAuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+		gc := util.GinContextFromContext(ctx)
+		fingerprint, err := fingerprints.GetFingerprintFromCtx(gc)
+		if err != nil || fingerprint == "" {
+			return AuthRequiredDirectiveHandler()(ctx, obj, next)
+		}
 		return next(ctx)
 	}
 }

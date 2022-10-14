@@ -608,6 +608,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeoneAdmiredYourFeedEventNotification{
 			HelperSomeoneAdmiredYourFeedEventNotificationData: model.HelperSomeoneAdmiredYourFeedEventNotificationData{
 				OwnerID:          notif.OwnerID,
+				FeedEventID:      notif.FeedEventID,
 				NotificationData: notif.Data,
 			},
 			Dbid:         notif.ID,
@@ -622,6 +623,8 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 		return model.SomeoneCommentedOnYourFeedEventNotification{
 			HelperSomeoneCommentedOnYourFeedEventNotificationData: model.HelperSomeoneCommentedOnYourFeedEventNotificationData{
 				OwnerID:          notif.OwnerID,
+				FeedEventID:      notif.FeedEventID,
+				CommentID:        notif.CommentID,
 				NotificationData: notif.Data,
 			},
 			Dbid:         notif.ID,
@@ -632,19 +635,20 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Comment:      nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionUserFollowedUsers:
-		return model.SomeoneFollowedYouNotification{
-			HelperSomeoneFollowedYouNotificationData: model.HelperSomeoneFollowedYouNotificationData{
-				OwnerID:          notif.OwnerID,
-				NotificationData: notif.Data,
-			},
-			Dbid:         notif.ID,
-			Seen:         &notif.Seen,
-			CreationTime: &notif.CreatedAt,
-			UpdatedTime:  &notif.LastUpdated,
-			Count:        &amount,
-			Followers:    nil, // handled by dedicated resolver
-		}, nil
-	case persist.ActionUserFollowedUserBack:
+		if !notif.Data.FollowedBack {
+			return model.SomeoneFollowedYouNotification{
+				HelperSomeoneFollowedYouNotificationData: model.HelperSomeoneFollowedYouNotificationData{
+					OwnerID:          notif.OwnerID,
+					NotificationData: notif.Data,
+				},
+				Dbid:         notif.ID,
+				Seen:         &notif.Seen,
+				CreationTime: &notif.CreatedAt,
+				UpdatedTime:  &notif.LastUpdated,
+				Count:        &amount,
+				Followers:    nil, // handled by dedicated resolver
+			}, nil
+		}
 		return model.SomeoneFollowedYouBackNotification{
 			HelperSomeoneFollowedYouBackNotificationData: model.HelperSomeoneFollowedYouBackNotificationData{
 				OwnerID:          notif.OwnerID,
@@ -658,10 +662,11 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Followers:    nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionViewedGallery:
-		nonCount := len(notif.Data.ViewerIPs)
+		nonCount := len(notif.Data.UnauthedViewerFingerprints)
 		return model.SomeoneViewedYourGalleryNotification{
 			HelperSomeoneViewedYourGalleryNotificationData: model.HelperSomeoneViewedYourGalleryNotificationData{
 				OwnerID:          notif.OwnerID,
+				GalleryID:        notif.GalleryID,
 				NotificationData: notif.Data,
 			},
 			Dbid:               notif.ID,
