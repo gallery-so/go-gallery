@@ -662,7 +662,7 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 			Followers:    nil, // handled by dedicated resolver
 		}, nil
 	case persist.ActionViewedGallery:
-		nonCount := len(notif.Data.UnauthedViewerFingerprints)
+		nonCount := len(notif.Data.UnauthedViewerIDs)
 		return model.SomeoneViewedYourGalleryNotification{
 			HelperSomeoneViewedYourGalleryNotificationData: model.HelperSomeoneViewedYourGalleryNotificationData{
 				OwnerID:          notif.OwnerID,

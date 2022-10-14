@@ -1,16 +1,12 @@
 package persist
 
-import (
-	"github.com/mikeydub/go-gallery/service/fingerprints"
-)
-
 type NotificationData struct {
-	AuthedViewerIDs            []DBID                     `json:"viewer_ids"`
-	UnauthedViewerFingerprints []fingerprints.Fingerprint `json:"viewer_ips"`
-	FollowerIDs                []DBID                     `json:"follower_ids"`
-	AdmirerIDs                 []DBID                     `json:"admirer_ids"`
-	FollowedBack               bool                       `json:"followed_back"`
-	Refollowed                 bool                       `json:"refollowed"`
+	AuthedViewerIDs   []DBID   `json:"viewer_ids"`
+	UnauthedViewerIDs []string `json:"unauthed_viewer_ids"`
+	FollowerIDs       []DBID   `json:"follower_ids"`
+	AdmirerIDs        []DBID   `json:"admirer_ids"`
+	FollowedBack      bool     `json:"followed_back"`
+	Refollowed        bool     `json:"refollowed"`
 }
 
 func (n NotificationData) Validate() NotificationData {
@@ -18,7 +14,7 @@ func (n NotificationData) Validate() NotificationData {
 	result.AdmirerIDs = uniqueDBIDs(n.AdmirerIDs)
 	result.FollowerIDs = uniqueDBIDs(n.FollowerIDs)
 	result.AuthedViewerIDs = uniqueDBIDs(n.AuthedViewerIDs)
-	result.UnauthedViewerFingerprints = uniqueFingerprints(n.UnauthedViewerFingerprints)
+	result.UnauthedViewerIDs = uniqueStrings(n.UnauthedViewerIDs)
 
 	return result
 }
@@ -28,7 +24,7 @@ func (n NotificationData) Concat(other NotificationData) NotificationData {
 	result.AdmirerIDs = append(other.AdmirerIDs, n.AdmirerIDs...)
 	result.FollowerIDs = append(other.FollowerIDs, n.FollowerIDs...)
 	result.AuthedViewerIDs = append(other.AuthedViewerIDs, n.AuthedViewerIDs...)
-	result.UnauthedViewerFingerprints = append(other.UnauthedViewerFingerprints, n.UnauthedViewerFingerprints...)
+	result.UnauthedViewerIDs = append(other.UnauthedViewerIDs, n.UnauthedViewerIDs...)
 
 	return result.Validate()
 }
@@ -47,14 +43,14 @@ func uniqueDBIDs(ids []DBID) []DBID {
 	return result
 }
 
-func uniqueFingerprints(strs []fingerprints.Fingerprint) []fingerprints.Fingerprint {
-	seen := make(map[fingerprints.Fingerprint]bool)
-	result := []fingerprints.Fingerprint{}
+func uniqueStrings(strs []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
 
-	for _, fpt := range strs {
-		if _, ok := seen[fpt]; !ok {
-			seen[fpt] = true
-			result = append(result, fpt)
+	for _, str := range strs {
+		if _, ok := seen[str]; !ok {
+			seen[str] = true
+			result = append(result, str)
 		}
 	}
 

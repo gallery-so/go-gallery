@@ -57,8 +57,6 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *persist.Repositories, q
 func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client) gin.HandlerFunc {
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler()
-	config.Directives.FingerprintRequired = graphql.FingerprintRequiredDirectiveHandler()
-	config.Directives.FingerprintOrAuthRequired = graphql.FingerprintOrAuthRequiredDirectiveHandler()
 	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
 
 	schema := generated.NewExecutableSchema(config)

@@ -24,4 +24,4 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS gallery_id varchar(255) REFERENCES g
 ALTER TABLE events ADD COLUMN IF NOT EXISTS comment_id varchar(255) REFERENCES comments (id);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS admire_id varchar(255) REFERENCES admires (id);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS feed_event_id varchar(255) REFERENCES feed_events (id);
-ALTER TABLE events ADD COLUMN IF NOT EXISTS fingerprint varchar(255);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS external_id varchar(255);

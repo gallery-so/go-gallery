@@ -9,7 +9,6 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/fingerprints"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -131,17 +130,14 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 			})
 		}
 	} else {
-		fp, err := fingerprints.GetFingerprintFromCtx(gc)
-		if err != nil {
-			return db.Gallery{}, err
-		}
+		remote, _ := gc.RemoteIP()
 
 		dispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
-			Fingerprint:    fp,
+			ExternalID:     remote.String(),
 		})
 	}
 

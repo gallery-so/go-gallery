@@ -12,12 +12,6 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
-# Add @fingerprintRequired to any field that requires a user to have a fingerprint cookie set.
-directive @fingerprintRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
-
-# Add @fingerprintOrAuthRequired to any field that requires a user to have a fingerprint cookie set or be logged in.
-directive @fingerprintOrAuthRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
-
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -915,9 +909,6 @@ type ErrNotAuthorized implements Error {
     cause: AuthorizationError!
 }
 
-type ErrNotFingerprinted implements Error {
-  message: String!
-}
 
 type ErrInvalidInput implements Error {
     message: String!
@@ -1192,7 +1183,6 @@ type ViewGalleryPayload {
 union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
-    | ErrNotFingerprinted
 
 type Mutation {
     # User Mutations
@@ -1233,7 +1223,7 @@ type Mutation {
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
     
-    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError @fingerprintOrAuthRequired
+    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 

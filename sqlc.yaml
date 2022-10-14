@@ -110,8 +110,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.EventData"
           - column: "events.feed_window_size"
             go_type: "int"
-          - column: "events.fingerprint"
-            go_type: "github.com/mikeydub/go-gallery/service/fingerprints.Fingerprint"
+          - column: "events.external_id"
+            go_type: "string"
 
           # Admires
           - column: "admires.actor_id"

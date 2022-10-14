@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/fingerprints"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -123,7 +122,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	switch event.Action {
 	case persist.ActionViewedGallery:
 		data.AuthedViewerIDs = []persist.DBID{event.ActorID}
-		data.UnauthedViewerFingerprints = []fingerprints.Fingerprint{event.Fingerprint}
+		data.UnauthedViewerIDs = []string{event.ExternalID}
 	case persist.ActionAdmiredFeedEvent:
 		data.AdmirerIDs = []persist.DBID{event.ActorID}
 	case persist.ActionUserFollowedUsers:

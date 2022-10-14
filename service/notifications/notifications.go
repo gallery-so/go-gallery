@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/fingerprints"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -166,27 +165,27 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 
 	mostRecentNotif := notifs[0]
 
-	if notif.Data.UnauthedViewerFingerprints != nil && len(notif.Data.UnauthedViewerFingerprints) > 0 {
-		fingerprintsToAdd := map[fingerprints.Fingerprint]bool{}
-		for _, ip := range notif.Data.UnauthedViewerFingerprints {
-			fingerprintsToAdd[ip] = true
+	if notif.Data.UnauthedViewerIDs != nil && len(notif.Data.UnauthedViewerIDs) > 0 {
+		externalsToAdd := map[string]bool{}
+		for _, ip := range notif.Data.UnauthedViewerIDs {
+			externalsToAdd[ip] = true
 		}
-		for _, ip := range notif.Data.UnauthedViewerFingerprints {
+		for _, ip := range notif.Data.UnauthedViewerIDs {
 		firstInner:
 			for _, n := range notifs {
-				if fingerprints.ContainsFingerprint(n.Data.UnauthedViewerFingerprints, ip) {
-					fingerprintsToAdd[ip] = false
+				if util.ContainsString(n.Data.UnauthedViewerIDs, ip) {
+					externalsToAdd[ip] = false
 					break firstInner
 				}
 			}
 		}
-		resultIPs := []fingerprints.Fingerprint{}
-		for ip, add := range fingerprintsToAdd {
+		resultIPs := []string{}
+		for ip, add := range externalsToAdd {
 			if add {
 				resultIPs = append(resultIPs, ip)
 			}
 		}
-		notif.Data.UnauthedViewerFingerprints = resultIPs
+		notif.Data.UnauthedViewerIDs = resultIPs
 	}
 
 	if notif.Data.AuthedViewerIDs != nil && len(notif.Data.AuthedViewerIDs) > 0 {

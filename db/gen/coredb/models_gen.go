@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
-	"github.com/mikeydub/go-gallery/service/fingerprints"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -123,7 +122,7 @@ type Event struct {
 	CommentID      persist.DBID
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
-	Fingerprint    fingerprints.Fingerprint
+	ExternalID     string
 }
 
 type Feature struct {
