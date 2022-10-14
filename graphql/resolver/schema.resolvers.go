@@ -744,16 +744,17 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
+func (r *mutationResolver) RemoveAdmire(ctx context.Context, feedEventID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
+	admireID, err := publicapi.For(ctx).Interaction.RemoveAdmireByFeedEventID(ctx, feedEventID)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.RemoveAdmirePayload{
-		Viewer: resolveViewer(ctx),
+		Viewer:   resolveViewer(ctx),
+		AdmireID: &admireID,
 		FeedEvent: &model.FeedEvent{
-			Dbid: feedEvent, // remaining fields handled by dedicated resolver
+			Dbid: feedEventID, // remaining fields handled by dedicated resolver
 		},
 	}
 	return output, nil

@@ -315,6 +315,27 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	return comments, pageInfo, err
 }
 
+func (api InteractionAPI) GetAdmireByActorIDAndFeedEventID(ctx context.Context, actorID persist.DBID, feedEventID persist.DBID) (*db.Admire, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"actorID":     {actorID, "required"},
+		"feedEventID": {feedEventID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	admire, err := api.loaders.AdmireByActorIDAndFeedEventID.Load(db.GetAdmireByActorIDAndFeedEventIDParams{
+		ActorID:     actorID,
+		FeedEventID: feedEventID,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &admire, nil
+}
+
 func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*db.Admire, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -340,6 +361,32 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 	}
 
 	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx))
+}
+
+func (api InteractionAPI) RemoveAdmireByFeedEventID(ctx context.Context, feedEventID persist.DBID) (persist.DBID, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"feedEventID": {feedEventID, "required"},
+	}); err != nil {
+		return "", err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	admire, err := api.GetAdmireByActorIDAndFeedEventID(ctx, userID, feedEventID)
+	if err != nil {
+		return "", err
+	}
+
+	err = api.repos.AdmireRepository.RemoveAdmire(ctx, admire.ID)
+	if err != nil {
+		return "", err
+	}
+
+	return admire.ID, nil
 }
 
 func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
@@ -371,16 +418,19 @@ func (api InteractionAPI) HasUserAdmiredFeedEvent(ctx context.Context, userID pe
 		return nil, err
 	}
 
-	hasAdmired, err := api.loaders.UserAdmiredFeedEvent.Load(db.GetUserAdmiredFeedEventParams{
-		ActorID:     userID,
-		FeedEventID: feedEventID,
-	})
-
-	if err != nil {
-		return nil, err
+	_, err := api.GetAdmireByActorIDAndFeedEventID(ctx, userID, feedEventID)
+	if err == nil {
+		hasAdmired := true
+		return &hasAdmired, nil
 	}
 
-	return &hasAdmired, nil
+	notFoundErr := persist.ErrAdmireNotFound{}
+	if errors.As(err, &notFoundErr) {
+		hasAdmired := false
+		return &hasAdmired, nil
+	}
+
+	return nil, err
 }
 
 func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {
