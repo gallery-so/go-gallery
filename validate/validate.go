@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -68,15 +67,12 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("nonce", NonceValidator)
 	v.RegisterValidation("signature", SignatureValidator)
 	v.RegisterValidation("username", UsernameValidator)
-	v.RegisterValidation("max_string_length", MaxStringLengthValidator)
 	v.RegisterValidation("sorted_asc", SortedAscValidator)
 	v.RegisterValidation("chain", ChainValidator)
-	v.RegisterAlias("medium", "max_string_length=600")
-	v.RegisterAlias("collectors_note", "max_string_length=1200")
-	v.RegisterAlias("collection_name", "max_string_length=200")
-	v.RegisterAlias("collection_note", "max_string_length=600")
-	v.RegisterAlias("token_note", "max_string_length=1200")
-	v.RegisterAlias("bio", "max_string_length=600")
+	v.RegisterAlias("collection_name", "max=200")
+	v.RegisterAlias("collection_note", "max=600")
+	v.RegisterAlias("token_note", "max=1200")
+	v.RegisterAlias("bio", "max=600")
 
 	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
 	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
@@ -173,18 +169,6 @@ var NonceValidator validator.Func = func(fl validator.FieldLevel) bool {
 		return true
 	}
 	return len(nonce) >= 10 && len(nonce) <= 150
-}
-
-// MaxStringLengthValidator validates strings with a given maximum length
-var MaxStringLengthValidator validator.Func = func(fl validator.FieldLevel) bool {
-	s := fl.Field().String()
-
-	maxLength, err := strconv.Atoi(fl.Param())
-	if err != nil {
-		panic(fmt.Errorf("error parsing MaxStringLengthValidator parameter: %s", err))
-	}
-
-	return len(s) <= maxLength
 }
 
 // UsernameValidator ensures that usernames are not reserved, are alphanumeric with the exception of underscores and periods, and do not contain consecutive periods or underscores
