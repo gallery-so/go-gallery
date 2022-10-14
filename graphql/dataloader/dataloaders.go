@@ -310,24 +310,9 @@ func loadUserByUsername(q *db.Queries) func(context.Context, []string) ([]db.Use
 }
 
 func loadOwnersByContractIDs(q *db.Queries) func(context.Context, []db.GetOwnersByContractIdBatchPaginateParams) ([][]db.User, []error) {
-	return func(ctx context.Context, contractIDs []db.GetOwnersByContractIdBatchPaginateParams) ([][]db.User, []error) {
-		users := make([][]db.User, len(contractIDs))
-		errors := make([]error, len(contractIDs))
-
-		params := make([]db.GetOwnersByContractIdBatchPaginateParams, len(contractIDs))
-		for i, id := range contractIDs {
-			params[i] = db.GetOwnersByContractIdBatchPaginateParams{
-				Contract:           id.Contract,
-				Limit:              id.Limit,
-				CurBeforeUniversal: id.CurAfterUniversal,
-				CurBeforeTime:      id.CurAfterTime,
-				CurBeforeID:        id.CurAfterID,
-				CurAfterUniversal:  id.CurBeforeUniversal,
-				CurAfterTime:       id.CurBeforeTime,
-				CurAfterID:         id.CurBeforeID,
-				PagingForward:      id.PagingForward,
-			}
-		}
+	return func(ctx context.Context, params []db.GetOwnersByContractIdBatchPaginateParams) ([][]db.User, []error) {
+		users := make([][]db.User, len(params))
+		errors := make([]error, len(params))
 
 		b := q.GetOwnersByContractIdBatchPaginate(ctx, params)
 		defer b.Close()
@@ -638,24 +623,9 @@ func loadOwnerByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 }
 
 func loadTokensByContractIDWithPagination(q *db.Queries) func(context.Context, []db.GetTokensByContractIdBatchPaginateParams) ([][]db.Token, []error) {
-	return func(ctx context.Context, contractIDs []db.GetTokensByContractIdBatchPaginateParams) ([][]db.Token, []error) {
-		tokens := make([][]db.Token, len(contractIDs))
-		errors := make([]error, len(contractIDs))
-
-		params := make([]db.GetTokensByContractIdBatchPaginateParams, len(contractIDs))
-		for i, id := range contractIDs {
-			params[i] = db.GetTokensByContractIdBatchPaginateParams{
-				Contract:           id.Contract,
-				Limit:              id.Limit,
-				CurBeforeUniversal: id.CurBeforeUniversal,
-				CurBeforeTime:      id.CurBeforeTime,
-				CurBeforeID:        id.CurBeforeID,
-				CurAfterUniversal:  id.CurAfterUniversal,
-				CurAfterTime:       id.CurAfterTime,
-				CurAfterID:         id.CurAfterID,
-				PagingForward:      id.PagingForward,
-			}
-		}
+	return func(ctx context.Context, params []db.GetTokensByContractIdBatchPaginateParams) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(params))
+		errors := make([]error, len(params))
 
 		b := q.GetTokensByContractIdBatchPaginate(ctx, params)
 		defer b.Close()
