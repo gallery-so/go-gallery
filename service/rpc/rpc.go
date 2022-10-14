@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"image/jpeg"
 	"io"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"net"
@@ -363,7 +364,10 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 		path = strings.ReplaceAll(path, "ar://", "")
 		bs, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
-			return nil, err
+			bs, err = GetArweaveDataHTTP(ctx, path)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return util.RemoveBOM(bs), nil
 	case persist.URITypeHTTP:
@@ -466,7 +470,11 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		path = strings.ReplaceAll(path, "ar://", "")
 		bs, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
-			return util.FileHeaderReader{}, err
+			resp, err := GetArweaveDataHTTPReader(ctx, path)
+			if err != nil {
+				return util.FileHeaderReader{}, err
+			}
+			return util.NewFileHeaderReader(resp)
 		}
 		buf := bytes.NewBuffer(util.RemoveBOM(bs))
 		return util.NewFileHeaderReader(buf)
@@ -569,7 +577,10 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		path = strings.ReplaceAll(path, "ar://", "")
 		result, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
-			return err
+			result, err = GetArweaveDataHTTP(ctx, path)
+			if err != nil {
+				return err
+			}
 		}
 		return json.Unmarshal(result, into)
 	case persist.URITypeHTTP:
@@ -872,12 +883,12 @@ func GetArweaveData(client *goar.Client, id string) ([]byte, error) {
 	for i := range splitPath {
 		t, err := client.GetTransactionByID(currentID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting transaction: %s", err.Error())
 		}
 		tx = t
 		data, err = client.GetTransactionData(currentID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting transaction data: %s", err.Error())
 		}
 		if i < len(splitPath)-1 {
 			decoded, err := base64.RawStdEncoding.DecodeString(string(data))
@@ -898,28 +909,53 @@ func GetArweaveData(client *goar.Client, id string) ([]byte, error) {
 	for _, tag := range tx.Tags {
 		decodedName, err := base64.RawURLEncoding.DecodeString(tag.Name)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error decoding tag name: %s", err.Error())
 		}
 		if strings.EqualFold(string(decodedName), "Content-Encoding") {
 			decodedValue, err := base64.RawURLEncoding.DecodeString(tag.Value)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error decoding tag value: %s", err.Error())
 			}
 			if strings.EqualFold(string(decodedValue), "gzip") {
 				zipped, err := gzip.NewReader(bytes.NewReader(data))
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("error unzipping data: %s", err.Error())
 				}
 				buf := new(bytes.Buffer)
 				_, err = io.Copy(buf, zipped)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("error copying data: %s", err.Error())
 				}
 				data = buf.Bytes()
 			}
 		}
 	}
 	return util.RemoveBOM(data), nil
+}
+
+func GetArweaveDataHTTPReader(ctx context.Context, id string) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://arweave.net/%s", id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error getting data: %s", err.Error())
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting data: %s", err.Error())
+	}
+	return resp.Body, nil
+}
+
+func GetArweaveDataHTTP(ctx context.Context, id string) ([]byte, error) {
+	resp, err := GetArweaveDataHTTPReader(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Close()
+	data, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return nil, fmt.Errorf("error reading data: %s", err.Error())
+	}
+	return data, nil
 }
 
 // GetArweaveContentType returns the content-type from an Arweave transaction
