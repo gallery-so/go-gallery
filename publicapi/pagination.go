@@ -81,10 +81,10 @@ func (p *keysetPaginator) paginate(before *string, after *string, first *int, la
 	}
 
 	// Reverse the slice if we're paginating backward. Keyset pagination requires our SQL queries to
-	// ORDER BY ASC for forward paging and ORDER BY DESC for backward paging, but the Relay pagination
-	// spec requires that returned elements should always be in the same order, regardless of whether
-	// we're paging forward or backward.
-	if last != nil {
+	// use opposite ORDER BY clauses for forward and backward paging, but the Relay pagination spec
+	// requires that returned elements should always be in the same order, regardless of whether we're
+	// paging forward or backward.
+	if !pagingForward {
 		for i, j := 0, len(results)-1; i < j; i, j = i+1, j-1 {
 			results[i], results[j] = results[j], results[i]
 		}
