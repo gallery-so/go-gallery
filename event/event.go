@@ -28,10 +28,10 @@ type EventHandlers struct {
 
 // Register specific event handlers
 func AddTo(ctx *gin.Context, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *cloudtasks.Client) {
-	eventDispatcher := eventDispatcher{handlers: map[persist.Action][]eventHandler{}}
 	eventRepo := postgres.EventRepository{Queries: queries}
-	feedHandler := feedHandler{eventRepo: eventRepo, tc: taskClient}
-	notificationHandler := notificationHandler{eventRepo: eventRepo, notificationHandlers: notif}
+	eventDispatcher := eventDispatcher{eventRepo: eventRepo, handlers: map[persist.Action][]eventHandler{}}
+	feedHandler := feedHandler{tc: taskClient}
+	notificationHandler := notificationHandler{notificationHandlers: notif}
 
 	eventDispatcher.AddHandler(persist.ActionUserCreated, feedHandler)
 	eventDispatcher.AddHandler(persist.ActionUserFollowedUsers, feedHandler, notificationHandler)
@@ -62,7 +62,8 @@ type eventHandler interface {
 }
 
 type eventDispatcher struct {
-	handlers map[persist.Action][]eventHandler
+	eventRepo postgres.EventRepository
+	handlers  map[persist.Action][]eventHandler
 }
 
 func (d *eventDispatcher) AddHandler(action persist.Action, handlers ...eventHandler) {
@@ -71,8 +72,12 @@ func (d *eventDispatcher) AddHandler(action persist.Action, handlers ...eventHan
 
 func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
 	if handlers, ok := d.handlers[event.Action]; ok {
+		persisted, err := d.eventRepo.Add(ctx, event)
+		if err != nil {
+			return err
+		}
 		for _, handler := range handlers {
-			if err := handler.Handle(ctx, event); err != nil {
+			if err := handler.Handle(ctx, *persisted); err != nil {
 				return err
 			}
 		}
@@ -82,47 +87,35 @@ func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
 }
 
 type feedHandler struct {
-	eventRepo postgres.EventRepository
-	tc        *cloudtasks.Client
+	tc *cloudtasks.Client
 }
 
-func (h feedHandler) Handle(ctx context.Context, event db.Event) error {
-	persisted, err := h.eventRepo.Add(ctx, event)
-
-	if err != nil {
-		return err
-	}
-
-	scheduleOn := persisted.CreatedAt.Add(time.Duration(viper.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second)
-	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persisted.ID}, h.tc)
+func (h feedHandler) Handle(ctx context.Context, persistedEvent db.Event) error {
+	scheduleOn := persistedEvent.CreatedAt.Add(time.Duration(viper.GetInt("GCLOUD_FEED_BUFFER_SECS")) * time.Second)
+	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persistedEvent.ID}, h.tc)
 }
 
 type notificationHandler struct {
-	eventRepo            postgres.EventRepository
 	queries              *db.Queries
 	dataloaders          *dataloader.Loaders
 	notificationHandlers *notifications.NotificationHandlers
 }
 
-func (h notificationHandler) Handle(ctx context.Context, event db.Event) error {
-	persisted, err := h.eventRepo.Add(ctx, event)
-	if err != nil {
-		return err
-	}
+func (h notificationHandler) Handle(ctx context.Context, persistedEvent db.Event) error {
 
-	owner, err := h.findOwnerForNotificationFromEvent(*persisted)
+	owner, err := h.findOwnerForNotificationFromEvent(persistedEvent)
 	if err != nil {
 		return err
 	}
 
 	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
 		OwnerID:     owner,
-		Action:      persisted.Action,
-		Data:        h.createNotificationDataForEvent(*persisted),
-		EventIds:    persist.DBIDList{persisted.ID},
-		GalleryID:   persisted.GalleryID,
-		FeedEventID: persisted.FeedEventID,
-		CommentID:   persisted.CommentID,
+		Action:      persistedEvent.Action,
+		Data:        h.createNotificationDataForEvent(persistedEvent),
+		EventIds:    persist.DBIDList{persistedEvent.ID},
+		GalleryID:   persistedEvent.GalleryID,
+		FeedEventID: persistedEvent.FeedEventID,
+		CommentID:   persistedEvent.CommentID,
 	})
 }
 
