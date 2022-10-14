@@ -24,12 +24,6 @@ import (
 var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
 var errMustResolveENS = errors.New("ENS username must resolve to owner address")
 
-// UpdateUserInput is the input for the user update pipeline
-type UpdateUserInput struct {
-	UserName string `json:"username" binding:"username"`
-	BioStr   string `json:"bio" binding:"medium"`
-}
-
 // GetUserInput is the input for the user get pipeline
 type GetUserInput struct {
 	UserID   persist.DBID    `json:"user_id" form:"user_id"`

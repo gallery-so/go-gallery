@@ -474,7 +474,7 @@ type ComplexityRoot struct {
 		RefreshCollection        func(childComplexity int, collectionID persist.DBID) int
 		RefreshContract          func(childComplexity int, contractID persist.DBID) int
 		RefreshToken             func(childComplexity int, tokenID persist.DBID) int
-		RemoveAdmire             func(childComplexity int, admireID persist.DBID) int
+		RemoveAdmire             func(childComplexity int, feedEventID persist.DBID) int
 		RemoveComment            func(childComplexity int, commentID persist.DBID) int
 		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
 		SetSpamPreference        func(childComplexity int, input model.SetSpamPreferenceInput) int
@@ -542,6 +542,7 @@ type ComplexityRoot struct {
 	}
 
 	RemoveAdmirePayload struct {
+		AdmireID  func(childComplexity int) int
 		FeedEvent func(childComplexity int) int
 		Viewer    func(childComplexity int) int
 	}
@@ -820,7 +821,7 @@ type MutationResolver interface {
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 	AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error)
-	RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error)
+	RemoveAdmire(ctx context.Context, feedEventID persist.DBID) (model.RemoveAdmirePayloadOrError, error)
 	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error)
 	RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error)
 }
@@ -2491,7 +2492,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveAdmire(childComplexity, args["admireId"].(persist.DBID)), true
+		return e.complexity.Mutation.RemoveAdmire(childComplexity, args["feedEventId"].(persist.DBID)), true
 
 	case "Mutation.removeComment":
 		if e.complexity.Mutation.RemoveComment == nil {
@@ -2908,6 +2909,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RefreshTokenPayload.Token(childComplexity), true
+
+	case "RemoveAdmirePayload.admireID":
+		if e.complexity.RemoveAdmirePayload.AdmireID == nil {
+			break
+		}
+
+		return e.complexity.RemoveAdmirePayload.AdmireID(childComplexity), true
 
 	case "RemoveAdmirePayload.feedEvent":
 		if e.complexity.RemoveAdmirePayload.FeedEvent == nil {
@@ -4694,8 +4702,9 @@ type AdmireFeedEventPayload {
 }
 
 type RemoveAdmirePayload {
-  viewer: Viewer
-  feedEvent: FeedEvent @goField(forceResolver: true)
+    viewer: Viewer
+    admireID: DBID
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 type CommentOnFeedEventPayload {
@@ -4745,7 +4754,7 @@ type Mutation {
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
     admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
-    removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
+    removeAdmire(feedEventId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 }
@@ -5292,14 +5301,14 @@ func (ec *executionContext) field_Mutation_removeAdmire_args(ctx context.Context
 	var err error
 	args := map[string]interface{}{}
 	var arg0 persist.DBID
-	if tmp, ok := rawArgs["admireId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("admireId"))
+	if tmp, ok := rawArgs["feedEventId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feedEventId"))
 		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["admireId"] = arg0
+	args["feedEventId"] = arg0
 	return args, nil
 }
 
@@ -13483,7 +13492,7 @@ func (ec *executionContext) _Mutation_removeAdmire(ctx context.Context, field gr
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveAdmire(rctx, args["admireId"].(persist.DBID))
+			return ec.resolvers.Mutation().RemoveAdmire(rctx, args["feedEventId"].(persist.DBID))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -14878,6 +14887,38 @@ func (ec *executionContext) _RemoveAdmirePayload_viewer(ctx context.Context, fie
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _RemoveAdmirePayload_admireID(ctx context.Context, field graphql.CollectedField, obj *model.RemoveAdmirePayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "RemoveAdmirePayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AdmireID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.DBID)
+	fc.Result = res
+	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _RemoveAdmirePayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.RemoveAdmirePayload) (ret graphql.Marshaler) {
@@ -25458,6 +25499,13 @@ func (ec *executionContext) _RemoveAdmirePayload(ctx context.Context, sel ast.Se
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._RemoveAdmirePayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "admireID":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._RemoveAdmirePayload_admireID(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

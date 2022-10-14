@@ -828,8 +828,9 @@ type RefreshTokenPayload struct {
 func (RefreshTokenPayload) IsRefreshTokenPayloadOrError() {}
 
 type RemoveAdmirePayload struct {
-	Viewer    *Viewer    `json:"viewer"`
-	FeedEvent *FeedEvent `json:"feedEvent"`
+	Viewer    *Viewer       `json:"viewer"`
+	AdmireID  *persist.DBID `json:"admireID"`
+	FeedEvent *FeedEvent    `json:"feedEvent"`
 }
 
 func (RemoveAdmirePayload) IsRemoveAdmirePayloadOrError() {}

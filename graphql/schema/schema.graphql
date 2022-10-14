@@ -1049,8 +1049,9 @@ type AdmireFeedEventPayload {
 }
 
 type RemoveAdmirePayload {
-  viewer: Viewer
-  feedEvent: FeedEvent @goField(forceResolver: true)
+    viewer: Viewer
+    admireID: DBID
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 type CommentOnFeedEventPayload {
@@ -1100,7 +1101,7 @@ type Mutation {
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
     admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
-    removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
+    removeAdmire(feedEventId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 }

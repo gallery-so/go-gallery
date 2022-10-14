@@ -10,7 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 )
 
-type UserAdmiredFeedEventLoaderSettings interface {
+type AdmireLoaderByActorAndFeedEventSettings interface {
 	getContext() context.Context
 	getWait() time.Duration
 	getMaxBatchOne() int
@@ -21,20 +21,20 @@ type UserAdmiredFeedEventLoaderSettings interface {
 	getMutexRegistry() *[]*sync.Mutex
 }
 
-// UserAdmiredFeedEventLoaderCacheSubscriptions
-type UserAdmiredFeedEventLoaderCacheSubscriptions struct {
-	// AutoCacheWithKey is a function that returns the coredb.GetUserAdmiredFeedEventParams cache key for a bool.
+// AdmireLoaderByActorAndFeedEventCacheSubscriptions
+type AdmireLoaderByActorAndFeedEventCacheSubscriptions struct {
+	// AutoCacheWithKey is a function that returns the coredb.GetAdmireByActorIDAndFeedEventIDParams cache key for a coredb.Admire.
 	// If AutoCacheWithKey is not nil, this loader will automatically cache published results from other loaders
-	// that return a bool. Loaders that return pointers or slices of bool
-	// will be dereferenced/iterated automatically, invoking this function with the base bool type.
-	AutoCacheWithKey func(bool) coredb.GetUserAdmiredFeedEventParams
+	// that return a coredb.Admire. Loaders that return pointers or slices of coredb.Admire
+	// will be dereferenced/iterated automatically, invoking this function with the base coredb.Admire type.
+	AutoCacheWithKey func(coredb.Admire) coredb.GetAdmireByActorIDAndFeedEventIDParams
 
-	// AutoCacheWithKeys is a function that returns the []coredb.GetUserAdmiredFeedEventParams cache keys for a bool.
+	// AutoCacheWithKeys is a function that returns the []coredb.GetAdmireByActorIDAndFeedEventIDParams cache keys for a coredb.Admire.
 	// Similar to AutoCacheWithKey, but for cases where a single value gets cached by many keys.
 	// If AutoCacheWithKeys is not nil, this loader will automatically cache published results from other loaders
-	// that return a bool. Loaders that return pointers or slices of bool
-	// will be dereferenced/iterated automatically, invoking this function with the base bool type.
-	AutoCacheWithKeys func(bool) []coredb.GetUserAdmiredFeedEventParams
+	// that return a coredb.Admire. Loaders that return pointers or slices of coredb.Admire
+	// will be dereferenced/iterated automatically, invoking this function with the base coredb.Admire type.
+	AutoCacheWithKeys func(coredb.Admire) []coredb.GetAdmireByActorIDAndFeedEventIDParams
 
 	// TODO: Allow custom cache functions once we're able to use generics. It could be done without generics, but
 	// would be messy and error-prone. A non-generic implementation might look something like:
@@ -46,30 +46,30 @@ type UserAdmiredFeedEventLoaderCacheSubscriptions struct {
 	// to prime the cache.
 }
 
-func (l *UserAdmiredFeedEventLoader) setContext(ctx context.Context) {
+func (l *AdmireLoaderByActorAndFeedEvent) setContext(ctx context.Context) {
 	l.ctx = ctx
 }
 
-func (l *UserAdmiredFeedEventLoader) setWait(wait time.Duration) {
+func (l *AdmireLoaderByActorAndFeedEvent) setWait(wait time.Duration) {
 	l.wait = wait
 }
 
-func (l *UserAdmiredFeedEventLoader) setMaxBatch(maxBatch int) {
+func (l *AdmireLoaderByActorAndFeedEvent) setMaxBatch(maxBatch int) {
 	l.maxBatch = maxBatch
 }
 
-func (l *UserAdmiredFeedEventLoader) setDisableCaching(disableCaching bool) {
+func (l *AdmireLoaderByActorAndFeedEvent) setDisableCaching(disableCaching bool) {
 	l.disableCaching = disableCaching
 }
 
-func (l *UserAdmiredFeedEventLoader) setPublishResults(publishResults bool) {
+func (l *AdmireLoaderByActorAndFeedEvent) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
-// NewUserAdmiredFeedEventLoader creates a new UserAdmiredFeedEventLoader with the given settings, functions, and options
-func NewUserAdmiredFeedEventLoader(
-	settings UserAdmiredFeedEventLoaderSettings, fetch func(ctx context.Context, keys []coredb.GetUserAdmiredFeedEventParams) ([]bool, []error),
-	funcs UserAdmiredFeedEventLoaderCacheSubscriptions,
+// NewAdmireLoaderByActorAndFeedEvent creates a new AdmireLoaderByActorAndFeedEvent with the given settings, functions, and options
+func NewAdmireLoaderByActorAndFeedEvent(
+	settings AdmireLoaderByActorAndFeedEventSettings, fetch func(ctx context.Context, keys []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error),
+	funcs AdmireLoaderByActorAndFeedEventCacheSubscriptions,
 	opts ...func(interface {
 		setContext(context.Context)
 		setWait(time.Duration)
@@ -77,8 +77,8 @@ func NewUserAdmiredFeedEventLoader(
 		setDisableCaching(bool)
 		setPublishResults(bool)
 	}),
-) *UserAdmiredFeedEventLoader {
-	loader := &UserAdmiredFeedEventLoader{
+) *AdmireLoaderByActorAndFeedEvent {
+	loader := &AdmireLoaderByActorAndFeedEvent{
 		ctx:                  settings.getContext(),
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
@@ -93,7 +93,9 @@ func NewUserAdmiredFeedEventLoader(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []coredb.GetUserAdmiredFeedEventParams) ([]bool, []error) { return fetch(loader.ctx, keys) }
+	loader.fetch = func(keys []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error) {
+		return fetch(loader.ctx, keys)
+	}
 
 	if loader.subscriptionRegistry == nil {
 		panic("subscriptionRegistry may not be nil")
@@ -106,7 +108,7 @@ func NewUserAdmiredFeedEventLoader(
 	if !loader.disableCaching {
 		// One-to-one mappings: cache one value with one key
 		if funcs.AutoCacheWithKey != nil {
-			cacheFunc := func(t bool) {
+			cacheFunc := func(t coredb.Admire) {
 				loader.unsafePrime(funcs.AutoCacheWithKey(t), t)
 			}
 			loader.registerCacheFunc(&cacheFunc, &loader.mu)
@@ -114,7 +116,7 @@ func NewUserAdmiredFeedEventLoader(
 
 		// One-to-many mappings: cache one value with many keys
 		if funcs.AutoCacheWithKeys != nil {
-			cacheFunc := func(t bool) {
+			cacheFunc := func(t coredb.Admire) {
 				keys := funcs.AutoCacheWithKeys(t)
 				for _, key := range keys {
 					loader.unsafePrime(key, t)
@@ -127,13 +129,13 @@ func NewUserAdmiredFeedEventLoader(
 	return loader
 }
 
-// UserAdmiredFeedEventLoader batches and caches requests
-type UserAdmiredFeedEventLoader struct {
+// AdmireLoaderByActorAndFeedEvent batches and caches requests
+type AdmireLoaderByActorAndFeedEvent struct {
 	// context passed to fetch functions
 	ctx context.Context
 
 	// this method provides the data for the loader
-	fetch func(keys []coredb.GetUserAdmiredFeedEventParams) ([]bool, []error)
+	fetch func(keys []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error)
 
 	// how long to wait before sending a batch
 	wait time.Duration
@@ -158,18 +160,18 @@ type UserAdmiredFeedEventLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[coredb.GetUserAdmiredFeedEventParams]bool
+	cache map[coredb.GetAdmireByActorIDAndFeedEventIDParams]coredb.Admire
 
 	// typed cache functions
-	//subscribers []func(bool)
-	subscribers []userAdmiredFeedEventLoaderSubscriber
+	//subscribers []func(coredb.Admire)
+	subscribers []admireLoaderByActorAndFeedEventSubscriber
 
 	// functions used to cache published results from other dataloaders
 	cacheFuncs []interface{}
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *userAdmiredFeedEventLoaderBatch
+	batch *admireLoaderByActorAndFeedEventBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
@@ -178,43 +180,43 @@ type UserAdmiredFeedEventLoader struct {
 	once sync.Once
 }
 
-type userAdmiredFeedEventLoaderBatch struct {
-	keys    []coredb.GetUserAdmiredFeedEventParams
-	data    []bool
+type admireLoaderByActorAndFeedEventBatch struct {
+	keys    []coredb.GetAdmireByActorIDAndFeedEventIDParams
+	data    []coredb.Admire
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a bool by key, batching and caching will be applied automatically
-func (l *UserAdmiredFeedEventLoader) Load(key coredb.GetUserAdmiredFeedEventParams) (bool, error) {
+// Load a Admire by key, batching and caching will be applied automatically
+func (l *AdmireLoaderByActorAndFeedEvent) Load(key coredb.GetAdmireByActorIDAndFeedEventIDParams) (coredb.Admire, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a bool.
+// LoadThunk returns a function that when called will block waiting for a Admire.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserAdmiredFeedEventLoader) LoadThunk(key coredb.GetUserAdmiredFeedEventParams) func() (bool, error) {
+func (l *AdmireLoaderByActorAndFeedEvent) LoadThunk(key coredb.GetAdmireByActorIDAndFeedEventIDParams) func() (coredb.Admire, error) {
 	l.mu.Lock()
 	if !l.disableCaching {
 		if it, ok := l.cache[key]; ok {
 			l.mu.Unlock()
-			return func() (bool, error) {
+			return func() (coredb.Admire, error) {
 				return it, nil
 			}
 		}
 	}
 	if l.batch == nil {
-		l.batch = &userAdmiredFeedEventLoaderBatch{done: make(chan struct{})}
+		l.batch = &admireLoaderByActorAndFeedEventBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (bool, error) {
+	return func() (coredb.Admire, error) {
 		<-batch.done
 
-		var data bool
+		var data coredb.Admire
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -245,43 +247,43 @@ func (l *UserAdmiredFeedEventLoader) LoadThunk(key coredb.GetUserAdmiredFeedEven
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *UserAdmiredFeedEventLoader) LoadAll(keys []coredb.GetUserAdmiredFeedEventParams) ([]bool, []error) {
-	results := make([]func() (bool, error), len(keys))
+func (l *AdmireLoaderByActorAndFeedEvent) LoadAll(keys []coredb.GetAdmireByActorIDAndFeedEventIDParams) ([]coredb.Admire, []error) {
+	results := make([]func() (coredb.Admire, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	bools := make([]bool, len(keys))
+	admires := make([]coredb.Admire, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		bools[i], errors[i] = thunk()
+		admires[i], errors[i] = thunk()
 	}
-	return bools, errors
+	return admires, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a bools.
+// LoadAllThunk returns a function that when called will block waiting for a Admires.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *UserAdmiredFeedEventLoader) LoadAllThunk(keys []coredb.GetUserAdmiredFeedEventParams) func() ([]bool, []error) {
-	results := make([]func() (bool, error), len(keys))
+func (l *AdmireLoaderByActorAndFeedEvent) LoadAllThunk(keys []coredb.GetAdmireByActorIDAndFeedEventIDParams) func() ([]coredb.Admire, []error) {
+	results := make([]func() (coredb.Admire, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]bool, []error) {
-		bools := make([]bool, len(keys))
+	return func() ([]coredb.Admire, []error) {
+		admires := make([]coredb.Admire, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			bools[i], errors[i] = thunk()
+			admires[i], errors[i] = thunk()
 		}
-		return bools, errors
+		return admires, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *UserAdmiredFeedEventLoader) Prime(key coredb.GetUserAdmiredFeedEventParams, value bool) bool {
+func (l *AdmireLoaderByActorAndFeedEvent) Prime(key coredb.GetAdmireByActorIDAndFeedEventIDParams, value coredb.Admire) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -295,7 +297,7 @@ func (l *UserAdmiredFeedEventLoader) Prime(key coredb.GetUserAdmiredFeedEventPar
 }
 
 // Prime the cache without acquiring locks. Should only be used when the lock is already held.
-func (l *UserAdmiredFeedEventLoader) unsafePrime(key coredb.GetUserAdmiredFeedEventParams, value bool) bool {
+func (l *AdmireLoaderByActorAndFeedEvent) unsafePrime(key coredb.GetAdmireByActorIDAndFeedEventIDParams, value coredb.Admire) bool {
 	if l.disableCaching {
 		return false
 	}
@@ -307,7 +309,7 @@ func (l *UserAdmiredFeedEventLoader) unsafePrime(key coredb.GetUserAdmiredFeedEv
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *UserAdmiredFeedEventLoader) Clear(key coredb.GetUserAdmiredFeedEventParams) {
+func (l *AdmireLoaderByActorAndFeedEvent) Clear(key coredb.GetAdmireByActorIDAndFeedEventIDParams) {
 	if l.disableCaching {
 		return
 	}
@@ -316,16 +318,16 @@ func (l *UserAdmiredFeedEventLoader) Clear(key coredb.GetUserAdmiredFeedEventPar
 	l.mu.Unlock()
 }
 
-func (l *UserAdmiredFeedEventLoader) unsafeSet(key coredb.GetUserAdmiredFeedEventParams, value bool) {
+func (l *AdmireLoaderByActorAndFeedEvent) unsafeSet(key coredb.GetAdmireByActorIDAndFeedEventIDParams, value coredb.Admire) {
 	if l.cache == nil {
-		l.cache = map[coredb.GetUserAdmiredFeedEventParams]bool{}
+		l.cache = map[coredb.GetAdmireByActorIDAndFeedEventIDParams]coredb.Admire{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *userAdmiredFeedEventLoaderBatch) keyIndex(l *UserAdmiredFeedEventLoader, key coredb.GetUserAdmiredFeedEventParams) int {
+func (b *admireLoaderByActorAndFeedEventBatch) keyIndex(l *AdmireLoaderByActorAndFeedEvent, key coredb.GetAdmireByActorIDAndFeedEventIDParams) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -349,7 +351,7 @@ func (b *userAdmiredFeedEventLoaderBatch) keyIndex(l *UserAdmiredFeedEventLoader
 	return pos
 }
 
-func (b *userAdmiredFeedEventLoaderBatch) startTimer(l *UserAdmiredFeedEventLoader) {
+func (b *admireLoaderByActorAndFeedEventBatch) startTimer(l *AdmireLoaderByActorAndFeedEvent) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -365,24 +367,24 @@ func (b *userAdmiredFeedEventLoaderBatch) startTimer(l *UserAdmiredFeedEventLoad
 	b.end(l)
 }
 
-func (b *userAdmiredFeedEventLoaderBatch) end(l *UserAdmiredFeedEventLoader) {
+func (b *admireLoaderByActorAndFeedEventBatch) end(l *AdmireLoaderByActorAndFeedEvent) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }
 
-type userAdmiredFeedEventLoaderSubscriber struct {
-	cacheFunc func(bool)
+type admireLoaderByActorAndFeedEventSubscriber struct {
+	cacheFunc func(coredb.Admire)
 	mutex     *sync.Mutex
 }
 
-func (l *UserAdmiredFeedEventLoader) publishToSubscribers(value bool) {
+func (l *AdmireLoaderByActorAndFeedEvent) publishToSubscribers(value coredb.Admire) {
 	// Lazy build our list of typed cache functions once
 	l.once.Do(func() {
 		for i, subscription := range *l.subscriptionRegistry {
-			if typedFunc, ok := subscription.(*func(bool)); ok {
+			if typedFunc, ok := subscription.(*func(coredb.Admire)); ok {
 				// Don't invoke our own cache function
 				if !l.ownsCacheFunc(typedFunc) {
-					l.subscribers = append(l.subscribers, userAdmiredFeedEventLoaderSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
+					l.subscribers = append(l.subscribers, admireLoaderByActorAndFeedEventSubscriber{cacheFunc: *typedFunc, mutex: (*l.mutexRegistry)[i]})
 				}
 			}
 		}
@@ -398,13 +400,13 @@ func (l *UserAdmiredFeedEventLoader) publishToSubscribers(value bool) {
 	}
 }
 
-func (l *UserAdmiredFeedEventLoader) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
+func (l *AdmireLoaderByActorAndFeedEvent) registerCacheFunc(cacheFunc interface{}, mutex *sync.Mutex) {
 	l.cacheFuncs = append(l.cacheFuncs, cacheFunc)
 	*l.subscriptionRegistry = append(*l.subscriptionRegistry, cacheFunc)
 	*l.mutexRegistry = append(*l.mutexRegistry, mutex)
 }
 
-func (l *UserAdmiredFeedEventLoader) ownsCacheFunc(f *func(bool)) bool {
+func (l *AdmireLoaderByActorAndFeedEvent) ownsCacheFunc(f *func(coredb.Admire)) bool {
 	for _, cacheFunc := range l.cacheFuncs {
 		if cacheFunc == f {
 			return true

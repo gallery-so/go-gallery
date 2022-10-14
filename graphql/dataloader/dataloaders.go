@@ -33,7 +33,7 @@
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionsLoader github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.PaginateInteractionsByFeedEventIDBatchRow
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionCountLoader github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchRow
 //go:generate go run github.com/gallery-so/dataloaden IntLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID int
-//go:generate go run github.com/gallery-so/dataloaden UserAdmiredFeedEventLoader github.com/mikeydub/go-gallery/db/gen/coredb.GetUserAdmiredFeedEventParams bool
+//go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 
 package dataloader
 
@@ -60,7 +60,6 @@ type Loaders struct {
 	UserByUserID                     *UserLoaderByID
 	UserByUsername                   *UserLoaderByString
 	UsersWithTrait                   *UsersLoaderByString
-	OwnersByContractID               *UsersLoaderByContractID
 	GalleryByGalleryID               *GalleryLoaderByID
 	GalleryByCollectionID            *GalleryLoaderByID
 	GalleriesByUserID                *GalleriesLoaderByID
@@ -75,30 +74,30 @@ type Loaders struct {
 	TokensByWalletID                 *TokensLoaderByID
 	TokensByUserID                   *TokensLoaderByID
 	TokensByUserIDAndChain           *TokensLoaderByIDAndChain
-	TokensByContractID               *TokensLoaderByID
 	TokensByContractIDWithPagination *TokensLoaderByContractID
 	TokensByUserIDAndContractID      *TokensLoaderByIDTuple
-	OwnerByTokenID                   *UserLoaderByID
 	NewTokensByFeedEventID           *TokensLoaderByID
+	TokensByContractID               *TokensLoaderByID
 	ContractByContractID             *ContractLoaderByID
 	ContractsByUserID                *ContractsLoaderByID
 	ContractByChainAddress           *ContractLoaderByChainAddress
 	FollowersByUserID                *UsersLoaderByID
 	FollowingByUserID                *UsersLoaderByID
 	GlobalFeed                       *GlobalFeedLoader
-	FeedByUserID                     *UserFeedLoader
+	PersonalFeedByUserID             *PersonalFeedLoader
+	UserFeedByUserID                 *UserFeedLoader
 	EventByEventID                   *EventLoaderByID
 	AdmireByAdmireID                 *AdmireLoaderByID
 	AdmireCountByFeedEventID         *IntLoaderByID
 	AdmiresByFeedEventID             *FeedEventAdmiresLoader
 	CommentByCommentID               *CommentLoaderByID
+	OwnerByTokenID                   *UserLoaderByID
 	CommentCountByFeedEventID        *IntLoaderByID
+	OwnersByContractID               *UsersLoaderByContractID
 	CommentsByFeedEventID            *FeedEventCommentsLoader
 	InteractionCountByFeedEventID    *FeedEventInteractionCountLoader
 	InteractionsByFeedEventID        *FeedEventInteractionsLoader
-	UserAdmiredFeedEvent             *UserAdmiredFeedEventLoader
-	PersonalFeedByUserID             *PersonalFeedLoader
-	UserFeedByUserID                 *UserFeedLoader
+	AdmireByActorIDAndFeedEventID    *AdmireLoaderByActorAndFeedEvent
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -265,7 +264,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.InteractionsByFeedEventID = NewFeedEventInteractionsLoader(defaults, loadInteractionsByFeedEventID(q))
 
-	loaders.UserAdmiredFeedEvent = NewUserAdmiredFeedEventLoader(defaults, loadUserAdmiredFeedEvent(q), UserAdmiredFeedEventLoaderCacheSubscriptions{})
+	loaders.AdmireByActorIDAndFeedEventID = NewAdmireLoaderByActorAndFeedEvent(defaults, loadAdmireByActorIDAndFeedEventID(q), AdmireLoaderByActorAndFeedEventCacheSubscriptions{})
 
 	return loaders
 }
@@ -933,7 +932,7 @@ func loadAdmireById(q *db.Queries) func(context.Context, []persist.DBID) ([]db.A
 			if admire, ok := admiresByID[id]; ok {
 				admires[i] = admire
 			} else {
-				errors[i] = persist.ErrAdmireNotFound{ID: id}
+				errors[i] = persist.ErrAdmireNotFound{AdmireID: id}
 			}
 		}
 
@@ -1067,16 +1066,19 @@ func loadInteractionsByFeedEventID(q *db.Queries) func(context.Context, []db.Pag
 	}
 }
 
-func loadUserAdmiredFeedEvent(q *db.Queries) func(context.Context, []db.GetUserAdmiredFeedEventParams) ([]bool, []error) {
-	return func(ctx context.Context, params []db.GetUserAdmiredFeedEventParams) ([]bool, []error) {
-		results := make([]bool, len(params))
+func loadAdmireByActorIDAndFeedEventID(q *db.Queries) func(context.Context, []db.GetAdmireByActorIDAndFeedEventIDParams) ([]db.Admire, []error) {
+	return func(ctx context.Context, params []db.GetAdmireByActorIDAndFeedEventIDParams) ([]db.Admire, []error) {
+		results := make([]db.Admire, len(params))
 		errors := make([]error, len(params))
 
-		b := q.GetUserAdmiredFeedEvent(ctx, params)
+		b := q.GetAdmireByActorIDAndFeedEventID(ctx, params)
 		defer b.Close()
 
-		b.QueryRow(func(i int, b bool, err error) {
-			results[i], errors[i] = b, err
+		b.QueryRow(func(i int, admire db.Admire, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrAdmireNotFound{ActorID: params[i].ActorID, FeedEventID: params[i].FeedEventID}
+			}
+			results[i], errors[i] = admire, err
 		})
 
 		return results, errors
