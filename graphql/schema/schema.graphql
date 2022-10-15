@@ -522,6 +522,10 @@ type FeedEvent implements Node {
     # If typeFilter is omitted, all interaction types will be queried.
     interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
 
+    viewerAdmire: Admire @goField(forceResolver: true)
+
+    # TODO: This is just here while we migrate the frontend over to viewerAdmire.
+    # Remove this in the near future.
     hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
@@ -893,6 +897,18 @@ type ErrSyncFailed implements Error {
     message: String!
 }
 
+type ErrAdmireNotFound implements Error {
+    message: String!
+}
+
+type ErrAdmireAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrCommentNotFound implements Error {
+    message: String!
+}
+
 input AuthMechanism {
     eoa: EoaAuth
     gnosisSafe: GnosisSafeAuth
@@ -1000,12 +1016,14 @@ union AdmireFeedEventPayloadOrError =
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrAdmireAlreadyExists
 
 union RemoveAdmirePayloadOrError =
     RemoveAdmirePayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrAdmireNotFound
 
 union CommentOnFeedEventPayloadOrError =
     CommentOnFeedEventPayload
@@ -1018,6 +1036,7 @@ union RemoveCommentPayloadOrError =
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrCommentNotFound
 
 type AdmireFeedEventPayload {
     viewer: Viewer
@@ -1078,7 +1097,7 @@ type Mutation {
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
     admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
-    removeAdmire(feedEventId: DBID!): RemoveAdmirePayloadOrError @authRequired
+    removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 }

@@ -254,11 +254,23 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrAdmireAlreadyExists struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrAdmireNotFound struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrAuthenticationFailed struct {
 		Message func(childComplexity int) int
 	}
 
 	ErrCollectionNotFound struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrCommentNotFound struct {
 		Message func(childComplexity int) int
 	}
 
@@ -335,6 +347,7 @@ type ComplexityRoot struct {
 		HasViewerAdmiredEvent func(childComplexity int) int
 		ID                    func(childComplexity int) int
 		Interactions          func(childComplexity int, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) int
+		ViewerAdmire          func(childComplexity int) int
 	}
 
 	FeedEventAdmireEdge struct {
@@ -472,7 +485,7 @@ type ComplexityRoot struct {
 		RefreshCollection        func(childComplexity int, collectionID persist.DBID) int
 		RefreshContract          func(childComplexity int, contractID persist.DBID) int
 		RefreshToken             func(childComplexity int, tokenID persist.DBID) int
-		RemoveAdmire             func(childComplexity int, feedEventID persist.DBID) int
+		RemoveAdmire             func(childComplexity int, admireID persist.DBID) int
 		RemoveComment            func(childComplexity int, commentID persist.DBID) int
 		RemoveUserWallets        func(childComplexity int, walletIds []persist.DBID) int
 		SetSpamPreference        func(childComplexity int, input model.SetSpamPreferenceInput) int
@@ -751,6 +764,7 @@ type FeedEventResolver interface {
 	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
 	Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error)
 	Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) (*model.FeedEventInteractionsConnection, error)
+	ViewerAdmire(ctx context.Context, obj *model.FeedEvent) (*model.Admire, error)
 	HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error)
 }
 type FollowInfoResolver interface {
@@ -798,7 +812,7 @@ type MutationResolver interface {
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 	AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error)
-	RemoveAdmire(ctx context.Context, feedEventID persist.DBID) (model.RemoveAdmirePayloadOrError, error)
+	RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error)
 	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error)
 	RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error)
 }
@@ -1582,6 +1596,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrAddressOwnedByUser.Message(childComplexity), true
 
+	case "ErrAdmireAlreadyExists.message":
+		if e.complexity.ErrAdmireAlreadyExists.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrAdmireAlreadyExists.Message(childComplexity), true
+
+	case "ErrAdmireNotFound.message":
+		if e.complexity.ErrAdmireNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrAdmireNotFound.Message(childComplexity), true
+
 	case "ErrAuthenticationFailed.message":
 		if e.complexity.ErrAuthenticationFailed.Message == nil {
 			break
@@ -1595,6 +1623,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrCollectionNotFound.Message(childComplexity), true
+
+	case "ErrCommentNotFound.message":
+		if e.complexity.ErrCommentNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrCommentNotFound.Message(childComplexity), true
 
 	case "ErrCommunityNotFound.message":
 		if e.complexity.ErrCommunityNotFound.Message == nil {
@@ -1799,6 +1834,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FeedEvent.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["typeFilter"].([]persist.InteractionType)), true
+
+	case "FeedEvent.viewerAdmire":
+		if e.complexity.FeedEvent.ViewerAdmire == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.ViewerAdmire(childComplexity), true
 
 	case "FeedEventAdmireEdge.cursor":
 		if e.complexity.FeedEventAdmireEdge.Cursor == nil {
@@ -2445,7 +2487,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveAdmire(childComplexity, args["feedEventId"].(persist.DBID)), true
+		return e.complexity.Mutation.RemoveAdmire(childComplexity, args["admireId"].(persist.DBID)), true
 
 	case "Mutation.removeComment":
 		if e.complexity.Mutation.RemoveComment == nil {
@@ -4072,6 +4114,10 @@ type FeedEvent implements Node {
     # If typeFilter is omitted, all interaction types will be queried.
     interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
 
+    viewerAdmire: Admire @goField(forceResolver: true)
+
+    # TODO: This is just here while we migrate the frontend over to viewerAdmire.
+    # Remove this in the near future.
     hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
@@ -4443,6 +4489,18 @@ type ErrSyncFailed implements Error {
     message: String!
 }
 
+type ErrAdmireNotFound implements Error {
+    message: String!
+}
+
+type ErrAdmireAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrCommentNotFound implements Error {
+    message: String!
+}
+
 input AuthMechanism {
     eoa: EoaAuth
     gnosisSafe: GnosisSafeAuth
@@ -4550,12 +4608,14 @@ union AdmireFeedEventPayloadOrError =
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrAdmireAlreadyExists
 
 union RemoveAdmirePayloadOrError =
     RemoveAdmirePayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrAdmireNotFound
 
 union CommentOnFeedEventPayloadOrError =
     CommentOnFeedEventPayload
@@ -4568,6 +4628,7 @@ union RemoveCommentPayloadOrError =
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrCommentNotFound
 
 type AdmireFeedEventPayload {
     viewer: Viewer
@@ -4628,7 +4689,7 @@ type Mutation {
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
     admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
-    removeAdmire(feedEventId: DBID!): RemoveAdmirePayloadOrError @authRequired
+    removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 }
@@ -5091,14 +5152,14 @@ func (ec *executionContext) field_Mutation_removeAdmire_args(ctx context.Context
 	var err error
 	args := map[string]interface{}{}
 	var arg0 persist.DBID
-	if tmp, ok := rawArgs["feedEventId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feedEventId"))
+	if tmp, ok := rawArgs["admireId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("admireId"))
 		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["feedEventId"] = arg0
+	args["admireId"] = arg0
 	return args, nil
 }
 
@@ -8812,6 +8873,76 @@ func (ec *executionContext) _ErrAddressOwnedByUser_message(ctx context.Context, 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ErrAdmireAlreadyExists_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmireAlreadyExists) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrAdmireAlreadyExists",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrAdmireNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmireNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrAdmireNotFound",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _ErrAuthenticationFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAuthenticationFailed) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -8856,6 +8987,41 @@ func (ec *executionContext) _ErrCollectionNotFound_message(ctx context.Context, 
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ErrCollectionNotFound",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrCommentNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrCommentNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrCommentNotFound",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -9790,6 +9956,38 @@ func (ec *executionContext) _FeedEvent_interactions(ctx context.Context, field g
 	res := resTmp.(*model.FeedEventInteractionsConnection)
 	fc.Result = res
 	return ec.marshalOFeedEventInteractionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventInteractionsConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_viewerAdmire(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FeedEvent().ViewerAdmire(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FeedEvent_hasViewerAdmiredEvent(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
@@ -13213,7 +13411,7 @@ func (ec *executionContext) _Mutation_removeAdmire(ctx context.Context, field gr
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveAdmire(rctx, args["feedEventId"].(persist.DBID))
+			return ec.resolvers.Mutation().RemoveAdmire(rctx, args["admireId"].(persist.DBID))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
@@ -19415,6 +19613,13 @@ func (ec *executionContext) _AdmireFeedEventPayloadOrError(ctx context.Context, 
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrAdmireAlreadyExists:
+		return ec._ErrAdmireAlreadyExists(ctx, sel, &obj)
+	case *model.ErrAdmireAlreadyExists:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireAlreadyExists(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -19834,6 +20039,27 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrSyncFailed(ctx, sel, obj)
+	case model.ErrAdmireNotFound:
+		return ec._ErrAdmireNotFound(ctx, sel, &obj)
+	case *model.ErrAdmireNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireNotFound(ctx, sel, obj)
+	case model.ErrAdmireAlreadyExists:
+		return ec._ErrAdmireAlreadyExists(ctx, sel, &obj)
+	case *model.ErrAdmireAlreadyExists:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireAlreadyExists(ctx, sel, obj)
+	case model.ErrCommentNotFound:
+		return ec._ErrCommentNotFound(ctx, sel, &obj)
+	case *model.ErrCommentNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCommentNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -20487,6 +20713,13 @@ func (ec *executionContext) _RemoveAdmirePayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrAdmireNotFound:
+		return ec._ErrAdmireNotFound(ctx, sel, &obj)
+	case *model.ErrAdmireNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -20524,6 +20757,13 @@ func (ec *executionContext) _RemoveCommentPayloadOrError(ctx context.Context, se
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrCommentNotFound:
+		return ec._ErrCommentNotFound(ctx, sel, &obj)
+	case *model.ErrCommentNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCommentNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -22414,6 +22654,68 @@ func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.
 	return out
 }
 
+var errAdmireAlreadyExistsImplementors = []string{"ErrAdmireAlreadyExists", "Error", "AdmireFeedEventPayloadOrError"}
+
+func (ec *executionContext) _ErrAdmireAlreadyExists(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmireAlreadyExists) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errAdmireAlreadyExistsImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrAdmireAlreadyExists")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrAdmireAlreadyExists_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errAdmireNotFoundImplementors = []string{"ErrAdmireNotFound", "Error", "RemoveAdmirePayloadOrError"}
+
+func (ec *executionContext) _ErrAdmireNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmireNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errAdmireNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrAdmireNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrAdmireNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
@@ -22458,6 +22760,37 @@ func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrCollectionNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errCommentNotFoundImplementors = []string{"ErrCommentNotFound", "Error", "RemoveCommentPayloadOrError"}
+
+func (ec *executionContext) _ErrCommentNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCommentNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errCommentNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrCommentNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrCommentNotFound_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -23073,6 +23406,23 @@ func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet
 					}
 				}()
 				res = ec._FeedEvent_interactions(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "viewerAdmire":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedEvent_viewerAdmire(ctx, field, obj)
 				return res
 			}
 

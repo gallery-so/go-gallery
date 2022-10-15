@@ -360,33 +360,22 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx))
-}
-
-func (api InteractionAPI) RemoveAdmireByFeedEventID(ctx context.Context, feedEventID persist.DBID) (persist.DBID, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"feedEventID": {feedEventID, "required"},
-	}); err != nil {
-		return "", err
-	}
-
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	admire, err := api.GetAdmireByActorIDAndFeedEventID(ctx, userID, feedEventID)
-	if err != nil {
+	if err == nil {
+		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, FeedEventID: feedEventID}
+	}
+
+	notFoundErr := persist.ErrAdmireNotFound{}
+	if !errors.As(err, &notFoundErr) {
 		return "", err
 	}
 
-	err = api.repos.AdmireRepository.RemoveAdmire(ctx, admire.ID)
-	if err != nil {
-		return "", err
-	}
-
-	return admire.ID, nil
+	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
 }
 
 func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
