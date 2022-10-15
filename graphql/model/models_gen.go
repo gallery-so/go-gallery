@@ -438,6 +438,20 @@ type ErrAddressOwnedByUser struct {
 func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError() {}
 func (ErrAddressOwnedByUser) IsError()                       {}
 
+type ErrAdmireAlreadyExists struct {
+	Message string `json:"message"`
+}
+
+func (ErrAdmireAlreadyExists) IsError()                         {}
+func (ErrAdmireAlreadyExists) IsAdmireFeedEventPayloadOrError() {}
+
+type ErrAdmireNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrAdmireNotFound) IsError()                      {}
+func (ErrAdmireNotFound) IsRemoveAdmirePayloadOrError() {}
+
 type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }
@@ -461,6 +475,13 @@ func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionTokenByIDOrError()     {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
+
+type ErrCommentNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrCommentNotFound) IsError()                       {}
+func (ErrCommentNotFound) IsRemoveCommentPayloadOrError() {}
 
 type ErrCommunityNotFound struct {
 	Message string `json:"message"`
@@ -626,6 +647,7 @@ type FeedEvent struct {
 	Admires               *FeedEventAdmiresConnection      `json:"admires"`
 	Comments              *FeedEventCommentsConnection     `json:"comments"`
 	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
+	ViewerAdmire          *Admire                          `json:"viewerAdmire"`
 	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
 }
 

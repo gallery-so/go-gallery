@@ -199,17 +199,30 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 	}, nil
 }
 
-func (r *feedEventResolver) HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error) {
+func (r *feedEventResolver) ViewerAdmire(ctx context.Context, obj *model.FeedEvent) (*model.Admire, error) {
 	api := publicapi.For(ctx)
 
 	// If the user isn't logged in, there is no viewer
 	if !api.User.IsUserLoggedIn(ctx) {
-		f := false
-		return &f, nil
+		return nil, nil
 	}
 
 	userID := api.User.GetLoggedInUserId(ctx)
-	return api.Interaction.HasUserAdmiredFeedEvent(ctx, userID, obj.Dbid)
+
+	admire, err := api.Interaction.GetAdmireByActorIDAndFeedEventID(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting the admire fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns an admire (if it can find one) or nil.
+		return nil, nil
+	}
+
+	return admireToModel(ctx, *admire), nil
+}
+
+func (r *feedEventResolver) HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error) {
+	// Trivial implementation for backward compatibility; this will be removed soon
+	f := false
+	return &f, nil
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -744,8 +757,8 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 	return output, nil
 }
 
-func (r *mutationResolver) RemoveAdmire(ctx context.Context, feedEventID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	admireID, err := publicapi.For(ctx).Interaction.RemoveAdmireByFeedEventID(ctx, feedEventID)
+func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
+	feedEventID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
 	if err != nil {
 		return nil, err
 	}
