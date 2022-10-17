@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/sirupsen/logrus"

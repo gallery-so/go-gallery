@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/event"
 
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
@@ -46,7 +48,7 @@ type PublicAPI struct {
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, throttler *throttle.Locker) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := newValidator()
@@ -60,7 +62,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repo
 		Collection:  &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:     &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:        &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
-		Contract:    &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
+		Contract:    &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, taskClient: taskClient},
 		Token:       &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
 		Wallet:      &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:        &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},

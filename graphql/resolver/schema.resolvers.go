@@ -118,16 +118,26 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
-func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error) {
+func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error) {
+	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last)
+}
+
+func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
 	refresh := false
-	onlyGallery := true
 	if obj.HelperCommunityData.ForceRefresh != nil {
 		refresh = *obj.HelperCommunityData.ForceRefresh
 	}
-	if obj.HelperCommunityData.OnlyGalleryUsers != nil {
-		onlyGallery = *obj.HelperCommunityData.OnlyGalleryUsers
+
+	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
 	}
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
+
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, before, after, first, last)
 }
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
@@ -892,8 +902,8 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error) {
-	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh, onlyGalleryUsers)
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {

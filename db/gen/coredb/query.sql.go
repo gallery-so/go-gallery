@@ -13,6 +13,30 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const countOwnersByContractId = `-- name: CountOwnersByContractId :one
+SELECT count(DISTINCT users.id) FROM users, tokens
+    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND tokens.deleted = false AND users.deleted = false
+`
+
+func (q *Queries) CountOwnersByContractId(ctx context.Context, contract persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOwnersByContractId, contract)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countTokensByContractId = `-- name: CountTokensByContractId :one
+SELECT count(*) FROM tokens WHERE contract = $1 AND deleted = false
+`
+
+func (q *Queries) CountTokensByContractId(ctx context.Context, contract persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countTokensByContractId, contract)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
 `
@@ -821,6 +845,100 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
+const getOwnersByContractIdPaginate = `-- name: GetOwnersByContractIdPaginate :many
+SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal FROM users, tokens
+    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND tokens.deleted = false AND users.deleted = false
+    AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
+    AND (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
+    ORDER BY CASE WHEN $9::bool THEN (users.universal,users.created_at,users.id) END ASC,
+             CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC
+    LIMIT $2
+`
+
+type GetOwnersByContractIdPaginateParams struct {
+	Contract           persist.DBID
+	Limit              int32
+	CurBeforeUniversal bool
+	CurBeforeTime      time.Time
+	CurBeforeID        persist.DBID
+	CurAfterUniversal  bool
+	CurAfterTime       time.Time
+	CurAfterID         persist.DBID
+	PagingForward      bool
+}
+
+func (q *Queries) GetOwnersByContractIdPaginate(ctx context.Context, arg GetOwnersByContractIdPaginateParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getOwnersByContractIdPaginate,
+		arg.Contract,
+		arg.Limit,
+		arg.CurBeforeUniversal,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterUniversal,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPreviewURLsByContractIdAndUserId = `-- name: GetPreviewURLsByContractIdAndUserId :many
+SELECT MEDIA->>'thumbnail_url'::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3
+`
+
+type GetPreviewURLsByContractIdAndUserIdParams struct {
+	Contract    persist.DBID
+	OwnerUserID persist.DBID
+}
+
+func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg GetPreviewURLsByContractIdAndUserIdParams) ([]interface{}, error) {
+	rows, err := q.db.Query(ctx, getPreviewURLsByContractIdAndUserId, arg.Contract, arg.OwnerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []interface{}
+	for rows.Next() {
+		var thumbnail_url interface{}
+		if err := rows.Scan(&thumbnail_url); err != nil {
+			return nil, err
+		}
+		items = append(items, thumbnail_url)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTokenById = `-- name: GetTokenById :one
 SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam FROM tokens WHERE id = $1 AND deleted = false
 `
@@ -856,6 +974,31 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 	return i, err
 }
 
+const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
+`
+
+func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User, error) {
+	row := q.db.QueryRow(ctx, getTokenOwnerByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+	)
+	return i, err
+}
+
 const getTokensByCollectionId = `-- name: GetTokensByCollectionId :many
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
@@ -866,6 +1009,132 @@ SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.descr
 
 func (q *Queries) GetTokensByCollectionId(ctx context.Context, id persist.DBID) ([]Token, error) {
 	rows, err := q.db.Query(ctx, getTokensByCollectionId, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTokensByContractId = `-- name: GetTokensByContractId :many
+SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam FROM tokens WHERE contract = $1 AND deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
+`
+
+func (q *Queries) GetTokensByContractId(ctx context.Context, contract persist.DBID) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByContractId, contract)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :many
+SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.contract = $1 AND t.deleted = false
+    AND (u.universal,t.created_at,t.id) < ($3, $4::timestamptz, $5)
+    AND (u.universal,t.created_at,t.id) > ($6, $7::timestamptz, $8)
+    ORDER BY CASE WHEN $9::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT $9::bool THEN (u.universal,t.created_at,t.id) END DESC
+    LIMIT $2
+`
+
+type GetTokensByContractIdPaginateParams struct {
+	Contract           persist.DBID
+	Limit              int32
+	CurBeforeUniversal bool
+	CurBeforeTime      time.Time
+	CurBeforeID        persist.DBID
+	CurAfterUniversal  bool
+	CurAfterTime       time.Time
+	CurAfterID         persist.DBID
+	PagingForward      bool
+}
+
+func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetTokensByContractIdPaginateParams) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByContractIdPaginate,
+		arg.Contract,
+		arg.Limit,
+		arg.CurBeforeUniversal,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterUniversal,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -960,6 +1229,64 @@ func (q *Queries) GetTokensByUserId(ctx context.Context, ownerUserID persist.DBI
 	return items, nil
 }
 
+const getTokensByUserIdAndContractID = `-- name: GetTokensByUserIdAndContractID :many
+SELECT tokens.id, tokens.deleted, tokens.version, tokens.created_at, tokens.last_updated, tokens.name, tokens.description, tokens.collectors_note, tokens.media, tokens.token_uri, tokens.token_type, tokens.token_id, tokens.quantity, tokens.ownership_history, tokens.token_metadata, tokens.external_url, tokens.block_number, tokens.owner_user_id, tokens.owned_by_wallets, tokens.chain, tokens.contract, tokens.is_user_marked_spam, tokens.is_provider_marked_spam FROM tokens, users
+    WHERE tokens.owner_user_id = $1 AND users.id = $1
+      AND tokens.owned_by_wallets && users.wallets
+      AND tokens.contract = $2
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
+`
+
+type GetTokensByUserIdAndContractIDParams struct {
+	OwnerUserID persist.DBID
+	Contract    persist.DBID
+}
+
+func (q *Queries) GetTokensByUserIdAndContractID(ctx context.Context, arg GetTokensByUserIdAndContractIDParams) ([]Token, error) {
+	rows, err := q.db.Query(ctx, getTokensByUserIdAndContractID, arg.OwnerUserID, arg.Contract)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Token
+	for rows.Next() {
+		var i Token
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTokensByWalletIds = `-- name: GetTokensByWalletIds :many
 SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC
@@ -1010,7 +1337,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -1027,12 +1354,13 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.Wallets,
 		&i.Bio,
 		&i.Traits,
+		&i.Universal,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -1049,12 +1377,13 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Wallets,
 		&i.Bio,
 		&i.Traits,
+		&i.Universal,
 	)
 	return i, err
 }
 
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -1077,6 +1406,7 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.Wallets,
 			&i.Bio,
 			&i.Traits,
+			&i.Universal,
 		); err != nil {
 			return nil, err
 		}

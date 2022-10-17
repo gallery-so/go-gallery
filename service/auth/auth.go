@@ -272,7 +272,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, user
 		logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
 	}
 
-	userExists = user.ID != ""
+	userExists = user.ID != "" && !user.Universal.Bool()
 
 	if userExists {
 		dbNonce, err := nonceRepo.Get(pCtx, pChainAddress)

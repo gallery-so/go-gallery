@@ -2,6 +2,9 @@ package publicapi
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -67,6 +70,99 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 	return tokens, nil
 }
 
+func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persist.DBID) ([]db.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.TokensByContractID.Load(contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Token, PageInfo, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+
+		tokens, err := api.loaders.TokensByContractIDWithPagination.Load(db.GetTokensByContractIdBatchPaginateParams{
+			Contract:           contractID,
+			Limit:              params.Limit,
+			CurBeforeUniversal: params.CursorBeforeBool,
+			CurAfterUniversal:  params.CursorAfterBool,
+			CurBeforeTime:      params.CursorBeforeTime,
+			CurBeforeID:        params.CursorBeforeID,
+			CurAfterTime:       params.CursorAfterTime,
+			CurAfterID:         params.CursorAfterID,
+			PagingForward:      params.PagingForward,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(tokens))
+		for i, token := range tokens {
+			results[i] = token
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountTokensByContractId(ctx, contractID)
+		return int(total), err
+	}
+
+	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
+		if token, ok := i.(db.Token); ok {
+			owner, err := api.loaders.OwnerByTokenID.Load(token.ID)
+			if err != nil {
+				return false, time.Time{}, "", err
+			}
+			return owner.Universal, token.CreatedAt, token.ID, nil
+		}
+		return false, time.Time{}, "", fmt.Errorf("interface{} is not a token")
+	}
+
+	paginator := boolTimeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	tokens := make([]db.Token, len(results))
+	for i, result := range results {
+		if token, ok := result.(db.Token); ok {
+			tokens[i] = token
+		} else {
+			return nil, PageInfo{}, fmt.Errorf("interface{} is not a token: %T", token)
+		}
+	}
+
+	return tokens, pageInfo, nil
+}
+
 func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, []error) {
 	return api.loaders.TokenByTokenID.LoadAll(tokenIDs)
 }
@@ -115,6 +211,23 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 	}
 
 	tokens, err := api.loaders.TokensByUserID.Load(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func (api TokenAPI) GetTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]db.Token, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID":     {userID, "required"},
+		"contractID": {contractID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	tokens, err := api.loaders.TokensByUserIDAndContractID.Load(persist.DBIDTuple{userID, contractID})
 	if err != nil {
 		return nil, err
 	}
@@ -195,23 +308,41 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 
 	token, err := api.loaders.TokenByTokenID.Load(tokenDBID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load token: %w", err)
 	}
 	contract, err := api.loaders.ContractByContractID.Load(token.Contract)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load contract for token: %w", err)
 	}
 
 	addresses := []persist.Address{}
 	for _, walletID := range token.OwnedByWallets {
 		wa, err := api.loaders.WalletByWalletID.Load(walletID)
 		if err != nil {
-			return err
+			if strings.Contains(err.Error(), "no rows in result set") {
+				continue
+			}
+			return fmt.Errorf("failed to load wallet %s: %w", walletID, err)
 		}
 		addresses = append(addresses, wa.Address)
 	}
 
 	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
+	if err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+
+	return nil
+}
+
+func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
+	if err := validateFields(api.validator, validationMap{
+		"contractIdentifiers": {ci, "required"},
+	}); err != nil {
+		return err
+	}
+
+	err := api.multichainProvider.RefreshTokensForContract(ctx, ci)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}

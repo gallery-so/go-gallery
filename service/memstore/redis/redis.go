@@ -20,7 +20,7 @@ const (
 	TestSuiteDB               = 5
 	IndexerServerThrottleDB   = 6
 	RefreshNFTsThrottleDB     = 7
-	MediaProcessingThrottleDB = 8
+	TokenProcessingThrottleDB = 8
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.

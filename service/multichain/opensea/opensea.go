@@ -155,7 +155,7 @@ func (p *Provider) GetBlockchainInfo(context.Context) (multichain.BlockchainInfo
 }
 
 // GetTokensByWalletAddress returns a list of tokens for a wallet address
-func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -166,7 +166,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
-func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -185,7 +185,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 }
 
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
-func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
@@ -255,12 +255,16 @@ func (p *Provider) RefreshContract(context.Context, persist.Address) error {
 	return nil
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
+func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
 	return []multichain.ChainAgnosticCommunityOwner{}, nil
 }
 
-func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetOwnedTokensByContract(context.Context, persist.Address, persist.Address, int, int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	return []multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, nil
+}
+
+func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
+	return addr.String()
 }
 
 // DeepRefresh re-indexes a wallet address. Because this isn't possible through OS, this is a no-op.

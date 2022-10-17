@@ -45,7 +45,7 @@ var nodeFetcher = model.NodeFetcher{
 
 	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
 		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.BoolToPointer(false), util.BoolToPointer(true))
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.BoolToPointer(false))
 		} else {
 			return nil, err
 		}
@@ -368,6 +368,51 @@ func resolveTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]*mod
 	return tokensToModel(ctx, tokens), nil
 }
 
+func resolveTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]*model.Token, error) {
+
+	tokens, err := publicapi.For(ctx).Token.GetTokensByUserIDAndContractID(ctx, userID, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
+func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]*model.Token, error) {
+
+	tokens, err := publicapi.For(ctx).Token.GetTokensByContractId(ctx, contractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokensToModel(ctx, tokens), nil
+}
+
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.TokensConnection, error) {
+
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.TokenEdge, len(tokens))
+	for i, token := range tokens {
+		edges[i] = &model.TokenEdge{
+			Node:   tokenToModel(ctx, token),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.TokensConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
+func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID) error {
+	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID)
+}
+
 func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
 	tokens, err := publicapi.For(ctx).Token.GetTokensByUserID(ctx, userID)
 
@@ -449,31 +494,38 @@ func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (
 	return membershipToModel(ctx, *tier), nil
 }
 
-func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (*model.Community, error) {
+func resolveCommunityByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh *bool) (*model.Community, error) {
 	community, err := publicapi.For(ctx).Contract.GetContractByAddress(ctx, contractAddress)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return communityToModel(ctx, *community, forceRefresh, onlyGalleryUsers), nil
+	return communityToModel(ctx, *community, forceRefresh), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, onlyGalleryUsers bool) ([]*model.TokenHolder, error) {
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, before, after *string, first, last *int) (*model.TokenHoldersConnection, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	owners, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, onlyGalleryUsers)
+	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), forceRefresh, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]*model.TokenHolder, len(owners))
+	edges := make([]*model.TokenHolderEdge, len(owners))
 	for i, owner := range owners {
-		result[i] = multichainTokenHolderToModel(ctx, owner)
+		edges[i] = &model.TokenHolderEdge{
+			Node:   owner,
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
 	}
 
-	return result, nil
+	return &model.TokenHoldersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+
 }
 
 func resolveGeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {
@@ -762,10 +814,11 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
-		Dbid:     user.ID,
-		Username: &user.Username.String,
-		Bio:      &user.Bio.String,
-		Wallets:  wallets,
+		Dbid:      user.ID,
+		Username:  &user.Username.String,
+		Bio:       &user.Bio.String,
+		Wallets:   wallets,
+		Universal: &user.Universal,
 
 		// each handled by dedicated resolver
 		Galleries: nil,
@@ -933,7 +986,7 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 	}
 }
 
-func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.TokenHolder) *model.TokenHolder {
+func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.TokenHolder, contractID persist.DBID) *model.TokenHolder {
 	previewTokens := make([]*string, len(tokenHolder.PreviewTokens))
 	for i, token := range tokenHolder.PreviewTokens {
 		previewTokens[i] = util.StringToPointer(token)
@@ -950,7 +1003,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 
 func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 	chain := persist.Chain(token.Chain.Int32)
-	metadata, _ := token.TokenMetadata.MarshalJSON()
+	metadata, _ := token.TokenMetadata.MarshallJSON()
 	metadataString := string(metadata)
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
 	tokenType := model.TokenType(token.TokenType.String)
@@ -1001,15 +1054,14 @@ func tokensToModel(ctx context.Context, token []db.Token) []*model.Token {
 	return res
 }
 
-func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool, onlyGalleryUsers *bool) *model.Community {
+func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
 	lastUpdated := community.LastUpdated
 	contractAddress := persist.NewChainAddress(community.Address, persist.Chain(community.Chain.Int32))
 	creatorAddress := persist.NewChainAddress(community.CreatorAddress, persist.Chain(community.Chain.Int32))
 	chain := persist.Chain(community.Chain.Int32)
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{
-			ForceRefresh:     forceRefresh,
-			OnlyGalleryUsers: onlyGalleryUsers,
+			ForceRefresh: forceRefresh,
 		},
 		Dbid:            community.ID,
 		LastUpdated:     &lastUpdated,
@@ -1042,12 +1094,7 @@ func getUrlExtension(url string) string {
 }
 
 func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
-	var med persist.Media
-	err := token.Media.AssignTo(&med)
-	if err != nil {
-		return getInvalidMedia(ctx, med)
-	}
-
+	med := token.Media
 	switch med.MediaType {
 	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
 		return getImageMedia(ctx, med)

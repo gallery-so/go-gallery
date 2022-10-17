@@ -145,6 +145,75 @@ SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
 SELECT * FROM tokens WHERE owned_by_wallets && $1 AND deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
+-- name: GetTokensByContractId :many
+SELECT * FROM tokens WHERE contract = $1 AND deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByContractIdBatch :batchmany
+SELECT * FROM tokens WHERE contract = $1 AND deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByContractIdPaginate :many
+SELECT t.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.contract = $1 AND t.deleted = false
+    AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
+    AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
+    LIMIT $2;
+
+-- name: GetTokensByContractIdBatchPaginate :batchmany
+SELECT t.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.contract = $1 AND t.deleted = false
+    AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
+    AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
+    LIMIT $2;
+
+-- name: CountTokensByContractId :one
+SELECT count(*) FROM tokens WHERE contract = $1 AND deleted = false;
+
+-- name: GetOwnersByContractIdPaginate :many
+SELECT DISTINCT ON (users.id) users.* FROM users, tokens
+    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND tokens.deleted = false AND users.deleted = false
+    AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
+    AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC
+    LIMIT $2;
+
+-- name: GetOwnersByContractIdBatchPaginate :batchmany
+SELECT DISTINCT ON (users.id) users.* FROM users, tokens
+    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND tokens.deleted = false AND users.deleted = false
+    AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
+    AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC
+    LIMIT $2;
+
+-- name: CountOwnersByContractId :one
+SELECT count(DISTINCT users.id) FROM users, tokens
+    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND tokens.deleted = false AND users.deleted = false;
+
+-- name: GetTokenOwnerByID :one
+SELECT u.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false;
+
+-- name: GetTokenOwnerByIDBatch :batchone
+SELECT u.* FROM tokens t
+    JOIN users u ON u.id = t.owner_user_id
+    WHERE t.id = $1 AND t.deleted = false AND u.deleted = false;
+
+-- name: GetPreviewURLsByContractIdAndUserId :many
+SELECT MEDIA->>'thumbnail_url'::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3;
+
 -- name: GetTokensByUserId :many
 SELECT tokens.* FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
@@ -156,6 +225,22 @@ SELECT tokens.* FROM tokens, users
 SELECT tokens.* FROM tokens, users
     WHERE tokens.owner_user_id = $1 AND users.id = $1
       AND tokens.owned_by_wallets && users.wallets
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByUserIdAndContractID :many
+SELECT tokens.* FROM tokens, users
+    WHERE tokens.owner_user_id = $1 AND users.id = $1
+      AND tokens.owned_by_wallets && users.wallets
+      AND tokens.contract = $2
+      AND tokens.deleted = false AND users.deleted = false
+    ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
+
+-- name: GetTokensByUserIdAndContractIDBatch :batchmany
+SELECT tokens.* FROM tokens, users
+    WHERE tokens.owner_user_id = $1 AND users.id = $1
+      AND tokens.owned_by_wallets && users.wallets
+      AND tokens.contract = $2
       AND tokens.deleted = false AND users.deleted = false
     ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 

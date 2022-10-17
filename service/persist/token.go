@@ -448,6 +448,16 @@ func (c Chain) NormalizeAddress(addr Address) string {
 	}
 }
 
+// BaseKeywords are the keywords that are default for discovering media for a given chain
+func (c Chain) BaseKeywords() (image []string, anim []string) {
+	switch c {
+	case ChainTezos:
+		return []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}, []string{"artifactUri", "displayUri", "uri", "image"}
+	default:
+		return []string{"image"}, []string{"animation", "video"}
+	}
+}
+
 // Value implements the driver.Valuer interface for the Chain type
 func (c Chain) Value() (driver.Value, error) {
 	return c, nil
@@ -802,6 +812,11 @@ func (m *TokenMetadata) Scan(src interface{}) error {
 
 // Value implements the database/sql/driver Valuer interface for the TokenMetadata type
 func (m TokenMetadata) Value() (driver.Value, error) {
+	return m.MarshallJSON()
+}
+
+// MarshallJSON implements the json.Marshaller interface for the TokenMetadata type
+func (m TokenMetadata) MarshallJSON() ([]byte, error) {
 	val, err := json.Marshal(m)
 	if err != nil {
 		return nil, err

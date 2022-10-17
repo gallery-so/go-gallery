@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
     USERNAME_IDEMPOTENT varchar(255),
     WALLETS varchar(255) [],
     BIO varchar,
-    TRAITS jsonb
+    TRAITS jsonb,
+    UNIVERSAL boolean NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS galleries (

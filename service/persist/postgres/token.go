@@ -126,11 +126,11 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 }
 
 // GetByWallet retrieves all tokens associated with a wallet
-func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.EthereumAddress, limit int64, page int64) ([]persist.Token, []persist.Contract, error) {
+func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.EthereumAddress, limit int64, offset int64) ([]persist.Token, []persist.Contract, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByWalletPaginateStmt.QueryContext(pCtx, pAddress, limit, page*limit)
+		rows, err = t.getByWalletPaginateStmt.QueryContext(pCtx, pAddress, limit, offset)
 	} else {
 		rows, err = t.getByWalletStmt.QueryContext(pCtx, pAddress)
 	}
@@ -165,11 +165,11 @@ func (t *TokenRepository) GetByWallet(pCtx context.Context, pAddress persist.Eth
 }
 
 // GetByContract retrieves all tokens associated with a contract
-func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress persist.EthereumAddress, limit int64, page int64) ([]persist.Token, error) {
+func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress persist.EthereumAddress, limit int64, offset int64) ([]persist.Token, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, limit, page*limit)
+		rows, err = t.getByContractPaginateStmt.QueryContext(pCtx, pContractAddress, limit, offset)
 	} else {
 		rows, err = t.getByContractStmt.QueryContext(pCtx, pContractAddress)
 	}
@@ -199,11 +199,11 @@ func (t *TokenRepository) GetByContract(pCtx context.Context, pContractAddress p
 }
 
 // GetOwnedByContract retrieves all tokens associated with a wallet with a specific contract
-func (t *TokenRepository) GetOwnedByContract(pCtx context.Context, pContractAddress, pAddress persist.EthereumAddress, limit int64, page int64) ([]persist.Token, persist.Contract, error) {
+func (t *TokenRepository) GetOwnedByContract(pCtx context.Context, pContractAddress, pAddress persist.EthereumAddress, limit int64, offset int64) ([]persist.Token, persist.Contract, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getOwnedByContractPaginateStmt.QueryContext(pCtx, pAddress, pContractAddress, limit, page*limit)
+		rows, err = t.getOwnedByContractPaginateStmt.QueryContext(pCtx, pAddress, pContractAddress, limit, offset)
 	} else {
 		rows, err = t.getOwnedByContractStmt.QueryContext(pCtx, pAddress, pContractAddress)
 	}
@@ -232,11 +232,11 @@ func (t *TokenRepository) GetOwnedByContract(pCtx context.Context, pContractAddr
 }
 
 // GetByTokenIdentifiers gets a token by its token ID and contract address
-func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.EthereumAddress, limit int64, page int64) ([]persist.Token, error) {
+func (t *TokenRepository) GetByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.EthereumAddress, limit int64, offset int64) ([]persist.Token, error) {
 	var rows *sql.Rows
 	var err error
 	if limit > 0 {
-		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, limit, page*limit)
+		rows, err = t.getByTokenIdentifiersPaginateStmt.QueryContext(pCtx, pTokenID, pContractAddress, limit, offset)
 	} else {
 		rows, err = t.getByTokenIdentifiersStmt.QueryContext(pCtx, pTokenID, pContractAddress)
 	}

@@ -236,13 +236,13 @@ type Token struct {
 	Name                 sql.NullString
 	Description          sql.NullString
 	CollectorsNote       sql.NullString
-	Media                pgtype.JSONB
+	Media                persist.Media
 	TokenUri             sql.NullString
 	TokenType            sql.NullString
 	TokenID              sql.NullString
 	Quantity             sql.NullString
-	OwnershipHistory     []pgtype.JSONB
-	TokenMetadata        pgtype.JSONB
+	OwnershipHistory     persist.AddressAtBlockList
+	TokenMetadata        persist.TokenMetadata
 	ExternalUrl          sql.NullString
 	BlockNumber          sql.NullInt64
 	OwnerUserID          persist.DBID
@@ -264,6 +264,7 @@ type User struct {
 	Wallets            persist.WalletList
 	Bio                sql.NullString
 	Traits             pgtype.JSONB
+	Universal          bool
 }
 
 type UserEvent struct {

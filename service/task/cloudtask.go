@@ -29,12 +29,17 @@ type FeedbotMessage struct {
 	Action      persist.Action `json:"action" binding:"required"`
 }
 
-// MediaProcessingMessage is the input message to the mediaprocessing service
-type MediaProcessingMessage struct {
+type TokenProcessingUserMessage struct {
 	UserID            persist.DBID  `json:"user_id" binding:"required"`
 	Chain             persist.Chain `json:"chain" binding:"required"`
 	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
 	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
+}
+
+type TokenProcessingContractTokensMessage struct {
+	ContractID        persist.DBID `json:"contract_id" binding:"required"`
+	Imagekeywords     []string     `json:"image_keywords" binding:"required"`
+	Animationkeywords []string     `json:"animation_keywords" binding:"required"`
 }
 
 // DeepRefreshMessage is the input message to the indexer-api for deep refreshes
@@ -113,7 +118,7 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 	return submitAppEngineTask(ctx, client, queue, task, body)
 }
 
-func CreateTaskForMediaProcessing(ctx context.Context, message MediaProcessingMessage, client *gcptasks.Client) error {
+func CreateTaskForMediaProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForMediaProcessing")
 	defer tracing.FinishSpan(span)
 
@@ -127,7 +132,37 @@ func CreateTaskForMediaProcessing(ctx context.Context, message MediaProcessingMe
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/process", viper.GetString("TOKEN_PROCESSING_URL")),
+				Url:        fmt.Sprintf("%s/media/process", viper.GetString("TOKEN_PROCESSING_URL")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
+func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProcessingContractTokensMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForContractOwnerProcessing")
+	defer tracing.FinishSpan(span)
+
+	tracing.AddEventDataToSpan(span, map[string]interface{}{
+		"Contract ID": message.ContractID,
+	})
+
+	queue := viper.GetString("TOKEN_PROCESSING_QUEUE")
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/owners/process/contract", viper.GetString("TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),

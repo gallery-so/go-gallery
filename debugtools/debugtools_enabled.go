@@ -11,6 +11,7 @@ package debugtools
 import (
 	"context"
 	"errors"
+
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"

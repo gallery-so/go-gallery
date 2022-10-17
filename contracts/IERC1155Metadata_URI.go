@@ -209,4 +209,3 @@ func (_IERC1155MetadataURI *IERC1155MetadataURISession) Uri(_id *big.Int) (strin
 func (_IERC1155MetadataURI *IERC1155MetadataURICallerSession) Uri(_id *big.Int) (string, error) {
 	return _IERC1155MetadataURI.Contract.Uri(&_IERC1155MetadataURI.CallOpts, _id)
 }
-

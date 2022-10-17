@@ -3,6 +3,7 @@
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/gallery-so/dataloaden UsersLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.GetOwnersByContractIdBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden GalleryLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Gallery
 //go:generate go run github.com/gallery-so/dataloaden GalleriesLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Gallery
 //go:generate go run github.com/gallery-so/dataloaden CollectionLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Collection
@@ -13,6 +14,8 @@
 //go:generate go run github.com/gallery-so/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/gallery-so/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/gallery-so/dataloaden TokensLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByContractIdBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDTuple github.com/mikeydub/go-gallery/service/persist.DBIDTuple []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden ContractLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Contract
 //go:generate go run github.com/gallery-so/dataloaden ContractsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Contract
@@ -54,42 +57,47 @@ type IDAndChain struct {
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
 type Loaders struct {
-	UserByUserID                  *UserLoaderByID
-	UserByUsername                *UserLoaderByString
-	UsersWithTrait                *UsersLoaderByString
-	GalleryByGalleryID            *GalleryLoaderByID
-	GalleryByCollectionID         *GalleryLoaderByID
-	GalleriesByUserID             *GalleriesLoaderByID
-	CollectionByCollectionID      *CollectionLoaderByID
-	CollectionsByGalleryID        *CollectionsLoaderByID
-	MembershipByMembershipID      *MembershipLoaderById
-	WalletByWalletID              *WalletLoaderById
-	WalletsByUserID               *WalletsLoaderByID
-	WalletByChainAddress          *WalletLoaderByChainAddress
-	TokenByTokenID                *TokenLoaderByID
-	TokensByCollectionID          *TokensLoaderByID
-	TokensByWalletID              *TokensLoaderByID
-	TokensByUserID                *TokensLoaderByID
-	TokensByUserIDAndChain        *TokensLoaderByIDAndChain
-	NewTokensByFeedEventID        *TokensLoaderByID
-	ContractByContractID          *ContractLoaderByID
-	ContractsByUserID             *ContractsLoaderByID
-	ContractByChainAddress        *ContractLoaderByChainAddress
-	FollowersByUserID             *UsersLoaderByID
-	FollowingByUserID             *UsersLoaderByID
-	GlobalFeed                    *GlobalFeedLoader
-	PersonalFeedByUserID          *PersonalFeedLoader
-	UserFeedByUserID              *UserFeedLoader
-	EventByEventID                *EventLoaderByID
-	AdmireByAdmireID              *AdmireLoaderByID
-	AdmireCountByFeedEventID      *IntLoaderByID
-	AdmiresByFeedEventID          *FeedEventAdmiresLoader
-	CommentByCommentID            *CommentLoaderByID
-	CommentCountByFeedEventID     *IntLoaderByID
-	CommentsByFeedEventID         *FeedEventCommentsLoader
-	InteractionCountByFeedEventID *FeedEventInteractionCountLoader
-	InteractionsByFeedEventID     *FeedEventInteractionsLoader
-	AdmireByActorIDAndFeedEventID *AdmireLoaderByActorAndFeedEvent
+	UserByUserID                     *UserLoaderByID
+	UserByUsername                   *UserLoaderByString
+	UsersWithTrait                   *UsersLoaderByString
+	GalleryByGalleryID               *GalleryLoaderByID
+	GalleryByCollectionID            *GalleryLoaderByID
+	GalleriesByUserID                *GalleriesLoaderByID
+	CollectionByCollectionID         *CollectionLoaderByID
+	CollectionsByGalleryID           *CollectionsLoaderByID
+	MembershipByMembershipID         *MembershipLoaderById
+	WalletByWalletID                 *WalletLoaderById
+	WalletsByUserID                  *WalletsLoaderByID
+	WalletByChainAddress             *WalletLoaderByChainAddress
+	TokenByTokenID                   *TokenLoaderByID
+	TokensByCollectionID             *TokensLoaderByID
+	TokensByWalletID                 *TokensLoaderByID
+	TokensByUserID                   *TokensLoaderByID
+	TokensByUserIDAndChain           *TokensLoaderByIDAndChain
+	TokensByContractIDWithPagination *TokensLoaderByContractID
+	TokensByUserIDAndContractID      *TokensLoaderByIDTuple
+	NewTokensByFeedEventID           *TokensLoaderByID
+	TokensByContractID               *TokensLoaderByID
+	ContractByContractID             *ContractLoaderByID
+	ContractsByUserID                *ContractsLoaderByID
+	ContractByChainAddress           *ContractLoaderByChainAddress
+	FollowersByUserID                *UsersLoaderByID
+	FollowingByUserID                *UsersLoaderByID
+	GlobalFeed                       *GlobalFeedLoader
+	PersonalFeedByUserID             *PersonalFeedLoader
+	UserFeedByUserID                 *UserFeedLoader
+	EventByEventID                   *EventLoaderByID
+	AdmireByAdmireID                 *AdmireLoaderByID
+	AdmireCountByFeedEventID         *IntLoaderByID
+	AdmiresByFeedEventID             *FeedEventAdmiresLoader
+	CommentByCommentID               *CommentLoaderByID
+	OwnerByTokenID                   *UserLoaderByID
+	CommentCountByFeedEventID        *IntLoaderByID
+	OwnersByContractID               *UsersLoaderByContractID
+	CommentsByFeedEventID            *FeedEventCommentsLoader
+	InteractionCountByFeedEventID    *FeedEventInteractionCountLoader
+	InteractionsByFeedEventID        *FeedEventInteractionsLoader
+	AdmireByActorIDAndFeedEventID    *AdmireLoaderByActorAndFeedEvent
 }
 
 func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loaders {
@@ -150,6 +158,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.UsersWithTrait = NewUsersLoaderByString(defaults, loadUsersWithTrait(q))
 
+	loaders.OwnersByContractID = NewUsersLoaderByContractID(defaults, loadOwnersByContractIDs(q))
+
 	loaders.GalleryByGalleryID = NewGalleryLoaderByID(defaults, loadGalleryByGalleryId(q), GalleryLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(gallery db.Gallery) persist.DBID { return gallery.ID },
 	})
@@ -194,9 +204,21 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.TokensByWalletID = NewTokensLoaderByID(defaults, loadTokensByWalletID(q))
 
+	loaders.TokensByContractID = NewTokensLoaderByID(defaults, loadTokensByContractID(q))
+
+	loaders.TokensByContractIDWithPagination = NewTokensLoaderByContractID(defaults, loadTokensByContractIDWithPagination(q))
+
 	loaders.TokensByUserID = NewTokensLoaderByID(defaults, loadTokensByUserID(q))
 
+	loaders.TokensByUserIDAndContractID = NewTokensLoaderByIDTuple(defaults, loadTokensByUserIDAndContractID(q))
+
 	loaders.TokensByUserIDAndChain = NewTokensLoaderByIDAndChain(defaults, loadTokensByUserIDAndChain(q))
+
+	loaders.TokensByUserIDAndChain = NewTokensLoaderByIDAndChain(defaults, loadTokensByUserIDAndChain(q))
+
+	loaders.OwnerByTokenID = NewUserLoaderByID(defaults, loadOwnerByTokenID(q), UserLoaderByIDCacheSubscriptions{
+		AutoCacheWithKey: func(user db.User) persist.DBID { return user.ID },
+	})
 
 	loaders.NewTokensByFeedEventID = NewTokensLoaderByID(defaults, loadNewTokensByFeedEventID(q))
 
@@ -280,6 +302,22 @@ func loadUserByUsername(q *db.Queries) func(context.Context, []string) ([]db.Use
 				err = persist.ErrUserNotFound{Username: usernames[i]}
 			}
 
+			users[i], errors[i] = user, err
+		})
+
+		return users, errors
+	}
+}
+
+func loadOwnersByContractIDs(q *db.Queries) func(context.Context, []db.GetOwnersByContractIdBatchPaginateParams) ([][]db.User, []error) {
+	return func(ctx context.Context, params []db.GetOwnersByContractIdBatchPaginateParams) ([][]db.User, []error) {
+		users := make([][]db.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetOwnersByContractIdBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, user []db.User, err error) {
 			users[i], errors[i] = user, err
 		})
 
@@ -552,6 +590,54 @@ func loadTokensByCollectionID(q *db.Queries) func(context.Context, []persist.DBI
 	}
 }
 
+func loadTokensByContractID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Token, []error) {
+	return func(ctx context.Context, contractIDs []persist.DBID) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetTokensByContractIdBatch(ctx, contractIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []db.Token, err error) {
+			tokens[i], errors[i] = t, err
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadOwnerByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]db.User, []error) {
+	return func(ctx context.Context, tokenIDs []persist.DBID) ([]db.User, []error) {
+		users := make([]db.User, len(tokenIDs))
+		errors := make([]error, len(tokenIDs))
+
+		b := q.GetTokenOwnerByIDBatch(ctx, tokenIDs)
+		defer b.Close()
+
+		b.QueryRow(func(i int, u db.User, err error) {
+			users[i], errors[i] = u, err
+		})
+
+		return users, errors
+	}
+}
+
+func loadTokensByContractIDWithPagination(q *db.Queries) func(context.Context, []db.GetTokensByContractIdBatchPaginateParams) ([][]db.Token, []error) {
+	return func(ctx context.Context, params []db.GetTokensByContractIdBatchPaginateParams) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetTokensByContractIdBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, gtbcibpr []db.Token, err error) {
+			tokens[i], errors[i] = gtbcibpr, err
+		})
+
+		return tokens, errors
+	}
+}
+
 func loadTokensByWalletID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Token, []error) {
 	return func(ctx context.Context, walletIds []persist.DBID) ([][]db.Token, []error) {
 		tokens := make([][]db.Token, len(walletIds))
@@ -579,6 +665,30 @@ func loadTokensByUserID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 		errors := make([]error, len(userIDs))
 
 		b := q.GetTokensByUserIdBatch(ctx, userIDs)
+		defer b.Close()
+
+		b.Query(func(i int, t []db.Token, err error) {
+			tokens[i], errors[i] = t, err
+		})
+
+		return tokens, errors
+	}
+}
+
+func loadTokensByUserIDAndContractID(q *db.Queries) func(context.Context, []persist.DBIDTuple) ([][]db.Token, []error) {
+	return func(ctx context.Context, idTuples []persist.DBIDTuple) ([][]db.Token, []error) {
+		tokens := make([][]db.Token, len(idTuples))
+		errors := make([]error, len(idTuples))
+
+		params := make([]db.GetTokensByUserIdAndContractIDBatchParams, len(idTuples))
+		for i, tuple := range idTuples {
+			params[i] = db.GetTokensByUserIdAndContractIDBatchParams{
+				OwnerUserID: tuple[0],
+				Contract:    tuple[1],
+			}
+		}
+
+		b := q.GetTokensByUserIdAndContractIDBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, t []db.Token, err error) {

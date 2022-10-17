@@ -348,18 +348,19 @@ func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
 type Community struct {
 	HelperCommunityData
-	Dbid             persist.DBID          `json:"dbid"`
-	LastUpdated      *time.Time            `json:"lastUpdated"`
-	ContractAddress  *persist.ChainAddress `json:"contractAddress"`
-	CreatorAddress   *persist.ChainAddress `json:"creatorAddress"`
-	Chain            *persist.Chain        `json:"chain"`
-	Name             *string               `json:"name"`
-	Description      *string               `json:"description"`
-	PreviewImage     *string               `json:"previewImage"`
-	ProfileImageURL  *string               `json:"profileImageURL"`
-	ProfileBannerURL *string               `json:"profileBannerURL"`
-	BadgeURL         *string               `json:"badgeURL"`
-	Owners           []*TokenHolder        `json:"owners"`
+	Dbid              persist.DBID            `json:"dbid"`
+	LastUpdated       *time.Time              `json:"lastUpdated"`
+	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
+	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Chain             *persist.Chain          `json:"chain"`
+	Name              *string                 `json:"name"`
+	Description       *string                 `json:"description"`
+	PreviewImage      *string                 `json:"previewImage"`
+	ProfileImageURL   *string                 `json:"profileImageURL"`
+	ProfileBannerURL  *string                 `json:"profileBannerURL"`
+	BadgeURL          *string                 `json:"badgeURL"`
+	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
+	Owners            *TokenHoldersConnection `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
@@ -713,6 +714,7 @@ type GalleryUser struct {
 	Username            *string         `json:"username"`
 	Bio                 *string         `json:"bio"`
 	Traits              *string         `json:"traits"`
+	Universal           *bool           `json:"universal"`
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
@@ -935,12 +937,27 @@ type Token struct {
 func (Token) IsNode()             {}
 func (Token) IsTokenByIDOrError() {}
 
+type TokenEdge struct {
+	Node   *Token  `json:"node"`
+	Cursor *string `json:"cursor"`
+}
+
 type TokenHolder struct {
 	HelperTokenHolderData
 	DisplayName   *string      `json:"displayName"`
 	Wallets       []*Wallet    `json:"wallets"`
 	User          *GalleryUser `json:"user"`
 	PreviewTokens []*string    `json:"previewTokens"`
+}
+
+type TokenHolderEdge struct {
+	Node   *TokenHolder `json:"node"`
+	Cursor *string      `json:"cursor"`
+}
+
+type TokenHoldersConnection struct {
+	Edges    []*TokenHolderEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
 }
 
 type TokensAddedToCollectionFeedEventData struct {
@@ -954,6 +971,11 @@ type TokensAddedToCollectionFeedEventData struct {
 }
 
 func (TokensAddedToCollectionFeedEventData) IsFeedEventData() {}
+
+type TokensConnection struct {
+	Edges    []*TokenEdge `json:"edges"`
+	PageInfo *PageInfo    `json:"pageInfo"`
+}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`

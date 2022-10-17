@@ -46,19 +46,19 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS) VALUES ($1, $2, $3, $4, $5) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS, UNIVERSAL) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID;`)
 	checkNoErr(err)
 
-	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByIDsStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,CREATED_AT,LAST_UPDATED FROM users WHERE ID = ANY($1) AND DELETED = false;`)
+	getByIDsStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,CREATED_AT,LAST_UPDATED FROM users WHERE ID = ANY($1) AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(WALLETS) AND DELETED = false;`)
+	getByWalletIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,UNIVERSAL,CREATED_AT,LAST_UPDATED FROM users WHERE $1 = ANY(WALLETS) AND DELETED = false;`)
 	checkNoErr(err)
 
-	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false;`)
+	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false AND UNIVERSAL = false;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = TRUE WHERE ID = $1;`)
@@ -172,7 +172,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, cha
 	if walletID != "" {
 		// If we do have a wallet with this ChainAddress, does it belong to a user?
 		var user persist.User
-		err := tx.StmtContext(ctx, u.getByWalletIDStmt).QueryRowContext(ctx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
+		err := tx.StmtContext(ctx, u.getByWalletIDStmt).QueryRowContext(ctx, walletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, &user.Universal, &user.CreationTime, &user.LastUpdated)
 		if err != nil && err != sql.ErrNoRows {
 			return "", err
 		}
@@ -191,7 +191,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, cha
 	newWalletID := persist.GenerateID()
 	// At this point, we know there's no existing wallet in the database with this ChainAddress, so let's make a new one!
 	if _, err := tx.StmtContext(ctx, u.createWalletStmt).ExecContext(ctx, newWalletID, chainAddress.Address(), chainAddress.Chain(), walletType); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create wallet: %w", err)
 	}
 
 	return newWalletID, nil
@@ -207,7 +207,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	defer tx.Rollback()
 
 	var user persist.User
-	err = tx.StmtContext(pCtx, u.getByUsernameStmt).QueryRowContext(pCtx, strings.ToLower(pUser.Username)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
+	err = tx.StmtContext(pCtx, u.getByUsernameStmt).QueryRowContext(pCtx, strings.ToLower(pUser.Username)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.CreationTime, &user.LastUpdated)
 	if err == nil {
 		return "", persist.ErrUsernameNotAvailable{Username: pUser.Username}
 	}
@@ -223,7 +223,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	}
 
 	var id persist.DBID
-	err = tx.StmtContext(pCtx, u.createStmt).QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Bio, []persist.DBID{walletID}).Scan(&id)
+	err = tx.StmtContext(pCtx, u.createStmt).QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Bio, []persist.DBID{walletID}, pUser.Universal).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -240,7 +240,7 @@ func (u *UserRepository) GetByID(pCtx context.Context, pID persist.DBID) (persis
 
 	user := persist.User{}
 	walletIDs := []persist.DBID{}
-	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.CreationTime, &user.LastUpdated)
+	err := u.getByIDStmt.QueryRowContext(pCtx, pID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.Universal, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{UserID: pID}
@@ -274,13 +274,13 @@ func (u *UserRepository) GetByIDs(pCtx context.Context, pIDs []persist.DBID) ([]
 	for rows.Next() {
 		user := persist.User{}
 		walletIDs := []persist.DBID{}
-		rows.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.CreationTime, &user.LastUpdated)
+		rows.Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, pq.Array(&walletIDs), &user.Universal, &user.CreationTime, &user.LastUpdated)
 		wallets := make([]persist.Wallet, len(walletIDs))
 
 		for i, walletID := range walletIDs {
 			wallet := persist.Wallet{ID: walletID}
 			err = u.getWalletStmt.QueryRowContext(pCtx, walletID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated)
-			if err != nil {
+			if err != nil && err != sql.ErrNoRows {
 				return nil, fmt.Errorf("failed to get wallet: %w", err)
 			}
 			wallets[i] = wallet
@@ -311,7 +311,7 @@ func (u *UserRepository) GetByChainAddress(pCtx context.Context, pChainAddress p
 func (u *UserRepository) GetByWalletID(pCtx context.Context, pWalletID persist.DBID) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWalletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
+	err := u.getByWalletIDStmt.QueryRowContext(pCtx, pWalletID).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, &user.Bio, &user.Traits, &user.Universal, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{WalletID: pWalletID}
@@ -327,7 +327,7 @@ func (u *UserRepository) GetByWalletID(pCtx context.Context, pWalletID persist.D
 func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (persist.User, error) {
 
 	var user persist.User
-	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.CreationTime, &user.LastUpdated)
+	err := u.getByUsernameStmt.QueryRowContext(pCtx, strings.ToLower(pUsername)).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.CreationTime, &user.LastUpdated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{Username: pUsername}
@@ -410,12 +410,12 @@ func (u *UserRepository) Delete(pCtx context.Context, pID persist.DBID) error {
 func (u *UserRepository) MergeUsers(pCtx context.Context, pInitialUser persist.DBID, pSecondUser persist.DBID) error {
 
 	var user persist.User
-	if err := u.getByIDStmt.QueryRowContext(pCtx, pInitialUser).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.CreationTime, &user.LastUpdated); err != nil {
+	if err := u.getByIDStmt.QueryRowContext(pCtx, pInitialUser).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Universal, &user.CreationTime, &user.LastUpdated); err != nil {
 		return err
 	}
 
 	var secondUser persist.User
-	if err := u.getByIDStmt.QueryRowContext(pCtx, pSecondUser).Scan(&secondUser.ID, &secondUser.Deleted, &secondUser.Version, &secondUser.Username, &secondUser.UsernameIdempotent, pq.Array(&secondUser.Wallets), &secondUser.Bio, &secondUser.CreationTime, &secondUser.LastUpdated); err != nil {
+	if err := u.getByIDStmt.QueryRowContext(pCtx, pSecondUser).Scan(&secondUser.ID, &secondUser.Deleted, &secondUser.Version, &secondUser.Username, &secondUser.UsernameIdempotent, pq.Array(&secondUser.Wallets), &secondUser.Bio, &user.Universal, &secondUser.CreationTime, &secondUser.LastUpdated); err != nil {
 		return err
 	}
 

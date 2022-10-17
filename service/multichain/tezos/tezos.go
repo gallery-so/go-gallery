@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/machinebox/graphql"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -24,7 +26,9 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
-const limit = 1000
+const pageSize = 1000
+
+const tezDomainsApiURL = "https://api.tezos.domains/graphql"
 
 type tokenStandard string
 
@@ -119,6 +123,7 @@ type Provider struct {
 	ipfsClient     *shell.Shell
 	arweaveClient  *goar.Client
 	storageClient  *storage.Client
+	graphQL        *graphql.Client
 	tokenBucket    string
 }
 
@@ -131,6 +136,7 @@ func NewProvider(tezosAPIUrl, mediaURL, ipfsGatewayURL string, httpClient *http.
 		httpClient:     httpClient,
 		ipfsClient:     ipfsClient,
 		arweaveClient:  arweaveClient,
+		graphQL:        graphql.NewClient(tezDomainsApiURL, graphql.WithHTTPClient(httpClient)),
 		storageClient:  storageClient,
 		tokenBucket:    tokenBucket,
 	}
@@ -145,12 +151,13 @@ func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.Blockchain
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
-func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, maxLimit, startingOffset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tzAddr, err := toTzAddress(addr)
 	if err != nil {
 		return nil, nil, err
 	}
-	offset := 0
+	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	offset := startingOffset
 	resultTokens := []tzktBalanceToken{}
 	for {
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&account=%s&limit=%d&sort.asc=id&offset=%d", d.apiURL, tzAddr.String(), limit, offset), nil)
@@ -172,13 +179,13 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
 		offset += limit
 
-		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), limit, offset)
+		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), pageSize, offset)
 	}
 
 	return d.tzBalanceTokensToTokens(ctx, resultTokens, addr.String())
@@ -186,9 +193,10 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Tezos Blockchain
-func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 
-	offset := 0
+	offset := startOffset
+	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -210,7 +218,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
@@ -230,8 +238,9 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
-func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	offset := 0
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	offset := startOffset
+	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -253,7 +262,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
@@ -335,8 +344,9 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 
 }
 
-func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
+	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -358,7 +368,7 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit {
+		if len(tzktBalances) < maxLimit {
 			break
 		}
 
@@ -378,8 +388,8 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 	return tokens, contract, nil
 }
 
-func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address) ([]multichain.ChainAgnosticCommunityOwner, error) {
-	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress)
+func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, maxLimit, maxOffset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
+	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress, maxLimit, maxOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -391,6 +401,107 @@ func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persi
 	}
 	return owners, nil
 
+}
+
+/*
+gql example
+{
+  reverseRecords(
+    where: {
+      address: {
+        in: [
+          "KT1Mqx5meQbhufngJnUAGEGpa4ZRxhPSiCgB"
+          "KT1GBZmSxmnKJXGMdMLbugPfLyUPmuLSMwKS"
+        ]
+      }
+    }
+  ) {
+    items {
+      address
+      owner
+      domain {
+        name
+      }
+    }
+  }
+}
+
+example response
+{
+  "data": {
+    "domains": {
+      "items": [
+        {
+          "address": "tz1VxMudmADssPp6FPDGRsvJXE41DD6i9g6n",
+          "name": "aaa.tez",
+          "owner": "tz1VxMudmADssPp6FPDGRsvJXE41DD6i9g6n",
+          "level": 2
+        },
+        {
+          "address": null,
+          "name": "a.aaa.tez",
+          "owner": "tz1VxMudmADssPp6FPDGRsvJXE41DD6i9g6n",
+          "level": 3
+        },
+        {
+          "address": null,
+          "name": "alice.tez",
+          "owner": "tz1Q4vimV3wsfp21o7Annt64X7Hs6MXg9Wix",
+          "level": 2
+        }
+      ]
+    }
+  },
+  "extensions": {}
+}
+*/
+
+type tezDomainResponse struct {
+	Data struct {
+		Domains struct {
+			Items []struct {
+				Address string `json:"address"`
+				Name    string `json:"name"`
+				Owner   string `json:"owner"`
+				Level   int    `json:"level"`
+			} `json:"items"`
+		} `json:"domains"`
+	} `json:"data"`
+}
+
+func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
+	req := graphql.NewRequest(fmt.Sprintf(`{
+	  "query": "query ($addresses: [String!]) {
+		reverseRecords(
+			where: {
+				address: {
+					in: $addresses
+				}
+			}
+		) {
+			items {
+				domain {
+					name
+				}
+			}
+		}
+	}",
+	  "variables": {
+		"addresses": [
+			%s
+		]
+	  }
+	}`, addr.String()))
+
+	resp := tezDomainResponse{}
+	err := d.graphQL.Run(ctx, req, &resp)
+	if err != nil {
+		return addr.String()
+	}
+	if len(resp.Data.Domains.Items) == 0 {
+		return addr.String()
+	}
+	return resp.Data.Domains.Items[0].Name
 }
 
 // RefreshToken refreshes the metadata for a given token.
@@ -543,7 +654,8 @@ func (d *Provider) makeTempMedia(ctx context.Context, tokenID persist.TokenID, c
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
-	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(multichain.TezAnimationKeywords), media.TezImageKeywords(multichain.TezImageKeywords), name, false)
+	imKeywords, animKeywords := persist.ChainTezos.BaseKeywords()
+	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(imKeywords), media.TezImageKeywords(animKeywords), name, false)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)

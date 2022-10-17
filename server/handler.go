@@ -65,7 +65,7 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 	h.AroundFields(graphql.RemapAndReportErrors)
 
 	newPublicAPI := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
-		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, throttler)
+		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, taskClient, throttler)
 	}
 
 	h.AroundFields(graphql.MutationCachingHandler(newPublicAPI))
