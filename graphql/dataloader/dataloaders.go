@@ -80,6 +80,7 @@ type Loaders struct {
 	TokensByContractID               *TokensLoaderByID
 	ContractByContractID             *ContractLoaderByID
 	ContractsByUserID                *ContractsLoaderByID
+	ContractsDisplayedByUserID       *ContractsLoaderByID
 	ContractByChainAddress           *ContractLoaderByChainAddress
 	FollowersByUserID                *UsersLoaderByID
 	FollowingByUserID                *UsersLoaderByID
@@ -233,6 +234,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	})
 
 	loaders.ContractsByUserID = NewContractsLoaderByID(defaults, loadContractsByUserID(q))
+
+	loaders.ContractsDisplayedByUserID = NewContractsLoaderByID(defaults, loadContractsDisplayedByUserID(q))
 
 	loaders.EventByEventID = NewEventLoaderByID(defaults, loadEventById(q), EventLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(event db.FeedEvent) persist.DBID { return event.ID },
@@ -800,6 +803,22 @@ func loadContractsByUserID(q *db.Queries) func(context.Context, []persist.DBID) 
 		errors := make([]error, len(contractIDs))
 
 		b := q.GetContractsByUserIDBatch(ctx, contractIDs)
+		defer b.Close()
+
+		b.Query(func(i int, c []db.Contract, err error) {
+			contracts[i], errors[i] = c, err
+		})
+
+		return contracts, errors
+	}
+}
+
+func loadContractsDisplayedByUserID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Contract, []error) {
+	return func(ctx context.Context, contractIDs []persist.DBID) ([][]db.Contract, []error) {
+		contracts := make([][]db.Contract, len(contractIDs))
+		errors := make([]error, len(contractIDs))
+
+		b := q.GetContractsDisplayedByUserIDBatch(ctx, contractIDs)
 		defer b.Close()
 
 		b.Query(func(i int, c []db.Contract, err error) {

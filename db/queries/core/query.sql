@@ -125,6 +125,18 @@ SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
     WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
     AND tokens.deleted = false AND contracts.deleted = false;
 
+-- name: GetContractsDisplayedByUserID :many
+SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
+    JOIN collections c ON c.NFTS && ARRAY[tokens.id]
+    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
+    AND tokens.deleted = false AND contracts.deleted = false;
+
+-- name: GetContractsDisplayedByUserIDBatch :batchmany
+SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
+    JOIN collections c ON c.NFTS && ARRAY[tokens.id]
+    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
+    AND tokens.deleted = false AND contracts.deleted = false;
+
 -- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.* FROM follows f
     INNER JOIN users u ON f.follower = u.id
