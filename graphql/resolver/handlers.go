@@ -207,12 +207,15 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 
 		res, err = next(ctx)
 
-		if span != nil && err == nil {
-			// If our result type implements the GraphQL Node pattern, add its ID to our event data
-			if node, ok := res.(interface{ ID() model.GqlID }); ok {
-				tracing.AddEventDataToSpan(span, map[string]interface{}{
-					"resolvedNodeId": node.ID(),
-				})
+		if span != nil {
+			// If we receive a non-nil result without an error, and our result type implements
+			// the GraphQL Node pattern, add its ID to our event data
+			if res != nil && err == nil {
+				if node, ok := res.(interface{ ID() model.GqlID }); ok {
+					tracing.AddEventDataToSpan(span, map[string]interface{}{
+						"resolvedNodeId": node.ID(),
+					})
+				}
 			}
 
 			tracing.FinishSpan(span)
