@@ -205,7 +205,7 @@ func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.G
 }
 
 func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
-	contracts, err := publicapi.For(ctx).Contract.GetContractsByUserID(ctx, userID)
+	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
 
 	if err != nil {
 		return nil, err
