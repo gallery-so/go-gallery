@@ -430,7 +430,22 @@ type Viewer {
     user: GalleryUser @goField(forceResolver: true)
     viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
     feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
+    
+    email: UserEmail @goField(forceResolver: true)
+
 }
+
+type UserEmail {
+    email: String
+    verified: Boolean
+    emailNotificationSettings: EmailNotificationSettings
+}
+
+type EmailNotificationSettings {
+    unsubscribedToAll: Boolean
+}
+
+
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
