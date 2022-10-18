@@ -23,6 +23,10 @@ type AuthorizationError interface {
 	IsAuthorizationError()
 }
 
+type CaptionFeedEventPayloadOrError interface {
+	IsCaptionFeedEventPayloadOrError()
+}
+
 type CollectionByIDOrError interface {
 	IsCollectionByIDOrError()
 }
@@ -235,6 +239,24 @@ type Badge struct {
 	ImageURL string    `json:"imageURL"`
 	Contract *Contract `json:"contract"`
 }
+
+type Caption struct {
+	Dbid         persist.DBID `json:"dbid"`
+	CreationTime *time.Time   `json:"creationTime"`
+	LastUpdated  *time.Time   `json:"lastUpdated"`
+	Captioner    *GalleryUser `json:"captioner"`
+	Caption      *string      `json:"caption"`
+}
+
+func (Caption) IsNode() {}
+
+type CaptionFeedEventPayload struct {
+	Viewer    *Viewer    `json:"viewer"`
+	Caption   *Caption   `json:"caption"`
+	FeedEvent *FeedEvent `json:"feedEvent"`
+}
+
+func (CaptionFeedEventPayload) IsCaptionFeedEventPayloadOrError() {}
 
 type ChainTokens struct {
 	Chain  *persist.Chain `json:"chain"`
@@ -457,6 +479,7 @@ type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }
 
+func (ErrAuthenticationFailed) IsCaptionFeedEventPayloadOrError()   {}
 func (ErrAuthenticationFailed) IsAddUserWalletPayloadOrError()      {}
 func (ErrAuthenticationFailed) IsError()                            {}
 func (ErrAuthenticationFailed) IsLoginPayloadOrError()              {}
@@ -508,6 +531,7 @@ type ErrFeedEventNotFound struct {
 func (ErrFeedEventNotFound) IsError()                            {}
 func (ErrFeedEventNotFound) IsFeedEventOrError()                 {}
 func (ErrFeedEventNotFound) IsFeedEventByIDOrError()             {}
+func (ErrFeedEventNotFound) IsCaptionFeedEventPayloadOrError()   {}
 func (ErrFeedEventNotFound) IsAdmireFeedEventPayloadOrError()    {}
 func (ErrFeedEventNotFound) IsRemoveAdmirePayloadOrError()       {}
 func (ErrFeedEventNotFound) IsCommentOnFeedEventPayloadOrError() {}
@@ -530,6 +554,7 @@ func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()          {}
+func (ErrInvalidInput) IsCaptionFeedEventPayloadOrError()         {}
 func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
 func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
@@ -647,6 +672,7 @@ type FeedEvent struct {
 	EventData             FeedEventData                    `json:"eventData"`
 	Admires               *FeedEventAdmiresConnection      `json:"admires"`
 	Comments              *FeedEventCommentsConnection     `json:"comments"`
+	Caption               *Caption                         `json:"caption"`
 	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
 	ViewerAdmire          *Admire                          `json:"viewerAdmire"`
 	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
@@ -665,6 +691,11 @@ type FeedEventAdmireEdge struct {
 type FeedEventAdmiresConnection struct {
 	Edges    []*FeedEventAdmireEdge `json:"edges"`
 	PageInfo *PageInfo              `json:"pageInfo"`
+}
+
+type FeedEventCaptionInput struct {
+	FeedEventID persist.DBID `json:"feedEventId"`
+	Comment     string       `json:"comment"`
 }
 
 type FeedEventCommentEdge struct {

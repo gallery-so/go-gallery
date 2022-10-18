@@ -485,6 +485,16 @@ type Comment implements Node {
     # should we include the feed event here?
 }
 
+type Caption implements Node {
+    id: ID!
+    dbid: DBID!
+    creationTime: Time
+    lastUpdated: Time
+    captioner: GalleryUser @goField(forceResolver: true)
+    caption: String
+    # should we include the feed event here?
+}
+
 # Actions a user can take on a resource
 enum Action {
     UserCreated
@@ -549,6 +559,7 @@ type FeedEvent implements Node {
     eventData: FeedEventData @goField(forceResolver: true)
     admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
     comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
+    caption: Caption
 
     # If supplied, typeFilter will only query for the requested interaction types.
     # If typeFilter is omitted, all interaction types will be queried.
@@ -794,6 +805,23 @@ type SetSpamPreferencePayload {
 union SetSpamPreferencePayloadOrError =
     SetSpamPreferencePayload
     | ErrNotAuthorized
+
+input FeedEventCaptionInput {
+  feedEventId: DBID!
+  comment: String!
+}
+
+type CaptionFeedEventPayload {
+  viewer: Viewer
+  caption: Caption @goField(forceResolver: true)
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+union CaptionFeedEventPayloadOrError =
+  CaptionFeedEventPayload
+  | ErrAuthenticationFailed
+  | ErrFeedEventNotFound
+  | ErrInvalidInput
 
 union AddUserWalletPayloadOrError =
     AddUserWalletPayload
@@ -1129,6 +1157,7 @@ type Mutation {
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
     admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
+    captionFeedEvent(input: FeedEventCaptionInput): CaptionFeedEventPayloadOrError @authRequired
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
