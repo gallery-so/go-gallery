@@ -571,48 +571,6 @@ func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.
 	return items, nil
 }
 
-const getContractsDisplayedByUserID = `-- name: GetContractsDisplayedByUserID :many
-SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description FROM contracts, tokens
-JOIN collections c ON tokens.id = ANY(c.NFTS)
-WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id AND c.owner_user_id = tokens.owner_user_id
-  AND tokens.deleted = false AND contracts.deleted = false
-`
-
-func (q *Queries) GetContractsDisplayedByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Contract, error) {
-	rows, err := q.db.Query(ctx, getContractsDisplayedByUserID, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Contract
-	for rows.Next() {
-		var i Contract
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.Name,
-			&i.Symbol,
-			&i.Address,
-			&i.CreatorAddress,
-			&i.Chain,
-			&i.ProfileBannerUrl,
-			&i.ProfileImageUrl,
-			&i.BadgeUrl,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getEvent = `-- name: GetEvent :one
 SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = $1 AND deleted = false
 `
