@@ -435,14 +435,16 @@ type Viewer {
 
 }
 
-type UserEmail {
+type UserEmail @goEmbedHelper {
+    user: GalleryUser
+
     email: String
     verified: Boolean
     emailNotificationSettings: EmailNotificationSettings
 }
 
 type EmailNotificationSettings {
-    unsubscribedToAll: Boolean
+    unsubscribedFromAll: Boolean
 }
 
 

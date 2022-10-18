@@ -846,7 +846,7 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 }
 
 const getOwnersByContractIdPaginate = `-- name: GetOwnersByContractIdPaginate :many
-SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal FROM users, tokens
+SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.email, users.email_verified, users.email_notification_settings FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
@@ -899,6 +899,9 @@ func (q *Queries) GetOwnersByContractIdPaginate(ctx context.Context, arg GetOwne
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailNotificationSettings,
 		); err != nil {
 			return nil, err
 		}
@@ -975,7 +978,7 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.email, u.email_verified, u.email_notification_settings FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -995,6 +998,9 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 		&i.Bio,
 		&i.Traits,
 		&i.Universal,
+		&i.Email,
+		&i.EmailVerified,
+		&i.EmailNotificationSettings,
 	)
 	return i, err
 }
@@ -1337,7 +1343,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -1355,12 +1361,15 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.Bio,
 		&i.Traits,
 		&i.Universal,
+		&i.Email,
+		&i.EmailVerified,
+		&i.EmailNotificationSettings,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -1378,12 +1387,75 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Bio,
 		&i.Traits,
 		&i.Universal,
+		&i.Email,
+		&i.EmailVerified,
+		&i.EmailNotificationSettings,
 	)
 	return i, err
 }
 
+const getUsersWithNotificationsOn = `-- name: GetUsersWithNotificationsOn :many
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE email_notification_settings->>'unsubscribed_from_all' = 'false' AND deleted = false AND email IS NOT NULL AND email_verified = true
+    AND (created_at, id) < ($2, $3)
+    AND (created_at, id) > ($4, $5)
+    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+    LIMIT $1
+`
+
+type GetUsersWithNotificationsOnParams struct {
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersWithNotificationsOnParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersWithNotificationsOn,
+		arg.Limit,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailNotificationSettings,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -1407,6 +1479,9 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailNotificationSettings,
 		); err != nil {
 			return nil, err
 		}

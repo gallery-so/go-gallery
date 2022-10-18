@@ -783,7 +783,7 @@ func (b *GetEventByIdBatchBatchResults) Close() error {
 }
 
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.email, u.email_verified, u.email_notification_settings FROM follows f
     INNER JOIN users u ON f.follower = u.id
     WHERE f.followee = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -828,6 +828,9 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.Email,
+				&i.EmailVerified,
+				&i.EmailNotificationSettings,
 			); err != nil {
 				break
 			}
@@ -846,7 +849,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Close() error {
 }
 
 const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.email, u.email_verified, u.email_notification_settings FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -891,6 +894,9 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.Email,
+				&i.EmailVerified,
+				&i.EmailNotificationSettings,
 			); err != nil {
 				break
 			}
@@ -1187,7 +1193,7 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
 }
 
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal FROM users, tokens
+SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.email, users.email_verified, users.email_notification_settings FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
@@ -1256,6 +1262,9 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.Email,
+				&i.EmailVerified,
+				&i.EmailNotificationSettings,
 			); err != nil {
 				break
 			}
@@ -1338,7 +1347,7 @@ func (b *GetTokenByIdBatchBatchResults) Close() error {
 }
 
 const getTokenOwnerByIDBatch = `-- name: GetTokenOwnerByIDBatch :batchone
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.email, u.email_verified, u.email_notification_settings FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -1376,6 +1385,9 @@ func (b *GetTokenOwnerByIDBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailNotificationSettings,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -1955,7 +1967,7 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 }
 
 const getUserByIdBatch = `-- name: GetUserByIdBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE id = $1 AND deleted = false
 `
 
 type GetUserByIdBatchBatchResults struct {
@@ -1991,6 +2003,9 @@ func (b *GetUserByIdBatchBatchResults) QueryRow(f func(int, User, error)) {
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailNotificationSettings,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -2007,7 +2022,7 @@ func (b *GetUserByIdBatchBatchResults) Close() error {
 }
 
 const getUserByUsernameBatch = `-- name: GetUserByUsernameBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 type GetUserByUsernameBatchBatchResults struct {
@@ -2043,6 +2058,9 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailNotificationSettings,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -2059,7 +2077,7 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 }
 
 const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 type GetUsersWithTraitBatchBatchResults struct {
@@ -2101,6 +2119,9 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.Email,
+				&i.EmailVerified,
+				&i.EmailNotificationSettings,
 			); err != nil {
 				break
 			}

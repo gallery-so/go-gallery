@@ -50,6 +50,8 @@ require (
 	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/qmuntal/gltf v0.22.0
 	github.com/segmentio/ksuid v1.0.4
+	github.com/sendgrid/rest v2.6.9+incompatible // indirect
+	github.com/sendgrid/sendgrid-go v3.12.0+incompatible
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a
 	github.com/sirupsen/logrus v1.8.1
