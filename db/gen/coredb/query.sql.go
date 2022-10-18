@@ -2075,11 +2075,34 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings FROM users WHERE id = ANY($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings FROM users WHERE id = ANY($2) AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $1
 `
 
-func (q *Queries) GetUsersByIDs(ctx context.Context, userIds persist.DBIDList) ([]User, error) {
-	rows, err := q.db.Query(ctx, getUsersByIDs, userIds)
+type GetUsersByIDsParams struct {
+	Limit         int32
+	UserIds       persist.DBIDList
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersByIDs,
+		arg.Limit,
+		arg.UserIds,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
 	if err != nil {
 		return nil, err
 	}

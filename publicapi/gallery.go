@@ -118,20 +118,20 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 			return db.Gallery{}, err
 		}
 
-		if gallery.OwnerUserID != userID {
-			// only view gallery if the user hasn't already viewed it in this most recent notification period
+		// if gallery.OwnerUserID != userID {
+		// only view gallery if the user hasn't already viewed it in this most recent notification period
 
-			err = dispatchEvent(ctx, db.Event{
-				ActorID:        userID,
-				ResourceTypeID: persist.ResourceTypeGallery,
-				SubjectID:      galleryID,
-				Action:         persist.ActionViewedGallery,
-				GalleryID:      galleryID,
-			}, api.validator)
-			if err != nil {
-				return db.Gallery{}, err
-			}
+		err = dispatchEvent(ctx, db.Event{
+			ActorID:        userID,
+			ResourceTypeID: persist.ResourceTypeGallery,
+			SubjectID:      galleryID,
+			Action:         persist.ActionViewedGallery,
+			GalleryID:      galleryID,
+		}, api.validator)
+		if err != nil {
+			return db.Gallery{}, err
 		}
+		// }
 	} else {
 		remote, _ := gc.RemoteIP()
 

@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -57,20 +58,64 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 	return &user, nil
 }
 
-func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID) ([]db.User, error) {
+func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userIDs": {userIDs, "required"},
 	}); err != nil {
-		return nil, err
+		return nil, PageInfo{}, err
 	}
 
-	users, err := api.queries.GetUsersByIDs(ctx, userIDs)
-	if err != nil {
-		return nil, err
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+
+		users, err := api.queries.GetUsersByIDs(ctx, db.GetUsersByIDsParams{
+			Limit:         params.Limit,
+			UserIds:       userIDs,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		interfaces := make([]interface{}, len(users))
+		for i, user := range users {
+			interfaces[i] = user
+		}
+
+		return interfaces, nil
 	}
 
-	return users, nil
+	countFunc := func() (int, error) {
+		return len(userIDs), nil
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if user, ok := i.(db.User); ok {
+			return user.CreatedAt, user.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an user")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	users := make([]db.User, len(results))
+	for i, result := range results {
+		if user, ok := result.(db.User); ok {
+			users[i] = user
+		}
+	}
+
+	return users, pageInfo, err
 }
 
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {

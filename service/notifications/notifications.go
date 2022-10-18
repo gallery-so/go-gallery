@@ -150,7 +150,11 @@ type viewedNotificationHandler struct {
 
 func beginningOfDay(t time.Time) time.Time {
 	year, month, day := t.Date()
-	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
+	pst, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		panic(err)
+	}
+	return time.Date(year, month, day, 0, 0, 0, 0, pst)
 }
 
 // this handler will still group notifications in the usual window, but it will also ensure that each viewer does

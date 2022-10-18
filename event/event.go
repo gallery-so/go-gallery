@@ -125,14 +125,22 @@ func (h notificationHandler) Handle(ctx context.Context, persistedEvent db.Event
 func (h notificationHandler) createNotificationDataForEvent(event db.Event) (data persist.NotificationData) {
 	switch event.Action {
 	case persist.ActionViewedGallery:
-		data.AuthedViewerIDs = []persist.DBID{event.ActorID}
-		data.UnauthedViewerIDs = []persist.NullString{event.ExternalID}
+		if event.ActorID != "" {
+			data.AuthedViewerIDs = []persist.DBID{event.ActorID}
+		}
+		if event.ExternalID != "" {
+			data.UnauthedViewerIDs = []persist.NullString{event.ExternalID}
+		}
 	case persist.ActionAdmiredFeedEvent:
-		data.AdmirerIDs = []persist.DBID{event.ActorID}
+		if event.ActorID != "" {
+			data.AdmirerIDs = []persist.DBID{event.ActorID}
+		}
 	case persist.ActionUserFollowedUsers:
-		data.FollowerIDs = []persist.DBID{event.ActorID}
-		data.FollowedBack = event.Data.UserFollowedBack
-		data.Refollowed = event.Data.UserRefollowed
+		if event.ActorID != "" {
+			data.FollowerIDs = []persist.DBID{event.ActorID}
+		}
+		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
+		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)
 	}
 	return
 }

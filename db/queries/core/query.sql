@@ -5,7 +5,12 @@ SELECT * FROM users WHERE id = $1 AND deleted = false;
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
 -- name: GetUsersByIDs :many
-SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false;
+SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $1;
 
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND deleted = false;

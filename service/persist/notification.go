@@ -1,12 +1,12 @@
 package persist
 
 type NotificationData struct {
-	AuthedViewerIDs   []DBID       `json:"viewer_ids"`
-	UnauthedViewerIDs []NullString `json:"unauthed_viewer_ids"`
-	FollowerIDs       []DBID       `json:"follower_ids"`
-	AdmirerIDs        []DBID       `json:"admirer_ids"`
-	FollowedBack      bool         `json:"followed_back"`
-	Refollowed        bool         `json:"refollowed"`
+	AuthedViewerIDs   []DBID       `json:"viewer_ids,omitempty"`
+	UnauthedViewerIDs []NullString `json:"unauthed_viewer_ids,omitempty"`
+	FollowerIDs       []DBID       `json:"follower_ids,omitempty"`
+	AdmirerIDs        []DBID       `json:"admirer_ids,omitempty"`
+	FollowedBack      NullBool     `json:"followed_back,omitempty"`
+	Refollowed        NullBool     `json:"refollowed,omitempty"`
 }
 
 func (n NotificationData) Validate() NotificationData {
