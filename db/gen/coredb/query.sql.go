@@ -573,9 +573,9 @@ func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.
 
 const getContractsDisplayedByUserID = `-- name: GetContractsDisplayedByUserID :many
 SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description FROM contracts, tokens
-    JOIN collections c ON c.NFTS && ARRAY[tokens.id]
-    WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id
-    AND tokens.deleted = false AND contracts.deleted = false
+JOIN collections c ON tokens.id = ANY(c.NFTS)
+WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id AND c.owner_user_id = tokens.owner_user_id
+  AND tokens.deleted = false AND contracts.deleted = false
 `
 
 func (q *Queries) GetContractsDisplayedByUserID(ctx context.Context, ownerUserID persist.DBID) ([]Contract, error) {
