@@ -133,12 +133,14 @@ func graphqlHandler(repos *persist.Repositories, queries *db.Queries, ethClient 
 			})
 		}
 
+		disableDataloaderCaching := false
+
 		mediamapper.AddTo(c)
-		event.AddTo(c, notificationsHandler, queries, taskClient)
+		event.AddTo(c, disableDataloaderCaching, notificationsHandler, queries, taskClient)
 		notifications.AddTo(c, notificationsHandler)
 
 		// Use the request context so dataloaders will add their traces to the request span
-		publicapi.AddTo(c, newPublicAPI(c.Request.Context(), false))
+		publicapi.AddTo(c, newPublicAPI(c.Request.Context(), disableDataloaderCaching))
 
 		h.ServeHTTP(c.Writer, c.Request)
 	}

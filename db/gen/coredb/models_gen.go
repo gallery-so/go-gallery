@@ -122,7 +122,7 @@ type Event struct {
 	CommentID      persist.DBID
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
-	ExternalID     string
+	ExternalID     persist.NullString
 }
 
 type Feature struct {
@@ -286,8 +286,8 @@ type User struct {
 	Wallets              persist.WalletList
 	Bio                  sql.NullString
 	Traits               pgtype.JSONB
-	NotificationSettings persist.UserNotificationSettings
 	Universal            bool
+	NotificationSettings persist.UserNotificationSettings
 }
 
 type UserEvent struct {

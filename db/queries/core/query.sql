@@ -270,6 +270,18 @@ INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id
 -- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
 
+-- name: CreateGalleryEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+
+-- name: CreateAdmireEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+
+-- name: CreateFeedEventEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+
+-- name: CreateCommentEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
 
@@ -451,11 +463,20 @@ SELECT * FROM notifications
     WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > @created_after
     ORDER BY created_at DESC;
 
--- name: CreateNotification :one
+-- name: CreateAdmireNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: CreateCommentNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, comment_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+
+-- name: CreateFollowNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
+-- name: CreateViewGalleryNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
 -- name: UpdateNotification :exec
-UPDATE notifications SET amount = amount + $2, event_ids = event_ids || $3, gallery_id = $4, comment_id = $5, feed_event_id = $6, data = $7 WHERE id = $1;
+UPDATE notifications SET data = $2, event_ids = event_ids || $3, amount = amount + $4, last_updated = now() WHERE id = $1;
 
 -- name: UpdateNotificationSettingsByID :exec
 UPDATE users SET notification_settings = $2 WHERE id = $1;

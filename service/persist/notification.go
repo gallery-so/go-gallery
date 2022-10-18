@@ -1,12 +1,12 @@
 package persist
 
 type NotificationData struct {
-	AuthedViewerIDs   []DBID   `json:"viewer_ids"`
-	UnauthedViewerIDs []string `json:"unauthed_viewer_ids"`
-	FollowerIDs       []DBID   `json:"follower_ids"`
-	AdmirerIDs        []DBID   `json:"admirer_ids"`
-	FollowedBack      bool     `json:"followed_back"`
-	Refollowed        bool     `json:"refollowed"`
+	AuthedViewerIDs   []DBID       `json:"viewer_ids"`
+	UnauthedViewerIDs []NullString `json:"unauthed_viewer_ids"`
+	FollowerIDs       []DBID       `json:"follower_ids"`
+	AdmirerIDs        []DBID       `json:"admirer_ids"`
+	FollowedBack      bool         `json:"followed_back"`
+	Refollowed        bool         `json:"refollowed"`
 }
 
 func (n NotificationData) Validate() NotificationData {
@@ -43,9 +43,9 @@ func uniqueDBIDs(ids []DBID) []DBID {
 	return result
 }
 
-func uniqueStrings(strs []string) []string {
-	seen := make(map[string]bool)
-	result := []string{}
+func uniqueStrings(strs []NullString) []NullString {
+	seen := make(map[NullString]bool)
+	result := []NullString{}
 
 	for _, str := range strs {
 		if _, ok := seen[str]; !ok {

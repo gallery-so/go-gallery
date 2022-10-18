@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -154,10 +155,11 @@ const viewedNotificationUniqueViewerWindow = time.Hour * 24
 // does not show up mutliple times in a week
 func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 
+	after := time.Now().Add(-viewedNotificationUniqueViewerWindow)
 	notifs, _ := h.queries.GetNotificationsByOwnerIDForActionAfter(ctx, db.GetNotificationsByOwnerIDForActionAfterParams{
 		OwnerID:      notif.OwnerID,
 		Action:       notif.Action,
-		CreatedAfter: time.Now().Add(-viewedNotificationUniqueViewerWindow),
+		CreatedAfter: after,
 	})
 	if notifs == nil || len(notifs) == 0 {
 		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
@@ -166,20 +168,20 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	mostRecentNotif := notifs[0]
 
 	if notif.Data.UnauthedViewerIDs != nil && len(notif.Data.UnauthedViewerIDs) > 0 {
-		externalsToAdd := map[string]bool{}
+		externalsToAdd := map[persist.NullString]bool{}
 		for _, ip := range notif.Data.UnauthedViewerIDs {
 			externalsToAdd[ip] = true
 		}
 		for _, ip := range notif.Data.UnauthedViewerIDs {
 		firstInner:
 			for _, n := range notifs {
-				if util.ContainsString(n.Data.UnauthedViewerIDs, ip) {
+				if persist.ContainsNullString(n.Data.UnauthedViewerIDs, ip) {
 					externalsToAdd[ip] = false
 					break firstInner
 				}
 			}
 		}
-		resultIPs := []string{}
+		resultIPs := []persist.NullString{}
 		for ip, add := range externalsToAdd {
 			if add {
 				resultIPs = append(resultIPs, ip)
@@ -284,15 +286,9 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 }
 
 func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *db.Queries, ps *pubsub.Client) error {
-	newNotif, err := queries.CreateNotification(ctx, db.CreateNotificationParams{
-		ID:       persist.GenerateID(),
-		OwnerID:  notif.OwnerID,
-		Action:   notif.Action,
-		Data:     notif.Data,
-		EventIds: notif.EventIds,
-	})
+	newNotif, err := addNotification(ctx, notif, queries)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create notification: %w", err)
 	}
 
 	marshalled, err := json.Marshal(newNotif)
@@ -321,13 +317,12 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	err := queries.UpdateNotification(ctx, db.UpdateNotificationParams{
 		ID: mostRecentNotif.ID,
 		// this concat will put the notif.Data values at the beginning of the array, sorted from most recently added to oldest added
-		Data:   mostRecentNotif.Data.Concat(notif.Data),
-		Amount: amount,
-		// this will automatically concat the event ids
+		Data:     mostRecentNotif.Data.Concat(notif.Data),
+		Amount:   amount,
 		EventIds: notif.EventIds,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error updating notification: %w", err)
 	}
 	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
 	if err != nil {
@@ -348,4 +343,50 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 
 	logger.For(ctx).Infof("pushed updated notification to pubsub: %s", updatedNotif.OwnerID)
 	return nil
+}
+
+func addNotification(ctx context.Context, notif db.Notification, queries *db.Queries) (db.Notification, error) {
+	id := persist.GenerateID()
+	switch notif.Action {
+	case persist.ActionAdmiredFeedEvent:
+		return queries.CreateAdmireNotification(ctx, db.CreateAdmireNotificationParams{
+			ID:          id,
+			OwnerID:     notif.OwnerID,
+			Action:      notif.Action,
+			Data:        notif.Data,
+			EventIds:    notif.EventIds,
+			FeedEventID: notif.FeedEventID,
+		})
+	case persist.ActionCommentedOnFeedEvent:
+		return queries.CreateCommentNotification(ctx, db.CreateCommentNotificationParams{
+			ID:          id,
+			OwnerID:     notif.OwnerID,
+			Action:      notif.Action,
+			Data:        notif.Data,
+			EventIds:    notif.EventIds,
+			FeedEventID: notif.FeedEventID,
+			CommentID:   notif.CommentID,
+		})
+
+	case persist.ActionUserFollowedUsers:
+		return queries.CreateFollowNotification(ctx, db.CreateFollowNotificationParams{
+			ID:       id,
+			OwnerID:  notif.OwnerID,
+			Action:   notif.Action,
+			Data:     notif.Data,
+			EventIds: notif.EventIds,
+		})
+	case persist.ActionViewedGallery:
+		return queries.CreateViewGalleryNotification(ctx, db.CreateViewGalleryNotificationParams{
+			ID:        id,
+			OwnerID:   notif.OwnerID,
+			Action:    notif.Action,
+			Data:      notif.Data,
+			EventIds:  notif.EventIds,
+			GalleryID: notif.GalleryID,
+		})
+
+	default:
+		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
+	}
 }

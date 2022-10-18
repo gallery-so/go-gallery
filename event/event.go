@@ -26,11 +26,11 @@ type EventHandlers struct {
 }
 
 // Register specific event handlers
-func AddTo(ctx *gin.Context, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *cloudtasks.Client) {
+func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *cloudtasks.Client) {
 	eventRepo := postgres.EventRepository{Queries: queries}
 	eventDispatcher := eventDispatcher{eventRepo: eventRepo, handlers: map[persist.Action][]eventHandler{}}
 	feedHandler := feedHandler{tc: taskClient}
-	notificationHandler := notificationHandler{notificationHandlers: notif}
+	notificationHandler := notificationHandler{notificationHandlers: notif, dataloaders: dataloader.NewLoaders(context.Background(), queries, disableDataloaderCaching)}
 
 	eventDispatcher.AddHandler(persist.ActionUserCreated, feedHandler)
 	eventDispatcher.AddHandler(persist.ActionUserFollowedUsers, feedHandler, notificationHandler)
@@ -122,7 +122,7 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 	switch event.Action {
 	case persist.ActionViewedGallery:
 		data.AuthedViewerIDs = []persist.DBID{event.ActorID}
-		data.UnauthedViewerIDs = []string{event.ExternalID}
+		data.UnauthedViewerIDs = []persist.NullString{event.ExternalID}
 	case persist.ActionAdmiredFeedEvent:
 		data.AdmirerIDs = []persist.DBID{event.ActorID}
 	case persist.ActionUserFollowedUsers:
