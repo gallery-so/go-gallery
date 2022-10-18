@@ -107,10 +107,8 @@ func EventValidator(sl validator.StructLevel) {
 }
 
 type ConnectionPaginationParams struct {
-	First  *int
-	Last   *int
-	Before *string
-	After  *string
+	First *int
+	Last  *int
 }
 
 func ConnectionPaginationParamsValidator(sl validator.StructLevel) {
