@@ -240,19 +240,8 @@ type Badge struct {
 	Contract *Contract `json:"contract"`
 }
 
-type Caption struct {
-	Dbid         persist.DBID `json:"dbid"`
-	CreationTime *time.Time   `json:"creationTime"`
-	LastUpdated  *time.Time   `json:"lastUpdated"`
-	Captioner    *GalleryUser `json:"captioner"`
-	Caption      *string      `json:"caption"`
-}
-
-func (Caption) IsNode() {}
-
 type CaptionFeedEventPayload struct {
 	Viewer    *Viewer    `json:"viewer"`
-	Caption   *Caption   `json:"caption"`
 	FeedEvent *FeedEvent `json:"feedEvent"`
 }
 
@@ -598,6 +587,7 @@ func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()   {}
 func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
 func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()          {}
 func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()        {}
+func (ErrNotAuthorized) IsCaptionFeedEventPayloadOrError()         {}
 func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()            {}
 func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()        {}
 func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
@@ -672,7 +662,7 @@ type FeedEvent struct {
 	EventData             FeedEventData                    `json:"eventData"`
 	Admires               *FeedEventAdmiresConnection      `json:"admires"`
 	Comments              *FeedEventCommentsConnection     `json:"comments"`
-	Caption               *Caption                         `json:"caption"`
+	Caption               *string                          `json:"caption"`
 	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
 	ViewerAdmire          *Admire                          `json:"viewerAdmire"`
 	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`

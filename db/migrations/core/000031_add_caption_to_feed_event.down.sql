@@ -1,0 +1,1 @@
+ALTER TABLE feed_events DROP COLUMN IF EXISTS caption;

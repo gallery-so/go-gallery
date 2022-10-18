@@ -13,6 +13,26 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const addFeedCaption = `-- name: AddFeedCaption :execrows
+UPDATE feed_events SET caption = $3::varchar, last_updated = NOW() WHERE deleted = false AND id = $1 AND owner_id = $2 AND caption IS NULL
+`
+
+type AddFeedCaptionParams struct {
+	ID      persist.DBID
+	OwnerID persist.DBID
+	Caption string
+}
+
+// AddFeedCaption will add a caption to a feed event.
+// This is currently a way operation: if the event already has a caption it won't be updated.
+func (q *Queries) AddFeedCaption(ctx context.Context, arg AddFeedCaptionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, addFeedCaption, arg.ID, arg.OwnerID, arg.Caption)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
@@ -79,7 +99,7 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 }
 
 const createFeedEvent = `-- name: CreateFeedEvent :one
-INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption
 `
 
 type CreateFeedEventParams struct {
@@ -112,6 +132,7 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }
@@ -720,7 +741,7 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 }
 
 const getLastFeedEvent = `-- name: GetLastFeedEvent :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
     WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
@@ -746,12 +767,13 @@ func (q *Queries) GetLastFeedEvent(ctx context.Context, arg GetLastFeedEventPara
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
     WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $4::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
@@ -783,12 +805,13 @@ func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLast
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const getLastFeedEventForToken = `-- name: GetLastFeedEventForToken :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
     WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $4::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
@@ -820,6 +843,7 @@ func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedE
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }

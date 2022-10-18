@@ -337,6 +337,11 @@ SELECT * FROM feed_events
     ORDER BY event_time DESC
     LIMIT 1;
 
+-- name: AddFeedCaption :execrows
+-- AddFeedCaption will add a caption to a feed event.
+-- This is currently a way operation: if the event already has a caption it won't be updated.
+UPDATE feed_events SET caption = @caption::varchar, last_updated = NOW() WHERE deleted = false AND id = $1 AND owner_id = $2 AND caption IS NULL;
+
 -- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
 

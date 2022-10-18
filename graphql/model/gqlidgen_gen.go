@@ -14,10 +14,6 @@ func (r *Admire) ID() GqlID {
 	return GqlID(fmt.Sprintf("Admire:%s", r.Dbid))
 }
 
-func (r *Caption) ID() GqlID {
-	return GqlID(fmt.Sprintf("Caption:%s", r.Dbid))
-}
-
 func (r *Collection) ID() GqlID {
 	return GqlID(fmt.Sprintf("Collection:%s", r.Dbid))
 }
@@ -84,7 +80,6 @@ func (r *Wallet) ID() GqlID {
 
 type NodeFetcher struct {
 	OnAdmire          func(ctx context.Context, dbid persist.DBID) (*Admire, error)
-	OnCaption         func(ctx context.Context, dbid persist.DBID) (*Caption, error)
 	OnCollection      func(ctx context.Context, dbid persist.DBID) (*Collection, error)
 	OnCollectionToken func(ctx context.Context, tokenId string, collectionId string) (*CollectionToken, error)
 	OnComment         func(ctx context.Context, dbid persist.DBID) (*Comment, error)
@@ -113,11 +108,6 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Admire' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnAdmire(ctx, persist.DBID(ids[0]))
-	case "Caption":
-		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Caption' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
-		}
-		return n.OnCaption(ctx, persist.DBID(ids[0]))
 	case "Collection":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Collection' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -182,8 +172,6 @@ func (n *NodeFetcher) ValidateHandlers() {
 	switch {
 	case n.OnAdmire == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnAdmire")
-	case n.OnCaption == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCaption")
 	case n.OnCollection == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCollection")
 	case n.OnCollectionToken == nil:

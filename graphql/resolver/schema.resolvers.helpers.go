@@ -574,7 +574,7 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 		return nil, err
 	}
 
-	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
+	return eventToModel(event, data), nil
 }
 
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
@@ -668,6 +668,22 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	}
 }
 
+func eventToModel(event *db.FeedEvent, data model.FeedEventData) *model.FeedEvent {
+	// Value always returns a nil error so we can ignore it.
+	caption, _ := event.Caption.Value()
+
+	var captionVal *string
+	if caption != nil {
+		captionVal = util.StringToPointer(caption.(string))
+	}
+
+	return &model.FeedEvent{
+		Dbid:      event.ID,
+		Caption:   captionVal,
+		EventData: data,
+	}
+}
+
 func eventToUserCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	return model.UserCreatedFeedEventData{
 		EventTime: &event.EventTime,
@@ -758,7 +774,7 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 		} else if err != nil {
 			return nil, err
 		} else {
-			node = model.FeedEvent{Dbid: evt.ID, EventData: data}
+			node = eventToModel(&evt, data)
 		}
 
 		edges[i] = &model.FeedEdge{Node: node}
