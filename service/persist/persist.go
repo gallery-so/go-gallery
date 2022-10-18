@@ -27,6 +27,8 @@ type DBID string
 // DBIDList is a slice of DBIDs, used to implement scanner/valuer interfaces
 type DBIDList []DBID
 
+type DBIDTuple [2]DBID
+
 func (l DBIDList) Value() (driver.Value, error) {
 	return pq.Array(l).Value()
 }

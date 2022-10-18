@@ -118,16 +118,26 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
-func (r *communityResolver) Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error) {
+func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error) {
+	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last)
+}
+
+func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
 	refresh := false
-	onlyGallery := true
 	if obj.HelperCommunityData.ForceRefresh != nil {
 		refresh = *obj.HelperCommunityData.ForceRefresh
 	}
-	if obj.HelperCommunityData.OnlyGalleryUsers != nil {
-		onlyGallery = *obj.HelperCommunityData.OnlyGalleryUsers
+
+	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
 	}
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, onlyGallery)
+
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, before, after, first, last)
 }
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
@@ -199,17 +209,30 @@ func (r *feedEventResolver) Interactions(ctx context.Context, obj *model.FeedEve
 	}, nil
 }
 
-func (r *feedEventResolver) HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error) {
+func (r *feedEventResolver) ViewerAdmire(ctx context.Context, obj *model.FeedEvent) (*model.Admire, error) {
 	api := publicapi.For(ctx)
 
 	// If the user isn't logged in, there is no viewer
 	if !api.User.IsUserLoggedIn(ctx) {
-		f := false
-		return &f, nil
+		return nil, nil
 	}
 
 	userID := api.User.GetLoggedInUserId(ctx)
-	return api.Interaction.HasUserAdmiredFeedEvent(ctx, userID, obj.Dbid)
+
+	admire, err := api.Interaction.GetAdmireByActorIDAndFeedEventID(ctx, userID, obj.Dbid)
+	if err != nil {
+		// If getting the admire fails for any reason, just return nil. This resolver doesn't
+		// return error types -- it just returns an admire (if it can find one) or nil.
+		return nil, nil
+	}
+
+	return admireToModel(ctx, *admire), nil
+}
+
+func (r *feedEventResolver) HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error) {
+	// Trivial implementation for backward compatibility; this will be removed soon
+	f := false
+	return &f, nil
 }
 
 func (r *followInfoResolver) User(ctx context.Context, obj *model.FollowInfo) (*model.GalleryUser, error) {
@@ -745,15 +768,16 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 }
 
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
-	feedEvent, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
+	feedEventID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.RemoveAdmirePayload{
-		Viewer: resolveViewer(ctx),
+		Viewer:   resolveViewer(ctx),
+		AdmireID: &admireID,
 		FeedEvent: &model.FeedEvent{
-			Dbid: feedEvent, // remaining fields handled by dedicated resolver
+			Dbid: feedEventID, // remaining fields handled by dedicated resolver
 		},
 	}
 	return output, nil
@@ -925,8 +949,8 @@ func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist
 	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
 }
 
-func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error) {
-	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh, onlyGalleryUsers)
+func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
+	return resolveCommunityByContractAddress(ctx, communityAddress, forceRefresh)
 }
 
 func (r *queryResolver) GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error) {

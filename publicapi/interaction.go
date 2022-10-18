@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/validate"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -315,6 +316,27 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 	return comments, pageInfo, err
 }
 
+func (api InteractionAPI) GetAdmireByActorIDAndFeedEventID(ctx context.Context, actorID persist.DBID, feedEventID persist.DBID) (*db.Admire, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"actorID":     {actorID, "required"},
+		"feedEventID": {feedEventID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	admire, err := api.loaders.AdmireByActorIDAndFeedEventID.Load(db.GetAdmireByActorIDAndFeedEventIDParams{
+		ActorID:     actorID,
+		FeedEventID: feedEventID,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &admire, nil
+}
+
 func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*db.Admire, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -339,25 +361,32 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	actor, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, actor)
-	if err != nil {
+	admire, err := api.GetAdmireByActorIDAndFeedEventID(ctx, userID, feedEventID)
+	if err == nil {
+		return "", persist.ErrAdmireAlreadyExists{AdmireID: admire.ID, ActorID: userID, FeedEventID: feedEventID}
+	}
+
+	notFoundErr := persist.ErrAdmireNotFound{}
+	if !errors.As(err, &notFoundErr) {
 		return "", err
 	}
+
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
 
 	go dispatchEvent(ctx, db.Event{
-		ActorID:        actor,
+		ActorID:        userID,
 		ResourceTypeID: persist.ResourceTypeFeedEvent,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		AdmireID:       admireID,
 	})
 
-	return admireID, nil
+	return admireID, err
 }
 
 func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
@@ -389,16 +418,19 @@ func (api InteractionAPI) HasUserAdmiredFeedEvent(ctx context.Context, userID pe
 		return nil, err
 	}
 
-	hasAdmired, err := api.loaders.UserAdmiredFeedEvent.Load(db.GetUserAdmiredFeedEventParams{
-		ActorID:     userID,
-		FeedEventID: feedEventID,
-	})
-
-	if err != nil {
-		return nil, err
+	_, err := api.GetAdmireByActorIDAndFeedEventID(ctx, userID, feedEventID)
+	if err == nil {
+		hasAdmired := true
+		return &hasAdmired, nil
 	}
 
-	return &hasAdmired, nil
+	notFoundErr := persist.ErrAdmireNotFound{}
+	if errors.As(err, &notFoundErr) {
+		hasAdmired := false
+		return &hasAdmired, nil
+	}
+
+	return nil, err
 }
 
 func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {
@@ -434,9 +466,9 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 	if err != nil {
 		return "", err
 	}
-  
-  // Sanitize
-  comment = validate.SanitizationPolicy.Sanitize(comment)
+
+	// Sanitize
+	comment = validate.SanitizationPolicy.Sanitize(comment)
 
 	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, actor, replyToID, comment)
 	if err != nil {

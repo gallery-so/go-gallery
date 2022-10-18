@@ -1,13 +1,14 @@
 package remapgen
 
 import (
+	"path"
+	"sort"
+	"syscall"
+
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/99designs/gqlgen/plugin"
 	"github.com/vektah/gqlparser/v2/ast"
-	"path"
-	"sort"
-	"syscall"
 )
 
 const outputFileName = "remapgen_gen.go"

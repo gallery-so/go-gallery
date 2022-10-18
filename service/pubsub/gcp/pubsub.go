@@ -2,8 +2,9 @@ package gcp
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/pubsub/pstest"

@@ -271,4 +271,3 @@ func (_IERC721Metadata *IERC721MetadataSession) TokenURI(tokenId *big.Int) (stri
 func (_IERC721Metadata *IERC721MetadataCallerSession) TokenURI(tokenId *big.Int) (string, error) {
 	return _IERC721Metadata.Contract.TokenURI(&_IERC721Metadata.CallOpts, tokenId)
 }
-

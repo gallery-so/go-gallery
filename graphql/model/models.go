@@ -39,8 +39,7 @@ type HelperTokenHolderData struct {
 }
 
 type HelperCommunityData struct {
-	ForceRefresh     *bool
-	OnlyGalleryUsers *bool
+	ForceRefresh *bool
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {

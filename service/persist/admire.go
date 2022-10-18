@@ -20,9 +20,21 @@ type AdmireRepository interface {
 }
 
 type ErrAdmireNotFound struct {
-	ID DBID
+	AdmireID    DBID
+	ActorID     DBID
+	FeedEventID DBID
 }
 
 func (e ErrAdmireNotFound) Error() string {
-	return fmt.Sprintf("admire not found by id: %s", e.ID)
+	return fmt.Sprintf("admire not found | AdmireID: %s, ActorID: %s, FeedEventID: %s", e.AdmireID, e.ActorID, e.FeedEventID)
+}
+
+type ErrAdmireAlreadyExists struct {
+	AdmireID    DBID
+	ActorID     DBID
+	FeedEventID DBID
+}
+
+func (e ErrAdmireAlreadyExists) Error() string {
+	return fmt.Sprintf("admire already exists | AdmireID: %s, ActorID: %s, FeedEventID: %s", e.AdmireID, e.ActorID, e.FeedEventID)
 }

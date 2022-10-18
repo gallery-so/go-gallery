@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 
 	"cloud.google.com/go/profiler"
-	"github.com/mikeydub/go-gallery/mediaprocessing"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/tokenprocessing"
+
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"google.golang.org/appengine"
 )
@@ -27,7 +28,7 @@ func main() {
 		logger.For(nil).Warnf("failed to start cloud profiler due to error: %s\n", err)
 	}
 
-	mediaprocessing.InitServer()
+	tokenprocessing.InitServer()
 	if appengine.IsAppEngine() {
 		appengine.Main()
 	} else {

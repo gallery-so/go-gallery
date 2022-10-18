@@ -62,6 +62,10 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "tokens.contract"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "tokens.token_metadata"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          - column: "tokens.media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
 
           # Contracts
           - column: "contracts.address"
@@ -185,3 +189,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "*.user_ids"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.thumbnail_url"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.media_url"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"

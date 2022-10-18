@@ -2,9 +2,10 @@ package memstore
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/logger"
 
 	"github.com/gammazero/workerpool"
 )

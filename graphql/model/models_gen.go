@@ -367,18 +367,19 @@ func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
 type Community struct {
 	HelperCommunityData
-	Dbid             persist.DBID          `json:"dbid"`
-	LastUpdated      *time.Time            `json:"lastUpdated"`
-	ContractAddress  *persist.ChainAddress `json:"contractAddress"`
-	CreatorAddress   *persist.ChainAddress `json:"creatorAddress"`
-	Chain            *persist.Chain        `json:"chain"`
-	Name             *string               `json:"name"`
-	Description      *string               `json:"description"`
-	PreviewImage     *string               `json:"previewImage"`
-	ProfileImageURL  *string               `json:"profileImageURL"`
-	ProfileBannerURL *string               `json:"profileBannerURL"`
-	BadgeURL         *string               `json:"badgeURL"`
-	Owners           []*TokenHolder        `json:"owners"`
+	Dbid              persist.DBID            `json:"dbid"`
+	LastUpdated       *time.Time              `json:"lastUpdated"`
+	ContractAddress   *persist.ChainAddress   `json:"contractAddress"`
+	CreatorAddress    *persist.ChainAddress   `json:"creatorAddress"`
+	Chain             *persist.Chain          `json:"chain"`
+	Name              *string                 `json:"name"`
+	Description       *string                 `json:"description"`
+	PreviewImage      *string                 `json:"previewImage"`
+	ProfileImageURL   *string                 `json:"profileImageURL"`
+	ProfileBannerURL  *string                 `json:"profileBannerURL"`
+	BadgeURL          *string                 `json:"badgeURL"`
+	TokensInCommunity *TokensConnection       `json:"tokensInCommunity"`
+	Owners            *TokenHoldersConnection `json:"owners"`
 }
 
 func (Community) IsNode()                      {}
@@ -457,6 +458,20 @@ type ErrAddressOwnedByUser struct {
 func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError() {}
 func (ErrAddressOwnedByUser) IsError()                       {}
 
+type ErrAdmireAlreadyExists struct {
+	Message string `json:"message"`
+}
+
+func (ErrAdmireAlreadyExists) IsError()                         {}
+func (ErrAdmireAlreadyExists) IsAdmireFeedEventPayloadOrError() {}
+
+type ErrAdmireNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrAdmireNotFound) IsError()                      {}
+func (ErrAdmireNotFound) IsRemoveAdmirePayloadOrError() {}
+
 type ErrAuthenticationFailed struct {
 	Message string `json:"message"`
 }
@@ -481,6 +496,13 @@ func (ErrCollectionNotFound) IsError()                          {}
 func (ErrCollectionNotFound) IsCollectionByIDOrError()          {}
 func (ErrCollectionNotFound) IsCollectionTokenByIDOrError()     {}
 func (ErrCollectionNotFound) IsDeleteCollectionPayloadOrError() {}
+
+type ErrCommentNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrCommentNotFound) IsError()                       {}
+func (ErrCommentNotFound) IsRemoveCommentPayloadOrError() {}
 
 type ErrCommunityNotFound struct {
 	Message string `json:"message"`
@@ -578,13 +600,6 @@ func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
 func (ErrNotAuthorized) IsError()                                  {}
 func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
 
-type ErrNotFingerprinted struct {
-	Message string `json:"message"`
-}
-
-func (ErrNotFingerprinted) IsError()                     {}
-func (ErrNotFingerprinted) IsViewGalleryPayloadOrError() {}
-
 type ErrSyncFailed struct {
 	Message string `json:"message"`
 }
@@ -653,6 +668,7 @@ type FeedEvent struct {
 	Admires               *FeedEventAdmiresConnection      `json:"admires"`
 	Comments              *FeedEventCommentsConnection     `json:"comments"`
 	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
+	ViewerAdmire          *Admire                          `json:"viewerAdmire"`
 	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
 }
 
@@ -718,6 +734,7 @@ type GalleryUser struct {
 	Username            *string         `json:"username"`
 	Bio                 *string         `json:"bio"`
 	Traits              *string         `json:"traits"`
+	Universal           *bool           `json:"universal"`
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
@@ -894,8 +911,9 @@ type RefreshTokenPayload struct {
 func (RefreshTokenPayload) IsRefreshTokenPayloadOrError() {}
 
 type RemoveAdmirePayload struct {
-	Viewer    *Viewer    `json:"viewer"`
-	FeedEvent *FeedEvent `json:"feedEvent"`
+	Viewer    *Viewer       `json:"viewer"`
+	AdmireID  *persist.DBID `json:"admireID"`
+	FeedEvent *FeedEvent    `json:"feedEvent"`
 }
 
 func (RemoveAdmirePayload) IsRemoveAdmirePayloadOrError() {}
@@ -1052,12 +1070,27 @@ type Token struct {
 func (Token) IsNode()             {}
 func (Token) IsTokenByIDOrError() {}
 
+type TokenEdge struct {
+	Node   *Token  `json:"node"`
+	Cursor *string `json:"cursor"`
+}
+
 type TokenHolder struct {
 	HelperTokenHolderData
 	DisplayName   *string      `json:"displayName"`
 	Wallets       []*Wallet    `json:"wallets"`
 	User          *GalleryUser `json:"user"`
 	PreviewTokens []*string    `json:"previewTokens"`
+}
+
+type TokenHolderEdge struct {
+	Node   *TokenHolder `json:"node"`
+	Cursor *string      `json:"cursor"`
+}
+
+type TokenHoldersConnection struct {
+	Edges    []*TokenHolderEdge `json:"edges"`
+	PageInfo *PageInfo          `json:"pageInfo"`
 }
 
 type TokensAddedToCollectionFeedEventData struct {
@@ -1071,6 +1104,11 @@ type TokensAddedToCollectionFeedEventData struct {
 }
 
 func (TokensAddedToCollectionFeedEventData) IsFeedEventData() {}
+
+type TokensConnection struct {
+	Edges    []*TokenEdge `json:"edges"`
+	PageInfo *PageInfo    `json:"pageInfo"`
+}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`

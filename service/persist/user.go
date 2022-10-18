@@ -22,6 +22,7 @@ type User struct {
 	Wallets            []Wallet        `json:"wallets"`
 	Bio                NullString      `json:"bio"`
 	Traits             Traits          `json:"traits"`
+	Universal          NullBool        `json:"universal"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
@@ -56,6 +57,7 @@ type CreateUserInput struct {
 	Bio          string
 	ChainAddress ChainAddress
 	WalletType   WalletType
+	Universal    bool
 }
 
 // UserRepository represents the interface for interacting with the persisted state of users

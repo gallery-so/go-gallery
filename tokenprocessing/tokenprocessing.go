@@ -1,7 +1,8 @@
-package mediaprocessing
+package tokenprocessing
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
@@ -16,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -26,7 +29,7 @@ import (
 // InitServer initializes the mediaprocessing server
 func InitServer() {
 	router := coreInitServer()
-	logger.For(nil).Info("Starting mediaprocessing server...")
+	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
@@ -37,7 +40,7 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	repos := newRepos()
+	repos := newRepos(postgres.NewClient())
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
 		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
@@ -61,8 +64,9 @@ func coreInitServer() *gin.Engine {
 	logger.For(ctx).Info("Registering handlers...")
 
 	t := newThrottler()
+	mc := server.NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), task.NewClient(context.Background()))
 
-	return handlersInitServer(router, repos, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, mc, repos, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
@@ -100,20 +104,8 @@ func setDefaults() {
 	}
 }
 
-func newRepos() *persist.Repositories {
-	pgClient := postgres.NewClient()
-	galleryRepo := postgres.NewGalleryRepository(pgClient, redis.NewCache(redis.GalleriesDB))
-	return &persist.Repositories{
-		TokenRepository:    postgres.NewTokenGalleryRepository(pgClient, galleryRepo),
-		ContractRepository: postgres.NewContractGalleryRepository(pgClient),
-		UserRepository:     postgres.NewUserRepository(pgClient),
-		WalletRepository:   postgres.NewWalletRepository(pgClient),
-		GalleryRepository:  galleryRepo,
-	}
-}
-
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.MediaProcessingThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleDB), time.Minute*5)
 }
 
 func initSentry() {
@@ -159,6 +151,27 @@ func initLogger() {
 		}
 
 	})
+}
+
+func newRepos(db *sql.DB) *persist.Repositories {
+	galleriesCacheToken := redis.NewCache(1)
+	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
+
+	return &persist.Repositories{
+		UserRepository:        postgres.NewUserRepository(db),
+		NonceRepository:       postgres.NewNonceRepository(db),
+		LoginRepository:       postgres.NewLoginRepository(db),
+		TokenRepository:       postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
+		CollectionRepository:  postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
+		GalleryRepository:     galleryTokenRepo,
+		ContractRepository:    postgres.NewContractGalleryRepository(db),
+		BackupRepository:      postgres.NewBackupRepository(db),
+		MembershipRepository:  postgres.NewMembershipRepository(db),
+		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
+		WalletRepository:      postgres.NewWalletRepository(db),
+		AdmireRepository:      postgres.NewAdmireRepository(db),
+		CommentRepository:     postgres.NewCommentRepository(db),
+	}
 }
 
 // configureRootContext configures the main context from which other contexts are derived.

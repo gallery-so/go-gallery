@@ -77,9 +77,8 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 	}
 
 	paginator := timeIDPaginator{
-		QueryFunc:          queryFunc,
-		CursorFunc:         feedCursor,
-		SortPagesAscending: true,
+		QueryFunc:  queryFunc,
+		CursorFunc: feedCursor,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -129,9 +128,8 @@ func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, be
 	}
 
 	paginator := timeIDPaginator{
-		QueryFunc:          queryFunc,
-		CursorFunc:         feedCursor,
-		SortPagesAscending: true,
+		QueryFunc:  queryFunc,
+		CursorFunc: feedCursor,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
@@ -173,9 +171,8 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 	}
 
 	paginator := timeIDPaginator{
-		QueryFunc:          queryFunc,
-		CursorFunc:         feedCursor,
-		SortPagesAscending: true,
+		QueryFunc:  queryFunc,
+		CursorFunc: feedCursor,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)

@@ -93,7 +93,15 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	}
 
 	if authResult.UserID != "" {
-		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
+		user, err := userRepo.GetByID(pCtx, authResult.UserID)
+		if err != nil {
+			logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
+		}
+		if user.Universal.Bool() {
+			userRepo.Delete(pCtx, authResult.UserID)
+		} else {
+			return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
+		}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates

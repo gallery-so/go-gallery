@@ -79,10 +79,8 @@ type ResolverRoot interface {
 }
 
 type DirectiveRoot struct {
-	AuthRequired              func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
-	FingerprintOrAuthRequired func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
-	FingerprintRequired       func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
-	RestrictEnvironment       func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
+	AuthRequired        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	RestrictEnvironment func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -216,19 +214,20 @@ type ComplexityRoot struct {
 	}
 
 	Community struct {
-		BadgeURL         func(childComplexity int) int
-		Chain            func(childComplexity int) int
-		ContractAddress  func(childComplexity int) int
-		CreatorAddress   func(childComplexity int) int
-		Dbid             func(childComplexity int) int
-		Description      func(childComplexity int) int
-		ID               func(childComplexity int) int
-		LastUpdated      func(childComplexity int) int
-		Name             func(childComplexity int) int
-		Owners           func(childComplexity int) int
-		PreviewImage     func(childComplexity int) int
-		ProfileBannerURL func(childComplexity int) int
-		ProfileImageURL  func(childComplexity int) int
+		BadgeURL          func(childComplexity int) int
+		Chain             func(childComplexity int) int
+		ContractAddress   func(childComplexity int) int
+		CreatorAddress    func(childComplexity int) int
+		Dbid              func(childComplexity int) int
+		Description       func(childComplexity int) int
+		ID                func(childComplexity int) int
+		LastUpdated       func(childComplexity int) int
+		Name              func(childComplexity int) int
+		Owners            func(childComplexity int, before *string, after *string, first *int, last *int) int
+		PreviewImage      func(childComplexity int) int
+		ProfileBannerURL  func(childComplexity int) int
+		ProfileImageURL   func(childComplexity int) int
+		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int) int
 	}
 
 	Contract struct {
@@ -267,11 +266,23 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrAdmireAlreadyExists struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrAdmireNotFound struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrAuthenticationFailed struct {
 		Message func(childComplexity int) int
 	}
 
 	ErrCollectionNotFound struct {
+		Message func(childComplexity int) int
+	}
+
+	ErrCommentNotFound struct {
 		Message func(childComplexity int) int
 	}
 
@@ -303,10 +314,6 @@ type ComplexityRoot struct {
 
 	ErrNotAuthorized struct {
 		Cause   func(childComplexity int) int
-		Message func(childComplexity int) int
-	}
-
-	ErrNotFingerprinted struct {
 		Message func(childComplexity int) int
 	}
 
@@ -352,6 +359,7 @@ type ComplexityRoot struct {
 		HasViewerAdmiredEvent func(childComplexity int) int
 		ID                    func(childComplexity int) int
 		Interactions          func(childComplexity int, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) int
+		ViewerAdmire          func(childComplexity int) int
 	}
 
 	FeedEventAdmireEdge struct {
@@ -417,6 +425,7 @@ type ComplexityRoot struct {
 		Tokens              func(childComplexity int) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
 		Traits              func(childComplexity int) int
+		Universal           func(childComplexity int) int
 		Username            func(childComplexity int) int
 		Wallets             func(childComplexity int) int
 	}
@@ -563,7 +572,7 @@ type ComplexityRoot struct {
 		CollectionByID          func(childComplexity int, id persist.DBID) int
 		CollectionTokenByID     func(childComplexity int, tokenID persist.DBID, collectionID persist.DBID) int
 		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
-		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) int
+		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
 		FeedEventByID           func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners func(childComplexity int) int
 		GeneralAllowlist        func(childComplexity int) int
@@ -590,6 +599,7 @@ type ComplexityRoot struct {
 	}
 
 	RemoveAdmirePayload struct {
+		AdmireID  func(childComplexity int) int
 		FeedEvent func(childComplexity int) int
 		Viewer    func(childComplexity int) int
 	}
@@ -711,11 +721,26 @@ type ComplexityRoot struct {
 		TokenURI              func(childComplexity int) int
 	}
 
+	TokenEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	TokenHolder struct {
 		DisplayName   func(childComplexity int) int
 		PreviewTokens func(childComplexity int) int
 		User          func(childComplexity int) int
 		Wallets       func(childComplexity int) int
+	}
+
+	TokenHolderEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	TokenHoldersConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	TokensAddedToCollectionFeedEventData struct {
@@ -725,6 +750,11 @@ type ComplexityRoot struct {
 		IsPreFeed  func(childComplexity int) int
 		NewTokens  func(childComplexity int) int
 		Owner      func(childComplexity int) int
+	}
+
+	TokensConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	UnfollowUserPayload struct {
@@ -857,13 +887,15 @@ type CommentOnFeedEventPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error)
 }
 type CommunityResolver interface {
-	Owners(ctx context.Context, obj *model.Community) ([]*model.TokenHolder, error)
+	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error)
+	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error)
 }
 type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
 	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
 	Comments(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventCommentsConnection, error)
 	Interactions(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int, typeFilter []persist.InteractionType) (*model.FeedEventInteractionsConnection, error)
+	ViewerAdmire(ctx context.Context, obj *model.FeedEvent) (*model.Admire, error)
 	HasViewerAdmiredEvent(ctx context.Context, obj *model.FeedEvent) (*bool, error)
 }
 type FollowInfoResolver interface {
@@ -932,7 +964,7 @@ type QueryResolver interface {
 	CollectionsByIds(ctx context.Context, ids []persist.DBID) ([]model.CollectionByIDOrError, error)
 	TokenByID(ctx context.Context, id persist.DBID) (model.TokenByIDOrError, error)
 	CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error)
-	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool, onlyGalleryUsers *bool) (model.CommunityByAddressOrError, error)
+	CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error)
 	GeneralAllowlist(ctx context.Context) ([]*persist.ChainAddress, error)
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
@@ -1581,7 +1613,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Community.Owners(childComplexity), true
+		args, err := ec.field_Community_owners_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.Owners(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Community.previewImage":
 		if e.complexity.Community.PreviewImage == nil {
@@ -1603,6 +1640,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.ProfileImageURL(childComplexity), true
+
+	case "Community.tokensInCommunity":
+		if e.complexity.Community.TokensInCommunity == nil {
+			break
+		}
+
+		args, err := ec.field_Community_tokensInCommunity_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Community.TokensInCommunity(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Contract.badgeURL":
 		if e.complexity.Contract.BadgeURL == nil {
@@ -1730,6 +1779,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrAddressOwnedByUser.Message(childComplexity), true
 
+	case "ErrAdmireAlreadyExists.message":
+		if e.complexity.ErrAdmireAlreadyExists.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrAdmireAlreadyExists.Message(childComplexity), true
+
+	case "ErrAdmireNotFound.message":
+		if e.complexity.ErrAdmireNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrAdmireNotFound.Message(childComplexity), true
+
 	case "ErrAuthenticationFailed.message":
 		if e.complexity.ErrAuthenticationFailed.Message == nil {
 			break
@@ -1743,6 +1806,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrCollectionNotFound.Message(childComplexity), true
+
+	case "ErrCommentNotFound.message":
+		if e.complexity.ErrCommentNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrCommentNotFound.Message(childComplexity), true
 
 	case "ErrCommunityNotFound.message":
 		if e.complexity.ErrCommunityNotFound.Message == nil {
@@ -1813,13 +1883,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrNotAuthorized.Message(childComplexity), true
-
-	case "ErrNotFingerprinted.message":
-		if e.complexity.ErrNotFingerprinted.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrNotFingerprinted.Message(childComplexity), true
 
 	case "ErrSyncFailed.message":
 		if e.complexity.ErrSyncFailed.Message == nil {
@@ -1954,6 +2017,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FeedEvent.Interactions(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["typeFilter"].([]persist.InteractionType)), true
+
+	case "FeedEvent.viewerAdmire":
+		if e.complexity.FeedEvent.ViewerAdmire == nil {
+			break
+		}
+
+		return e.complexity.FeedEvent.ViewerAdmire(childComplexity), true
 
 	case "FeedEventAdmireEdge.cursor":
 		if e.complexity.FeedEventAdmireEdge.Cursor == nil {
@@ -2209,6 +2279,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Traits(childComplexity), true
+
+	case "GalleryUser.universal":
+		if e.complexity.GalleryUser.Universal == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.Universal(childComplexity), true
 
 	case "GalleryUser.username":
 		if e.complexity.GalleryUser.Username == nil {
@@ -3014,7 +3091,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool), args["onlyGalleryUsers"].(*bool)), true
+		return e.complexity.Query.CommunityByAddress(childComplexity, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool)), true
 
 	case "Query.feedEventById":
 		if e.complexity.Query.FeedEventByID == nil {
@@ -3153,6 +3230,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RefreshTokenPayload.Token(childComplexity), true
+
+	case "RemoveAdmirePayload.admireID":
+		if e.complexity.RemoveAdmirePayload.AdmireID == nil {
+			break
+		}
+
+		return e.complexity.RemoveAdmirePayload.AdmireID(childComplexity), true
 
 	case "RemoveAdmirePayload.feedEvent":
 		if e.complexity.RemoveAdmirePayload.FeedEvent == nil {
@@ -3734,6 +3818,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.TokenURI(childComplexity), true
 
+	case "TokenEdge.cursor":
+		if e.complexity.TokenEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.TokenEdge.Cursor(childComplexity), true
+
+	case "TokenEdge.node":
+		if e.complexity.TokenEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.TokenEdge.Node(childComplexity), true
+
 	case "TokenHolder.displayName":
 		if e.complexity.TokenHolder.DisplayName == nil {
 			break
@@ -3761,6 +3859,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokenHolder.Wallets(childComplexity), true
+
+	case "TokenHolderEdge.cursor":
+		if e.complexity.TokenHolderEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.TokenHolderEdge.Cursor(childComplexity), true
+
+	case "TokenHolderEdge.node":
+		if e.complexity.TokenHolderEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.TokenHolderEdge.Node(childComplexity), true
+
+	case "TokenHoldersConnection.edges":
+		if e.complexity.TokenHoldersConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.TokenHoldersConnection.Edges(childComplexity), true
+
+	case "TokenHoldersConnection.pageInfo":
+		if e.complexity.TokenHoldersConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.TokenHoldersConnection.PageInfo(childComplexity), true
 
 	case "TokensAddedToCollectionFeedEventData.action":
 		if e.complexity.TokensAddedToCollectionFeedEventData.Action == nil {
@@ -3803,6 +3929,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokensAddedToCollectionFeedEventData.Owner(childComplexity), true
+
+	case "TokensConnection.edges":
+		if e.complexity.TokensConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.TokensConnection.Edges(childComplexity), true
+
+	case "TokensConnection.pageInfo":
+		if e.complexity.TokensConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.TokensConnection.PageInfo(childComplexity), true
 
 	case "UnfollowUserPayload.user":
 		if e.complexity.UnfollowUserPayload.User == nil {
@@ -4189,12 +4329,6 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
-# Add @fingerprintRequired to any field that requires a user to have a fingerprint cookie set.
-directive @fingerprintRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
-
-# Add @fingerprintOrAuthRequired to any field that requires a user to have a fingerprint cookie set or be logged in.
-directive @fingerprintOrAuthRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
-
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -4238,6 +4372,7 @@ type GalleryUser implements Node {
     username: String
     bio: String
     traits: String
+    universal: Boolean
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -4544,6 +4679,26 @@ type MembershipTier implements Node {
     owners: [TokenHolder]
 }
 
+type TokenEdge {
+  node: Token
+  cursor: String
+}
+
+type TokensConnection {
+  edges: [TokenEdge]
+  pageInfo: PageInfo!
+}
+
+type TokenHolderEdge {
+  node: TokenHolder
+  cursor: String
+}
+
+type TokenHoldersConnection {
+  edges: [TokenHolderEdge]
+  pageInfo: PageInfo!
+}
+
 type Community implements Node
   @goGqlId(fields: ["contractAddress", "chain"])
   @goEmbedHelper {
@@ -4562,7 +4717,9 @@ type Community implements Node
   profileBannerURL: String
   badgeURL: String
 
-  owners: [TokenHolder] @goField(forceResolver: true)
+  tokensInCommunity(before: String, after: String, first: Int, last: Int): TokensConnection @goField(forceResolver: true)
+
+  owners(before: String, after: String, first: Int, last: Int): TokenHoldersConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -4743,6 +4900,10 @@ type FeedEvent implements Node {
     # If typeFilter is omitted, all interaction types will be queried.
     interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
 
+    viewerAdmire: Admire @goField(forceResolver: true)
+
+    # TODO: This is just here while we migrate the frontend over to viewerAdmire.
+    # Remove this in the near future.
     hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
@@ -4840,7 +5001,7 @@ type Query {
     collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
     tokenById(id: DBID!): TokenByIdOrError
     collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean, onlyGalleryUsers: Boolean): CommunityByAddressOrError
+    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
     generalAllowlist: [ChainAddress!]
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
@@ -5092,9 +5253,6 @@ type ErrNotAuthorized implements Error {
     cause: AuthorizationError!
 }
 
-type ErrNotFingerprinted implements Error {
-  message: String!
-}
 
 type ErrInvalidInput implements Error {
     message: String!
@@ -5115,6 +5273,18 @@ type ErrDoesNotOwnRequiredToken implements Error {
 }
 
 type ErrSyncFailed implements Error {
+    message: String!
+}
+
+type ErrAdmireNotFound implements Error {
+    message: String!
+}
+
+type ErrAdmireAlreadyExists implements Error {
+    message: String!
+}
+
+type ErrCommentNotFound implements Error {
     message: String!
 }
 
@@ -5225,12 +5395,14 @@ union AdmireFeedEventPayloadOrError =
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrAdmireAlreadyExists
 
 union RemoveAdmirePayloadOrError =
     RemoveAdmirePayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrAdmireNotFound
 
 union CommentOnFeedEventPayloadOrError =
     CommentOnFeedEventPayload
@@ -5243,6 +5415,7 @@ union RemoveCommentPayloadOrError =
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
+  | ErrCommentNotFound
 
 type AdmireFeedEventPayload {
     viewer: Viewer
@@ -5251,8 +5424,9 @@ type AdmireFeedEventPayload {
 }
 
 type RemoveAdmirePayload {
-  viewer: Viewer
-  feedEvent: FeedEvent @goField(forceResolver: true)
+    viewer: Viewer
+    admireID: DBID
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 type CommentOnFeedEventPayload {
@@ -5369,7 +5543,6 @@ type ViewGalleryPayload {
 union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
-    | ErrNotFingerprinted
 
 type Mutation {
     # User Mutations
@@ -5410,7 +5583,7 @@ type Mutation {
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
     
-    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError @fingerprintOrAuthRequired
+    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
@@ -5441,6 +5614,90 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 		}
 	}
 	args["allowed"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_owners_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_Community_tokensInCommunity_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
 	return args, nil
 }
 
@@ -6185,15 +6442,6 @@ func (ec *executionContext) field_Query_communityByAddress_args(ctx context.Cont
 		}
 	}
 	args["forceRefresh"] = arg1
-	var arg2 *bool
-	if tmp, ok := rawArgs["onlyGalleryUsers"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onlyGalleryUsers"))
-		arg2, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["onlyGalleryUsers"] = arg2
 	return args, nil
 }
 
@@ -9256,6 +9504,45 @@ func (ec *executionContext) _Community_badgeURL(ctx context.Context, field graph
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Community_tokensInCommunity(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Community",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Community_tokensInCommunity_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Community().TokensInCommunity(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokensConnection)
+	fc.Result = res
+	return ec.marshalOTokensConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokensConnection(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Community_owners(ctx context.Context, field graphql.CollectedField, obj *model.Community) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -9272,9 +9559,16 @@ func (ec *executionContext) _Community_owners(ctx context.Context, field graphql
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Community_owners_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Community().Owners(rctx, obj)
+		return ec.resolvers.Community().Owners(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9283,9 +9577,9 @@ func (ec *executionContext) _Community_owners(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.TokenHolder)
+	res := resTmp.(*model.TokenHoldersConnection)
 	fc.Result = res
-	return ec.marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, field.Selections, res)
+	return ec.marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHoldersConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Contract_id(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
@@ -9873,6 +10167,76 @@ func (ec *executionContext) _ErrAddressOwnedByUser_message(ctx context.Context, 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ErrAdmireAlreadyExists_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmireAlreadyExists) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrAdmireAlreadyExists",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrAdmireNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAdmireNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrAdmireNotFound",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _ErrAuthenticationFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAuthenticationFailed) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -9917,6 +10281,41 @@ func (ec *executionContext) _ErrCollectionNotFound_message(ctx context.Context, 
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ErrCollectionNotFound",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrCommentNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrCommentNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrCommentNotFound",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -10291,41 +10690,6 @@ func (ec *executionContext) _ErrNotAuthorized_cause(ctx context.Context, field g
 	res := resTmp.(model.AuthorizationError)
 	fc.Result = res
 	return ec.marshalNAuthorizationError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthorizationError(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _ErrNotFingerprinted_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNotFingerprinted) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "ErrNotFingerprinted",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrSyncFailed_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrSyncFailed) (ret graphql.Marshaler) {
@@ -10886,6 +11250,38 @@ func (ec *executionContext) _FeedEvent_interactions(ctx context.Context, field g
 	res := resTmp.(*model.FeedEventInteractionsConnection)
 	fc.Result = res
 	return ec.marshalOFeedEventInteractionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventInteractionsConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _FeedEvent_viewerAdmire(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "FeedEvent",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FeedEvent().ViewerAdmire(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Admire)
+	fc.Result = res
+	return ec.marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _FeedEvent_hasViewerAdmiredEvent(ctx context.Context, field graphql.CollectedField, obj *model.FeedEvent) (ret graphql.Marshaler) {
@@ -11835,6 +12231,38 @@ func (ec *executionContext) _GalleryUser_traits(ctx context.Context, field graph
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_universal(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Universal, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -14612,28 +15040,8 @@ func (ec *executionContext) _Mutation_viewGallery(ctx context.Context, field gra
 	}
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().ViewGallery(rctx, args["galleryId"].(persist.DBID))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.FingerprintOrAuthRequired == nil {
-				return nil, errors.New("directive fingerprintOrAuthRequired is not implemented")
-			}
-			return ec.directives.FingerprintOrAuthRequired(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(model.ViewGalleryPayloadOrError); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ViewGalleryPayloadOrError`, tmp)
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ViewGallery(rctx, args["galleryId"].(persist.DBID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15984,7 +16392,7 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CommunityByAddress(rctx, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool), args["onlyGalleryUsers"].(*bool))
+		return ec.resolvers.Query().CommunityByAddress(rctx, args["communityAddress"].(persist.ChainAddress), args["forceRefresh"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16337,6 +16745,38 @@ func (ec *executionContext) _RemoveAdmirePayload_viewer(ctx context.Context, fie
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _RemoveAdmirePayload_admireID(ctx context.Context, field graphql.CollectedField, obj *model.RemoveAdmirePayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "RemoveAdmirePayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AdmireID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.DBID)
+	fc.Result = res
+	return ec.marshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _RemoveAdmirePayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.RemoveAdmirePayload) (ret graphql.Marshaler) {
@@ -18951,6 +19391,70 @@ func (ec *executionContext) _Token_openseaId(ctx context.Context, field graphql.
 	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TokenEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.TokenEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Token)
+	fc.Result = res
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.TokenEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _TokenHolder_displayName(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolder) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19077,6 +19581,137 @@ func (ec *executionContext) _TokenHolder_previewTokens(ctx context.Context, fiel
 	res := resTmp.([]*string)
 	fc.Result = res
 	return ec.marshalOString2ᚕᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHolderEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolderEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHolderEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Node, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TokenHolder)
+	fc.Result = res
+	return ec.marshalOTokenHolder2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHolderEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.TokenHolderEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHolderEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHoldersConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.TokenHoldersConnection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHoldersConnection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.TokenHolderEdge)
+	fc.Result = res
+	return ec.marshalOTokenHolderEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolderEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokenHoldersConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.TokenHoldersConnection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokenHoldersConnection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _TokensAddedToCollectionFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.TokensAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
@@ -19269,6 +19904,73 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData_isPreFeed(ctx 
 	res := resTmp.(*bool)
 	fc.Result = res
 	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokensConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.TokensConnection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokensConnection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Edges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.TokenEdge)
+	fc.Result = res
+	return ec.marshalOTokenEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TokensConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.TokensConnection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TokensConnection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
@@ -22620,6 +23322,13 @@ func (ec *executionContext) _AdmireFeedEventPayloadOrError(ctx context.Context, 
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrAdmireAlreadyExists:
+		return ec._ErrAdmireAlreadyExists(ctx, sel, &obj)
+	case *model.ErrAdmireAlreadyExists:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireAlreadyExists(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -23004,13 +23713,6 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrNotFingerprinted:
-		return ec._ErrNotFingerprinted(ctx, sel, &obj)
-	case *model.ErrNotFingerprinted:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrNotFingerprinted(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -23046,6 +23748,27 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrSyncFailed(ctx, sel, obj)
+	case model.ErrAdmireNotFound:
+		return ec._ErrAdmireNotFound(ctx, sel, &obj)
+	case *model.ErrAdmireNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireNotFound(ctx, sel, obj)
+	case model.ErrAdmireAlreadyExists:
+		return ec._ErrAdmireAlreadyExists(ctx, sel, &obj)
+	case *model.ErrAdmireAlreadyExists:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireAlreadyExists(ctx, sel, obj)
+	case model.ErrCommentNotFound:
+		return ec._ErrCommentNotFound(ctx, sel, &obj)
+	case *model.ErrCommentNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCommentNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -23837,6 +24560,13 @@ func (ec *executionContext) _RemoveAdmirePayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrAdmireNotFound:
+		return ec._ErrAdmireNotFound(ctx, sel, &obj)
+	case *model.ErrAdmireNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAdmireNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -23874,6 +24604,13 @@ func (ec *executionContext) _RemoveCommentPayloadOrError(ctx context.Context, se
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrCommentNotFound:
+		return ec._ErrCommentNotFound(ctx, sel, &obj)
+	case *model.ErrCommentNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrCommentNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -24287,13 +25024,6 @@ func (ec *executionContext) _ViewGalleryPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrAuthenticationFailed(ctx, sel, obj)
-	case model.ErrNotFingerprinted:
-		return ec._ErrNotFingerprinted(ctx, sel, &obj)
-	case *model.ErrNotFingerprinted:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._ErrNotFingerprinted(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -25533,6 +26263,23 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "tokensInCommunity":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Community_tokensInCommunity(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "owners":
 			field := field
 
@@ -25822,6 +26569,68 @@ func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.
 	return out
 }
 
+var errAdmireAlreadyExistsImplementors = []string{"ErrAdmireAlreadyExists", "Error", "AdmireFeedEventPayloadOrError"}
+
+func (ec *executionContext) _ErrAdmireAlreadyExists(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmireAlreadyExists) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errAdmireAlreadyExistsImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrAdmireAlreadyExists")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrAdmireAlreadyExists_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errAdmireNotFoundImplementors = []string{"ErrAdmireNotFound", "Error", "RemoveAdmirePayloadOrError"}
+
+func (ec *executionContext) _ErrAdmireNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAdmireNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errAdmireNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrAdmireNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrAdmireNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var errAuthenticationFailedImplementors = []string{"ErrAuthenticationFailed", "AddUserWalletPayloadOrError", "Error", "LoginPayloadOrError", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "ViewGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrAuthenticationFailed(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAuthenticationFailed) graphql.Marshaler {
@@ -25866,6 +26675,37 @@ func (ec *executionContext) _ErrCollectionNotFound(ctx context.Context, sel ast.
 		case "message":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrCollectionNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var errCommentNotFoundImplementors = []string{"ErrCommentNotFound", "Error", "RemoveCommentPayloadOrError"}
+
+func (ec *executionContext) _ErrCommentNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrCommentNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errCommentNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrCommentNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrCommentNotFound_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -26113,37 +26953,6 @@ func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.Selec
 		case "cause":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._ErrNotAuthorized_cause(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var errNotFingerprintedImplementors = []string{"ErrNotFingerprinted", "Error", "ViewGalleryPayloadOrError"}
-
-func (ec *executionContext) _ErrNotFingerprinted(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotFingerprinted) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errNotFingerprintedImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrNotFingerprinted")
-		case "message":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._ErrNotFingerprinted_message(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -26512,6 +27321,23 @@ func (ec *executionContext) _FeedEvent(ctx context.Context, sel ast.SelectionSet
 					}
 				}()
 				res = ec._FeedEvent_interactions(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "viewerAdmire":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FeedEvent_viewerAdmire(ctx, field, obj)
 				return res
 			}
 
@@ -26999,6 +27825,13 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 		case "traits":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._GalleryUser_traits(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "universal":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GalleryUser_universal(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -28611,6 +29444,13 @@ func (ec *executionContext) _RemoveAdmirePayload(ctx context.Context, sel ast.Se
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "admireID":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._RemoveAdmirePayload_admireID(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		case "feedEvent":
 			field := field
 
@@ -29611,6 +30451,41 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
+var tokenEdgeImplementors = []string{"TokenEdge"}
+
+func (ec *executionContext) _TokenEdge(ctx context.Context, sel ast.SelectionSet, obj *model.TokenEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokenEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TokenEdge")
+		case "node":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenEdge_node(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "cursor":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenEdge_cursor(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var tokenHolderImplementors = []string{"TokenHolder"}
 
 func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionSet, obj *model.TokenHolder) graphql.Marshaler {
@@ -29669,6 +30544,79 @@ func (ec *executionContext) _TokenHolder(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = innerFunc(ctx)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var tokenHolderEdgeImplementors = []string{"TokenHolderEdge"}
+
+func (ec *executionContext) _TokenHolderEdge(ctx context.Context, sel ast.SelectionSet, obj *model.TokenHolderEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokenHolderEdgeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TokenHolderEdge")
+		case "node":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenHolderEdge_node(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "cursor":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenHolderEdge_cursor(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var tokenHoldersConnectionImplementors = []string{"TokenHoldersConnection"}
+
+func (ec *executionContext) _TokenHoldersConnection(ctx context.Context, sel ast.SelectionSet, obj *model.TokenHoldersConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokenHoldersConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TokenHoldersConnection")
+		case "edges":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenHoldersConnection_edges(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "pageInfo":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokenHoldersConnection_pageInfo(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -29762,6 +30710,44 @@ func (ec *executionContext) _TokensAddedToCollectionFeedEventData(ctx context.Co
 
 			out.Values[i] = innerFunc(ctx)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var tokensConnectionImplementors = []string{"TokensConnection"}
+
+func (ec *executionContext) _TokensConnection(ctx context.Context, sel ast.SelectionSet, obj *model.TokensConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tokensConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TokensConnection")
+		case "edges":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokensConnection_edges(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "pageInfo":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TokensConnection_pageInfo(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -33233,6 +34219,54 @@ func (ec *executionContext) marshalOTokenByIdOrError2githubᚗcomᚋmikeydubᚋg
 	return ec._TokenByIdOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOTokenEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenEdge(ctx context.Context, sel ast.SelectionSet, v []*model.TokenEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOTokenEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOTokenEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenEdge(ctx context.Context, sel ast.SelectionSet, v *model.TokenEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TokenEdge(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOTokenHolder2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolder(ctx context.Context, sel ast.SelectionSet, v []*model.TokenHolder) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -33281,6 +34315,61 @@ func (ec *executionContext) marshalOTokenHolder2ᚖgithubᚗcomᚋmikeydubᚋgo�
 	return ec._TokenHolder(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOTokenHolderEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolderEdge(ctx context.Context, sel ast.SelectionSet, v []*model.TokenHolderEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOTokenHolderEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolderEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
+func (ec *executionContext) marshalOTokenHolderEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHolderEdge(ctx context.Context, sel ast.SelectionSet, v *model.TokenHolderEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TokenHolderEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHoldersConnection(ctx context.Context, sel ast.SelectionSet, v *model.TokenHoldersConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TokenHoldersConnection(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx context.Context, v interface{}) (*model.TokenType, error) {
 	if v == nil {
 		return nil, nil
@@ -33295,6 +34384,13 @@ func (ec *executionContext) marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOTokensConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokensConnection(ctx context.Context, sel ast.SelectionSet, v *model.TokensConnection) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TokensConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnfollowUserPayloadOrError) graphql.Marshaler {

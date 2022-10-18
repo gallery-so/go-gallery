@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/lib/pq"
 )
+
+type AddressAtBlockList []AddressAtBlock
 
 // TokenGallery represents an individual Token
 type TokenGallery struct {
@@ -41,6 +45,15 @@ type TokenGallery struct {
 	BlockNumber          BlockNumber `json:"block_number"`
 	IsUserMarkedSpam     *bool       `json:"is_user_marked_spam"`
 	IsProviderMarkedSpam *bool       `json:"is_provider_marked_spam"`
+}
+
+func (l AddressAtBlockList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+// Scan implements the Scanner interface for the DBIDList type
+func (l *AddressAtBlockList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
 }
 
 // TokenIdentifiers returns the unique identifier for a token

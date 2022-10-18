@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v4"
-	"github.com/lib/pq"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/jackc/pgx/v4"
+	"github.com/lib/pq"
 )
 
 // Early access address adder!
