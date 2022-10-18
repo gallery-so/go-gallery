@@ -531,7 +531,6 @@ type ComplexityRoot struct {
 	}
 
 	NotificationSettings struct {
-		ID                           func(childComplexity int) int
 		SomeoneAdmiredYourUpdate     func(childComplexity int) int
 		SomeoneCommentedOnYourUpdate func(childComplexity int) int
 		SomeoneFollowedYou           func(childComplexity int) int
@@ -2884,13 +2883,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.NotificationEdge.Node(childComplexity), true
 
-	case "NotificationSettings.id":
-		if e.complexity.NotificationSettings.ID == nil {
-			break
-		}
-
-		return e.complexity.NotificationSettings.ID(childComplexity), true
-
 	case "NotificationSettings.someoneAdmiredYourUpdate":
 		if e.complexity.NotificationSettings.SomeoneAdmiredYourUpdate == nil {
 			break
@@ -4768,9 +4760,7 @@ type Viewer {
     notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
 
-type NotificationSettings implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
-    id: ID!
-
+type NotificationSettings @goEmbedHelper {
     user: GalleryUser
 
     someoneFollowedYou: Boolean
@@ -15210,41 +15200,6 @@ func (ec *executionContext) _NotificationEdge_cursor(ctx context.Context, field 
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _NotificationSettings_id(ctx context.Context, field graphql.CollectedField, obj *model.NotificationSettings) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "NotificationSettings",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID(), nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(model.GqlID)
-	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _NotificationSettings_user(ctx context.Context, field graphql.CollectedField, obj *model.NotificationSettings) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -24311,13 +24266,6 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Contract(ctx, sel, obj)
-	case model.NotificationSettings:
-		return ec._NotificationSettings(ctx, sel, &obj)
-	case *model.NotificationSettings:
-		if obj == nil {
-			return graphql.Null
-		}
-		return ec._NotificationSettings(ctx, sel, obj)
 	case model.Admire:
 		return ec._Admire(ctx, sel, &obj)
 	case *model.Admire:
@@ -28705,7 +28653,7 @@ func (ec *executionContext) _NotificationEdge(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var notificationSettingsImplementors = []string{"NotificationSettings", "Node"}
+var notificationSettingsImplementors = []string{"NotificationSettings"}
 
 func (ec *executionContext) _NotificationSettings(ctx context.Context, sel ast.SelectionSet, obj *model.NotificationSettings) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, notificationSettingsImplementors)
@@ -28715,16 +28663,6 @@ func (ec *executionContext) _NotificationSettings(ctx context.Context, sel ast.S
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("NotificationSettings")
-		case "id":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._NotificationSettings_id(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		case "user":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._NotificationSettings_user(ctx, field, obj)

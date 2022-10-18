@@ -53,9 +53,6 @@ var nodeFetcher = model.NodeFetcher{
 			return nil, err
 		}
 	},
-	OnNotificationSettings: func(ctx context.Context, id string) (*model.NotificationSettings, error) {
-		return resolveViewerNotificationSettings(ctx)
-	},
 	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {
@@ -636,7 +633,7 @@ func resolveViewerNotifications(ctx context.Context, before *string, after *stri
 
 	return &model.NotificationsConnection{
 		Edges:       edges,
-		PageInfo:    pageInfoToModel(ctx, pageInfo), // handled by dedicated resolver,
+		PageInfo:    pageInfoToModel(ctx, pageInfo),
 		UnseenCount: &unseen,
 	}, nil
 }
@@ -788,28 +785,22 @@ func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notifi
 
 	result := make(chan model.Notification)
 
-	wp := workerpool.New(10)
-
 	go func() {
 		for notif := range notifs {
-			n := notif
 			// use async to prevent blocking the dispatcher
-			wp.Submit(func() {
-				asModel, err := notificationToModel(n)
-				if err != nil {
-					logger.For(nil).Errorf("error converting notification to model: %v", err)
-					return
-				}
-				select {
-				case result <- asModel:
-					logger.For(nil).Debug("sent new notification to subscription")
-				default:
-					logger.For(nil).Errorf("notification subscription channel full, dropping notification")
-					notifDispatcher.UnsubscribeNewNotificationsForUser(userID)
-				}
-			})
+			asModel, err := notificationToModel(notif)
+			if err != nil {
+				logger.For(nil).Errorf("error converting notification to model: %v", err)
+				return
+			}
+			select {
+			case result <- asModel:
+				logger.For(nil).Debug("sent new notification to subscription")
+			default:
+				logger.For(nil).Errorf("notification subscription channel full, dropping notification")
+				notifDispatcher.UnsubscribeNewNotificationsForUser(userID)
+			}
 		}
-		wp.StopWait()
 	}()
 
 	return result
@@ -868,7 +859,6 @@ func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userI
 		PageInfo: nil, // handled by dedicated resolver
 		HelperGroupNotificationUsersConnectionData: model.HelperGroupNotificationUsersConnectionData{
 			UserIDs: userIDs,
-			ByFirst: first != nil,
 		},
 	}, nil
 }

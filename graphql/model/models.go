@@ -51,13 +51,11 @@ type HelperCollectionCreatedFeedEventDataData struct {
 }
 
 type HelperFeedConnectionData struct {
-	UserId  persist.DBID
-	ByFirst bool
+	UserId persist.DBID
 }
 
 type HelperGroupNotificationUsersConnectionData struct {
 	UserIDs persist.DBIDList
-	ByFirst bool
 }
 
 type HelperNotificationSettingsData struct {

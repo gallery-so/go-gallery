@@ -35,7 +35,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-		admires, err := api.loaders.NotificationsByUserID.Load(db.GetUserNotificationsBatchParams{
+		notifs, err := api.loaders.NotificationsByUserID.Load(db.GetUserNotificationsBatchParams{
 			OwnerID:       userID,
 			Limit:         params.Limit,
 			CurBeforeTime: params.CursorBeforeTime,
@@ -49,9 +49,9 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 			return nil, err
 		}
 
-		results := make([]interface{}, len(admires))
-		for i, admire := range admires {
-			results[i] = admire
+		results := make([]interface{}, len(notifs))
+		for i, notif := range notifs {
+			results[i] = notif
 		}
 
 		return results, nil
@@ -63,7 +63,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 	}
 
 	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if admire, ok := i.(db.Admire); ok {
+		if admire, ok := i.(db.Notification); ok {
 			return admire.CreatedAt, admire.ID, nil
 		}
 		return time.Time{}, "", fmt.Errorf("interface{} is not an admire")

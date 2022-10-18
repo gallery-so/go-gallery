@@ -853,8 +853,6 @@ type NotificationSettings struct {
 	SomeoneViewedYourGallery     *bool        `json:"someoneViewedYourGallery"`
 }
 
-func (NotificationSettings) IsNode() {}
-
 type NotificationSettingsInput struct {
 	SomeoneFollowedYou           *bool `json:"someoneFollowedYou"`
 	SomeoneAdmiredYourUpdate     *bool `json:"someoneAdmiredYourUpdate"`

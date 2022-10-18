@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS notification_owner_id_idx ON notifications (owner_id);
 
+CREATE INDEX IF NOT EXISTS notification_created_at_id_idx ON notifications (created_at, id);
+
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_settings JSONB;
 
 ALTER TABLE events ADD COLUMN IF NOT EXISTS gallery_id varchar(255) REFERENCES galleries (id);

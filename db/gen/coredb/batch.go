@@ -540,7 +540,7 @@ func (b *GetCommentsByActorIDBatchBatchResults) Close() error {
 }
 
 const getCommentsByFeedEventIDBatch = `-- name: GetCommentsByFeedEventIDBatch :batchmany
-SELECT id, version, feed_event_id, actor_id, reply_to, comment, deleted, created_at, last_updated FROM comments WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT comments.id, comments.version, feed_event_id, actor_id, reply_to, comment, comments.deleted, comments.created_at, comments.last_updated, f.id, f.version, owner_id, action, data, event_time, event_ids, f.deleted, f.last_updated, f.created_at FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetCommentsByFeedEventIDBatchBatchResults struct {
@@ -548,9 +548,31 @@ type GetCommentsByFeedEventIDBatchBatchResults struct {
 	ind int
 }
 
-func (q *Queries) GetCommentsByFeedEventIDBatch(ctx context.Context, feedEventID []persist.DBID) *GetCommentsByFeedEventIDBatchBatchResults {
+type GetCommentsByFeedEventIDBatchRow struct {
+	ID            persist.DBID
+	Version       int32
+	FeedEventID   persist.DBID
+	ActorID       persist.DBID
+	ReplyTo       persist.DBID
+	Comment       string
+	Deleted       bool
+	CreatedAt     time.Time
+	LastUpdated   time.Time
+	ID_2          persist.DBID
+	Version_2     int32
+	OwnerID       persist.DBID
+	Action        persist.Action
+	Data          persist.FeedEventData
+	EventTime     time.Time
+	EventIds      persist.DBIDList
+	Deleted_2     bool
+	LastUpdated_2 time.Time
+	CreatedAt_2   time.Time
+}
+
+func (q *Queries) GetCommentsByFeedEventIDBatch(ctx context.Context, id []persist.DBID) *GetCommentsByFeedEventIDBatchBatchResults {
 	batch := &pgx.Batch{}
-	for _, a := range feedEventID {
+	for _, a := range id {
 		vals := []interface{}{
 			a,
 		}
@@ -560,16 +582,16 @@ func (q *Queries) GetCommentsByFeedEventIDBatch(ctx context.Context, feedEventID
 	return &GetCommentsByFeedEventIDBatchBatchResults{br, 0}
 }
 
-func (b *GetCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []Comment, error)) {
+func (b *GetCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []GetCommentsByFeedEventIDBatchRow, error)) {
 	for {
 		rows, err := b.br.Query()
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
 		}
 		defer rows.Close()
-		var items []Comment
+		var items []GetCommentsByFeedEventIDBatchRow
 		for rows.Next() {
-			var i Comment
+			var i GetCommentsByFeedEventIDBatchRow
 			if err := rows.Scan(
 				&i.ID,
 				&i.Version,
@@ -580,6 +602,16 @@ func (b *GetCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []Comment,
 				&i.Deleted,
 				&i.CreatedAt,
 				&i.LastUpdated,
+				&i.ID_2,
+				&i.Version_2,
+				&i.OwnerID,
+				&i.Action,
+				&i.Data,
+				&i.EventTime,
+				&i.EventIds,
+				&i.Deleted_2,
+				&i.LastUpdated_2,
+				&i.CreatedAt_2,
 			); err != nil {
 				break
 			}

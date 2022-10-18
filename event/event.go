@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
 )
 
 const EventHandlerContextKey = "event.eventHandlers"
@@ -71,15 +72,18 @@ func (d *eventDispatcher) AddHandler(action persist.Action, handlers ...eventHan
 
 func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
 	if handlers, ok := d.handlers[event.Action]; ok {
-		persisted, err := d.eventRepo.Add(ctx, event)
+		eg, newCtx := errgroup.WithContext(ctx)
+		persisted, err := d.eventRepo.Add(newCtx, event)
 		if err != nil {
 			return err
 		}
 		for _, handler := range handlers {
-			if err := handler.Handle(ctx, *persisted); err != nil {
-				return err
-			}
+			h := handler
+			eg.Go(func() error {
+				return h.Handle(newCtx, *persisted)
+			})
 		}
+		return eg.Wait()
 	}
 	logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
 	return nil
@@ -134,20 +138,20 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 }
 
 func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (persist.DBID, error) {
-	switch event.Action {
-	case persist.ActionViewedGallery:
+	switch event.ResourceTypeID {
+	case persist.ResourceTypeGallery:
 		gallery, err := h.dataloaders.GalleryByGalleryID.Load(event.GalleryID)
 		if err != nil {
 			return "", err
 		}
 		return gallery.OwnerUserID, nil
-	case persist.ActionAdmiredFeedEvent, persist.ActionCommentedOnFeedEvent:
+	case persist.ResourceTypeFeedEvent:
 		feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
 		if err != nil {
 			return "", err
 		}
 		return feedEvent.OwnerID, nil
-	case persist.ActionUserFollowedUsers:
+	case persist.ResourceTypeUser:
 		return event.UserID, nil
 	}
 

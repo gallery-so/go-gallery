@@ -160,14 +160,17 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, bio, api.repos.UserRepository, api.repos.GalleryRepository)
 
 	// Send event
-	dispatchEvent(ctx, db.Event{
+	err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
 		UserID:         userID,
 		SubjectID:      userID,
 		Data:           persist.EventData{UserBio: bio},
-	})
+	}, api.validator)
+	if err != nil {
+		return "", "", err
+	}
 
 	return userID, galleryID, err
 }

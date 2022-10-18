@@ -70,19 +70,6 @@ func (r *MembershipTier) ID() GqlID {
 	return GqlID(fmt.Sprintf("MembershipTier:%s", r.Dbid))
 }
 
-func (r *NotificationSettings) ID() GqlID {
-	//-----------------------------------------------------------------------------------------------
-	//-----------------------------------------------------------------------------------------------
-	// Some fields specified by @goGqlId require manual binding because one of the following is true:
-	// (a) the field does not exist on the NotificationSettings type, or
-	// (b) the field exists but is not a string type
-	//-----------------------------------------------------------------------------------------------
-	// Please create binding methods on the NotificationSettings type with the following signatures:
-	// func (r *NotificationSettings) GetGqlIDField_UserID() string
-	//-----------------------------------------------------------------------------------------------
-	return GqlID(fmt.Sprintf("NotificationSettings:%s", r.GetGqlIDField_UserID()))
-}
-
 func (r *SomeoneAdmiredYourFeedEventNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneAdmiredYourFeedEventNotification:%s", r.Dbid))
 }
@@ -122,7 +109,6 @@ type NodeFetcher struct {
 	OnGallery                                     func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser                                 func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier                              func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
-	OnNotificationSettings                        func(ctx context.Context, userId string) (*NotificationSettings, error)
 	OnSomeoneAdmiredYourFeedEventNotification     func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourFeedEventNotification, error)
 	OnSomeoneCommentedOnYourFeedEventNotification func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourFeedEventNotification, error)
 	OnSomeoneFollowedYouBackNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouBackNotification, error)
@@ -192,11 +178,6 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipTier' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnMembershipTier(ctx, persist.DBID(ids[0]))
-	case "NotificationSettings":
-		if len(ids) != 1 {
-			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'NotificationSettings' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
-		}
-		return n.OnNotificationSettings(ctx, string(ids[0]))
 	case "SomeoneAdmiredYourFeedEventNotification":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneAdmiredYourFeedEventNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -259,8 +240,6 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryUser")
 	case n.OnMembershipTier == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipTier")
-	case n.OnNotificationSettings == nil:
-		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnNotificationSettings")
 	case n.OnSomeoneAdmiredYourFeedEventNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneAdmiredYourFeedEventNotification")
 	case n.OnSomeoneCommentedOnYourFeedEventNotification == nil:

@@ -451,9 +451,7 @@ type Viewer {
     notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
 
-type NotificationSettings implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
-    id: ID!
-
+type NotificationSettings @goEmbedHelper {
     user: GalleryUser
 
     someoneFollowedYou: Boolean

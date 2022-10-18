@@ -160,7 +160,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Send event
-	dispatchEvent(ctx, db.Event{
+	err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -170,9 +170,12 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 			CollectionTokenIDs:       createdCollection.Nfts,
 			CollectionCollectorsNote: collectorsNote,
 		},
-	})
+	}, api.validator)
+	if err != nil {
+		return nil, err
+	}
 
-	return &createdCollection, err
+	return &createdCollection, nil
 }
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
@@ -226,14 +229,17 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	}
 
 	// Send event
-	dispatchEvent(ctx, db.Event{
+	err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
-	})
+	}, api.validator)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -285,14 +291,17 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	backupGalleriesForUser(ctx, userID, api.repos)
 
 	// Send event
-	dispatchEvent(ctx, db.Event{
+	err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
-	})
+	}, api.validator)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

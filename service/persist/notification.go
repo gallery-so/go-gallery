@@ -25,6 +25,8 @@ func (n NotificationData) Concat(other NotificationData) NotificationData {
 	result.FollowerIDs = append(other.FollowerIDs, n.FollowerIDs...)
 	result.AuthedViewerIDs = append(other.AuthedViewerIDs, n.AuthedViewerIDs...)
 	result.UnauthedViewerIDs = append(other.UnauthedViewerIDs, n.UnauthedViewerIDs...)
+	result.FollowedBack = other.FollowedBack || n.FollowedBack
+	result.Refollowed = other.Refollowed || n.Refollowed
 
 	return result.Validate()
 }
