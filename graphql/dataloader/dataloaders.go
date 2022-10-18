@@ -95,6 +95,7 @@ type Loaders struct {
 	AdmiresByFeedEventID             *FeedEventAdmiresLoader
 	CommentByCommentID               *CommentLoaderByID
 	CommentCountByFeedEventID        *IntLoaderByID
+	EventByEventID                   *EventLoaderByID
 	NotificationByID                 *NotificationLoaderByID
 	NotificationsByUserID            *NotificationsLoaderByUserID
 	ContractsDisplayedByUserID       *ContractsLoaderByID
