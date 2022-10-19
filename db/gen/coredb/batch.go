@@ -1187,14 +1187,14 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
 }
 
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal FROM users, tokens
+SELECT DISTINCT ON (result.id) result.id, result.deleted, result.version, result.last_updated, result.created_at, result.username, result.username_idempotent, result.wallets, result.bio, result.traits, result.universal FROM (SELECT users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
     AND (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
     ORDER BY CASE WHEN $9::bool THEN (users.universal,users.created_at,users.id) END ASC,
              CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2
+    LIMIT $2) AS result
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {
