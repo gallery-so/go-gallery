@@ -155,9 +155,13 @@ func (e ErrInvalidInput) Error() string {
 	return str
 }
 
-func dispatchEventToFeed(ctx context.Context, evt db.Event) {
+func dispatchEventToFeed(ctx context.Context, evt db.Event) *db.FeedEvent {
+	if evt.Caption.Valid {
+		return event.SaveImmediateToFeed(ctx, evt)
+	}
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
 	go pushFeedEvent(ctx, evt)
+	return nil
 }
 
 func pushFeedEvent(ctx context.Context, evt db.Event) {

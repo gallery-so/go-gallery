@@ -3,7 +3,6 @@ package feed
 import (
 	"context"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -16,26 +15,21 @@ type EventBuilder struct {
 	eventRepo         *postgres.EventRepository
 	feedRepo          *postgres.FeedRepository
 	feedBlocklistRepo *postgres.FeedBlocklistRepository
+	// SkipBuffer, when set to true, will disregard the requisite "cooldown"
+	// period of an incoming event.
+	SkipBuffer bool
 }
 
-func NewEventBuilder(pgx *pgxpool.Pool) *EventBuilder {
-	queries := db.New(pgx)
+func NewEventBuilder(queries *db.Queries, skipBuffer bool) *EventBuilder {
 	return &EventBuilder{
 		eventRepo:         &postgres.EventRepository{Queries: queries},
 		feedRepo:          &postgres.FeedRepository{Queries: queries},
 		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
+		SkipBuffer:        skipBuffer,
 	}
 }
 
-func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
-	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
-	defer tracing.FinishSpan(span)
-
-	event, err := b.eventRepo.Get(ctx, message.ID)
-	if err != nil {
-		return nil, err
-	}
-
+func (b *EventBuilder) NewEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, event.ActorID, event.Action)
 	if err != nil {
 		return nil, err
@@ -43,12 +37,6 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	if blocked {
 		return nil, nil
 	}
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"Message ID": message.ID,
-		"Event ID":   event.ID,
-		"Action":     event.Action,
-	})
 
 	switch event.Action {
 	case persist.ActionUserCreated:
@@ -66,6 +54,18 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
+}
+
+func (b *EventBuilder) NewEventFromTask(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
+	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
+	defer tracing.FinishSpan(span)
+
+	event, err := b.eventRepo.Get(ctx, message.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.NewEvent(ctx, event)
 }
 
 func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {

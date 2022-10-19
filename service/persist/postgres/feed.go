@@ -22,6 +22,7 @@ func (r *FeedRepository) Add(ctx context.Context, event db.FeedEvent) (*db.FeedE
 		Data:      event.Data,
 		EventTime: event.EventTime,
 		EventIds:  event.EventIds,
+		Caption:   event.Caption,
 	})
 
 	return &evt, err

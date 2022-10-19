@@ -62,6 +62,7 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 		ResourceTypeID: event.ResourceTypeID,
 		CollectionID:   event.SubjectID,
 		Data:           event.Data,
+		Caption:        event.Caption,
 	})
 	return &event, err
 }

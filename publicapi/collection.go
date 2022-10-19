@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -96,7 +97,7 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 	return collections, nil
 }
 
-func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings) (*db.Collection, error) {
+func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"galleryID":      {galleryID, "required"},
@@ -104,20 +105,27 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		"collectorsNote": {collectorsNote, "collection_note"},
 		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 		"sections":       {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
+		"caption":        {caption, fmt.Sprintf("omitempty,caption")},
 	}); err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	// Sanitize
+	if caption != nil {
+		cleaned := validate.SanitizationPolicy.Sanitize(*caption)
+		caption = &cleaned
 	}
 
 	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
 		Tokens:        tokens,
 		TokenSettings: tokenSettings,
 	}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	layout, err := persist.ValidateLayout(layout, tokens)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Sanitize
@@ -126,12 +134,12 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	collection := persist.CollectionDB{
@@ -146,21 +154,22 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 	collectionID, err := api.repos.CollectionRepository.Create(ctx, collection)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = api.repos.GalleryRepository.AddCollections(ctx, galleryID, userID, []persist.DBID{collectionID})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	createdCollection, err := api.loaders.CollectionByCollectionID.Load(collectionID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	// Send event. If a caption is attached to the event, we persist it
+	// immediately as a FeedEvent.
+	feedEvent := dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -170,9 +179,10 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 			CollectionTokenIDs:       createdCollection.Nfts,
 			CollectionCollectorsNote: collectorsNote,
 		},
+		Caption: captionToSqlString(caption),
 	})
 
-	return &createdCollection, err
+	return &createdCollection, feedEvent, err
 }
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
@@ -238,36 +248,43 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	return nil
 }
 
-func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings) error {
+func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
 		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 		"sections":     {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
+		"caption":      {caption, fmt.Sprintf("omitempty,caption")},
 	}); err != nil {
-		return err
+		return nil, err
+	}
+
+	// Sanitize
+	if caption != nil {
+		cleaned := validate.SanitizationPolicy.Sanitize(*caption)
+		caption = &cleaned
 	}
 
 	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
 		Tokens:        tokens,
 		TokenSettings: tokenSettings,
 	}); err != nil {
-		return err
+		return nil, err
 	}
 
 	layout, err := persist.ValidateLayout(layout, tokens)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = api.repos.TokenRepository.TokensAreOwnedByUser(ctx, userID, tokens)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	update := persist.CollectionUpdateTokensInput{
@@ -279,22 +296,24 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 
 	err = api.repos.CollectionRepository.UpdateTokens(ctx, collectionID, userID, update)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	backupGalleriesForUser(ctx, userID, api.repos)
 
-	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	// Send event. If a caption is attached to the event, persist it
+	// immediately as a FeedEvent.
+	feedEvent := dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
+		Caption:        captionToSqlString(caption),
 	})
 
-	return nil
+	return feedEvent, nil
 }
 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
@@ -318,4 +337,11 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 	}
 
 	return nil
+}
+
+func captionToSqlString(caption *string) sql.NullString {
+	if caption == nil {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: *caption, Valid: true}
 }

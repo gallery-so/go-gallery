@@ -49,6 +49,7 @@ type ResolverRoot interface {
 	Comment() CommentResolver
 	CommentOnFeedEventPayload() CommentOnFeedEventPayloadResolver
 	Community() CommunityResolver
+	CreateCollectionPayload() CreateCollectionPayloadResolver
 	FeedEvent() FeedEventResolver
 	FollowInfo() FollowInfoResolver
 	FollowUserPayload() FollowUserPayloadResolver
@@ -64,6 +65,7 @@ type ResolverRoot interface {
 	TokenHolder() TokenHolderResolver
 	TokensAddedToCollectionFeedEventData() TokensAddedToCollectionFeedEventDataResolver
 	UnfollowUserPayload() UnfollowUserPayloadResolver
+	UpdateCollectionTokensPayload() UpdateCollectionTokensPayloadResolver
 	UserCreatedFeedEventData() UserCreatedFeedEventDataResolver
 	UserFollowedUsersFeedEventData() UserFollowedUsersFeedEventDataResolver
 	Viewer() ViewerResolver
@@ -240,6 +242,7 @@ type ComplexityRoot struct {
 
 	CreateCollectionPayload struct {
 		Collection func(childComplexity int) int
+		FeedEvent  func(childComplexity int) int
 	}
 
 	CreateUserPayload struct {
@@ -692,6 +695,7 @@ type ComplexityRoot struct {
 
 	UpdateCollectionTokensPayload struct {
 		Collection func(childComplexity int) int
+		FeedEvent  func(childComplexity int) int
 	}
 
 	UpdateGalleryCollectionsPayload struct {
@@ -800,6 +804,9 @@ type CommunityResolver interface {
 	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error)
 	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error)
 }
+type CreateCollectionPayloadResolver interface {
+	FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error)
+}
 type FeedEventResolver interface {
 	EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error)
 	Admires(ctx context.Context, obj *model.FeedEvent, before *string, after *string, first *int, last *int) (*model.FeedEventAdmiresConnection, error)
@@ -906,6 +913,9 @@ type TokensAddedToCollectionFeedEventDataResolver interface {
 }
 type UnfollowUserPayloadResolver interface {
 	User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error)
+}
+type UpdateCollectionTokensPayloadResolver interface {
+	FeedEvent(ctx context.Context, obj *model.UpdateCollectionTokensPayload) (*model.FeedEvent, error)
 }
 type UserCreatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error)
@@ -1620,6 +1630,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CreateCollectionPayload.Collection(childComplexity), true
+
+	case "CreateCollectionPayload.feedEvent":
+		if e.complexity.CreateCollectionPayload.FeedEvent == nil {
+			break
+		}
+
+		return e.complexity.CreateCollectionPayload.FeedEvent(childComplexity), true
 
 	case "CreateUserPayload.galleryId":
 		if e.complexity.CreateUserPayload.GalleryID == nil {
@@ -3509,6 +3526,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateCollectionTokensPayload.Collection(childComplexity), true
 
+	case "UpdateCollectionTokensPayload.feedEvent":
+		if e.complexity.UpdateCollectionTokensPayload.FeedEvent == nil {
+			break
+		}
+
+		return e.complexity.UpdateCollectionTokensPayload.FeedEvent(childComplexity), true
+
 	case "UpdateGalleryCollectionsPayload.gallery":
 		if e.complexity.UpdateGalleryCollectionsPayload.Gallery == nil {
 			break
@@ -4461,6 +4485,7 @@ input CreateCollectionInput {
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
     tokenSettings: [CollectionTokenSettingsInput!]!
+    caption: String
 }
 
 union CreateCollectionPayloadOrError =
@@ -4470,6 +4495,7 @@ union CreateCollectionPayloadOrError =
 
 type CreateCollectionPayload {
     collection: Collection
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 union DeleteCollectionPayloadOrError =
@@ -4502,6 +4528,7 @@ input UpdateCollectionTokensInput {
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
     tokenSettings: [CollectionTokenSettingsInput!]!
+    caption: String
 }
 
 union UpdateCollectionTokensPayloadOrError =
@@ -4511,6 +4538,7 @@ union UpdateCollectionTokensPayloadOrError =
 
 type UpdateCollectionTokensPayload {
     collection: Collection
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 input UpdateCollectionHiddenInput {
@@ -9079,6 +9107,38 @@ func (ec *executionContext) _CreateCollectionPayload_collection(ctx context.Cont
 	res := resTmp.(*model.Collection)
 	fc.Result = res
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CreateCollectionPayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.CreateCollectionPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CreateCollectionPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CreateCollectionPayload().FeedEvent(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedEvent)
+	fc.Result = res
+	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CreateUserPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserPayload) (ret graphql.Marshaler) {
@@ -17650,6 +17710,38 @@ func (ec *executionContext) _UpdateCollectionTokensPayload_collection(ctx contex
 	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UpdateCollectionTokensPayload_feedEvent(ctx context.Context, field graphql.CollectedField, obj *model.UpdateCollectionTokensPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateCollectionTokensPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.UpdateCollectionTokensPayload().FeedEvent(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.FeedEvent)
+	fc.Result = res
+	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UpdateGalleryCollectionsPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.UpdateGalleryCollectionsPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -20030,6 +20122,14 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 			if err != nil {
 				return it, err
 			}
+		case "caption":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("caption"))
+			it.Caption, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
 		}
 	}
 
@@ -20402,6 +20502,14 @@ func (ec *executionContext) unmarshalInputUpdateCollectionTokensInput(ctx contex
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tokenSettings"))
 			it.TokenSettings, err = ec.unmarshalNCollectionTokenSettingsInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionTokenSettingsInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "caption":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("caption"))
+			it.Caption, err = ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -23606,6 +23714,23 @@ func (ec *executionContext) _CreateCollectionPayload(ctx context.Context, sel as
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "feedEvent":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CreateCollectionPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -27436,6 +27561,23 @@ func (ec *executionContext) _UpdateCollectionTokensPayload(ctx context.Context, 
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "feedEvent":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._UpdateCollectionTokensPayload_feedEvent(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

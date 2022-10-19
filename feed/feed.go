@@ -7,6 +7,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v4/pgxpool"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -37,7 +38,7 @@ func coreInit(pgx *pgxpool.Pool) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	return handlersInit(router, pgx, task.NewClient(context.Background()))
+	return handlersInit(router, db.New(pgx), task.NewClient(context.Background()))
 }
 
 func setDefaults() {

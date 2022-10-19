@@ -118,6 +118,7 @@ type Event struct {
 	Deleted        bool
 	LastUpdated    time.Time
 	CreatedAt      time.Time
+	Caption        sql.NullString
 }
 
 type Feature struct {
