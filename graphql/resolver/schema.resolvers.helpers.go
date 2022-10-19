@@ -1096,8 +1096,10 @@ func getUrlExtension(url string) string {
 func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 	med := token.Media
 	switch med.MediaType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
+	case persist.MediaTypeImage, persist.MediaTypeSVG:
 		return getImageMedia(ctx, med)
+	case persist.MediaTypeGIF:
+		return getGIFMedia(ctx, med)
 	case persist.MediaTypeVideo:
 		return getVideoMedia(ctx, med)
 	case persist.MediaTypeAudio:
@@ -1142,6 +1144,17 @@ func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
 	url := remapLargeImageUrls(media.MediaURL.String())
 
 	return model.ImageMedia{
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: &url,
+	}
+}
+
+func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
+	url := remapLargeImageUrls(media.MediaURL.String())
+
+	return model.GIFMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),

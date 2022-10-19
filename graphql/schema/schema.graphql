@@ -120,15 +120,16 @@ union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
-    | VideoMedia
-    | AudioMedia
-    | TextMedia
-    | HtmlMedia
-    | JsonMedia
-    | GltfMedia
-    | UnknownMedia
-    | SyncingMedia
-    | InvalidMedia
+  | GIFMedia
+  | VideoMedia
+  | AudioMedia
+  | TextMedia
+  | HtmlMedia
+  | JsonMedia
+  | GltfMedia
+  | UnknownMedia
+  | SyncingMedia
+  | InvalidMedia
 
 type PreviewURLSet {
     raw: String
@@ -167,6 +168,14 @@ type ImageMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type GIFMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type VideoMedia implements Media {
