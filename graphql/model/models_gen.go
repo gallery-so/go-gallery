@@ -701,6 +701,16 @@ type FollowUserPayload struct {
 
 func (FollowUserPayload) IsFollowUserPayloadOrError() {}
 
+type GIFMedia struct {
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
+}
+
+func (GIFMedia) IsMediaSubtype() {}
+func (GIFMedia) IsMedia()        {}
+
 type Gallery struct {
 	Dbid        persist.DBID  `json:"dbid"`
 	Owner       *GalleryUser  `json:"owner"`
