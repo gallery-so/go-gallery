@@ -562,6 +562,14 @@ type FeedEvent implements Node {
     hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
+type ErrActionNotCapturable implements Error {
+  message: String!
+}
+
+union CapturedAction = 
+  FeedEvent
+  | ErrActionNotCapturable
+
 type UserCreatedFeedEventData implements FeedEventData {
     eventTime: Time
     owner: GalleryUser @goField(forceResolver: true)
@@ -693,10 +701,9 @@ union CreateCollectionPayloadOrError =
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type CreateCollectionPayload {
+type CreateCollectionPayload @goEmbedHelper {
     collection: Collection
-    # feedEvent is present when a caption is included in the input.
-    feedEvent: FeedEvent @goField(forceResolver: true)
+    action: CapturedAction @goField(forceResolver: true)
 }
 
 union DeleteCollectionPayloadOrError =
@@ -737,10 +744,9 @@ union UpdateCollectionTokensPayloadOrError =
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type UpdateCollectionTokensPayload {
+type UpdateCollectionTokensPayload @goEmbedHelper {
     collection: Collection
-    # feedEvent is present when a caption is included in the input.
-    feedEvent: FeedEvent @goField(forceResolver: true)
+    action: CapturedAction @goField(forceResolver: true)
 }
 
 input UpdateCollectionHiddenInput {

@@ -46,13 +46,13 @@ func DispatchEventToFeed(ctx context.Context, event db.Event) error {
 	return For(gc).Feed.Dispatch(ctx, event)
 }
 
-func HandleImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func HandleFeedImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	gc := util.GinContextFromContext(ctx)
-	feedEvent, err := For(gc).Feed.InvokeHandler(ctx, event)
+	result, err := For(gc).Feed.InvokeHandler(ctx, event)
 	if err != nil {
 		return nil, err
 	}
-	return feedEvent.(*db.FeedEvent), nil
+	return result.(*db.FeedEvent), nil
 }
 
 func For(ctx context.Context) *EventHandlers {
@@ -82,7 +82,7 @@ func (d *eventDispatcher) AddImmediateHandler(action persist.Action, handler imm
 
 func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
 	if handler, ok := d.handlers[event.Action]; ok {
-		return handler.Handle(ctx, event)
+		return handler.Submit(ctx, event)
 	}
 	logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
 	return nil
@@ -90,18 +90,18 @@ func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
 
 func (d *eventDispatcher) InvokeHandler(ctx context.Context, event db.Event) (interface{}, error) {
 	if handler, ok := d.immediateHandlers[event.Action]; ok {
-		return handler.Invoke(ctx, event)
+		return handler.Call(ctx, event)
 	}
 	logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
 	return nil, nil
 }
 
 type eventHandler interface {
-	Handle(context.Context, db.Event) error
+	Submit(context.Context, db.Event) error
 }
 
 type immediateHandler interface {
-	Invoke(context.Context, db.Event) (interface{}, error)
+	Call(context.Context, db.Event) (interface{}, error)
 }
 
 type feedHandler struct {
@@ -118,8 +118,8 @@ func newFeedHandler(queries *db.Queries, taskClient *cloudtasks.Client) feedHand
 	}
 }
 
-// Handle creates a delayed task for the Feed service to handle later.
-func (h feedHandler) Handle(ctx context.Context, event db.Event) error {
+// Submit creates a delayed task for the Feed service to handle later.
+func (h feedHandler) Submit(ctx context.Context, event db.Event) error {
 	persisted, err := h.eventRepo.Add(ctx, event)
 	if err != nil {
 		return err
@@ -129,11 +129,11 @@ func (h feedHandler) Handle(ctx context.Context, event db.Event) error {
 	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persisted.ID}, h.tc)
 }
 
-// Invoke sidesteps the Feed service so that an event is immediately available as a feed event.
-func (h feedHandler) Invoke(ctx context.Context, event db.Event) (interface{}, error) {
-	persisted, err := h.eventRepo.Add(ctx, event)
+// Call sidesteps the Feed service so that an event is immediately available as a feed event.
+func (h feedHandler) Call(ctx context.Context, event db.Event) (interface{}, error) {
+	savedEventID, err := h.eventRepo.Add(ctx, event)
 	if err != nil {
 		return nil, err
 	}
-	return h.eventBuilder.NewEvent(ctx, *persisted)
+	return h.eventBuilder.NewEvent(ctx, *savedEventID)
 }

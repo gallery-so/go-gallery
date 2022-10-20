@@ -159,8 +159,8 @@ func (e ErrInvalidInput) Error() string {
 
 func dispatchEventToFeed(ctx context.Context, evt db.Event, caption *string) (*db.FeedEvent, error) {
 	if caption != nil {
-		evt.Caption = strToNullStr(caption)
-		return event.HandleImmediate(ctx, evt)
+		evt.Caption = stringToNullable(caption)
+		return event.HandleFeedImmediate(ctx, evt)
 	}
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
 	go pushFeedEvent(ctx, evt)
@@ -180,7 +180,7 @@ func pushFeedEvent(ctx context.Context, evt db.Event) {
 	}
 }
 
-func strToNullStr(caption *string) sql.NullString {
+func stringToNullable(caption *string) sql.NullString {
 	if caption == nil {
 		return sql.NullString{Valid: false}
 	}

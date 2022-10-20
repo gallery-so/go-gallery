@@ -315,7 +315,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		CollectionID:   collectionID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
-		Caption:        strToNullStr(caption),
+		Caption:        stringToNullable(caption),
 	}, caption)
 }
 

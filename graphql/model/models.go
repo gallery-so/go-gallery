@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -39,11 +40,19 @@ type HelperCommunityData struct {
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {
-	FeedEventId persist.DBID
+	FeedEventID persist.DBID
 }
 
 type HelperCollectionCreatedFeedEventDataData struct {
-	FeedEventId persist.DBID
+	FeedEventID persist.DBID
+}
+
+type HelperCreateCollectionPayloadData struct {
+	FeedEvent *db.FeedEvent
+}
+
+type HelperUpdateCollectionTokensPayloadData struct {
+	FeedEvent *db.FeedEvent
 }
 
 type ErrInvalidIDFormat struct {

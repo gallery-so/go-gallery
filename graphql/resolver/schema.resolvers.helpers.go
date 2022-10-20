@@ -642,6 +642,13 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 	return commentToModel(ctx, *comment), nil
 }
 
+func resolveCapturedAction(ctx context.Context, feedEvent *db.FeedEvent) (model.CapturedAction, error) {
+	if feedEvent == nil {
+		return model.ErrActionNotCapturable{Message: "not a capturable action"}, nil
+	}
+	return eventToModel(feedEvent)
+}
+
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
@@ -730,7 +737,7 @@ func eventToCollectionCreatedFeedEventData(event *db.FeedEvent) model.FeedEventD
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
 		HelperCollectionCreatedFeedEventDataData: model.HelperCollectionCreatedFeedEventDataData{
-			FeedEventId: event.ID,
+			FeedEventID: event.ID,
 		},
 	}
 }
@@ -754,7 +761,7 @@ func eventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.Feed
 		NewTokens:  nil, // handled by dedicated resolver
 		IsPreFeed:  util.BoolToPointer(event.Data.CollectionIsPreFeed),
 		HelperTokensAddedToCollectionFeedEventDataData: model.HelperTokensAddedToCollectionFeedEventDataData{
-			FeedEventId: event.ID,
+			FeedEventID: event.ID,
 		},
 	}
 }

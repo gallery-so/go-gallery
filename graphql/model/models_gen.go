@@ -23,6 +23,10 @@ type AuthorizationError interface {
 	IsAuthorizationError()
 }
 
+type CapturedAction interface {
+	IsCapturedAction()
+}
+
 type CollectionByIDOrError interface {
 	IsCollectionByIDOrError()
 }
@@ -391,8 +395,9 @@ type CreateCollectionInput struct {
 }
 
 type CreateCollectionPayload struct {
-	Collection *Collection `json:"collection"`
-	FeedEvent  *FeedEvent  `json:"feedEvent"`
+	HelperCreateCollectionPayloadData
+	Collection *Collection    `json:"collection"`
+	Action     CapturedAction `json:"action"`
 }
 
 func (CreateCollectionPayload) IsCreateCollectionPayloadOrError() {}
@@ -433,6 +438,13 @@ type EoaAuth struct {
 	Nonce       string               `json:"nonce"`
 	Signature   string               `json:"signature"`
 }
+
+type ErrActionNotCapturable struct {
+	Message string `json:"message"`
+}
+
+func (ErrActionNotCapturable) IsError()          {}
+func (ErrActionNotCapturable) IsCapturedAction() {}
 
 type ErrAddressOwnedByUser struct {
 	Message string `json:"message"`
@@ -656,6 +668,7 @@ type FeedEvent struct {
 }
 
 func (FeedEvent) IsNode()                 {}
+func (FeedEvent) IsCapturedAction()       {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
 
@@ -1039,8 +1052,9 @@ type UpdateCollectionTokensInput struct {
 }
 
 type UpdateCollectionTokensPayload struct {
-	Collection *Collection `json:"collection"`
-	FeedEvent  *FeedEvent  `json:"feedEvent"`
+	HelperUpdateCollectionTokensPayloadData
+	Collection *Collection    `json:"collection"`
+	Action     CapturedAction `json:"action"`
 }
 
 func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
