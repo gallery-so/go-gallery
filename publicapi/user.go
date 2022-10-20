@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -21,7 +22,7 @@ import (
 )
 
 type UserAPI struct {
-	repos         *persist.Repositories
+	repos         *postgres.Repositories
 	queries       *db.Queries
 	loaders       *dataloader.Loaders
 	validator     *validator.Validate

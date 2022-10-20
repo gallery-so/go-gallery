@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -18,7 +19,7 @@ import (
 )
 
 type ContractAPI struct {
-	repos              *persist.Repositories
+	repos              *postgres.Repositories
 	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate

@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -13,7 +14,7 @@ import (
 )
 
 type FeedAPI struct {
-	repos     *persist.Repositories
+	repos     *postgres.Repositories
 	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate

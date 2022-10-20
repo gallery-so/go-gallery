@@ -77,7 +77,7 @@ type RefreshNFTsInput struct {
 // 	}
 // }
 
-// func refreshOpensea(nftRepo persist.NFTRepository, userRepo persist.UserRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) gin.HandlerFunc {
+// func refreshOpensea(nftRepo persist.NFTRepository, userRepo postgres.UserRepository, collRepo postgres.CollectionRepository, galleryRepo postgres.GalleryRepository, backupRepo postgres.BackupRepository) gin.HandlerFunc {
 // 	return func(c *gin.Context) {
 // 		var input RefreshNFTsInput
 // 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -99,7 +99,7 @@ type RefreshNFTsInput struct {
 // }
 
 // // RefreshOpensea refreshes the opensea data for the given user ids and addresses
-// func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo persist.UserRepository, nftRepo persist.NFTRepository, collRepo persist.CollectionRepository, galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) error {
+// func RefreshOpensea(c context.Context, input RefreshNFTsInput, userRepo postgres.UserRepository, nftRepo persist.NFTRepository, collRepo postgres.CollectionRepository, galleryRepo postgres.GalleryRepository, backupRepo postgres.BackupRepository) error {
 // 	logrus.Debugf("refreshOpensea input: %+v", input)
 // 	if input.UserIDs != nil && len(input.UserIDs) > 0 {
 // 		for _, userID := range input.UserIDs {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"math/big"
 	"net/http"
 	"sort"
@@ -27,7 +28,7 @@ const maxCommunitySize = 10_000
 
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
-	Repos  *persist.Repositories
+	Repos  *postgres.Repositories
 	Cache  memstore.Cache
 	Chains map[persist.Chain][]ChainProvider
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
@@ -153,7 +154,7 @@ type ChainProvider interface {
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
 // NewProvider creates a new MultiChainDataRetriever
-func NewProvider(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
+func NewProvider(ctx context.Context, repos *postgres.Repositories, cache memstore.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
@@ -945,7 +946,7 @@ func communityOwnersToTokenHolders(owners []ChainAgnosticCommunityOwner) []Token
 	return res
 }
 
-func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolder, userRepo persist.UserRepository) ([]TokenHolder, error) {
+func tokenHoldersToTokenHolders(ctx context.Context, owners []persist.TokenHolder, userRepo *postgres.UserRepository) ([]TokenHolder, error) {
 	seenUsers := make(map[persist.DBID]persist.TokenHolder)
 	allUserIDs := make([]persist.DBID, 0, len(owners))
 	for _, owner := range owners {

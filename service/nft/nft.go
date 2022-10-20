@@ -3,6 +3,7 @@ package nft
 import (
 	"context"
 	"errors"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -16,7 +17,7 @@ type GetPreviewsForUserInput struct {
 }
 
 // GetPreviewsForUser returns a slice of 3 preview URLs from a user's collections
-func GetPreviewsForUser(pCtx context.Context, galleryRepo persist.GalleryRepository, userRepo persist.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
+func GetPreviewsForUser(pCtx context.Context, galleryRepo postgres.GalleryRepository, userRepo postgres.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
 	var galleries []persist.Gallery
 	var err error
 	if u.UserID != "" {
@@ -49,7 +50,7 @@ func GetPreviewsForUser(pCtx context.Context, galleryRepo persist.GalleryReposit
 }
 
 // GetPreviewsForUserToken returns a slice of 3 preview URLs from a user's collections
-func GetPreviewsForUserToken(pCtx context.Context, galleryRepo persist.GalleryRepository, userRepo persist.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
+func GetPreviewsForUserToken(pCtx context.Context, galleryRepo postgres.GalleryRepository, userRepo postgres.UserRepository, u GetPreviewsForUserInput) ([]persist.NullString, error) {
 	var galleries []persist.Gallery
 	var err error
 	if u.UserID != "" {
@@ -126,7 +127,7 @@ outer:
 }
 
 // TODO this should be in multichain
-// func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddress string, nftRepo persist.NFTRepository, userRepo persist.UserRepository) error {
+// func RefreshOpenseaNFTs(ctx context.Context, userID persist.DBID, walletAddress string, nftRepo persist.NFTRepository, userRepo postgres.UserRepository) error {
 
 // 	addresses := []persist.Wallet{}
 // 	if walletAddress != "" {

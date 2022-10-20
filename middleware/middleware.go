@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"net/http"
 	"strings"
 
@@ -33,7 +34,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 }
 
 // AuthRequired is a middleware that checks if the user is authenticated
-func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func AuthRequired(userRepository postgres.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		authHeaders := strings.Split(header, " ")

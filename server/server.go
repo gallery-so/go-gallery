@@ -163,15 +163,14 @@ func setDefaults() {
 	}
 }
 
-func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *persist.Repositories {
+func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
 	queries := db.New(pgx)
 	galleriesCacheToken := redis.NewCache(1)
 	galleryTokenRepo := postgres.NewGalleryRepository(pq, queries, galleriesCacheToken)
 
-	return &persist.Repositories{
+	return &postgres.Repositories{
 		UserRepository:        postgres.NewUserRepository(pq, queries),
 		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		LoginRepository:       postgres.NewLoginRepository(pq, queries),
 		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries, galleryTokenRepo),
 		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries, galleryTokenRepo),
 		GalleryRepository:     galleryTokenRepo,
@@ -236,7 +235,7 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
+func NewMultichainProvider(repos *postgres.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)

@@ -14,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -153,11 +152,11 @@ func initLogger() {
 	})
 }
 
-func newRepos(db *sql.DB) *persist.Repositories {
+func newRepos(db *sql.DB) *postgres.Repositories {
 	galleriesCacheToken := redis.NewCache(1)
 	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
 
-	return &persist.Repositories{
+	return &postgres.Repositories{
 		UserRepository:        postgres.NewUserRepository(db),
 		NonceRepository:       postgres.NewNonceRepository(db),
 		LoginRepository:       postgres.NewLoginRepository(db),

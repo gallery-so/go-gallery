@@ -189,3 +189,19 @@ func checkNoErr(err error) {
 		panic(err)
 	}
 }
+
+// Repositories is the set of all available persistence repositories
+type Repositories struct {
+	UserRepository        *UserRepository
+	NonceRepository       *NonceRepository
+	GalleryRepository     *GalleryRepository
+	TokenRepository       *TokenGalleryRepository
+	CollectionRepository  *CollectionTokenRepository
+	ContractRepository    *ContractGalleryRepository
+	BackupRepository      *BackupRepository
+	MembershipRepository  *MembershipRepository
+	EarlyAccessRepository *EarlyAccessRepository
+	WalletRepository      *WalletRepository
+	AdmireRepository      *AdmireRepository
+	CommentRepository     *CommentRepository
+}

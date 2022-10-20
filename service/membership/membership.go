@@ -3,6 +3,7 @@ package membership
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"net/http"
 	"time"
 
@@ -28,7 +29,7 @@ var MembershipTierIDs = []persist.TokenID{"4", "1", "3", "5", "6", "8"}
 const PremiumCards persist.EthereumAddress = "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698"
 
 // UpdateMembershipTiers fetches all membership cards for all token IDs
-func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiers(membershipRepository *postgres.MembershipRepository, userRepository *postgres.UserRepository, galleryRepository *postgres.GalleryRepository, walletRepository *postgres.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
@@ -62,7 +63,7 @@ func UpdateMembershipTiers(membershipRepository persist.MembershipRepository, us
 }
 
 // UpdateMembershipTier fetches all membership cards for a token ID
-func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository *postgres.MembershipRepository, userRepository *postgres.UserRepository, galleryRepository *postgres.GalleryRepository, walletRepository *postgres.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	_, err := processCurrentTier(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
@@ -84,7 +85,7 @@ func UpdateMembershipTier(pTokenID persist.TokenID, membershipRepository persist
 }
 
 // UpdateMembershipTiersToken fetches all membership cards for a token ID
-func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
+func UpdateMembershipTiersToken(membershipRepository postgres.MembershipRepository, userRepository postgres.UserRepository, nftRepository postgres.TokenGalleryRepository, galleryRepository postgres.GalleryRepository, walletRepository postgres.WalletRepository, ethClient *ethclient.Client) ([]persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	membershipTiers := make([]persist.MembershipTier, len(MembershipTierIDs))
@@ -106,7 +107,7 @@ func UpdateMembershipTiersToken(membershipRepository persist.MembershipRepositor
 }
 
 // UpdateMembershipTierToken fetches all membership cards for a token ID
-func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
+func UpdateMembershipTierToken(pTokenID persist.TokenID, membershipRepository postgres.MembershipRepository, userRepository postgres.UserRepository, nftRepository postgres.TokenGalleryRepository, galleryRepository postgres.GalleryRepository, walletRepository postgres.WalletRepository, ethClient *ethclient.Client) (persist.MembershipTier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	_, err := processCurrentTierToken(ctx, pTokenID, ethClient, userRepository, galleryRepository, membershipRepository, walletRepository)
@@ -218,7 +219,7 @@ func filterTokenHolders(holdersChannel chan persist.TokenHolder, numHolders int,
 	return filtered
 }
 
-func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
+func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository *postgres.UserRepository, galleryRepository *postgres.GalleryRepository, membershipRepository *postgres.MembershipRepository, walletRepository *postgres.WalletRepository) (persist.MembershipTier, error) {
 
 	tier, err := membershipRepository.GetByTokenID(ctx, pTokenID)
 	if err != nil {
@@ -248,7 +249,7 @@ func processCurrentTier(ctx context.Context, pTokenID persist.TokenID, ethClient
 	return tier, nil
 }
 
-func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
+func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethClient *ethclient.Client, userRepository postgres.UserRepository, galleryRepository postgres.GalleryRepository, membershipRepository postgres.MembershipRepository, walletRepository postgres.WalletRepository) (persist.MembershipTier, error) {
 
 	tier, err := membershipRepository.GetByTokenID(ctx, pTokenID)
 	if err != nil {
@@ -278,7 +279,7 @@ func processCurrentTierToken(ctx context.Context, pTokenID persist.TokenID, ethC
 	return tier, nil
 }
 
-func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTMetadata, owners []persist.EthereumAddress, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
+func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTMetadata, owners []persist.EthereumAddress, ethClient *ethclient.Client, userRepository *postgres.UserRepository, galleryRepository *postgres.GalleryRepository, membershipRepository *postgres.MembershipRepository, walletRepository *postgres.WalletRepository) (persist.MembershipTier, error) {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
@@ -334,7 +335,7 @@ func processOwners(ctx context.Context, id persist.TokenID, metadata alchemyNFTM
 	return tier, nil
 }
 
-func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository) persist.TokenHolder {
+func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository *postgres.UserRepository, galleryRepository *postgres.GalleryRepository, walletRepository *postgres.WalletRepository) persist.TokenHolder {
 	membershipOwner := persist.TokenHolder{WalletIDs: pWalletIDs}
 
 	for _, walletID := range pWalletIDs {
@@ -360,7 +361,7 @@ func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id pers
 	return membershipOwner
 }
 
-func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository) persist.TokenHolder {
+func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id persist.TokenID, ethClient *ethclient.Client, userRepository postgres.UserRepository, galleryRepository postgres.GalleryRepository, walletRepository postgres.WalletRepository) persist.TokenHolder {
 	membershipOwner := persist.TokenHolder{WalletIDs: pWalletIDs}
 
 	for _, walletID := range pWalletIDs {
@@ -400,7 +401,7 @@ func fillMembershipOwnerToken(ctx context.Context, pWalletIDs []persist.DBID, id
 	return membershipOwner
 }
 
-func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository persist.UserRepository, nftRepository persist.TokenGalleryRepository, galleryRepository persist.GalleryRepository, membershipRepository persist.MembershipRepository, walletRepository persist.WalletRepository) (persist.MembershipTier, error) {
+func processEventsToken(ctx context.Context, id persist.TokenID, ethClient *ethclient.Client, userRepository postgres.UserRepository, nftRepository postgres.TokenGalleryRepository, galleryRepository postgres.GalleryRepository, membershipRepository postgres.MembershipRepository, walletRepository postgres.WalletRepository) (persist.MembershipTier, error) {
 	tier := persist.MembershipTier{
 		TokenID:     id,
 		LastUpdated: persist.LastUpdatedTime(time.Now()),
@@ -464,8 +465,8 @@ func OrderMembershipTiers(pTiers []persist.MembershipTier) []persist.MembershipT
 }
 
 // GetMembershipTiers returns the most recent membership tiers and potentially updates tiers
-func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipRepository persist.MembershipRepository, userRepository persist.UserRepository,
-	galleryRepository persist.GalleryRepository, walletRepository persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
+func GetMembershipTiers(ctx context.Context, forceRefresh bool, membershipRepository *postgres.MembershipRepository, userRepository *postgres.UserRepository,
+	galleryRepository *postgres.GalleryRepository, walletRepository *postgres.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) ([]persist.MembershipTier, error) {
 
 	if forceRefresh {
 		logger.For(ctx).Infof("Force refresh - updating membership tiers")

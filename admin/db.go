@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -27,11 +26,11 @@ type statements struct {
 	getCollectionsStmt    *sql.Stmt
 	updateCollectionStmt  *sql.Stmt
 
-	galleryRepo persist.GalleryRepository
+	galleryRepo postgres.GalleryRepository
 	// nftRepo     persist.NFTRepository
-	userRepo   persist.UserRepository
-	collRepo   persist.CollectionRepository
-	backupRepo persist.BackupRepository
+	userRepo   postgres.UserRepository
+	collRepo   postgres.CollectionRepository
+	backupRepo postgres.BackupRepository
 }
 
 func newStatements(db *sql.DB) *statements {

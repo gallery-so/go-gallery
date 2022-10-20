@@ -24,7 +24,7 @@ type backupGalleriesInput struct {
 	UserID persist.DBID `form:"user_id" binding:"required"`
 }
 
-func getGalleries(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
+func getGalleries(galleryRepo postgres.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var input getGalleriesInput
@@ -57,7 +57,7 @@ func getGalleries(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
 	}
 }
 
-func refreshCache(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
+func refreshCache(galleryRepo postgres.GalleryRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input refreshCacheInput
 		if err := c.ShouldBindQuery(&input); err != nil {
@@ -74,7 +74,7 @@ func refreshCache(galleryRepo persist.GalleryRepository) gin.HandlerFunc {
 	}
 }
 
-func backupGalleries(galleryRepo persist.GalleryRepository, backupRepo persist.BackupRepository) gin.HandlerFunc {
+func backupGalleries(galleryRepo postgres.GalleryRepository, backupRepo postgres.BackupRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input backupGalleriesInput
 		if err := c.ShouldBindQuery(&input); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -181,9 +182,9 @@ type NonceAuthenticator struct {
 	Nonce              string
 	Signature          string
 	WalletType         persist.WalletType
-	UserRepo           persist.UserRepository
-	NonceRepo          persist.NonceRepository
-	WalletRepo         persist.WalletRepository
+	UserRepo           *postgres.UserRepository
+	NonceRepo          *postgres.NonceRepository
+	WalletRepo         *postgres.WalletRepository
 	EthClient          *ethclient.Client
 	MultichainProvider *multichain.Provider
 }
@@ -264,8 +265,8 @@ func Logout(pCtx context.Context) {
 }
 
 // GetAuthNonce will determine whether a user is permitted to log in, and if so, generate a nonce to be signed
-func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo persist.UserRepository, nonceRepo persist.NonceRepository,
-	walletRepository persist.WalletRepository, earlyAccessRepo persist.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
+func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository,
+	walletRepository *postgres.WalletRepository, earlyAccessRepo *postgres.EarlyAccessRepository, ethClient *ethclient.Client) (nonce string, userExists bool, err error) {
 
 	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
@@ -302,7 +303,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, user
 }
 
 // NonceRotate will rotate a nonce for a user
-func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
+func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUserID persist.DBID, nonceRepo *postgres.NonceRepository) error {
 	err := nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
 	if err != nil {
 		return err
@@ -313,7 +314,7 @@ func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUser
 // GetUserWithNonce returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
+func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository, walletRepository *postgres.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
 	nonce, err := nonceRepo.Get(pCtx, pChainAddress)
 	if err != nil {
 		return nonceValue, userID, err
