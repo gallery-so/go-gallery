@@ -312,7 +312,7 @@ func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int
 		curBeforeID := persist.DBID("")
 		curAfterTime := defaultCursorAfterTime
 		curAfterID := persist.DBID("")
-		curBeforeBool := false
+		curBeforeBool := true
 		curAfterBool := false
 
 		var err error

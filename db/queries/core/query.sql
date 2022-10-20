@@ -189,8 +189,7 @@ SELECT DISTINCT ON (result.id) result.* FROM (SELECT users.* FROM users, tokens
     AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2) AS result;
+        CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2;
 
 -- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
