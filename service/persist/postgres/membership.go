@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/lib/pq"
@@ -12,13 +13,14 @@ import (
 // MembershipRepository is a repository for storing membership information in the database
 type MembershipRepository struct {
 	db                  *sql.DB
+	queries             *db.Queries
 	upsertByTokenIDStmt *sql.Stmt
 	getByTokenIDStmt    *sql.Stmt
 	getAllStmt          *sql.Stmt
 }
 
 // NewMembershipRepository creates a new postgres repository for interacting with tiers
-func NewMembershipRepository(db *sql.DB) *MembershipRepository {
+func NewMembershipRepository(db *sql.DB, queries *db.Queries) *MembershipRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -31,7 +33,7 @@ func NewMembershipRepository(db *sql.DB) *MembershipRepository {
 	getAllStmt, err := db.PrepareContext(ctx, `SELECT ID,TOKEN_ID,NAME,ASSET_URL,OWNERS,CREATED_AT,LAST_UPDATED FROM membership WHERE DELETED = false;`)
 	checkNoErr(err)
 
-	return &MembershipRepository{db: db, upsertByTokenIDStmt: upsertByTokenIDStmt, getByTokenIDStmt: getByTokenIDStmt, getAllStmt: getAllStmt}
+	return &MembershipRepository{db: db, queries: queries, upsertByTokenIDStmt: upsertByTokenIDStmt, getByTokenIDStmt: getByTokenIDStmt, getAllStmt: getAllStmt}
 }
 
 // UpsertByTokenID upserts the given tier

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/lib/pq"
@@ -16,6 +17,7 @@ var errNotOwnedByUser = errors.New("not all nfts are owned by the user")
 // CollectionTokenRepository is the repository for interacting with collections in a postgres database
 type CollectionTokenRepository struct {
 	db                      *sql.DB
+	queries                 *db.Queries
 	galleryRepo             *GalleryRepository
 	createStmt              *sql.Stmt
 	getByUserIDOwnerStmt    *sql.Stmt
@@ -40,7 +42,7 @@ type CollectionTokenRepository struct {
 
 // NewCollectionTokenRepository creates a new CollectionTokenRepository
 // TODO another join for addresses
-func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryRepository) *CollectionTokenRepository {
+func NewCollectionTokenRepository(db *sql.DB, queries *db.Queries, galleryRepo *GalleryRepository) *CollectionTokenRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -103,7 +105,7 @@ func NewCollectionTokenRepository(db *sql.DB, galleryRepo *GalleryRepository) *C
 	getUserWalletsStmt, err := db.PrepareContext(ctx, `SELECT wallets FROM users WHERE ID = $1;`)
 	checkNoErr(err)
 
-	return &CollectionTokenRepository{db: db, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserWalletsStmt: getUserWalletsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
+	return &CollectionTokenRepository{db: db, queries: queries, galleryRepo: galleryRepo, createStmt: createStmt, getByUserIDOwnerStmt: getByUserIDOwnerStmt, getByIDOwnerStmt: getByIDOwnerStmt, updateInfoStmt: updateInfoStmt, updateInfoUnsafeStmt: updateInfoUnsafeStmt, updateHiddenStmt: updateHiddenStmt, updateHiddenUnsafeStmt: updateHiddenUnsafeStmt, updateNFTsStmt: updateNFTsStmt, updateNFTsUnsafeStmt: updateNFTsUnsafeStmt, nftsToRemoveStmt: nftsToRemoveStmt, deleteNFTsStmt: deleteNFTsStmt, removeNFTFromCollectionsStmt: removeNFTFromCollectionsStmt, getNFTsForAddressStmt: getNFTsForAddressStmt, deleteCollectionStmt: deleteCollectionStmt, getUserWalletsStmt: getUserWalletsStmt, getByUserIDOwnerRawStmt: getByUserIDOwnerRawStmt, getByIDOwnerRawStmt: getByIDOwnerRawStmt}
 }
 
 // Create creates a new collection in the database

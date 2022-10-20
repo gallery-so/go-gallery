@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/lib/pq"
@@ -16,6 +17,7 @@ import (
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
 	db                                      *sql.DB
+	queries                                 *db.Queries
 	galleryRepo                             *GalleryRepository
 	getByUserIDStmt                         *sql.Stmt
 	getByUserIDPaginateStmt                 *sql.Stmt
@@ -39,7 +41,7 @@ var errTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
 
 // NewTokenGalleryRepository creates a new TokenRepository
 // TODO joins on addresses
-func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *TokenGalleryRepository {
+func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries, galleryRepo *GalleryRepository) *TokenGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -93,6 +95,7 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 
 	return &TokenGalleryRepository{
 		db:                                      db,
+		queries:                                 queries,
 		galleryRepo:                             galleryRepo,
 		getByUserIDStmt:                         getByUserIDStmt,
 		getByUserIDPaginateStmt:                 getByUserIDPaginateStmt,

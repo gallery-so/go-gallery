@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/lib/pq"
@@ -13,6 +14,7 @@ import (
 // BackupRepository is the postgres implementation for interacting with backed up versions of galleries
 type BackupRepository struct {
 	db                    *sql.DB
+	queries               *db.Queries
 	getCurrentBackupsStmt *sql.Stmt
 	getGalleryIDStmt      *sql.Stmt
 	getBackupsStmt        *sql.Stmt
@@ -31,7 +33,7 @@ type BackupRepository struct {
 const maxBackups = 50
 
 // NewBackupRepository creates a new postgres repository for interacting with backed up versions of galleries
-func NewBackupRepository(db *sql.DB) *BackupRepository {
+func NewBackupRepository(db *sql.DB, queries *db.Queries) *BackupRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -70,6 +72,7 @@ func NewBackupRepository(db *sql.DB) *BackupRepository {
 
 	return &BackupRepository{
 		db:                    db,
+		queries:               queries,
 		getCurrentBackupsStmt: getCurrentBackupsStmt,
 		deleteBackupStmt:      deleteBackupStmt,
 		insertBackupStmt:      insertBackupStmt,

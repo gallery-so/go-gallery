@@ -76,7 +76,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		panic(err)
 	}
 
-	repos := newRepos(pqClient)
+	repos := newRepos(pqClient, pgx)
 	ethClient := newEthClient()
 	httpClient := &http.Client{Timeout: 10 * time.Minute}
 	ipfsClient := rpc.NewIPFSShell()
@@ -163,24 +163,25 @@ func setDefaults() {
 	}
 }
 
-func newRepos(db *sql.DB) *persist.Repositories {
+func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *persist.Repositories {
+	queries := db.New(pgx)
 	galleriesCacheToken := redis.NewCache(1)
-	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
+	galleryTokenRepo := postgres.NewGalleryRepository(pq, queries, galleriesCacheToken)
 
 	return &persist.Repositories{
-		UserRepository:        postgres.NewUserRepository(db),
-		NonceRepository:       postgres.NewNonceRepository(db),
-		LoginRepository:       postgres.NewLoginRepository(db),
-		TokenRepository:       postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
+		UserRepository:        postgres.NewUserRepository(pq, queries),
+		NonceRepository:       postgres.NewNonceRepository(pq, queries),
+		LoginRepository:       postgres.NewLoginRepository(pq, queries),
+		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries, galleryTokenRepo),
+		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries, galleryTokenRepo),
 		GalleryRepository:     galleryTokenRepo,
-		ContractRepository:    postgres.NewContractGalleryRepository(db),
-		BackupRepository:      postgres.NewBackupRepository(db),
-		MembershipRepository:  postgres.NewMembershipRepository(db),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
-		WalletRepository:      postgres.NewWalletRepository(db),
-		AdmireRepository:      postgres.NewAdmireRepository(db),
-		CommentRepository:     postgres.NewCommentRepository(db),
+		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
+		BackupRepository:      postgres.NewBackupRepository(pq, queries),
+		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
+		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
+		WalletRepository:      postgres.NewWalletRepository(pq, queries),
+		AdmireRepository:      postgres.NewAdmireRepository(pq, queries),
+		CommentRepository:     postgres.NewCommentRepository(pq, queries),
 	}
 }
 

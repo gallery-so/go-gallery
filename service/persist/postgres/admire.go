@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -11,12 +12,13 @@ import (
 // AdmireRepository represents an admire repository in the postgres database
 type AdmireRepository struct {
 	db         *sql.DB
+	queries    *db.Queries
 	createStmt *sql.Stmt
 	deleteStmt *sql.Stmt
 }
 
 // NewAdmireRepository creates a new postgres repository for interacting with admires
-func NewAdmireRepository(db *sql.DB) *AdmireRepository {
+func NewAdmireRepository(db *sql.DB, queries *db.Queries) *AdmireRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -28,6 +30,7 @@ func NewAdmireRepository(db *sql.DB) *AdmireRepository {
 
 	return &AdmireRepository{
 		db:         db,
+		queries:    queries,
 		createStmt: createStmt,
 		deleteStmt: deleteStmt,
 	}

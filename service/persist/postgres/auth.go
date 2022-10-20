@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -11,29 +12,31 @@ import (
 // LoginRepository is a repository for user login attempts
 type LoginRepository struct {
 	db         *sql.DB
+	queries    *db.Queries
 	createStmt *sql.Stmt
 }
 
 // NonceRepository is a repository for user nonces
 type NonceRepository struct {
 	db                    *sql.DB
+	queries               *db.Queries
 	getByChainAddressStmt *sql.Stmt
 	createStmt            *sql.Stmt
 }
 
 // NewLoginRepository creates a new postgres repository for interacting with user login attempts
-func NewLoginRepository(db *sql.DB) *LoginRepository {
+func NewLoginRepository(db *sql.DB, queries *db.Queries) *LoginRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO login_attempts (ID,USER_EXISTS,ADDRESS,VERSION,NONCE_VALUE,REQUEST_HEADERS,REQUEST_HOST_ADDRESS,SIGNATURE,SIGNATURE_VALID) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ID`)
 	checkNoErr(err)
 
-	return &LoginRepository{db: db, createStmt: createStmt}
+	return &LoginRepository{db: db, queries: queries, createStmt: createStmt}
 }
 
 // NewNonceRepository creates a new postgres repository for interacting with user nonces
-func NewNonceRepository(db *sql.DB) *NonceRepository {
+func NewNonceRepository(db *sql.DB, queries *db.Queries) *NonceRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -43,7 +46,7 @@ func NewNonceRepository(db *sql.DB) *NonceRepository {
 	createStmt, err := db.PrepareContext(ctx, `INSERT INTO nonces (ID,VALUE,ADDRESS,CHAIN,VERSION,DELETED) VALUES ($1,$2,$3,$4,$5,$6)`)
 	checkNoErr(err)
 
-	return &NonceRepository{db: db, getByChainAddressStmt: getByChainAddressStmt, createStmt: createStmt}
+	return &NonceRepository{db: db, queries: queries, getByChainAddressStmt: getByChainAddressStmt, createStmt: createStmt}
 }
 
 // Get returns a nonce from the DB by its address

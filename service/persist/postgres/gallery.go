@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -21,6 +22,7 @@ var errCollsNotOwnedByUser = errors.New("collections not owned by user")
 // GalleryRepository is the repository for interacting with galleries in a postgres database
 type GalleryRepository struct {
 	db                        *sql.DB
+	queries                   *db.Queries
 	createStmt                *sql.Stmt
 	updateStmt                *sql.Stmt
 	updateUnsafeStmt          *sql.Stmt
@@ -40,7 +42,7 @@ type GalleryRepository struct {
 
 // NewGalleryRepository creates a new GalleryTokenRepository
 // TODO another join to addresses
-func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository {
+func NewGalleryRepository(db *sql.DB, queries *db.Queries, gCache memstore.Cache) *GalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -95,7 +97,7 @@ func NewGalleryRepository(db *sql.DB, gCache memstore.Cache) *GalleryRepository 
 	getGalleryCollectionsStmt, err := db.PrepareContext(ctx, `SELECT array_agg(c.ID) FROM galleries g, unnest(g.COLLECTIONS) WITH ORDINALITY AS u(coll, coll_ord) LEFT JOIN collections c ON c.ID = coll WHERE g.ID = $1 AND c.DELETED = false and g.DELETED = false GROUP BY coll_ord ORDER BY coll_ord;`)
 	checkNoErr(err)
 
-	return &GalleryRepository{db: db, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllCollectionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt}
+	return &GalleryRepository{db: db, queries: queries, createStmt: createStmt, updateStmt: updateStmt, updateUnsafeStmt: updateUnsafeStmt, addCollectionsStmt: addCollectionsStmt, getByUserIDStmt: getByUserIDStmt, getByIDStmt: getByIDStmt, galleriesCache: gCache, checkOwnCollectionsStmt: checkOwnCollectionsStmt, countAllCollectionsStmt: countAllCollectionsStmt, countCollsStmt: countCollsStmt, getCollectionsStmt: getCollectionsStmt, getGalleryCollectionsStmt: getGalleryCollectionsStmt, getByUserIDRawStmt: getByUserIDRawStmt, getByIDRawStmt: getByIDRawStmt}
 }
 
 // Create creates a new gallery

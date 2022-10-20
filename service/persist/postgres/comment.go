@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -11,12 +12,13 @@ import (
 // CommentRepository represents an comment repository in the postgres database
 type CommentRepository struct {
 	db         *sql.DB
+	queries    *db.Queries
 	createStmt *sql.Stmt
 	deleteStmt *sql.Stmt
 }
 
 // NewCommentRepository creates a new postgres repository for interacting with comments
-func NewCommentRepository(db *sql.DB) *CommentRepository {
+func NewCommentRepository(db *sql.DB, queries *db.Queries) *CommentRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -28,6 +30,7 @@ func NewCommentRepository(db *sql.DB) *CommentRepository {
 
 	return &CommentRepository{
 		db:         db,
+		queries:    queries,
 		createStmt: createStmt,
 		deleteStmt: deleteStmt,
 	}
