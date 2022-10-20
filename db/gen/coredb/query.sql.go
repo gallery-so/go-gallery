@@ -1414,6 +1414,7 @@ type GetUsersWithNotificationsOnParams struct {
 }
 
 // for some reason this query will not allow me to use @tags for $1
+// verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
 func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersWithNotificationsOnParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, getUsersWithNotificationsOn,
 		arg.Column1,
