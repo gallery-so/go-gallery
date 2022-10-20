@@ -1395,16 +1395,17 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUsersWithNotificationsOn = `-- name: GetUsersWithNotificationsOn :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE email_notification_settings->>'unsubscribed_from_all' = 'false' AND deleted = false AND email IS NOT NULL AND email_verified = true
-    AND (created_at, id) < ($2, $3)
-    AND (created_at, id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE email_notification_settings->>'unsubscribed_from_all' = 'false' AND $2::int = ANY(email_notification_settings->>'individual_unsubscriptions') AND deleted = false AND email IS NOT NULL AND email_verified = true
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
     LIMIT $1
 `
 
 type GetUsersWithNotificationsOnParams struct {
 	Limit         int32
+	EmailType     int32
 	CurBeforeTime time.Time
 	CurBeforeID   persist.DBID
 	CurAfterTime  time.Time
@@ -1415,6 +1416,7 @@ type GetUsersWithNotificationsOnParams struct {
 func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersWithNotificationsOnParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, getUsersWithNotificationsOn,
 		arg.Limit,
+		arg.EmailType,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
 		arg.CurAfterTime,

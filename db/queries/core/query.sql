@@ -424,7 +424,7 @@ SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
 
 -- name: GetUsersWithNotificationsOn :many
-SELECT * FROM users WHERE email_notification_settings->>'unsubscribed_from_all' = 'false' AND deleted = false AND email IS NOT NULL AND email_verified = true
+SELECT * FROM users WHERE email_notification_settings->>'unsubscribed_from_all' = 'false' AND @email_type::int = ANY(email_notification_settings->>'individual_unsubscriptions') AND deleted = false AND email IS NOT NULL AND email_verified = true
     AND (created_at, id) < (@cur_before_time, @cur_before_id)
     AND (created_at, id) > (@cur_after_time, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,

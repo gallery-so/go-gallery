@@ -267,7 +267,7 @@ type User struct {
 	Universal                 bool
 	Email                     sql.NullString
 	EmailVerified             bool
-	EmailNotificationSettings pgtype.JSONB
+	EmailNotificationSettings persist.EmailNotificationSettings
 }
 
 type UserEvent struct {

@@ -37,6 +37,8 @@ sql:
           # Users
           - column: "users.wallets"
             go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
+          - column: "users.email_notification_settings"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailNotificationSettings"
 
           # Galleries
           - column: "galleries.collections"
@@ -161,3 +163,5 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.media_url"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.email_type"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailType"
