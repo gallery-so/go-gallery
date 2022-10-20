@@ -180,7 +180,7 @@ func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *persist.Repositories {
 		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
 		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
 		WalletRepository:      postgres.NewWalletRepository(pq, queries),
-		AdmireRepository:      postgres.NewAdmireRepository(pq, queries),
+		AdmireRepository:      postgres.NewAdmireRepository(queries),
 		CommentRepository:     postgres.NewCommentRepository(pq, queries),
 	}
 }
