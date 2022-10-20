@@ -90,7 +90,7 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, htmltemplates *htmltemplate.Template, plaintemplates *plaintemplate.Template) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		err := runForUsersWithNotificationsOn(c, persist.EmailTypeNotifications, queries, func(u coredb.User) error {
+		err := runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.User) error {
 
 			plainBuf := new(bytes.Buffer)
 			htmlBuf := new(bytes.Buffer)
@@ -134,13 +134,13 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, htmltem
 	}
 }
 
-func runForUsersWithNotificationsOn(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.User) error) error {
+func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.User) error) error {
 	errGroup := new(errgroup.Group)
 	var lastID persist.DBID
 	var lastCreatedAt time.Time
 	var endTime time.Time = time.Now().Add(24 * time.Hour)
 	for {
-		users, err := queries.GetUsersWithNotificationsOn(ctx, coredb.GetUsersWithNotificationsOnParams{
+		users, err := queries.GetUsersWithNotificationsOnForEmailType(ctx, coredb.GetUsersWithNotificationsOnForEmailTypeParams{
 			Limit:         10000,
 			CurAfterTime:  lastCreatedAt,
 			CurBeforeTime: endTime,
