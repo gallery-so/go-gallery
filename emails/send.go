@@ -3,7 +3,6 @@ package emails
 import (
 	"bytes"
 	"context"
-	"fmt"
 	htmltemplate "html/template"
 	"net/http"
 	plaintemplate "text/template"
@@ -75,7 +74,7 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 		subject := "Gallery Verification"
 		to := mail.NewEmail(user.Username.String, user.Email.String)
 		plainTextContent := plainBuf.String()
-		htmlContent := fmt.Sprintf(htmlBuf.String(), j)
+		htmlContent := htmlBuf.String()
 		message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
 
 		_, err = s.Send(message)
