@@ -2,7 +2,6 @@ package emails
 
 import (
 	"context"
-	"database/sql"
 	htmltemplate "html/template"
 	"net/http"
 	plaintemplate "text/template"
@@ -15,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -150,27 +148,6 @@ func initLogger() {
 		}
 
 	})
-}
-
-func newRepos(db *sql.DB) *persist.Repositories {
-	galleriesCacheToken := redis.NewCache(1)
-	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
-
-	return &persist.Repositories{
-		UserRepository:        postgres.NewUserRepository(db),
-		NonceRepository:       postgres.NewNonceRepository(db),
-		LoginRepository:       postgres.NewLoginRepository(db),
-		TokenRepository:       postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
-		GalleryRepository:     galleryTokenRepo,
-		ContractRepository:    postgres.NewContractGalleryRepository(db),
-		BackupRepository:      postgres.NewBackupRepository(db),
-		MembershipRepository:  postgres.NewMembershipRepository(db),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
-		WalletRepository:      postgres.NewWalletRepository(db),
-		AdmireRepository:      postgres.NewAdmireRepository(db),
-		CommentRepository:     postgres.NewCommentRepository(db),
-	}
 }
 
 // configureRootContext configures the main context from which other contexts are derived.
