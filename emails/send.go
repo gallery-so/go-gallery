@@ -152,15 +152,16 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 			return err
 		}
 
-		errGroup.Go(func() error {
-			for _, user := range users {
-				err = fn(user)
+		for _, user := range users {
+			u := user
+			errGroup.Go(func() error {
+				err = fn(u)
 				if err != nil {
 					return err
 				}
-			}
-			return nil
-		})
+				return nil
+			})
+		}
 
 		if len(users) < 10000 {
 			break
