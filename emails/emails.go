@@ -3,8 +3,9 @@ package emails
 import (
 	"context"
 	"database/sql"
-	"html/template"
+	htmltemplate "html/template"
 	"net/http"
+	plaintemplate "text/template"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -39,7 +40,12 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	t, err := template.ParseGlob("./emails/templates/*")
+	t, err := htmltemplate.ParseGlob("./emails/templates/html/*")
+	if err != nil {
+		logger.For(ctx).Fatalf("failed to parse templates: %s", err)
+	}
+
+	pt, err := plaintemplate.ParseGlob("./emails/templates/plain/*")
 	if err != nil {
 		logger.For(ctx).Fatalf("failed to parse templates: %s", err)
 	}
@@ -65,7 +71,7 @@ func coreInitServer() *gin.Engine {
 
 	logger.For(ctx).Info("Registering handlers...")
 
-	return handlersInitServer(router, loaders, queries, client, t)
+	return handlersInitServer(router, loaders, queries, client, t, pt)
 }
 
 func setDefaults() {
@@ -80,13 +86,14 @@ func setDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("SENDGRID_API_KEY", "")
+	viper.SetDefault("FROM_EMAIL", "test@gallery.so")
 
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("mediaprocessing")
+		envFile := util.ResolveEnvFile("emails")
 		util.LoadEnvFile(envFile)
 	}
 

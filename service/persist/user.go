@@ -34,11 +34,12 @@ type UserUpdateInfoInput struct {
 }
 
 type CreateUserInput struct {
-	Username     string
-	Bio          string
-	ChainAddress ChainAddress
-	WalletType   WalletType
-	Universal    bool
+	Username                   string
+	Bio                        string
+	ChainAddress               ChainAddress
+	WalletType                 WalletType
+	Universal                  bool
+	EmailNotificationsSettings EmailUnsubscriptions
 }
 
 // UserRepository represents the interface for interacting with the persisted state of users

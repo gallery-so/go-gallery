@@ -5,28 +5,28 @@ import (
 	"encoding/json"
 )
 
-type EmailType int
+type EmailType string
 
 const (
-	EmailTypeNotifications EmailType = iota
-	EmailTypeAdmin
+	EmailTypeNotifications EmailType = "notifications"
+	EmailTypeAdmin                   = "admin"
 )
 
-type EmailNotificationSettings struct {
-	UnsubscribedFromAll       NullBool    `json:"unsubscribed_from_all"`
-	IndividualUnsubscriptions []EmailType `json:"individual_unsubscriptions"`
+type EmailUnsubscriptions struct {
+	All           NullBool `json:"all"`
+	Notifications NullBool `json:"notifications"`
 }
 
-func (e EmailNotificationSettings) Value() (driver.Value, error) {
+func (e EmailUnsubscriptions) Value() (driver.Value, error) {
 	return json.Marshal(e)
 }
 
-func (e *EmailNotificationSettings) Scan(src interface{}) error {
+func (e *EmailUnsubscriptions) Scan(src interface{}) error {
 	return json.Unmarshal(src.([]byte), e)
 }
 
 func (e EmailType) Value() (driver.Value, error) {
-	return int(e), nil
+	return string(e), nil
 }
 
 func (e *EmailType) Scan(src interface{}) error {
@@ -37,13 +37,6 @@ func (e *EmailType) Scan(src interface{}) error {
 	return nil
 }
 
-func (e *EmailType) String() string {
-	switch *e {
-	case EmailTypeNotifications:
-		return "notifications"
-	case EmailTypeAdmin:
-		return "admin"
-	default:
-		return "unknown"
-	}
+func (e EmailType) String() string {
+	return string(e)
 }

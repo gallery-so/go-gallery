@@ -37,8 +37,8 @@ sql:
           # Users
           - column: "users.wallets"
             go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
-          - column: "users.email_notification_settings"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailNotificationSettings"
+          - column: "users.email_unsubscriptions"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailUnsubscriptions"
 
           # Galleries
           - column: "galleries.collections"

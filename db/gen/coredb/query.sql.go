@@ -846,7 +846,7 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 }
 
 const getOwnersByContractIdPaginate = `-- name: GetOwnersByContractIdPaginate :many
-SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.email, users.email_verified, users.email_notification_settings FROM users, tokens
+SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.email, users.email_verified, users.email_unsubscriptions FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
@@ -901,7 +901,7 @@ func (q *Queries) GetOwnersByContractIdPaginate(ctx context.Context, arg GetOwne
 			&i.Universal,
 			&i.Email,
 			&i.EmailVerified,
-			&i.EmailNotificationSettings,
+			&i.EmailUnsubscriptions,
 		); err != nil {
 			return nil, err
 		}
@@ -978,7 +978,7 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.email, u.email_verified, u.email_notification_settings FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.email, u.email_verified, u.email_unsubscriptions FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -1000,7 +1000,7 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 		&i.Universal,
 		&i.Email,
 		&i.EmailVerified,
-		&i.EmailNotificationSettings,
+		&i.EmailUnsubscriptions,
 	)
 	return i, err
 }
@@ -1343,7 +1343,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -1363,13 +1363,13 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.Universal,
 		&i.Email,
 		&i.EmailVerified,
-		&i.EmailNotificationSettings,
+		&i.EmailUnsubscriptions,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -1389,23 +1389,23 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Universal,
 		&i.Email,
 		&i.EmailVerified,
-		&i.EmailNotificationSettings,
+		&i.EmailUnsubscriptions,
 	)
 	return i, err
 }
 
 const getUsersWithNotificationsOn = `-- name: GetUsersWithNotificationsOn :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE email_notification_settings->>'unsubscribed_from_all' = 'false' AND $2::int = ANY(email_notification_settings->>'individual_unsubscriptions') AND deleted = false AND email IS NOT NULL AND email_verified = true
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE email_unsubscriptions->>'all' = 'false' AND email_unsubscriptions->>$1::varchar = 'false' AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-    LIMIT $1
+    LIMIT $2
 `
 
 type GetUsersWithNotificationsOnParams struct {
+	Column1       string
 	Limit         int32
-	EmailType     int32
 	CurBeforeTime time.Time
 	CurBeforeID   persist.DBID
 	CurAfterTime  time.Time
@@ -1413,10 +1413,11 @@ type GetUsersWithNotificationsOnParams struct {
 	PagingForward bool
 }
 
+// for some reason this query will not allow me to use @tags for $1
 func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersWithNotificationsOnParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, getUsersWithNotificationsOn,
+		arg.Column1,
 		arg.Limit,
-		arg.EmailType,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
 		arg.CurAfterTime,
@@ -1444,7 +1445,7 @@ func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersW
 			&i.Universal,
 			&i.Email,
 			&i.EmailVerified,
-			&i.EmailNotificationSettings,
+			&i.EmailUnsubscriptions,
 		); err != nil {
 			return nil, err
 		}
@@ -1457,7 +1458,7 @@ func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersW
 }
 
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_notification_settings FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -1483,7 +1484,7 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.Universal,
 			&i.Email,
 			&i.EmailVerified,
-			&i.EmailNotificationSettings,
+			&i.EmailUnsubscriptions,
 		); err != nil {
 			return nil, err
 		}
@@ -1645,4 +1646,18 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const updateUserVerificationStatus = `-- name: UpdateUserVerificationStatus :exec
+UPDATE users SET email_verified = $2 WHERE id = $1
+`
+
+type UpdateUserVerificationStatusParams struct {
+	ID            persist.DBID
+	EmailVerified bool
+}
+
+func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {
+	_, err := q.db.Exec(ctx, updateUserVerificationStatus, arg.ID, arg.EmailVerified)
+	return err
 }
