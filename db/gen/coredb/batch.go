@@ -1193,8 +1193,7 @@ SELECT DISTINCT ON (result.id) result.id, result.deleted, result.version, result
     AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
     AND (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
     ORDER BY CASE WHEN $9::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2) AS result
+        CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {
