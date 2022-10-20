@@ -13,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
 
@@ -296,35 +295,31 @@ func IntToPointerSlice(s []int) []*int {
 }
 
 // GetURIPath takes a uri in any form and returns just the path
-func GetURIPath(uri persist.TokenURI, withoutQuery bool) string {
+func GetURIPath(initial string, withoutQuery bool) string {
 
 	var path string
 
-	switch uri.Type() {
-	case persist.URITypeIPFS, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
-		initial := uri.String()
-		path = strings.TrimSpace(initial)
-		if strings.HasPrefix(initial, "http") {
-			path = strings.TrimPrefix(path, "https://")
-			path = strings.TrimPrefix(path, "http://")
-			indexOfPath := strings.Index(path, "/")
-			if indexOfPath > 0 {
-				path = path[indexOfPath:]
-			}
-		} else if strings.HasPrefix(initial, "ipfs://") {
-			path = strings.ReplaceAll(initial, "ipfs://", "")
+	path = strings.TrimSpace(initial)
+	if strings.HasPrefix(initial, "http") {
+		path = strings.TrimPrefix(path, "https://")
+		path = strings.TrimPrefix(path, "http://")
+		indexOfPath := strings.Index(path, "/")
+		if indexOfPath > 0 {
+			path = path[indexOfPath:]
 		}
-		path = strings.ReplaceAll(path, "ipfs/", "")
-		path = strings.TrimPrefix(path, "/")
-		if withoutQuery {
-			path = strings.Split(path, "?")[0]
-			path = strings.TrimSuffix(path, "/")
-		}
-	case persist.URITypeArweave:
-		initial := uri.String()
-		path := strings.ReplaceAll(initial, "arweave://", "")
+	} else if strings.HasPrefix(initial, "ipfs://") {
+		path = strings.ReplaceAll(initial, "ipfs://", "")
+	} else if strings.HasPrefix(initial, "arweave://") || strings.HasPrefix(initial, "ar://") {
+		path = strings.ReplaceAll(initial, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
 	}
+	path = strings.ReplaceAll(path, "ipfs/", "")
+	path = strings.TrimPrefix(path, "/")
+	if withoutQuery {
+		path = strings.Split(path, "?")[0]
+		path = strings.TrimSuffix(path, "/")
+	}
+
 	return path
 }
 

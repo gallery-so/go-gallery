@@ -351,7 +351,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return util.RemoveBOM(decoded), nil
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
-		path := util.GetURIPath(turi, true)
+		path := util.GetURIPath(asString, true)
 
 		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
@@ -360,7 +360,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return util.RemoveBOM(bs), nil
 	case persist.URITypeArweave:
-		path := util.GetURIPath(turi, true)
+		path := util.GetURIPath(asString, true)
 
 		bs, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
@@ -457,7 +457,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 
 		return util.NewFileHeaderReader(buf)
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
-		path := util.GetURIPath(turi, true)
+		path := util.GetURIPath(asString, true)
 
 		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
 		if err != nil {
@@ -466,7 +466,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 
 		return util.NewFileHeaderReader(resp)
 	case persist.URITypeArweave:
-		path := util.GetURIPath(turi, true)
+		path := util.GetURIPath(asString, true)
 
 		bs, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
