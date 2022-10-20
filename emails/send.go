@@ -165,6 +165,12 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 		if len(users) < 10000 {
 			break
 		}
+
+		if len(users) > 0 {
+			lastUser := users[len(users)-1]
+			lastID = lastUser.ID
+			lastCreatedAt = lastUser.CreatedAt
+		}
 	}
 
 	return errGroup.Wait()
