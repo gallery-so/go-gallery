@@ -105,7 +105,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 		return err
 	}
 
-	err = api.multichainProvider.RefreshContract(ctx, persist.NewContractIdentifiers(contract.Address, persist.Chain(contract.Chain.Int32)))
+	err = api.multichainProvider.RefreshContract(ctx, persist.NewContractIdentifiers(contract.Address, contract.Chain))
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -127,7 +127,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 		return err
 	}
 
-	im, anim := persist.Chain(contract.Chain.Int32).BaseKeywords()
+	im, anim := contract.Chain.BaseKeywords()
 
 	in := task.TokenProcessingContractTokensMessage{
 		ContractID:        contractID,
