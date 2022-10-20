@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
@@ -67,7 +67,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repo
 		Token:       &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
 		Wallet:      &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:        &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
-		Feed:        &FeedAPI{feedRepo: &postgres.FeedRepository{queries}, loaders: loaders, validator: validator, ethClient: ethClient},
+		Feed:        &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Interaction: &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 	}
 }
@@ -111,10 +111,12 @@ func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
 	return userID, nil
 }
 
-type validationMap map[string]struct {
+type valWithTags struct {
 	value interface{}
 	tag   string
 }
+
+type validationMap map[string]valWithTags
 
 func validateFields(validator *validator.Validate, fields validationMap) error {
 	validationErr := ErrInvalidInput{}
@@ -148,20 +150,21 @@ func (e *ErrInvalidInput) Append(parameter string, reason string) {
 func (e ErrInvalidInput) Error() string {
 	str := "invalid input:\n"
 
-	for i, _ := range e.Parameters {
+	for i := range e.Parameters {
 		str += fmt.Sprintf("    parameter: %s, reason: %s\n", e.Parameters[i], e.Reasons[i])
 	}
 
 	return str
 }
 
-func dispatchEventToFeed(ctx context.Context, evt db.Event) *db.FeedEvent {
-	if evt.Caption.Valid {
-		return event.SaveImmediateToFeed(ctx, evt)
+func dispatchEventToFeed(ctx context.Context, evt db.Event, caption *string) (*db.FeedEvent, error) {
+	if caption != nil {
+		evt.Caption = strToNullStr(caption)
+		return event.HandleImmediate(ctx, evt)
 	}
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
 	go pushFeedEvent(ctx, evt)
-	return nil
+	return nil, nil
 }
 
 func pushFeedEvent(ctx context.Context, evt db.Event) {
@@ -175,4 +178,11 @@ func pushFeedEvent(ctx context.Context, evt db.Event) {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
+}
+
+func strToNullStr(caption *string) sql.NullString {
+	if caption == nil {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: *caption, Valid: true}
 }

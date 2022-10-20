@@ -33,10 +33,6 @@ func (r *admireFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *mod
 	return resolveFeedEventByEventID(ctx, admire.FeedEventID)
 }
 
-func (r *captionFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *model.CaptionFeedEventPayload) (*model.FeedEvent, error) {
-	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
-}
-
 func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryByCollectionId(ctx, obj.Dbid)
 
@@ -145,7 +141,10 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, be
 }
 
 func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error) {
-	panic(fmt.Errorf("not implemented"))
+	if obj.FeedEvent.Dbid != "" {
+		return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+	}
+	return &model.FeedEvent{}, nil
 }
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
@@ -414,18 +413,14 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		return nil, err
 	}
 
-	var eventModel *model.FeedEvent
+	var eventModel model.FeedEvent
 	if feedEvent != nil {
-		feedData, err := feedEventToDataModel(feedEvent)
-		if err != nil {
-			return nil, err
-		}
-		eventModel = eventToModel(feedEvent, feedData)
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
 	}
 
 	output := model.CreateCollectionPayload{
 		Collection: collectionToModel(ctx, *collection),
-		FeedEvent:  eventModel,
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -507,23 +502,19 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 		return nil, err
 	}
 
-	var eventModel *model.FeedEvent
-	if feedEvent != nil {
-		feedData, err := feedEventToDataModel(feedEvent)
-		if err != nil {
-			return nil, err
-		}
-		eventModel = eventToModel(feedEvent, feedData)
-	}
-
 	collection, err := api.Collection.GetCollectionById(ctx, input.CollectionID)
 	if err != nil {
 		return nil, err
 	}
 
+	var eventModel model.FeedEvent
+	if feedEvent != nil {
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
+	}
+
 	output := &model.UpdateCollectionTokensPayload{
 		Collection: collectionToModel(ctx, *collection),
-		FeedEvent:  eventModel,
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -794,18 +785,6 @@ func (r *mutationResolver) AdmireFeedEvent(ctx context.Context, feedEventID pers
 	return output, nil
 }
 
-func (r *mutationResolver) CaptionFeedEvent(ctx context.Context, input *model.FeedEventCaptionInput) (model.CaptionFeedEventPayloadOrError, error) {
-	err := publicapi.For(ctx).Feed.CaptionFeedEvent(ctx, input.FeedEventID, input.Comment)
-	if err != nil {
-		return nil, err
-	}
-	output := &model.CaptionFeedEventPayload{
-		Viewer:    resolveViewer(ctx),
-		FeedEvent: &model.FeedEvent{Dbid: input.FeedEventID}, // remaining fields handled by dedicates resolver
-	}
-	return output, nil
-}
-
 func (r *mutationResolver) RemoveAdmire(ctx context.Context, admireID persist.DBID) (model.RemoveAdmirePayloadOrError, error) {
 	feedEventID, err := publicapi.For(ctx).Interaction.RemoveAdmire(ctx, admireID)
 	if err != nil {
@@ -1064,7 +1043,10 @@ func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.Unfol
 }
 
 func (r *updateCollectionTokensPayloadResolver) FeedEvent(ctx context.Context, obj *model.UpdateCollectionTokensPayload) (*model.FeedEvent, error) {
-	panic(fmt.Errorf("not implemented"))
+	if obj.FeedEvent.Dbid != "" {
+		return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
+	}
+	return &model.FeedEvent{}, nil
 }
 
 func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error) {
@@ -1141,11 +1123,6 @@ func (r *Resolver) Admire() generated.AdmireResolver { return &admireResolver{r}
 // AdmireFeedEventPayload returns generated.AdmireFeedEventPayloadResolver implementation.
 func (r *Resolver) AdmireFeedEventPayload() generated.AdmireFeedEventPayloadResolver {
 	return &admireFeedEventPayloadResolver{r}
-}
-
-// CaptionFeedEventPayload returns generated.CaptionFeedEventPayloadResolver implementation.
-func (r *Resolver) CaptionFeedEventPayload() generated.CaptionFeedEventPayloadResolver {
-	return &captionFeedEventPayloadResolver{r}
 }
 
 // Collection returns generated.CollectionResolver implementation.
@@ -1277,7 +1254,6 @@ func (r *Resolver) ChainPubKeyInput() generated.ChainPubKeyInputResolver {
 
 type admireResolver struct{ *Resolver }
 type admireFeedEventPayloadResolver struct{ *Resolver }
-type captionFeedEventPayloadResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }

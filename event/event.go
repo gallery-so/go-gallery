@@ -46,7 +46,7 @@ func DispatchEventToFeed(ctx context.Context, event db.Event) error {
 	return For(gc).Feed.Dispatch(ctx, event)
 }
 
-func SaveImmediateToFeed(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func HandleImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	gc := util.GinContextFromContext(ctx)
 	feedEvent, err := For(gc).Feed.InvokeHandler(ctx, event)
 	if err != nil {
@@ -111,12 +111,11 @@ type feedHandler struct {
 }
 
 func newFeedHandler(queries *db.Queries, taskClient *cloudtasks.Client) feedHandler {
-	handler := feedHandler{
+	return feedHandler{
 		eventRepo:    postgres.EventRepository{Queries: queries},
 		eventBuilder: feed.NewEventBuilder(queries, true),
 		tc:           taskClient,
 	}
-	return handler
 }
 
 // Handle creates a delayed task for the Feed service to handle later.

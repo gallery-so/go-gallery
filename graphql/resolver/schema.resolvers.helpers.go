@@ -563,18 +563,11 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 
 func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.FeedEvent, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
-
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := feedEventToDataModel(event)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return eventToModel(event, data), nil
+	return eventToModel(event)
 }
 
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
@@ -668,8 +661,13 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	}
 }
 
-func eventToModel(event *db.FeedEvent, data model.FeedEventData) *model.FeedEvent {
-	// Value always returns a nil error so we can ignore it.
+func eventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
+	data, err := feedEventToDataModel(event)
+	if err != nil {
+		return nil, err
+	}
+
+	// Value always returns a nil error so we can safely ignore it.
 	caption, _ := event.Caption.Value()
 
 	var captionVal *string
@@ -681,7 +679,7 @@ func eventToModel(event *db.FeedEvent, data model.FeedEventData) *model.FeedEven
 		Dbid:      event.ID,
 		Caption:   captionVal,
 		EventData: data,
-	}
+	}, nil
 }
 
 func eventToUserCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
@@ -765,16 +763,13 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
-		data, err := feedEventToDataModel(&evt)
-
 		var node model.FeedEventOrError
+		node, err := eventToModel(&evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}
 		} else if err != nil {
 			return nil, err
-		} else {
-			node = eventToModel(&evt, data)
 		}
 
 		edges[i] = &model.FeedEdge{Node: node}

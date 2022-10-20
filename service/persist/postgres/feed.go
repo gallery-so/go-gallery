@@ -28,18 +28,6 @@ func (r *FeedRepository) Add(ctx context.Context, event db.FeedEvent) (*db.FeedE
 	return &evt, err
 }
 
-func (r *FeedRepository) AddCaptionToEvent(ctx context.Context, userID, feedEventID persist.DBID, caption string) (bool, error) {
-	affected, err := r.Queries.AddFeedCaption(ctx, db.AddFeedCaptionParams{
-		OwnerID: userID,
-		ID:      feedEventID,
-		Caption: caption,
-	})
-	if err != nil {
-		return false, err
-	}
-	return affected > 0, nil
-}
-
 // LastEventFrom returns the most recent event which occurred before `event`.
 func (r *FeedRepository) LastEventFrom(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEvent(ctx, db.GetLastFeedEventParams{

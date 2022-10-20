@@ -18,11 +18,6 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
-	"CaptionFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
-		obj, ok := object.(CaptionFeedEventPayloadOrError)
-		return obj, ok
-	},
-
 	"CollectionByIdOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CollectionByIDOrError)
 		return obj, ok

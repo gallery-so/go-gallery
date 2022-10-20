@@ -695,6 +695,7 @@ union CreateCollectionPayloadOrError =
 
 type CreateCollectionPayload {
     collection: Collection
+    # feedEvent is present when a caption is included in the input.
     feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
@@ -738,6 +739,7 @@ union UpdateCollectionTokensPayloadOrError =
 
 type UpdateCollectionTokensPayload {
     collection: Collection
+    # feedEvent is present when a caption is included in the input.
     feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
@@ -799,23 +801,6 @@ type SetSpamPreferencePayload {
 union SetSpamPreferencePayloadOrError =
     SetSpamPreferencePayload
     | ErrNotAuthorized
-
-input FeedEventCaptionInput {
-  feedEventId: DBID!
-  comment: String!
-}
-
-type CaptionFeedEventPayload {
-  viewer: Viewer
-  feedEvent: FeedEvent @goField(forceResolver: true)
-}
-
-union CaptionFeedEventPayloadOrError =
-  CaptionFeedEventPayload
-  | ErrAuthenticationFailed
-  | ErrNotAuthorized
-  | ErrFeedEventNotFound
-  | ErrInvalidInput
 
 union AddUserWalletPayloadOrError =
     AddUserWalletPayload
@@ -1151,7 +1136,6 @@ type Mutation {
     followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
     unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
     admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
-    captionFeedEvent(input: FeedEventCaptionInput): CaptionFeedEventPayloadOrError @authRequired
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired

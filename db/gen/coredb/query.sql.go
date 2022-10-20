@@ -13,26 +13,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-const addFeedCaption = `-- name: AddFeedCaption :execrows
-UPDATE feed_events SET caption = $3::varchar, last_updated = NOW() WHERE deleted = false AND id = $1 AND owner_id = $2 AND caption IS NULL
-`
-
-type AddFeedCaptionParams struct {
-	ID      persist.DBID
-	OwnerID persist.DBID
-	Caption string
-}
-
-// AddFeedCaption will add a caption to a feed event.
-// This is currently a way operation: if the event already has a caption it won't be updated.
-func (q *Queries) AddFeedCaption(ctx context.Context, arg AddFeedCaptionParams) (int64, error) {
-	result, err := q.db.Exec(ctx, addFeedCaption, arg.ID, arg.OwnerID, arg.Caption)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id

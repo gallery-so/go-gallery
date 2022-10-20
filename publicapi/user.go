@@ -151,7 +151,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		UserID:         userID,
 		SubjectID:      userID,
 		Data:           persist.EventData{UserBio: bio},
-	})
+	}, nil)
 
 	return userID, galleryID, err
 }

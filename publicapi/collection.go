@@ -2,8 +2,8 @@ package publicapi
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -98,22 +98,26 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
+	fieldsToValidate := validationMap{
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
 		"tokens":         {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 		"sections":       {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
-		"caption":        {caption, fmt.Sprintf("omitempty,caption")},
-	}); err != nil {
-		return nil, nil, err
 	}
 
-	// Sanitize
+	// Trim and optimistically sanitize the input while we're at it.
+	var trimmedCaption string
 	if caption != nil {
-		cleaned := validate.SanitizationPolicy.Sanitize(*caption)
+		trimmedCaption = strings.TrimSpace(*caption)
+		fieldsToValidate["caption"] = valWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
+	}
+
+	// Validate
+	if err := validateFields(api.validator, fieldsToValidate); err != nil {
+		return nil, nil, err
 	}
 
 	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
@@ -167,9 +171,8 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		return nil, nil, err
 	}
 
-	// Send event. If a caption is attached to the event, we persist it
-	// immediately as a FeedEvent.
-	feedEvent := dispatchEventToFeed(ctx, db.Event{
+	// Send event
+	feedEvent, err := dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -179,8 +182,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 			CollectionTokenIDs:       createdCollection.Nfts,
 			CollectionCollectorsNote: collectorsNote,
 		},
-		Caption: captionToSqlString(caption),
-	})
+	}, caption)
 
 	return &createdCollection, feedEvent, err
 }
@@ -243,26 +245,30 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		CollectionID:   collectionID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
-	})
+	}, nil)
 
 	return nil
 }
 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.FeedEvent, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
+	fieldsToValidate := validationMap{
 		"collectionID": {collectionID, "required"},
 		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 		"sections":     {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
-		"caption":      {caption, fmt.Sprintf("omitempty,caption")},
-	}); err != nil {
-		return nil, err
 	}
 
-	// Sanitize
+	// Trim and optimistically sanitize the input while we're at it.
+	var trimmedCaption string
 	if caption != nil {
-		cleaned := validate.SanitizationPolicy.Sanitize(*caption)
+		trimmedCaption = strings.TrimSpace(*caption)
+		fieldsToValidate["caption"] = valWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
+	}
+
+	// Validate
+	if err := validateFields(api.validator, fieldsToValidate); err != nil {
+		return nil, err
 	}
 
 	if err := api.validator.Struct(validate.CollectionTokenSettingsParams{
@@ -301,19 +307,16 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 
 	backupGalleriesForUser(ctx, userID, api.repos)
 
-	// Send event. If a caption is attached to the event, persist it
-	// immediately as a FeedEvent.
-	feedEvent := dispatchEventToFeed(ctx, db.Event{
+	// Send event
+	return dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
-		Caption:        captionToSqlString(caption),
-	})
-
-	return feedEvent, nil
+		Caption:        strToNullStr(caption),
+	}, caption)
 }
 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
@@ -337,11 +340,4 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 	}
 
 	return nil
-}
-
-func captionToSqlString(caption *string) sql.NullString {
-	if caption == nil {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: *caption, Valid: true}
 }

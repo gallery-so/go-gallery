@@ -3,7 +3,6 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -11,12 +10,11 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/validate"
 )
 
 type FeedAPI struct {
-	feedRepo  *postgres.FeedRepository
+	repos     *persist.Repositories
+	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
@@ -36,38 +34,6 @@ func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (
 	}
 
 	return &event, nil
-}
-
-func (api FeedAPI) CaptionFeedEvent(ctx context.Context, feedEventID persist.DBID, caption string) error {
-	// Trim whitespace first, so comments consisting only of whitespace will fail
-	// the "required" validation below
-	caption = strings.TrimSpace(caption)
-
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"feedEventID": {feedEventID, "required"},
-		"caption":     {caption, "required"},
-	}); err != nil {
-		return err
-	}
-
-	// Sanitize
-	caption = validate.SanitizationPolicy.Sanitize(caption)
-
-	userID, err := getAuthenticatedUser(ctx)
-	if err != nil {
-		return err
-	}
-
-	captioned, err := api.feedRepo.AddCaptionToEvent(ctx, userID, feedEventID, caption)
-	if err != nil {
-		return err
-	}
-	if !captioned {
-		return persist.ErrFeedEventNotFoundByID{ID: feedEventID}
-	}
-
-	return nil
 }
 
 func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
