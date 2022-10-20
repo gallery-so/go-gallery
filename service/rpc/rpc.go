@@ -351,7 +351,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return util.RemoveBOM(decoded), nil
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
-		path := util.GetIPFSPath(asString, true)
+		path := util.GetURIPath(turi, true)
 
 		bs, err := GetIPFSData(ctx, ipfsClient, path)
 		if err != nil {
@@ -360,8 +360,8 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 
 		return util.RemoveBOM(bs), nil
 	case persist.URITypeArweave:
-		path := strings.ReplaceAll(asString, "arweave://", "")
-		path = strings.ReplaceAll(path, "ar://", "")
+		path := util.GetURIPath(turi, true)
+
 		bs, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
 			bs, err = GetArweaveDataHTTP(ctx, path)
@@ -457,7 +457,7 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 
 		return util.NewFileHeaderReader(buf)
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
-		path := util.GetIPFSPath(asString, true)
+		path := util.GetURIPath(turi, true)
 
 		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
 		if err != nil {
@@ -466,8 +466,8 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 
 		return util.NewFileHeaderReader(resp)
 	case persist.URITypeArweave:
-		path := strings.ReplaceAll(asString, "arweave://", "")
-		path = strings.ReplaceAll(path, "ar://", "")
+		path := util.GetURIPath(turi, true)
+
 		bs, err := GetArweaveData(arweaveClient, path)
 		if err != nil {
 			resp, err := GetArweaveDataHTTPReader(ctx, path)
@@ -567,7 +567,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		return nil
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
 
-		bs, err := GetIPFSData(ctx, ipfsClient, util.GetIPFSPath(asString, false))
+		bs, err := GetIPFSData(ctx, ipfsClient, util.GetURIPath(asString, false))
 		if err != nil {
 			return err
 		}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
 
@@ -294,25 +295,35 @@ func IntToPointerSlice(s []int) []*int {
 	return ret
 }
 
-// GetIPFSPath takes an IPFS URL in any form and returns just the path
-func GetIPFSPath(initial string, withoutQuery bool) string {
+// GetURIPath takes a uri in any form and returns just the path
+func GetURIPath(uri persist.TokenURI, withoutQuery bool) string {
 
-	path := strings.TrimSpace(initial)
-	if strings.HasPrefix(initial, "http") {
-		path = strings.TrimPrefix(path, "https://")
-		path = strings.TrimPrefix(path, "http://")
-		indexOfPath := strings.Index(path, "/")
-		if indexOfPath > 0 {
-			path = path[indexOfPath:]
+	var path string
+
+	switch uri.Type() {
+	case persist.URITypeIPFS, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
+		initial := uri.String()
+		path = strings.TrimSpace(initial)
+		if strings.HasPrefix(initial, "http") {
+			path = strings.TrimPrefix(path, "https://")
+			path = strings.TrimPrefix(path, "http://")
+			indexOfPath := strings.Index(path, "/")
+			if indexOfPath > 0 {
+				path = path[indexOfPath:]
+			}
+		} else if strings.HasPrefix(initial, "ipfs://") {
+			path = strings.ReplaceAll(initial, "ipfs://", "")
 		}
-	} else if strings.HasPrefix(initial, "ipfs://") {
-		path = strings.ReplaceAll(initial, "ipfs://", "")
-	}
-	path = strings.ReplaceAll(path, "ipfs/", "")
-	path = strings.TrimPrefix(path, "/")
-	if withoutQuery {
-		path = strings.Split(path, "?")[0]
-		path = strings.TrimSuffix(path, "/")
+		path = strings.ReplaceAll(path, "ipfs/", "")
+		path = strings.TrimPrefix(path, "/")
+		if withoutQuery {
+			path = strings.Split(path, "?")[0]
+			path = strings.TrimSuffix(path, "/")
+		}
+	case persist.URITypeArweave:
+		initial := uri.String()
+		path := strings.ReplaceAll(initial, "arweave://", "")
+		path = strings.ReplaceAll(path, "ar://", "")
 	}
 	return path
 }

@@ -311,13 +311,14 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 }
 
 func remapPaths(mediaURL string) string {
+	asURI := persist.TokenURI(mediaURL)
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
-		path := util.GetIPFSPath(mediaURL, false)
+		path := util.GetURIPath(asURI, false)
 		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 	case persist.URITypeArweave:
-		// TODO
-		return mediaURL
+		path := util.GetURIPath(asURI, false)
+		return fmt.Sprintf("https://arweave.net/%s", path)
 	default:
 		return mediaURL
 	}
