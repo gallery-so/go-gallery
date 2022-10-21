@@ -27,12 +27,12 @@ func AddTo(ctx *gin.Context, queries *db.Queries, taskClient *cloudtasks.Client)
 	eventDispatcher := newEventDispatcher()
 	feedHandler := newFeedHandler(queries, taskClient)
 
-	eventDispatcher.AddHandler(persist.ActionUserCreated, feedHandler)
-	eventDispatcher.AddHandler(persist.ActionUserFollowedUsers, feedHandler)
-	eventDispatcher.AddHandler(persist.ActionCollectorsNoteAddedToToken, feedHandler)
-	eventDispatcher.AddHandler(persist.ActionCollectionCreated, feedHandler)
-	eventDispatcher.AddHandler(persist.ActionCollectorsNoteAddedToCollection, feedHandler)
-	eventDispatcher.AddHandler(persist.ActionTokensAddedToCollection, feedHandler)
+	eventDispatcher.AddDelayedHandler(persist.ActionUserCreated, feedHandler)
+	eventDispatcher.AddDelayedHandler(persist.ActionUserFollowedUsers, feedHandler)
+	eventDispatcher.AddDelayedHandler(persist.ActionCollectorsNoteAddedToToken, feedHandler)
+	eventDispatcher.AddDelayedHandler(persist.ActionCollectionCreated, feedHandler)
+	eventDispatcher.AddDelayedHandler(persist.ActionCollectorsNoteAddedToCollection, feedHandler)
+	eventDispatcher.AddDelayedHandler(persist.ActionTokensAddedToCollection, feedHandler)
 
 	eventDispatcher.AddImmediateHandler(persist.ActionCollectionCreated, feedHandler)
 	eventDispatcher.AddImmediateHandler(persist.ActionTokensAddedToCollection, feedHandler)
@@ -61,19 +61,19 @@ func For(ctx context.Context) *EventHandlers {
 }
 
 type eventDispatcher struct {
-	handlers          map[persist.Action]eventHandler
+	delayedHandlers   map[persist.Action]delayedHandler
 	immediateHandlers map[persist.Action]immediateHandler
 }
 
 func newEventDispatcher() eventDispatcher {
 	return eventDispatcher{
-		handlers:          map[persist.Action]eventHandler{},
+		delayedHandlers:   map[persist.Action]delayedHandler{},
 		immediateHandlers: map[persist.Action]immediateHandler{},
 	}
 }
 
-func (d *eventDispatcher) AddHandler(action persist.Action, handler eventHandler) {
-	d.handlers[action] = handler
+func (d *eventDispatcher) AddDelayedHandler(action persist.Action, handler delayedHandler) {
+	d.delayedHandlers[action] = handler
 }
 
 func (d *eventDispatcher) AddImmediateHandler(action persist.Action, handler immediateHandler) {
@@ -81,8 +81,8 @@ func (d *eventDispatcher) AddImmediateHandler(action persist.Action, handler imm
 }
 
 func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
-	if handler, ok := d.handlers[event.Action]; ok {
-		return handler.Submit(ctx, event)
+	if handler, ok := d.delayedHandlers[event.Action]; ok {
+		return handler.HandleDelayed(ctx, event)
 	}
 	logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
 	return nil
@@ -90,18 +90,18 @@ func (d *eventDispatcher) Dispatch(ctx context.Context, event db.Event) error {
 
 func (d *eventDispatcher) InvokeHandler(ctx context.Context, event db.Event) (interface{}, error) {
 	if handler, ok := d.immediateHandlers[event.Action]; ok {
-		return handler.Call(ctx, event)
+		return handler.HandleImmediate(ctx, event)
 	}
 	logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
 	return nil, nil
 }
 
-type eventHandler interface {
-	Submit(context.Context, db.Event) error
+type delayedHandler interface {
+	HandleDelayed(context.Context, db.Event) error
 }
 
 type immediateHandler interface {
-	Call(context.Context, db.Event) (interface{}, error)
+	HandleImmediate(context.Context, db.Event) (interface{}, error)
 }
 
 type feedHandler struct {
@@ -118,8 +118,8 @@ func newFeedHandler(queries *db.Queries, taskClient *cloudtasks.Client) feedHand
 	}
 }
 
-// Submit creates a delayed task for the Feed service to handle later.
-func (h feedHandler) Submit(ctx context.Context, event db.Event) error {
+// HandledDelayed creates a delayed task for the Feed service to handle later.
+func (h feedHandler) HandleDelayed(ctx context.Context, event db.Event) error {
 	persisted, err := h.eventRepo.Add(ctx, event)
 	if err != nil {
 		return err
@@ -129,8 +129,8 @@ func (h feedHandler) Submit(ctx context.Context, event db.Event) error {
 	return task.CreateTaskForFeed(ctx, scheduleOn, task.FeedMessage{ID: persisted.ID}, h.tc)
 }
 
-// Call sidesteps the Feed service so that an event is immediately available as a feed event.
-func (h feedHandler) Call(ctx context.Context, event db.Event) (interface{}, error) {
+// HandleDelayed sidesteps the Feed service so that an event is immediately available as a feed event.
+func (h feedHandler) HandleImmediate(ctx context.Context, event db.Event) (interface{}, error) {
 	savedEventID, err := h.eventRepo.Add(ctx, event)
 	if err != nil {
 		return nil, err
