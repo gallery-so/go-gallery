@@ -11,18 +11,10 @@ import (
 )
 
 func (r *Admire) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Admire:%s", r.Dbid))
 }
 
 func (r *Collection) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Collection:%s", r.Dbid))
 }
 
@@ -37,18 +29,10 @@ func (r *CollectionToken) ID() GqlID {
 	// func (r *CollectionToken) GetGqlIDField_TokenID() string
 	// func (r *CollectionToken) GetGqlIDField_CollectionID() string
 	//-----------------------------------------------------------------------------------------------
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("CollectionToken:%s:%s", r.GetGqlIDField_TokenID(), r.GetGqlIDField_CollectionID()))
 }
 
 func (r *Comment) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Comment:%s", r.Dbid))
 }
 
@@ -63,66 +47,34 @@ func (r *Community) ID() GqlID {
 	// func (r *Community) GetGqlIDField_ContractAddress() string
 	// func (r *Community) GetGqlIDField_Chain() string
 	//-----------------------------------------------------------------------------------------------
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Community:%s:%s", r.GetGqlIDField_ContractAddress(), r.GetGqlIDField_Chain()))
 }
 
 func (r *Contract) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Contract:%s", r.Dbid))
 }
 
 func (r *FeedEvent) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("FeedEvent:%s", r.Dbid))
 }
 
 func (r *Gallery) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Gallery:%s", r.Dbid))
 }
 
 func (r *GalleryUser) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("GalleryUser:%s", r.Dbid))
 }
 
 func (r *MembershipTier) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("MembershipTier:%s", r.Dbid))
 }
 
 func (r *Token) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Token:%s", r.Dbid))
 }
 
 func (r *Wallet) ID() GqlID {
-	// It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-	if r == nil {
-		return ""
-	}
 	return GqlID(fmt.Sprintf("Wallet:%s", r.Dbid))
 }
 

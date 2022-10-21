@@ -21,10 +21,6 @@ func (r *{{$node.Name}}) ID() GqlID {
         {{- end }}
     //-----------------------------------------------------------------------------------------------
     {{- end }}
-    // It's safe to return the same ID since the node itself will resolve to nil and the ID never gets used.
-    if r == nil {
-      return ""
-    }
     return GqlID({{$node.Implementation}})
 }
 {{ end }}
