@@ -140,8 +140,11 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, be
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, before, after, first, last)
 }
 
-func (r *createCollectionPayloadResolver) Action(ctx context.Context, obj *model.CreateCollectionPayload) (model.CapturedAction, error) {
-	return resolveCapturedAction(ctx, obj.HelperCreateCollectionPayloadData.FeedEvent)
+func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
@@ -410,9 +413,14 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		return nil, err
 	}
 
+	var eventModel model.FeedEvent
+	if feedEvent != nil {
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
+	}
+
 	output := model.CreateCollectionPayload{
-		Collection:                        collectionToModel(ctx, *collection),
-		HelperCreateCollectionPayloadData: model.HelperCreateCollectionPayloadData{FeedEvent: feedEvent},
+		Collection: collectionToModel(ctx, *collection),
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -499,9 +507,14 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 		return nil, err
 	}
 
+	var eventModel model.FeedEvent
+	if feedEvent != nil {
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
+	}
+
 	output := &model.UpdateCollectionTokensPayload{
-		Collection:                              collectionToModel(ctx, *collection),
-		HelperUpdateCollectionTokensPayloadData: model.HelperUpdateCollectionTokensPayloadData{FeedEvent: feedEvent},
+		Collection: collectionToModel(ctx, *collection),
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -1029,8 +1042,11 @@ func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.Unfol
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
 }
 
-func (r *updateCollectionTokensPayloadResolver) Action(ctx context.Context, obj *model.UpdateCollectionTokensPayload) (model.CapturedAction, error) {
-	return resolveCapturedAction(ctx, obj.HelperUpdateCollectionTokensPayloadData.FeedEvent)
+func (r *updateCollectionTokensPayloadResolver) FeedEvent(ctx context.Context, obj *model.UpdateCollectionTokensPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error) {

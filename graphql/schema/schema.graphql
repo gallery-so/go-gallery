@@ -562,14 +562,6 @@ type FeedEvent implements Node {
     hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
-type ErrActionNotCapturable implements Error {
-  message: String!
-}
-
-union CapturedAction = 
-  FeedEvent
-  | ErrActionNotCapturable
-
 type UserCreatedFeedEventData implements FeedEventData {
     eventTime: Time
     owner: GalleryUser @goField(forceResolver: true)
@@ -701,9 +693,9 @@ union CreateCollectionPayloadOrError =
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type CreateCollectionPayload @goEmbedHelper {
+type CreateCollectionPayload {
     collection: Collection
-    action: CapturedAction @goField(forceResolver: true)
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 union DeleteCollectionPayloadOrError =
@@ -744,9 +736,9 @@ union UpdateCollectionTokensPayloadOrError =
     | ErrNotAuthorized
     | ErrInvalidInput
 
-type UpdateCollectionTokensPayload @goEmbedHelper {
+type UpdateCollectionTokensPayload {
     collection: Collection
-    action: CapturedAction @goField(forceResolver: true)
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 input UpdateCollectionHiddenInput {

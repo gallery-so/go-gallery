@@ -21,6 +21,9 @@ func (r *{{$node.Name}}) ID() GqlID {
         {{- end }}
     //-----------------------------------------------------------------------------------------------
     {{- end }}
+    if r == nil {
+      return ""
+    }
     return GqlID({{$node.Implementation}})
 }
 {{ end }}

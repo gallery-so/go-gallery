@@ -642,13 +642,6 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 	return commentToModel(ctx, *comment), nil
 }
 
-func resolveCapturedAction(ctx context.Context, feedEvent *db.FeedEvent) (model.CapturedAction, error) {
-	if feedEvent == nil {
-		return model.ErrActionNotCapturable{Message: "not a capturable action"}, nil
-	}
-	return eventToModel(feedEvent)
-}
-
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
