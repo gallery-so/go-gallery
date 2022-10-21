@@ -2,6 +2,7 @@ package feed
 
 import (
 	"context"
+	"reflect"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -10,6 +11,56 @@ import (
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/spf13/viper"
 )
+
+var (
+	defaultEventGroups = map[persist.Action]mergeGroup{
+		persist.ActionCollectionCreated:               collectionGroup,
+		persist.ActionCollectorsNoteAddedToCollection: collectionGroup,
+		persist.ActionTokensAddedToCollection:         collectionGroup,
+	}
+
+	defaultGroupCriterias = map[string]activeCriteria{
+		collectionGroup.String(): actorAndSubject,
+	}
+
+	defaultEventCriterias = map[persist.Action]activeCriteria{
+		persist.ActionUserCreated:                     noCriteria,
+		persist.ActionUserFollowedUsers:               actorAndAction,
+		persist.ActionCollectorsNoteAddedToToken:      actorSubjectAndAction,
+		persist.ActionCollectionCreated:               actorSubjectAndAction,
+		persist.ActionCollectorsNoteAddedToCollection: actorSubjectAndAction,
+		persist.ActionTokensAddedToCollection:         actorSubjectAndAction,
+	}
+)
+
+var collectionGroup = mergeGroup{
+	persist.ActionCollectionCreated,
+	persist.ActionTokensAddedToCollection,
+	persist.ActionCollectorsNoteAddedToCollection,
+}
+
+var (
+	noCriteria            = activeCriteria{}
+	actorAndAction        = activeCriteria{Actor: true, Action: true}
+	actorAndSubject       = activeCriteria{Actor: true, Subject: true}
+	actorSubjectAndAction = activeCriteria{Actor: true, Subject: true, Action: true}
+)
+
+type mergeGroup []persist.Action
+
+func (m mergeGroup) String() string {
+	result := ""
+	for _, action := range m {
+		result = result + "|" + string(action)
+	}
+	return result
+}
+
+type activeCriteria struct {
+	Actor,
+	Subject,
+	Action bool
+}
 
 type EventBuilder struct {
 	eventRepo         *postgres.EventRepository
@@ -29,6 +80,18 @@ func NewEventBuilder(queries *db.Queries, skipCooldown bool) *EventBuilder {
 	}
 }
 
+func (b *EventBuilder) NewEventFromTask(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
+	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
+	defer tracing.FinishSpan(span)
+
+	event, err := b.eventRepo.Get(ctx, message.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.NewEvent(ctx, event)
+}
+
 func (b *EventBuilder) NewEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, event.ActorID, event.Action)
 	if err != nil {
@@ -36,6 +99,10 @@ func (b *EventBuilder) NewEvent(ctx context.Context, event db.Event) (*db.FeedEv
 	}
 	if blocked {
 		return nil, nil
+	}
+
+	if reflect.DeepEqual(defaultEventGroups[event.Action], collectionGroup) {
+		return createGroup
 	}
 
 	switch event.Action {
@@ -56,25 +123,54 @@ func (b *EventBuilder) NewEvent(ctx context.Context, event db.Event) (*db.FeedEv
 	}
 }
 
-func (b *EventBuilder) NewEventFromTask(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
-	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
-	defer tracing.FinishSpan(span)
-
-	event, err := b.eventRepo.Get(ctx, message.ID)
+func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, error) {
+	if b.skipCooldown {
+		return true, nil
+	}
+	active, err := b.isActive(ctx, event)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
-	return b.NewEvent(ctx, event)
+	return !active, nil
+}
+
+func (b *EventBuilder) isActive(ctx context.Context, event db.Event) (bool, error) {
+	group, ok := defaultEventGroups[event.Action]
+	if !ok {
+		group = mergeGroup{event.Action}
+	}
+
+	key := group.String()
+	groupCriteria, gOK := defaultGroupCriterias[key]
+	eventCritiera, eOK := defaultEventCriterias[persist.Action(key)]
+
+	var criteria activeCriteria
+	switch {
+	case gOK:
+		criteria = groupCriteria
+	case eOK:
+		criteria = eventCritiera
+	default:
+		criteria = noCriteria
+	}
+
+	switch criteria {
+	case actorAndAction:
+		panic("implement")
+	case actorAndSubject:
+		panic("implement")
+	case actorSubjectAndAction:
+		panic("implement")
+	}
+
+	return false, nil
 }
 
 func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActive(ctx, event)
-	if err != nil {
+	useEvent, err := b.useEvent(ctx, event)
+	if err != nil || !useEvent {
 		return nil, err
-	}
-	if !useEvent(isActive, b.skipCooldown) {
-		return nil, nil
 	}
 
 	feedEvent, err := b.feedRepo.LastEventFrom(ctx, event)
@@ -99,12 +195,9 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Even
 }
 
 func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActive(ctx, event)
-	if err != nil {
+	useEvent, err := b.useEvent(ctx, event)
+	if err != nil || !useEvent {
 		return nil, err
-	}
-	if !useEvent(isActive, b.skipCooldown) {
-		return nil, nil
 	}
 
 	feedEvent, err := b.feedRepo.LastEventFrom(ctx, event)
@@ -121,43 +214,20 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event d
 		}
 	}
 
-	var followedIDs []persist.DBID
-	var followedBack []bool
-	var eventIDs []persist.DBID
+	merger := mergedFollowEvent{}
+	mergedEvent := merger.Merge(events...)
 
-	for _, event := range events {
-		if !event.Data.UserRefollowed {
-			followedIDs = append(followedIDs, event.SubjectID)
-			followedBack = append(followedBack, event.Data.UserFollowedBack)
-			eventIDs = append(eventIDs, event.ID)
-		}
-	}
-
-	if len(followedIDs) < 1 {
+	if !merger.hasNewFollows() {
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, db.FeedEvent{
-		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
-		Action:  event.Action,
-		Data: persist.FeedEventData{
-			UserFollowedIDs:  followedIDs,
-			UserFollowedBack: followedBack,
-		},
-		EventTime: event.CreatedAt,
-		EventIds:  eventIDs,
-		Caption:   event.Caption,
-	})
+	return b.feedRepo.Add(ctx, mergedEvent)
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-	if err != nil {
+	useEvent, err := b.useEvent(ctx, event)
+	if err != nil || !useEvent {
 		return nil, err
-	}
-	if !useEvent(isActive, b.skipCooldown) {
-		return nil, nil
 	}
 
 	// don't present empty notes
@@ -196,12 +266,9 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 }
 
 func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-	if err != nil {
+	useEvent, err := b.useEvent(ctx, event)
+	if err != nil || !useEvent {
 		return nil, err
-	}
-	if !useEvent(isActive, b.skipCooldown) {
-		return nil, nil
 	}
 
 	// don't show empty collections
@@ -226,12 +293,9 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event d
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-	if err != nil {
+	useEvent, err := b.useEvent(ctx, event)
+	if err != nil || !useEvent {
 		return nil, err
-	}
-	if !useEvent(isActive, b.skipCooldown) {
-		return nil, nil
 	}
 
 	// don't present empty notes
@@ -264,12 +328,9 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 }
 
 func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-	if err != nil {
+	useEvent, err := b.useEvent(ctx, event)
+	if err != nil || !useEvent {
 		return nil, err
-	}
-	if !useEvent(isActive, b.skipCooldown) {
-		return nil, nil
 	}
 
 	// don't show empty collections
@@ -344,8 +405,4 @@ func newTokens(tokens []persist.DBID, otherTokens []persist.DBID) []persist.DBID
 	}
 
 	return newTokens
-}
-
-func useEvent(isActive, skipCooldown bool) bool {
-	return skipCooldown || !isActive
 }
