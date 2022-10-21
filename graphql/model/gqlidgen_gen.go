@@ -11,6 +11,8 @@ import (
 )
 
 func (r *Admire) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -18,6 +20,8 @@ func (r *Admire) ID() GqlID {
 }
 
 func (r *Collection) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -35,6 +39,8 @@ func (r *CollectionToken) ID() GqlID {
 	// func (r *CollectionToken) GetGqlIDField_TokenID() string
 	// func (r *CollectionToken) GetGqlIDField_CollectionID() string
 	//-----------------------------------------------------------------------------------------------
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -42,6 +48,8 @@ func (r *CollectionToken) ID() GqlID {
 }
 
 func (r *Comment) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -59,6 +67,8 @@ func (r *Community) ID() GqlID {
 	// func (r *Community) GetGqlIDField_ContractAddress() string
 	// func (r *Community) GetGqlIDField_Chain() string
 	//-----------------------------------------------------------------------------------------------
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -66,6 +76,8 @@ func (r *Community) ID() GqlID {
 }
 
 func (r *Contract) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -73,6 +85,8 @@ func (r *Contract) ID() GqlID {
 }
 
 func (r *FeedEvent) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -80,6 +94,8 @@ func (r *FeedEvent) ID() GqlID {
 }
 
 func (r *Gallery) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -87,6 +103,8 @@ func (r *Gallery) ID() GqlID {
 }
 
 func (r *GalleryUser) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -94,6 +112,8 @@ func (r *GalleryUser) ID() GqlID {
 }
 
 func (r *MembershipTier) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -101,6 +121,8 @@ func (r *MembershipTier) ID() GqlID {
 }
 
 func (r *Token) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}
@@ -108,6 +130,8 @@ func (r *Token) ID() GqlID {
 }
 
 func (r *Wallet) ID() GqlID {
+	// It's safe to return the same ID when the node is nil because the object itself will
+	// resolve to nil so the ID is not actually used.
 	if r == nil {
 		return ""
 	}

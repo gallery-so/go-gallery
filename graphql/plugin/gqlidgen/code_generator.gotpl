@@ -21,6 +21,8 @@ func (r *{{$node.Name}}) ID() GqlID {
         {{- end }}
     //-----------------------------------------------------------------------------------------------
     {{- end }}
+    // It's safe to return the same ID when the node is nil because the object itself will
+    // resolve to nil so the ID is not actually used.
     if r == nil {
       return ""
     }
