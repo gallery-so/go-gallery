@@ -777,6 +777,11 @@ func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
 
 func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int) *model.CollectionLayout {
 	if version == 0 {
+		// Some older collections predate configurable columns; the default back then was 3
+		if layout.Columns == 0 {
+			layout.Columns = 3
+		}
+
 		// Treat the original collection as a single section.
 		return &model.CollectionLayout{
 			Sections: []*int{util.IntToPointer(0)},
