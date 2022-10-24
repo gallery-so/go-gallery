@@ -28,7 +28,7 @@ func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*db.
 		return nil, err
 	}
 
-	event, err := api.loaders.EventByEventID.Load(eventID)
+	event, err := api.loaders.FeedEventByFeedEventID.Load(eventID)
 	if err != nil {
 		return nil, err
 	}

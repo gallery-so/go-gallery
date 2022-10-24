@@ -37,6 +37,8 @@ sql:
           # Users
           - column: "users.wallets"
             go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
+          - column: "users.notification_settings"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
 
           # Galleries
           - column: "galleries.collections"
@@ -60,12 +62,10 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "tokens.contract"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
-          - column: "tokens.media"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
-          - column: "tokens.ownership_history"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.AddressAtBlockList"
           - column: "tokens.token_metadata"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenMetadata"
+          - column: "tokens.media"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Media"
 
           # Contracts
           - column: "contracts.address"
@@ -100,12 +100,22 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "events.subject_id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "events.gallery_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "events.comment_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "events.admire_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "events.feed_event_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "events.action"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
           - column: "events.data"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EventData"
           - column: "events.feed_window_size"
-            go_type: "int"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullInt"
+          - column: "events.external_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
 
           # Admires
           - column: "admires.actor_id"
@@ -137,6 +147,24 @@ sql:
           - column: "feed_blocklist.action"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
 
+          # Notifications
+          - column: "notifications.owner_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "notifications.actor_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "notifications.gallery_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "notifications.comment_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "notifications.feed_event_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "notifications.action"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Action"
+          - column: "notifications.data"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NotificationData"
+          - column: "notifications.event_ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
           - column: "*.id"
@@ -156,6 +184,8 @@ sql:
           - column: "*.admire_ids"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "*.comment_ids"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.user_ids"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "*.thumbnail_url"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"

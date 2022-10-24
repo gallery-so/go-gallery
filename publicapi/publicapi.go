@@ -31,20 +31,21 @@ var errBadCursorFormat = errors.New("bad cursor format")
 const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
-	repos       *persist.Repositories
-	queries     *db.Queries
-	loaders     *dataloader.Loaders
-	validator   *validator.Validate
-	Auth        *AuthAPI
-	Collection  *CollectionAPI
-	Gallery     *GalleryAPI
-	User        *UserAPI
-	Token       *TokenAPI
-	Contract    *ContractAPI
-	Wallet      *WalletAPI
-	Misc        *MiscAPI
-	Feed        *FeedAPI
-	Interaction *InteractionAPI
+	repos         *persist.Repositories
+	queries       *db.Queries
+	loaders       *dataloader.Loaders
+	validator     *validator.Validate
+	Auth          *AuthAPI
+	Collection    *CollectionAPI
+	Gallery       *GalleryAPI
+	User          *UserAPI
+	Token         *TokenAPI
+	Contract      *ContractAPI
+	Wallet        *WalletAPI
+	Misc          *MiscAPI
+	Feed          *FeedAPI
+	Notifications *NotificationsAPI
+	Interaction   *InteractionAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
@@ -54,20 +55,21 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repo
 	validator := newValidator()
 
 	return &PublicAPI{
-		repos:       repos,
-		queries:     queries,
-		loaders:     loaders,
-		validator:   validator,
-		Auth:        &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
-		Collection:  &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		Gallery:     &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		User:        &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
-		Contract:    &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, taskClient: taskClient},
-		Token:       &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
-		Wallet:      &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
-		Misc:        &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
-		Feed:        &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		Interaction: &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		repos:         repos,
+		queries:       queries,
+		loaders:       loaders,
+		validator:     validator,
+		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
+		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
+		Contract:      &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, taskClient: taskClient},
+		Token:         &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
+		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
+		Misc:          &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
+		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 	}
 }
 
@@ -154,17 +156,21 @@ func (e ErrInvalidInput) Error() string {
 	return str
 }
 
-func dispatchEventToFeed(ctx context.Context, evt db.Event) {
+func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate) error {
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	go pushFeedEvent(ctx, evt)
+	if err := v.Struct(evt); err != nil {
+		return err
+	}
+	go pushEvent(ctx, evt)
+	return nil
 }
 
-func pushFeedEvent(ctx context.Context, evt db.Event) {
+func pushEvent(ctx context.Context, evt db.Event) {
 	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 		sentryutil.SetEventContext(hub.Scope(), evt.ActorID, evt.SubjectID, evt.Action)
 	}
 
-	err := event.DispatchEventToFeed(ctx, evt)
+	err := event.DispatchEvent(ctx, evt)
 
 	if err != nil {
 		logger.For(ctx).Error(err)
