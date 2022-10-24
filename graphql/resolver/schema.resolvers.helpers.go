@@ -1073,6 +1073,11 @@ func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
 
 func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int) *model.CollectionLayout {
 	if version == 0 {
+		// Some older collections predate configurable columns; the default back then was 3
+		if layout.Columns == 0 {
+			layout.Columns = 3
+		}
+
 		// Treat the original collection as a single section.
 		return &model.CollectionLayout{
 			Sections: []*int{util.IntToPointer(0)},
@@ -1392,8 +1397,10 @@ func getUrlExtension(url string) string {
 func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 	med := token.Media
 	switch med.MediaType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
+	case persist.MediaTypeImage, persist.MediaTypeSVG:
 		return getImageMedia(ctx, med)
+	case persist.MediaTypeGIF:
+		return getGIFMedia(ctx, med)
 	case persist.MediaTypeVideo:
 		return getVideoMedia(ctx, med)
 	case persist.MediaTypeAudio:
@@ -1438,6 +1445,17 @@ func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
 	url := remapLargeImageUrls(media.MediaURL.String())
 
 	return model.ImageMedia{
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: &url,
+	}
+}
+
+func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
+	url := remapLargeImageUrls(media.MediaURL.String())
+
+	return model.GIFMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),

@@ -405,6 +405,13 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
+	GIFMedia struct {
+		ContentRenderURL func(childComplexity int) int
+		MediaType        func(childComplexity int) int
+		MediaURL         func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
+	}
+
 	Gallery struct {
 		Collections func(childComplexity int) int
 		Dbid        func(childComplexity int) int
@@ -2156,6 +2163,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FollowUserPayload.Viewer(childComplexity), true
+
+	case "GIFMedia.contentRenderURL":
+		if e.complexity.GIFMedia.ContentRenderURL == nil {
+			break
+		}
+
+		return e.complexity.GIFMedia.ContentRenderURL(childComplexity), true
+
+	case "GIFMedia.mediaType":
+		if e.complexity.GIFMedia.MediaType == nil {
+			break
+		}
+
+		return e.complexity.GIFMedia.MediaType(childComplexity), true
+
+	case "GIFMedia.mediaURL":
+		if e.complexity.GIFMedia.MediaURL == nil {
+			break
+		}
+
+		return e.complexity.GIFMedia.MediaURL(childComplexity), true
+
+	case "GIFMedia.previewURLs":
+		if e.complexity.GIFMedia.PreviewURLs == nil {
+			break
+		}
+
+		return e.complexity.GIFMedia.PreviewURLs(childComplexity), true
 
 	case "Gallery.collections":
 		if e.complexity.Gallery.Collections == nil {
@@ -4429,15 +4464,16 @@ union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
-    | VideoMedia
-    | AudioMedia
-    | TextMedia
-    | HtmlMedia
-    | JsonMedia
-    | GltfMedia
-    | UnknownMedia
-    | SyncingMedia
-    | InvalidMedia
+  | GIFMedia
+  | VideoMedia
+  | AudioMedia
+  | TextMedia
+  | HtmlMedia
+  | JsonMedia
+  | GltfMedia
+  | UnknownMedia
+  | SyncingMedia
+  | InvalidMedia
 
 type PreviewURLSet {
     raw: String
@@ -4476,6 +4512,14 @@ type ImageMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type GIFMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type VideoMedia implements Media {
@@ -11921,6 +11965,134 @@ func (ec *executionContext) _FollowUserPayload_user(ctx context.Context, field g
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
 	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GIFMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.GIFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GIFMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PreviewURLs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GIFMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.GIFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GIFMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GIFMedia_mediaType(ctx context.Context, field graphql.CollectedField, obj *model.GIFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GIFMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GIFMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.GIFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GIFMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContentRenderURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Gallery_id(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
@@ -24052,6 +24224,13 @@ func (ec *executionContext) _Media(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ImageMedia(ctx, sel, obj)
+	case model.GIFMedia:
+		return ec._GIFMedia(ctx, sel, &obj)
+	case *model.GIFMedia:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GIFMedia(ctx, sel, obj)
 	case model.VideoMedia:
 		return ec._VideoMedia(ctx, sel, &obj)
 	case *model.VideoMedia:
@@ -24131,6 +24310,13 @@ func (ec *executionContext) _MediaSubtype(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._ImageMedia(ctx, sel, obj)
+	case model.GIFMedia:
+		return ec._GIFMedia(ctx, sel, &obj)
+	case *model.GIFMedia:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GIFMedia(ctx, sel, obj)
 	case model.VideoMedia:
 		return ec._VideoMedia(ctx, sel, &obj)
 	case *model.VideoMedia:
@@ -27640,6 +27826,55 @@ func (ec *executionContext) _FollowUserPayload(ctx context.Context, sel ast.Sele
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var gIFMediaImplementors = []string{"GIFMedia", "MediaSubtype", "Media"}
+
+func (ec *executionContext) _GIFMedia(ctx context.Context, sel ast.SelectionSet, obj *model.GIFMedia) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, gIFMediaImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GIFMedia")
+		case "previewURLs":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GIFMedia_previewURLs(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "mediaURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GIFMedia_mediaURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "mediaType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GIFMedia_mediaType(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "contentRenderURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GIFMedia_contentRenderURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

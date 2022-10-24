@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/mikeydub/go-gallery/publicapi"
+	"reflect"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/getsentry/sentry-go"
@@ -210,8 +211,10 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 
 		if span != nil {
 			// If we receive a non-nil result without an error, and our result type implements
-			// the GraphQL Node pattern, add its ID to our event data
-			if res != nil && err == nil {
+			// the GraphQL Node pattern, add its ID to our event data. We also have to use
+			// reflection here: the result could be a non-nil pointer to a nil interface,
+			// which would cause a panic when we try to call its ID() method.
+			if err == nil && res != nil && reflect.ValueOf(res).Kind() == reflect.Ptr && !reflect.ValueOf(res).IsNil() {
 				if node, ok := res.(interface{ ID() model.GqlID }); ok {
 					tracing.AddEventDataToSpan(span, map[string]interface{}{
 						"resolvedNodeId": node.ID(),

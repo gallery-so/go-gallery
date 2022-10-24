@@ -190,25 +190,14 @@ SELECT t.* FROM tokens t
 -- name: CountTokensByContractId :one
 SELECT count(*) FROM tokens WHERE contract = $1 AND deleted = false;
 
--- name: GetOwnersByContractIdPaginate :many
-SELECT DISTINCT ON (users.id) users.* FROM users, tokens
-    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
-    AND tokens.deleted = false AND users.deleted = false
-    AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2;
-
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (users.id) users.* FROM users, tokens
+SELECT DISTINCT ON (result.id) result.* FROM (SELECT users.* FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2;
+        CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2;
 
 -- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens

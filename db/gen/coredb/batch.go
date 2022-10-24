@@ -1334,14 +1334,13 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 }
 
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings FROM users, tokens
+SELECT DISTINCT ON (result.id) result.id, result.deleted, result.version, result.last_updated, result.created_at, result.username, result.username_idempotent, result.wallets, result.bio, result.traits, result.universal, result.notification_settings FROM (SELECT users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
     AND (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
     ORDER BY CASE WHEN $9::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2
+        CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {

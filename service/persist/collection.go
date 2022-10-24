@@ -12,7 +12,7 @@ const (
 	maxColumns          = 10
 	defaultColumns      = 3
 	maxWhitespace       = 1000
-	maxTokensPerSection = 500
+	maxTokensPerSection = 1000
 )
 
 // CollectionDB is the struct that represents a collection of tokens in the database
