@@ -324,6 +324,19 @@ type CollectionTokenSettingsInput struct {
 	RenderLive bool         `json:"renderLive"`
 }
 
+type CollectionUpdatedFeedEventData struct {
+	HelperCollectionUpdatedFeedEventDataData
+	EventTime         *time.Time         `json:"eventTime"`
+	Owner             *GalleryUser       `json:"owner"`
+	Action            *persist.Action    `json:"action"`
+	Collection        *Collection        `json:"collection"`
+	NewCollectorsNote *string            `json:"newCollectorsNote"`
+	NewTokens         []*CollectionToken `json:"newTokens"`
+	IsNewCollection   *bool              `json:"isNewCollection"`
+}
+
+func (CollectionUpdatedFeedEventData) IsFeedEventData() {}
+
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`
 	Owner             *GalleryUser    `json:"owner"`

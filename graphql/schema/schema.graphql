@@ -644,6 +644,16 @@ type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelpe
     isPreFeed: Boolean
 }
 
+type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+    collection: Collection @goField(forceResolver: true)
+    newCollectorsNote: String
+    newTokens: [CollectionToken] @goField(forceResolver: true)
+    isNewCollection: Boolean
+}
+
 type ErrUnknownAction implements Error {
     message: String!
 }

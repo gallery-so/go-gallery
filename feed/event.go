@@ -2,6 +2,7 @@ package feed
 
 import (
 	"context"
+	"errors"
 	"reflect"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -13,54 +14,41 @@ import (
 )
 
 var (
-	defaultEventGroups = map[persist.Action]mergeGroup{
+	defaultEventGroups = map[persist.Action]actionGroup{
 		persist.ActionCollectionCreated:               collectionGroup,
 		persist.ActionCollectorsNoteAddedToCollection: collectionGroup,
 		persist.ActionTokensAddedToCollection:         collectionGroup,
 	}
 
-	defaultGroupCriterias = map[string]activeCriteria{
-		collectionGroup.String(): actorAndSubject,
-	}
-
-	defaultEventCriterias = map[persist.Action]activeCriteria{
+	defaultEventCriterias = map[persist.Action]criteria{
 		persist.ActionUserCreated:                     noCriteria,
-		persist.ActionUserFollowedUsers:               actorAndAction,
-		persist.ActionCollectorsNoteAddedToToken:      actorSubjectAndAction,
-		persist.ActionCollectionCreated:               actorSubjectAndAction,
-		persist.ActionCollectorsNoteAddedToCollection: actorSubjectAndAction,
-		persist.ActionTokensAddedToCollection:         actorSubjectAndAction,
+		persist.ActionUserFollowedUsers:               actorActionCriteria,
+		persist.ActionCollectorsNoteAddedToToken:      actorSubjectActionCriteria,
+		persist.ActionCollectionCreated:               actorSubjectActionCriteria,
+		persist.ActionCollectorsNoteAddedToCollection: actorSubjectActionCriteria,
+		persist.ActionTokensAddedToCollection:         actorSubjectActionCriteria,
 	}
 )
 
-var collectionGroup = mergeGroup{
+var collectionGroup = actionGroup{
 	persist.ActionCollectionCreated,
 	persist.ActionTokensAddedToCollection,
 	persist.ActionCollectorsNoteAddedToCollection,
 }
 
-var (
-	noCriteria            = activeCriteria{}
-	actorAndAction        = activeCriteria{Actor: true, Action: true}
-	actorAndSubject       = activeCriteria{Actor: true, Subject: true}
-	actorSubjectAndAction = activeCriteria{Actor: true, Subject: true, Action: true}
+const (
+	noCriteria criteria = iota
+	actorActionCriteria
+	actorSubjectCriteria
+	actorSubjectActionCriteria
 )
 
-type mergeGroup []persist.Action
+var errUnhandledSingleEvent = errors.New("unhandled single event")
+var errUnhandledGroupedEvent = errors.New("unhandled group event")
 
-func (m mergeGroup) String() string {
-	result := ""
-	for _, action := range m {
-		result = result + "|" + string(action)
-	}
-	return result
-}
+type actionGroup []persist.Action
 
-type activeCriteria struct {
-	Actor,
-	Subject,
-	Action bool
-}
+type criteria int
 
 type EventBuilder struct {
 	eventRepo         *postgres.EventRepository
@@ -80,7 +68,7 @@ func NewEventBuilder(queries *db.Queries, skipCooldown bool) *EventBuilder {
 	}
 }
 
-func (b *EventBuilder) NewEventFromTask(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
+func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
 	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
 	defer tracing.FinishSpan(span)
 
@@ -89,45 +77,54 @@ func (b *EventBuilder) NewEventFromTask(ctx context.Context, message task.FeedMe
 		return nil, err
 	}
 
-	return b.NewEvent(ctx, event)
+	return b.NewFeedEventFromEvent(ctx, event)
 }
 
-func (b *EventBuilder) NewEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, event.ActorID, event.Action)
-	if err != nil {
+	if err != nil || blocked {
 		return nil, err
 	}
-	if blocked {
-		return nil, nil
+	if _, groupable := defaultEventGroups[event.Action]; groupable {
+		return b.createGroupedFeedEvent(ctx, event)
 	}
+	return b.createSingleFeedEvent(ctx, event)
+}
 
-	if reflect.DeepEqual(defaultEventGroups[event.Action], collectionGroup) {
-		return createGroup
-	}
-
-	switch event.Action {
-	case persist.ActionUserCreated:
-		return b.createUserCreatedEvent(ctx, event)
-	case persist.ActionUserFollowedUsers:
-		return b.createUserFollowedUsersEvent(ctx, event)
-	case persist.ActionCollectorsNoteAddedToToken:
-		return b.createCollectorsNoteAddedToTokenEvent(ctx, event)
-	case persist.ActionCollectionCreated:
-		return b.createCollectionCreatedEvent(ctx, event)
-	case persist.ActionCollectorsNoteAddedToCollection:
-		return b.createCollectorsNoteAddedToCollectionEvent(ctx, event)
-	case persist.ActionTokensAddedToCollection:
-		return b.createTokensAddedToCollectionEvent(ctx, event)
+func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	switch {
+	case reflect.DeepEqual(defaultEventGroups[event.Action], collectionGroup):
+		return b.createCollectionUpdatedFeedEvent(ctx, event)
 	default:
-		return nil, persist.ErrUnknownAction{Action: event.Action}
+		return nil, errUnhandledGroupedEvent
 	}
 }
 
-func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, error) {
+func (b *EventBuilder) createSingleFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	switch event.Action {
+	case persist.ActionUserCreated:
+		return b.createUserCreatedFeedEvent(ctx, event)
+	case persist.ActionUserFollowedUsers:
+		return b.createUserFollowedUsersFeedEvent(ctx, event)
+	case persist.ActionCollectorsNoteAddedToToken:
+		return b.createCollectorsNoteAddedToTokenFeedEvent(ctx, event)
+	case persist.ActionCollectionCreated:
+		return b.createCollectionCreatedFeedEvent(ctx, event)
+	case persist.ActionCollectorsNoteAddedToCollection:
+		return b.createCollectorsNoteAddedToCollectionFeedEvent(ctx, event)
+	case persist.ActionTokensAddedToCollection:
+		return b.createTokensAddedToCollectionFeedEvent(ctx, event)
+	default:
+		return nil, errUnhandledSingleEvent
+	}
+}
+
+func (b *EventBuilder) useEvent(ctx context.Context, event db.Event, actions ...persist.Action) (bool, error) {
 	if b.skipCooldown {
 		return true, nil
 	}
-	active, err := b.isActive(ctx, event)
+
+	active, err := b.isActive(ctx, event, actions)
 	if err != nil {
 		return false, err
 	}
@@ -135,51 +132,48 @@ func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, erro
 	return !active, nil
 }
 
-func (b *EventBuilder) isActive(ctx context.Context, event db.Event) (bool, error) {
+func (b *EventBuilder) isActive(ctx context.Context, event db.Event, actions []persist.Action) (bool, error) {
 	group, ok := defaultEventGroups[event.Action]
 	if !ok {
-		group = mergeGroup{event.Action}
+		group = actionGroup{event.Action}
 	}
 
-	key := group.String()
-	groupCriteria, gOK := defaultGroupCriterias[key]
-	eventCritiera, eOK := defaultEventCriterias[persist.Action(key)]
-
-	var criteria activeCriteria
-	switch {
-	case gOK:
-		criteria = groupCriteria
-	case eOK:
-		criteria = eventCritiera
-	default:
+	var criteria criteria
+	if reflect.DeepEqual(group, collectionGroup) {
+		criteria = actorSubjectCriteria
+	} else if eventCriteria, ok := defaultEventCriterias[event.Action]; ok {
+		criteria = eventCriteria
+	} else {
 		criteria = noCriteria
 	}
 
 	switch criteria {
-	case actorAndAction:
-		panic("implement")
-	case actorAndSubject:
-		panic("implement")
-	case actorSubjectAndAction:
-		panic("implement")
+	case actorActionCriteria:
+		return b.eventRepo.IsActorActionActive(ctx, event, actions)
+	case actorSubjectCriteria:
+		return b.eventRepo.IsActorSubjectActive(ctx, event)
+	case actorSubjectActionCriteria:
+		return b.eventRepo.IsActorSubjectActionActive(ctx, event, actions)
+	case noCriteria:
+		return false, nil
 	}
 
 	return false, nil
 }
 
-func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event)
+func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	useEvent, err := b.useEvent(ctx, event, event.Action)
 	if err != nil || !useEvent {
 		return nil, err
 	}
 
-	feedEvent, err := b.feedRepo.LastEventFrom(ctx, event)
+	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event)
 	if err != nil {
 		return nil, err
 	}
 
 	// only want to store this event type once
-	if feedEvent != nil {
+	if priorEvent != nil {
 		return nil, nil
 	}
 
@@ -194,38 +188,36 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Even
 	})
 }
 
-func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event)
+func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	useEvent, err := b.useEvent(ctx, event, event.Action)
 	if err != nil || !useEvent {
 		return nil, err
 	}
 
-	feedEvent, err := b.feedRepo.LastEventFrom(ctx, event)
+	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event)
 	if err != nil {
 		return nil, err
 	}
 
 	events := []db.Event{event}
 
-	if feedEvent != nil {
+	if priorEvent != nil {
 		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	merger := mergedFollowEvent{}
-	mergedEvent := merger.Merge(events...)
-
-	if !merger.hasNewFollows() {
+	merged := mergedFollowEvent{}.merge(events...).asFeedEvent()
+	if len(merged.Data.UserFollowedIDs) == 0 {
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, mergedEvent)
+	return b.feedRepo.Add(ctx, merged)
 }
 
-func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event)
+func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	useEvent, err := b.useEvent(ctx, event, event.Action)
 	if err != nil || !useEvent {
 		return nil, err
 	}
@@ -240,13 +232,13 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 		return nil, nil
 	}
 
-	feedEvent, err := b.feedRepo.LastTokenEventFromEvent(ctx, event)
+	priorEvent, err := b.feedRepo.LastPublishedTokenFeedEvent(ctx, event)
 	if err != nil {
 		return nil, err
 	}
 
 	// only show if note has changed
-	if feedEvent != nil && feedEvent.Data.TokenNewCollectorsNote == event.Data.TokenCollectorsNote {
+	if priorEvent != nil && priorEvent.Data.TokenNewCollectorsNote == event.Data.TokenCollectorsNote {
 		return nil, nil
 	}
 
@@ -265,8 +257,8 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 	})
 }
 
-func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event)
+func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	useEvent, err := b.useEvent(ctx, event, event.Action)
 	if err != nil || !useEvent {
 		return nil, err
 	}
@@ -292,8 +284,8 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event d
 	})
 }
 
-func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event)
+func (b *EventBuilder) createCollectorsNoteAddedToCollectionFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	useEvent, err := b.useEvent(ctx, event, event.Action)
 	if err != nil || !useEvent {
 		return nil, err
 	}
@@ -303,13 +295,13 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 		return nil, nil
 	}
 
-	feedEvent, err := b.feedRepo.LastCollectionEventFromEvent(ctx, event)
+	priorEvent, err := b.feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.SubjectID, event.CreatedAt, event.Action)
 	if err != nil {
 		return nil, err
 	}
 
 	// only show if note has changed
-	if feedEvent != nil && feedEvent.Data.CollectionNewCollectorsNote == event.Data.CollectionCollectorsNote {
+	if priorEvent != nil && priorEvent.Data.CollectionNewCollectorsNote == event.Data.CollectionCollectorsNote {
 		return nil, nil
 	}
 
@@ -327,46 +319,33 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 	})
 }
 
-func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event)
+func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	useEvent, err := b.useEvent(ctx, event, event.Action)
 	if err != nil || !useEvent {
 		return nil, err
 	}
 
-	// don't show empty collections
-	if len(event.Data.CollectionTokenIDs) < 1 {
+	// Don't show empty collections
+	if len(event.Data.CollectionTokenIDs) == 0 {
 		return nil, nil
 	}
 
-	feedEvent, err := b.feedRepo.LastCollectionEventFromEvent(ctx, event)
+	priorEvent, err := b.feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.CollectionID, event.CreatedAt, collectionGroup)
 	if err != nil {
 		return nil, err
 	}
 
-	createEvent, err := b.feedRepo.LastCollectionEvent(ctx,
-		event.ActorID, persist.ActionCollectionCreated, event.SubjectID, event.CreatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	added := make([]persist.DBID, 0)
+	addedTokens := make([]persist.DBID, 0)
 	var isPreFeed bool
 
-	if feedEvent != nil {
-		// compare against last token added event
-		added = newTokens(event.Data.CollectionTokenIDs, feedEvent.Data.CollectionTokenIDs)
-	} else if createEvent != nil {
-		// compare against the create collection event
-		added = newTokens(event.Data.CollectionTokenIDs, createEvent.Data.CollectionTokenIDs)
-	} else {
-		// don't have the create event, likely because the collection was created
-		// before the feed
+	if priorEvent == nil {
 		isPreFeed = true
+	} else {
+		addedTokens = newTokens(event.Data.CollectionTokenIDs, priorEvent.Data.CollectionTokenIDs)
 	}
 
-	// only send if tokens added
-	if !isPreFeed && len(added) == 0 {
+	// Only send if tokens were added
+	if !isPreFeed && len(addedTokens) == 0 {
 		return nil, nil
 	}
 
@@ -377,13 +356,17 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		Data: persist.FeedEventData{
 			CollectionID:          event.SubjectID,
 			CollectionTokenIDs:    event.Data.CollectionTokenIDs,
-			CollectionNewTokenIDs: added,
+			CollectionNewTokenIDs: addedTokens,
 			CollectionIsPreFeed:   isPreFeed,
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},
 		Caption:   event.Caption,
 	})
+}
+
+func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	return nil, nil
 }
 
 func newTokens(tokens []persist.DBID, otherTokens []persist.DBID) []persist.DBID {

@@ -605,7 +605,7 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 		return nil, err
 	}
 
-	return eventToModel(event)
+	return feedEventToModel(event)
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -952,12 +952,14 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 		return eventToCollectorsNoteAddedToCollectionFeedEventData(event), nil
 	case persist.ActionTokensAddedToCollection:
 		return eventToTokensAddedToCollectionFeedEventData(event), nil
+	case persist.ActionCollectionUpdated:
+		return eventToCollectionUpdatedFeedEventData(event), nil
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
 }
 
-func eventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
+func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
 	data, err := feedEventToDataModel(event)
 	if err != nil {
 		return nil, err
@@ -1055,12 +1057,27 @@ func eventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.Feed
 	}
 }
 
+func eventToCollectionUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
+	return model.CollectionUpdatedFeedEventData{
+		EventTime:         &event.EventTime,
+		Owner:             &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
+		Collection:        &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
+		Action:            &event.Action,
+		NewTokens:         nil, // handled by dedicated resolver
+		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
+		IsNewCollection:   util.BoolToPointer(event.Data.CollectionIsNew),
+		HelperCollectionUpdatedFeedEventDataData: model.HelperCollectionUpdatedFeedEventDataData{
+			FeedEventID: event.ID,
+		},
+	}
+}
+
 func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
 		var node model.FeedEventOrError
-		node, err := eventToModel(&evt)
+		node, err := feedEventToModel(&evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}

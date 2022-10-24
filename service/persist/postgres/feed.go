@@ -28,47 +28,11 @@ func (r *FeedRepository) Add(ctx context.Context, event db.FeedEvent) (*db.FeedE
 	return &evt, err
 }
 
-// LastEventFrom returns the most recent event which occurred before `event`.
-func (r *FeedRepository) LastEventFrom(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	evt, err := r.Queries.GetLastFeedEvent(ctx, db.GetLastFeedEventParams{
-		OwnerID:   event.ActorID,
-		Action:    event.Action,
-		EventTime: event.CreatedAt,
-	})
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-
-	return &evt, err
-}
-
-// LastTokenEventFromEvent returns the most recent token event which occured before `event`.
-func (r *FeedRepository) LastTokenEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	evt, err := r.Queries.GetLastFeedEventForToken(ctx, db.GetLastFeedEventForTokenParams{
-		OwnerID:   event.ActorID,
-		Action:    event.Action,
-		TokenID:   string(event.SubjectID),
-		EventTime: event.CreatedAt,
-	})
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-
-	return &evt, err
-}
-
-// LastCollectionEventFromEvent returns the most recent collection event which occurred before `event`.
-func (r *FeedRepository) LastCollectionEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	return r.LastCollectionEvent(ctx, event.ActorID, event.Action, event.SubjectID, event.CreatedAt)
-}
-
-// LastCollectionEvent returns the most recent collection event for the given owner, action, and collection that occurred before time `since`.
-func (r *FeedRepository) LastCollectionEvent(ctx context.Context, ownerID persist.DBID, action persist.Action, collectionID persist.DBID, since time.Time) (*db.FeedEvent, error) {
+// LastPublishedCollectionFeedEvent returns the most recent collection event for the given owner, action, and collection that occurred before time `since`.
+func (r *FeedRepository) LastPublishedCollectionFeedEvent(ctx context.Context, ownerID persist.DBID, collectionID persist.DBID, since time.Time, actions []persist.Action) (*db.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEventForCollection(ctx, db.GetLastFeedEventForCollectionParams{
 		OwnerID:      ownerID,
-		Action:       action,
+		Actions:      actionsToString(actions),
 		CollectionID: string(collectionID),
 		EventTime:    since,
 	})

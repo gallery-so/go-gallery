@@ -5,6 +5,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+// mergedFollowEvent
 type mergedFollowEvent struct {
 	evt          db.Event
 	eventIDs     []persist.DBID
@@ -12,19 +13,22 @@ type mergedFollowEvent struct {
 	followedBack []bool
 }
 
-func (m *mergedFollowEvent) Merge(events ...db.Event) db.FeedEvent {
+func (m mergedFollowEvent) merge(events ...db.Event) mergedFollowEvent {
 	for _, event := range events {
 		if !event.Data.UserRefollowed {
-			m.merge(event)
+			m.add(event)
 		}
 	}
+	return m
+}
+
+func (m mergedFollowEvent) asFeedEvent() db.FeedEvent {
 	return db.FeedEvent{
 		ID:        persist.GenerateID(),
 		OwnerID:   m.evt.ActorID,
 		Action:    m.evt.Action,
 		EventTime: m.evt.CreatedAt,
 		EventIds:  m.eventIDs,
-		Caption:   m.evt.Caption,
 		Data: persist.FeedEventData{
 			UserFollowedIDs:  m.followedIDs,
 			UserFollowedBack: m.followedBack,
@@ -32,23 +36,59 @@ func (m *mergedFollowEvent) Merge(events ...db.Event) db.FeedEvent {
 	}
 }
 
-func (m *mergedFollowEvent) hasNewFollows() bool {
-	return len(m.followedIDs) > 1
-}
-
-func (m *mergedFollowEvent) merge(other db.Event) {
-	greater := compare(m.evt, other)
+func (m *mergedFollowEvent) add(other db.Event) {
+	gt := compare(m.evt, other)
 	m = &mergedFollowEvent{
 		evt: db.Event{
-			ID:        greater.ID,
-			ActorID:   greater.ActorID,
-			Action:    greater.Action,
-			CreatedAt: greater.CreatedAt,
-			Caption:   greater.Caption,
+			ID:        gt.ID,
+			ActorID:   gt.ActorID,
+			Action:    gt.Action,
+			CreatedAt: gt.CreatedAt,
 		},
 		eventIDs:     append(m.eventIDs, other.ID),
 		followedIDs:  append(m.followedIDs, other.SubjectID),
 		followedBack: append(m.followedBack, other.Data.UserFollowedBack),
+	}
+}
+
+func (m mergedFollowEvent) hasNewFollows() bool {
+	return len(m.followedIDs) > 1
+}
+
+// mergedCollectionUpdatedEvent
+type mergedCollectionUpdatedEvent struct {
+	evt             db.Event
+	addedTokens     []persist.DBID
+	eventIDs        []persist.DBID
+	isNewCollection bool
+}
+
+func (m mergedCollectionUpdatedEvent) merge(events ...db.Event) mergedCollectionUpdatedEvent {
+	for _, event := range events {
+		m.add(event)
+	}
+	return m
+}
+
+func (m *mergedCollectionUpdatedEvent) add(other db.Event) {
+	gt := compare(m.evt, other)
+	m = &mergedCollectionUpdatedEvent{
+		evt: db.Event{
+			ID:           gt.ID,
+			ActorID:      gt.ActorID,
+			SubjectID:    gt.SubjectID,
+			CollectionID: gt.CollectionID,
+			Action:       gt.Action,
+			CreatedAt:    gt.CreatedAt,
+			Data: persist.EventData{
+				CollectionTokenIDs:       gt.Data.CollectionTokenIDs,
+				CollectionCollectorsNote: gt.Data.CollectionCollectorsNote,
+			},
+		},
+		eventIDs: append(m.eventIDs, other.ID),
+	}
+	if other.Action == persist.ActionCollectionCreated {
+		m.isNewCollection = true
 	}
 }
 

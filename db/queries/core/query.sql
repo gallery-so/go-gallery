@@ -293,20 +293,25 @@ WITH RECURSIVE activity AS (
 )
 SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC;
 
--- name: IsWindowActive :one
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND deleted = false
-    AND created_at > @window_start AND created_at <= @window_end
-    LIMIT 1
+-- name: IsActorActionActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1 and action = any(@actions::varchar[])
+  and created_at > @window_start and created_at <= @window_end
 );
 
--- name: IsWindowActiveWithSubject :one
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
-    AND created_at > @window_start AND created_at <= @window_end
-    LIMIT 1
+-- name: IsActorSubjectActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1 and subject_id = $2
+  and created_at > @window_start and created_at <= @window_end
+);
+
+-- name: IsActorSubjectActionActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1 and subject_id = $2 and action = any(@actions::varchar[])
+  and created_at > @window_start and created_at <= @window_end
 );
 
 -- name: PaginateGlobalFeed :batchmany
@@ -356,10 +361,13 @@ SELECT * FROM feed_events
     LIMIT 1;
 
 -- name: GetLastFeedEventForCollection :one
-SELECT * FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = @collection_id::varchar AND event_time < $3 AND deleted = false
-    ORDER BY event_time DESC
-    LIMIT 1;
+select * from feed_events where deleted = false
+    and owner_id = $1
+    and action = any(@actions::varchar[])
+    and data ->> 'collection_id' = @collection_id::varchar
+    and event_time < $2
+    order by event_time desc
+    limit 1;
 
 -- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);

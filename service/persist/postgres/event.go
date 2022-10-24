@@ -111,25 +111,34 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 	return &event, err
 }
 
-// WindowActive checks if there are more recent events with an action that matches the provided event.
-func (r *EventRepository) WindowActive(ctx context.Context, event db.Event) (bool, error) {
-	return r.Queries.IsWindowActive(ctx, db.IsWindowActiveParams{
+func (r *EventRepository) IsActorActionActive(ctx context.Context, event db.Event, actions []persist.Action) (bool, error) {
+	windowStart, windowEnd := windowBounds(event)
+	return r.Queries.IsActorActionActive(ctx, db.IsActorActionActiveParams{
 		ActorID:     event.ActorID,
-		Action:      event.Action,
-		WindowStart: event.CreatedAt,
-		WindowEnd:   event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second),
+		Actions:     actionsToString(actions),
+		WindowStart: windowStart,
+		WindowEnd:   windowEnd,
 	})
 }
 
-// WindowActiveForSubject checks if there are more recent events with an action on a specific resource such as
-// as a collection or a token.
-func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event db.Event) (bool, error) {
-	return r.Queries.IsWindowActiveWithSubject(ctx, db.IsWindowActiveWithSubjectParams{
+func (r *EventRepository) IsActorSubjectActive(ctx context.Context, event db.Event) (bool, error) {
+	windowStart, windowEnd := windowBounds(event)
+	return r.Queries.IsActorSubjectActive(ctx, db.IsActorSubjectActiveParams{
 		ActorID:     event.ActorID,
-		Action:      event.Action,
 		SubjectID:   event.SubjectID,
-		WindowStart: event.CreatedAt,
-		WindowEnd:   event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second),
+		WindowStart: windowStart,
+		WindowEnd:   windowEnd,
+	})
+}
+
+func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions []persist.Action) (bool, error) {
+	windowStart, windowEnd := windowBounds(event)
+	return r.Queries.IsActorSubjectActionActive(ctx, db.IsActorSubjectActionActiveParams{
+		ActorID:     event.ActorID,
+		SubjectID:   event.SubjectID,
+		Actions:     actionsToString(actions),
+		WindowStart: windowStart,
+		WindowEnd:   windowEnd,
 	})
 }
 
@@ -139,4 +148,16 @@ func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DB
 		ID:   eventID,
 		Secs: float64(windowSeconds),
 	})
+}
+
+func windowBounds(event db.Event) (start, end time.Time) {
+	return event.CreatedAt, event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second)
+}
+
+func actionsToString(actions []persist.Action) []string {
+	actionsAsStr := make([]string, len(actions))
+	for i, action := range actions {
+		actionsAsStr[i] = string(action)
+	}
+	return actionsAsStr
 }

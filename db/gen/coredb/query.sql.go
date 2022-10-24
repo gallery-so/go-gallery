@@ -1253,24 +1253,27 @@ func (q *Queries) GetLastFeedEvent(ctx context.Context, arg GetLastFeedEventPara
 }
 
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $4::varchar AND event_time < $3 AND deleted = false
-    ORDER BY event_time DESC
-    LIMIT 1
+select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
+    and owner_id = $1
+    and action = any($3::varchar[])
+    and data ->> 'collection_id' = $4::varchar
+    and event_time < $2
+    order by event_time desc
+    limit 1
 `
 
 type GetLastFeedEventForCollectionParams struct {
 	OwnerID      persist.DBID
-	Action       persist.Action
 	EventTime    time.Time
+	Actions      []string
 	CollectionID string
 }
 
 func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLastFeedEventForCollectionParams) (FeedEvent, error) {
 	row := q.db.QueryRow(ctx, getLastFeedEventForCollection,
 		arg.OwnerID,
-		arg.Action,
 		arg.EventTime,
+		arg.Actions,
 		arg.CollectionID,
 	)
 	var i FeedEvent
@@ -2230,6 +2233,89 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 	return items, nil
 }
 
+const isActorActionActive = `-- name: IsActorActionActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1 and action = any($2::varchar[])
+  and created_at > $3 and created_at <= $4
+)
+`
+
+type IsActorActionActiveParams struct {
+	ActorID     persist.DBID
+	Actions     []string
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+func (q *Queries) IsActorActionActive(ctx context.Context, arg IsActorActionActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isActorActionActive,
+		arg.ActorID,
+		arg.Actions,
+		arg.WindowStart,
+		arg.WindowEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const isActorSubjectActionActive = `-- name: IsActorSubjectActionActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1 and subject_id = $2 and action = any($3::varchar[])
+  and created_at > $4 and created_at <= $5
+)
+`
+
+type IsActorSubjectActionActiveParams struct {
+	ActorID     persist.DBID
+	SubjectID   persist.DBID
+	Actions     []string
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+func (q *Queries) IsActorSubjectActionActive(ctx context.Context, arg IsActorSubjectActionActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isActorSubjectActionActive,
+		arg.ActorID,
+		arg.SubjectID,
+		arg.Actions,
+		arg.WindowStart,
+		arg.WindowEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const isActorSubjectActive = `-- name: IsActorSubjectActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1 and subject_id = $2
+  and created_at > $3 and created_at <= $4
+)
+`
+
+type IsActorSubjectActiveParams struct {
+	ActorID     persist.DBID
+	SubjectID   persist.DBID
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+func (q *Queries) IsActorSubjectActive(ctx context.Context, arg IsActorSubjectActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isActorSubjectActive,
+		arg.ActorID,
+		arg.SubjectID,
+		arg.WindowStart,
+		arg.WindowEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false)
 `
@@ -2241,64 +2327,6 @@ type IsFeedUserActionBlockedParams struct {
 
 func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserActionBlockedParams) (bool, error) {
 	row := q.db.QueryRow(ctx, isFeedUserActionBlocked, arg.UserID, arg.Action)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
-const isWindowActive = `-- name: IsWindowActive :one
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND deleted = false
-    AND created_at > $3 AND created_at <= $4
-    LIMIT 1
-)
-`
-
-type IsWindowActiveParams struct {
-	ActorID     persist.DBID
-	Action      persist.Action
-	WindowStart time.Time
-	WindowEnd   time.Time
-}
-
-func (q *Queries) IsWindowActive(ctx context.Context, arg IsWindowActiveParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isWindowActive,
-		arg.ActorID,
-		arg.Action,
-		arg.WindowStart,
-		arg.WindowEnd,
-	)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
-const isWindowActiveWithSubject = `-- name: IsWindowActiveWithSubject :one
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
-    AND created_at > $4 AND created_at <= $5
-    LIMIT 1
-)
-`
-
-type IsWindowActiveWithSubjectParams struct {
-	ActorID     persist.DBID
-	Action      persist.Action
-	SubjectID   persist.DBID
-	WindowStart time.Time
-	WindowEnd   time.Time
-}
-
-func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowActiveWithSubjectParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isWindowActiveWithSubject,
-		arg.ActorID,
-		arg.Action,
-		arg.SubjectID,
-		arg.WindowStart,
-		arg.WindowEnd,
-	)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
