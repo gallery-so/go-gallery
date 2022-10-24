@@ -182,10 +182,9 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit {
 			break
 		}
-
 		offset += limit
 
 		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), pageSize, offset)
@@ -224,7 +223,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit {
 			break
 		}
 
@@ -271,7 +270,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit {
 			break
 		}
 
@@ -380,7 +379,7 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit {
 			break
 		}
 
