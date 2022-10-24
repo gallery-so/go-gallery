@@ -361,6 +361,9 @@ func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey,
 func (d *Provider) poapsToTokens(pPoap []poapToken, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	tokens := make([]multichain.ChainAgnosticToken, 0, len(pPoap))
 	contracts := make([]multichain.ChainAgnosticContract, 0, len(pPoap))
+	if limit == 0 {
+		limit = len(pPoap)
+	}
 	for i, poap := range pPoap {
 		if i < offset {
 			continue
