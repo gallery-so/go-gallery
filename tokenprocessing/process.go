@@ -126,6 +126,16 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", key, contractAddress, t.TokenID, t.Chain)
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
+	name, description := media.FindNameAndDescription(ctx, t.TokenMetadata)
+
+	if name == "" {
+		name = t.Name.String()
+	}
+
+	if description == "" {
+		description = t.Description.String()
+	}
+
 	totalTimeOfMedia := time.Now()
 	med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
@@ -140,8 +150,8 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		Media:       med,
 		Metadata:    t.TokenMetadata,
 		TokenURI:    t.TokenURI,
-		Name:        persist.NullString(t.Name),
-		Description: persist.NullString(t.Description),
+		Name:        persist.NullString(name),
+		Description: persist.NullString(description),
 		LastUpdated: persist.LastUpdatedTime{},
 	}
 	totalUpdateTime := time.Now()

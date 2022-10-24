@@ -8,6 +8,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/validate"
@@ -100,7 +101,8 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
-		tokens, err := api.loaders.TokensByContractIDWithPagination.Load(db.GetTokensByContractIdBatchPaginateParams{
+		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
+		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			Contract:           contractID,
 			Limit:              params.Limit,
 			CurBeforeUniversal: params.CursorBeforeBool,

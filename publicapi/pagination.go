@@ -3,8 +3,10 @@ package publicapi
 import (
 	"encoding/base64"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -156,11 +158,11 @@ func (p *timeIDPaginator) encodeTimeIDCursor(t time.Time, id persist.DBID) (stri
 	idBytes := []byte(id)
 	bytes = append(bytes, idBytes...)
 
-	return base64.StdEncoding.EncodeToString(bytes), nil
+	return base64.RawStdEncoding.EncodeToString(bytes), nil
 }
 
 func (p *timeIDPaginator) decodeTimeIDCursor(cursor string) (time.Time, persist.DBID, error) {
-	bytes, err := base64.StdEncoding.DecodeString(cursor)
+	bytes, err := base64.RawStdEncoding.DecodeString(cursor)
 	if err != nil || len(bytes) == 0 {
 		return time.Time{}, "", errBadCursorFormat
 	}
@@ -272,22 +274,28 @@ func (p *boolTimeIDPaginator) encodeCursor(b bool, t time.Time, id persist.DBID)
 	if err != nil {
 		return "", err
 	}
-	idBytes := []byte(id)
 	bytes = append(bytes, timeBytes...)
-	bytes = append(bytes, idBytes...)
+	if id != "" {
+		bytes = append(bytes, []byte(id)...)
+	}
 
-	return base64.StdEncoding.EncodeToString(bytes), nil
+	valid := utf8.Valid(bytes)
+	valid2 := utf8.ValidString(base64.RawStdEncoding.EncodeToString(bytes))
+
+	logger.For(nil).Debugf("encodeCursor: %v %v %v %v %v %v %v", b, t, id, base64.RawStdEncoding.EncodeToString(bytes), bytes, valid, valid2)
+
+	return base64.RawStdEncoding.EncodeToString(bytes), nil
 }
 
 func (p *boolTimeIDPaginator) decodeCursor(cursor string) (bool, time.Time, persist.DBID, error) {
-	bytes, err := base64.StdEncoding.DecodeString(cursor)
+	bytes, err := base64.RawStdEncoding.DecodeString(cursor)
 	if err != nil || len(bytes) < 2 {
 		return false, time.Time{}, "", errBadCursorFormat
 	}
 
 	// the first byte is a bool
 	b := false
-	if bytes[0] == 1 {
+	if bytes[0] > 0 {
 		b = true
 	}
 	// The second byte declares how many bytes the time.Time is
@@ -302,6 +310,8 @@ func (p *boolTimeIDPaginator) decodeCursor(cursor string) (bool, time.Time, pers
 	if len(bytes) > (timeLen + 1) {
 		id = persist.DBID(bytes[timeLen+1:])
 	}
+
+	logger.For(nil).Debugf("decodeCursor for %s: %v %v %v %v %v %v %v", cursor, b, t, id, base64.RawStdEncoding.EncodeToString(bytes), bytes, len(bytes), timeLen)
 
 	return b, t, id, nil
 }
@@ -370,7 +380,7 @@ func parseTime(bytes []byte, idx int, err error) (time.Time, int, error) {
 	}
 
 	t := time.Time{}
-	err = t.UnmarshalBinary(timeSlice[1 : timeLen+1])
+	err = t.UnmarshalJSON(timeSlice[1 : timeLen+1])
 	if err != nil {
 		return time.Time{}, 0, err
 	}
@@ -378,7 +388,7 @@ func parseTime(bytes []byte, idx int, err error) (time.Time, int, error) {
 }
 
 func marshallTimeBytes(t time.Time, id persist.DBID) ([]byte, error) {
-	timeBytes, err := t.MarshalBinary()
+	timeBytes, err := t.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
