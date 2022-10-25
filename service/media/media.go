@@ -379,6 +379,10 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 }
 
+func FindNameAndDescription(ctx context.Context, metadata persist.TokenMetadata) (name string, description string) {
+	return util.GetValueFromMapUnsafe(metadata, "name", util.DefaultSearchDepth).(string), util.GetValueFromMapUnsafe(metadata, "description", util.DefaultSearchDepth).(string)
+}
+
 func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
 	imgMediaType, _, _, err := PredictMediaType(ctx, curImg)
 	if err != nil {
