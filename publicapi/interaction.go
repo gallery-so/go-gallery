@@ -485,6 +485,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		CommentID:      commentID,
+		Action:         persist.ActionCommentedOnFeedEvent,
 	}, api.validator, nil)
 	if err != nil {
 		return "", err
