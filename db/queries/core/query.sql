@@ -497,3 +497,6 @@ SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 
 
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
+
+-- name: GetUsersByChainAddresses :many
+select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
