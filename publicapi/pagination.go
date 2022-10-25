@@ -1,14 +1,14 @@
 package publicapi
 
 import (
+	"bytes"
 	"encoding/base64"
-	"time"
-	"unicode/utf8"
-
+	"encoding/binary"
+	"fmt"
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/validate"
+	"time"
 )
 
 type PageInfo struct {
@@ -149,35 +149,29 @@ type timeIDPagingParams struct {
 	PagingForward    bool
 }
 
-func (p *timeIDPaginator) encodeTimeIDCursor(t time.Time, id persist.DBID) (string, error) {
-	// The first byte declares how many bytes the time.Time is
-	bytes, err := marshallTimeBytes(t, id)
-	if err != nil {
+func (p *timeIDPaginator) encodeCursor(t time.Time, id persist.DBID) (string, error) {
+	encoder := newCursorEncoder()
+	if err := encoder.appendTime(t); err != nil {
 		return "", err
 	}
-	idBytes := []byte(id)
-	bytes = append(bytes, idBytes...)
-
-	return base64.RawStdEncoding.EncodeToString(bytes), nil
+	encoder.appendDBID(id)
+	return encoder.AsBase64(), nil
 }
 
-func (p *timeIDPaginator) decodeTimeIDCursor(cursor string) (time.Time, persist.DBID, error) {
-	bytes, err := base64.RawStdEncoding.DecodeString(cursor)
-	if err != nil || len(bytes) == 0 {
-		return time.Time{}, "", errBadCursorFormat
-	}
-
-	// The first byte declares how many bytes the time.Time is
-	t, timeLen, err := parseTime(bytes, 0, err)
+func (p *timeIDPaginator) decodeCursor(cursor string) (time.Time, persist.DBID, error) {
+	decoder, err := newCursorDecoder(cursor)
 	if err != nil {
 		return time.Time{}, "", err
 	}
 
-	id := persist.DBID("")
+	t, err := decoder.readTime()
+	if err != nil {
+		return time.Time{}, "", err
+	}
 
-	// It's okay for the ID to be empty
-	if len(bytes) > (timeLen + 1) {
-		id = persist.DBID(bytes[timeLen+1:])
+	id, err := decoder.readDBID()
+	if err != nil {
+		return time.Time{}, "", err
 	}
 
 	return t, id, nil
@@ -192,14 +186,14 @@ func (p *timeIDPaginator) paginate(before *string, after *string, first *int, la
 
 		var err error
 		if before != nil {
-			curBeforeTime, curBeforeID, err = p.decodeTimeIDCursor(*before)
+			curBeforeTime, curBeforeID, err = p.decodeCursor(*before)
 			if err != nil {
 				return nil, err
 			}
 		}
 
 		if after != nil {
-			curAfterTime, curAfterID, err = p.decodeTimeIDCursor(*after)
+			curAfterTime, curAfterID, err = p.decodeCursor(*after)
 			if err != nil {
 				return nil, err
 			}
@@ -223,7 +217,7 @@ func (p *timeIDPaginator) paginate(before *string, after *string, first *int, la
 			return "", err
 		}
 
-		return p.encodeTimeIDCursor(nodeTime, nodeID)
+		return p.encodeCursor(nodeTime, nodeID)
 	}
 
 	paginator := keysetPaginator{
@@ -256,62 +250,38 @@ type boolTimeIDPaginator struct {
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
 	CountFunc func() (count int, err error)
-
-	// SortPagesAscending determines whether the sort order within a page should be ascending
-	// or descending. Defaults to false (descending), since our clients are typically paginating
-	// backward.
-	SortPagesAscending bool
 }
 
 func (p *boolTimeIDPaginator) encodeCursor(b bool, t time.Time, id persist.DBID) (string, error) {
-	firstByte := byte(0)
-	if b {
-		firstByte = 1
-	}
-	bytes := []byte{firstByte}
-	// The first byte declares how many timeBytes the time.Time is
-	timeBytes, err := marshallTimeBytes(t, id)
-	if err != nil {
+	encoder := newCursorEncoder()
+	encoder.appendBool(b)
+	if err := encoder.appendTime(t); err != nil {
 		return "", err
 	}
-	bytes = append(bytes, timeBytes...)
-	if id != "" {
-		bytes = append(bytes, []byte(id)...)
-	}
-
-	valid := utf8.Valid(bytes)
-	valid2 := utf8.ValidString(base64.RawStdEncoding.EncodeToString(bytes))
-
-	logger.For(nil).Debugf("encodeCursor: %v %v %v %v %v %v %v", b, t, id, base64.RawStdEncoding.EncodeToString(bytes), bytes, valid, valid2)
-
-	return base64.RawStdEncoding.EncodeToString(bytes), nil
+	encoder.appendDBID(id)
+	return encoder.AsBase64(), nil
 }
 
 func (p *boolTimeIDPaginator) decodeCursor(cursor string) (bool, time.Time, persist.DBID, error) {
-	bytes, err := base64.RawStdEncoding.DecodeString(cursor)
-	if err != nil || len(bytes) < 2 {
-		return false, time.Time{}, "", errBadCursorFormat
-	}
-
-	// the first byte is a bool
-	b := false
-	if bytes[0] > 0 {
-		b = true
-	}
-	// The second byte declares how many bytes the time.Time is
-	t, timeLen, err := parseTime(bytes, 1, err)
+	decoder, err := newCursorDecoder(cursor)
 	if err != nil {
 		return false, time.Time{}, "", err
 	}
 
-	id := persist.DBID("")
-
-	// It's okay for the ID to be empty
-	if len(bytes) > (timeLen + 1) {
-		id = persist.DBID(bytes[timeLen+1:])
+	b, err := decoder.readBool()
+	if err != nil {
+		return false, time.Time{}, "", err
 	}
 
-	logger.For(nil).Debugf("decodeCursor for %s: %v %v %v %v %v %v %v", cursor, b, t, id, base64.RawStdEncoding.EncodeToString(bytes), bytes, len(bytes), timeLen)
+	t, err := decoder.readTime()
+	if err != nil {
+		return false, time.Time{}, "", err
+	}
+
+	id, err := decoder.readDBID()
+	if err != nil {
+		return false, time.Time{}, "", err
+	}
 
 	return b, t, id, nil
 }
@@ -372,33 +342,167 @@ func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int
 	return paginator.paginate(before, after, first, last)
 }
 
-func parseTime(bytes []byte, idx int, err error) (time.Time, int, error) {
-	timeSlice := bytes[idx:]
-	timeLen := int(timeSlice[0])
-	if timeLen > len(timeSlice)-1 {
-		return time.Time{}, 0, errBadCursorFormat
-	}
-
-	t := time.Time{}
-	err = t.UnmarshalBinary(timeSlice[1 : timeLen+1])
-	if err != nil {
-		return time.Time{}, 0, err
-	}
-	return t, len(timeSlice[1:timeLen+1]) + 1, nil
+type cursorEncoder struct {
+	buffer []byte
 }
 
-func marshallTimeBytes(t time.Time, id persist.DBID) ([]byte, error) {
-	timeBytes, err := t.MarshalBinary()
-	if err != nil {
-		return nil, err
+func newCursorEncoder() cursorEncoder {
+	return cursorEncoder{}
+}
+
+// AsBase64 returns the underlying byte buffer as a Base64 string
+func (e *cursorEncoder) AsBase64() string {
+	return base64.RawStdEncoding.EncodeToString(e.buffer)
+}
+
+func (e *cursorEncoder) appendBool(b bool) {
+	val := 0
+	if b {
+		val = 1
 	}
 
-	idBytes := []byte(id)
+	// appendUInt64 uses a variable-length encoding, so this will only use one byte
+	e.appendUInt64(uint64(val))
+}
 
-	bytes := make([]byte, 0, 1+len(timeBytes)+len(idBytes))
+func (e *cursorEncoder) appendTime(t time.Time) error {
+	timeBytes, err := t.MarshalBinary()
+	if err != nil {
+		return err
+	}
 
-	bytes = append(bytes, byte(len(timeBytes)))
+	// Write the time's length first
+	e.appendUInt64(uint64(len(timeBytes)))
 
-	bytes = append(bytes, timeBytes...)
-	return bytes, nil
+	// Then write the time's bytes
+	e.buffer = append(e.buffer, timeBytes...)
+
+	return nil
+}
+
+func (e *cursorEncoder) appendString(str string) {
+	strLen := len(str)
+
+	// Write the string's length first
+	e.appendUInt64(uint64(strLen))
+
+	// Then write the string's bytes
+	if strLen != 0 {
+		e.buffer = append(e.buffer, []byte(str)...)
+	}
+}
+
+func (e *cursorEncoder) appendDBID(dbid persist.DBID) {
+	e.appendString(dbid.String())
+}
+
+// appendUInt64 appends a uint64 to the underlying buffer, using a variable-length
+// encoding (smaller numbers require fewer bytes)
+func (e *cursorEncoder) appendUInt64(i uint64) {
+	buf := make([]byte, binary.MaxVarintLen64)
+	bytesWritten := binary.PutUvarint(buf, i)
+	e.buffer = append(e.buffer, buf[:bytesWritten]...)
+}
+
+// appendInt64 appends an int64 to the underlying buffer, using a variable-length
+// encoding (smaller numbers require fewer bytes)
+func (e *cursorEncoder) appendInt64(i int64) {
+	buf := make([]byte, binary.MaxVarintLen64)
+	bytesWritten := binary.PutVarint(buf, i)
+	e.buffer = append(e.buffer, buf[:bytesWritten]...)
+}
+
+type cursorDecoder struct {
+	reader *bytes.Reader
+}
+
+func newCursorDecoder(base64Cursor string) (cursorDecoder, error) {
+	decoded, err := base64.RawStdEncoding.DecodeString(base64Cursor)
+	if err != nil {
+		return cursorDecoder{}, err
+	}
+
+	return cursorDecoder{reader: bytes.NewReader(decoded)}, nil
+}
+
+// readBool reads a bool from the underlying reader and advances the stream
+func (d *cursorDecoder) readBool() (bool, error) {
+	b, err := d.readUInt64()
+
+	if err != nil {
+		return false, err
+	}
+
+	return b > 0, nil
+}
+
+// readTime reads a time from the underlying reader and advances the stream
+func (d *cursorDecoder) readTime() (time.Time, error) {
+	t := time.Time{}
+
+	// Times are prefixed with their length
+	timeLen, err := d.readUInt64()
+	if err != nil {
+		return t, err
+	}
+
+	timeBytes := make([]byte, timeLen)
+	numRead, err := d.reader.Read(timeBytes)
+	if err != nil {
+		return t, err
+	}
+
+	if uint64(numRead) != timeLen {
+		return t, fmt.Errorf("error reading time: expected %d bytes, but only read %d bytes\n", timeLen, numRead)
+	}
+
+	err = t.UnmarshalBinary(timeBytes)
+	if err != nil {
+		return t, err
+	}
+
+	return t, nil
+}
+
+// readString reads a string from the underlying reader and advances the stream
+func (d *cursorDecoder) readString() (string, error) {
+	// Strings are prefixed with their length
+	strLen, err := d.readUInt64()
+	if err != nil {
+		return "", err
+	}
+
+	strBytes := make([]byte, strLen)
+	numRead, err := d.reader.Read(strBytes)
+	if err != nil {
+		return "", err
+	}
+
+	if uint64(numRead) != strLen {
+		return "", fmt.Errorf("error reading string: expected %d bytes, but only read %d bytes\n", strLen, numRead)
+	}
+
+	return string(strBytes), nil
+}
+
+// readDBID reads a DBID from the underlying reader and advances the stream
+func (d *cursorDecoder) readDBID() (persist.DBID, error) {
+	str, err := d.readString()
+	if err != nil {
+		return "", err
+	}
+
+	return persist.DBID(str), nil
+}
+
+// readUInt64 reads a uint64 from the underlying reader and advances the stream,
+// using a variable-length encoding (smaller numbers require fewer bytes)
+func (d *cursorDecoder) readUInt64() (uint64, error) {
+	return binary.ReadUvarint(d.reader)
+}
+
+// readInt64 reads an int64 from the underlying reader and advances the stream,
+// using a variable-length encoding (smaller numbers require fewer bytes)
+func (d *cursorDecoder) readInt64() (int64, error) {
+	return binary.ReadVarint(d.reader)
 }
