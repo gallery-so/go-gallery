@@ -4,7 +4,6 @@ on:
     branches:
       - main
       - benny/github-actions
-      - benny/owned-by-wallets-fix
 env:
   CLOUDSDK_CORE_DISABLE_PROMPTS: 1
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

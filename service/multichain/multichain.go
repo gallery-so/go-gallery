@@ -693,6 +693,12 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 						}
 					}()
 				}
+
+				err = p.Repos.UserRepository.FillWalletDataForUser(ctx, &user)
+				if err != nil {
+					errChan <- err
+					return
+				}
 				userChan <- user
 				tokensForUserChan <- tokenForUser{
 					userID:   user.ID,
@@ -852,6 +858,10 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			if w, ok := addressToWallets[chainToken.chain.NormalizeAddress(token.OwnerAddress)]; ok {
 				seenWallets[ti] = append(seenWallets[ti], w)
 				seenWallets[ti] = dedupeWallets(seenWallets[ti])
+			}
+
+			if len(seenWallets[ti]) == 0 {
+				panic(fmt.Sprintf("no wallets found for token %+v and user %+v", token, ownerUser))
 			}
 
 			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)

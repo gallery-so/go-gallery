@@ -519,3 +519,23 @@ func (u *UserRepository) UserFollowsUser(pCtx context.Context, follower persist.
 
 	return follows, nil
 }
+func (u *UserRepository) FillWalletDataForUser(pCtx context.Context, user *persist.User) error {
+
+	if len(user.Wallets) == 0 {
+		return nil
+	}
+
+	wallets := make([]persist.Wallet, 0, len(user.Wallets))
+	for _, wallet := range user.Wallets {
+		wallet := persist.Wallet{ID: wallet.ID}
+		if err := u.getWalletStmt.QueryRowContext(pCtx, wallet.ID).Scan(&wallet.Address, &wallet.Chain, &wallet.WalletType, &wallet.Version, &wallet.CreationTime, &wallet.LastUpdated); err != nil {
+			return err
+		}
+
+		wallets = append(wallets, wallet)
+	}
+
+	user.Wallets = wallets
+
+	return nil
+}
