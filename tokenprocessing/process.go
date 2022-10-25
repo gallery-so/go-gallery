@@ -181,9 +181,11 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persis
 		}
 		key := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
 
-		if err := throttler.Lock(c, key); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
+		if !input.ForceRefresh {
+			if err := throttler.Lock(c, key); err != nil {
+				util.ErrResponse(c, http.StatusOK, err)
+				return
+			}
 		}
 
 		// do not unlock, let expiry handle the unlock
