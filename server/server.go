@@ -31,6 +31,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
+	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -258,13 +259,13 @@ func NewMultichainProvider(repos *persist.Repositories, queries *coredb.Queries,
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)
-	// openseaProvider := opensea.NewProvider(ethClient, httpClient)
+	openseaProvider := opensea.NewProvider(ethClient, httpClient)
 	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
 	return multichain.NewProvider(context.Background(), repos, queries, cache, taskClient,
 		overrides,
 		ethProvider,
-		// openseaProvider,
+		openseaProvider,
 		tezosProvider,
 		poapProvider,
 	)
