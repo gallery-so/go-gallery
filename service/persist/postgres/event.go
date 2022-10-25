@@ -80,7 +80,7 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		AdmireID:       event.SubjectID,
+		AdmireID:       event.AdmireID,
 		FeedEventID:    event.FeedEventID,
 		Data:           event.Data,
 	})
@@ -93,7 +93,7 @@ func (r *EventRepository) AddCommentEvent(ctx context.Context, event db.Event) (
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		CommentID:      event.SubjectID,
+		CommentID:      event.CommentID,
 		FeedEventID:    event.FeedEventID,
 		Data:           event.Data,
 	})

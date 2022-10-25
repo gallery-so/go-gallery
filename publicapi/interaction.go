@@ -380,7 +380,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 
 	err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
-		ResourceTypeID: persist.ResourceTypeFeedEvent,
+		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		AdmireID:       admireID,
@@ -481,10 +481,11 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 
 	err = dispatchEvent(ctx, db.Event{
 		ActorID:        actor,
-		ResourceTypeID: persist.ResourceTypeFeedEvent,
+		ResourceTypeID: persist.ResourceTypeComment,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		CommentID:      commentID,
+		Action:         persist.ActionCommentedOnFeedEvent,
 	}, api.validator)
 	if err != nil {
 		return "", err
