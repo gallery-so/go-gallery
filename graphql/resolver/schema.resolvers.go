@@ -838,6 +838,53 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 	return output, nil
 }
 
+func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error) {
+	gallery, err := publicapi.For(ctx).Gallery.ViewGallery(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.ViewGalleryPayload{
+		Gallery: galleryToModel(ctx, gallery),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error) {
+	notifications, err := publicapi.For(ctx).Notifications.ClearUserNotifications(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]model.Notification, len(notifications))
+	for i, n := range notifications {
+		model, err := notificationToModel(n)
+		if err != nil {
+			return nil, err
+		}
+		models[i] = model
+	}
+
+	output := &model.ClearAllNotificationsPayload{
+		Notifications: models,
+	}
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error) {
+	err := publicapi.For(ctx).User.UpdateUserNotificationSettings(ctx, persist.UserNotificationSettings{
+		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     settings.SomeoneViewedYourGallery,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resolveViewerNotificationSettings(ctx)
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -985,6 +1032,46 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 	return tokensToModel(ctx, tokens), nil
 }
 
+func (r *someoneAdmiredYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, obj.FeedEventID)
+}
+
+func (r *someoneAdmiredYourFeedEventNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
+func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.CommentID)
+}
+
+func (r *someoneCommentedOnYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, obj.HelperSomeoneCommentedOnYourFeedEventNotificationData.FeedEventID)
+}
+
+func (r *someoneFollowedYouBackNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
+}
+
+func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
+}
+
+func (r *someoneViewedYourGalleryNotificationResolver) UserViewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AuthedViewerIDs, before, after, first, last)
+}
+
+func (r *someoneViewedYourGalleryNotificationResolver) Gallery(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.Gallery, error) {
+	return resolveGalleryByGalleryID(ctx, obj.GalleryID)
+}
+
+func (r *subscriptionResolver) NewNotification(ctx context.Context) (<-chan model.Notification, error) {
+	return resolveNewNotificationSubscription(ctx), nil
+}
+
+func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan model.Notification, error) {
+	return resolveUpdatedNotificationSubscription(ctx), nil
+}
+
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
 }
@@ -1097,6 +1184,14 @@ func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *st
 	}, nil
 }
 
+func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
+	return resolveViewerNotifications(ctx, before, after, first, last)
+}
+
+func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error) {
+	return resolveViewerNotificationSettings(ctx)
+}
+
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
 	return resolveTokensByWalletID(ctx, obj.Dbid)
 }
@@ -1205,6 +1300,34 @@ func (r *Resolver) SetSpamPreferencePayload() generated.SetSpamPreferencePayload
 	return &setSpamPreferencePayloadResolver{r}
 }
 
+// SomeoneAdmiredYourFeedEventNotification returns generated.SomeoneAdmiredYourFeedEventNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAdmiredYourFeedEventNotificationResolver {
+	return &someoneAdmiredYourFeedEventNotificationResolver{r}
+}
+
+// SomeoneCommentedOnYourFeedEventNotification returns generated.SomeoneCommentedOnYourFeedEventNotificationResolver implementation.
+func (r *Resolver) SomeoneCommentedOnYourFeedEventNotification() generated.SomeoneCommentedOnYourFeedEventNotificationResolver {
+	return &someoneCommentedOnYourFeedEventNotificationResolver{r}
+}
+
+// SomeoneFollowedYouBackNotification returns generated.SomeoneFollowedYouBackNotificationResolver implementation.
+func (r *Resolver) SomeoneFollowedYouBackNotification() generated.SomeoneFollowedYouBackNotificationResolver {
+	return &someoneFollowedYouBackNotificationResolver{r}
+}
+
+// SomeoneFollowedYouNotification returns generated.SomeoneFollowedYouNotificationResolver implementation.
+func (r *Resolver) SomeoneFollowedYouNotification() generated.SomeoneFollowedYouNotificationResolver {
+	return &someoneFollowedYouNotificationResolver{r}
+}
+
+// SomeoneViewedYourGalleryNotification returns generated.SomeoneViewedYourGalleryNotificationResolver implementation.
+func (r *Resolver) SomeoneViewedYourGalleryNotification() generated.SomeoneViewedYourGalleryNotificationResolver {
+	return &someoneViewedYourGalleryNotificationResolver{r}
+}
+
+// Subscription returns generated.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
+
 // Token returns generated.TokenResolver implementation.
 func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 
@@ -1274,6 +1397,12 @@ type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }
 type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
+type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
+type someoneFollowedYouNotificationResolver struct{ *Resolver }
+type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }

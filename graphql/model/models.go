@@ -20,6 +20,10 @@ func (r *Community) GetGqlIDField_Chain() string {
 	return fmt.Sprint(r.ContractAddress.Chain())
 }
 
+func (r *NotificationSettings) GetGqlIDField_UserID() string {
+	return fmt.Sprint(r.HelperNotificationSettingsData.UserId.String())
+}
+
 func (r *Community) GetGqlIDField_ContractAddress() string {
 	return r.ContractAddress.Address().String()
 }
@@ -44,6 +48,48 @@ type HelperTokensAddedToCollectionFeedEventDataData struct {
 
 type HelperCollectionCreatedFeedEventDataData struct {
 	FeedEventID persist.DBID
+}
+
+type HelperFeedConnectionData struct {
+	UserId persist.DBID
+}
+
+type HelperGroupNotificationUsersConnectionData struct {
+	UserIDs persist.DBIDList
+}
+
+type HelperNotificationSettingsData struct {
+	UserId persist.DBID
+}
+
+type HelperSomeoneFollowedYouNotificationData struct {
+	OwnerID          persist.DBID
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneViewedYourGalleryNotificationData struct {
+	OwnerID          persist.DBID
+	GalleryID        persist.DBID
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneFollowedYouBackNotificationData struct {
+	OwnerID          persist.DBID
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneCommentedOnYourFeedEventNotificationData struct {
+	OwnerID          persist.DBID
+	FeedEventID      persist.DBID
+	CommentID        persist.DBID
+	NotificationData persist.NotificationData
+}
+type HelperSomeoneAdmiredYourFeedEventNotificationData struct {
+	OwnerID          persist.DBID
+	FeedEventID      persist.DBID
+	NotificationData persist.NotificationData
+}
+
+type HelperNotificationsConnectionData struct {
+	UserId  persist.DBID
+	ByFirst bool
 }
 
 type ErrInvalidIDFormat struct {

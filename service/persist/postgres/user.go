@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -35,6 +36,8 @@ type UserRepository struct {
 	removeFollowerStmt       *sql.Stmt
 	followsUserStmt          *sql.Stmt
 	userHasTrait             *sql.Stmt
+
+	queries *coredb.Queries
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
@@ -154,6 +157,12 @@ func (u *UserRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUpd
 		if rows == 0 {
 			return persist.ErrUserNotFound{UserID: pID}
 		}
+	case persist.UserUpdateNotificationSettings:
+		update := pUpdate.(persist.UserUpdateNotificationSettings)
+		return u.queries.UpdateNotificationSettingsByID(pCtx, coredb.UpdateNotificationSettingsByIDParams{
+			ID:                   pID,
+			NotificationSettings: update.NotificationSettings,
+		})
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}

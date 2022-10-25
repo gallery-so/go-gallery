@@ -296,8 +296,8 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 	return output, nil
 }
 
-// UpdateUser updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
-func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
+// UpdateUserInfo updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
+func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
 	if strings.HasSuffix(strings.ToLower(username), ".eth") {
 		user, err := userRepository.GetByID(pCtx, userID)
 		if err != nil {

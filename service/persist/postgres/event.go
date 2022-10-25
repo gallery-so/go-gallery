@@ -25,6 +25,14 @@ func (r *EventRepository) Add(ctx context.Context, event db.Event) (*db.Event, e
 		return r.AddTokenEvent(ctx, event)
 	case persist.ResourceTypeCollection:
 		return r.AddCollectionEvent(ctx, event)
+	case persist.ResourceTypeAdmire:
+		return r.AddAdmireEvent(ctx, event)
+	case persist.ResourceTypeComment:
+		return r.AddCommentEvent(ctx, event)
+	case persist.ResourceTypeFeedEvent:
+		return r.AddFeedEventEvent(ctx, event)
+	case persist.ResourceTypeGallery:
+		return r.AddGalleryEvent(ctx, event)
 	default:
 		return nil, persist.ErrUnknownResourceType{ResourceType: event.ResourceTypeID}
 	}
@@ -63,6 +71,56 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 		CollectionID:   event.SubjectID,
 		Data:           event.Data,
 		Caption:        event.Caption,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateAdmireEvent(ctx, db.CreateAdmireEventParams{
+		ID:             persist.GenerateID(),
+		ActorID:        event.ActorID,
+		Action:         event.Action,
+		ResourceTypeID: event.ResourceTypeID,
+		AdmireID:       event.SubjectID,
+		FeedEventID:    event.FeedEventID,
+		Data:           event.Data,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddCommentEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateCommentEvent(ctx, db.CreateCommentEventParams{
+		ID:             persist.GenerateID(),
+		ActorID:        event.ActorID,
+		Action:         event.Action,
+		ResourceTypeID: event.ResourceTypeID,
+		CommentID:      event.SubjectID,
+		FeedEventID:    event.FeedEventID,
+		Data:           event.Data,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddFeedEventEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateFeedEventEvent(ctx, db.CreateFeedEventEventParams{
+		ID:             persist.GenerateID(),
+		ActorID:        event.ActorID,
+		Action:         event.Action,
+		ResourceTypeID: event.ResourceTypeID,
+		FeedEventID:    event.SubjectID,
+		Data:           event.Data,
+	})
+	return &event, err
+}
+
+func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (*db.Event, error) {
+	event, err := r.Queries.CreateGalleryEvent(ctx, db.CreateGalleryEventParams{
+		ID:             persist.GenerateID(),
+		ActorID:        event.ActorID,
+		Action:         event.Action,
+		ResourceTypeID: event.ResourceTypeID,
+		GalleryID:      event.SubjectID,
+		Data:           event.Data,
 	})
 	return &event, err
 }
