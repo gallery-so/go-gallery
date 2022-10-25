@@ -79,28 +79,7 @@ func DispatchDelayed(ctx context.Context, event db.Event) error {
 	return eg.Wait()
 }
 
-func DispatchImmediate(ctx context.Context, event db.Event) error {
-	gc := util.GinContextFromContext(ctx)
-	handlers := For(gc)
-
-	if _, handable := handlers.registry[delayedKey][event.Action]; !handable {
-		logger.For(ctx).Warnf("no handler configured for action: %s", event.Action)
-		return nil
-	}
-
-	persistedEvent, err := handlers.eventRepo.Add(ctx, event)
-	if err != nil {
-		return err
-	}
-
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error { return handlers.feed.dispatchImmediate(ctx, *persistedEvent) })
-	eg.Go(func() error { return handlers.notifications.dispatchImmediate(ctx, *persistedEvent) })
-	return eg.Wait()
-}
-
-// DispatchFeedImmediate stores an event immediately as a feed event.
-func DispatchFeedImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func DispatchImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	gc := util.GinContextFromContext(ctx)
 	handlers := For(gc)
 
@@ -114,12 +93,16 @@ func DispatchFeedImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, 
 		return nil, err
 	}
 
-	result, err := For(gc).feed.dispatchImmediate(ctx, *persistedEvent)
+	feedEvent, err := handlers.feed.dispatchImmediate(ctx, *persistedEvent)
+	if err != nil {
+		return nil, err
+	}
+	err = handlers.notifications.dispatchDelayed(ctx, *persistedEvent)
 	if err != nil {
 		return nil, err
 	}
 
-	return result.(*db.FeedEvent), nil
+	return feedEvent.(*db.FeedEvent), nil
 }
 
 func For(ctx context.Context) *eventSender {

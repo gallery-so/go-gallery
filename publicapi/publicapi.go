@@ -167,10 +167,8 @@ func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, cap
 
 	if caption != nil {
 		evt.Caption = stringToNullable(caption)
-		return event.DispatchFeedImmediate(ctx, evt)
+		return event.DispatchImmediate(ctx, evt)
 	}
-
-	// Send delayed
 
 	go pushEvent(ctx, evt)
 	return nil, nil
@@ -180,10 +178,7 @@ func pushEvent(ctx context.Context, evt db.Event) {
 	if hub := sentryutil.SentryHubFromContext(ctx); hub != nil {
 		sentryutil.SetEventContext(hub.Scope(), evt.ActorID, evt.SubjectID, evt.Action)
 	}
-
-	err := event.DispatchDelayed(ctx, evt)
-
-	if err != nil {
+	if err := event.DispatchDelayed(ctx, evt); err != nil {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
