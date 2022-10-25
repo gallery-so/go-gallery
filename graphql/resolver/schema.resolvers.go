@@ -127,9 +127,11 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 }
 
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
-	err := refreshTokensInContractAsync(ctx, obj.Dbid)
-	if err != nil {
-		return nil, err
+	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
+		err := refreshTokensInContractAsync(ctx, obj.Dbid)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
