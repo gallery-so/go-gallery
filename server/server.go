@@ -22,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -30,7 +31,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
-	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/multichain/poap"
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -100,7 +100,9 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	}
 	taskClient := task.NewClient(context.Background())
 
-	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub)
+	queries := db.New(pgx)
+
+	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub)
 }
 
 func newTasksClient() *cloudtasks.Client {
@@ -252,17 +254,17 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(repos *persist.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
+func NewMultichainProvider(repos *persist.Repositories, queries *coredb.Queries, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)
-	openseaProvider := opensea.NewProvider(ethClient, httpClient)
+	// openseaProvider := opensea.NewProvider(ethClient, httpClient)
 	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
-	return multichain.NewProvider(context.Background(), repos, cache, taskClient,
+	return multichain.NewProvider(context.Background(), repos, queries, cache, taskClient,
 		overrides,
 		ethProvider,
-		openseaProvider,
+		// openseaProvider,
 		tezosProvider,
 		poapProvider,
 	)

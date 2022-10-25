@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -1997,6 +1998,65 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
+`
+
+type GetUsersByChainAddressesParams struct {
+	Addresses []string
+	Chain     int32
+}
+
+type GetUsersByChainAddressesRow struct {
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	Universal            bool
+	NotificationSettings persist.UserNotificationSettings
+	Address              persist.Address
+}
+
+func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByChainAddressesParams) ([]GetUsersByChainAddressesRow, error) {
+	rows, err := q.db.Query(ctx, getUsersByChainAddresses, arg.Addresses, arg.Chain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUsersByChainAddressesRow
+	for rows.Next() {
+		var i GetUsersByChainAddressesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.Address,
 		); err != nil {
 			return nil, err
 		}

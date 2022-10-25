@@ -10,6 +10,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -91,7 +92,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	removeWalletFromUserStmt, err := db.PrepareContext(ctx, `UPDATE users SET WALLETS = array_remove(WALLETS, $1) WHERE ID = $2;`)
 	checkNoErr(err)
 
-	deleteWalletStmt, err := db.PrepareContext(ctx, `UPDATE wallets SET DELETED = true WHERE ID = $1;`)
+	deleteWalletStmt, err := db.PrepareContext(ctx, `UPDATE wallets SET DELETED = true, LAST_UPDATED = NOW() WHERE ID = $1;`)
 	checkNoErr(err)
 
 	addFollowerStmt, err := db.PrepareContext(ctx, `INSERT INTO follows (ID, FOLLOWER, FOLLOWEE, DELETED) VALUES ($1, $2, $3, false) ON CONFLICT (FOLLOWER, FOLLOWEE) DO UPDATE SET deleted = false, LAST_UPDATED = now() RETURNING LAST_UPDATED > CREATED_AT;`)
@@ -191,6 +192,7 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, cha
 			return "", persist.ErrAddressOwnedByUser{ChainAddress: chainAddress, OwnerID: user.ID}
 		}
 
+		logger.For(ctx).Infof("wallet %s already exists, but is not owned by a user", walletID)
 		// If the wallet exists but doesn't belong to anyone, it should be deleted.
 		if _, err := tx.StmtContext(ctx, u.deleteWalletStmt).ExecContext(ctx, walletID); err != nil {
 			return "", err
@@ -200,7 +202,11 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, cha
 	newWalletID := persist.GenerateID()
 	// At this point, we know there's no existing wallet in the database with this ChainAddress, so let's make a new one!
 	if _, err := tx.StmtContext(ctx, u.createWalletStmt).ExecContext(ctx, newWalletID, chainAddress.Address(), chainAddress.Chain(), walletType); err != nil {
-		return "", fmt.Errorf("failed to create wallet: %w", err)
+		return "", persist.ErrWalletCreateFailed{
+			ChainAddress: chainAddress,
+			WalletID:     walletID,
+			Err:          err,
+		}
 	}
 
 	return newWalletID, nil
