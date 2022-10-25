@@ -31,7 +31,7 @@ type FeedbotMessage struct {
 
 type TokenProcessingUserMessage struct {
 	UserID            persist.DBID  `json:"user_id" binding:"required"`
-	Chain             persist.Chain `json:"chain" binding:"required"`
+	Chain             persist.Chain `json:"chain"`
 	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
 	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
 }

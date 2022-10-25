@@ -23,7 +23,7 @@ import (
 type ProcessMediaForTokenInput struct {
 	TokenID           persist.TokenID `json:"token_id" binding:"required"`
 	ContractAddress   persist.Address `json:"contract_address" binding:"required"`
-	Chain             persist.Chain   `json:"chain" binding:"required"`
+	Chain             persist.Chain   `json:"chain"`
 	OwnerAddress      persist.Address `json:"owner_address" binding:"required"`
 	ImageKeywords     []string        `json:"image_keywords" binding:"required"`
 	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
