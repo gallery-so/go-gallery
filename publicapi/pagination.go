@@ -495,12 +495,14 @@ func (d *cursorDecoder) readDBID() (persist.DBID, error) {
 	return persist.DBID(str), nil
 }
 
-// readUInt64 reads a uint64 from the underlying reader and advances the stream
+// readUInt64 reads a uint64 from the underlying reader and advances the stream,
+// using a variable-length encoding (smaller numbers require fewer bytes)
 func (d *cursorDecoder) readUInt64() (uint64, error) {
 	return binary.ReadUvarint(d.reader)
 }
 
-// readInt64 reads an int64 from the underlying reader and advances the stream
+// readInt64 reads an int64 from the underlying reader and advances the stream,
+// using a variable-length encoding (smaller numbers require fewer bytes)
 func (d *cursorDecoder) readInt64() (int64, error) {
 	return binary.ReadVarint(d.reader)
 }
