@@ -860,10 +860,6 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 				seenWallets[ti] = dedupeWallets(seenWallets[ti])
 			}
 
-			if len(seenWallets[ti]) == 0 {
-				panic(fmt.Sprintf("no wallets found for token %+v and user %+v", token, ownerUser))
-			}
-
 			ownership, err := addressAtBlockToAddressAtBlock(ctx, token.OwnershipHistory, chainToken.chain)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get ownership history for token: %s", err)
