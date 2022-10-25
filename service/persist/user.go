@@ -76,6 +76,7 @@ type UserRepository interface {
 	AddFollower(pCtx context.Context, follower DBID, followee DBID) (refollowed bool, err error)
 	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
 	UserFollowsUser(pCtx context.Context, userA DBID, userB DBID) (bool, error)
+	FillWalletDataForUser(pCtx context.Context, user *User) error
 }
 
 // Scan implements the database/sql Scanner interface for the Traits type
