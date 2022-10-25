@@ -204,6 +204,11 @@ SELECT count(DISTINCT users.id) FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false;
 
+-- name: CountGalleryOwnersByContractId :one
+SELECT count(DISTINCT users.id) FROM users, tokens
+    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND tokens.deleted = false AND users.deleted = false AND users.universal = false;
+
 -- name: GetTokenOwnerByID :one
 SELECT u.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id

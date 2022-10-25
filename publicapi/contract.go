@@ -137,7 +137,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
 
-func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, before, after *string, first, last *int) ([]*model.TokenHolder, PageInfo, error) {
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]*model.TokenHolder, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required"},
@@ -154,7 +154,8 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+
 		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			Contract:           contract.ID,
 			Limit:              params.Limit,
@@ -179,28 +180,80 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return results, nil
 	}
 
+	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+
+		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
+			Contract:      contract.ID,
+			Limit:         params.Limit,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(owners))
+		for i, owner := range owners {
+			results[i] = owner
+		}
+
+		return results, nil
+	}
+
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountOwnersByContractId(ctx, contract.ID)
+		var total int64
+		var err error
+		if onlyGalleryUsers != nil && *onlyGalleryUsers {
+			total, err = api.queries.CountGalleryOwnersByContractId(ctx, contract.ID)
+		} else {
+			total, err = api.queries.CountOwnersByContractId(ctx, contract.ID)
+		}
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
+	boolCursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
 		if user, ok := i.(db.User); ok {
 			return user.Universal, user.CreatedAt, user.ID, nil
 		}
 		return false, time.Time{}, "", fmt.Errorf("interface{} is not a token")
 	}
 
-	paginator := boolTimeIDPaginator{
-		QueryFunc:  queryFunc,
-		CursorFunc: cursorFunc,
-		CountFunc:  countFunc,
+	timeCursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if user, ok := i.(db.User); ok {
+			return user.CreatedAt, user.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not a token")
 	}
+	var results []interface{}
+	var pageInfo PageInfo
 
-	results, pageInfo, err := paginator.paginate(before, after, first, last)
+	if onlyGalleryUsers != nil && *onlyGalleryUsers {
+		paginator := timeIDPaginator{
+			QueryFunc:  timeFunc,
+			CursorFunc: timeCursorFunc,
+			CountFunc:  countFunc,
+		}
 
-	if err != nil {
-		return nil, PageInfo{}, err
+		results, pageInfo, err = paginator.paginate(before, after, first, last)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+	} else {
+		paginator := boolTimeIDPaginator{
+			QueryFunc:  boolFunc,
+			CursorFunc: boolCursorFunc,
+			CountFunc:  countFunc,
+		}
+
+		results, pageInfo, err = paginator.paginate(before, after, first, last)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
 	}
 
 	owners := make([]*model.TokenHolder, len(results))

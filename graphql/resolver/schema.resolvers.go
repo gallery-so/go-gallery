@@ -126,18 +126,13 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last)
 }
 
-func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
-	refresh := false
-	if obj.HelperCommunityData.ForceRefresh != nil {
-		refresh = *obj.HelperCommunityData.ForceRefresh
-	}
-
+func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
 	err := refreshTokensInContractAsync(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
 
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, before, after, first, last)
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
 }
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {

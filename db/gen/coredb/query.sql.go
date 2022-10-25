@@ -52,6 +52,19 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 	return items, nil
 }
 
+const countGalleryOwnersByContractId = `-- name: CountGalleryOwnersByContractId :one
+SELECT count(DISTINCT users.id) FROM users, tokens
+    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND tokens.deleted = false AND users.deleted = false AND users.universal = false
+`
+
+func (q *Queries) CountGalleryOwnersByContractId(ctx context.Context, contract persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countGalleryOwnersByContractId, contract)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
