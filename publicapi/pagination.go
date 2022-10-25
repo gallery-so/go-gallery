@@ -380,15 +380,15 @@ func parseTime(bytes []byte, idx int, err error) (time.Time, int, error) {
 	}
 
 	t := time.Time{}
-	err = t.UnmarshalJSON(timeSlice[1 : timeLen+1])
+	err = t.UnmarshalBinary(timeSlice[1 : timeLen+1])
 	if err != nil {
 		return time.Time{}, 0, err
 	}
-	return t, len(timeSlice[1 : timeLen+1]), nil
+	return t, len(timeSlice[1:timeLen+1]) + 1, nil
 }
 
 func marshallTimeBytes(t time.Time, id persist.DBID) ([]byte, error) {
-	timeBytes, err := t.MarshalJSON()
+	timeBytes, err := t.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
