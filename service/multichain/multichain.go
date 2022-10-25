@@ -571,14 +571,14 @@ outer:
 
 	logger.For(ctx).Debug("creating tokens")
 
-	for _, user := range users {
-		allUserTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, -1, 0)
+	for userID, user := range users {
+		allUserTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, userID, -1, 0)
 		if err != nil {
 			return err
 		}
 
 		logger.For(ctx).Debugf("creating tokens for user %s", user.Username)
-		_, err = p.upsertTokens(ctx, chainTokensForUsers[user.ID], addressToContract, allUserTokens, user)
+		_, err = p.upsertTokens(ctx, chainTokensForUsers[userID], addressToContract, allUserTokens, user)
 		if err != nil {
 			return err
 		}
@@ -747,7 +747,7 @@ outer:
 
 func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User) ([]persist.TokenGallery, error) {
 
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersTokens, user)
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
 	if err != nil {
 		return nil, err
 	}
@@ -789,7 +789,7 @@ func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainCont
 	return addressesToContracts, nil
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
