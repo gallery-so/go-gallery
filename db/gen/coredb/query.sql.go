@@ -354,52 +354,6 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 	return i, err
 }
 
-const createFeedEventEvent = `-- name: CreateFeedEventEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id
-`
-
-type CreateFeedEventEventParams struct {
-	ID             persist.DBID
-	ActorID        persist.DBID
-	Action         persist.Action
-	ResourceTypeID persist.ResourceType
-	FeedEventID    persist.DBID
-	Data           persist.EventData
-}
-
-func (q *Queries) CreateFeedEventEvent(ctx context.Context, arg CreateFeedEventEventParams) (Event, error) {
-	row := q.db.QueryRow(ctx, createFeedEventEvent,
-		arg.ID,
-		arg.ActorID,
-		arg.Action,
-		arg.ResourceTypeID,
-		arg.FeedEventID,
-		arg.Data,
-	)
-	var i Event
-	err := row.Scan(
-		&i.ID,
-		&i.Version,
-		&i.ActorID,
-		&i.ResourceTypeID,
-		&i.SubjectID,
-		&i.UserID,
-		&i.TokenID,
-		&i.CollectionID,
-		&i.Action,
-		&i.Data,
-		&i.Deleted,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.GalleryID,
-		&i.CommentID,
-		&i.AdmireID,
-		&i.FeedEventID,
-		&i.ExternalID,
-	)
-	return i, err
-}
-
 const createFollowNotification = `-- name: CreateFollowNotification :one
 INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
 `

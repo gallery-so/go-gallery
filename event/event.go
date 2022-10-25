@@ -153,12 +153,6 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 			return "", err
 		}
 		return gallery.OwnerUserID, nil
-	case persist.ResourceTypeFeedEvent:
-		feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
-		if err != nil {
-			return "", err
-		}
-		return feedEvent.OwnerID, nil
 	case persist.ResourceTypeComment:
 		feedEvent, err := h.dataloaders.FeedEventByFeedEventID.Load(event.FeedEventID)
 		if err != nil {
