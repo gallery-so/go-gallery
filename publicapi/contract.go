@@ -154,12 +154,12 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, PageInfo{}, err
 	}
 
-	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+	ogu := false
+	if onlyGalleryUsers != nil {
+		ogu = *onlyGalleryUsers
+	}
 
-		ogu := false
-		if onlyGalleryUsers != nil {
-			ogu = *onlyGalleryUsers
-		}
+	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
 		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			Contract:           contract.ID,
@@ -187,13 +187,12 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	}
 
 	countFunc := func() (int, error) {
-		var total int64
-		var err error
-		if onlyGalleryUsers != nil && *onlyGalleryUsers {
-			total, err = api.queries.CountGalleryOwnersByContractId(ctx, contract.ID)
-		} else {
-			total, err = api.queries.CountOwnersByContractId(ctx, contract.ID)
-		}
+
+		total, err := api.queries.CountOwnersByContractId(ctx, db.CountOwnersByContractIdParams{
+			Contract:         contract.ID,
+			GalleryUsersOnly: ogu,
+		})
+
 		return int(total), err
 	}
 

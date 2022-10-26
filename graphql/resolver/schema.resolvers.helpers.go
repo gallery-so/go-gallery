@@ -426,9 +426,9 @@ func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]
 	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.TokensConnection, error) {
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
 
-	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last)
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}

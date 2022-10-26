@@ -1695,10 +1695,11 @@ const getTokensByContractIdBatchPaginate = `-- name: GetTokensByContractIdBatchP
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
-    AND (u.universal,t.created_at,t.id) < ($3, $4::timestamptz, $5)
-    AND (u.universal,t.created_at,t.id) > ($6, $7::timestamptz, $8)
-    ORDER BY CASE WHEN $9::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (u.universal,t.created_at,t.id) END DESC
+    AND (NOT $3::bool OR u.universal = false)
+    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
+    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
+    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
     LIMIT $2
 `
 
@@ -1710,6 +1711,7 @@ type GetTokensByContractIdBatchPaginateBatchResults struct {
 type GetTokensByContractIdBatchPaginateParams struct {
 	Contract           persist.DBID
 	Limit              int32
+	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
 	CurBeforeID        persist.DBID
@@ -1725,6 +1727,7 @@ func (q *Queries) GetTokensByContractIdBatchPaginate(ctx context.Context, arg []
 		vals := []interface{}{
 			a.Contract,
 			a.Limit,
+			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
 			a.CurBeforeTime,
 			a.CurBeforeID,
