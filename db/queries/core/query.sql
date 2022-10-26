@@ -270,9 +270,6 @@ INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_
 -- name: CreateAdmireEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
 
--- name: CreateFeedEventEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
-
 -- name: CreateCommentEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
 
@@ -497,3 +494,6 @@ SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 
 
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
+
+-- name: GetUsersByChainAddresses :many
+select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;

@@ -131,7 +131,6 @@ type groupedNotificationHandler struct {
 }
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-
 	curNotif, _ := h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
 		OwnerID: notif.OwnerID,
 		Action:  notif.Action,
@@ -329,7 +328,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	if err != nil {
 		return fmt.Errorf("error updating notification: %w", err)
 	}
-	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
+	updatedNotif, err := queries.GetNotificationByID(ctx, notif.ID)
 	if err != nil {
 		return err
 	}

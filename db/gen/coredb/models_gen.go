@@ -118,12 +118,12 @@ type Event struct {
 	Deleted        bool
 	LastUpdated    time.Time
 	CreatedAt      time.Time
-	Caption        sql.NullString
 	GalleryID      persist.DBID
 	CommentID      persist.DBID
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
 	ExternalID     persist.NullString
+	Caption        sql.NullString
 }
 
 type Feature struct {

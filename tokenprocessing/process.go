@@ -23,7 +23,7 @@ import (
 type ProcessMediaForTokenInput struct {
 	TokenID           persist.TokenID `json:"token_id" binding:"required"`
 	ContractAddress   persist.Address `json:"contract_address" binding:"required"`
-	Chain             persist.Chain   `json:"chain" binding:"required"`
+	Chain             persist.Chain   `json:"chain"`
 	OwnerAddress      persist.Address `json:"owner_address" binding:"required"`
 	ImageKeywords     []string        `json:"image_keywords" binding:"required"`
 	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
@@ -126,6 +126,16 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", key, contractAddress, t.TokenID, t.Chain)
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
+	name, description := media.FindNameAndDescription(ctx, t.TokenMetadata)
+
+	if name == "" {
+		name = t.Name.String()
+	}
+
+	if description == "" {
+		description = t.Description.String()
+	}
+
 	totalTimeOfMedia := time.Now()
 	med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
@@ -140,8 +150,8 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		Media:       med,
 		Metadata:    t.TokenMetadata,
 		TokenURI:    t.TokenURI,
-		Name:        persist.NullString(t.Name),
-		Description: persist.NullString(t.Description),
+		Name:        persist.NullString(name),
+		Description: persist.NullString(description),
 		LastUpdated: persist.LastUpdatedTime{},
 	}
 	totalUpdateTime := time.Now()
@@ -171,10 +181,13 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persis
 		}
 		key := fmt.Sprintf("%s-%d", contract.Address, contract.Chain)
 
-		if err := throttler.Lock(c, key); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
+		if !input.ForceRefresh {
+			if err := throttler.Lock(c, key); err != nil {
+				util.ErrResponse(c, http.StatusOK, err)
+				return
+			}
 		}
+
 		// do not unlock, let expiry handle the unlock
 		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
 		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {

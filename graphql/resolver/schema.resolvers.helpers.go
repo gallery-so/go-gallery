@@ -447,8 +447,8 @@ func resolveTokensByContractIDWithPagination(ctx context.Context, contractID per
 	}, nil
 }
 
-func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID) error {
-	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID)
+func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
+	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
 }
 
 func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {

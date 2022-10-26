@@ -282,7 +282,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 	vals := make([]interface{}, 0, len(newTokens)*paramsPerRow)
 	for i, token := range newTokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, token.OwnedByWallets, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam)
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]

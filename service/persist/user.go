@@ -76,6 +76,7 @@ type UserRepository interface {
 	AddFollower(pCtx context.Context, follower DBID, followee DBID) (refollowed bool, err error)
 	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
 	UserFollowsUser(pCtx context.Context, userA DBID, userB DBID) (bool, error)
+	FillWalletDataForUser(pCtx context.Context, user *User) error
 }
 
 // Scan implements the database/sql Scanner interface for the Traits type
@@ -144,4 +145,14 @@ type ErrAddressNotOwnedByUser struct {
 
 func (e ErrAddressNotOwnedByUser) Error() string {
 	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.ChainAddress, e.UserID)
+}
+
+type ErrWalletCreateFailed struct {
+	ChainAddress ChainAddress
+	WalletID     DBID
+	Err          error
+}
+
+func (e ErrWalletCreateFailed) Error() string {
+	return fmt.Sprintf("wallet create failed: address: %s, walletID: %s, error: %s", e.ChainAddress, e.WalletID, e.Err)
 }

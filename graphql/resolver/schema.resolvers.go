@@ -119,7 +119,11 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 }
 
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error) {
-	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	refresh := false
+	if obj.ForceRefresh != nil {
+		refresh = *obj.ForceRefresh
+	}
+	err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
 	if err != nil {
 		return nil, err
 	}
@@ -128,11 +132,11 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
 	refresh := false
-	if obj.HelperCommunityData.ForceRefresh != nil {
-		refresh = *obj.HelperCommunityData.ForceRefresh
+	if obj.ForceRefresh != nil {
+		refresh = *obj.ForceRefresh
 	}
 
-	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
 	if err != nil {
 		return nil, err
 	}
