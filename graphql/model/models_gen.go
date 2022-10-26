@@ -406,10 +406,12 @@ type CreateCollectionInput struct {
 	Tokens         []persist.DBID                  `json:"tokens"`
 	Layout         *CollectionLayoutInput          `json:"layout"`
 	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+	Caption        *string                         `json:"caption"`
 }
 
 type CreateCollectionPayload struct {
 	Collection *Collection `json:"collection"`
+	FeedEvent  *FeedEvent  `json:"feedEvent"`
 }
 
 func (CreateCollectionPayload) IsCreateCollectionPayloadOrError() {}
@@ -667,6 +669,7 @@ type FeedEvent struct {
 	EventData             FeedEventData                    `json:"eventData"`
 	Admires               *FeedEventAdmiresConnection      `json:"admires"`
 	Comments              *FeedEventCommentsConnection     `json:"comments"`
+	Caption               *string                          `json:"caption"`
 	Interactions          *FeedEventInteractionsConnection `json:"interactions"`
 	ViewerAdmire          *Admire                          `json:"viewerAdmire"`
 	HasViewerAdmiredEvent *bool                            `json:"hasViewerAdmiredEvent"`
@@ -1163,10 +1166,12 @@ type UpdateCollectionTokensInput struct {
 	Tokens        []persist.DBID                  `json:"tokens"`
 	Layout        *CollectionLayoutInput          `json:"layout"`
 	TokenSettings []*CollectionTokenSettingsInput `json:"tokenSettings"`
+	Caption       *string                         `json:"caption"`
 }
 
 type UpdateCollectionTokensPayload struct {
 	Collection *Collection `json:"collection"`
+	FeedEvent  *FeedEvent  `json:"feedEvent"`
 }
 
 func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}

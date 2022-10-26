@@ -123,6 +123,7 @@ type Event struct {
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
 	ExternalID     persist.NullString
+	Caption        sql.NullString
 }
 
 type Feature struct {
@@ -160,6 +161,7 @@ type FeedEvent struct {
 	Deleted     bool
 	LastUpdated time.Time
 	CreatedAt   time.Time
+	Caption     sql.NullString
 }
 
 type Follow struct {

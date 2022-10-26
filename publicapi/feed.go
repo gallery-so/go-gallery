@@ -20,15 +20,15 @@ type FeedAPI struct {
 	ethClient *ethclient.Client
 }
 
-func (api FeedAPI) GetEventById(ctx context.Context, eventID persist.DBID) (*db.FeedEvent, error) {
+func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
-		"eventID": {eventID, "required"},
+		"feedEventID": {feedEventID, "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	event, err := api.loaders.FeedEventByFeedEventID.Load(eventID)
+	event, err := api.loaders.FeedEventByFeedEventID.Load(feedEventID)
 	if err != nil {
 		return nil, err
 	}

@@ -378,14 +378,14 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 
 	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
 
-	err = dispatchEvent(ctx, db.Event{
+	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		AdmireID:       admireID,
 		Action:         persist.ActionAdmiredFeedEvent,
-	}, api.validator)
+	}, api.validator, nil)
 	if err != nil {
 		return "", err
 	}
@@ -479,14 +479,14 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
-	err = dispatchEvent(ctx, db.Event{
+	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        actor,
 		ResourceTypeID: persist.ResourceTypeComment,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
 		CommentID:      commentID,
 		Action:         persist.ActionCommentedOnFeedEvent,
-	}, api.validator)
+	}, api.validator, nil)
 	if err != nil {
 		return "", err
 	}

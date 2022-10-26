@@ -75,7 +75,7 @@ func (r *collectionCreatedFeedEventDataResolver) Collection(ctx context.Context,
 }
 
 func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
+	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
 }
 
 func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error) {
@@ -142,6 +142,13 @@ func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, be
 	}
 
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, before, after, first, last)
+}
+
+func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
@@ -405,14 +412,19 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
 	}
 
-	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout, settings)
-
+	collection, feedEvent, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout, settings, input.Caption)
 	if err != nil {
 		return nil, err
 	}
 
+	var eventModel model.FeedEvent
+	if feedEvent != nil {
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
+	}
+
 	output := model.CreateCollectionPayload{
 		Collection: collectionToModel(ctx, *collection),
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -489,7 +501,7 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
 	}
 
-	err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout, settings)
+	feedEvent, err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout, settings, input.Caption)
 	if err != nil {
 		return nil, err
 	}
@@ -499,8 +511,14 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 		return nil, err
 	}
 
+	var eventModel model.FeedEvent
+	if feedEvent != nil {
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
+	}
+
 	output := &model.UpdateCollectionTokensPayload{
 		Collection: collectionToModel(ctx, *collection),
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -1108,11 +1126,18 @@ func (r *tokensAddedToCollectionFeedEventDataResolver) Collection(ctx context.Co
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
+	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
 }
 
 func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
+}
+
+func (r *updateCollectionTokensPayloadResolver) FeedEvent(ctx context.Context, obj *model.UpdateCollectionTokensPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error) {
@@ -1233,6 +1258,11 @@ func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPaylo
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
 
+// CreateCollectionPayload returns generated.CreateCollectionPayloadResolver implementation.
+func (r *Resolver) CreateCollectionPayload() generated.CreateCollectionPayloadResolver {
+	return &createCollectionPayloadResolver{r}
+}
+
 // FeedEvent returns generated.FeedEventResolver implementation.
 func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
 
@@ -1318,6 +1348,11 @@ func (r *Resolver) UnfollowUserPayload() generated.UnfollowUserPayloadResolver {
 	return &unfollowUserPayloadResolver{r}
 }
 
+// UpdateCollectionTokensPayload returns generated.UpdateCollectionTokensPayloadResolver implementation.
+func (r *Resolver) UpdateCollectionTokensPayload() generated.UpdateCollectionTokensPayloadResolver {
+	return &updateCollectionTokensPayloadResolver{r}
+}
+
 // UserCreatedFeedEventData returns generated.UserCreatedFeedEventDataResolver implementation.
 func (r *Resolver) UserCreatedFeedEventData() generated.UserCreatedFeedEventDataResolver {
 	return &userCreatedFeedEventDataResolver{r}
@@ -1354,6 +1389,7 @@ type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
+type createCollectionPayloadResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
@@ -1375,6 +1411,7 @@ type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
+type updateCollectionTokensPayloadResolver struct{ *Resolver }
 type userCreatedFeedEventDataResolver struct{ *Resolver }
 type userFollowedUsersFeedEventDataResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
