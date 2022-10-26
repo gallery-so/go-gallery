@@ -30,10 +30,7 @@ const (
 
 // Register specific event handlers
 func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *cloudtasks.Client) {
-	sender := eventSender{
-		registry:  map[sendType]registedActions{delayedKey: {}, immediateKey: {}},
-		eventRepo: postgres.EventRepository{Queries: queries},
-	}
+	sender := newEventSender(queries)
 
 	feed := newEventDispatcher("feed")
 	feedHandler := newFeedHandler(queries, taskClient)
@@ -64,7 +61,7 @@ func DispatchDelayed(ctx context.Context, event db.Event) error {
 	handlers := For(gc)
 
 	if _, handable := handlers.registry[delayedKey][event.Action]; !handable {
-		logger.For(ctx).Warnf("no handler configured for action: %s", event.Action)
+		logger.For(ctx).Warnf("no delayed handler configured for action: %s", event.Action)
 		return nil
 	}
 
@@ -79,12 +76,13 @@ func DispatchDelayed(ctx context.Context, event db.Event) error {
 	return eg.Wait()
 }
 
+// DispatchImmediate flushes the event immediately to its registered handlers.
 func DispatchImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	gc := util.GinContextFromContext(ctx)
 	handlers := For(gc)
 
 	if _, handable := handlers.registry[immediateKey][event.Action]; !handable {
-		logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
+		logger.For(ctx).Warnf("no immediate handler registered for action: %s", event.Action)
 		return nil, nil
 	}
 
@@ -117,6 +115,13 @@ type eventSender struct {
 	notifications *eventDispatcher
 	registry      map[sendType]registedActions
 	eventRepo     postgres.EventRepository
+}
+
+func newEventSender(queries *db.Queries) eventSender {
+	return eventSender{
+		registry:  map[sendType]registedActions{delayedKey: {}, immediateKey: {}},
+		eventRepo: postgres.EventRepository{Queries: queries},
+	}
 }
 
 func (e *eventSender) addDelayedHandler(dispatcher *eventDispatcher, action persist.Action, handler delayedHandler) {
