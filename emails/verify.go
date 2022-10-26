@@ -13,8 +13,12 @@ import (
 )
 
 type VerifyEmailInput struct {
-	JWT    string       `json:"jwt" binding:"required"`
-	UserID persist.DBID `json:"user_id" binding:"required"`
+	JWT string `json:"jwt" binding:"required"`
+}
+
+type VerifyEmailOutput struct {
+	UserID persist.DBID `json:"user_id"`
+	Email  string       `json:"email"`
 }
 
 var errUserIDMismatch = fmt.Errorf("user ID mismatch")
@@ -35,11 +39,6 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if userID != input.UserID {
-			util.ErrResponse(c, http.StatusUnauthorized, errUserIDMismatch)
-			return
-		}
-
 		err = queries.UpdateUserVerificationStatus(c, coredb.UpdateUserVerificationStatusParams{
 			ID:            userID,
 			EmailVerified: true,
@@ -49,6 +48,15 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusOK)
+		user, err := queries.GetUserById(c, userID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, VerifyEmailOutput{
+			UserID: user.ID,
+			Email:  user.Email.String(),
+		})
 	}
 }

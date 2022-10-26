@@ -13,6 +13,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -936,6 +937,30 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 	}
 
 	return commentToModel(ctx, *comment), nil
+}
+
+func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {
+	output, err := emails.VerifyEmail(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.VerifyEmailPayload{
+		Email: &output.Email,
+	}, nil
+
+}
+
+func updateUserEmail(ctx context.Context, email string) (*model.UpdateEmailPayload, error) {
+	err := publicapi.For(ctx).User.UpdateUserEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.UpdateEmailPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+
 }
 
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {

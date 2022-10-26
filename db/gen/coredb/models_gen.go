@@ -290,7 +290,7 @@ type User struct {
 	Traits               pgtype.JSONB
 	Universal            bool
 	NotificationSettings persist.UserNotificationSettings
-	Email                sql.NullString
+	Email                persist.NullString
 	EmailVerified        bool
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 }

@@ -522,5 +522,8 @@ SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsu
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
 
+-- name: UpdateUserEmail :exec
+UPDATE users SET email = $2, email_verified = false WHERE id = $1;
+
 -- name: GetUsersByChainAddresses :many
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;

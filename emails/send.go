@@ -21,6 +21,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const emailsAtATime = 10_000
+
 type VerificationEmailInput struct {
 	UserID persist.DBID `json:"user_id" binding:"required"`
 }
@@ -72,7 +74,7 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
 		subject := "Gallery Verification"
-		to := mail.NewEmail(user.Username.String, user.Email.String)
+		to := mail.NewEmail(user.Username.String, user.Email.String())
 		plainTextContent := plainBuf.String()
 		htmlContent := htmlBuf.String()
 		message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
@@ -107,7 +109,7 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, htmltem
 
 			from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
 			subject := "Your Gallery Notifications"
-			to := mail.NewEmail(u.Username.String, u.Email.String)
+			to := mail.NewEmail(u.Username.String, u.Email.String())
 			plainTextContent := plainBuf.String()
 			htmlContent := htmlBuf.String()
 
@@ -141,7 +143,7 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 	var endTime time.Time = time.Now().Add(24 * time.Hour)
 	for {
 		users, err := queries.GetUsersWithNotificationsOnForEmailType(ctx, coredb.GetUsersWithNotificationsOnForEmailTypeParams{
-			Limit:         10000,
+			Limit:         emailsAtATime,
 			CurAfterTime:  lastCreatedAt,
 			CurBeforeTime: endTime,
 			CurAfterID:    lastID,
@@ -163,7 +165,7 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 			})
 		}
 
-		if len(users) < 10000 {
+		if len(users) < emailsAtATime {
 			break
 		}
 

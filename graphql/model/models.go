@@ -92,6 +92,10 @@ type HelperNotificationsConnectionData struct {
 	ByFirst bool
 }
 
+type HelperUserEmailData struct {
+	UserId persist.DBID
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

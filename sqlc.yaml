@@ -41,6 +41,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailUnsubscriptions"
           - column: "users.notification_settings"
             go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
+          - column: "users.email"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
 
           # Galleries
           - column: "galleries.collections"

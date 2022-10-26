@@ -1259,6 +1259,26 @@ union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
 
+type VerifyEmailPayload {
+    email: String
+}
+
+union VerifyEmailPayloadOrError =
+    VerifyEmailPayload
+    | ErrInvalidInput
+
+input UpdateEmailInput {
+    email: String!
+}
+
+type UpdateEmailPayload {
+    viewer: Viewer
+}
+
+union UpdateEmailPayloadOrError =
+    UpdateEmailPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1287,7 +1307,8 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!, bio:String): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: String): CreateUserPayloadOrError
+    updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
@@ -1303,6 +1324,8 @@ type Mutation {
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
+
+    verifyEmail(token: String!): VerifyEmailPayloadOrError
 }
 
 type Subscription {

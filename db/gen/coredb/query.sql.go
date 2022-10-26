@@ -2027,7 +2027,7 @@ type GetUsersByChainAddressesRow struct {
 	Traits               pgtype.JSONB
 	Universal            bool
 	NotificationSettings persist.UserNotificationSettings
-	Email                sql.NullString
+	Email                persist.NullString
 	EmailVerified        bool
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	Address              persist.Address
@@ -2484,6 +2484,20 @@ type UpdateNotificationSettingsByIDParams struct {
 
 func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {
 	_, err := q.db.Exec(ctx, updateNotificationSettingsByID, arg.ID, arg.NotificationSettings)
+	return err
+}
+
+const updateUserEmail = `-- name: UpdateUserEmail :exec
+UPDATE users SET email = $2, email_verified = false WHERE id = $1
+`
+
+type UpdateUserEmailParams struct {
+	ID    persist.DBID
+	Email persist.NullString
+}
+
+func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
+	_, err := q.db.Exec(ctx, updateUserEmail, arg.ID, arg.Email)
 	return err
 }
 
