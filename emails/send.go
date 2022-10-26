@@ -119,7 +119,7 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, htmltem
 			plainTextContent := plainBuf.String()
 			htmlContent := htmlBuf.String()
 
-			logger.For(c).Debugf("sending email to %s", u.Email.String)
+			logger.For(c).Debugf("sending email to %s", u.Email.String())
 			logger.For(c).Debugf("html: %s", htmlContent)
 			logger.For(c).Debugf("plain: %s", plainTextContent)
 
