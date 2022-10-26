@@ -171,6 +171,7 @@ SELECT * FROM tokens WHERE contract = $1 AND deleted = false
 SELECT t.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
+    AND (NOT @gallery_users_only::bool OR u.universal = false)
     AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
@@ -181,6 +182,7 @@ SELECT t.* FROM tokens t
 SELECT t.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
+    AND (NOT @gallery_users_only::bool OR u.universal = false)
     AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
@@ -188,11 +190,12 @@ SELECT t.* FROM tokens t
     LIMIT $2;
 
 -- name: CountTokensByContractId :one
-SELECT count(*) FROM tokens WHERE contract = $1 AND deleted = false;
+SELECT count(*) FROM tokens JOIN users ON users.id = tokens.owner_user_id WHERE contract = $1 AND (NOT @gallery_users_only::bool OR users.universal = false) AND tokens.deleted = false;
 
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
 SELECT DISTINCT ON (result.id) result.* FROM (SELECT users.* FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND (NOT @gallery_users_only::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
@@ -202,6 +205,7 @@ SELECT DISTINCT ON (result.id) result.* FROM (SELECT users.* FROM users, tokens
 -- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND (NOT @gallery_users_only::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false;
 
 -- name: GetTokenOwnerByID :one
