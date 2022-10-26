@@ -1205,7 +1205,7 @@ func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *st
 }
 
 func (r *viewerResolver) Email(ctx context.Context, obj *model.Viewer) (*model.UserEmail, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveViewerEmail(ctx), nil
 }
 
 func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {

@@ -552,7 +552,6 @@ type ComplexityRoot struct {
 		SomeoneCommentedOnYourUpdate func(childComplexity int) int
 		SomeoneFollowedYou           func(childComplexity int) int
 		SomeoneViewedYourGallery     func(childComplexity int) int
-		User                         func(childComplexity int) int
 	}
 
 	NotificationsConnection struct {
@@ -823,7 +822,6 @@ type ComplexityRoot struct {
 	UserEmail struct {
 		Email                     func(childComplexity int) int
 		EmailNotificationSettings func(childComplexity int) int
-		User                      func(childComplexity int) int
 		Verified                  func(childComplexity int) int
 	}
 
@@ -3028,13 +3026,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.NotificationSettings.SomeoneViewedYourGallery(childComplexity), true
 
-	case "NotificationSettings.user":
-		if e.complexity.NotificationSettings.User == nil {
-			break
-		}
-
-		return e.complexity.NotificationSettings.User(childComplexity), true
-
 	case "NotificationsConnection.edges":
 		if e.complexity.NotificationsConnection.Edges == nil {
 			break
@@ -4186,13 +4177,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserEmail.EmailNotificationSettings(childComplexity), true
 
-	case "UserEmail.user":
-		if e.complexity.UserEmail.User == nil {
-			break
-		}
-
-		return e.complexity.UserEmail.User(childComplexity), true
-
 	case "UserEmail.verified":
 		if e.complexity.UserEmail.Verified == nil {
 			break
@@ -4949,9 +4933,7 @@ type Viewer {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
 
-type NotificationSettings @goEmbedHelper {
-  user: GalleryUser
-
+type NotificationSettings {
   someoneFollowedYou: Boolean
   someoneAdmiredYourUpdate: Boolean
   someoneCommentedOnYourUpdate: Boolean
@@ -4965,11 +4947,16 @@ input NotificationSettingsInput {
   someoneViewedYourGallery: Boolean
 }
 
-type UserEmail @goEmbedHelper {
-    user: GalleryUser
+enum EmailVerificationStatus {
+    Unverified
+    Verified
+    Failed
+    Admin
+}
 
+type UserEmail {
     email: String
-    verified: Boolean
+    verified: EmailVerificationStatus
     emailNotificationSettings: EmailNotificationSettings
 }
 
@@ -15809,38 +15796,6 @@ func (ec *executionContext) _NotificationEdge_cursor(ctx context.Context, field 
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _NotificationSettings_user(ctx context.Context, field graphql.CollectedField, obj *model.NotificationSettings) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "NotificationSettings",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.GalleryUser)
-	fc.Result = res
-	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _NotificationSettings_someoneFollowedYou(ctx context.Context, field graphql.CollectedField, obj *model.NotificationSettings) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -21081,38 +21036,6 @@ func (ec *executionContext) _UserCreatedFeedEventData_action(ctx context.Context
 	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserEmail_user(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "UserEmail",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.GalleryUser)
-	fc.Result = res
-	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _UserEmail_email(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -21172,9 +21095,9 @@ func (ec *executionContext) _UserEmail_verified(ctx context.Context, field graph
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(*persist.EmailVerificationStatus)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalOEmailVerificationStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmailVerificationStatus(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UserEmail_emailNotificationSettings(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
@@ -29742,13 +29665,6 @@ func (ec *executionContext) _NotificationSettings(ctx context.Context, sel ast.S
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("NotificationSettings")
-		case "user":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._NotificationSettings_user(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		case "someoneFollowedYou":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._NotificationSettings_someoneFollowedYou(ctx, field, obj)
@@ -32145,13 +32061,6 @@ func (ec *executionContext) _UserEmail(ctx context.Context, sel ast.SelectionSet
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("UserEmail")
-		case "user":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserEmail_user(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		case "email":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UserEmail_email(ctx, field, obj)
@@ -34290,6 +34199,22 @@ func (ec *executionContext) marshalOEmailNotificationSettings2ᚖgithubᚗcomᚋ
 		return graphql.Null
 	}
 	return ec._EmailNotificationSettings(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOEmailVerificationStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmailVerificationStatus(ctx context.Context, v interface{}) (*persist.EmailVerificationStatus, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(persist.EmailVerificationStatus)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOEmailVerificationStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmailVerificationStatus(ctx context.Context, sel ast.SelectionSet, v *persist.EmailVerificationStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEoaAuth(ctx context.Context, v interface{}) (*model.EoaAuth, error) {

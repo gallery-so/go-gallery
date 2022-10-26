@@ -467,9 +467,7 @@ type Viewer {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
 
-type NotificationSettings @goEmbedHelper {
-  user: GalleryUser
-
+type NotificationSettings {
   someoneFollowedYou: Boolean
   someoneAdmiredYourUpdate: Boolean
   someoneCommentedOnYourUpdate: Boolean
@@ -483,11 +481,16 @@ input NotificationSettingsInput {
   someoneViewedYourGallery: Boolean
 }
 
-type UserEmail @goEmbedHelper {
-    user: GalleryUser
+enum EmailVerificationStatus {
+    Unverified
+    Verified
+    Failed
+    Admin
+}
 
+type UserEmail {
     email: String
-    verified: Boolean
+    verified: EmailVerificationStatus
     emailNotificationSettings: EmailNotificationSettings
 }
 

@@ -872,12 +872,10 @@ type NotificationEdge struct {
 }
 
 type NotificationSettings struct {
-	HelperNotificationSettingsData
-	User                         *GalleryUser `json:"user"`
-	SomeoneFollowedYou           *bool        `json:"someoneFollowedYou"`
-	SomeoneAdmiredYourUpdate     *bool        `json:"someoneAdmiredYourUpdate"`
-	SomeoneCommentedOnYourUpdate *bool        `json:"someoneCommentedOnYourUpdate"`
-	SomeoneViewedYourGallery     *bool        `json:"someoneViewedYourGallery"`
+	SomeoneFollowedYou           *bool `json:"someoneFollowedYou"`
+	SomeoneAdmiredYourUpdate     *bool `json:"someoneAdmiredYourUpdate"`
+	SomeoneCommentedOnYourUpdate *bool `json:"someoneCommentedOnYourUpdate"`
+	SomeoneViewedYourGallery     *bool `json:"someoneViewedYourGallery"`
 }
 
 type NotificationSettingsInput struct {
@@ -1243,11 +1241,9 @@ type UserCreatedFeedEventData struct {
 func (UserCreatedFeedEventData) IsFeedEventData() {}
 
 type UserEmail struct {
-	HelperUserEmailData
-	User                      *GalleryUser               `json:"user"`
-	Email                     *string                    `json:"email"`
-	Verified                  *bool                      `json:"verified"`
-	EmailNotificationSettings *EmailNotificationSettings `json:"emailNotificationSettings"`
+	Email                     *string                          `json:"email"`
+	Verified                  *persist.EmailVerificationStatus `json:"verified"`
+	EmailNotificationSettings *EmailNotificationSettings       `json:"emailNotificationSettings"`
 }
 
 type UserFollowedUsersFeedEventData struct {

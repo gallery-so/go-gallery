@@ -20,10 +20,6 @@ func (r *Community) GetGqlIDField_Chain() string {
 	return fmt.Sprint(r.ContractAddress.Chain())
 }
 
-func (r *NotificationSettings) GetGqlIDField_UserID() string {
-	return fmt.Sprint(r.HelperNotificationSettingsData.UserId.String())
-}
-
 func (r *Community) GetGqlIDField_ContractAddress() string {
 	return r.ContractAddress.Address().String()
 }

@@ -523,6 +523,33 @@ func resolveViewer(ctx context.Context) *model.Viewer {
 	return viewer
 }
 
+func resolveViewerEmail(ctx context.Context) *model.UserEmail {
+
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil
+	}
+
+	return userToEmailModel(user)
+
+}
+
+func userToEmailModel(user *db.User) *model.UserEmail {
+
+	email := user.Email.String()
+
+	return &model.UserEmail{
+		Email:    &email,
+		Verified: &user.EmailVerified,
+		EmailNotificationSettings: &model.EmailNotificationSettings{
+			UnsubscribedFromAll: user.EmailUnsubscriptions.All,
+		},
+	}
+
+}
+
 func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (*model.MembershipTier, error) {
 	tier, err := publicapi.For(ctx).User.GetMembershipByMembershipId(ctx, id)
 
@@ -760,10 +787,6 @@ func resolveViewerNotificationSettings(ctx context.Context) (*model.Notification
 func notificationSettingsToModel(ctx context.Context, user *db.User) *model.NotificationSettings {
 	settings := user.NotificationSettings
 	return &model.NotificationSettings{
-		HelperNotificationSettingsData: model.HelperNotificationSettingsData{
-			UserId: user.ID,
-		},
-		User:                         userToModel(ctx, *user),
 		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
 		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
 		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
