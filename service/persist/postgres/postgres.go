@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"strings"
 	"time"
 
@@ -188,6 +189,14 @@ func checkNoErr(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func dbidsToStrings(dbids []persist.DBID) []string {
+	strings := make([]string, len(dbids))
+	for i, dbid := range dbids {
+		strings[i] = string(dbid)
+	}
+	return strings
 }
 
 // Repositories is the set of all available persistence repositories
