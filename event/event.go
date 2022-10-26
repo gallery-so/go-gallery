@@ -41,7 +41,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(feed, persist.ActionUserFollowedUsers, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionCollectorsNoteAddedToToken, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionCollectionCreated, feedHandler)
-	sender.addDelayedHandler(feed, persist.ActionCollectorsNoteAddedToToken, feedHandler)
+	sender.addDelayedHandler(feed, persist.ActionCollectorsNoteAddedToCollection, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
@@ -84,7 +84,7 @@ func DispatchImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, erro
 	handlers := For(gc)
 
 	if _, handable := handlers.registry[immediateKey][event.Action]; !handable {
-		logger.For(ctx).Warnf("no handler configured for action: %s", event.Action)
+		logger.For(ctx).Warnf("no handler registered for action: %s", event.Action)
 		return nil, nil
 	}
 
@@ -155,7 +155,6 @@ func (d *eventDispatcher) dispatchDelayed(ctx context.Context, event db.Event) e
 	if handler, ok := d.delayedHandlers[event.Action]; ok {
 		return handler.handleDelayed(ctx, event)
 	}
-	logger.For(ctx).WithField("service", d.service).Warnf("no delayed handler registered for action: %s", event.Action)
 	return nil
 }
 
@@ -163,7 +162,6 @@ func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event db.Event)
 	if handler, ok := d.immediateHandlers[event.Action]; ok {
 		return handler.handleImmediate(ctx, event)
 	}
-	logger.For(ctx).WithField("service", d.service).Warnf("no immediate handler registered for action: %s", event.Action)
 	return nil, nil
 }
 
