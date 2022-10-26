@@ -225,11 +225,11 @@ type ComplexityRoot struct {
 		ID                func(childComplexity int) int
 		LastUpdated       func(childComplexity int) int
 		Name              func(childComplexity int) int
-		Owners            func(childComplexity int, before *string, after *string, first *int, last *int) int
+		Owners            func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 		PreviewImage      func(childComplexity int) int
 		ProfileBannerURL  func(childComplexity int) int
 		ProfileImageURL   func(childComplexity int) int
-		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int) int
+		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 	}
 
 	Contract struct {
@@ -898,8 +898,8 @@ type CommentOnFeedEventPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CommentOnFeedEventPayload) (*model.FeedEvent, error)
 }
 type CommunityResolver interface {
-	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error)
-	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error)
+	TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error)
+	Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error)
 }
 type CreateCollectionPayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error)
@@ -1636,7 +1636,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Community.Owners(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Community.Owners(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool)), true
 
 	case "Community.previewImage":
 		if e.complexity.Community.PreviewImage == nil {
@@ -1669,7 +1669,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Community.TokensInCommunity(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Community.TokensInCommunity(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool)), true
 
 	case "Contract.badgeURL":
 		if e.complexity.Contract.BadgeURL == nil {
@@ -4786,9 +4786,9 @@ type Community implements Node
   profileBannerURL: String
   badgeURL: String
 
-  tokensInCommunity(before: String, after: String, first: Int, last: Int): TokensConnection @goField(forceResolver: true)
+  tokensInCommunity(before: String, after: String, first: Int, last: Int, onlyGalleryUsers: Boolean): TokensConnection @goField(forceResolver: true)
 
-  owners(before: String, after: String, first: Int, last: Int): TokenHoldersConnection @goField(forceResolver: true)
+  owners(before: String, after: String, first: Int, last: Int, onlyGalleryUsers: Boolean): TokenHoldersConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {
@@ -5728,6 +5728,15 @@ func (ec *executionContext) field_Community_owners_args(ctx context.Context, raw
 		}
 	}
 	args["last"] = arg3
+	var arg4 *bool
+	if tmp, ok := rawArgs["onlyGalleryUsers"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onlyGalleryUsers"))
+		arg4, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["onlyGalleryUsers"] = arg4
 	return args, nil
 }
 
@@ -5770,6 +5779,15 @@ func (ec *executionContext) field_Community_tokensInCommunity_args(ctx context.C
 		}
 	}
 	args["last"] = arg3
+	var arg4 *bool
+	if tmp, ok := rawArgs["onlyGalleryUsers"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onlyGalleryUsers"))
+		arg4, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["onlyGalleryUsers"] = arg4
 	return args, nil
 }
 
@@ -9601,7 +9619,7 @@ func (ec *executionContext) _Community_tokensInCommunity(ctx context.Context, fi
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Community().TokensInCommunity(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+		return ec.resolvers.Community().TokensInCommunity(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -9640,7 +9658,7 @@ func (ec *executionContext) _Community_owners(ctx context.Context, field graphql
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Community().Owners(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+		return ec.resolvers.Community().Owners(rctx, obj, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

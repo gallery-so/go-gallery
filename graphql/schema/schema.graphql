@@ -409,9 +409,9 @@ type Community implements Node
   profileBannerURL: String
   badgeURL: String
 
-  tokensInCommunity(before: String, after: String, first: Int, last: Int): TokensConnection @goField(forceResolver: true)
+  tokensInCommunity(before: String, after: String, first: Int, last: Int, onlyGalleryUsers: Boolean): TokensConnection @goField(forceResolver: true)
 
-  owners(before: String, after: String, first: Int, last: Int): TokenHoldersConnection @goField(forceResolver: true)
+  owners(before: String, after: String, first: Int, last: Int, onlyGalleryUsers: Boolean): TokenHoldersConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {

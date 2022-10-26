@@ -118,30 +118,34 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
-func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error) {
-	refresh := false
-	if obj.ForceRefresh != nil {
-		refresh = *obj.ForceRefresh
+func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
+
+	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
+		refresh := false
+		if obj.ForceRefresh != nil {
+			refresh = *obj.ForceRefresh
+		}
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+		if err != nil {
+			return nil, err
+		}
 	}
-	err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
-	if err != nil {
-		return nil, err
-	}
-	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last)
+	return resolveTokensByContractIDWithPagination(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
 }
 
-func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
-	refresh := false
-	if obj.ForceRefresh != nil {
-		refresh = *obj.ForceRefresh
+func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
+	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
+		refresh := false
+		if obj.ForceRefresh != nil {
+			refresh = *obj.ForceRefresh
+		}
+		err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
-	if err != nil {
-		return nil, err
-	}
-
-	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, before, after, first, last)
+	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, before, after, first, last, onlyGalleryUsers)
 }
 
 func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error) {

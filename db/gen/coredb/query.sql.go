@@ -56,22 +56,33 @@ func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND (NOT $2::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false
 `
 
-func (q *Queries) CountOwnersByContractId(ctx context.Context, contract persist.DBID) (int64, error) {
-	row := q.db.QueryRow(ctx, countOwnersByContractId, contract)
+type CountOwnersByContractIdParams struct {
+	Contract         persist.DBID
+	GalleryUsersOnly bool
+}
+
+func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersByContractIdParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOwnersByContractId, arg.Contract, arg.GalleryUsersOnly)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const countTokensByContractId = `-- name: CountTokensByContractId :one
-SELECT count(*) FROM tokens WHERE contract = $1 AND deleted = false
+SELECT count(*) FROM tokens JOIN users ON users.id = tokens.owner_user_id WHERE contract = $1 AND (NOT $2::bool OR users.universal = false) AND tokens.deleted = false
 `
 
-func (q *Queries) CountTokensByContractId(ctx context.Context, contract persist.DBID) (int64, error) {
-	row := q.db.QueryRow(ctx, countTokensByContractId, contract)
+type CountTokensByContractIdParams struct {
+	Contract         persist.DBID
+	GalleryUsersOnly bool
+}
+
+func (q *Queries) CountTokensByContractId(ctx context.Context, arg CountTokensByContractIdParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTokensByContractId, arg.Contract, arg.GalleryUsersOnly)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -1640,16 +1651,18 @@ const getTokensByContractIdPaginate = `-- name: GetTokensByContractIdPaginate :m
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
-    AND (u.universal,t.created_at,t.id) < ($3, $4::timestamptz, $5)
-    AND (u.universal,t.created_at,t.id) > ($6, $7::timestamptz, $8)
-    ORDER BY CASE WHEN $9::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (u.universal,t.created_at,t.id) END DESC
+    AND (NOT $3::bool OR u.universal = false)
+    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
+    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
+    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
     LIMIT $2
 `
 
 type GetTokensByContractIdPaginateParams struct {
 	Contract           persist.DBID
 	Limit              int32
+	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
 	CurBeforeID        persist.DBID
@@ -1663,6 +1676,7 @@ func (q *Queries) GetTokensByContractIdPaginate(ctx context.Context, arg GetToke
 	rows, err := q.db.Query(ctx, getTokensByContractIdPaginate,
 		arg.Contract,
 		arg.Limit,
+		arg.GalleryUsersOnly,
 		arg.CurBeforeUniversal,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
