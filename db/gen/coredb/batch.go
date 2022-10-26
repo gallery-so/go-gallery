@@ -1336,11 +1336,12 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
 SELECT DISTINCT ON (result.id) result.id, result.deleted, result.version, result.last_updated, result.created_at, result.username, result.username_idempotent, result.wallets, result.bio, result.traits, result.universal, result.notification_settings FROM (SELECT users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND (NOT $3::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false
-    AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
-    AND (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
-    ORDER BY CASE WHEN $9::bool THEN (users.universal,users.created_at,users.id) END ASC,
-        CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2
+    AND (users.universal,users.created_at,users.id) < ($4, $5::timestamptz, $6)
+    AND (users.universal,users.created_at,users.id) > ($7, $8::timestamptz, $9)
+    ORDER BY CASE WHEN $10::bool THEN (users.universal,users.created_at,users.id) END ASC,
+        CASE WHEN NOT $10::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {
@@ -1351,6 +1352,7 @@ type GetOwnersByContractIdBatchPaginateBatchResults struct {
 type GetOwnersByContractIdBatchPaginateParams struct {
 	Contract           persist.DBID
 	Limit              int32
+	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
 	CurBeforeID        persist.DBID
@@ -1366,6 +1368,7 @@ func (q *Queries) GetOwnersByContractIdBatchPaginate(ctx context.Context, arg []
 		vals := []interface{}{
 			a.Contract,
 			a.Limit,
+			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
 			a.CurBeforeTime,
 			a.CurBeforeID,

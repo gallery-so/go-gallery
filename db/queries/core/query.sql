@@ -193,6 +193,7 @@ SELECT count(*) FROM tokens WHERE contract = $1 AND deleted = false;
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
 SELECT DISTINCT ON (result.id) result.* FROM (SELECT users.* FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
+    AND (NOT @gallery_users_only::bool OR users.universal = false)
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)

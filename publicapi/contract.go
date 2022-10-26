@@ -156,9 +156,15 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 
 	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
+		ogu := false
+		if onlyGalleryUsers != nil {
+			ogu = *onlyGalleryUsers
+		}
+
 		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			Contract:           contract.ID,
 			Limit:              params.Limit,
+			GalleryUsersOnly:   ogu,
 			CurBeforeUniversal: params.CursorBeforeBool,
 			CurAfterUniversal:  params.CursorAfterBool,
 			CurBeforeTime:      params.CursorBeforeTime,
@@ -166,30 +172,6 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 			CurAfterTime:       params.CursorAfterTime,
 			CurAfterID:         params.CursorAfterID,
 			PagingForward:      params.PagingForward,
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		results := make([]interface{}, len(owners))
-		for i, owner := range owners {
-			results[i] = owner
-		}
-
-		return results, nil
-	}
-
-	timeFunc := func(params timeIDPagingParams) ([]interface{}, error) {
-
-		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
-			Contract:      contract.ID,
-			Limit:         params.Limit,
-			CurBeforeTime: params.CursorBeforeTime,
-			CurBeforeID:   params.CursorBeforeID,
-			CurAfterTime:  params.CursorAfterTime,
-			CurAfterID:    params.CursorAfterID,
-			PagingForward: params.PagingForward,
 		})
 
 		if err != nil {
@@ -222,38 +204,15 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return false, time.Time{}, "", fmt.Errorf("interface{} is not a token")
 	}
 
-	timeCursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
-		if user, ok := i.(db.User); ok {
-			return user.CreatedAt, user.ID, nil
-		}
-		return time.Time{}, "", fmt.Errorf("interface{} is not a token")
+	paginator := boolTimeIDPaginator{
+		QueryFunc:  boolFunc,
+		CursorFunc: boolCursorFunc,
+		CountFunc:  countFunc,
 	}
-	var results []interface{}
-	var pageInfo PageInfo
 
-	if onlyGalleryUsers != nil && *onlyGalleryUsers {
-		paginator := timeIDPaginator{
-			QueryFunc:  timeFunc,
-			CursorFunc: timeCursorFunc,
-			CountFunc:  countFunc,
-		}
-
-		results, pageInfo, err = paginator.paginate(before, after, first, last)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-
-	} else {
-		paginator := boolTimeIDPaginator{
-			QueryFunc:  boolFunc,
-			CursorFunc: boolCursorFunc,
-			CountFunc:  countFunc,
-		}
-
-		results, pageInfo, err = paginator.paginate(before, after, first, last)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+	if err != nil {
+		return nil, PageInfo{}, err
 	}
 
 	owners := make([]*model.TokenHolder, len(results))
