@@ -270,9 +270,6 @@ INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_
 -- name: CreateAdmireEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
 
--- name: CreateFeedEventEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
-
 -- name: CreateCommentEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
 
