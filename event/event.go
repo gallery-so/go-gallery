@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -32,7 +34,7 @@ const (
 func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications.NotificationHandlers, queries *db.Queries, taskClient *cloudtasks.Client) {
 	sender := newEventSender(queries)
 
-	feed := newEventDispatcher("feed")
+	feed := newEventDispatcher()
 	feedHandler := newFeedHandler(queries, taskClient)
 	sender.addDelayedHandler(feed, persist.ActionUserCreated, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionUserFollowedUsers, feedHandler)
@@ -43,7 +45,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addImmediateHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 
-	notifications := newEventDispatcher("notifications")
+	notifications := newEventDispatcher()
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
 	sender.addDelayedHandler(notifications, persist.ActionUserFollowedUsers, notificationHandler)
 	sender.addDelayedHandler(notifications, persist.ActionAdmiredFeedEvent, notificationHandler)
@@ -55,47 +57,51 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	ctx.Set(eventSenderContextKey, &sender)
 }
 
-// DispatchEvent sends the event to all of its registered handlers.
+// DispatchDelayed sends the event to all of its registered handlers.
 func DispatchDelayed(ctx context.Context, event db.Event) error {
 	gc := util.GinContextFromContext(ctx)
-	handlers := For(gc)
+	sender := For(gc)
 
-	if _, handable := handlers.registry[delayedKey][event.Action]; !handable {
-		logger.For(ctx).Warnf("no delayed handler configured for action: %s", event.Action)
+	if _, handable := sender.registry[delayedKey][event.Action]; !handable {
+		logger.For(ctx).WithField("action", event.Action).Warn("no delayed handler configured for action")
 		return nil
 	}
 
-	persistedEvent, err := handlers.eventRepo.Add(ctx, event)
+	persistedEvent, err := sender.eventRepo.Add(ctx, event)
 	if err != nil {
 		return err
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error { return handlers.feed.dispatchDelayed(ctx, *persistedEvent) })
-	eg.Go(func() error { return handlers.notifications.dispatchDelayed(ctx, *persistedEvent) })
+	eg.Go(func() error { return sender.feed.dispatchDelayed(ctx, *persistedEvent) })
+	eg.Go(func() error { return sender.notifications.dispatchDelayed(ctx, *persistedEvent) })
 	return eg.Wait()
 }
 
 // DispatchImmediate flushes the event immediately to its registered handlers.
 func DispatchImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	gc := util.GinContextFromContext(ctx)
-	handlers := For(gc)
+	sender := For(gc)
 
-	if _, handable := handlers.registry[immediateKey][event.Action]; !handable {
-		logger.For(ctx).Warnf("no immediate handler registered for action: %s", event.Action)
+	if _, handable := sender.registry[immediateKey][event.Action]; !handable {
+		logger.For(ctx).WithField("action", event.Action).Warn("no immediate handler configured for action")
 		return nil, nil
 	}
 
-	persistedEvent, err := handlers.eventRepo.Add(ctx, event)
+	persistedEvent, err := sender.eventRepo.Add(ctx, event)
 	if err != nil {
 		return nil, err
 	}
 
-	feedEvent, err := handlers.feed.dispatchImmediate(ctx, *persistedEvent)
-	if err != nil {
-		return nil, err
-	}
-	err = handlers.notifications.dispatchDelayed(ctx, *persistedEvent)
+	go func() {
+		ctx := sentryutil.NewSentryHubGinContext(ctx)
+		if err := sender.notifications.dispatchDelayed(ctx, *persistedEvent); err != nil {
+			logger.For(ctx).Error(err)
+			sentryutil.ReportError(ctx, err)
+		}
+	}()
+
+	feedEvent, err := sender.feed.dispatchImmediate(ctx, *persistedEvent)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +125,10 @@ type eventSender struct {
 
 func newEventSender(queries *db.Queries) eventSender {
 	return eventSender{
-		registry:  map[sendType]registedActions{delayedKey: {}, immediateKey: {}},
+		registry: map[sendType]registedActions{
+			delayedKey:   {},
+			immediateKey: {},
+		},
 		eventRepo: postgres.EventRepository{Queries: queries},
 	}
 }
@@ -135,14 +144,12 @@ func (e *eventSender) addImmediateHandler(dispatcher *eventDispatcher, action pe
 }
 
 type eventDispatcher struct {
-	service           string
 	delayedHandlers   map[persist.Action]delayedHandler
 	immediateHandlers map[persist.Action]immediateHandler
 }
 
-func newEventDispatcher(service string) *eventDispatcher {
+func newEventDispatcher() *eventDispatcher {
 	return &eventDispatcher{
-		service:           service,
 		delayedHandlers:   map[persist.Action]delayedHandler{},
 		immediateHandlers: map[persist.Action]immediateHandler{},
 	}
