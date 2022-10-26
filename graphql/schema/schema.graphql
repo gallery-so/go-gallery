@@ -120,15 +120,16 @@ union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
     ImageMedia
-    | VideoMedia
-    | AudioMedia
-    | TextMedia
-    | HtmlMedia
-    | JsonMedia
-    | GltfMedia
-    | UnknownMedia
-    | SyncingMedia
-    | InvalidMedia
+  | GIFMedia
+  | VideoMedia
+  | AudioMedia
+  | TextMedia
+  | HtmlMedia
+  | JsonMedia
+  | GltfMedia
+  | UnknownMedia
+  | SyncingMedia
+  | InvalidMedia
 
 type PreviewURLSet {
     raw: String
@@ -167,6 +168,14 @@ type ImageMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type GIFMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type VideoMedia implements Media {
@@ -426,13 +435,52 @@ type ViewerGallery {
     gallery: Gallery
 }
 
-type Viewer {
-    user: GalleryUser @goField(forceResolver: true)
-    viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
-    
-    email: UserEmail @goField(forceResolver: true)
+type NotificationEdge {
+    node: Notification
+    cursor: String
+}
 
+type NotificationsConnection @goEmbedHelper {
+    edges: [NotificationEdge]
+    unseenCount: Int
+    pageInfo: PageInfo
+}
+
+type Viewer {
+  user: GalleryUser @goField(forceResolver: true)
+  viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+  feed(before: String, after: String, first: Int, last: Int): FeedConnection
+    @goField(forceResolver: true)
+
+  email: UserEmail @goField(forceResolver: true)
+  """
+  Returns a list of notifications in reverse chronological order.
+  Seen notifications come after unseen notifications
+  """
+  notifications(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): NotificationsConnection @goField(forceResolver: true)
+
+  notificationSettings: NotificationSettings @goField(forceResolver: true)
+}
+
+type NotificationSettings @goEmbedHelper {
+  user: GalleryUser
+
+  someoneFollowedYou: Boolean
+  someoneAdmiredYourUpdate: Boolean
+  someoneCommentedOnYourUpdate: Boolean
+  someoneViewedYourGallery: Boolean
+}
+
+input NotificationSettingsInput {
+  someoneFollowedYou: Boolean
+  someoneAdmiredYourUpdate: Boolean
+  someoneCommentedOnYourUpdate: Boolean
+  someoneViewedYourGallery: Boolean
 }
 
 type UserEmail @goEmbedHelper {
@@ -557,6 +605,7 @@ type FeedEvent implements Node {
     eventData: FeedEventData @goField(forceResolver: true)
     admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
     comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
+    caption: String
 
     # If supplied, typeFilter will only query for the requested interaction types.
     # If typeFilter is omitted, all interaction types will be queried.
@@ -692,6 +741,7 @@ input CreateCollectionInput {
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
     tokenSettings: [CollectionTokenSettingsInput!]!
+    caption: String
 }
 
 union CreateCollectionPayloadOrError =
@@ -701,6 +751,7 @@ union CreateCollectionPayloadOrError =
 
 type CreateCollectionPayload {
     collection: Collection
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 union DeleteCollectionPayloadOrError =
@@ -733,6 +784,7 @@ input UpdateCollectionTokensInput {
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
     tokenSettings: [CollectionTokenSettingsInput!]!
+    caption: String
 }
 
 union UpdateCollectionTokensPayloadOrError =
@@ -742,6 +794,7 @@ union UpdateCollectionTokensPayloadOrError =
 
 type UpdateCollectionTokensPayload {
     collection: Collection
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 input UpdateCollectionHiddenInput {
@@ -914,6 +967,7 @@ type ErrNotAuthorized implements Error {
     message: String!
     cause: AuthorizationError!
 }
+
 
 type ErrInvalidInput implements Error {
     message: String!
@@ -1102,6 +1156,109 @@ type RemoveCommentPayload {
   feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
+interface Notification implements Node {
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+}
+
+interface GroupedNotification implements Notification & Node {
+    id: ID!
+    seen: Boolean
+    creationTime: Time
+    updatedTime: Time
+
+    count: Int
+}
+
+type GroupNotificationUserEdge {
+    node: GalleryUser
+    cursor: String
+}
+
+type GroupNotificationUsersConnection @goEmbedHelper {
+    edges:  [GroupNotificationUserEdge] 
+    pageInfo: PageInfo
+}
+
+type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+}
+
+type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+}
+
+type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  feedEvent: FeedEvent @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+}
+
+type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+
+  # Don't need a `who` here since the `comment` can provide that
+  # Do we want this comment to be the latest comment
+  comment: Comment @goField(forceResolver: true)
+  feedEvent: FeedEvent @goField(forceResolver: true)
+}
+
+type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
+  @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
+  count: Int
+
+  userViewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  nonUserViewerCount: Int
+  gallery: Gallery @goField(forceResolver: true)
+}
+
+type ClearAllNotificationsPayload {
+    notifications: [Notification]
+}
+
+type ViewGalleryPayload {
+    gallery: Gallery
+}
+
+union ViewGalleryPayloadOrError =
+    ViewGalleryPayload
+    | ErrAuthenticationFailed
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1140,4 +1297,15 @@ type Mutation {
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+    
+    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+
+    clearAllNotifications: ClearAllNotificationsPayload @authRequired
+
+    updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
+}
+
+type Subscription {
+    newNotification: Notification
+    notificationUpdated: Notification
 }

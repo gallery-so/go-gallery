@@ -4,6 +4,14 @@ SELECT * FROM users WHERE id = $1 AND deleted = false;
 -- name: GetUserByIdBatch :batchone
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
+-- name: GetUsersByIDs :many
+SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $1;
+
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND deleted = false;
 
@@ -182,25 +190,14 @@ SELECT t.* FROM tokens t
 -- name: CountTokensByContractId :one
 SELECT count(*) FROM tokens WHERE contract = $1 AND deleted = false;
 
--- name: GetOwnersByContractIdPaginate :many
-SELECT DISTINCT ON (users.id) users.* FROM users, tokens
-    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
-    AND tokens.deleted = false AND users.deleted = false
-    AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2;
-
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (users.id) users.* FROM users, tokens
+SELECT DISTINCT ON (result.id) result.* FROM (SELECT users.* FROM users, tokens
     WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
     AND tokens.deleted = false AND users.deleted = false
     AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2;
+        CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2;
 
 -- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
@@ -265,7 +262,16 @@ INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id,
 INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
 
 -- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
+
+-- name: CreateGalleryEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+
+-- name: CreateAdmireEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+
+-- name: CreateCommentEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
@@ -328,7 +334,10 @@ SELECT * FROM feed_events WHERE owner_id = $1 AND deleted = false
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
 -- name: CreateFeedEvent :one
-INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+
+-- name: GeetFeedEventByID :one
+SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
 -- name: GetLastFeedEvent :one
 SELECT * FROM feed_events
@@ -402,6 +411,69 @@ SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_
 -- name: GetCommentsByActorIDBatch :batchmany
 SELECT * FROM comments WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
+-- name: GetCommentsByFeedEventID :many
+SELECT * FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
+
+-- name: GetCommentsByFeedEventIDBatch :batchmany
+SELECT * FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC;
+
+-- name: GetUserNotifications :many
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- name: GetUserNotificationsBatch :batchmany
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- name: CountUserNotifications :one
+SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false;
+
+-- name: GetNotificationByID :one
+SELECT * FROM notifications WHERE id = $1 AND deleted = false;
+
+-- name: GetNotificationByIDBatch :batchone
+SELECT * FROM notifications WHERE id = $1 AND deleted = false;
+
+-- name: GetMostRecentNotificationByOwnerIDForAction :one
+SELECT * FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false
+    ORDER BY created_at DESC
+    LIMIT 1;
+
+-- name: GetNotificationsByOwnerIDForActionAfter :many
+SELECT * FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > @created_after
+    ORDER BY created_at DESC;
+
+-- name: CreateAdmireNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: CreateCommentNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, comment_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+
+-- name: CreateFollowNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: CreateViewGalleryNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: UpdateNotification :exec
+UPDATE notifications SET data = $2, event_ids = event_ids || $3, amount = amount + $4, last_updated = now() WHERE id = $1;
+
+-- name: UpdateNotificationSettingsByID :exec
+UPDATE users SET notification_settings = $2 WHERE id = $1;
+
+-- name: ClearNotificationsForUser :many
+UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING *;
+
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
     SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
@@ -445,3 +517,6 @@ SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsu
 
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
+
+-- name: GetUsersByChainAddresses :many
+select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;

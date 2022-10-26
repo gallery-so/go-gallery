@@ -114,7 +114,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 
 }
 
-func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID) error {
+func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractID": {contractID, "required"},
@@ -133,6 +133,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 		ContractID:        contractID,
 		Imagekeywords:     im,
 		Animationkeywords: anim,
+		ForceRefresh:      forceRefresh,
 	}
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }

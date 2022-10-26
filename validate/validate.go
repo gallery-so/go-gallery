@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 
 	"github.com/go-playground/validator/v10"
@@ -73,10 +74,12 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterAlias("collection_note", "max=600")
 	v.RegisterAlias("token_note", "max=1200")
 	v.RegisterAlias("bio", "max=600")
+	v.RegisterAlias("caption", "max=600")
 
 	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
 	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
 	v.RegisterStructValidation(CollectionTokenSettingsParamsValidator, CollectionTokenSettingsParams{})
+	v.RegisterStructValidation(EventValidator, coredb.Event{})
 }
 
 func ChainAddressValidator(sl validator.StructLevel) {
@@ -93,6 +96,15 @@ func ChainAddressValidator(sl validator.StructLevel) {
 	if chain < 0 || chain > persist.MaxChainValue {
 		sl.ReportError(chain, "Chain", "Chain", "valid_chain_type", "")
 	}
+}
+
+func EventValidator(sl validator.StructLevel) {
+	event := sl.Current().Interface().(coredb.Event)
+
+	if event.Action == "" {
+		sl.ReportError(event.Action, "Action", "Action", "required", "")
+	}
+
 }
 
 type ConnectionPaginationParams struct {

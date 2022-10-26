@@ -33,6 +33,25 @@ type UserUpdateInfoInput struct {
 	Bio                NullString      `json:"bio"`
 }
 
+// UserUpdateNotificationSettings represents the data to be updated when updating a user's notification settings
+type UserUpdateNotificationSettings struct {
+	LastUpdated          LastUpdatedTime          `json:"last_updated"`
+	NotificationSettings UserNotificationSettings `json:"notification_settings"`
+}
+
+/*
+ 	someoneFollowedYou: Boolean
+    someoneAdmiredYourUpdate: Boolean
+    someoneCommentedOnYourUpdate: Boolean
+    someoneViewedYourGallery: Boolean
+*/
+type UserNotificationSettings struct {
+	SomeoneFollowedYou           *bool `json:"someone_followed_you,omitempty"`
+	SomeoneAdmiredYourUpdate     *bool `json:"someone_admired_your_update,omitempty"`
+	SomeoneCommentedOnYourUpdate *bool `json:"someone_commented_on_your_update,omitempty"`
+	SomeoneViewedYourGallery     *bool `json:"someone_viewed_your_gallery,omitempty"`
+}
+
 type CreateUserInput struct {
 	Username                   string
 	Bio                        string
@@ -58,6 +77,7 @@ type UserRepository interface {
 	AddFollower(pCtx context.Context, follower DBID, followee DBID) (refollowed bool, err error)
 	RemoveFollower(pCtx context.Context, follower DBID, followee DBID) error
 	UserFollowsUser(pCtx context.Context, userA DBID, userB DBID) (bool, error)
+	FillWalletDataForUser(pCtx context.Context, user *User) error
 }
 
 // Scan implements the database/sql Scanner interface for the Traits type
@@ -126,4 +146,14 @@ type ErrAddressNotOwnedByUser struct {
 
 func (e ErrAddressNotOwnedByUser) Error() string {
 	return fmt.Sprintf("address is not owned by user: address: %s, userID: %s", e.ChainAddress, e.UserID)
+}
+
+type ErrWalletCreateFailed struct {
+	ChainAddress ChainAddress
+	WalletID     DBID
+	Err          error
+}
+
+func (e ErrWalletCreateFailed) Error() string {
+	return fmt.Sprintf("wallet create failed: address: %s, walletID: %s, error: %s", e.ChainAddress, e.WalletID, e.Err)
 }

@@ -11,9 +11,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/notifications"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -49,6 +52,41 @@ var nodeFetcher = model.NodeFetcher{
 		} else {
 			return nil, err
 		}
+	},
+	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneAdmiredYourFeedEventNotification), nil
+	},
+	OnSomeoneCommentedOnYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourFeedEventNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneCommentedOnYourFeedEventNotification), nil
+	},
+	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneFollowedYouBackNotification), nil
+	},
+	OnSomeoneFollowedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneFollowedYouNotification), nil
+	},
+	OnSomeoneViewedYourGalleryNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneViewedYourGalleryNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneViewedYourGalleryNotification), nil
 	},
 }
 
@@ -409,8 +447,8 @@ func resolveTokensByContractIDWithPagination(ctx context.Context, contractID per
 	}, nil
 }
 
-func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID) error {
-	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID)
+func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
+	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
 }
 
 func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
@@ -563,18 +601,259 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 
 func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.FeedEvent, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return eventToModel(event)
+}
+
+func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
+
+	notifs, pageInfo, err := publicapi.For(ctx).Notifications.GetViewerNotifications(ctx, before, after, first, last)
 
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := feedEventToDataModel(event)
+	edges, err := notificationsToEdges(notifs)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
+	unseen := unseenNotifications(notifs)
+
+	return &model.NotificationsConnection{
+		Edges:       edges,
+		PageInfo:    pageInfoToModel(ctx, pageInfo),
+		UnseenCount: &unseen,
+	}, nil
+}
+
+func notificationsToEdges(notifs []db.Notification) ([]*model.NotificationEdge, error) {
+	edges := make([]*model.NotificationEdge, len(notifs))
+
+	for i, notif := range notifs {
+
+		node, err := notificationToModel(notif)
+		if err != nil {
+			return nil, err
+		}
+
+		edges[i] = &model.NotificationEdge{
+			Node: node,
+		}
+	}
+
+	return edges, nil
+}
+
+func notificationToModel(notif db.Notification) (model.Notification, error) {
+	amount := int(notif.Amount)
+	switch notif.Action {
+	case persist.ActionAdmiredFeedEvent:
+		return model.SomeoneAdmiredYourFeedEventNotification{
+			HelperSomeoneAdmiredYourFeedEventNotificationData: model.HelperSomeoneAdmiredYourFeedEventNotificationData{
+				OwnerID:          notif.OwnerID,
+				FeedEventID:      notif.FeedEventID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			FeedEvent:    nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionCommentedOnFeedEvent:
+		return model.SomeoneCommentedOnYourFeedEventNotification{
+			HelperSomeoneCommentedOnYourFeedEventNotificationData: model.HelperSomeoneCommentedOnYourFeedEventNotificationData{
+				OwnerID:          notif.OwnerID,
+				FeedEventID:      notif.FeedEventID,
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			FeedEvent:    nil, // handled by dedicated resolver
+			Comment:      nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserFollowedUsers:
+		if !notif.Data.FollowedBack {
+			return model.SomeoneFollowedYouNotification{
+				HelperSomeoneFollowedYouNotificationData: model.HelperSomeoneFollowedYouNotificationData{
+					OwnerID:          notif.OwnerID,
+					NotificationData: notif.Data,
+				},
+				Dbid:         notif.ID,
+				Seen:         &notif.Seen,
+				CreationTime: &notif.CreatedAt,
+				UpdatedTime:  &notif.LastUpdated,
+				Count:        &amount,
+				Followers:    nil, // handled by dedicated resolver
+			}, nil
+		}
+		return model.SomeoneFollowedYouBackNotification{
+			HelperSomeoneFollowedYouBackNotificationData: model.HelperSomeoneFollowedYouBackNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Followers:    nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionViewedGallery:
+		nonCount := len(notif.Data.UnauthedViewerIDs)
+		return model.SomeoneViewedYourGalleryNotification{
+			HelperSomeoneViewedYourGalleryNotificationData: model.HelperSomeoneViewedYourGalleryNotificationData{
+				OwnerID:          notif.OwnerID,
+				GalleryID:        notif.GalleryID,
+				NotificationData: notif.Data,
+			},
+			Dbid:               notif.ID,
+			Seen:               &notif.Seen,
+			CreationTime:       &notif.CreatedAt,
+			UpdatedTime:        &notif.LastUpdated,
+			Count:              &amount,
+			UserViewers:        nil, // handled by dedicated resolver
+			Gallery:            nil, // handled by dedicated resolver
+			NonUserViewerCount: &nonCount,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
+	}
+}
+
+func unseenNotifications(notifs []db.Notification) int {
+	count := 0
+	for _, notif := range notifs {
+		if !notif.Seen {
+			count++
+		}
+	}
+
+	return count
+}
+
+func resolveViewerNotificationSettings(ctx context.Context) (*model.NotificationSettings, error) {
+
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return notificationSettingsToModel(ctx, user), nil
+
+}
+
+func notificationSettingsToModel(ctx context.Context, user *db.User) *model.NotificationSettings {
+	settings := user.NotificationSettings
+	return &model.NotificationSettings{
+		HelperNotificationSettingsData: model.HelperNotificationSettingsData{
+			UserId: user.ID,
+		},
+		User:                         userToModel(ctx, *user),
+		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     settings.SomeoneViewedYourGallery,
+	}
+}
+
+func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notification {
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	notifDispatcher := notifications.For(ctx)
+	notifs := notifDispatcher.GetNewNotificationsForUser(userID)
+	logger.For(ctx).Info("new notification subscription for ", userID)
+
+	result := make(chan model.Notification)
+
+	go func() {
+		for notif := range notifs {
+			// use async to prevent blocking the dispatcher
+			asModel, err := notificationToModel(notif)
+			if err != nil {
+				logger.For(nil).Errorf("error converting notification to model: %v", err)
+				return
+			}
+			select {
+			case result <- asModel:
+				logger.For(nil).Debug("sent new notification to subscription")
+			default:
+				logger.For(nil).Errorf("notification subscription channel full, dropping notification")
+				notifDispatcher.UnsubscribeNewNotificationsForUser(userID)
+			}
+		}
+	}()
+
+	return result
+}
+
+func resolveUpdatedNotificationSubscription(ctx context.Context) <-chan model.Notification {
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	notifDispatcher := notifications.For(ctx)
+	notifs := notifDispatcher.GetUpdatedNotificationsForUser(userID)
+
+	result := make(chan model.Notification)
+
+	wp := workerpool.New(10)
+
+	go func() {
+		for notif := range notifs {
+			n := notif
+			wp.Submit(func() {
+				asModel, err := notificationToModel(n)
+				if err != nil {
+					logger.For(nil).Errorf("error converting notification to model: %v", err)
+					return
+				}
+				select {
+				case result <- asModel:
+					logger.For(nil).Debug("sent updated notification to subscription")
+				default:
+					logger.For(nil).Errorf("notification subscription channel full, dropping notification")
+					notifDispatcher.UnsubscribeUpdatedNotificationsForUser(userID)
+				}
+			})
+		}
+		wp.StopWait()
+	}()
+
+	return result
+}
+
+func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userIDs persist.DBIDList, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, userIDs, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.GroupNotificationUserEdge, len(users))
+
+	for i, user := range users {
+		edges[i] = &model.GroupNotificationUserEdge{
+			Node:   userToModel(ctx, user),
+			Cursor: nil,
+		}
+	}
+
+	return &model.GroupNotificationUsersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+		HelperGroupNotificationUsersConnectionData: model.HelperGroupNotificationUsersConnectionData{
+			UserIDs: userIDs,
+		},
+	}, nil
 }
 
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
@@ -629,6 +908,16 @@ func resolveTokenSettingsByIDs(ctx context.Context, tokenID, collectionID persis
 	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive}, nil
 }
 
+func resolveNotificationByID(ctx context.Context, id persist.DBID) (model.Notification, error) {
+	notification, err := publicapi.For(ctx).Notifications.GetByID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return notificationToModel(notification)
+}
+
 func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
 	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, admireID)
 
@@ -666,6 +955,27 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
+}
+
+func eventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
+	data, err := feedEventToDataModel(event)
+	if err != nil {
+		return nil, err
+	}
+
+	// Value always returns a nil error so we can safely ignore it.
+	caption, _ := event.Caption.Value()
+
+	var captionVal *string
+	if caption != nil {
+		captionVal = util.StringToPointer(caption.(string))
+	}
+
+	return &model.FeedEvent{
+		Dbid:      event.ID,
+		Caption:   captionVal,
+		EventData: data,
+	}, nil
 }
 
 func eventToUserCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
@@ -716,7 +1026,7 @@ func eventToCollectionCreatedFeedEventData(event *db.FeedEvent) model.FeedEventD
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
 		HelperCollectionCreatedFeedEventDataData: model.HelperCollectionCreatedFeedEventDataData{
-			FeedEventId: event.ID,
+			FeedEventID: event.ID,
 		},
 	}
 }
@@ -740,7 +1050,7 @@ func eventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.Feed
 		NewTokens:  nil, // handled by dedicated resolver
 		IsPreFeed:  util.BoolToPointer(event.Data.CollectionIsPreFeed),
 		HelperTokensAddedToCollectionFeedEventDataData: model.HelperTokensAddedToCollectionFeedEventDataData{
-			FeedEventId: event.ID,
+			FeedEventID: event.ID,
 		},
 	}
 }
@@ -749,16 +1059,13 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
-		data, err := feedEventToDataModel(&evt)
-
 		var node model.FeedEventOrError
+		node, err := eventToModel(&evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}
 		} else if err != nil {
 			return nil, err
-		} else {
-			node = model.FeedEvent{Dbid: evt.ID, EventData: data}
 		}
 
 		edges[i] = &model.FeedEdge{Node: node}
@@ -777,6 +1084,11 @@ func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
 
 func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int) *model.CollectionLayout {
 	if version == 0 {
+		// Some older collections predate configurable columns; the default back then was 3
+		if layout.Columns == 0 {
+			layout.Columns = 3
+		}
+
 		// Treat the original collection as a single section.
 		return &model.CollectionLayout{
 			Sections: []*int{util.IntToPointer(0)},
@@ -1096,8 +1408,10 @@ func getUrlExtension(url string) string {
 func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 	med := token.Media
 	switch med.MediaType {
-	case persist.MediaTypeImage, persist.MediaTypeGIF, persist.MediaTypeSVG:
+	case persist.MediaTypeImage, persist.MediaTypeSVG:
 		return getImageMedia(ctx, med)
+	case persist.MediaTypeGIF:
+		return getGIFMedia(ctx, med)
 	case persist.MediaTypeVideo:
 		return getVideoMedia(ctx, med)
 	case persist.MediaTypeAudio:
@@ -1142,6 +1456,17 @@ func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
 	url := remapLargeImageUrls(media.MediaURL.String())
 
 	return model.ImageMedia{
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: &url,
+	}
+}
+
+func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
+	url := remapLargeImageUrls(media.MediaURL.String())
+
+	return model.GIFMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),

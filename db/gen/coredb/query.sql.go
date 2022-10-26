@@ -10,8 +10,48 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
+
+const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
+UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+`
+
+func (q *Queries) ClearNotificationsForUser(ctx context.Context, ownerID persist.DBID) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, clearNotificationsForUser, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const countOwnersByContractId = `-- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
@@ -37,26 +77,39 @@ func (q *Queries) CountTokensByContractId(ctx context.Context, contract persist.
 	return count, err
 }
 
-const createCollectionEvent = `-- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+const countUserNotifications = `-- name: CountUserNotifications :one
+SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false
 `
 
-type CreateCollectionEventParams struct {
+func (q *Queries) CountUserNotifications(ctx context.Context, ownerID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countUserNotifications, ownerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createAdmireEvent = `-- name: CreateAdmireEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
+`
+
+type CreateAdmireEventParams struct {
 	ID             persist.DBID
 	ActorID        persist.DBID
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
-	CollectionID   persist.DBID
+	AdmireID       persist.DBID
+	FeedEventID    persist.DBID
 	Data           persist.EventData
 }
 
-func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
-	row := q.db.QueryRow(ctx, createCollectionEvent,
+func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createAdmireEvent,
 		arg.ID,
 		arg.ActorID,
 		arg.Action,
 		arg.ResourceTypeID,
-		arg.CollectionID,
+		arg.AdmireID,
+		arg.FeedEventID,
 		arg.Data,
 	)
 	var i Event
@@ -74,12 +127,202 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+	)
+	return i, err
+}
+
+const createAdmireNotification = `-- name: CreateAdmireNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+`
+
+type CreateAdmireNotificationParams struct {
+	ID          persist.DBID
+	OwnerID     persist.DBID
+	Action      persist.Action
+	Data        persist.NotificationData
+	EventIds    persist.DBIDList
+	FeedEventID persist.DBID
+}
+
+func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmireNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createAdmireNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.FeedEventID,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+	)
+	return i, err
+}
+
+const createCollectionEvent = `-- name: CreateCollectionEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
+`
+
+type CreateCollectionEventParams struct {
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	CollectionID   persist.DBID
+	Data           persist.EventData
+	Caption        sql.NullString
+}
+
+func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createCollectionEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.CollectionID,
+		arg.Data,
+		arg.Caption,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+	)
+	return i, err
+}
+
+const createCommentEvent = `-- name: CreateCommentEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
+`
+
+type CreateCommentEventParams struct {
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	CommentID      persist.DBID
+	FeedEventID    persist.DBID
+	Data           persist.EventData
+}
+
+func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createCommentEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.CommentID,
+		arg.FeedEventID,
+		arg.Data,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+	)
+	return i, err
+}
+
+const createCommentNotification = `-- name: CreateCommentNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, feed_event_id, comment_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+`
+
+type CreateCommentNotificationParams struct {
+	ID          persist.DBID
+	OwnerID     persist.DBID
+	Action      persist.Action
+	Data        persist.NotificationData
+	EventIds    persist.DBIDList
+	FeedEventID persist.DBID
+	CommentID   persist.DBID
+}
+
+func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateCommentNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createCommentNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.FeedEventID,
+		arg.CommentID,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
 	)
 	return i, err
 }
 
 const createFeedEvent = `-- name: CreateFeedEvent :one
-INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption
 `
 
 type CreateFeedEventParams struct {
@@ -89,6 +332,7 @@ type CreateFeedEventParams struct {
 	Data      persist.FeedEventData
 	EventTime time.Time
 	EventIds  persist.DBIDList
+	Caption   sql.NullString
 }
 
 func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams) (FeedEvent, error) {
@@ -99,6 +343,7 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 		arg.Data,
 		arg.EventTime,
 		arg.EventIds,
+		arg.Caption,
 	)
 	var i FeedEvent
 	err := row.Scan(
@@ -112,12 +357,100 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
+	)
+	return i, err
+}
+
+const createFollowNotification = `-- name: CreateFollowNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2, $3, $4, $5) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+`
+
+type CreateFollowNotificationParams struct {
+	ID       persist.DBID
+	OwnerID  persist.DBID
+	Action   persist.Action
+	Data     persist.NotificationData
+	EventIds persist.DBIDList
+}
+
+func (q *Queries) CreateFollowNotification(ctx context.Context, arg CreateFollowNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createFollowNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+	)
+	return i, err
+}
+
+const createGalleryEvent = `-- name: CreateGalleryEvent :one
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
+`
+
+type CreateGalleryEventParams struct {
+	ID             persist.DBID
+	ActorID        persist.DBID
+	Action         persist.Action
+	ResourceTypeID persist.ResourceType
+	GalleryID      persist.DBID
+	Data           persist.EventData
+}
+
+func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEventParams) (Event, error) {
+	row := q.db.QueryRow(ctx, createGalleryEvent,
+		arg.ID,
+		arg.ActorID,
+		arg.Action,
+		arg.ResourceTypeID,
+		arg.GalleryID,
+		arg.Data,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.ActorID,
+		&i.ResourceTypeID,
+		&i.SubjectID,
+		&i.UserID,
+		&i.TokenID,
+		&i.CollectionID,
+		&i.Action,
+		&i.Data,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const createTokenEvent = `-- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
 `
 
 type CreateTokenEventParams struct {
@@ -153,12 +486,18 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const createUserEvent = `-- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
 `
 
 type CreateUserEventParams struct {
@@ -194,6 +533,77 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
+	)
+	return i, err
+}
+
+const createViewGalleryNotification = `-- name: CreateViewGalleryNotification :one
+INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
+`
+
+type CreateViewGalleryNotificationParams struct {
+	ID        persist.DBID
+	OwnerID   persist.DBID
+	Action    persist.Action
+	Data      persist.NotificationData
+	EventIds  persist.DBIDList
+	GalleryID persist.DBID
+}
+
+func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateViewGalleryNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createViewGalleryNotification,
+		arg.ID,
+		arg.OwnerID,
+		arg.Action,
+		arg.Data,
+		arg.EventIds,
+		arg.GalleryID,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+	)
+	return i, err
+}
+
+const geetFeedEventByID = `-- name: GeetFeedEventByID :one
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GeetFeedEventByID(ctx context.Context, id persist.DBID) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, geetFeedEventByID, id)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }
@@ -434,6 +844,74 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 	return items, nil
 }
 
+const getCommentsByFeedEventID = `-- name: GetCommentsByFeedEventID :many
+SELECT comments.id, comments.version, feed_event_id, actor_id, reply_to, comment, comments.deleted, comments.created_at, comments.last_updated, f.id, f.version, owner_id, action, data, event_time, event_ids, f.deleted, f.last_updated, f.created_at, caption FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
+`
+
+type GetCommentsByFeedEventIDRow struct {
+	ID            persist.DBID
+	Version       int32
+	FeedEventID   persist.DBID
+	ActorID       persist.DBID
+	ReplyTo       persist.DBID
+	Comment       string
+	Deleted       bool
+	CreatedAt     time.Time
+	LastUpdated   time.Time
+	ID_2          persist.DBID
+	Version_2     int32
+	OwnerID       persist.DBID
+	Action        persist.Action
+	Data          persist.FeedEventData
+	EventTime     time.Time
+	EventIds      persist.DBIDList
+	Deleted_2     bool
+	LastUpdated_2 time.Time
+	CreatedAt_2   time.Time
+	Caption       sql.NullString
+}
+
+func (q *Queries) GetCommentsByFeedEventID(ctx context.Context, id persist.DBID) ([]GetCommentsByFeedEventIDRow, error) {
+	rows, err := q.db.Query(ctx, getCommentsByFeedEventID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCommentsByFeedEventIDRow
+	for rows.Next() {
+		var i GetCommentsByFeedEventIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.FeedEventID,
+			&i.ActorID,
+			&i.ReplyTo,
+			&i.Comment,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+			&i.ID_2,
+			&i.Version_2,
+			&i.OwnerID,
+			&i.Action,
+			&i.Data,
+			&i.EventTime,
+			&i.EventIds,
+			&i.Deleted_2,
+			&i.LastUpdated_2,
+			&i.CreatedAt_2,
+			&i.Caption,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getContractByChainAddress = `-- name: GetContractByChainAddress :one
 select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
@@ -572,7 +1050,7 @@ func (q *Queries) GetContractsByUserID(ctx context.Context, ownerUserID persist.
 }
 
 const getEvent = `-- name: GetEvent :one
-SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = $1 AND deleted = false
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption FROM events WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) {
@@ -592,22 +1070,28 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.GalleryID,
+		&i.CommentID,
+		&i.AdmireID,
+		&i.FeedEventID,
+		&i.ExternalID,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const getEventsInWindow = `-- name: GetEventsInWindow :many
 WITH RECURSIVE activity AS (
-    SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE events.id = $1 AND deleted = false
+    SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption FROM events WHERE events.id = $1 AND deleted = false
     UNION
-    SELECT e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at FROM events e, activity a
+    SELECT e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption FROM events e, activity a
     WHERE e.actor_id = a.actor_id
         AND e.action = a.action
         AND e.created_at < a.created_at
         AND e.created_at >= a.created_at - make_interval(secs => $2)
         AND e.deleted = false
 )
-SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC
+SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC
 `
 
 type GetEventsInWindowParams struct {
@@ -638,6 +1122,12 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 			&i.Deleted,
 			&i.LastUpdated,
 			&i.CreatedAt,
+			&i.GalleryID,
+			&i.CommentID,
+			&i.AdmireID,
+			&i.FeedEventID,
+			&i.ExternalID,
+			&i.Caption,
 		); err != nil {
 			return nil, err
 		}
@@ -720,7 +1210,7 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 }
 
 const getLastFeedEvent = `-- name: GetLastFeedEvent :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
     WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
@@ -746,12 +1236,13 @@ func (q *Queries) GetLastFeedEvent(ctx context.Context, arg GetLastFeedEventPara
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
     WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = $4::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
@@ -783,12 +1274,13 @@ func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLast
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const getLastFeedEventForToken = `-- name: GetLastFeedEventForToken :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
     WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $4::varchar AND event_time < $3 AND deleted = false
     ORDER BY event_time DESC
     LIMIT 1
@@ -820,6 +1312,7 @@ func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedE
 		&i.Deleted,
 		&i.LastUpdated,
 		&i.CreatedAt,
+		&i.Caption,
 	)
 	return i, err
 }
@@ -845,63 +1338,102 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
-const getOwnersByContractIdPaginate = `-- name: GetOwnersByContractIdPaginate :many
-SELECT DISTINCT ON (users.id) users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.email, users.email_verified, users.email_unsubscriptions FROM users, tokens
-    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
-    AND tokens.deleted = false AND users.deleted = false
-    AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
-    AND (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
-    ORDER BY CASE WHEN $9::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2
+const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false
+    ORDER BY created_at DESC
+    LIMIT 1
 `
 
-type GetOwnersByContractIdPaginateParams struct {
-	Contract           persist.DBID
-	Limit              int32
-	CurBeforeUniversal bool
-	CurBeforeTime      time.Time
-	CurBeforeID        persist.DBID
-	CurAfterUniversal  bool
-	CurAfterTime       time.Time
-	CurAfterID         persist.DBID
-	PagingForward      bool
+type GetMostRecentNotificationByOwnerIDForActionParams struct {
+	OwnerID persist.DBID
+	Action  persist.Action
 }
 
-func (q *Queries) GetOwnersByContractIdPaginate(ctx context.Context, arg GetOwnersByContractIdPaginateParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getOwnersByContractIdPaginate,
-		arg.Contract,
-		arg.Limit,
-		arg.CurBeforeUniversal,
-		arg.CurBeforeTime,
-		arg.CurBeforeID,
-		arg.CurAfterUniversal,
-		arg.CurAfterTime,
-		arg.CurAfterID,
-		arg.PagingForward,
+func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, getMostRecentNotificationByOwnerIDForAction, arg.OwnerID, arg.Action)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
 	)
+	return i, err
+}
+
+const getNotificationByID = `-- name: GetNotificationByID :one
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetNotificationByID(ctx context.Context, id persist.DBID) (Notification, error) {
+	row := q.db.QueryRow(ctx, getNotificationByID, id)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.OwnerID,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Action,
+		&i.Data,
+		&i.EventIds,
+		&i.FeedEventID,
+		&i.CommentID,
+		&i.GalleryID,
+		&i.Seen,
+		&i.Amount,
+	)
+	return i, err
+}
+
+const getNotificationsByOwnerIDForActionAfter = `-- name: GetNotificationsByOwnerIDForActionAfter :many
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications
+    WHERE owner_id = $1 AND action = $2 AND deleted = false AND created_at > $3
+    ORDER BY created_at DESC
+`
+
+type GetNotificationsByOwnerIDForActionAfterParams struct {
+	OwnerID      persist.DBID
+	Action       persist.Action
+	CreatedAfter time.Time
+}
+
+func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, arg GetNotificationsByOwnerIDForActionAfterParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, getNotificationsByOwnerIDForActionAfter, arg.OwnerID, arg.Action, arg.CreatedAfter)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []Notification
 	for rows.Next() {
-		var i User
+		var i Notification
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
+			&i.OwnerID,
 			&i.Version,
 			&i.LastUpdated,
 			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.Email,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
 		); err != nil {
 			return nil, err
 		}
@@ -978,7 +1510,7 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.email, u.email_verified, u.email_unsubscriptions FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email, u.email_verified, u.email_unsubscriptions FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -998,6 +1530,7 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 		&i.Bio,
 		&i.Traits,
 		&i.Universal,
+		&i.NotificationSettings,
 		&i.Email,
 		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
@@ -1343,7 +1876,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -1361,6 +1894,7 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.Bio,
 		&i.Traits,
 		&i.Universal,
+		&i.NotificationSettings,
 		&i.Email,
 		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
@@ -1369,7 +1903,7 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -1387,6 +1921,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Bio,
 		&i.Traits,
 		&i.Universal,
+		&i.NotificationSettings,
 		&i.Email,
 		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
@@ -1394,8 +1929,198 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserNotifications = `-- name: GetUserNotifications :many
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $2
+`
+
+type GetUserNotificationsParams struct {
+	OwnerID       persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificationsParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, getUserNotifications,
+		arg.OwnerID,
+		arg.Limit,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email, users.email_verified, users.email_unsubscriptions,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
+`
+
+type GetUsersByChainAddressesParams struct {
+	Addresses []string
+	Chain     int32
+}
+
+type GetUsersByChainAddressesRow struct {
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	Universal            bool
+	NotificationSettings persist.UserNotificationSettings
+	Email                sql.NullString
+	EmailVerified        bool
+	EmailUnsubscriptions persist.EmailUnsubscriptions
+	Address              persist.Address
+}
+
+func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByChainAddressesParams) ([]GetUsersByChainAddressesRow, error) {
+	rows, err := q.db.Query(ctx, getUsersByChainAddresses, arg.Addresses, arg.Chain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUsersByChainAddressesRow
+	for rows.Next() {
+		var i GetUsersByChainAddressesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.Address,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersByIDs = `-- name: GetUsersByIDs :many
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE id = ANY($2) AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $1
+`
+
+type GetUsersByIDsParams struct {
+	Limit         int32
+	UserIds       persist.DBIDList
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersByIDs,
+		arg.Limit,
+		arg.UserIds,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithNotificationsOn = `-- name: GetUsersWithNotificationsOn :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -1441,6 +2166,7 @@ func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersW
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.NotificationSettings,
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
@@ -1456,7 +2182,7 @@ func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersW
 }
 
 const getUsersWithNotificationsOnForEmailType = `-- name: GetUsersWithNotificationsOnForEmailType :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -1505,6 +2231,7 @@ func (q *Queries) GetUsersWithNotificationsOnForEmailType(ctx context.Context, a
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.NotificationSettings,
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
@@ -1520,7 +2247,7 @@ func (q *Queries) GetUsersWithNotificationsOnForEmailType(ctx context.Context, a
 }
 
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, email, email_verified, email_unsubscriptions FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -1544,6 +2271,7 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.NotificationSettings,
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
@@ -1708,6 +2436,41 @@ func (q *Queries) IsWindowActiveWithSubject(ctx context.Context, arg IsWindowAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const updateNotification = `-- name: UpdateNotification :exec
+UPDATE notifications SET data = $2, event_ids = event_ids || $3, amount = amount + $4, last_updated = now() WHERE id = $1
+`
+
+type UpdateNotificationParams struct {
+	ID       persist.DBID
+	Data     persist.NotificationData
+	EventIds persist.DBIDList
+	Amount   int32
+}
+
+func (q *Queries) UpdateNotification(ctx context.Context, arg UpdateNotificationParams) error {
+	_, err := q.db.Exec(ctx, updateNotification,
+		arg.ID,
+		arg.Data,
+		arg.EventIds,
+		arg.Amount,
+	)
+	return err
+}
+
+const updateNotificationSettingsByID = `-- name: UpdateNotificationSettingsByID :exec
+UPDATE users SET notification_settings = $2 WHERE id = $1
+`
+
+type UpdateNotificationSettingsByIDParams struct {
+	ID                   persist.DBID
+	NotificationSettings persist.UserNotificationSettings
+}
+
+func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg UpdateNotificationSettingsByIDParams) error {
+	_, err := q.db.Exec(ctx, updateNotificationSettingsByID, arg.ID, arg.NotificationSettings)
+	return err
 }
 
 const updateUserVerificationStatus = `-- name: UpdateUserVerificationStatus :exec

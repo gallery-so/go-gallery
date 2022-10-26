@@ -3,7 +3,6 @@ package feed
 import (
 	"context"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -16,26 +15,21 @@ type EventBuilder struct {
 	eventRepo         *postgres.EventRepository
 	feedRepo          *postgres.FeedRepository
 	feedBlocklistRepo *postgres.FeedBlocklistRepository
+	// skipCooldown, if enabled, will disregard the requisite "cooldown"
+	// period of an incoming event.
+	skipCooldown bool
 }
 
-func NewEventBuilder(pgx *pgxpool.Pool) *EventBuilder {
-	queries := db.New(pgx)
+func NewEventBuilder(queries *db.Queries, skipCooldown bool) *EventBuilder {
 	return &EventBuilder{
 		eventRepo:         &postgres.EventRepository{Queries: queries},
 		feedRepo:          &postgres.FeedRepository{Queries: queries},
 		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
+		skipCooldown:      skipCooldown,
 	}
 }
 
-func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
-	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
-	defer tracing.FinishSpan(span)
-
-	event, err := b.eventRepo.Get(ctx, message.ID)
-	if err != nil {
-		return nil, err
-	}
-
+func (b *EventBuilder) NewEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, event.ActorID, event.Action)
 	if err != nil {
 		return nil, err
@@ -43,12 +37,6 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	if blocked {
 		return nil, nil
 	}
-
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"Message ID": message.ID,
-		"Event ID":   event.ID,
-		"Action":     event.Action,
-	})
 
 	switch event.Action {
 	case persist.ActionUserCreated:
@@ -68,12 +56,25 @@ func (b *EventBuilder) NewEvent(ctx context.Context, message task.FeedMessage) (
 	}
 }
 
+func (b *EventBuilder) NewEventFromTask(ctx context.Context, message task.FeedMessage) (*db.FeedEvent, error) {
+	span, ctx := tracing.StartSpan(ctx, "eventBuilder.NewEvent", "newEvent")
+	defer tracing.FinishSpan(span)
+
+	event, err := b.eventRepo.Get(ctx, message.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.NewEvent(ctx, event)
+}
+
 func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActive(ctx, event)
-
-	// more recent events are bufferred
-	if err != nil || isActive {
+	if err != nil {
 		return nil, err
+	}
+	if !useEvent(isActive, b.skipCooldown) {
+		return nil, nil
 	}
 
 	feedEvent, err := b.feedRepo.LastEventFrom(ctx, event)
@@ -93,15 +94,17 @@ func (b *EventBuilder) createUserCreatedEvent(ctx context.Context, event db.Even
 		EventTime: event.CreatedAt,
 		Data:      persist.FeedEventData{UserBio: event.Data.UserBio},
 		EventIds:  persist.DBIDList{event.ID},
+		Caption:   event.Caption,
 	})
 }
 
 func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActive(ctx, event)
-
-	// more recent events are bufferred
-	if err != nil || isActive {
+	if err != nil {
 		return nil, err
+	}
+	if !useEvent(isActive, b.skipCooldown) {
+		return nil, nil
 	}
 
 	feedEvent, err := b.feedRepo.LastEventFrom(ctx, event)
@@ -144,15 +147,17 @@ func (b *EventBuilder) createUserFollowedUsersEvent(ctx context.Context, event d
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  eventIDs,
+		Caption:   event.Caption,
 	})
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-
-	// more recent events are bufferred
-	if err != nil || isActive {
+	if err != nil {
 		return nil, err
+	}
+	if !useEvent(isActive, b.skipCooldown) {
+		return nil, nil
 	}
 
 	// don't present empty notes
@@ -186,15 +191,17 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenEvent(ctx context.Context
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},
+		Caption:   event.Caption,
 	})
 }
 
 func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-
-	// more recent events are bufferred
-	if err != nil || isActive {
+	if err != nil {
 		return nil, err
+	}
+	if !useEvent(isActive, b.skipCooldown) {
+		return nil, nil
 	}
 
 	// don't show empty collections
@@ -214,15 +221,17 @@ func (b *EventBuilder) createCollectionCreatedEvent(ctx context.Context, event d
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},
+		Caption:   event.Caption,
 	})
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-
-	// more recent events are bufferred
-	if err != nil || isActive {
+	if err != nil {
 		return nil, err
+	}
+	if !useEvent(isActive, b.skipCooldown) {
+		return nil, nil
 	}
 
 	// don't present empty notes
@@ -250,15 +259,17 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionEvent(ctx context.Co
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},
+		Caption:   event.Caption,
 	})
 }
 
 func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	isActive, err := b.eventRepo.WindowActiveForSubject(ctx, event)
-
-	// more recent events are bufferred
-	if err != nil || isActive {
+	if err != nil {
 		return nil, err
+	}
+	if !useEvent(isActive, b.skipCooldown) {
+		return nil, nil
 	}
 
 	// don't show empty collections
@@ -310,6 +321,7 @@ func (b *EventBuilder) createTokensAddedToCollectionEvent(ctx context.Context, e
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},
+		Caption:   event.Caption,
 	})
 }
 
@@ -332,4 +344,8 @@ func newTokens(tokens []persist.DBID, otherTokens []persist.DBID) []persist.DBID
 	}
 
 	return newTokens
+}
+
+func useEvent(isActive, skipCooldown bool) bool {
+	return skipCooldown || !isActive
 }

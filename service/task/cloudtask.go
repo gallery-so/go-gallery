@@ -31,7 +31,7 @@ type FeedbotMessage struct {
 
 type TokenProcessingUserMessage struct {
 	UserID            persist.DBID  `json:"user_id" binding:"required"`
-	Chain             persist.Chain `json:"chain" binding:"required"`
+	Chain             persist.Chain `json:"chain"`
 	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
 	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
 }
@@ -40,6 +40,7 @@ type TokenProcessingContractTokensMessage struct {
 	ContractID        persist.DBID `json:"contract_id" binding:"required"`
 	Imagekeywords     []string     `json:"image_keywords" binding:"required"`
 	Animationkeywords []string     `json:"animation_keywords" binding:"required"`
+	ForceRefresh      bool         `json:"force_refresh"`
 }
 
 // DeepRefreshMessage is the input message to the indexer-api for deep refreshes

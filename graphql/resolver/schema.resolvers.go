@@ -75,7 +75,7 @@ func (r *collectionCreatedFeedEventDataResolver) Collection(ctx context.Context,
 }
 
 func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
+	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
 }
 
 func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error) {
@@ -119,7 +119,11 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 }
 
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokensConnection, error) {
-	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	refresh := false
+	if obj.ForceRefresh != nil {
+		refresh = *obj.ForceRefresh
+	}
+	err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
 	if err != nil {
 		return nil, err
 	}
@@ -128,16 +132,23 @@ func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Co
 
 func (r *communityResolver) Owners(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int) (*model.TokenHoldersConnection, error) {
 	refresh := false
-	if obj.HelperCommunityData.ForceRefresh != nil {
-		refresh = *obj.HelperCommunityData.ForceRefresh
+	if obj.ForceRefresh != nil {
+		refresh = *obj.ForceRefresh
 	}
 
-	err := refreshTokensInContractAsync(ctx, obj.Dbid)
+	err := refreshTokensInContractAsync(ctx, obj.Dbid, refresh)
 	if err != nil {
 		return nil, err
 	}
 
 	return resolveCommunityOwnersByContractID(ctx, obj.Dbid, refresh, before, after, first, last)
+}
+
+func (r *createCollectionPayloadResolver) FeedEvent(ctx context.Context, obj *model.CreateCollectionPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 func (r *feedEventResolver) EventData(ctx context.Context, obj *model.FeedEvent) (model.FeedEventData, error) {
@@ -401,14 +412,19 @@ func (r *mutationResolver) CreateCollection(ctx context.Context, input model.Cre
 		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
 	}
 
-	collection, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout, settings)
-
+	collection, feedEvent, err := api.Collection.CreateCollection(ctx, input.GalleryID, input.Name, input.CollectorsNote, input.Tokens, layout, settings, input.Caption)
 	if err != nil {
 		return nil, err
 	}
 
+	var eventModel model.FeedEvent
+	if feedEvent != nil {
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
+	}
+
 	output := model.CreateCollectionPayload{
 		Collection: collectionToModel(ctx, *collection),
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -485,7 +501,7 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
 	}
 
-	err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout, settings)
+	feedEvent, err := api.Collection.UpdateCollectionTokens(ctx, input.CollectionID, input.Tokens, layout, settings, input.Caption)
 	if err != nil {
 		return nil, err
 	}
@@ -495,8 +511,14 @@ func (r *mutationResolver) UpdateCollectionTokens(ctx context.Context, input mod
 		return nil, err
 	}
 
+	var eventModel model.FeedEvent
+	if feedEvent != nil {
+		eventModel = model.FeedEvent{Dbid: feedEvent.ID}
+	}
+
 	output := &model.UpdateCollectionTokensPayload{
 		Collection: collectionToModel(ctx, *collection),
+		FeedEvent:  &eventModel,
 	}
 
 	return output, nil
@@ -820,6 +842,53 @@ func (r *mutationResolver) RemoveComment(ctx context.Context, commentID persist.
 	return output, nil
 }
 
+func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error) {
+	gallery, err := publicapi.For(ctx).Gallery.ViewGallery(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.ViewGalleryPayload{
+		Gallery: galleryToModel(ctx, gallery),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error) {
+	notifications, err := publicapi.For(ctx).Notifications.ClearUserNotifications(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]model.Notification, len(notifications))
+	for i, n := range notifications {
+		model, err := notificationToModel(n)
+		if err != nil {
+			return nil, err
+		}
+		models[i] = model
+	}
+
+	output := &model.ClearAllNotificationsPayload{
+		Notifications: models,
+	}
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error) {
+	err := publicapi.For(ctx).User.UpdateUserNotificationSettings(ctx, persist.UserNotificationSettings{
+		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     settings.SomeoneViewedYourGallery,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resolveViewerNotificationSettings(ctx)
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -967,6 +1036,46 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 	return tokensToModel(ctx, tokens), nil
 }
 
+func (r *someoneAdmiredYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, obj.FeedEventID)
+}
+
+func (r *someoneAdmiredYourFeedEventNotificationResolver) Admirers(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AdmirerIDs, before, after, first, last)
+}
+
+func (r *someoneCommentedOnYourFeedEventNotificationResolver) Comment(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.Comment, error) {
+	return resolveCommentByCommentID(ctx, obj.CommentID)
+}
+
+func (r *someoneCommentedOnYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneCommentedOnYourFeedEventNotification) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, obj.HelperSomeoneCommentedOnYourFeedEventNotificationData.FeedEventID)
+}
+
+func (r *someoneFollowedYouBackNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouBackNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
+}
+
+func (r *someoneFollowedYouNotificationResolver) Followers(ctx context.Context, obj *model.SomeoneFollowedYouNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.FollowerIDs, before, after, first, last)
+}
+
+func (r *someoneViewedYourGalleryNotificationResolver) UserViewers(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	return resolveGroupNotificationUsersConnectionByUserIDs(ctx, obj.NotificationData.AuthedViewerIDs, before, after, first, last)
+}
+
+func (r *someoneViewedYourGalleryNotificationResolver) Gallery(ctx context.Context, obj *model.SomeoneViewedYourGalleryNotification) (*model.Gallery, error) {
+	return resolveGalleryByGalleryID(ctx, obj.GalleryID)
+}
+
+func (r *subscriptionResolver) NewNotification(ctx context.Context) (<-chan model.Notification, error) {
+	return resolveNewNotificationSubscription(ctx), nil
+}
+
+func (r *subscriptionResolver) NotificationUpdated(ctx context.Context) (<-chan model.Notification, error) {
+	return resolveUpdatedNotificationSubscription(ctx), nil
+}
+
 func (r *tokenResolver) Owner(ctx context.Context, obj *model.Token) (*model.GalleryUser, error) {
 	return resolveTokenOwnerByTokenID(ctx, obj.Dbid)
 }
@@ -1017,11 +1126,18 @@ func (r *tokensAddedToCollectionFeedEventDataResolver) Collection(ctx context.Co
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventId)
+	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
 }
 
 func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
+}
+
+func (r *updateCollectionTokensPayloadResolver) FeedEvent(ctx context.Context, obj *model.UpdateCollectionTokensPayload) (*model.FeedEvent, error) {
+	if obj.FeedEvent.Dbid == "" {
+		return nil, nil
+	}
+	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
 
 func (r *userCreatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.UserCreatedFeedEventData) (*model.GalleryUser, error) {
@@ -1070,6 +1186,14 @@ func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *st
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
+	return resolveViewerNotifications(ctx, before, after, first, last)
+}
+
+func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error) {
+	return resolveViewerNotificationSettings(ctx)
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
@@ -1134,6 +1258,11 @@ func (r *Resolver) CommentOnFeedEventPayload() generated.CommentOnFeedEventPaylo
 // Community returns generated.CommunityResolver implementation.
 func (r *Resolver) Community() generated.CommunityResolver { return &communityResolver{r} }
 
+// CreateCollectionPayload returns generated.CreateCollectionPayloadResolver implementation.
+func (r *Resolver) CreateCollectionPayload() generated.CreateCollectionPayloadResolver {
+	return &createCollectionPayloadResolver{r}
+}
+
 // FeedEvent returns generated.FeedEventResolver implementation.
 func (r *Resolver) FeedEvent() generated.FeedEventResolver { return &feedEventResolver{r} }
 
@@ -1175,6 +1304,34 @@ func (r *Resolver) SetSpamPreferencePayload() generated.SetSpamPreferencePayload
 	return &setSpamPreferencePayloadResolver{r}
 }
 
+// SomeoneAdmiredYourFeedEventNotification returns generated.SomeoneAdmiredYourFeedEventNotificationResolver implementation.
+func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAdmiredYourFeedEventNotificationResolver {
+	return &someoneAdmiredYourFeedEventNotificationResolver{r}
+}
+
+// SomeoneCommentedOnYourFeedEventNotification returns generated.SomeoneCommentedOnYourFeedEventNotificationResolver implementation.
+func (r *Resolver) SomeoneCommentedOnYourFeedEventNotification() generated.SomeoneCommentedOnYourFeedEventNotificationResolver {
+	return &someoneCommentedOnYourFeedEventNotificationResolver{r}
+}
+
+// SomeoneFollowedYouBackNotification returns generated.SomeoneFollowedYouBackNotificationResolver implementation.
+func (r *Resolver) SomeoneFollowedYouBackNotification() generated.SomeoneFollowedYouBackNotificationResolver {
+	return &someoneFollowedYouBackNotificationResolver{r}
+}
+
+// SomeoneFollowedYouNotification returns generated.SomeoneFollowedYouNotificationResolver implementation.
+func (r *Resolver) SomeoneFollowedYouNotification() generated.SomeoneFollowedYouNotificationResolver {
+	return &someoneFollowedYouNotificationResolver{r}
+}
+
+// SomeoneViewedYourGalleryNotification returns generated.SomeoneViewedYourGalleryNotificationResolver implementation.
+func (r *Resolver) SomeoneViewedYourGalleryNotification() generated.SomeoneViewedYourGalleryNotificationResolver {
+	return &someoneViewedYourGalleryNotificationResolver{r}
+}
+
+// Subscription returns generated.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
+
 // Token returns generated.TokenResolver implementation.
 func (r *Resolver) Token() generated.TokenResolver { return &tokenResolver{r} }
 
@@ -1189,6 +1346,11 @@ func (r *Resolver) TokensAddedToCollectionFeedEventData() generated.TokensAddedT
 // UnfollowUserPayload returns generated.UnfollowUserPayloadResolver implementation.
 func (r *Resolver) UnfollowUserPayload() generated.UnfollowUserPayloadResolver {
 	return &unfollowUserPayloadResolver{r}
+}
+
+// UpdateCollectionTokensPayload returns generated.UpdateCollectionTokensPayloadResolver implementation.
+func (r *Resolver) UpdateCollectionTokensPayload() generated.UpdateCollectionTokensPayloadResolver {
+	return &updateCollectionTokensPayloadResolver{r}
 }
 
 // UserCreatedFeedEventData returns generated.UserCreatedFeedEventDataResolver implementation.
@@ -1227,6 +1389,7 @@ type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }
 type commentOnFeedEventPayloadResolver struct{ *Resolver }
 type communityResolver struct{ *Resolver }
+type createCollectionPayloadResolver struct{ *Resolver }
 type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
@@ -1238,10 +1401,17 @@ type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }
 type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
+type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
+type someoneFollowedYouBackNotificationResolver struct{ *Resolver }
+type someoneFollowedYouNotificationResolver struct{ *Resolver }
+type someoneViewedYourGalleryNotificationResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }
 type tokenResolver struct{ *Resolver }
 type tokenHolderResolver struct{ *Resolver }
 type tokensAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type unfollowUserPayloadResolver struct{ *Resolver }
+type updateCollectionTokensPayloadResolver struct{ *Resolver }
 type userCreatedFeedEventDataResolver struct{ *Resolver }
 type userFollowedUsersFeedEventDataResolver struct{ *Resolver }
 type viewerResolver struct{ *Resolver }
