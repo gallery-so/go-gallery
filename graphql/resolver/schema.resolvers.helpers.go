@@ -541,10 +541,10 @@ func userToEmailModel(user *db.User) *model.UserEmail {
 	email := user.Email.String()
 
 	return &model.UserEmail{
-		Email:    &email,
-		Verified: &user.EmailVerified,
+		Email:              &email,
+		VerificationStatus: &user.EmailVerified,
 		EmailNotificationSettings: &model.EmailNotificationSettings{
-			UnsubscribedFromAll: user.EmailUnsubscriptions.All,
+			UnsubscribedFromAll: user.EmailUnsubscriptions.All.BoolPointer(),
 		},
 	}
 

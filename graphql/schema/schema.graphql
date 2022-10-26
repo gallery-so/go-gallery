@@ -490,7 +490,7 @@ enum EmailVerificationStatus {
 
 type UserEmail {
     email: String
-    verified: EmailVerificationStatus
+    verificationStatus: EmailVerificationStatus
     emailNotificationSettings: EmailNotificationSettings
 }
 

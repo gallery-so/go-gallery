@@ -58,6 +58,10 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		err = addEmailToSendgridList(c, user.Email.String(), viper.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
 
 		c.JSON(http.StatusOK, VerifyEmailOutput{
 			UserID: user.ID,

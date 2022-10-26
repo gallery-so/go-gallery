@@ -100,6 +100,18 @@ func (m Traits) Value() (driver.Value, error) {
 	return []byte(strings.ToValidUTF8(strings.ReplaceAll(string(val), "\\u0000", ""), "")), nil
 }
 
+func (u UserNotificationSettings) Value() (driver.Value, error) {
+	return json.Marshal(u)
+}
+
+func (u *UserNotificationSettings) Scan(src interface{}) error {
+	if src == nil {
+		*u = UserNotificationSettings{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), u)
+}
+
 // ErrUserNotFound is returned when a user is not found
 type ErrUserNotFound struct {
 	UserID        DBID

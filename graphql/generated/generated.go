@@ -822,7 +822,7 @@ type ComplexityRoot struct {
 	UserEmail struct {
 		Email                     func(childComplexity int) int
 		EmailNotificationSettings func(childComplexity int) int
-		Verified                  func(childComplexity int) int
+		VerificationStatus        func(childComplexity int) int
 	}
 
 	UserFollowedUsersFeedEventData struct {
@@ -4177,12 +4177,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserEmail.EmailNotificationSettings(childComplexity), true
 
-	case "UserEmail.verified":
-		if e.complexity.UserEmail.Verified == nil {
+	case "UserEmail.verificationStatus":
+		if e.complexity.UserEmail.VerificationStatus == nil {
 			break
 		}
 
-		return e.complexity.UserEmail.Verified(childComplexity), true
+		return e.complexity.UserEmail.VerificationStatus(childComplexity), true
 
 	case "UserFollowedUsersFeedEventData.action":
 		if e.complexity.UserFollowedUsersFeedEventData.Action == nil {
@@ -4956,7 +4956,7 @@ enum EmailVerificationStatus {
 
 type UserEmail {
     email: String
-    verified: EmailVerificationStatus
+    verificationStatus: EmailVerificationStatus
     emailNotificationSettings: EmailNotificationSettings
 }
 
@@ -21068,7 +21068,7 @@ func (ec *executionContext) _UserEmail_email(ctx context.Context, field graphql.
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UserEmail_verified(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserEmail_verificationStatus(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -21086,7 +21086,7 @@ func (ec *executionContext) _UserEmail_verified(ctx context.Context, field graph
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Verified, nil
+		return obj.VerificationStatus, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -32068,9 +32068,9 @@ func (ec *executionContext) _UserEmail(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "verified":
+		case "verificationStatus":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UserEmail_verified(ctx, field, obj)
+				return ec._UserEmail_verificationStatus(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

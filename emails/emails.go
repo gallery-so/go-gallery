@@ -85,7 +85,7 @@ func setDefaults() {
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("SENDGRID_API_KEY", "")
 	viper.SetDefault("FROM_EMAIL", "test@gallery.so")
-	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "Default")
+	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "c63e40ab-5049-4ce1-9d14-8742a3c5c1a8")
 
 	viper.AutomaticEnv()
 

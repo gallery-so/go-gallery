@@ -1242,7 +1242,7 @@ func (UserCreatedFeedEventData) IsFeedEventData() {}
 
 type UserEmail struct {
 	Email                     *string                          `json:"email"`
-	Verified                  *persist.EmailVerificationStatus `json:"verified"`
+	VerificationStatus        *persist.EmailVerificationStatus `json:"verificationStatus"`
 	EmailNotificationSettings *EmailNotificationSettings       `json:"emailNotificationSettings"`
 }
 

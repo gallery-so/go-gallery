@@ -3,6 +3,7 @@ package persist
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -11,7 +12,7 @@ type EmailType string
 
 type EmailVerificationStatus int
 
-var emailVerificationStatuses = [...]string{"Unverified", "Verified", "Failed", "Admin"}
+var emailVerificationStatuses = []string{"Unverified", "Verified", "Failed", "Admin"}
 
 const (
 	EmailTypeNotifications EmailType = "notifications"
@@ -26,8 +27,8 @@ const (
 )
 
 type EmailUnsubscriptions struct {
-	All           *bool `json:"all"`
-	Notifications *bool `json:"notifications"`
+	All           NullBool `json:"all"`
+	Notifications NullBool `json:"notifications"`
 }
 
 func (e EmailUnsubscriptions) Value() (driver.Value, error) {
@@ -62,7 +63,7 @@ func (e *EmailVerificationStatus) Scan(src interface{}) error {
 	if src == nil {
 		return nil
 	}
-	*e = EmailVerificationStatus(src.(int32))
+	*e = EmailVerificationStatus(src.(int64))
 	return nil
 }
 
@@ -71,7 +72,7 @@ func (e EmailVerificationStatus) String() string {
 }
 
 func (e EmailVerificationStatus) MarshalGQL(w io.Writer) {
-	w.Write([]byte(e.String()))
+	w.Write([]byte(fmt.Sprintf(`"%s"`, e.String())))
 }
 
 func (e *EmailVerificationStatus) UnmarshalGQL(v interface{}) error {
