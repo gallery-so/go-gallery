@@ -3,6 +3,7 @@ package emails
 import (
 	"bytes"
 	"context"
+	"fmt"
 	htmltemplate "html/template"
 	"net/http"
 	plaintemplate "text/template"
@@ -50,6 +51,11 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 		user, err := dataloaders.UserByUserID.Load(input.UserID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		if user.Email == "" {
+			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("user %s has no email", input.UserID))
 			return
 		}
 

@@ -291,7 +291,7 @@ type User struct {
 	Universal            bool
 	NotificationSettings persist.UserNotificationSettings
 	Email                persist.NullString
-	EmailVerified        bool
+	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 }
 

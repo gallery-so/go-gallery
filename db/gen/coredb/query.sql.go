@@ -2028,7 +2028,7 @@ type GetUsersByChainAddressesRow struct {
 	Universal            bool
 	NotificationSettings persist.UserNotificationSettings
 	Email                persist.NullString
-	EmailVerified        bool
+	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	Address              persist.Address
 }
@@ -2488,7 +2488,7 @@ func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg Update
 }
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec
-UPDATE users SET email = $2, email_verified = false WHERE id = $1
+UPDATE users SET email = $2, email_verified = 0 WHERE id = $1
 `
 
 type UpdateUserEmailParams struct {
@@ -2507,7 +2507,7 @@ UPDATE users SET email_verified = $2 WHERE id = $1
 
 type UpdateUserVerificationStatusParams struct {
 	ID            persist.DBID
-	EmailVerified bool
+	EmailVerified persist.EmailVerificationStatus
 }
 
 func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {

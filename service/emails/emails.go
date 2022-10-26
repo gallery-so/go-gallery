@@ -24,7 +24,7 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 
 	buf := bytes.NewBuffer(body)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/emails/verify", viper.GetString("EMAILS_HOST")), buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/verify", viper.GetString("EMAILS_HOST")), buf)
 	if err != nil {
 		return emails.VerifyEmailOutput{}, err
 	}

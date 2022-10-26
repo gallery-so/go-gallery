@@ -7,9 +7,17 @@ import (
 
 type EmailType string
 
+type EmailVerificationStatus int
+
 const (
 	EmailTypeNotifications EmailType = "notifications"
 	EmailTypeAdmin                   = "admin"
+)
+
+const (
+	EmailVerificationStatusUnverified EmailVerificationStatus = iota
+	EmailVerificationStatusVerified
+	EmailVerificationStatusAdmin
 )
 
 type EmailUnsubscriptions struct {

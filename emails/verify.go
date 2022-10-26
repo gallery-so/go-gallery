@@ -41,7 +41,7 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 
 		err = queries.UpdateUserVerificationStatus(c, coredb.UpdateUserVerificationStatusParams{
 			ID:            userID,
-			EmailVerified: true,
+			EmailVerified: persist.EmailVerificationStatusVerified,
 		})
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
