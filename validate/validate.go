@@ -74,6 +74,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterAlias("collection_note", "max=600")
 	v.RegisterAlias("token_note", "max=1200")
 	v.RegisterAlias("bio", "max=600")
+	v.RegisterAlias("caption", "max=600")
 
 	v.RegisterStructValidation(ChainAddressValidator, persist.ChainAddress{})
 	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})

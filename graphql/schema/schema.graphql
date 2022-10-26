@@ -585,6 +585,7 @@ type FeedEvent implements Node {
     eventData: FeedEventData @goField(forceResolver: true)
     admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
     comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
+    caption: String
 
     # If supplied, typeFilter will only query for the requested interaction types.
     # If typeFilter is omitted, all interaction types will be queried.
@@ -720,6 +721,7 @@ input CreateCollectionInput {
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
     tokenSettings: [CollectionTokenSettingsInput!]!
+    caption: String
 }
 
 union CreateCollectionPayloadOrError =
@@ -729,6 +731,7 @@ union CreateCollectionPayloadOrError =
 
 type CreateCollectionPayload {
     collection: Collection
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 union DeleteCollectionPayloadOrError =
@@ -761,6 +764,7 @@ input UpdateCollectionTokensInput {
     tokens: [DBID!]!
     layout: CollectionLayoutInput!
     tokenSettings: [CollectionTokenSettingsInput!]!
+    caption: String
 }
 
 union UpdateCollectionTokensPayloadOrError =
@@ -770,6 +774,7 @@ union UpdateCollectionTokensPayloadOrError =
 
 type UpdateCollectionTokensPayload {
     collection: Collection
+    feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 input UpdateCollectionHiddenInput {

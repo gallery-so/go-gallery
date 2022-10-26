@@ -540,7 +540,7 @@ func (b *GetCommentsByActorIDBatchBatchResults) Close() error {
 }
 
 const getCommentsByFeedEventIDBatch = `-- name: GetCommentsByFeedEventIDBatch :batchmany
-SELECT comments.id, comments.version, feed_event_id, actor_id, reply_to, comment, comments.deleted, comments.created_at, comments.last_updated, f.id, f.version, owner_id, action, data, event_time, event_ids, f.deleted, f.last_updated, f.created_at FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
+SELECT comments.id, comments.version, feed_event_id, actor_id, reply_to, comment, comments.deleted, comments.created_at, comments.last_updated, f.id, f.version, owner_id, action, data, event_time, event_ids, f.deleted, f.last_updated, f.created_at, caption FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
 `
 
 type GetCommentsByFeedEventIDBatchBatchResults struct {
@@ -568,6 +568,7 @@ type GetCommentsByFeedEventIDBatchRow struct {
 	Deleted_2     bool
 	LastUpdated_2 time.Time
 	CreatedAt_2   time.Time
+	Caption       sql.NullString
 }
 
 func (q *Queries) GetCommentsByFeedEventIDBatch(ctx context.Context, id []persist.DBID) *GetCommentsByFeedEventIDBatchBatchResults {
@@ -612,6 +613,7 @@ func (b *GetCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []GetComme
 				&i.Deleted_2,
 				&i.LastUpdated_2,
 				&i.CreatedAt_2,
+				&i.Caption,
 			); err != nil {
 				break
 			}
@@ -822,7 +824,7 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 }
 
 const getEventByIdBatch = `-- name: GetEventByIdBatch :batchone
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = $1 AND deleted = false
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE id = $1 AND deleted = false
 `
 
 type GetEventByIdBatchBatchResults struct {
@@ -857,6 +859,7 @@ func (b *GetEventByIdBatchBatchResults) QueryRow(f func(int, FeedEvent, error)) 
 			&i.Deleted,
 			&i.LastUpdated,
 			&i.CreatedAt,
+			&i.Caption,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -2676,7 +2679,7 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE deleted = false
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE deleted = false
     AND (event_time, id) < ($2, $3)
     AND (event_time, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (event_time, id) END ASC,
@@ -2736,6 +2739,7 @@ func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []FeedEvent, error)) 
 				&i.Deleted,
 				&i.LastUpdated,
 				&i.CreatedAt,
+				&i.Caption,
 			); err != nil {
 				break
 			}
@@ -2838,7 +2842,7 @@ func (b *PaginateInteractionsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :batchmany
-SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
+SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at, fe.caption FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
     AND fe.owner_id = fl.followee AND fl.follower = $1
     AND (fe.event_time, fe.id) < ($3, $4)
     AND (fe.event_time, fe.id) > ($5, $6)
@@ -2901,6 +2905,7 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []FeedEvent
 				&i.Deleted,
 				&i.LastUpdated,
 				&i.CreatedAt,
+				&i.Caption,
 			); err != nil {
 				break
 			}
@@ -2919,7 +2924,7 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Close() error {
 }
 
 const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE owner_id = $1 AND deleted = false
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE owner_id = $1 AND deleted = false
     AND (event_time, id) < ($3, $4)
     AND (event_time, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (event_time, id) END ASC,
@@ -2981,6 +2986,7 @@ func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, er
 				&i.Deleted,
 				&i.LastUpdated,
 				&i.CreatedAt,
+				&i.Caption,
 			); err != nil {
 				break
 			}

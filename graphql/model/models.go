@@ -43,11 +43,11 @@ type HelperCommunityData struct {
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {
-	FeedEventId persist.DBID
+	FeedEventID persist.DBID
 }
 
 type HelperCollectionCreatedFeedEventDataData struct {
-	FeedEventId persist.DBID
+	FeedEventID persist.DBID
 }
 
 type HelperFeedConnectionData struct {

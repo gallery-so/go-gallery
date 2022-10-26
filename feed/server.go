@@ -7,14 +7,14 @@ import (
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v4/pgxpool"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
-func handleEvent(pgx *pgxpool.Pool, taskClient *cloudtasks.Client) gin.HandlerFunc {
+func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		message := task.FeedMessage{}
 
@@ -23,8 +23,8 @@ func handleEvent(pgx *pgxpool.Pool, taskClient *cloudtasks.Client) gin.HandlerFu
 			return
 		}
 
-		builder := NewEventBuilder(pgx)
-		event, err := builder.NewEvent(c.Request.Context(), message)
+		builder := NewEventBuilder(queries, false)
+		event, err := builder.NewEventFromTask(c.Request.Context(), message)
 
 		if err != nil {
 			logger.For(c).WithFields(logrus.Fields{"eventID": message.ID}).Debugf("failed to handle event: %s", err)

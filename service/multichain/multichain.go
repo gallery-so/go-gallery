@@ -13,6 +13,7 @@ import (
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -27,9 +28,10 @@ const maxCommunitySize = 10_000
 
 // Provider is an interface for retrieving data from multiple chains
 type Provider struct {
-	Repos  *persist.Repositories
-	Cache  memstore.Cache
-	Chains map[persist.Chain][]ChainProvider
+	Repos   *persist.Repositories
+	Queries *coredb.Queries
+	Cache   memstore.Cache
+	Chains  map[persist.Chain][]ChainProvider
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	ChainAddressOverrides ChainOverrideMap
 	TasksClient           *cloudtasks.Client
@@ -153,7 +155,7 @@ type ChainProvider interface {
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
 // NewProvider creates a new MultiChainDataRetriever
-func NewProvider(ctx context.Context, repos *persist.Repositories, cache memstore.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
+func NewProvider(ctx context.Context, repos *persist.Repositories, queries *coredb.Queries, cache memstore.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, chains ...ChainProvider) *Provider {
 	c := map[persist.Chain][]ChainProvider{}
 	for _, chain := range chains {
 		info, err := chain.GetBlockchainInfo(ctx)
@@ -166,6 +168,7 @@ func NewProvider(ctx context.Context, repos *persist.Repositories, cache memstor
 		Repos:       repos,
 		Cache:       cache,
 		TasksClient: taskClient,
+		Queries:     queries,
 
 		Chains:                c,
 		ChainAddressOverrides: chainOverrides,
@@ -557,7 +560,7 @@ outer:
 
 	logger.For(ctx).Debug("creating users")
 
-	chainTokensForUsers, users, err := p.createUsersForTokens(ctx, allTokens)
+	chainTokensForUsers, users, err := p.createUsersForTokens(ctx, allTokens, ci.Chain)
 	if err != nil {
 		return err
 	}
@@ -571,14 +574,14 @@ outer:
 
 	logger.For(ctx).Debug("creating tokens")
 
-	for _, user := range users {
-		allUserTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, -1, 0)
+	for userID, user := range users {
+		allUserTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, userID, -1, 0)
 		if err != nil {
 			return err
 		}
 
 		logger.For(ctx).Debugf("creating tokens for user %s", user.Username)
-		_, err = p.upsertTokens(ctx, chainTokensForUsers[user.ID], addressToContract, allUserTokens, user)
+		_, err = p.upsertTokens(ctx, chainTokensForUsers[userID], addressToContract, allUserTokens, user)
 		if err != nil {
 			return err
 		}
@@ -611,7 +614,7 @@ type tokenForUser struct {
 }
 
 // this function returns a map of user IDs to their new tokens as well as a map of user IDs to the users themselves
-func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainTokens) (map[persist.DBID][]chainTokens, map[persist.DBID]persist.User, error) {
+func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainTokens, chain persist.Chain) (map[persist.DBID][]chainTokens, map[persist.DBID]persist.User, error) {
 	users := map[persist.DBID]persist.User{}
 	userTokens := map[persist.DBID]map[int]chainTokens{}
 	seenTokens := map[tokenUniqueIdentifiers]bool{}
@@ -623,6 +626,53 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 	wp := workerpool.New(100)
 
 	mu := &sync.Mutex{}
+
+	ownerAddresses := make([]string, 0, len(tokens))
+
+	for _, chainToken := range tokens {
+		for _, token := range chainToken.tokens {
+			ownerAddresses = append(ownerAddresses, token.OwnerAddress.String())
+		}
+	}
+
+	// get all current users
+
+	allCurrentUsers, err := p.Queries.GetUsersByChainAddresses(ctx, coredb.GetUsersByChainAddressesParams{
+		Addresses: ownerAddresses,
+		Chain:     int32(chain),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// figure out which users are not in the database
+
+	addressesToUsers := map[string]persist.User{}
+
+	for _, user := range allCurrentUsers {
+		traits := persist.Traits{}
+		err = user.Traits.AssignTo(&traits)
+		if err != nil {
+			return nil, nil, err
+		}
+		addressesToUsers[string(user.Address)] = persist.User{
+			Version:            persist.NullInt32(user.Version.Int32),
+			ID:                 user.ID,
+			CreationTime:       persist.CreationTime(user.CreatedAt),
+			Deleted:            persist.NullBool(user.Deleted),
+			LastUpdated:        persist.LastUpdatedTime(user.LastUpdated),
+			Username:           persist.NullString(user.Username.String),
+			UsernameIdempotent: persist.NullString(user.UsernameIdempotent.String),
+			Wallets:            user.Wallets,
+			Bio:                persist.NullString(user.Bio.String),
+			Traits:             traits,
+			Universal:          persist.NullBool(user.Universal),
+		}
+	}
+
+	logger.For(ctx).Debugf("found %d users", len(addressesToUsers))
+
+	// create users for those that are not in the database
 
 	for _, chainToken := range tokens {
 		providers, err := p.getProvidersForChain(chainToken.chain)
@@ -641,8 +691,8 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 			ct := chainToken
 			t := agnosticToken
 			wp.Submit(func() {
-				user, err := p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
-				if err != nil || user.ID == "" {
+				user, ok := addressesToUsers[string(t.OwnerAddress)]
+				if !ok {
 					username := t.OwnerAddress.String()
 					for _, provider := range providers {
 						doBreak := func() bool {
@@ -680,6 +730,12 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 									errChan <- err
 									return
 								}
+							} else if _, ok := err.(persist.ErrWalletCreateFailed); ok {
+								user, err = p.Repos.UserRepository.GetByChainAddress(ctx, persist.NewChainAddress(t.OwnerAddress, ct.chain))
+								if err != nil {
+									errChan <- err
+									return
+								}
 							} else {
 								errChan <- err
 								return
@@ -692,6 +748,12 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 							}
 						}
 					}()
+				}
+
+				err = p.Repos.UserRepository.FillWalletDataForUser(ctx, &user)
+				if err != nil {
+					errChan <- err
+					return
 				}
 				userChan <- user
 				tokensForUserChan <- tokenForUser{
@@ -747,7 +809,7 @@ outer:
 
 func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User) ([]persist.TokenGallery, error) {
 
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, allUsersTokens, user)
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
 	if err != nil {
 		return nil, err
 	}
@@ -789,7 +851,7 @@ func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainCont
 	return addressesToContracts, nil
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, dbTokens []persist.TokenGallery, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)

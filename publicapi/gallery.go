@@ -121,13 +121,13 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		// if gallery.OwnerUserID != userID {
 		// only view gallery if the user hasn't already viewed it in this most recent notification period
 
-		err = dispatchEvent(ctx, db.Event{
+		_, err = dispatchEvent(ctx, db.Event{
 			ActorID:        userID,
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
-		}, api.validator)
+		}, api.validator, nil)
 		if err != nil {
 			return db.Gallery{}, err
 		}
@@ -135,13 +135,13 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	} else {
 		remote, _ := gc.RemoteIP()
 
-		err := dispatchEvent(ctx, db.Event{
+		_, err := dispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
 			ExternalID:     persist.NullString(remote.String()),
-		}, api.validator)
+		}, api.validator, nil)
 		if err != nil {
 			return db.Gallery{}, err
 		}
