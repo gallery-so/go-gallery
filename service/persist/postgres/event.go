@@ -143,10 +143,11 @@ func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event 
 }
 
 // EventsInWindow returns events belonging to the same window of activity as the given eventID.
-func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]db.Event, error) {
+func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int, actions ...persist.Action) ([]db.Event, error) {
 	return r.Queries.GetEventsInWindow(ctx, db.GetEventsInWindowParams{
-		ID:   eventID,
-		Secs: float64(windowSeconds),
+		ID:      eventID,
+		Secs:    float64(windowSeconds),
+		Actions: actionsToString(actions),
 	})
 }
 

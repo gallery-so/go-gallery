@@ -28,18 +28,41 @@ func (r *FeedRepository) Add(ctx context.Context, event db.FeedEvent) (*db.FeedE
 	return &evt, err
 }
 
+func (r *FeedRepository) LastPublishedUserFeedEvent(ctx context.Context, ownerID persist.DBID, beforeTime time.Time, actions ...persist.Action) (*db.FeedEvent, error) {
+	evt, err := r.Queries.GetLastFeedEventForUser(ctx, db.GetLastFeedEventForUserParams{
+		OwnerID:   ownerID,
+		Actions:   actionsToString(actions),
+		EventTime: beforeTime,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &evt, err
+}
+
+func (r *FeedRepository) LastPublishedTokenFeedEvent(ctx context.Context, ownerID, tokenID persist.DBID, beforeTime time.Time, actions ...persist.Action) (*db.FeedEvent, error) {
+	evt, err := r.Queries.GetLastFeedEventForToken(ctx, db.GetLastFeedEventForTokenParams{
+		OwnerID:   ownerID,
+		TokenID:   tokenID.String(),
+		Actions:   actionsToString(actions),
+		EventTime: beforeTime,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &evt, err
+}
+
 // LastPublishedCollectionFeedEvent returns the most recent collection event for the given owner, action, and collection that occurred before time `since`.
-func (r *FeedRepository) LastPublishedCollectionFeedEvent(ctx context.Context, ownerID persist.DBID, collectionID persist.DBID, since time.Time, actions []persist.Action) (*db.FeedEvent, error) {
+func (r *FeedRepository) LastPublishedCollectionFeedEvent(ctx context.Context, ownerID persist.DBID, collectionID persist.DBID, beforeTime time.Time, actions ...persist.Action) (*db.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEventForCollection(ctx, db.GetLastFeedEventForCollectionParams{
 		OwnerID:      ownerID,
 		Actions:      actionsToString(actions),
 		CollectionID: string(collectionID),
-		EventTime:    since,
+		EventTime:    beforeTime,
 	})
-
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
-
 	return &evt, err
 }

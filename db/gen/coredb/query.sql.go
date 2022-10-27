@@ -596,29 +596,6 @@ func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateV
 	return i, err
 }
 
-const geetFeedEventByID = `-- name: GeetFeedEventByID :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE id = $1 AND deleted = false
-`
-
-func (q *Queries) GeetFeedEventByID(ctx context.Context, id persist.DBID) (FeedEvent, error) {
-	row := q.db.QueryRow(ctx, geetFeedEventByID, id)
-	var i FeedEvent
-	err := row.Scan(
-		&i.ID,
-		&i.Version,
-		&i.OwnerID,
-		&i.Action,
-		&i.Data,
-		&i.EventTime,
-		&i.EventIds,
-		&i.Deleted,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Caption,
-	)
-	return i, err
-}
-
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
 SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE id = $1 AND deleted = false
 `
@@ -1092,26 +1069,28 @@ func (q *Queries) GetEvent(ctx context.Context, id persist.DBID) (Event, error) 
 }
 
 const getEventsInWindow = `-- name: GetEventsInWindow :many
-WITH RECURSIVE activity AS (
-    SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption FROM events WHERE events.id = $1 AND deleted = false
-    UNION
-    SELECT e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption FROM events e, activity a
-    WHERE e.actor_id = a.actor_id
-        AND e.action = a.action
-        AND e.created_at < a.created_at
-        AND e.created_at >= a.created_at - make_interval(secs => $2)
-        AND e.deleted = false
+with recursive activity as (
+    select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption from events where events.id = $1 and deleted = false
+    union
+    select e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption from events e, activity a
+    where e.actor_id = a.actor_id
+        and e.action = any($3::varchar[])
+        and e.created_at < a.created_at
+        and e.created_at >= a.created_at - make_interval(secs => $2)
+        and e.deleted = false
+        and e.caption is null
 )
-SELECT id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC
+select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption from events where id = any(select id from activity) order by created_at desc
 `
 
 type GetEventsInWindowParams struct {
-	ID   persist.DBID
-	Secs float64
+	ID      persist.DBID
+	Secs    float64
+	Actions []string
 }
 
 func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, getEventsInWindow, arg.ID, arg.Secs)
+	rows, err := q.db.Query(ctx, getEventsInWindow, arg.ID, arg.Secs, arg.Actions)
 	if err != nil {
 		return nil, err
 	}
@@ -1220,38 +1199,6 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 	return i, err
 }
 
-const getLastFeedEvent = `-- name: GetLastFeedEvent :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
-    WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
-    ORDER BY event_time DESC
-    LIMIT 1
-`
-
-type GetLastFeedEventParams struct {
-	OwnerID   persist.DBID
-	Action    persist.Action
-	EventTime time.Time
-}
-
-func (q *Queries) GetLastFeedEvent(ctx context.Context, arg GetLastFeedEventParams) (FeedEvent, error) {
-	row := q.db.QueryRow(ctx, getLastFeedEvent, arg.OwnerID, arg.Action, arg.EventTime)
-	var i FeedEvent
-	err := row.Scan(
-		&i.ID,
-		&i.Version,
-		&i.OwnerID,
-		&i.Action,
-		&i.Data,
-		&i.EventTime,
-		&i.EventIds,
-		&i.Deleted,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Caption,
-	)
-	return i, err
-}
-
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
 select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
     and owner_id = $1
@@ -1294,26 +1241,63 @@ func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLast
 }
 
 const getLastFeedEventForToken = `-- name: GetLastFeedEventForToken :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = $4::varchar AND event_time < $3 AND deleted = false
-    ORDER BY event_time DESC
-    LIMIT 1
+select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
+    and owner_id = $1
+    and action = any($3::varchar[])
+    and data ->> 'token_id' = $4::varchar
+    and event_time < $2
+    order by event_time desc
+    limit 1
 `
 
 type GetLastFeedEventForTokenParams struct {
 	OwnerID   persist.DBID
-	Action    persist.Action
 	EventTime time.Time
+	Actions   []string
 	TokenID   string
 }
 
 func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedEventForTokenParams) (FeedEvent, error) {
 	row := q.db.QueryRow(ctx, getLastFeedEventForToken,
 		arg.OwnerID,
-		arg.Action,
 		arg.EventTime,
+		arg.Actions,
 		arg.TokenID,
 	)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Caption,
+	)
+	return i, err
+}
+
+const getLastFeedEventForUser = `-- name: GetLastFeedEventForUser :one
+select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
+    and owner_id = $1
+    and action = any($3::varchar[])
+    and event_time < $2
+    order by event_time desc
+    limit 1
+`
+
+type GetLastFeedEventForUserParams struct {
+	OwnerID   persist.DBID
+	EventTime time.Time
+	Actions   []string
+}
+
+func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEventForUserParams) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, getLastFeedEventForUser, arg.OwnerID, arg.EventTime, arg.Actions)
 	var i FeedEvent
 	err := row.Scan(
 		&i.ID,
