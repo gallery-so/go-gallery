@@ -202,6 +202,13 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	return nil
 }
 
+func (g *GalleryRepository) GetPreviewsURLsByUserID(pCtx context.Context, pUserID persist.DBID, limit int) ([]string, error) {
+	return g.queries.GalleryRepoGetPreviewsForUserID(pCtx, db.GalleryRepoGetPreviewsForUserIDParams{
+		OwnerUserID: pUserID,
+		Limit:       int32(limit),
+	})
+}
+
 // GetByUserID returns the galleries owned by the given userID
 // TODO: Examine uses of this, since we don't return galleries in this hydrated format anymore.
 // 		 Ideally, we can replace this function with non-hydrates functions.

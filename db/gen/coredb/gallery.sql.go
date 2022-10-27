@@ -175,6 +175,39 @@ func (q *Queries) GalleryRepoGetGalleryCollections(ctx context.Context, id persi
 	return items, nil
 }
 
+const galleryRepoGetPreviewsForUserID = `-- name: GalleryRepoGetPreviewsForUserID :many
+select (t.media ->> 'thumbnail_url')::text from galleries g,
+    unnest(g.collections) with ordinality as collection_ids(id, ord) inner join collections c on c.id = collection_ids.id and c.deleted = false,
+    unnest(c.nfts) with ordinality as token_ids(id, ord) inner join tokens t on t.id = token_ids.id and t.deleted = false
+    where g.owner_user_id = $1 and g.deleted = false and t.media ->> 'thumbnail_url' != ''
+    order by collection_ids.ord, token_ids.ord limit $2
+`
+
+type GalleryRepoGetPreviewsForUserIDParams struct {
+	OwnerUserID persist.DBID
+	Limit       int32
+}
+
+func (q *Queries) GalleryRepoGetPreviewsForUserID(ctx context.Context, arg GalleryRepoGetPreviewsForUserIDParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, galleryRepoGetPreviewsForUserID, arg.OwnerUserID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var column_1 string
+		if err := rows.Scan(&column_1); err != nil {
+			return nil, err
+		}
+		items = append(items, column_1)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const galleryRepoUpdate = `-- name: GalleryRepoUpdate :execrows
 update galleries set last_updated = $1, collections = $2 where id = $4 and owner_user_id = $3
 `

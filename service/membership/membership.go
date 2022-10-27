@@ -15,7 +15,6 @@ import (
 	"github.com/gammazero/workerpool"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
-	"github.com/mikeydub/go-gallery/service/nft"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
@@ -274,13 +273,14 @@ func fillMembershipOwner(ctx context.Context, pWalletIDs []persist.DBID, id pers
 		}
 
 		membershipOwner.UserID = glryUser.ID
+		previews, err := galleryRepository.GetPreviewsURLsByUserID(ctx, glryUser.ID, 3)
 
-		galleries, err := galleryRepository.GetByUserID(ctx, glryUser.ID)
-		if err == nil && len(galleries) > 0 {
-			gallery := galleries[0]
-			if gallery.Collections != nil && len(gallery.Collections) > 0 {
-				membershipOwner.PreviewTokens = nft.GetPreviewsFromCollections(gallery.Collections)
+		if err == nil && len(previews) > 0 {
+			asNullStrings := make([]persist.NullString, len(previews))
+			for i, p := range previews {
+				asNullStrings[i] = persist.NullString(p)
 			}
+			membershipOwner.PreviewTokens = asNullStrings
 		}
 
 		return membershipOwner

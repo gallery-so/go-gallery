@@ -27,3 +27,10 @@ select c.id from galleries g, unnest(g.collections) with ordinality as u(coll, c
 
 -- name: GalleryRepoGetByUserIDRaw :many
 select * from galleries g where g.owner_user_id = $1 and g.deleted = false;
+
+-- name: GalleryRepoGetPreviewsForUserID :many
+select (t.media ->> 'thumbnail_url')::text from galleries g,
+    unnest(g.collections) with ordinality as collection_ids(id, ord) inner join collections c on c.id = collection_ids.id and c.deleted = false,
+    unnest(c.nfts) with ordinality as token_ids(id, ord) inner join tokens t on t.id = token_ids.id and t.deleted = false
+    where g.owner_user_id = $1 and g.deleted = false and t.media ->> 'thumbnail_url' != ''
+    order by collection_ids.ord, token_ids.ord limit $2;
