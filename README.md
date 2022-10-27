@@ -212,14 +212,6 @@ Skip longer running tests with the `-short` flag:
 go test -short
 ```
 
-### Integration Testing
-
-Run integration tests against ethereum mainnet:
-
-```bash
-go test -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
-```
-
 ### Running locally with live data
 
 If you have access to the `_encrypted_local` file, you can run the server locally with live data. This is useful for testing the server locally with real data.
