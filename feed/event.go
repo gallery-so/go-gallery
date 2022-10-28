@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -15,9 +16,9 @@ import (
 
 var (
 	defaultEventGroups = map[persist.Action]actions{
-		persist.ActionCollectionCreated:               updateCollectionActions,
-		persist.ActionCollectorsNoteAddedToCollection: updateCollectionActions,
-		persist.ActionTokensAddedToCollection:         updateCollectionActions,
+		persist.ActionCollectionCreated:               editCollectionActions,
+		persist.ActionCollectorsNoteAddedToCollection: editCollectionActions,
+		persist.ActionTokensAddedToCollection:         editCollectionActions,
 	}
 
 	defaultSegments = map[persist.Action]segment{
@@ -30,7 +31,7 @@ var (
 	}
 
 	// Events in this group can be grouped together as a single collection update
-	updateCollectionActions = actions{
+	editCollectionActions = actions{
 		persist.ActionCollectionCreated,
 		persist.ActionTokensAddedToCollection,
 		persist.ActionCollectorsNoteAddedToCollection,
@@ -71,6 +72,9 @@ type EventBuilder struct {
 	// skipCooldown, if enabled, will disregard the requisite "cooldown"
 	// period of an incoming event.
 	skipCooldown bool
+	// windowSize is used to determine if a user is still editing and is ignored if
+	// skipCooldown is enabled.
+	windowSize time.Duration
 }
 
 func NewEventBuilder(queries *db.Queries, skipCooldown bool) *EventBuilder {
@@ -79,6 +83,7 @@ func NewEventBuilder(queries *db.Queries, skipCooldown bool) *EventBuilder {
 		feedRepo:          &postgres.FeedRepository{Queries: queries},
 		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
 		skipCooldown:      skipCooldown,
+		windowSize:        viper.GetDuration("FEED_WINDOW_SIZE") * time.Second,
 	}
 }
 
@@ -95,8 +100,7 @@ func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.Fe
 }
 
 func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event)
-	if err != nil || !useEvent {
+	if useEvent, err := b.useEvent(ctx, event); err != nil || !useEvent {
 		return nil, err
 	}
 
@@ -104,19 +108,17 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 		return b.createGroupedFeedEvent(ctx, event)
 	}
 
-	return b.createSingleFeedEvent(ctx, event)
+	return b.createFeedEvent(ctx, event)
 }
 
 func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	switch {
-	case reflect.DeepEqual(defaultEventGroups[event.Action], updateCollectionActions):
+	if reflect.DeepEqual(defaultEventGroups[event.Action], editCollectionActions) {
 		return b.createCollectionUpdatedFeedEvent(ctx, event)
-	default:
-		return nil, errUnhandledGroupedEvent
 	}
+	return nil, errUnhandledGroupedEvent
 }
 
-func (b *EventBuilder) createSingleFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
 		return b.createUserCreatedFeedEvent(ctx, event)
@@ -157,11 +159,11 @@ func (b *EventBuilder) isActive(ctx context.Context, event db.Event) (bool, erro
 	segment, actions := segmentForAction(event.Action)
 	switch segment {
 	case actorActionSegment:
-		return b.eventRepo.IsActorActionActive(ctx, event, actions)
+		return b.eventRepo.IsActorActionActive(ctx, event, actions, b.windowSize)
 	case actorSubjectSegment:
-		return b.eventRepo.IsActorSubjectActive(ctx, event)
+		return b.eventRepo.IsActorSubjectActive(ctx, event, b.windowSize)
 	case actorSubjectActionSegment:
-		return b.eventRepo.IsActorSubjectActionActive(ctx, event, actions)
+		return b.eventRepo.IsActorSubjectActionActive(ctx, event, actions, b.windowSize)
 	case noSegment:
 		return false, nil
 	default:
@@ -183,7 +185,7 @@ func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:        persist.GenerateID(),
 		OwnerID:   event.ActorID,
-		Action:    persist.ActionUserCreated,
+		Action:    event.Action,
 		EventTime: event.CreatedAt,
 		Data:      persist.FeedEventData{UserBio: event.Data.UserBio},
 		EventIds:  persist.DBIDList{event.ID},
@@ -238,7 +240,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
-		Action:  persist.ActionCollectorsNoteAddedToToken,
+		Action:  event.Action,
 		Data: persist.FeedEventData{
 			TokenID:                event.SubjectID,
 			TokenCollectionID:      event.Data.TokenCollectionID,
@@ -259,7 +261,7 @@ func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, eve
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
-		Action:  persist.ActionCollectionCreated,
+		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:                event.SubjectID,
 			CollectionTokenIDs:          event.Data.CollectionTokenIDs,
@@ -285,7 +287,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionFeedEvent(ctx contex
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: event.ActorID,
-		Action:  persist.ActionCollectorsNoteAddedToCollection,
+		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:                event.SubjectID,
 			CollectionNewCollectorsNote: event.Data.CollectionCollectorsNote,
@@ -302,8 +304,8 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 		return nil, nil
 	}
 
-	addedTokens, isPreFeed, err := getAddedTokens(ctx, b.feedRepo, event)
-	if err != nil || (!isPreFeed && len(addedTokens) < 1) {
+	addedTokens, hasPrior, err := getAddedTokens(ctx, b.feedRepo, event)
+	if err != nil || (hasPrior && len(addedTokens) < 1) {
 		return nil, err
 	}
 
@@ -315,7 +317,7 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 			CollectionID:          event.SubjectID,
 			CollectionTokenIDs:    event.Data.CollectionTokenIDs,
 			CollectionNewTokenIDs: addedTokens,
-			CollectionIsPreFeed:   isPreFeed,
+			CollectionIsPreFeed:   !hasPrior,
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},
@@ -324,14 +326,16 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 }
 
 func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), updateCollectionActions)
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), editCollectionActions)
 	if err != nil {
 		return nil, err
 	}
 
 	merged := mergeCollectionEvents(events)
+
+	// Just treat the event as a typical event
 	if merged.event.Action != persist.ActionCollectionUpdated {
-		return b.createSingleFeedEvent(ctx, merged.event)
+		return b.createFeedEvent(ctx, merged.event)
 	}
 
 	addedTokens, _, err := getAddedTokens(ctx, b.feedRepo, merged.event)
@@ -344,6 +348,7 @@ func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, eve
 		return nil, err
 	}
 
+	// Skip storing the event if nothing interesting changed
 	if len(addedTokens) < 1 && (merged.event.Data.CollectionCollectorsNote == "" || !noteChanged) {
 		return nil, nil
 	}
@@ -365,20 +370,20 @@ func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, eve
 }
 
 // getAddedTokens returns the new tokens that were added since the last published feed event.
-func getAddedTokens(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (added []persist.DBID, isPreFeed bool, err error) {
+func getAddedTokens(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (added []persist.DBID, hasPrior bool, err error) {
 	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.CollectionID, event.CreatedAt, collectionTokensAddedActions)
 	if err != nil {
 		return added, true, err
 	}
 
 	// If a create event doesn't exist, then the collection was made before the feed
-	// or the event itself is a create event.
+	// or the event itself is the create event.
 	if priorEvent == nil {
-		return event.Data.CollectionTokenIDs, true, nil
+		return event.Data.CollectionTokenIDs, false, nil
 	}
 
 	added = newTokens(event.Data.CollectionTokenIDs, priorEvent.Data.CollectionTokenIDs)
-	return added, false, nil
+	return added, true, nil
 }
 
 // isCollectionCollectorsNoteChanged returns true if the collector's note differs from the last published feed event.
@@ -396,8 +401,8 @@ func isCollectionCollectorsNoteChanged(ctx context.Context, feedRepo *postgres.F
 }
 
 func segmentForAction(action persist.Action) (segment, actions) {
-	if reflect.DeepEqual(defaultEventGroups[action], updateCollectionActions) {
-		return actorSubjectSegment, updateCollectionActions
+	if reflect.DeepEqual(defaultEventGroups[action], editCollectionActions) {
+		return actorSubjectSegment, editCollectionActions
 	} else if eventSegment, ok := defaultSegments[action]; ok {
 		return eventSegment, actions{action}
 	} else {

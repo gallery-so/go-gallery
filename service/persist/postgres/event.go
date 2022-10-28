@@ -6,7 +6,6 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
 )
 
 type EventRepository struct {
@@ -111,34 +110,31 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 	return &event, err
 }
 
-func (r *EventRepository) IsActorActionActive(ctx context.Context, event db.Event, actions []persist.Action) (bool, error) {
-	windowStart, windowEnd := windowBounds(event)
+func (r *EventRepository) IsActorActionActive(ctx context.Context, event db.Event, actions []persist.Action, windowSize time.Duration) (bool, error) {
 	return r.Queries.IsActorActionActive(ctx, db.IsActorActionActiveParams{
 		ActorID:     event.ActorID,
-		Actions:     actionsToString(actions),
-		WindowStart: windowStart,
-		WindowEnd:   windowEnd,
+		Actions:     actionsToStrings(actions),
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(windowSize),
 	})
 }
 
-func (r *EventRepository) IsActorSubjectActive(ctx context.Context, event db.Event) (bool, error) {
-	windowStart, windowEnd := windowBounds(event)
+func (r *EventRepository) IsActorSubjectActive(ctx context.Context, event db.Event, windowSize time.Duration) (bool, error) {
 	return r.Queries.IsActorSubjectActive(ctx, db.IsActorSubjectActiveParams{
 		ActorID:     event.ActorID,
 		SubjectID:   event.SubjectID,
-		WindowStart: windowStart,
-		WindowEnd:   windowEnd,
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(windowSize),
 	})
 }
 
-func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions []persist.Action) (bool, error) {
-	windowStart, windowEnd := windowBounds(event)
+func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions []persist.Action, windowSize time.Duration) (bool, error) {
 	return r.Queries.IsActorSubjectActionActive(ctx, db.IsActorSubjectActionActiveParams{
 		ActorID:     event.ActorID,
 		SubjectID:   event.SubjectID,
-		Actions:     actionsToString(actions),
-		WindowStart: windowStart,
-		WindowEnd:   windowEnd,
+		Actions:     actionsToStrings(actions),
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(windowSize),
 	})
 }
 
@@ -147,15 +143,11 @@ func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DB
 	return r.Queries.GetEventsInWindow(ctx, db.GetEventsInWindowParams{
 		ID:      eventID,
 		Secs:    float64(windowSeconds),
-		Actions: actionsToString(actions),
+		Actions: actionsToStrings(actions),
 	})
 }
 
-func windowBounds(event db.Event) (start, end time.Time) {
-	return event.CreatedAt, event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second)
-}
-
-func actionsToString(actions []persist.Action) []string {
+func actionsToStrings(actions []persist.Action) []string {
 	actionsAsStr := make([]string, len(actions))
 	for i, action := range actions {
 		actionsAsStr[i] = string(action)

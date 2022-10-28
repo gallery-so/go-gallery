@@ -12,7 +12,7 @@ func mergeFollowEvents(eventsAsc []db.Event) *combinedFollowEvent {
 
 func mergeCollectionEvents(eventsAsc []db.Event) *combinedCollectionEvent {
 	var combined combinedCollectionEvent
-	return combined.merge(eventsAsc...)
+	return combined.merge(eventsAsc)
 }
 
 type combinedFollowEvent struct {
@@ -45,20 +45,25 @@ type combinedCollectionEvent struct {
 	isNewCollection bool
 }
 
-func (c *combinedCollectionEvent) merge(events ...db.Event) *combinedCollectionEvent {
-	for _, other := range events {
+func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectionEvent {
+	for _, other := range eventsAsc {
 		action := c.event.Action
+
+		// If there are two or more unique actions, the resulting event is categorized as
+		// a generic update.
 		if c.event.Action == "" {
 			action = other.Action
 		} else if c.event.Action != other.Action {
 			action = persist.ActionCollectionUpdated
 		}
 
+		// Not every event has tokens attached to it, so we check that the event is relevant first.
 		collectionTokenIDs := c.event.Data.CollectionTokenIDs
 		if other.Action == persist.ActionCollectionCreated || other.Action == persist.ActionTokensAddedToCollection {
 			collectionTokenIDs = other.Data.CollectionTokenIDs
 		}
 
+		// Not every event has a collector's note attached to it, so we check that the event is relevant first.
 		collectorsNote := c.event.Data.CollectionCollectorsNote
 		if other.Action == persist.ActionCollectionCreated || other.Action == persist.ActionCollectorsNoteAddedToCollection {
 			collectorsNote = other.Data.CollectionCollectorsNote
