@@ -193,14 +193,22 @@ SELECT t.* FROM tokens t
 SELECT count(*) FROM tokens JOIN users ON users.id = tokens.owner_user_id WHERE contract = $1 AND (NOT @gallery_users_only::bool OR users.universal = false) AND tokens.deleted = false;
 
 -- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (result.id) result.* FROM (SELECT users.* FROM users, tokens
-    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
-    AND (NOT @gallery_users_only::bool OR users.universal = false)
-    AND tokens.deleted = false AND users.deleted = false
-    AND (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
-    AND (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (users.universal,users.created_at,users.id) END ASC,
-        CASE WHEN NOT @paging_forward::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2;
+-- Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
+--       return complete rows from the users table. As a workaround, aliasing the subquery to
+--       "users" seems to fix the issue (along with aliasing the users table inside the subquery
+--       to "u" to avoid confusion -- otherwise, sqlc creates a custom row type that includes
+--       all users.* fields twice).
+select users.* from (
+    select distinct on (u.id) u.* from users u, tokens t
+        where t.contract = $1 and t.owner_user_id = u.id
+        and (not @gallery_users_only::bool or u.universal = false)
+        and t.deleted = false and u.deleted = false
+    ) as users
+    where (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
+    and (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
+    order by case when @paging_forward::bool then (users.universal,users.created_at,users.id) end asc,
+         case when not @paging_forward::bool then (users.universal,users.created_at,users.id) end desc limit $2;
+
 
 -- name: CountOwnersByContractId :one
 SELECT count(DISTINCT users.id) FROM users, tokens
