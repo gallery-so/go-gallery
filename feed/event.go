@@ -14,47 +14,55 @@ import (
 )
 
 var (
-	defaultEventGroups = map[persist.Action][]persist.Action{
+	defaultEventGroups = map[persist.Action]actions{
 		persist.ActionCollectionCreated:               updateCollectionActions,
 		persist.ActionCollectorsNoteAddedToCollection: updateCollectionActions,
 		persist.ActionTokensAddedToCollection:         updateCollectionActions,
 	}
 
-	defaultEventCriterias = map[persist.Action]criteria{
-		persist.ActionUserCreated:                     noCriteria,
-		persist.ActionUserFollowedUsers:               actorActionCriteria,
-		persist.ActionCollectorsNoteAddedToToken:      actorSubjectActionCriteria,
-		persist.ActionCollectionCreated:               actorSubjectActionCriteria,
-		persist.ActionCollectorsNoteAddedToCollection: actorSubjectActionCriteria,
-		persist.ActionTokensAddedToCollection:         actorSubjectActionCriteria,
+	defaultSegments = map[persist.Action]segment{
+		persist.ActionUserCreated:                     noSegment,
+		persist.ActionUserFollowedUsers:               actorActionSegment,
+		persist.ActionCollectorsNoteAddedToToken:      actorSubjectActionSegment,
+		persist.ActionCollectionCreated:               actorSubjectActionSegment,
+		persist.ActionCollectorsNoteAddedToCollection: actorSubjectActionSegment,
+		persist.ActionTokensAddedToCollection:         actorSubjectActionSegment,
 	}
 
-	// Events in this group can be grouped together as a collection update
-	updateCollectionActions = []persist.Action{
+	// Events in this group can be grouped together as a single collection update
+	updateCollectionActions = actions{
 		persist.ActionCollectionCreated,
 		persist.ActionTokensAddedToCollection,
 		persist.ActionCollectorsNoteAddedToCollection,
 	}
 
-	// Events in this group can contain a collection collector's note
-	collectionCollectorsNoteActions = []persist.Action{
+	// Feed events in this group can contain a collection collector's note
+	collectionCollectorsNoteActions = actions{
 		persist.ActionCollectionUpdated,
 		persist.ActionCollectorsNoteAddedToCollection,
+		persist.ActionCollectionCreated,
+	}
+
+	// Feed events in this group can contain added tokens
+	collectionTokensAddedActions = actions{
+		persist.ActionCollectionUpdated,
+		persist.ActionTokensAddedToCollection,
 		persist.ActionCollectionCreated,
 	}
 )
 
 const (
-	noCriteria criteria = iota
-	actorActionCriteria
-	actorSubjectCriteria
-	actorSubjectActionCriteria
+	noSegment segment = iota
+	actorActionSegment
+	actorSubjectSegment
+	actorSubjectActionSegment
 )
 
 var errUnhandledSingleEvent = errors.New("unhandled single event")
 var errUnhandledGroupedEvent = errors.New("unhandled group event")
 
-type criteria int
+type segment int
+type actions []persist.Action
 
 type EventBuilder struct {
 	eventRepo         *postgres.EventRepository
@@ -87,9 +95,15 @@ func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.Fe
 }
 
 func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	useEvent, err := b.useEvent(ctx, event)
+	if err != nil || !useEvent {
+		return nil, err
+	}
+
 	if _, groupable := defaultEventGroups[event.Action]; groupable {
 		return b.createGroupedFeedEvent(ctx, event)
 	}
+
 	return b.createSingleFeedEvent(ctx, event)
 }
 
@@ -121,30 +135,34 @@ func (b *EventBuilder) createSingleFeedEvent(ctx context.Context, event db.Event
 	}
 }
 
-func (b *EventBuilder) useEvent(ctx context.Context, event db.Event, actions ...persist.Action) (bool, error) {
+func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, error) {
 	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, event.ActorID, event.Action)
 	if err != nil || blocked {
 		return false, err
 	}
+
 	if b.skipCooldown {
 		return true, nil
 	}
-	active, err := b.isActive(ctx, event, actions)
+
+	active, err := b.isActive(ctx, event)
 	if err != nil {
 		return false, err
 	}
+
 	return !active, nil
 }
 
-func (b *EventBuilder) isActive(ctx context.Context, event db.Event, actions []persist.Action) (bool, error) {
-	switch activeCriteriaForAction(event.Action) {
-	case actorActionCriteria:
+func (b *EventBuilder) isActive(ctx context.Context, event db.Event) (bool, error) {
+	segment, actions := segmentForAction(event.Action)
+	switch segment {
+	case actorActionSegment:
 		return b.eventRepo.IsActorActionActive(ctx, event, actions)
-	case actorSubjectCriteria:
+	case actorSubjectSegment:
 		return b.eventRepo.IsActorSubjectActive(ctx, event)
-	case actorSubjectActionCriteria:
+	case actorSubjectActionSegment:
 		return b.eventRepo.IsActorSubjectActionActive(ctx, event, actions)
-	case noCriteria:
+	case noSegment:
 		return false, nil
 	default:
 		return false, nil
@@ -152,12 +170,7 @@ func (b *EventBuilder) isActive(ctx context.Context, event db.Event, actions []p
 }
 
 func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event, persist.ActionUserCreated)
-	if err != nil || !useEvent {
-		return nil, err
-	}
-
-	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event.ActorID, event.CreatedAt, persist.ActionUserCreated)
+	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event.ActorID, event.CreatedAt, actions{persist.ActionUserCreated})
 	if err != nil {
 		return nil, err
 	}
@@ -178,12 +191,7 @@ func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.
 }
 
 func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event, persist.ActionUserFollowedUsers)
-	if err != nil || !useEvent {
-		return nil, err
-	}
-
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), persist.ActionUserFollowedUsers)
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), actions{persist.ActionUserFollowedUsers})
 	if err != nil {
 		return nil, err
 	}
@@ -193,15 +201,20 @@ func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, eve
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, merged.asFeedEvent())
+	return b.feedRepo.Add(ctx, db.FeedEvent{
+		ID:        persist.GenerateID(),
+		OwnerID:   merged.event.ActorID,
+		Action:    merged.event.Action,
+		EventTime: merged.event.CreatedAt,
+		EventIds:  merged.eventIDs,
+		Data: persist.FeedEventData{
+			UserFollowedIDs:  merged.followedIDs,
+			UserFollowedBack: merged.followedBack,
+		},
+	})
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event, persist.ActionCollectorsNoteAddedToToken)
-	if err != nil || !useEvent {
-		return nil, err
-	}
-
 	// don't present empty notes
 	if event.Data.TokenCollectorsNote == "" {
 		return nil, nil
@@ -212,7 +225,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 		return nil, nil
 	}
 
-	priorEvent, err := b.feedRepo.LastPublishedTokenFeedEvent(ctx, event.ActorID, event.TokenID, event.CreatedAt, persist.ActionCollectorsNoteAddedToToken)
+	priorEvent, err := b.feedRepo.LastPublishedTokenFeedEvent(ctx, event.ActorID, event.TokenID, event.CreatedAt, collectionCollectorsNoteActions)
 	if err != nil {
 		return nil, err
 	}
@@ -238,11 +251,6 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 }
 
 func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event, event.Action)
-	if err != nil || !useEvent {
-		return nil, err
-	}
-
 	// don't show empty collections
 	if len(event.Data.CollectionTokenIDs) < 1 {
 		return nil, nil
@@ -265,24 +273,13 @@ func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, eve
 }
 
 func (b *EventBuilder) createCollectorsNoteAddedToCollectionFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event, persist.ActionCollectorsNoteAddedToCollection)
-	if err != nil || !useEvent {
-		return nil, err
-	}
-
 	// don't present empty notes
 	if event.Data.CollectionCollectorsNote == "" {
 		return nil, nil
 	}
 
-	priorEvent, err := b.feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.SubjectID, event.CreatedAt, collectionCollectorsNoteActions...)
-	if err != nil {
+	if changed, err := isCollectionCollectorsNoteChanged(ctx, b.feedRepo, event); err != nil || !changed {
 		return nil, err
-	}
-
-	// only show if note has changed
-	if priorEvent != nil && priorEvent.Data.CollectionNewCollectorsNote == event.Data.CollectionCollectorsNote {
-		return nil, nil
 	}
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
@@ -300,24 +297,14 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionFeedEvent(ctx contex
 }
 
 func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event, event.Action)
-	if err != nil || !useEvent {
-		return nil, err
-	}
-
 	// Don't show empty collections
 	if len(event.Data.CollectionTokenIDs) == 0 {
 		return nil, nil
 	}
 
-	addedTokens, isPreFeed, err := getNewlyAddedTokens(ctx, b.feedRepo, event)
-	if err != nil {
+	addedTokens, isPreFeed, err := getAddedTokens(ctx, b.feedRepo, event)
+	if err != nil || (!isPreFeed && len(addedTokens) < 1) {
 		return nil, err
-	}
-
-	// Only send if tokens were added
-	if !isPreFeed && len(addedTokens) == 0 {
-		return nil, nil
 	}
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
@@ -337,49 +324,85 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 }
 
 func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	useEvent, err := b.useEvent(ctx, event, updateCollectionActions...)
-	if err != nil || !useEvent {
-		return nil, err
-	}
-
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), updateCollectionActions...)
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), updateCollectionActions)
 	if err != nil {
 		return nil, err
 	}
 
 	merged := mergeCollectionEvents(events)
-	// If the merged event is made up of only one type of event,
-	// then treat the merged event as a normal event.
-	if merged.evt.Action != persist.ActionCollectionUpdated {
-		return b.createSingleFeedEvent(ctx, merged.evt)
+	if merged.event.Action != persist.ActionCollectionUpdated {
+		return b.createSingleFeedEvent(ctx, merged.event)
 	}
 
-	addedTokens, _, err := getNewlyAddedTokens(ctx, b.feedRepo, event)
+	addedTokens, _, err := getAddedTokens(ctx, b.feedRepo, merged.event)
 	if err != nil {
 		return nil, err
 	}
 
-	// It's not a very interesting event to show if no tokens were added or
-	if len(addedTokens) < 1 && merged.evt.Data.CollectionCollectorsNote == "" {
+	noteChanged, err := isCollectionCollectorsNoteChanged(ctx, b.feedRepo, event)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(addedTokens) < 1 && (merged.event.Data.CollectionCollectorsNote == "" || !noteChanged) {
 		return nil, nil
 	}
 
-	return b.feedRepo.Add(ctx, merged.asFeedEvent(addedTokens))
+	return b.feedRepo.Add(ctx, db.FeedEvent{
+		ID:        persist.GenerateID(),
+		OwnerID:   merged.event.ActorID,
+		Action:    merged.event.Action,
+		EventTime: merged.event.CreatedAt,
+		EventIds:  merged.eventIDs,
+		Data: persist.FeedEventData{
+			CollectionID:                merged.event.SubjectID,
+			CollectionTokenIDs:          merged.event.Data.CollectionTokenIDs,
+			CollectionNewCollectorsNote: merged.event.Data.CollectionCollectorsNote,
+			CollectionIsNew:             merged.isNewCollection,
+			CollectionNewTokenIDs:       addedTokens,
+		},
+	})
 }
 
-func getNewlyAddedTokens(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (addedTokens []persist.DBID, isPreFeed bool, err error) {
-	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.CollectionID, event.CreatedAt, persist.ActionCollectionCreated, persist.ActionTokensAddedToCollection)
+// getAddedTokens returns the new tokens that were added since the last published feed event.
+func getAddedTokens(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (added []persist.DBID, isPreFeed bool, err error) {
+	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.CollectionID, event.CreatedAt, collectionTokensAddedActions)
 	if err != nil {
-		return nil, true, err
+		return added, true, err
 	}
 
-	// If a create event doesn't exist, then the collection was made before the feed.
+	// If a create event doesn't exist, then the collection was made before the feed
+	// or the event itself is a create event.
 	if priorEvent == nil {
-		return nil, true, nil
+		return event.Data.CollectionTokenIDs, true, nil
 	}
 
-	addedTokens = newTokens(event.Data.CollectionTokenIDs, priorEvent.Data.CollectionTokenIDs)
-	return addedTokens, false, nil
+	added = newTokens(event.Data.CollectionTokenIDs, priorEvent.Data.CollectionTokenIDs)
+	return added, false, nil
+}
+
+// isCollectionCollectorsNoteChanged returns true if the collector's note differs from the last published feed event.
+func isCollectionCollectorsNoteChanged(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (bool, error) {
+	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.CollectionID, event.CreatedAt, collectionCollectorsNoteActions)
+	if err != nil {
+		return false, err
+	}
+
+	if priorEvent != nil && priorEvent.Data.CollectionNewCollectorsNote == event.Data.CollectionCollectorsNote {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func segmentForAction(action persist.Action) (segment, actions) {
+	if reflect.DeepEqual(defaultEventGroups[action], updateCollectionActions) {
+		return actorSubjectSegment, updateCollectionActions
+	} else if eventSegment, ok := defaultSegments[action]; ok {
+		return eventSegment, actions{action}
+	} else {
+		return noSegment, actions{}
+	}
 }
 
 func newTokens(tokens []persist.DBID, otherTokens []persist.DBID) []persist.DBID {
@@ -401,14 +424,4 @@ func newTokens(tokens []persist.DBID, otherTokens []persist.DBID) []persist.DBID
 	}
 
 	return newTokens
-}
-
-func activeCriteriaForAction(action persist.Action) criteria {
-	if reflect.DeepEqual(defaultEventGroups[action], updateCollectionActions) {
-		return actorSubjectCriteria
-	} else if eventCriteria, ok := defaultEventCriterias[action]; ok {
-		return eventCriteria
-	} else {
-		return noCriteria
-	}
 }

@@ -83,15 +83,15 @@ func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.
 }
 
 func (r *collectionUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) (*model.GalleryUser, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
 func (r *collectionUpdatedFeedEventDataResolver) Collection(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) (*model.Collection, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveCollectionByCollectionID(ctx, obj.Collection.Dbid)
 }
 
 func (r *collectionUpdatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) ([]*model.CollectionToken, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
 }
 
 func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error) {

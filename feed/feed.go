@@ -54,7 +54,8 @@ func setDefaults() {
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 	viper.SetDefault("FEEDBOT_SECRET", "feed-bot-secret")
-	viper.SetDefault("FEED_WINDOW_SIZE", 5)
+	// XXX: viper.SetDefault("FEED_WINDOW_SIZE", 5)
+	viper.SetDefault("FEED_WINDOW_SIZE", 20)
 	viper.SetDefault("GAE_VERSION", "")
 	viper.AutomaticEnv()
 

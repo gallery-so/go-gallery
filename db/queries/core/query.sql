@@ -292,7 +292,7 @@ with recursive activity as (
         and e.deleted = false
         and e.caption is null
 )
-select * from events where id = any(select id from activity) order by created_at desc;
+select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
 -- name: IsActorActionActive :one
 select exists(
