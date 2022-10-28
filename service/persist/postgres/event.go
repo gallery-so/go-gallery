@@ -110,10 +110,10 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 	return &event, err
 }
 
-func (r *EventRepository) IsActorActionActive(ctx context.Context, event db.Event, actions []persist.Action, windowSize time.Duration) (bool, error) {
+func (r *EventRepository) IsActorActionActive(ctx context.Context, event db.Event, actions persist.ActionList, windowSize time.Duration) (bool, error) {
 	return r.Queries.IsActorActionActive(ctx, db.IsActorActionActiveParams{
 		ActorID:     event.ActorID,
-		Actions:     actionsToStrings(actions),
+		Actions:     actions,
 		WindowStart: event.CreatedAt,
 		WindowEnd:   event.CreatedAt.Add(windowSize),
 	})
@@ -128,29 +128,21 @@ func (r *EventRepository) IsActorSubjectActive(ctx context.Context, event db.Eve
 	})
 }
 
-func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions []persist.Action, windowSize time.Duration) (bool, error) {
+func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions persist.ActionList, windowSize time.Duration) (bool, error) {
 	return r.Queries.IsActorSubjectActionActive(ctx, db.IsActorSubjectActionActiveParams{
 		ActorID:     event.ActorID,
 		SubjectID:   event.SubjectID,
-		Actions:     actionsToStrings(actions),
+		Actions:     actions,
 		WindowStart: event.CreatedAt,
 		WindowEnd:   event.CreatedAt.Add(windowSize),
 	})
 }
 
 // EventsInWindow returns events belonging to the same window of activity as the given eventID.
-func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int, actions []persist.Action) ([]db.Event, error) {
+func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int, actions persist.ActionList) ([]db.Event, error) {
 	return r.Queries.GetEventsInWindow(ctx, db.GetEventsInWindowParams{
 		ID:      eventID,
 		Secs:    float64(windowSeconds),
-		Actions: actionsToStrings(actions),
+		Actions: actions,
 	})
-}
-
-func actionsToStrings(actions []persist.Action) []string {
-	actionsAsStr := make([]string, len(actions))
-	for i, action := range actions {
-		actionsAsStr[i] = string(action)
-	}
-	return actionsAsStr
 }

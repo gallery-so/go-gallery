@@ -31,7 +31,7 @@ func (r *FeedRepository) Add(ctx context.Context, event db.FeedEvent) (*db.FeedE
 func (r *FeedRepository) LastPublishedUserFeedEvent(ctx context.Context, ownerID persist.DBID, before time.Time, actions []persist.Action) (*db.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEventForUser(ctx, db.GetLastFeedEventForUserParams{
 		OwnerID:   ownerID,
-		Actions:   actionsToStrings(actions),
+		Actions:   actions,
 		EventTime: before,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -44,7 +44,7 @@ func (r *FeedRepository) LastPublishedTokenFeedEvent(ctx context.Context, ownerI
 	evt, err := r.Queries.GetLastFeedEventForToken(ctx, db.GetLastFeedEventForTokenParams{
 		OwnerID:   ownerID,
 		TokenID:   tokenID.String(),
-		Actions:   actionsToStrings(actions),
+		Actions:   actions,
 		EventTime: before,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -57,8 +57,8 @@ func (r *FeedRepository) LastPublishedTokenFeedEvent(ctx context.Context, ownerI
 func (r *FeedRepository) LastPublishedCollectionFeedEvent(ctx context.Context, ownerID persist.DBID, collectionID persist.DBID, before time.Time, actions []persist.Action) (*db.FeedEvent, error) {
 	evt, err := r.Queries.GetLastFeedEventForCollection(ctx, db.GetLastFeedEventForCollectionParams{
 		OwnerID:      ownerID,
-		Actions:      actionsToStrings(actions),
-		CollectionID: string(collectionID),
+		Actions:      actions,
+		CollectionID: collectionID,
 		EventTime:    before,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {

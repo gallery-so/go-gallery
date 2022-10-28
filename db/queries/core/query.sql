@@ -286,7 +286,7 @@ with recursive activity as (
     union
     select e.* from events e, activity a
     where e.actor_id = a.actor_id
-        and e.action = any(@actions::varchar[])
+        and e.action = any(@actions)
         and e.created_at < a.created_at
         and e.created_at >= a.created_at - make_interval(secs => $2)
         and e.deleted = false
@@ -297,21 +297,25 @@ select * from events where id = any(select id from activity) order by (created_a
 -- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false
-  and actor_id = $1 and action = any(@actions::varchar[])
+  and actor_id = $1
+  and action = any(@actions)
   and created_at > @window_start and created_at <= @window_end
 );
 
 -- name: IsActorSubjectActive :one
 select exists(
   select 1 from events where deleted = false
-  and actor_id = $1 and subject_id = $2
+  and actor_id = $1
+  and subject_id = $2
   and created_at > @window_start and created_at <= @window_end
 );
 
 -- name: IsActorSubjectActionActive :one
 select exists(
   select 1 from events where deleted = false
-  and actor_id = $1 and subject_id = $2 and action = any(@actions::varchar[])
+  and actor_id = $1
+  and subject_id = $2
+  and action = any(@actions)
   and created_at > @window_start and created_at <= @window_end
 );
 
@@ -349,7 +353,7 @@ INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, capt
 -- name: GetLastFeedEventForUser :one
 select * from feed_events where deleted = false
     and owner_id = $1
-    and action = any(@actions::varchar[])
+    and action = any(@actions)
     and event_time < $2
     order by event_time desc
     limit 1;
@@ -357,7 +361,7 @@ select * from feed_events where deleted = false
 -- name: GetLastFeedEventForToken :one
 select * from feed_events where deleted = false
     and owner_id = $1
-    and action = any(@actions::varchar[])
+    and action = any(@actions)
     and data ->> 'token_id' = @token_id::varchar
     and event_time < $2
     order by event_time desc
@@ -366,8 +370,8 @@ select * from feed_events where deleted = false
 -- name: GetLastFeedEventForCollection :one
 select * from feed_events where deleted = false
     and owner_id = $1
-    and action = any(@actions::varchar[])
-    and data ->> 'collection_id' = @collection_id::varchar
+    and action = any(@actions)
+    and data ->> 'collection_id' = @collection_id
     and event_time < $2
     order by event_time desc
     limit 1;

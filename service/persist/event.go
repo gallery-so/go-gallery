@@ -6,6 +6,7 @@ import (
 
 type ResourceType int
 type Action string
+type ActionList []Action
 
 const (
 	ResourceTypeUser ResourceType = iota

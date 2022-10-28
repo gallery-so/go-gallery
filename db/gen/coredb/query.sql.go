@@ -1074,7 +1074,7 @@ with recursive activity as (
     union
     select e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption from events e, activity a
     where e.actor_id = a.actor_id
-        and e.action = any($3::varchar[])
+        and e.action = any($3)
         and e.created_at < a.created_at
         and e.created_at >= a.created_at - make_interval(secs => $2)
         and e.deleted = false
@@ -1086,7 +1086,7 @@ select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, c
 type GetEventsInWindowParams struct {
 	ID      persist.DBID
 	Secs    float64
-	Actions []string
+	Actions persist.ActionList
 }
 
 func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowParams) ([]Event, error) {
@@ -1202,8 +1202,8 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
 select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
     and owner_id = $1
-    and action = any($3::varchar[])
-    and data ->> 'collection_id' = $4::varchar
+    and action = any($3)
+    and data ->> 'collection_id' = $4
     and event_time < $2
     order by event_time desc
     limit 1
@@ -1212,8 +1212,8 @@ select id, version, owner_id, action, data, event_time, event_ids, deleted, last
 type GetLastFeedEventForCollectionParams struct {
 	OwnerID      persist.DBID
 	EventTime    time.Time
-	Actions      []string
-	CollectionID string
+	Actions      persist.ActionList
+	CollectionID persist.DBID
 }
 
 func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLastFeedEventForCollectionParams) (FeedEvent, error) {
@@ -1243,7 +1243,7 @@ func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLast
 const getLastFeedEventForToken = `-- name: GetLastFeedEventForToken :one
 select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
     and owner_id = $1
-    and action = any($3::varchar[])
+    and action = any($3)
     and data ->> 'token_id' = $4::varchar
     and event_time < $2
     order by event_time desc
@@ -1253,7 +1253,7 @@ select id, version, owner_id, action, data, event_time, event_ids, deleted, last
 type GetLastFeedEventForTokenParams struct {
 	OwnerID   persist.DBID
 	EventTime time.Time
-	Actions   []string
+	Actions   persist.ActionList
 	TokenID   string
 }
 
@@ -1284,7 +1284,7 @@ func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedE
 const getLastFeedEventForUser = `-- name: GetLastFeedEventForUser :one
 select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
     and owner_id = $1
-    and action = any($3::varchar[])
+    and action = any($3)
     and event_time < $2
     order by event_time desc
     limit 1
@@ -1293,7 +1293,7 @@ select id, version, owner_id, action, data, event_time, event_ids, deleted, last
 type GetLastFeedEventForUserParams struct {
 	OwnerID   persist.DBID
 	EventTime time.Time
-	Actions   []string
+	Actions   persist.ActionList
 }
 
 func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEventForUserParams) (FeedEvent, error) {
@@ -2220,14 +2220,15 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 const isActorActionActive = `-- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false
-  and actor_id = $1 and action = any($2::varchar[])
+  and actor_id = $1
+  and action = any($2)
   and created_at > $3 and created_at <= $4
 )
 `
 
 type IsActorActionActiveParams struct {
 	ActorID     persist.DBID
-	Actions     []string
+	Actions     persist.ActionList
 	WindowStart time.Time
 	WindowEnd   time.Time
 }
@@ -2247,7 +2248,9 @@ func (q *Queries) IsActorActionActive(ctx context.Context, arg IsActorActionActi
 const isActorSubjectActionActive = `-- name: IsActorSubjectActionActive :one
 select exists(
   select 1 from events where deleted = false
-  and actor_id = $1 and subject_id = $2 and action = any($3::varchar[])
+  and actor_id = $1
+  and subject_id = $2
+  and action = any($3)
   and created_at > $4 and created_at <= $5
 )
 `
@@ -2255,7 +2258,7 @@ select exists(
 type IsActorSubjectActionActiveParams struct {
 	ActorID     persist.DBID
 	SubjectID   persist.DBID
-	Actions     []string
+	Actions     persist.ActionList
 	WindowStart time.Time
 	WindowEnd   time.Time
 }
@@ -2276,7 +2279,8 @@ func (q *Queries) IsActorSubjectActionActive(ctx context.Context, arg IsActorSub
 const isActorSubjectActive = `-- name: IsActorSubjectActive :one
 select exists(
   select 1 from events where deleted = false
-  and actor_id = $1 and subject_id = $2
+  and actor_id = $1
+  and subject_id = $2
   and created_at > $3 and created_at <= $4
 )
 `

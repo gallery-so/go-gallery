@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	defaultEventGroups = map[persist.Action]actions{
+	defaultEventGroups = map[persist.Action]persist.ActionList{
 		persist.ActionCollectionCreated:               editCollectionActions,
 		persist.ActionCollectorsNoteAddedToCollection: editCollectionActions,
 		persist.ActionTokensAddedToCollection:         editCollectionActions,
@@ -31,21 +31,21 @@ var (
 	}
 
 	// Events in this group can be grouped together as a single collection update
-	editCollectionActions = actions{
+	editCollectionActions = persist.ActionList{
 		persist.ActionCollectionCreated,
 		persist.ActionTokensAddedToCollection,
 		persist.ActionCollectorsNoteAddedToCollection,
 	}
 
 	// Feed events in this group can contain a collection collector's note
-	collectionCollectorsNoteActions = actions{
+	collectionCollectorsNoteActions = persist.ActionList{
 		persist.ActionCollectionUpdated,
 		persist.ActionCollectorsNoteAddedToCollection,
 		persist.ActionCollectionCreated,
 	}
 
 	// Feed events in this group can contain added tokens
-	collectionTokensAddedActions = actions{
+	collectionTokensAddedActions = persist.ActionList{
 		persist.ActionCollectionUpdated,
 		persist.ActionTokensAddedToCollection,
 		persist.ActionCollectionCreated,
@@ -63,7 +63,6 @@ var errUnhandledSingleEvent = errors.New("unhandled single event")
 var errUnhandledGroupedEvent = errors.New("unhandled group event")
 
 type segment int
-type actions []persist.Action
 
 type EventBuilder struct {
 	eventRepo         *postgres.EventRepository
@@ -172,7 +171,7 @@ func (b *EventBuilder) isActive(ctx context.Context, event db.Event) (bool, erro
 }
 
 func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event.ActorID, event.CreatedAt, actions{persist.ActionUserCreated})
+	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event.ActorID, event.CreatedAt, persist.ActionList{persist.ActionUserCreated})
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +192,7 @@ func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.
 }
 
 func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), actions{persist.ActionUserFollowedUsers})
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), persist.ActionList{persist.ActionUserFollowedUsers})
 	if err != nil {
 		return nil, err
 	}
@@ -400,13 +399,13 @@ func isCollectionCollectorsNoteChanged(ctx context.Context, feedRepo *postgres.F
 	return true, nil
 }
 
-func segmentForAction(action persist.Action) (segment, actions) {
+func segmentForAction(action persist.Action) (segment, persist.ActionList) {
 	if reflect.DeepEqual(defaultEventGroups[action], editCollectionActions) {
 		return actorSubjectSegment, editCollectionActions
 	} else if eventSegment, ok := defaultSegments[action]; ok {
-		return eventSegment, actions{action}
+		return eventSegment, persist.ActionList{action}
 	} else {
-		return noSegment, actions{}
+		return noSegment, persist.ActionList{}
 	}
 }
 
