@@ -767,10 +767,6 @@ func loadNewTokensByFeedEventID(q *db.Queries) func(context.Context, []persist.D
 		defer b.Close()
 
 		b.Query(func(i int, t []db.Token, err error) {
-			// XXX: REMOVE ME
-			if err != nil {
-				panic(err)
-			}
 			tokens[i], errors[i] = t, err
 		})
 

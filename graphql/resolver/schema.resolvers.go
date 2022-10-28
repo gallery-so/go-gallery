@@ -131,6 +131,7 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 }
 
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
+
 	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
 		refresh := false
 		if obj.ForceRefresh != nil {
