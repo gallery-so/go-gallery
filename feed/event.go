@@ -146,15 +146,15 @@ func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, erro
 		return true, nil
 	}
 
-	active, err := b.isActive(ctx, event)
+	stillEditing, err := b.isStillEditing(ctx, event)
 	if err != nil {
 		return false, err
 	}
 
-	return !active, nil
+	return !stillEditing, nil
 }
 
-func (b *EventBuilder) isActive(ctx context.Context, event db.Event) (bool, error) {
+func (b *EventBuilder) isStillEditing(ctx context.Context, event db.Event) (bool, error) {
 	segment, actions := segmentForAction(event.Action)
 	switch segment {
 	case actorActionSegment:
@@ -171,7 +171,7 @@ func (b *EventBuilder) isActive(ctx context.Context, event db.Event) (bool, erro
 }
 
 func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event.ActorID, event.CreatedAt, persist.ActionList{persist.ActionUserCreated})
+	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event.ActorID, event.CreatedAt, persist.ActionList{event.Action})
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.
 }
 
 func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), persist.ActionList{persist.ActionUserFollowedUsers})
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), persist.ActionList{event.Action})
 	if err != nil {
 		return nil, err
 	}
