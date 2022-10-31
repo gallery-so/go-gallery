@@ -379,8 +379,18 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 }
 
-func FindNameAndDescription(ctx context.Context, metadata persist.TokenMetadata) (name string, description string) {
-	return util.GetValueFromMapUnsafe(metadata, "name", util.DefaultSearchDepth).(string), util.GetValueFromMapUnsafe(metadata, "description", util.DefaultSearchDepth).(string)
+func FindNameAndDescription(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
+	name, ok := util.GetValueFromMapUnsafe(metadata, "name", util.DefaultSearchDepth).(string)
+	if !ok {
+		name = ""
+	}
+
+	description, ok := util.GetValueFromMapUnsafe(metadata, "description", util.DefaultSearchDepth).(string)
+	if !ok {
+		description = ""
+	}
+
+	return name, description
 }
 
 func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
