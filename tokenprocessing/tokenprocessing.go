@@ -107,7 +107,7 @@ func setDefaults() {
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleDB), time.Hour*12)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleDB), time.Minute*30)
 }
 
 func initSentry() {

@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const staleCommunityTime = time.Hour * 2
+const staleCommunityTime = time.Minute * 30
 
 const maxCommunitySize = 10_000
 
