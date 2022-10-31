@@ -1,6 +1,6 @@
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.User
-//go:generate go run github.com/gallery-so/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.User
+//go:generate go run github.com/gallery-so/dataloaden UserLoaderByAddress github.com/mikeydub/go-gallery/db/gen/coredb.GetUserByAddressBatchParams github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UserLoaderByString string github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByString string []github.com/mikeydub/go-gallery/db/gen/coredb.User
 //go:generate go run github.com/gallery-so/dataloaden UsersLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.GetOwnersByContractIdBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.User
@@ -61,6 +61,7 @@ type IDAndChain struct {
 type Loaders struct {
 	UserByUserID                     *UserLoaderByID
 	UserByUsername                   *UserLoaderByString
+	UserByAddress                    *UserLoaderByAddress
 	UsersWithTrait                   *UsersLoaderByString
 	GalleryByGalleryID               *GalleryLoaderByID
 	GalleryByCollectionID            *GalleryLoaderByID
@@ -161,6 +162,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.UserByUsername = NewUserLoaderByString(defaults, loadUserByUsername(q), UserLoaderByStringCacheSubscriptions{
 		AutoCacheWithKey: func(user db.User) string { return user.Username.String },
 	})
+
+	loaders.UserByAddress = NewUserLoaderByAddress(defaults, loadUserByAddress(q), UserLoaderByAddressCacheSubscriptions{})
 
 	loaders.UsersWithTrait = NewUsersLoaderByString(defaults, loadUsersWithTrait(q))
 
@@ -318,6 +321,26 @@ func loadUserByUsername(q *db.Queries) func(context.Context, []string) ([]db.Use
 		b.QueryRow(func(i int, user db.User, err error) {
 			if err == pgx.ErrNoRows {
 				err = persist.ErrUserNotFound{Username: usernames[i]}
+			}
+
+			users[i], errors[i] = user, err
+		})
+
+		return users, errors
+	}
+}
+
+func loadUserByAddress(q *db.Queries) func(context.Context, []db.GetUserByAddressBatchParams) ([]db.User, []error) {
+	return func(ctx context.Context, params []db.GetUserByAddressBatchParams) ([]db.User, []error) {
+		users := make([]db.User, len(params))
+		errors := make([]error, len(params))
+
+		b := q.GetUserByAddressBatch(ctx, params)
+		defer b.Close()
+
+		b.QueryRow(func(i int, user db.User, err error) {
+			if err == pgx.ErrNoRows {
+				err = persist.ErrUserNotFound{ChainAddress: persist.NewChainAddress(params[i].Address, persist.Chain(params[i].Chain))}
 			}
 
 			users[i], errors[i] = user, err

@@ -590,6 +590,7 @@ type ComplexityRoot struct {
 		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
 		Node                    func(childComplexity int, id model.GqlID) int
 		TokenByID               func(childComplexity int, id persist.DBID) int
+		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                func(childComplexity int, id persist.DBID) int
 		UserByUsername          func(childComplexity int, username string) int
 		UsersWithTrait          func(childComplexity int, trait string) int
@@ -973,6 +974,7 @@ type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerOrError, error)
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error)
+	UserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (model.UserByAddressOrError, error)
 	UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
@@ -3220,6 +3222,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
 
+	case "Query.userByAddress":
+		if e.complexity.Query.UserByAddress == nil {
+			break
+		}
+
+		args, err := ec.field_Query_userByAddress_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UserByAddress(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
+
 	case "Query.userById":
 		if e.complexity.Query.UserByID == nil {
 			break
@@ -4474,7 +4488,6 @@ type ChainTokens {
     tokens: [Token]
 }
 
-
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
@@ -4857,6 +4870,8 @@ union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
+union UserByAddressOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
+
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
@@ -5063,6 +5078,7 @@ type Query {
     viewer: ViewerOrError @authRequired
     userByUsername(username: String!): UserByUsernameOrError
     userById(id: DBID!): UserByIdOrError
+    userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
     usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
@@ -6634,6 +6650,21 @@ func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawA
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_userByAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chainAddress"] = arg0
 	return args, nil
 }
 
@@ -16380,6 +16411,45 @@ func (ec *executionContext) _Query_userById(ctx context.Context, field graphql.C
 	return ec.marshalOUserByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByIDOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_userByAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_userByAddress_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().UserByAddress(rctx, args["chainAddress"].(persist.ChainAddress))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UserByAddressOrError)
+	fc.Result = res
+	return ec.marshalOUserByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByAddressOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_usersWithTrait(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -25248,6 +25318,36 @@ func (ec *executionContext) _UpdateUserInfoPayloadOrError(ctx context.Context, s
 	}
 }
 
+func (ec *executionContext) _UserByAddressOrError(ctx context.Context, sel ast.SelectionSet, obj model.UserByAddressOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GalleryUser:
+		return ec._GalleryUser(ctx, sel, &obj)
+	case *model.GalleryUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryUser(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UserByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.UserByIDOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -27136,7 +27236,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -27414,7 +27514,7 @@ func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.S
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)
@@ -28153,7 +28253,7 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError"}
+var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError"}
 
 func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryUserImplementors)
@@ -29453,6 +29553,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_userById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "userByAddress":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userByAddress(ctx, field)
 				return res
 			}
 
@@ -34822,6 +34942,13 @@ func (ec *executionContext) marshalOUpdateUserInfoPayloadOrError2githubᚗcomᚋ
 		return graphql.Null
 	}
 	return ec._UpdateUserInfoPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUserByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByAddressOrError(ctx context.Context, sel ast.SelectionSet, v model.UserByAddressOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UserByAddressOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUserByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.UserByIDOrError) graphql.Marshaler {

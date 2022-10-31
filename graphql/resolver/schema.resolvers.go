@@ -119,7 +119,6 @@ func (r *commentOnFeedEventPayloadResolver) FeedEvent(ctx context.Context, obj *
 }
 
 func (r *communityResolver) TokensInCommunity(ctx context.Context, obj *model.Community, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
-
 	if onlyGalleryUsers == nil || (onlyGalleryUsers != nil && !*onlyGalleryUsers) {
 		refresh := false
 		if obj.ForceRefresh != nil {
@@ -911,6 +910,10 @@ func (r *queryResolver) UserByUsername(ctx context.Context, username string) (mo
 
 func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error) {
 	return resolveGalleryUserByUserID(ctx, id)
+}
+
+func (r *queryResolver) UserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (model.UserByAddressOrError, error) {
+	return resolveGalleryUserByAddress(ctx, chainAddress)
 }
 
 func (r *queryResolver) UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error) {

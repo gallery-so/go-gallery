@@ -108,7 +108,29 @@ type ErrUserNotFound struct {
 }
 
 func (e ErrUserNotFound) Error() string {
-	return fmt.Sprintf("user not found: address: %s, ID: %s, walletID: %s, username: %s, authenticator: %s", e.ChainAddress, e.UserID, e.WalletID, e.Username, e.Authenticator)
+	template := "user not found: %s;authMethod=%s"
+
+	if e.UserID != "" {
+		method := fmt.Sprintf("method=%s;userID=%s", "byUserID", e.UserID)
+		return fmt.Sprintf(template, method, e.Authenticator)
+	}
+
+	if e.WalletID != "" {
+		method := fmt.Sprintf("method=%s;walletID=%s", "byWalletID", e.WalletID)
+		return fmt.Sprintf(template, method, e.Authenticator)
+	}
+
+	if e.Username != "" {
+		method := fmt.Sprintf("method=%s;username=%s", "byUsername", e.Username)
+		return fmt.Sprintf(template, method, e.Authenticator)
+	}
+
+	if e.ChainAddress != (ChainAddress{}) {
+		method := fmt.Sprintf("method=%s;chainAddress=%s", "byChainAddress", e.ChainAddress)
+		return fmt.Sprintf(template, method, e.Authenticator)
+	}
+
+	return fmt.Sprintf("user not found:authMethod=%s", e.Authenticator)
 }
 
 type ErrUserAlreadyExists struct {

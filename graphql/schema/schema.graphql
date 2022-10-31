@@ -97,7 +97,6 @@ type ChainTokens {
     tokens: [Token]
 }
 
-
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
@@ -480,6 +479,8 @@ union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
+union UserByAddressOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
+
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
@@ -686,6 +687,7 @@ type Query {
     viewer: ViewerOrError @authRequired
     userByUsername(username: String!): UserByUsernameOrError
     userById(id: DBID!): UserByIdOrError
+    userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
     usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
