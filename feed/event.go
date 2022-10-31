@@ -3,7 +3,6 @@ package feed
 import (
 	"context"
 	"errors"
-	"reflect"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -15,26 +14,25 @@ import (
 )
 
 var (
-	defaultEventGroups = map[persist.Action]persist.ActionList{
-		persist.ActionCollectionCreated:               editCollectionActions,
-		persist.ActionCollectorsNoteAddedToCollection: editCollectionActions,
-		persist.ActionTokensAddedToCollection:         editCollectionActions,
+	groupingConfig = map[persist.Action]persist.ActionList{
+		persist.ActionCollectionUpdated: {
+			persist.ActionCollectionCreated,
+			persist.ActionTokensAddedToCollection,
+			persist.ActionCollectorsNoteAddedToCollection,
+		},
 	}
+	eventGroups = createEventGroups(groupingConfig)
+)
 
-	defaultSegments = map[persist.Action]segment{
+var (
+	eventSegments = map[persist.Action]segment{
 		persist.ActionUserCreated:                     noSegment,
 		persist.ActionUserFollowedUsers:               actorActionSegment,
 		persist.ActionCollectorsNoteAddedToToken:      actorSubjectActionSegment,
 		persist.ActionCollectionCreated:               actorSubjectActionSegment,
 		persist.ActionCollectorsNoteAddedToCollection: actorSubjectActionSegment,
 		persist.ActionTokensAddedToCollection:         actorSubjectActionSegment,
-	}
-
-	// Events in this group can be grouped together as a single collection update
-	editCollectionActions = persist.ActionList{
-		persist.ActionCollectionCreated,
-		persist.ActionTokensAddedToCollection,
-		persist.ActionCollectorsNoteAddedToCollection,
+		persist.ActionCollectionUpdated:               actorSubjectSegment,
 	}
 
 	// Feed events in this group can contain a collection collector's note
@@ -59,8 +57,18 @@ const (
 	actorSubjectActionSegment
 )
 
-var errUnhandledSingleEvent = errors.New("unhandled single event")
-var errUnhandledGroupedEvent = errors.New("unhandled group event")
+var errUnhandledSingleEvent = errors.New("unhandable single event")
+var errUnhandledGroupedEvent = errors.New("unhandable group event")
+
+func createEventGroups(groupingConfig map[persist.Action]persist.ActionList) map[persist.Action]persist.Action {
+	eventGroups := map[persist.Action]persist.Action{}
+	for parent, actions := range groupingConfig {
+		for _, action := range actions {
+			eventGroups[action] = parent
+		}
+	}
+	return eventGroups
+}
 
 type segment int
 
@@ -103,7 +111,7 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 		return nil, err
 	}
 
-	if _, groupable := defaultEventGroups[event.Action]; groupable {
+	if _, groupable := eventGroups[event.Action]; groupable {
 		return b.createGroupedFeedEvent(ctx, event)
 	}
 
@@ -111,7 +119,7 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 }
 
 func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	if reflect.DeepEqual(defaultEventGroups[event.Action], editCollectionActions) {
+	if eventGroups[event.Action] == persist.ActionCollectionUpdated {
 		return b.createCollectionUpdatedFeedEvent(ctx, event)
 	}
 	return nil, errUnhandledGroupedEvent
@@ -155,14 +163,13 @@ func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, erro
 }
 
 func (b *EventBuilder) isStillEditing(ctx context.Context, event db.Event) (bool, error) {
-	segment, actions := segmentForAction(event.Action)
-	switch segment {
+	switch getSegment(event.Action) {
 	case actorActionSegment:
-		return b.eventRepo.IsActorActionActive(ctx, event, actions, b.windowSize)
+		return b.eventRepo.IsActorActionActive(ctx, event, getActions(event.Action), b.windowSize)
 	case actorSubjectSegment:
 		return b.eventRepo.IsActorSubjectActive(ctx, event, b.windowSize)
 	case actorSubjectActionSegment:
-		return b.eventRepo.IsActorSubjectActionActive(ctx, event, actions, b.windowSize)
+		return b.eventRepo.IsActorSubjectActionActive(ctx, event, getActions(event.Action), b.windowSize)
 	case noSegment:
 		return false, nil
 	default:
@@ -325,7 +332,7 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 }
 
 func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), editCollectionActions)
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionCollectionUpdated])
 	if err != nil {
 		return nil, err
 	}
@@ -399,14 +406,25 @@ func isCollectionCollectorsNoteChanged(ctx context.Context, feedRepo *postgres.F
 	return true, nil
 }
 
-func segmentForAction(action persist.Action) (segment, persist.ActionList) {
-	if reflect.DeepEqual(defaultEventGroups[action], editCollectionActions) {
-		return actorSubjectSegment, editCollectionActions
-	} else if eventSegment, ok := defaultSegments[action]; ok {
-		return eventSegment, persist.ActionList{action}
-	} else {
-		return noSegment, persist.ActionList{}
+func getActions(action persist.Action) persist.ActionList {
+	// Check if action belongs to a group
+	if actions, ok := groupingConfig[action]; ok {
+		return actions
 	}
+	return persist.ActionList{action}
+}
+
+func getSegment(action persist.Action) segment {
+	// Check if action has a parent action
+	if parent, ok := eventGroups[action]; ok {
+		action = parent
+	}
+
+	eventSegment, ok := eventSegments[action]
+	if !ok {
+		return noSegment
+	}
+	return eventSegment
 }
 
 func newTokens(tokens []persist.DBID, otherTokens []persist.DBID) []persist.DBID {
