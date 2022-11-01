@@ -218,11 +218,10 @@ func processIncompleteTokens(ctx context.Context, inputs <-chan processTokensInp
 						// (token URI, metadata, etc.)
 						if !token.Media.IsServable() {
 							tokensWithoutMedia = append(tokensWithoutMedia, token)
-						}
-						// token.Media.IsServable() because the tokens in tokensWithoutMedia will have all their metadata fields updated as well, including the ones that wold be updated for tokensWithoutMetadataFields
-						// we don't want to update them twice.
-						// also, the media being servable guaruntees that the metadata is valid, meaning that we actually have somewhere to look fro the metadata fields
-						if token.Name == "" || token.Description == "" && token.Media.IsServable() {
+						} else if token.Name == "" || token.Description == "" {
+							// token.Media.IsServable() because the tokens in tokensWithoutMedia will have all their metadata fields updated as well, including the ones that wold be updated for tokensWithoutMetadataFields
+							// we don't want to update them twice.
+							// also, the media being servable guaruntees that the metadata is valid, meaning that we actually have somewhere to look fro the metadata fields
 							tokensWithoutMetadataFields = append(tokensWithoutMetadataFields, token)
 						}
 					}
