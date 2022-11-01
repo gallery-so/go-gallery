@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mikeydub/go-gallery/service/logger"
-
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
@@ -92,18 +90,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	}
 
 	if authResult.UserID != "" {
-		user, err := userRepo.GetByID(pCtx, authResult.UserID)
-		if err != nil {
-			return "", "", err
-		}
-		if user.Universal.Bool() {
-			err = userRepo.Delete(pCtx, authResult.UserID)
-			if err != nil {
-				logger.For(pCtx).WithError(err).Error("error deleting user")
-			}
-		} else {
-			return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
-		}
+		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -174,18 +161,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 	addressOwnerID := authResult.UserID
 
 	if addressOwnerID != "" {
-		user, err := userRepo.GetByID(pCtx, addressOwnerID)
-		if err != nil {
-			return err
-		}
-		if user.Universal.Bool() {
-			err = userRepo.Delete(pCtx, authResult.UserID)
-			if err != nil {
-				return err
-			}
-		} else {
-			return persist.ErrUserAlreadyExists{Authenticator: addressAuth.GetDescription()}
-		}
+		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress}
 	}
 
 	authenticatedAddress, ok := authResult.GetAuthenticatedAddress(pChainAddress)

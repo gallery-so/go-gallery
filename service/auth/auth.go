@@ -194,9 +194,17 @@ func (e NonceAuthenticator) GetDescription() string {
 
 func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
 	asChainAddress := e.ChainPubKey.ToChainAddress()
-	nonce, userID, _ := GetUserWithNonce(pCtx, asChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
+	nonce, userID, universal, _ := GetUserWithNonce(pCtx, asChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
 	if nonce == "" {
 		return nil, ErrNonceNotFound{ChainAddress: asChainAddress}
+	}
+
+	if universal {
+		err := e.UserRepo.Delete(pCtx, userID)
+		if err != nil {
+			return nil, err
+		}
+		userID = ""
 	}
 
 	if e.WalletType != persist.WalletTypeEOA {
@@ -313,25 +321,26 @@ func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUser
 // GetUserWithNonce returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
+func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepository persist.WalletRepository) (nonceValue string, userID persist.DBID, universal bool, err error) {
 	nonce, err := nonceRepo.Get(pCtx, pChainAddress)
 	if err != nil {
-		return nonceValue, userID, err
+		return nonceValue, userID, universal, err
 	}
 
 	nonceValue = nonce.Value.String()
 
 	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
-		return nonceValue, userID, err
+		return nonceValue, userID, universal, err
 	}
 	if user.ID != "" {
 		userID = user.ID
+		universal = user.Universal.Bool()
 	} else {
-		return nonceValue, userID, persist.ErrUserNotFound{ChainAddress: pChainAddress}
+		return nonceValue, userID, universal, persist.ErrUserNotFound{ChainAddress: pChainAddress}
 	}
 
-	return nonceValue, userID, nil
+	return nonceValue, userID, universal, nil
 }
 
 // GetUserIDFromCtx returns the user ID from the context
