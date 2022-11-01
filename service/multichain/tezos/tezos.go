@@ -182,11 +182,11 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit || len(resultTokens) >= maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
 		}
 
-		if len(resultTokens)+limit >= maxLimit {
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
 			// this will ensure that we don't go over the max limit
 			limit = maxLimit - len(resultTokens)
 		}
@@ -228,11 +228,12 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit || len(resultTokens) >= maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
 		}
 
-		if len(resultTokens)+limit >= maxLimit {
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
 			limit = maxLimit - len(resultTokens)
 		}
 
@@ -279,11 +280,12 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit || len(resultTokens) >= maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
 		}
 
-		if len(resultTokens)+limit >= maxLimit {
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
 			limit = maxLimit - len(resultTokens)
 		}
 
@@ -392,14 +394,14 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < limit || len(resultTokens) >= maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
 		}
 
-		if len(resultTokens)+limit >= maxLimit {
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
 			limit = maxLimit - len(resultTokens)
 		}
-
 		offset += limit
 	}
 
