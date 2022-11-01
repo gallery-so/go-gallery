@@ -932,11 +932,13 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 	res := make([]persist.TokenGallery, len(seenTokens))
 	i := 0
 	for _, t := range seenTokens {
-		if t.Name == "" || t.Description == "" {
+		if t.Name == "" {
 			name, ok := util.GetValueFromMapUnsafe(t.TokenMetadata, "name", util.DefaultSearchDepth).(string)
 			if ok {
 				t.Name = persist.NullString(name)
 			}
+		}
+		if t.Description == "" {
 			description, ok := util.GetValueFromMapUnsafe(t.TokenMetadata, "description", util.DefaultSearchDepth).(string)
 			if ok {
 				t.Description = persist.NullString(description)
