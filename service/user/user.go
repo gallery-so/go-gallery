@@ -161,7 +161,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 	addressOwnerID := authResult.UserID
 
 	if addressOwnerID != "" {
-		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress}
+		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressOwnerID}
 	}
 
 	authenticatedAddress, ok := authResult.GetAuthenticatedAddress(pChainAddress)
