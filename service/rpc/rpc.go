@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -198,6 +199,7 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 			Dial:                (&net.Dialer{KeepAlive: defaultHTTPKeepAlive * time.Second}).Dial,
 			MaxIdleConns:        defaultHTTPMaxIdleConns,
 			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		}, continueTrace, spanOptions...),
 	}
 }
