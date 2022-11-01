@@ -227,6 +227,16 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 	return userToModel(ctx, *user), nil
 }
 
+func resolveGalleryUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*model.GalleryUser, error) {
+	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, chainAddress)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return userToModel(ctx, *user), nil
+}
+
 func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error) {
 	users, err := publicapi.For(ctx).User.GetUsersWithTrait(ctx, trait)
 
