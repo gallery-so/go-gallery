@@ -222,7 +222,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
 
-	err = NonceRotate(pCtx, asChainAddress, userID, e.NonceRepo)
+	err = NonceRotate(pCtx, asChainAddress, e.NonceRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, user
 }
 
 // NonceRotate will rotate a nonce for a user
-func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUserID persist.DBID, nonceRepo persist.NonceRepository) error {
+func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, nonceRepo persist.NonceRepository) error {
 	err := nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
 	if err != nil {
 		return err
