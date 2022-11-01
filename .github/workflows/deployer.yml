@@ -204,7 +204,7 @@ jobs:
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
-          credentials_json: "${{ secrets.GCP_PROD_CREDENTIALS }}"
+          credentials_json: "${{ secrets.GCP_DEV_CREDENTIALS }}"
       - name: "Install gcloud cli"
         uses: google-github-actions/setup-gcloud@v0
       - name: "Docker auth"
