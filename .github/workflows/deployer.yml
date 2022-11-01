@@ -212,7 +212,7 @@ jobs:
       - name: "Deploy"
         run: |
           cd _deploy
-          make deploy-dev-indexer
+          make deploy-dev-indexer-server
   deploy-prod-indexer:
     runs-on: ubuntu-latest
     steps:
@@ -253,4 +253,4 @@ jobs:
       - name: "Deploy"
         run: |
           cd _deploy
-          make deploy-prod-indexer
+          make deploy-prod-indexer-server
