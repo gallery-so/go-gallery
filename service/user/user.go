@@ -89,7 +89,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		return "", "", auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	if authResult.UserID != "" {
+	if authResult.User != nil && !authResult.User.Universal.Bool() {
 		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
@@ -158,15 +158,13 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return err
 	}
 
-	addressOwnerID := authResult.UserID
-
-	if addressOwnerID != "" {
-		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressOwnerID}
+	if authResult.User != nil && !authResult.User.Universal.Bool() {
+		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: authResult.User.ID}
 	}
 
 	authenticatedAddress, ok := authResult.GetAuthenticatedAddress(pChainAddress)
 	if !ok {
-		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressOwnerID}
+		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: authResult.User.ID}
 	}
 
 	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType); err != nil {

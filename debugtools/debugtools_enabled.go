@@ -39,7 +39,7 @@ func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 	}
 
 	authResult := auth.AuthResult{
-		UserID:    d.UserID,
+		User:      d.User,
 		Addresses: wallets,
 	}
 
