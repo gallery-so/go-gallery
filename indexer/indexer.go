@@ -25,6 +25,7 @@ import (
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -912,15 +913,10 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 		}
 		delete(previousOwners, k)
 		metadata := metadatas[k]
-		delete(metadatas, k)
-		var name, description string
 
-		if w, ok := findFirstFieldFromMetadata(metadata.md, "name").(string); ok {
-			name = w
-		}
-		if w, ok := findFirstFieldFromMetadata(metadata.md, "description").(string); ok {
-			description = w
-		}
+		name, description := media.FindNameAndDescription(ctx, metadata.md)
+
+		delete(metadatas, k)
 
 		uri := uris[k]
 		delete(uris, k)
@@ -955,15 +951,10 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 		}
 
 		metadata := metadatas[k]
-		delete(metadatas, k)
-		var name, description string
 
-		if v, ok := findFirstFieldFromMetadata(metadata.md, "name").(string); ok {
-			name = v
-		}
-		if v, ok := findFirstFieldFromMetadata(metadata.md, "description").(string); ok {
-			description = v
-		}
+		name, description := media.FindNameAndDescription(ctx, metadata.md)
+
+		delete(metadatas, k)
 
 		uri := uris[k]
 		delete(uris, k)
@@ -1103,16 +1094,6 @@ func fillContractFields(ctx context.Context, ethClient *ethclient.Client, contra
 }
 
 // HELPER FUNCS ---------------------------------------------------------------
-
-func findFirstFieldFromMetadata(metadata persist.TokenMetadata, fields ...string) interface{} {
-
-	for _, field := range fields {
-		if val := util.GetValueFromMapUnsafe(metadata, field, util.DefaultSearchDepth); val != nil {
-			return val
-		}
-	}
-	return nil
-}
 
 func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 	transfersMap := map[persist.BlockNumber]transfersAtBlock{}

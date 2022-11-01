@@ -63,7 +63,7 @@ func processAddresses(addresses <-chan persist.Address, wg *sync.WaitGroup) {
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
 			defer cancel()
 
-			body := indexer.UpdateTokenMediaInput{
+			body := indexer.UpdateTokenInput{
 				OwnerAddress: persist.EthereumAddress(a),
 				UpdateAll:    true,
 			}

@@ -109,8 +109,8 @@ type TokenUpdateInfoInput struct {
 	CollectorsNote NullString `json:"collectors_note"`
 }
 
-// TokenUpdateMediaInput represents an update to a tokens image properties
-type TokenUpdateMediaInput struct {
+// TokenUpdateAllURIDerivedFieldsInput represents an update to any field that can be derived from the token URI, including the metadata itself and tokenURI where the metadata is hosted
+type TokenUpdateAllURIDerivedFieldsInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
 	Media       Media         `json:"media"`
@@ -118,6 +118,21 @@ type TokenUpdateMediaInput struct {
 	TokenURI    TokenURI      `json:"token_uri"`
 	Name        NullString    `json:"name"`
 	Description NullString    `json:"description"`
+}
+
+// TokenUpdateMediaInput represents an update to just a token's media fields
+type TokenUpdateMediaInput struct {
+	LastUpdated LastUpdatedTime `json:"last_updated"`
+
+	Media Media `json:"media"`
+}
+
+// TokenUpdateMetadataFieldsInput represents an update to any field that can be derived from the token metadata
+type TokenUpdateMetadataFieldsInput struct {
+	LastUpdated LastUpdatedTime `json:"last_updated"`
+
+	Name        NullString `json:"name"`
+	Description NullString `json:"description"`
 }
 
 // TokenGalleryRepository represents a repository for interacting with persisted tokens

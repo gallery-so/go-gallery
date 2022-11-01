@@ -460,7 +460,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 
-				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
+				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllURIDerivedFieldsInput{
 					Media:       token.Media,
 					Metadata:    token.TokenMetadata,
 					Name:        persist.NullString(token.Name),

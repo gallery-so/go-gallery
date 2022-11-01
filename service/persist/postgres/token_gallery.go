@@ -15,24 +15,26 @@ import (
 
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
-	db                                      *sql.DB
-	galleryRepo                             *GalleryRepository
-	getByUserIDStmt                         *sql.Stmt
-	getByUserIDPaginateStmt                 *sql.Stmt
-	getByTokenIDStmt                        *sql.Stmt
-	getByTokenIDPaginateStmt                *sql.Stmt
-	getByTokenIdentifiersStmt               *sql.Stmt
-	getByTokenIdentifiersPaginateStmt       *sql.Stmt
-	getByFullIdentifiersStmt                *sql.Stmt
-	updateInfoStmt                          *sql.Stmt
-	updateMediaStmt                         *sql.Stmt
-	updateInfoByTokenIdentifiersUnsafeStmt  *sql.Stmt
-	updateMediaByTokenIdentifiersUnsafeStmt *sql.Stmt
-	deleteByIdentifiersStmt                 *sql.Stmt
-	deleteByIDStmt                          *sql.Stmt
-	getContractByAddressStmt                *sql.Stmt
-	setTokensAsUserMarkedSpamStmt           *sql.Stmt
-	checkOwnTokensStmt                      *sql.Stmt
+	db                                                  *sql.DB
+	galleryRepo                                         *GalleryRepository
+	getByUserIDStmt                                     *sql.Stmt
+	getByUserIDPaginateStmt                             *sql.Stmt
+	getByTokenIDStmt                                    *sql.Stmt
+	getByTokenIDPaginateStmt                            *sql.Stmt
+	getByTokenIdentifiersStmt                           *sql.Stmt
+	getByTokenIdentifiersPaginateStmt                   *sql.Stmt
+	getByFullIdentifiersStmt                            *sql.Stmt
+	updateInfoStmt                                      *sql.Stmt
+	updateMediaStmt                                     *sql.Stmt
+	updateInfoByTokenIdentifiersUnsafeStmt              *sql.Stmt
+	updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt *sql.Stmt
+	updateMediaByTokenIdentifiersUnsafeStmt             *sql.Stmt
+	updateMetadataFieldsByTokenIdentifiersUnsafeStmt    *sql.Stmt
+	deleteByIdentifiersStmt                             *sql.Stmt
+	deleteByIDStmt                                      *sql.Stmt
+	getContractByAddressStmt                            *sql.Stmt
+	setTokensAsUserMarkedSpamStmt                       *sql.Stmt
+	checkOwnTokensStmt                                  *sql.Stmt
 }
 
 var errTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
@@ -73,7 +75,13 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 	updateInfoByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
 	checkNoErr(err)
 
-	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE TOKEN_ID = $7 AND CONTRACT = $8 AND DELETED = false;`)
+	updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE TOKEN_ID = $7 AND CONTRACT = $8 AND DELETED = false;`)
+	checkNoErr(err)
+
+	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
+	checkNoErr(err)
+
+	updateMetadataFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET NAME = $1, DESCRIPTION = $2, LAST_UPDATED = $3 WHERE TOKEN_ID = $4 AND CONTRACT = $5 AND DELETED = false;`)
 	checkNoErr(err)
 
 	deleteByIdentifiersStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE TOKEN_ID = $1 AND CONTRACT = $2 AND OWNER_USER_ID = $3 AND CHAIN = $4;`)
@@ -92,24 +100,26 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 	checkNoErr(err)
 
 	return &TokenGalleryRepository{
-		db:                                      db,
-		galleryRepo:                             galleryRepo,
-		getByUserIDStmt:                         getByUserIDStmt,
-		getByUserIDPaginateStmt:                 getByUserIDPaginateStmt,
-		getByTokenIdentifiersStmt:               getByTokenIdentifiersStmt,
-		getByTokenIdentifiersPaginateStmt:       getByTokenIdentifiersPaginateStmt,
-		updateInfoStmt:                          updateInfoStmt,
-		updateMediaStmt:                         updateMediaStmt,
-		updateInfoByTokenIdentifiersUnsafeStmt:  updateInfoByTokenIdentifiersUnsafeStmt,
-		updateMediaByTokenIdentifiersUnsafeStmt: updateMediaByTokenIdentifiersUnsafeStmt,
-		deleteByIdentifiersStmt:                 deleteByIdentifiersStmt,
-		getByTokenIDStmt:                        getByTokenIDStmt,
-		getByTokenIDPaginateStmt:                getByTokenIDPaginateStmt,
-		deleteByIDStmt:                          deleteByIDStmt,
-		getContractByAddressStmt:                getContractByAddressStmt,
-		setTokensAsUserMarkedSpamStmt:           setTokensAsUserMarkedSpamStmt,
-		checkOwnTokensStmt:                      checkOwnTokensStmt,
-		getByFullIdentifiersStmt:                getByFullIdentifiersStmt,
+		db:                                     db,
+		galleryRepo:                            galleryRepo,
+		getByUserIDStmt:                        getByUserIDStmt,
+		getByUserIDPaginateStmt:                getByUserIDPaginateStmt,
+		getByTokenIdentifiersStmt:              getByTokenIdentifiersStmt,
+		getByTokenIdentifiersPaginateStmt:      getByTokenIdentifiersPaginateStmt,
+		updateInfoStmt:                         updateInfoStmt,
+		updateMediaStmt:                        updateMediaStmt,
+		updateInfoByTokenIdentifiersUnsafeStmt: updateInfoByTokenIdentifiersUnsafeStmt,
+		updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt: updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt,
+		updateMediaByTokenIdentifiersUnsafeStmt:             updateMediaByTokenIdentifiersUnsafeStmt,
+		updateMetadataFieldsByTokenIdentifiersUnsafeStmt:    updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
+		deleteByIdentifiersStmt:                             deleteByIdentifiersStmt,
+		getByTokenIDStmt:                                    getByTokenIDStmt,
+		getByTokenIDPaginateStmt:                            getByTokenIDPaginateStmt,
+		deleteByIDStmt:                                      deleteByIDStmt,
+		getContractByAddressStmt:                            getContractByAddressStmt,
+		setTokensAsUserMarkedSpamStmt:                       setTokensAsUserMarkedSpamStmt,
+		checkOwnTokensStmt:                                  checkOwnTokensStmt,
+		getByFullIdentifiersStmt:                            getByFullIdentifiersStmt,
 	}
 
 }
@@ -308,8 +318,8 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
 		res, err = t.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pID, pUserID)
-	case persist.TokenUpdateMediaInput:
-		update := pUpdate.(persist.TokenUpdateMediaInput)
+	case persist.TokenUpdateAllURIDerivedFieldsInput:
+		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
 		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pID, pUserID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
@@ -341,9 +351,15 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 	case persist.TokenUpdateInfoInput:
 		update := pUpdate.(persist.TokenUpdateInfoInput)
 		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, contractID)
+	case persist.TokenUpdateAllURIDerivedFieldsInput:
+		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
+		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
-		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pTokenID, contractID)
+	case persist.TokenUpdateMetadataFieldsInput:
+		update := pUpdate.(persist.TokenUpdateMetadataFieldsInput)
+		res, err = t.updateMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
