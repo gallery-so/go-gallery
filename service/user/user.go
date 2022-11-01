@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 
@@ -95,10 +94,13 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	if authResult.UserID != "" {
 		user, err := userRepo.GetByID(pCtx, authResult.UserID)
 		if err != nil {
-			logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
+			return "", "", err
 		}
 		if user.Universal.Bool() {
-			userRepo.Delete(pCtx, authResult.UserID)
+			err = userRepo.Delete(pCtx, authResult.UserID)
+			if err != nil {
+				logger.For(pCtx).WithError(err).Error("error deleting user")
+			}
 		} else {
 			return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 		}
@@ -172,7 +174,18 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 	addressOwnerID := authResult.UserID
 
 	if addressOwnerID != "" {
-		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressOwnerID}
+		user, err := userRepo.GetByID(pCtx, addressOwnerID)
+		if err != nil {
+			return err
+		}
+		if user.Universal.Bool() {
+			err = userRepo.Delete(pCtx, authResult.UserID)
+			if err != nil {
+				return err
+			}
+		} else {
+			return persist.ErrUserAlreadyExists{Authenticator: addressAuth.GetDescription()}
+		}
 	}
 
 	authenticatedAddress, ok := authResult.GetAuthenticatedAddress(pChainAddress)
@@ -181,55 +194,6 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 	}
 
 	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// AddAddressToUserToken adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, pWalletType persist.WalletType, addressAuth auth.Authenticator,
-	userRepo persist.UserRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
-
-	authResult, err := addressAuth.Authenticate(pCtx)
-	if err != nil {
-		return err
-	}
-
-	addressUserID := authResult.UserID
-
-	if addressUserID != "" {
-		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
-	}
-
-	if !auth.ContainsWallet(authResult.Addresses, auth.AuthenticatedAddress{ChainAddress: pChainAddress}) {
-		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
-	}
-
-	defer func() {
-		// user has successfully added an address
-		// validate that the user's NFTs are valid and have cached media content
-
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := validateNFTsForUser(ctx, pUserID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("validateNFTsForUser")
-			}
-		}()
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := ensureMediaContent(ctx, pChainAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("ensureMediaForUser")
-			}
-		}()
-	}()
-
-	// TODO add address to user waterfalls to wallet and address table
-	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress, pWalletType); err != nil {
 		return err
 	}
 
