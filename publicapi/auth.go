@@ -2,15 +2,19 @@ package publicapi
 
 import (
 	"context"
+	"fmt"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/spf13/viper"
 )
 
 type AuthAPI struct {
@@ -35,6 +39,68 @@ func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce
 		EthClient:          api.ethClient,
 	}
 	return authenticator
+}
+
+func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
+	if !debugtools.Enabled || viper.GetString("ENV") != "local" {
+		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
+	}
+
+	if debugParams.AsUsername == nil {
+		if debugParams.ChainAddresses == nil {
+			return nil, fmt.Errorf("debug auth failed: either asUsername or chainAddresses must be specified")
+		}
+
+		userID := persist.DBID("")
+		if debugParams.UserID != nil {
+			userID = *debugParams.UserID
+		}
+
+		user, err := api.repos.UserRepository.GetByID(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("debug auth failed: %w", err)
+		}
+
+		return debugtools.NewDebugAuthenticator(&user, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
+	}
+
+	if debugParams.UserID != nil || debugParams.ChainAddresses != nil {
+		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be used in conjunction with userId or chainAddresses parameters")
+	}
+
+	username := *debugParams.AsUsername
+	if username == "" {
+		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be empty")
+	}
+
+	user, err := api.repos.UserRepository.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
+	}
+
+	wallets, err := api.queries.GetWalletsByUserID(ctx, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
+	}
+
+	var addresses []persist.ChainAddress
+	for _, wallet := range wallets {
+		addresses = append(addresses, persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)))
+	}
+
+	return debugtools.NewDebugAuthenticator(&user, addresses), nil
+}
+
+func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
+	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
+
+	for _, address := range chainAddresses {
+		if address != nil {
+			addresses = append(addresses, *address)
+		}
+	}
+
+	return addresses
 }
 
 func (api AuthAPI) GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (nonce string, userExists bool, err error) {

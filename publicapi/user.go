@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"time"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
@@ -58,6 +59,66 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 	return &user, nil
 }
 
+func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userIDs": {userIDs, "required"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
+
+		users, err := api.queries.GetUsersByIDs(ctx, db.GetUsersByIDsParams{
+			Limit:         params.Limit,
+			UserIds:       userIDs,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		interfaces := make([]interface{}, len(users))
+		for i, user := range users {
+			interfaces[i] = user
+		}
+
+		return interfaces, nil
+	}
+
+	countFunc := func() (int, error) {
+		return len(userIDs), nil
+	}
+
+	cursorFunc := func(i interface{}) (time.Time, persist.DBID, error) {
+		if user, ok := i.(db.User); ok {
+			return user.CreatedAt, user.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("interface{} is not an user")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	users := make([]db.User, len(results))
+	for i, result := range results {
+		if user, ok := result.(db.User); ok {
+			users[i] = user
+		}
+	}
+
+	return users, pageInfo, err
+}
+
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -67,6 +128,26 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.
 	}
 
 	user, err := api.loaders.UserByUsername.Load(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"chainAddress": {chainAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	chain := chainAddress.Chain()
+	user, err := api.loaders.UserByAddress.Load(db.GetUserByAddressBatchParams{
+		Chain:   int32(chain),
+		Address: persist.Address(chain.NormalizeAddress(chainAddress.Address())),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -145,14 +226,17 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, bio, api.repos.UserRepository, api.repos.GalleryRepository)
 
 	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
 		UserID:         userID,
 		SubjectID:      userID,
 		Data:           persist.EventData{UserBio: bio},
-	})
+	}, api.validator, nil)
+	if err != nil {
+		return "", "", err
+	}
 
 	return userID, galleryID, err
 }
@@ -174,12 +258,28 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 		return err
 	}
 
-	err = user.UpdateUser(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
+	err = user.UpdateUserInfo(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (api UserAPI) UpdateUserNotificationSettings(ctx context.Context, notificationSettings persist.UserNotificationSettings) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"notification_settings": {notificationSettings, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.queries.UpdateNotificationSettingsByID(ctx, db.UpdateNotificationSettingsByIDParams{ID: userID, NotificationSettings: notificationSettings})
 }
 
 func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([]persist.MembershipTier, error) {
@@ -295,7 +395,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		return
 	}
 
-	pushFeedEvent(ctx, db.Event{
+	pushEvent(ctx, db.Event{
 		ActorID:        curUserID,
 		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeUser,

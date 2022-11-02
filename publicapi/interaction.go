@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/validate"
+
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -376,7 +378,21 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	return api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
+	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
+
+	_, err = dispatchEvent(ctx, db.Event{
+		ActorID:        userID,
+		ResourceTypeID: persist.ResourceTypeAdmire,
+		SubjectID:      feedEventID,
+		FeedEventID:    feedEventID,
+		AdmireID:       admireID,
+		Action:         persist.ActionAdmiredFeedEvent,
+	}, api.validator, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return admireID, err
 }
 
 func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
@@ -452,10 +468,32 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
+	actor, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return "", err
+	}
+
 	// Sanitize
 	comment = validate.SanitizationPolicy.Sanitize(comment)
 
-	return api.repos.CommentRepository.CreateComment(ctx, feedEventID, For(ctx).User.GetLoggedInUserId(ctx), replyToID, comment)
+	commentID, err := api.repos.CommentRepository.CreateComment(ctx, feedEventID, actor, replyToID, comment)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = dispatchEvent(ctx, db.Event{
+		ActorID:        actor,
+		ResourceTypeID: persist.ResourceTypeComment,
+		SubjectID:      feedEventID,
+		FeedEventID:    feedEventID,
+		CommentID:      commentID,
+		Action:         persist.ActionCommentedOnFeedEvent,
+	}, api.validator, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return commentID, nil
 }
 
 func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {

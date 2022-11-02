@@ -148,7 +148,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 }
 
 func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&address=%s&limit=1", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID, ownerAddress), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&token_id=%s&address=%s", d.indexerBaseURL, tokenIdentifiers.ContractAddress, tokenIdentifiers.TokenID, ownerAddress), nil)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -276,7 +276,7 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) error {
 
-	input := indexer.UpdateTokenMediaInput{
+	input := indexer.UpdateTokenInput{
 		OwnerAddress:    persist.EthereumAddress(ownerAddress.String()),
 		TokenID:         ti.TokenID,
 		ContractAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(ti.ContractAddress)),
@@ -340,7 +340,7 @@ func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain
 func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 
-	input := indexer.UpdateTokenMediaInput{
+	input := indexer.UpdateTokenInput{
 		OwnerAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(wallet)),
 		UpdateAll:    all,
 	}
@@ -572,7 +572,7 @@ func tokensToChainAgnostic(tokens []persist.Token) []multichain.ChainAgnosticTok
 }
 
 func contractsToChainAgnostic(contracts []persist.Contract) []multichain.ChainAgnosticContract {
-	result := make([]multichain.ChainAgnosticContract, len(contracts))
+	result := make([]multichain.ChainAgnosticContract, 0, len(contracts))
 	for _, contract := range contracts {
 		result = append(result, contractToChainAgnostic(contract))
 	}

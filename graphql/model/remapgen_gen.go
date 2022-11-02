@@ -98,6 +98,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GroupedNotification": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GroupedNotification)
+		return obj, ok
+	},
+
 	"Interaction": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Interaction)
 		return obj, ok
@@ -120,6 +125,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"Node": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Node)
+		return obj, ok
+	},
+
+	"Notification": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(Notification)
 		return obj, ok
 	},
 
@@ -203,6 +213,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UserByAddressOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UserByAddressOrError)
+		return obj, ok
+	},
+
 	"UserByIdOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UserByIDOrError)
 		return obj, ok
@@ -210,6 +225,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"UserByUsernameOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UserByUsernameOrError)
+		return obj, ok
+	},
+
+	"ViewGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ViewGalleryPayloadOrError)
 		return obj, ok
 	},
 

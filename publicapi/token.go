@@ -9,6 +9,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/validate"
@@ -87,7 +88,7 @@ func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persis
 	return tokens, nil
 }
 
-func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) ([]db.Token, PageInfo, error) {
+func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]db.Token, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractID": {contractID, "required"},
@@ -99,11 +100,18 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 		return nil, PageInfo{}, err
 	}
 
+	ogu := false
+	if onlyGalleryUsers != nil {
+		ogu = *onlyGalleryUsers
+	}
+
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
 
-		tokens, err := api.loaders.TokensByContractIDWithPagination.Load(db.GetTokensByContractIdBatchPaginateParams{
+		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
+		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			Contract:           contractID,
 			Limit:              params.Limit,
+			GalleryUsersOnly:   ogu,
 			CurBeforeUniversal: params.CursorBeforeBool,
 			CurAfterUniversal:  params.CursorAfterBool,
 			CurBeforeTime:      params.CursorBeforeTime,
@@ -125,7 +133,10 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountTokensByContractId(ctx, contractID)
+		total, err := api.queries.CountTokensByContractId(ctx, db.CountTokensByContractIdParams{
+			Contract:         contractID,
+			GalleryUsersOnly: ogu,
+		})
 		return int(total), err
 	}
 
@@ -428,7 +439,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	}
 
 	// Send event
-	dispatchEventToFeed(ctx, db.Event{
+	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        userID,
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
@@ -438,9 +449,9 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 			TokenCollectionID:   collectionID,
 			TokenCollectorsNote: collectorsNote,
 		},
-	})
+	}, api.validator, nil)
 
-	return nil
+	return err
 }
 
 func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID, isSpam bool) error {

@@ -115,7 +115,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 
 }
 
-func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID) error {
+func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractID": {contractID, "required"},
@@ -134,11 +134,12 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 		ContractID:        contractID,
 		Imagekeywords:     im,
 		Animationkeywords: anim,
+		ForceRefresh:      forceRefresh,
 	}
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
 
-func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, forceRefresh bool, before, after *string, first, last *int) ([]*model.TokenHolder, PageInfo, error) {
+func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]*model.TokenHolder, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"contractAddress": {contractAddress, "required"},
@@ -155,10 +156,17 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+	ogu := false
+	if onlyGalleryUsers != nil {
+		ogu = *onlyGalleryUsers
+	}
+
+	boolFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+
 		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			Contract:           contract.ID,
 			Limit:              params.Limit,
+			GalleryUsersOnly:   ogu,
 			CurBeforeUniversal: params.CursorBeforeBool,
 			CurAfterUniversal:  params.CursorAfterBool,
 			CurBeforeTime:      params.CursorBeforeTime,
@@ -181,11 +189,16 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	}
 
 	countFunc := func() (int, error) {
-		total, err := api.queries.CountOwnersByContractId(ctx, contract.ID)
+
+		total, err := api.queries.CountOwnersByContractId(ctx, db.CountOwnersByContractIdParams{
+			Contract:         contract.ID,
+			GalleryUsersOnly: ogu,
+		})
+
 		return int(total), err
 	}
 
-	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
+	boolCursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
 		if user, ok := i.(db.User); ok {
 			return user.Universal, user.CreatedAt, user.ID, nil
 		}
@@ -193,13 +206,12 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 	}
 
 	paginator := boolTimeIDPaginator{
-		QueryFunc:  queryFunc,
-		CursorFunc: cursorFunc,
+		QueryFunc:  boolFunc,
+		CursorFunc: boolCursorFunc,
 		CountFunc:  countFunc,
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
-
 	if err != nil {
 		return nil, PageInfo{}, err
 	}

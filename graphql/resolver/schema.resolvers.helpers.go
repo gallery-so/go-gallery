@@ -11,9 +11,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
+	"github.com/mikeydub/go-gallery/service/notifications"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -49,6 +52,41 @@ var nodeFetcher = model.NodeFetcher{
 		} else {
 			return nil, err
 		}
+	},
+	OnSomeoneAdmiredYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneAdmiredYourFeedEventNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneAdmiredYourFeedEventNotification), nil
+	},
+	OnSomeoneCommentedOnYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourFeedEventNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneCommentedOnYourFeedEventNotification), nil
+	},
+	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneFollowedYouBackNotification), nil
+	},
+	OnSomeoneFollowedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneFollowedYouNotification), nil
+	},
+	OnSomeoneViewedYourGalleryNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneViewedYourGalleryNotification, error) {
+		notif, err := resolveNotificationByID(ctx, dbid)
+		if err != nil {
+			return nil, err
+		}
+		return notif.(*model.SomeoneViewedYourGalleryNotification), nil
 	},
 }
 
@@ -111,51 +149,6 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	return nil, false
 }
 
-func createDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
-	if !debugtools.Enabled || viper.GetString("ENV") != "local" {
-		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
-	}
-
-	if debugParams.AsUsername == nil {
-		if debugParams.ChainAddresses == nil {
-			return nil, fmt.Errorf("debug auth failed: either asUsername or chainAddresses must be specified")
-		}
-
-		userID := persist.DBID("")
-		if debugParams.UserID != nil {
-			userID = *debugParams.UserID
-		}
-
-		return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
-	}
-
-	if debugParams.UserID != nil || debugParams.ChainAddresses != nil {
-		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be used in conjunction with userId or chainAddresses parameters")
-	}
-
-	username := *debugParams.AsUsername
-	if username == "" {
-		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be empty")
-	}
-
-	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
-	if err != nil {
-		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
-	}
-
-	wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, user.ID)
-	if err != nil {
-		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
-	}
-
-	var addresses []persist.ChainAddress
-	for _, wallet := range wallets {
-		addresses = append(addresses, persist.NewChainAddress(wallet.Address, wallet.Chain))
-	}
-
-	return debugtools.NewDebugAuthenticator(user.ID, addresses), nil
-}
-
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.AuthMechanism) (auth.Authenticator, error) {
 
@@ -163,7 +156,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 
 	if debugtools.Enabled {
 		if viper.GetString("ENV") == "local" && m.Debug != nil {
-			return createDebugAuthenticator(ctx, *m.Debug)
+			return authApi.NewDebugAuthenticator(ctx, *m.Debug)
 		}
 	}
 
@@ -181,6 +174,16 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 
 func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return userToModel(ctx, *user), nil
+}
+
+func resolveGalleryUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*model.GalleryUser, error) {
+	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, chainAddress)
 
 	if err != nil {
 		return nil, err
@@ -388,9 +391,9 @@ func resolveTokensByContractID(ctx context.Context, contractID persist.DBID) ([]
 	return tokensToModel(ctx, tokens), nil
 }
 
-func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int) (*model.TokensConnection, error) {
+func resolveTokensByContractIDWithPagination(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokensConnection, error) {
 
-	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last)
+	tokens, pageInfo, err := publicapi.For(ctx).Token.GetTokensByContractIdPaginate(ctx, contractID, before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -409,8 +412,8 @@ func resolveTokensByContractIDWithPagination(ctx context.Context, contractID per
 	}, nil
 }
 
-func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID) error {
-	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID)
+func refreshTokensInContractAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
+	return publicapi.For(ctx).Contract.RefreshOwnersAsync(ctx, contractID, forceRefresh)
 }
 
 func resolveTokensByUserID(ctx context.Context, userID persist.DBID) ([]*model.Token, error) {
@@ -504,12 +507,12 @@ func resolveCommunityByContractAddress(ctx context.Context, contractAddress pers
 	return communityToModel(ctx, *community, forceRefresh), nil
 }
 
-func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, forceRefresh bool, before, after *string, first, last *int) (*model.TokenHoldersConnection, error) {
+func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) (*model.TokenHoldersConnection, error) {
 	contract, err := publicapi.For(ctx).Contract.GetContractByID(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), forceRefresh, before, after, first, last)
+	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -563,18 +566,259 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 
 func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.FeedEvent, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return eventToModel(event)
+}
+
+func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
+
+	notifs, pageInfo, err := publicapi.For(ctx).Notifications.GetViewerNotifications(ctx, before, after, first, last)
 
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := feedEventToDataModel(event)
+	edges, err := notificationsToEdges(notifs)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.FeedEvent{Dbid: eventID, EventData: data}, nil
+	unseen := unseenNotifications(notifs)
+
+	return &model.NotificationsConnection{
+		Edges:       edges,
+		PageInfo:    pageInfoToModel(ctx, pageInfo),
+		UnseenCount: &unseen,
+	}, nil
+}
+
+func notificationsToEdges(notifs []db.Notification) ([]*model.NotificationEdge, error) {
+	edges := make([]*model.NotificationEdge, len(notifs))
+
+	for i, notif := range notifs {
+
+		node, err := notificationToModel(notif)
+		if err != nil {
+			return nil, err
+		}
+
+		edges[i] = &model.NotificationEdge{
+			Node: node,
+		}
+	}
+
+	return edges, nil
+}
+
+func notificationToModel(notif db.Notification) (model.Notification, error) {
+	amount := int(notif.Amount)
+	switch notif.Action {
+	case persist.ActionAdmiredFeedEvent:
+		return model.SomeoneAdmiredYourFeedEventNotification{
+			HelperSomeoneAdmiredYourFeedEventNotificationData: model.HelperSomeoneAdmiredYourFeedEventNotificationData{
+				OwnerID:          notif.OwnerID,
+				FeedEventID:      notif.FeedEventID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			FeedEvent:    nil, // handled by dedicated resolver
+			Admirers:     nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionCommentedOnFeedEvent:
+		return model.SomeoneCommentedOnYourFeedEventNotification{
+			HelperSomeoneCommentedOnYourFeedEventNotificationData: model.HelperSomeoneCommentedOnYourFeedEventNotificationData{
+				OwnerID:          notif.OwnerID,
+				FeedEventID:      notif.FeedEventID,
+				CommentID:        notif.CommentID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			FeedEvent:    nil, // handled by dedicated resolver
+			Comment:      nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionUserFollowedUsers:
+		if !notif.Data.FollowedBack {
+			return model.SomeoneFollowedYouNotification{
+				HelperSomeoneFollowedYouNotificationData: model.HelperSomeoneFollowedYouNotificationData{
+					OwnerID:          notif.OwnerID,
+					NotificationData: notif.Data,
+				},
+				Dbid:         notif.ID,
+				Seen:         &notif.Seen,
+				CreationTime: &notif.CreatedAt,
+				UpdatedTime:  &notif.LastUpdated,
+				Count:        &amount,
+				Followers:    nil, // handled by dedicated resolver
+			}, nil
+		}
+		return model.SomeoneFollowedYouBackNotification{
+			HelperSomeoneFollowedYouBackNotificationData: model.HelperSomeoneFollowedYouBackNotificationData{
+				OwnerID:          notif.OwnerID,
+				NotificationData: notif.Data,
+			},
+			Dbid:         notif.ID,
+			Seen:         &notif.Seen,
+			CreationTime: &notif.CreatedAt,
+			UpdatedTime:  &notif.LastUpdated,
+			Count:        &amount,
+			Followers:    nil, // handled by dedicated resolver
+		}, nil
+	case persist.ActionViewedGallery:
+		nonCount := len(notif.Data.UnauthedViewerIDs)
+		return model.SomeoneViewedYourGalleryNotification{
+			HelperSomeoneViewedYourGalleryNotificationData: model.HelperSomeoneViewedYourGalleryNotificationData{
+				OwnerID:          notif.OwnerID,
+				GalleryID:        notif.GalleryID,
+				NotificationData: notif.Data,
+			},
+			Dbid:               notif.ID,
+			Seen:               &notif.Seen,
+			CreationTime:       &notif.CreatedAt,
+			UpdatedTime:        &notif.LastUpdated,
+			Count:              &amount,
+			UserViewers:        nil, // handled by dedicated resolver
+			Gallery:            nil, // handled by dedicated resolver
+			NonUserViewerCount: &nonCount,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
+	}
+}
+
+func unseenNotifications(notifs []db.Notification) int {
+	count := 0
+	for _, notif := range notifs {
+		if !notif.Seen {
+			count++
+		}
+	}
+
+	return count
+}
+
+func resolveViewerNotificationSettings(ctx context.Context) (*model.NotificationSettings, error) {
+
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return notificationSettingsToModel(ctx, user), nil
+
+}
+
+func notificationSettingsToModel(ctx context.Context, user *db.User) *model.NotificationSettings {
+	settings := user.NotificationSettings
+	return &model.NotificationSettings{
+		HelperNotificationSettingsData: model.HelperNotificationSettingsData{
+			UserId: user.ID,
+		},
+		User:                         userToModel(ctx, *user),
+		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
+		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
+		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
+		SomeoneViewedYourGallery:     settings.SomeoneViewedYourGallery,
+	}
+}
+
+func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notification {
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	notifDispatcher := notifications.For(ctx)
+	notifs := notifDispatcher.GetNewNotificationsForUser(userID)
+	logger.For(ctx).Info("new notification subscription for ", userID)
+
+	result := make(chan model.Notification)
+
+	go func() {
+		for notif := range notifs {
+			// use async to prevent blocking the dispatcher
+			asModel, err := notificationToModel(notif)
+			if err != nil {
+				logger.For(nil).Errorf("error converting notification to model: %v", err)
+				return
+			}
+			select {
+			case result <- asModel:
+				logger.For(nil).Debug("sent new notification to subscription")
+			default:
+				logger.For(nil).Errorf("notification subscription channel full, dropping notification")
+				notifDispatcher.UnsubscribeNewNotificationsForUser(userID)
+			}
+		}
+	}()
+
+	return result
+}
+
+func resolveUpdatedNotificationSubscription(ctx context.Context) <-chan model.Notification {
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	notifDispatcher := notifications.For(ctx)
+	notifs := notifDispatcher.GetUpdatedNotificationsForUser(userID)
+
+	result := make(chan model.Notification)
+
+	wp := workerpool.New(10)
+
+	go func() {
+		for notif := range notifs {
+			n := notif
+			wp.Submit(func() {
+				asModel, err := notificationToModel(n)
+				if err != nil {
+					logger.For(nil).Errorf("error converting notification to model: %v", err)
+					return
+				}
+				select {
+				case result <- asModel:
+					logger.For(nil).Debug("sent updated notification to subscription")
+				default:
+					logger.For(nil).Errorf("notification subscription channel full, dropping notification")
+					notifDispatcher.UnsubscribeUpdatedNotificationsForUser(userID)
+				}
+			})
+		}
+		wp.StopWait()
+	}()
+
+	return result
+}
+
+func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userIDs persist.DBIDList, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, userIDs, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.GroupNotificationUserEdge, len(users))
+
+	for i, user := range users {
+		edges[i] = &model.GroupNotificationUserEdge{
+			Node:   userToModel(ctx, user),
+			Cursor: nil,
+		}
+	}
+
+	return &model.GroupNotificationUsersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+		HelperGroupNotificationUsersConnectionData: model.HelperGroupNotificationUsersConnectionData{
+			UserIDs: userIDs,
+		},
+	}, nil
 }
 
 func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (model.FeedEventData, error) {
@@ -629,6 +873,16 @@ func resolveTokenSettingsByIDs(ctx context.Context, tokenID, collectionID persis
 	return &model.CollectionTokenSettings{RenderLive: &defaultTokenSettings.RenderLive}, nil
 }
 
+func resolveNotificationByID(ctx context.Context, id persist.DBID) (model.Notification, error) {
+	notification, err := publicapi.For(ctx).Notifications.GetByID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return notificationToModel(notification)
+}
+
 func resolveAdmireByAdmireID(ctx context.Context, admireID persist.DBID) (*model.Admire, error) {
 	admire, err := publicapi.For(ctx).Interaction.GetAdmireByID(ctx, admireID)
 
@@ -666,6 +920,27 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
+}
+
+func eventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
+	data, err := feedEventToDataModel(event)
+	if err != nil {
+		return nil, err
+	}
+
+	// Value always returns a nil error so we can safely ignore it.
+	caption, _ := event.Caption.Value()
+
+	var captionVal *string
+	if caption != nil {
+		captionVal = util.StringToPointer(caption.(string))
+	}
+
+	return &model.FeedEvent{
+		Dbid:      event.ID,
+		Caption:   captionVal,
+		EventData: data,
+	}, nil
 }
 
 func eventToUserCreatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
@@ -716,7 +991,7 @@ func eventToCollectionCreatedFeedEventData(event *db.FeedEvent) model.FeedEventD
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
 		HelperCollectionCreatedFeedEventDataData: model.HelperCollectionCreatedFeedEventDataData{
-			FeedEventId: event.ID,
+			FeedEventID: event.ID,
 		},
 	}
 }
@@ -740,7 +1015,7 @@ func eventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.Feed
 		NewTokens:  nil, // handled by dedicated resolver
 		IsPreFeed:  util.BoolToPointer(event.Data.CollectionIsPreFeed),
 		HelperTokensAddedToCollectionFeedEventDataData: model.HelperTokensAddedToCollectionFeedEventDataData{
-			FeedEventId: event.ID,
+			FeedEventID: event.ID,
 		},
 	}
 }
@@ -749,16 +1024,13 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
-		data, err := feedEventToDataModel(&evt)
-
 		var node model.FeedEventOrError
+		node, err := eventToModel(&evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}
 		} else if err != nil {
 			return nil, err
-		} else {
-			node = model.FeedEvent{Dbid: evt.ID, EventData: data}
 		}
 
 		edges[i] = &model.FeedEdge{Node: node}
@@ -777,6 +1049,11 @@ func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
 
 func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int) *model.CollectionLayout {
 	if version == 0 {
+		// Some older collections predate configurable columns; the default back then was 3
+		if layout.Columns == 0 {
+			layout.Columns = 3
+		}
+
 		// Treat the original collection as a single section.
 		return &model.CollectionLayout{
 			Sections: []*int{util.IntToPointer(0)},
@@ -1259,16 +1536,4 @@ func getInvalidMedia(ctx context.Context, media persist.Media) model.InvalidMedi
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
-}
-
-func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
-	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
-
-	for _, address := range chainAddresses {
-		if address != nil {
-			addresses = append(addresses, *address)
-		}
-	}
-
-	return addresses
 }

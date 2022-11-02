@@ -539,6 +539,98 @@ func (b *GetCommentsByActorIDBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getCommentsByFeedEventIDBatch = `-- name: GetCommentsByFeedEventIDBatch :batchmany
+SELECT comments.id, comments.version, feed_event_id, actor_id, reply_to, comment, comments.deleted, comments.created_at, comments.last_updated, f.id, f.version, owner_id, action, data, event_time, event_ids, f.deleted, f.last_updated, f.created_at, caption FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
+`
+
+type GetCommentsByFeedEventIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetCommentsByFeedEventIDBatchRow struct {
+	ID            persist.DBID
+	Version       int32
+	FeedEventID   persist.DBID
+	ActorID       persist.DBID
+	ReplyTo       persist.DBID
+	Comment       string
+	Deleted       bool
+	CreatedAt     time.Time
+	LastUpdated   time.Time
+	ID_2          persist.DBID
+	Version_2     int32
+	OwnerID       persist.DBID
+	Action        persist.Action
+	Data          persist.FeedEventData
+	EventTime     time.Time
+	EventIds      persist.DBIDList
+	Deleted_2     bool
+	LastUpdated_2 time.Time
+	CreatedAt_2   time.Time
+	Caption       sql.NullString
+}
+
+func (q *Queries) GetCommentsByFeedEventIDBatch(ctx context.Context, id []persist.DBID) *GetCommentsByFeedEventIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getCommentsByFeedEventIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetCommentsByFeedEventIDBatchBatchResults{br, 0}
+}
+
+func (b *GetCommentsByFeedEventIDBatchBatchResults) Query(f func(int, []GetCommentsByFeedEventIDBatchRow, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []GetCommentsByFeedEventIDBatchRow
+		for rows.Next() {
+			var i GetCommentsByFeedEventIDBatchRow
+			if err := rows.Scan(
+				&i.ID,
+				&i.Version,
+				&i.FeedEventID,
+				&i.ActorID,
+				&i.ReplyTo,
+				&i.Comment,
+				&i.Deleted,
+				&i.CreatedAt,
+				&i.LastUpdated,
+				&i.ID_2,
+				&i.Version_2,
+				&i.OwnerID,
+				&i.Action,
+				&i.Data,
+				&i.EventTime,
+				&i.EventIds,
+				&i.Deleted_2,
+				&i.LastUpdated_2,
+				&i.CreatedAt_2,
+				&i.Caption,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetCommentsByFeedEventIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getContractByChainAddressBatch = `-- name: GetContractByChainAddressBatch :batchone
 select id, deleted, version, created_at, last_updated, name, symbol, address, creator_address, chain, profile_banner_url, profile_image_url, badge_url, description FROM contracts WHERE address = $1 AND chain = $2 AND deleted = false
 `
@@ -732,7 +824,7 @@ func (b *GetContractsDisplayedByUserIDBatchBatchResults) Close() error {
 }
 
 const getEventByIdBatch = `-- name: GetEventByIdBatch :batchone
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE id = $1 AND deleted = false
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE id = $1 AND deleted = false
 `
 
 type GetEventByIdBatchBatchResults struct {
@@ -767,6 +859,7 @@ func (b *GetEventByIdBatchBatchResults) QueryRow(f func(int, FeedEvent, error)) 
 			&i.Deleted,
 			&i.LastUpdated,
 			&i.CreatedAt,
+			&i.Caption,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -783,7 +876,7 @@ func (b *GetEventByIdBatchBatchResults) Close() error {
 }
 
 const getFollowersByUserIdBatch = `-- name: GetFollowersByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings FROM follows f
     INNER JOIN users u ON f.follower = u.id
     WHERE f.followee = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -828,6 +921,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.NotificationSettings,
 			); err != nil {
 				break
 			}
@@ -846,7 +940,7 @@ func (b *GetFollowersByUserIdBatchBatchResults) Close() error {
 }
 
 const getFollowingByUserIdBatch = `-- name: GetFollowingByUserIdBatch :batchmany
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM follows f
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings FROM follows f
     INNER JOIN users u ON f.followee = u.id
     WHERE f.follower = $1 AND f.deleted = false
     ORDER BY f.last_updated DESC
@@ -891,6 +985,7 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.NotificationSettings,
 			); err != nil {
 				break
 			}
@@ -1186,15 +1281,72 @@ func (b *GetNewTokensByFeedEventIdBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getNotificationByIDBatch = `-- name: GetNotificationByIDBatch :batchone
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE id = $1 AND deleted = false
+`
+
+type GetNotificationByIDBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+func (q *Queries) GetNotificationByIDBatch(ctx context.Context, id []persist.DBID) *GetNotificationByIDBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range id {
+		vals := []interface{}{
+			a,
+		}
+		batch.Queue(getNotificationByIDBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetNotificationByIDBatchBatchResults{br, 0}
+}
+
+func (b *GetNotificationByIDBatchBatchResults) QueryRow(f func(int, Notification, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i Notification
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetNotificationByIDBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (result.id) result.id, result.deleted, result.version, result.last_updated, result.created_at, result.username, result.username_idempotent, result.wallets, result.bio, result.traits, result.universal FROM (SELECT users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal FROM users, tokens
-    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
-    AND tokens.deleted = false AND users.deleted = false
-    AND (users.universal,users.created_at,users.id) < ($3, $4::timestamptz, $5)
-    AND (users.universal,users.created_at,users.id) > ($6, $7::timestamptz, $8)
-    ORDER BY CASE WHEN $9::bool THEN (users.universal,users.created_at,users.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (users.universal,users.created_at,users.id) END DESC
-    LIMIT $2) AS result
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings from (
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings from users u, tokens t
+        where t.contract = $1 and t.owner_user_id = u.id
+        and (not $3::bool or u.universal = false)
+        and t.deleted = false and u.deleted = false
+    ) as users
+    where (users.universal,users.created_at,users.id) < ($4, $5::timestamptz, $6)
+    and (users.universal,users.created_at,users.id) > ($7, $8::timestamptz, $9)
+    order by case when $10::bool then (users.universal,users.created_at,users.id) end asc,
+         case when not $10::bool then (users.universal,users.created_at,users.id) end desc limit $2
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {
@@ -1205,6 +1357,7 @@ type GetOwnersByContractIdBatchPaginateBatchResults struct {
 type GetOwnersByContractIdBatchPaginateParams struct {
 	Contract           persist.DBID
 	Limit              int32
+	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
 	CurBeforeID        persist.DBID
@@ -1214,12 +1367,18 @@ type GetOwnersByContractIdBatchPaginateParams struct {
 	PagingForward      bool
 }
 
+// Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
+//       return complete rows from the users table. As a workaround, aliasing the subquery to
+//       "users" seems to fix the issue (along with aliasing the users table inside the subquery
+//       to "u" to avoid confusion -- otherwise, sqlc creates a custom row type that includes
+//       all users.* fields twice).
 func (q *Queries) GetOwnersByContractIdBatchPaginate(ctx context.Context, arg []GetOwnersByContractIdBatchPaginateParams) *GetOwnersByContractIdBatchPaginateBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
 		vals := []interface{}{
 			a.Contract,
 			a.Limit,
+			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
 			a.CurBeforeTime,
 			a.CurBeforeID,
@@ -1256,6 +1415,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.NotificationSettings,
 			); err != nil {
 				break
 			}
@@ -1338,7 +1498,7 @@ func (b *GetTokenByIdBatchBatchResults) Close() error {
 }
 
 const getTokenOwnerByIDBatch = `-- name: GetTokenOwnerByIDBatch :batchone
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -1376,6 +1536,7 @@ func (b *GetTokenOwnerByIDBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.NotificationSettings,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -1544,10 +1705,11 @@ const getTokensByContractIdBatchPaginate = `-- name: GetTokensByContractIdBatchP
 SELECT t.id, t.deleted, t.version, t.created_at, t.last_updated, t.name, t.description, t.collectors_note, t.media, t.token_uri, t.token_type, t.token_id, t.quantity, t.ownership_history, t.token_metadata, t.external_url, t.block_number, t.owner_user_id, t.owned_by_wallets, t.chain, t.contract, t.is_user_marked_spam, t.is_provider_marked_spam FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.contract = $1 AND t.deleted = false
-    AND (u.universal,t.created_at,t.id) < ($3, $4::timestamptz, $5)
-    AND (u.universal,t.created_at,t.id) > ($6, $7::timestamptz, $8)
-    ORDER BY CASE WHEN $9::bool THEN (u.universal,t.created_at,t.id) END ASC,
-             CASE WHEN NOT $9::bool THEN (u.universal,t.created_at,t.id) END DESC
+    AND (NOT $3::bool OR u.universal = false)
+    AND (u.universal,t.created_at,t.id) < ($4, $5::timestamptz, $6)
+    AND (u.universal,t.created_at,t.id) > ($7, $8::timestamptz, $9)
+    ORDER BY CASE WHEN $10::bool THEN (u.universal,t.created_at,t.id) END ASC,
+             CASE WHEN NOT $10::bool THEN (u.universal,t.created_at,t.id) END DESC
     LIMIT $2
 `
 
@@ -1559,6 +1721,7 @@ type GetTokensByContractIdBatchPaginateBatchResults struct {
 type GetTokensByContractIdBatchPaginateParams struct {
 	Contract           persist.DBID
 	Limit              int32
+	GalleryUsersOnly   bool
 	CurBeforeUniversal bool
 	CurBeforeTime      time.Time
 	CurBeforeID        persist.DBID
@@ -1574,6 +1737,7 @@ func (q *Queries) GetTokensByContractIdBatchPaginate(ctx context.Context, arg []
 		vals := []interface{}{
 			a.Contract,
 			a.Limit,
+			a.GalleryUsersOnly,
 			a.CurBeforeUniversal,
 			a.CurBeforeTime,
 			a.CurBeforeID,
@@ -1954,8 +2118,73 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getUserByAddressBatch = `-- name: GetUserByAddressBatch :batchone
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings
+from users, wallets
+where wallets.address = $1
+	and wallets.chain = $2::int
+	and array[wallets.id] <@ users.wallets
+	and wallets.deleted = false
+	and users.deleted = false
+`
+
+type GetUserByAddressBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetUserByAddressBatchParams struct {
+	Address persist.Address
+	Chain   int32
+}
+
+func (q *Queries) GetUserByAddressBatch(ctx context.Context, arg []GetUserByAddressBatchParams) *GetUserByAddressBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Address,
+			a.Chain,
+		}
+		batch.Queue(getUserByAddressBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUserByAddressBatchBatchResults{br, 0}
+}
+
+func (b *GetUserByAddressBatchBatchResults) QueryRow(f func(int, User, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i User
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetUserByAddressBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getUserByIdBatch = `-- name: GetUserByIdBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings FROM users WHERE id = $1 AND deleted = false
 `
 
 type GetUserByIdBatchBatchResults struct {
@@ -1991,6 +2220,7 @@ func (b *GetUserByIdBatchBatchResults) QueryRow(f func(int, User, error)) {
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.NotificationSettings,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -2007,7 +2237,7 @@ func (b *GetUserByIdBatchBatchResults) Close() error {
 }
 
 const getUserByUsernameBatch = `-- name: GetUserByUsernameBatch :batchone
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 type GetUserByUsernameBatchBatchResults struct {
@@ -2043,6 +2273,7 @@ func (b *GetUserByUsernameBatchBatchResults) QueryRow(f func(int, User, error)) 
 			&i.Bio,
 			&i.Traits,
 			&i.Universal,
+			&i.NotificationSettings,
 		)
 		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
 			break
@@ -2058,8 +2289,92 @@ func (b *GetUserByUsernameBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getUserNotificationsBatch = `-- name: GetUserNotificationsBatch :batchmany
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $2
+`
+
+type GetUserNotificationsBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetUserNotificationsBatchParams struct {
+	OwnerID       persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUserNotificationsBatch(ctx context.Context, arg []GetUserNotificationsBatchParams) *GetUserNotificationsBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.OwnerID,
+			a.Limit,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+		}
+		batch.Queue(getUserNotificationsBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUserNotificationsBatchBatchResults{br, 0}
+}
+
+func (b *GetUserNotificationsBatchBatchResults) Query(f func(int, []Notification, error)) {
+	for {
+		rows, err := b.br.Query()
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		defer rows.Close()
+		var items []Notification
+		for rows.Next() {
+			var i Notification
+			if err := rows.Scan(
+				&i.ID,
+				&i.Deleted,
+				&i.OwnerID,
+				&i.Version,
+				&i.LastUpdated,
+				&i.CreatedAt,
+				&i.Action,
+				&i.Data,
+				&i.EventIds,
+				&i.FeedEventID,
+				&i.CommentID,
+				&i.GalleryID,
+				&i.Seen,
+				&i.Amount,
+			); err != nil {
+				break
+			}
+			items = append(items, i)
+		}
+
+		if f != nil {
+			f(b.ind, items, rows.Err())
+		}
+		b.ind++
+	}
+}
+
+func (b *GetUserNotificationsBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
 const getUsersWithTraitBatch = `-- name: GetUsersWithTraitBatch :batchmany
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 type GetUsersWithTraitBatchBatchResults struct {
@@ -2101,6 +2416,7 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 				&i.Bio,
 				&i.Traits,
 				&i.Universal,
+				&i.NotificationSettings,
 			); err != nil {
 				break
 			}
@@ -2435,7 +2751,7 @@ func (b *PaginateCommentsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginateGlobalFeed = `-- name: PaginateGlobalFeed :batchmany
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE deleted = false
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE deleted = false
     AND (event_time, id) < ($2, $3)
     AND (event_time, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (event_time, id) END ASC,
@@ -2495,6 +2811,7 @@ func (b *PaginateGlobalFeedBatchResults) Query(f func(int, []FeedEvent, error)) 
 				&i.Deleted,
 				&i.LastUpdated,
 				&i.CreatedAt,
+				&i.Caption,
 			); err != nil {
 				break
 			}
@@ -2597,7 +2914,7 @@ func (b *PaginateInteractionsByFeedEventIDBatchBatchResults) Close() error {
 }
 
 const paginatePersonalFeedByUserID = `-- name: PaginatePersonalFeedByUserID :batchmany
-SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
+SELECT fe.id, fe.version, fe.owner_id, fe.action, fe.data, fe.event_time, fe.event_ids, fe.deleted, fe.last_updated, fe.created_at, fe.caption FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
     AND fe.owner_id = fl.followee AND fl.follower = $1
     AND (fe.event_time, fe.id) < ($3, $4)
     AND (fe.event_time, fe.id) > ($5, $6)
@@ -2660,6 +2977,7 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Query(f func(int, []FeedEvent
 				&i.Deleted,
 				&i.LastUpdated,
 				&i.CreatedAt,
+				&i.Caption,
 			); err != nil {
 				break
 			}
@@ -2678,7 +2996,7 @@ func (b *PaginatePersonalFeedByUserIDBatchResults) Close() error {
 }
 
 const paginateUserFeedByUserID = `-- name: PaginateUserFeedByUserID :batchmany
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at FROM feed_events WHERE owner_id = $1 AND deleted = false
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE owner_id = $1 AND deleted = false
     AND (event_time, id) < ($3, $4)
     AND (event_time, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (event_time, id) END ASC,
@@ -2740,6 +3058,7 @@ func (b *PaginateUserFeedByUserIDBatchResults) Query(f func(int, []FeedEvent, er
 				&i.Deleted,
 				&i.LastUpdated,
 				&i.CreatedAt,
+				&i.Caption,
 			); err != nil {
 				break
 			}

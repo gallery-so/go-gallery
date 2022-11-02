@@ -182,9 +182,6 @@ func (n NullString) String() string {
 
 // Value implements the database/sql driver Valuer interface for the NullString type
 func (n NullString) Value() (driver.Value, error) {
-	if n.String() == "" {
-		return "", nil
-	}
 	return strings.ToValidUTF8(strings.ReplaceAll(n.String(), "\\u0000", ""), ""), nil
 }
 
@@ -349,6 +346,15 @@ func RemoveDuplicateAddresses(a []EthereumAddress) []EthereumAddress {
 func ContainsDBID(pSrc []DBID, pID DBID) bool {
 	for _, v := range pSrc {
 		if v == pID {
+			return true
+		}
+	}
+	return false
+}
+
+func ContainsNullString(pSrc []NullString, pStr NullString) bool {
+	for _, v := range pSrc {
+		if v == pStr {
 			return true
 		}
 	}

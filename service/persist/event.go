@@ -11,12 +11,18 @@ const (
 	ResourceTypeUser ResourceType = iota
 	ResourceTypeToken
 	ResourceTypeCollection
+	ResourceTypeGallery
+	ResourceTypeAdmire
+	ResourceTypeComment
 	ActionUserCreated                     Action = "UserCreated"
 	ActionUserFollowedUsers               Action = "UserFollowedUsers"
 	ActionCollectorsNoteAddedToToken      Action = "CollectorsNoteAddedToToken"
 	ActionCollectionCreated               Action = "CollectionCreated"
 	ActionCollectorsNoteAddedToCollection Action = "CollectorsNoteAddedToCollection"
 	ActionTokensAddedToCollection         Action = "TokensAddedToCollection"
+	ActionAdmiredFeedEvent                Action = "AdmiredFeedEvent"
+	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
+	ActionViewedGallery                   Action = "ViewedGallery"
 )
 
 type EventData struct {

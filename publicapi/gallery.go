@@ -9,6 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -92,4 +93,57 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 	}
 
 	return nil
+}
+
+func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return db.Gallery{}, err
+	}
+
+	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	gc := util.GinContextFromContext(ctx)
+
+	if auth.GetUserAuthedFromCtx(gc) {
+		userID, err := getAuthenticatedUser(ctx)
+		if err != nil {
+			return db.Gallery{}, err
+		}
+
+		// if gallery.OwnerUserID != userID {
+		// only view gallery if the user hasn't already viewed it in this most recent notification period
+
+		_, err = dispatchEvent(ctx, db.Event{
+			ActorID:        userID,
+			ResourceTypeID: persist.ResourceTypeGallery,
+			SubjectID:      galleryID,
+			Action:         persist.ActionViewedGallery,
+			GalleryID:      galleryID,
+		}, api.validator, nil)
+		if err != nil {
+			return db.Gallery{}, err
+		}
+		// }
+	} else {
+		remote, _ := gc.RemoteIP()
+
+		_, err := dispatchEvent(ctx, db.Event{
+			ResourceTypeID: persist.ResourceTypeGallery,
+			SubjectID:      galleryID,
+			Action:         persist.ActionViewedGallery,
+			GalleryID:      galleryID,
+			ExternalID:     persist.NullString(remote.String()),
+		}, api.validator, nil)
+		if err != nil {
+			return db.Gallery{}, err
+		}
+	}
+
+	return gallery, nil
 }

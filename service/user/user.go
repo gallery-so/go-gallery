@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"strings"
-	"time"
-
-	"github.com/mikeydub/go-gallery/service/logger"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -93,16 +90,8 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		return "", "", auth.ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	if authResult.UserID != "" {
-		user, err := userRepo.GetByID(pCtx, authResult.UserID)
-		if err != nil {
-			logger.For(pCtx).WithError(err).Error("error retrieving user by address to get login nonce")
-		}
-		if user.Universal.Bool() {
-			userRepo.Delete(pCtx, authResult.UserID)
-		} else {
-			return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
-		}
+	if authResult.User != nil && !authResult.User.Universal.Bool() {
+		return "", "", persist.ErrUserAlreadyExists{Authenticator: authenticator.GetDescription()}
 	}
 
 	// TODO: This currently takes the first authenticated address returned by the authenticator and creates
@@ -170,67 +159,16 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return err
 	}
 
-	addressOwnerID := authResult.UserID
-
-	if addressOwnerID != "" {
-		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressOwnerID}
+	if authResult.User != nil && !authResult.User.Universal.Bool() {
+		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: authResult.User.ID}
 	}
 
 	authenticatedAddress, ok := authResult.GetAuthenticatedAddress(pChainAddress)
 	if !ok {
-		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressOwnerID}
+		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: authResult.User.ID}
 	}
 
 	if err := userRepo.AddWallet(pCtx, pUserID, authenticatedAddress.ChainAddress, authenticatedAddress.WalletType); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// AddAddressToUserToken adds a single address to a user in the DB because a signature needs to be provided and validated per address
-func AddAddressToUserToken(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, pWalletType persist.WalletType, addressAuth auth.Authenticator,
-	userRepo postgres.UserRepository, tokenRepo postgres.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
-
-	authResult, err := addressAuth.Authenticate(pCtx)
-	if err != nil {
-		return err
-	}
-
-	addressUserID := authResult.UserID
-
-	if addressUserID != "" {
-		return persist.ErrAddressOwnedByUser{ChainAddress: pChainAddress, OwnerID: addressUserID}
-	}
-
-	if !auth.ContainsWallet(authResult.Addresses, auth.AuthenticatedAddress{ChainAddress: pChainAddress}) {
-		return persist.ErrAddressNotOwnedByUser{ChainAddress: pChainAddress, UserID: addressUserID}
-	}
-
-	defer func() {
-		// user has successfully added an address
-		// validate that the user's NFTs are valid and have cached media content
-
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := validateNFTsForUser(ctx, pUserID, userRepo, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, stg)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("validateNFTsForUser")
-			}
-		}()
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-			defer cancel()
-			err := ensureMediaContent(ctx, pChainAddress, tokenRepo, ethClient, ipfsClient, arweaveClient, stg)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("ensureMediaForUser")
-			}
-		}()
-	}()
-
-	// TODO add address to user waterfalls to wallet and address table
-	if err := userRepo.AddWallet(pCtx, pUserID, pChainAddress, pWalletType); err != nil {
 		return err
 	}
 
@@ -297,8 +235,8 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo postgres.UserRe
 	return output, nil
 }
 
-// UpdateUser updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
-func UpdateUser(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository *postgres.UserRepository, ethClient *ethclient.Client) error {
+// UpdateUserInfo updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
+func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository *postgres.UserRepository, ethClient *ethclient.Client) error {
 	if strings.HasSuffix(strings.ToLower(username), ".eth") {
 		user, err := userRepository.GetByID(pCtx, userID)
 		if err != nil {

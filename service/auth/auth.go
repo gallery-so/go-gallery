@@ -115,7 +115,7 @@ type Authenticator interface {
 }
 
 type AuthResult struct {
-	UserID    persist.DBID
+	User      *persist.User
 	Addresses []AuthenticatedAddress
 }
 
@@ -195,7 +195,7 @@ func (e NonceAuthenticator) GetDescription() string {
 
 func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
 	asChainAddress := e.ChainPubKey.ToChainAddress()
-	nonce, userID, _ := GetUserWithNonce(pCtx, asChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
+	nonce, user, _ := GetUserWithNonce(pCtx, asChainAddress, e.UserRepo, e.NonceRepo, e.WalletRepo)
 	if nonce == "" {
 		return nil, ErrNonceNotFound{ChainAddress: asChainAddress}
 	}
@@ -215,7 +215,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 		return nil, ErrSignatureVerificationFailed{ErrSignatureInvalid}
 	}
 
-	err = NonceRotate(pCtx, asChainAddress, userID, e.NonceRepo)
+	err = NonceRotate(pCtx, asChainAddress, e.NonceRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 
 	authResult := AuthResult{
 		Addresses: []AuthenticatedAddress{{ChainAddress: asChainAddress, WalletType: e.WalletType, WalletID: walletID}},
-		UserID:    userID,
+		User:      user,
 	}
 
 	return &authResult, nil
@@ -243,19 +243,19 @@ func Login(pCtx context.Context, authenticator Authenticator) (persist.DBID, err
 		return "", ErrAuthenticationFailed{WrappedErr: err}
 	}
 
-	if authResult.UserID == "" {
+	if authResult.User == nil || authResult.User.Universal.Bool() {
 		return "", persist.ErrUserNotFound{Authenticator: authenticator.GetDescription()}
 	}
 
-	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.UserID)
+	jwtTokenStr, err := JWTGeneratePipeline(pCtx, authResult.User.ID)
 	if err != nil {
 		return "", err
 	}
 
-	SetAuthStateForCtx(gc, authResult.UserID, nil)
+	SetAuthStateForCtx(gc, authResult.User.ID, nil)
 	SetJWTCookie(gc, jwtTokenStr)
 
-	return authResult.UserID, nil
+	return authResult.User.ID, nil
 }
 
 func Logout(pCtx context.Context) {
@@ -303,7 +303,7 @@ func GetAuthNonce(pCtx context.Context, pChainAddress persist.ChainAddress, user
 }
 
 // NonceRotate will rotate a nonce for a user
-func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUserID persist.DBID, nonceRepo *postgres.NonceRepository) error {
+func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, nonceRepo *postgres.NonceRepository) error {
 	err := nonceRepo.Create(pCtx, GenerateNonce(), pChainAddress)
 	if err != nil {
 		return err
@@ -314,25 +314,25 @@ func NonceRotate(pCtx context.Context, pChainAddress persist.ChainAddress, pUser
 // GetUserWithNonce returns nonce value string, user id
 // will return empty strings and error if no nonce found
 // will return empty string if no user found
-func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository, walletRepository *postgres.WalletRepository) (nonceValue string, userID persist.DBID, err error) {
+func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, userRepo *postgres.UserRepository, nonceRepo *postgres.NonceRepository, walletRepository *postgres.WalletRepository) (nonceValue string, user *persist.User, err error) {
 	nonce, err := nonceRepo.Get(pCtx, pChainAddress)
 	if err != nil {
-		return nonceValue, userID, err
+		return nonceValue, user, err
 	}
 
 	nonceValue = nonce.Value.String()
 
-	user, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
+	dbUser, err := userRepo.GetByChainAddress(pCtx, pChainAddress)
 	if err != nil {
-		return nonceValue, userID, err
+		return nonceValue, user, err
 	}
-	if user.ID != "" {
-		userID = user.ID
+	if dbUser.ID != "" {
+		user = &dbUser
 	} else {
-		return nonceValue, userID, persist.ErrUserNotFound{ChainAddress: pChainAddress}
+		return nonceValue, user, persist.ErrUserNotFound{ChainAddress: pChainAddress}
 	}
 
-	return nonceValue, userID, nil
+	return nonceValue, user, nil
 }
 
 // GetUserIDFromCtx returns the user ID from the context

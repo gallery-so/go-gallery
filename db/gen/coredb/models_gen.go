@@ -118,6 +118,12 @@ type Event struct {
 	Deleted        bool
 	LastUpdated    time.Time
 	CreatedAt      time.Time
+	GalleryID      persist.DBID
+	CommentID      persist.DBID
+	AdmireID       persist.DBID
+	FeedEventID    persist.DBID
+	ExternalID     persist.NullString
+	Caption        sql.NullString
 }
 
 type Feature struct {
@@ -155,6 +161,7 @@ type FeedEvent struct {
 	Deleted     bool
 	LastUpdated time.Time
 	CreatedAt   time.Time
+	Caption     sql.NullString
 }
 
 type Follow struct {
@@ -227,6 +234,23 @@ type Nonce struct {
 	Chain       persist.Chain
 }
 
+type Notification struct {
+	ID          persist.DBID
+	Deleted     bool
+	OwnerID     persist.DBID
+	Version     sql.NullInt32
+	LastUpdated time.Time
+	CreatedAt   time.Time
+	Action      persist.Action
+	Data        persist.NotificationData
+	EventIds    persist.DBIDList
+	FeedEventID persist.DBID
+	CommentID   persist.DBID
+	GalleryID   persist.DBID
+	Seen        bool
+	Amount      int32
+}
+
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -241,7 +265,7 @@ type Token struct {
 	TokenType            sql.NullString
 	TokenID              persist.TokenID
 	Quantity             sql.NullString
-	OwnershipHistory     persist.AddressAtBlockList
+	OwnershipHistory     []pgtype.JSONB
 	TokenMetadata        persist.TokenMetadata
 	ExternalUrl          sql.NullString
 	BlockNumber          sql.NullInt64
@@ -254,17 +278,18 @@ type Token struct {
 }
 
 type User struct {
-	ID                 persist.DBID
-	Deleted            bool
-	Version            sql.NullInt32
-	LastUpdated        time.Time
-	CreatedAt          time.Time
-	Username           sql.NullString
-	UsernameIdempotent sql.NullString
-	Wallets            persist.WalletList
-	Bio                sql.NullString
-	Traits             pgtype.JSONB
-	Universal          bool
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	Universal            bool
+	NotificationSettings persist.UserNotificationSettings
 }
 
 type UserEvent struct {

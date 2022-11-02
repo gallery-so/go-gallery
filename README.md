@@ -11,7 +11,7 @@
 ```bash
 $ git clone git@github.com:gallery-so/go-gallery.git
 $ cd go-gallery
-$ go get -u -d ./...
+$ go get -u=patch -d ./...
 ```
 
 ## Setup (Mac)
@@ -62,12 +62,6 @@ To remove running redis and postgres instance:
 ```bash
 $ make docker-stop
 ```
-
-**Deploying our Postgres image**
-
-`make g-docker` will push a new docker image that initializes a postgres instance with our custom schema. To get access to our dockerhub, contact a core team member.
-
-_Do not run this script if you've run the shell script for seeding NFT data._
 
 **Working with migrations**
 
@@ -216,14 +210,6 @@ Skip longer running tests with the `-short` flag:
 
 ```bash
 go test -short
-```
-
-### Integration Testing
-
-Run integration tests against ethereum mainnet:
-
-```bash
-go test -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
 ```
 
 ### Running locally with live data

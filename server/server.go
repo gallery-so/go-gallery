@@ -15,12 +15,14 @@ import (
 	"google.golang.org/api/option"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -72,7 +74,8 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		validate.RegisterCustomValidators(v)
 	}
 
-	if err := redis.ClearCache(redis.GalleriesDB); err != nil {
+	err := redis.ClearCache(redis.GalleriesDB)
+	if err != nil {
 		panic(err)
 	}
 
@@ -82,13 +85,25 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 	var storage *storage.Client
+	var pub *pubsub.Client
 	if viper.GetString("ENV") == "local" {
 		storage = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		storage = media.NewStorageClient(context.Background())
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"))
+		if err != nil {
+			panic(err)
+		}
 	}
 	taskClient := task.NewClient(context.Background())
-	return handlersInit(router, repos, db.New(pgx), ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient)
+
+	queries := db.New(pgx)
+
+	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub)
 }
 
 func newTasksClient() *cloudtasks.Client {
@@ -145,6 +160,11 @@ func setDefaults() {
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
+	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
+	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
+	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
+	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
+	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 
 	viper.AutomaticEnv()
 
@@ -233,14 +253,14 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(repos *postgres.Repositories, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
+func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)
 	openseaProvider := opensea.NewProvider(ethClient, httpClient)
 	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
-	return multichain.NewProvider(context.Background(), repos, cache, taskClient,
+	return multichain.NewProvider(context.Background(), repos, queries, cache, taskClient,
 		overrides,
 		ethProvider,
 		openseaProvider,

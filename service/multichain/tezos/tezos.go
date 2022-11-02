@@ -157,6 +157,9 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 		return nil, nil, err
 	}
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	if limit < 1 {
+		limit = pageSize
+	}
 	offset := startingOffset
 	resultTokens := []tzktBalanceToken{}
 	for {
@@ -179,10 +182,14 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
 		}
 
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
+			limit = maxLimit - len(resultTokens)
+		}
 		offset += limit
 
 		logger.For(ctx).Debugf("retrieved %d tokens for address %s (limit %d offset %d)", len(resultTokens), tzAddr.String(), pageSize, offset)
@@ -197,6 +204,9 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 
 	offset := startOffset
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	if limit < 1 {
+		limit = pageSize
+	}
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -218,8 +228,13 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
+		}
+
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
+			limit = maxLimit - len(resultTokens)
 		}
 
 		offset += limit
@@ -241,6 +256,9 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := startOffset
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	if limit < 1 {
+		limit = pageSize
+	}
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -262,8 +280,13 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
+		}
+
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
+			limit = maxLimit - len(resultTokens)
 		}
 
 		offset += limit
@@ -347,6 +370,9 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	if limit < 1 {
+		limit = pageSize
+	}
 	resultTokens := []tzktBalanceToken{}
 
 	for {
@@ -368,10 +394,14 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 		}
 		resultTokens = append(resultTokens, tzktBalances...)
 
-		if len(tzktBalances) < maxLimit {
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
 			break
 		}
 
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
+			limit = maxLimit - len(resultTokens)
+		}
 		offset += limit
 	}
 

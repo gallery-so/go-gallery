@@ -313,11 +313,11 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
-		path := util.GetIPFSPath(mediaURL, false)
+		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 	case persist.URITypeArweave:
-		// TODO
-		return mediaURL
+		path := util.GetURIPath(mediaURL, false)
+		return fmt.Sprintf("https://arweave.net/%s", path)
 	default:
 		return mediaURL
 	}
@@ -377,6 +377,20 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 	}
 	return imgURL, vURL
 
+}
+
+func FindNameAndDescription(ctx context.Context, metadata persist.TokenMetadata) (string, string) {
+	name, ok := util.GetValueFromMapUnsafe(metadata, "name", util.DefaultSearchDepth).(string)
+	if !ok {
+		name = ""
+	}
+
+	description, ok := util.GetValueFromMapUnsafe(metadata, "description", util.DefaultSearchDepth).(string)
+	if !ok {
+		description = ""
+	}
+
+	return name, description
 }
 
 func predictTrueURLs(ctx context.Context, curImg, curV string) (string, string) {
