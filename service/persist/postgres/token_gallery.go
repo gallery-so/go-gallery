@@ -41,7 +41,7 @@ var errTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
 
 // NewTokenGalleryRepository creates a new TokenRepository
 // TODO joins on addresses
-func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries, galleryRepo *GalleryRepository) *TokenGalleryRepository {
+func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -96,7 +96,6 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries, galleryRepo *Gal
 	return &TokenGalleryRepository{
 		db:                                      db,
 		queries:                                 queries,
-		galleryRepo:                             galleryRepo,
 		getByUserIDStmt:                         getByUserIDStmt,
 		getByUserIDPaginateStmt:                 getByUserIDPaginateStmt,
 		getByTokenIdentifiersStmt:               getByTokenIdentifiersStmt,
@@ -327,7 +326,7 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 	if rows == 0 {
 		return persist.ErrTokenNotFoundByID{ID: pID}
 	}
-	return t.galleryRepo.RefreshCache(pCtx, pUserID)
+	return nil
 }
 
 // UpdateByTokenIdentifiersUnsafe updates a token by its token identifiers without checking if it is owned by any given user

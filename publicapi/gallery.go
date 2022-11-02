@@ -10,7 +10,6 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 )
 
 const maxCollectionsPerGallery = 1000
@@ -92,23 +91,5 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
-	backupGalleriesForUser(ctx, userID, api.repos)
-
 	return nil
-}
-
-func backupGalleriesForUser(ctx context.Context, userID persist.DBID, repos *postgres.Repositories) {
-	ctxCopy := util.GinContextFromContext(ctx).Copy()
-
-	// TODO: Make sure backups still work here with our gin context retrieval
-	go func(ctx context.Context) {
-		galleries, err := repos.GalleryRepository.GetByUserID(ctx, userID)
-		if err != nil {
-			return
-		}
-
-		for _, gallery := range galleries {
-			repos.BackupRepository.Insert(ctx, gallery)
-		}
-	}(ctxCopy)
 }

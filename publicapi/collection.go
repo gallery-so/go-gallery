@@ -283,8 +283,6 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return err
 	}
 
-	backupGalleriesForUser(ctx, userID, api.repos)
-
 	// Send event
 	dispatchEventToFeed(ctx, db.Event{
 		ActorID:        userID,

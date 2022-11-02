@@ -165,15 +165,13 @@ func setDefaults() {
 
 func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
 	queries := db.New(pgx)
-	galleriesCacheToken := redis.NewCache(1)
-	galleryTokenRepo := postgres.NewGalleryRepository(pq, queries, galleriesCacheToken)
 
 	return &postgres.Repositories{
 		UserRepository:        postgres.NewUserRepository(pq, queries),
 		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries, galleryTokenRepo),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries, galleryTokenRepo),
-		GalleryRepository:     galleryTokenRepo,
+		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
+		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
+		GalleryRepository:     postgres.NewGalleryRepository(queries),
 		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
 		BackupRepository:      postgres.NewBackupRepository(pq, queries),
 		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
