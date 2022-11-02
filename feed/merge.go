@@ -49,11 +49,12 @@ func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectio
 	for _, other := range eventsAsc {
 		action := c.event.Action
 
-		// If there are two or more unique actions, the resulting event is categorized as
+		// If the collection is new, then categorize the event as a new collection event. Otherwise,
+		// if there are two or more unique actions, the resulting event is categorized as
 		// a generic update.
 		if c.event.Action == "" {
 			action = other.Action
-		} else if c.event.Action != other.Action {
+		} else if action != persist.ActionCollectionCreated && c.event.Action != other.Action {
 			action = persist.ActionCollectionUpdated
 		}
 

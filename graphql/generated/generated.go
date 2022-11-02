@@ -187,7 +187,6 @@ type ComplexityRoot struct {
 		Action            func(childComplexity int) int
 		Collection        func(childComplexity int) int
 		EventTime         func(childComplexity int) int
-		IsNewCollection   func(childComplexity int) int
 		NewCollectorsNote func(childComplexity int) int
 		NewTokens         func(childComplexity int) int
 		Owner             func(childComplexity int) int
@@ -1456,13 +1455,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionUpdatedFeedEventData.EventTime(childComplexity), true
-
-	case "CollectionUpdatedFeedEventData.isNewCollection":
-		if e.complexity.CollectionUpdatedFeedEventData.IsNewCollection == nil {
-			break
-		}
-
-		return e.complexity.CollectionUpdatedFeedEventData.IsNewCollection(childComplexity), true
 
 	case "CollectionUpdatedFeedEventData.newCollectorsNote":
 		if e.complexity.CollectionUpdatedFeedEventData.NewCollectorsNote == nil {
@@ -5110,7 +5102,6 @@ type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
     collection: Collection @goField(forceResolver: true)
     newCollectorsNote: String
     newTokens: [CollectionToken] @goField(forceResolver: true)
-    isNewCollection: Boolean
 }
 
 type ErrUnknownAction implements Error {
@@ -8824,38 +8815,6 @@ func (ec *executionContext) _CollectionUpdatedFeedEventData_newTokens(ctx contex
 	res := resTmp.([]*model.CollectionToken)
 	fc.Result = res
 	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _CollectionUpdatedFeedEventData_isNewCollection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "CollectionUpdatedFeedEventData",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.IsNewCollection, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CollectorsNoteAddedToCollectionFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (ret graphql.Marshaler) {
@@ -26628,13 +26587,6 @@ func (ec *executionContext) _CollectionUpdatedFeedEventData(ctx context.Context,
 				return innerFunc(ctx)
 
 			})
-		case "isNewCollection":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionUpdatedFeedEventData_isNewCollection(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
