@@ -876,7 +876,7 @@ func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainCont
 	for chain, addresses := range contractsForChain {
 		newContracts, err := d.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
 		if err != nil {
-			return nil, fmt.Errorf("error upserting tokens: %s", err)
+			return nil, fmt.Errorf("error fetching contracts: %s", err)
 		}
 		for _, c := range newContracts {
 			addressesToContracts[c.Chain.NormalizeAddress(c.Address)] = c.ID

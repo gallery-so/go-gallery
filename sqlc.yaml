@@ -195,3 +195,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.chain"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
+          - column: "*.actions"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ActionList"
+          - column: "*.collection_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
