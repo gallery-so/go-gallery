@@ -32,6 +32,12 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
+	var ownerGalleryID persist.DBID
+	err := pg.QueryRow(ctx, "SELECT id FROM galleries WHERE owner_user_id = $1", ownerID).Scan(&ownerGalleryID)
+	if err != nil {
+		panic(err)
+	}
+
 	aFewUsers, err := pg.Query(ctx, "SELECT ID FROM USERS LIMIT 10")
 	if err != nil {
 		panic(err)
@@ -47,46 +53,33 @@ func main() {
 		userIDs = append(userIDs, id)
 	}
 
-	aFewGalleries, err := pg.Query(ctx, "SELECT ID FROM GALLERIES LIMIT 10")
-	if err != nil {
-		panic(err)
-	}
-
-	galleryIDs := make([]persist.DBID, 0)
-	for aFewGalleries.Next() {
-		var id persist.DBID
-		err := aFewGalleries.Scan(&id)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(id)
-		galleryIDs = append(galleryIDs, id)
-	}
-
 	notifs := make([]coredb.Notification, 0, len(userIDs))
 	events := make([]coredb.Event, 0, len(userIDs))
 	for _, id := range userIDs {
-		action, actionID := actionForNum(rand.Intn(4), userIDs, galleryIDs)
+		action := actionForNum(rand.Intn(4))
 
 		var resource persist.ResourceType
+		var subject persist.DBID
 		switch action {
 		case persist.ActionViewedGallery:
 			resource = persist.ResourceTypeGallery
+			subject = ownerGalleryID
 		case persist.ActionUserFollowedUsers:
 			resource = persist.ResourceTypeUser
+			subject = ownerID
 		}
 		event := coredb.Event{
 			ID:             persist.GenerateID(),
 			ActorID:        id,
 			ResourceTypeID: resource,
-			SubjectID:      actionID,
+			SubjectID:      subject,
 			Action:         action,
 		}
 
 		if action == persist.ActionViewedGallery {
-			event.GalleryID = actionID
+			event.GalleryID = subject
 		} else if action == persist.ActionUserFollowedUsers {
-			event.UserID = ownerID
+			event.UserID = subject
 		}
 
 		events = append(events, event)
@@ -98,7 +91,7 @@ func main() {
 			EventIds: []persist.DBID{event.ID},
 		}
 		if action == persist.ActionViewedGallery {
-			notif.GalleryID = actionID
+			notif.GalleryID = ownerGalleryID
 			notif.Data.AuthedViewerIDs = []persist.DBID{id}
 		} else if action == persist.ActionUserFollowedUsers {
 			notif.Data.FollowerIDs = []persist.DBID{id}
@@ -140,14 +133,14 @@ func main() {
 
 }
 
-func actionForNum(num int, userIDs, galleryIDs []persist.DBID) (persist.Action, persist.DBID) {
+func actionForNum(num int) persist.Action {
 	switch num {
 	case 0:
-		return persist.ActionViewedGallery, galleryIDs[rand.Intn(len(galleryIDs))]
+		return persist.ActionViewedGallery
 	case 1:
-		return persist.ActionUserFollowedUsers, userIDs[rand.Intn(len(userIDs))]
+		return persist.ActionUserFollowedUsers
 	default:
-		return persist.ActionViewedGallery, galleryIDs[rand.Intn(len(galleryIDs))]
+		return persist.ActionViewedGallery
 	}
 }
 
