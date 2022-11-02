@@ -193,7 +193,6 @@ func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
 		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
 		GalleryRepository:     postgres.NewGalleryRepository(queries),
 		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
-		BackupRepository:      postgres.NewBackupRepository(pq, queries),
 		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
 		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
 		WalletRepository:      postgres.NewWalletRepository(pq, queries),

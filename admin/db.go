@@ -28,9 +28,8 @@ type statements struct {
 
 	galleryRepo postgres.GalleryRepository
 	// nftRepo     persist.NFTRepository
-	userRepo   postgres.UserRepository
-	collRepo   postgres.CollectionRepository
-	backupRepo postgres.BackupRepository
+	userRepo postgres.UserRepository
+	collRepo postgres.CollectionRepository
 }
 
 func newStatements(db *sql.DB) *statements {

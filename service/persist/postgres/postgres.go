@@ -207,7 +207,6 @@ type Repositories struct {
 	TokenRepository       *TokenGalleryRepository
 	CollectionRepository  *CollectionTokenRepository
 	ContractRepository    *ContractGalleryRepository
-	BackupRepository      *BackupRepository
 	MembershipRepository  *MembershipRepository
 	EarlyAccessRepository *EarlyAccessRepository
 	WalletRepository      *WalletRepository
