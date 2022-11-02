@@ -338,7 +338,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		addresses = append(addresses, wa.Address)
 	}
 
-	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), contract.Chain), addresses)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -393,7 +393,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 				addresses = append(addresses, wa.Address)
 			}
 
-			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
+			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), contract.Chain), addresses)
 			if err != nil {
 				errChan <- ErrTokenRefreshFailed{Message: err.Error()}
 				return

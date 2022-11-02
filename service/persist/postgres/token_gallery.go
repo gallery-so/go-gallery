@@ -35,6 +35,7 @@ type TokenGalleryRepository struct {
 	getContractByAddressStmt                            *sql.Stmt
 	setTokensAsUserMarkedSpamStmt                       *sql.Stmt
 	checkOwnTokensStmt                                  *sql.Stmt
+	deleteTokensOfContractBeforeTimeStampStmt           *sql.Stmt
 }
 
 var errTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
@@ -99,6 +100,9 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 	checkOwnTokensStmt, err := db.PrepareContext(ctx, `SELECT COUNT(*) = $1 FROM tokens WHERE OWNER_USER_ID = $2 AND ID = ANY($3);`)
 	checkNoErr(err)
 
+	removeTokensOfContractBeforeTimeStampStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET DELETED = true WHERE CONTRACT = $1 AND LAST_UPDATED < $2 AND DELETED = false;`)
+	checkNoErr(err)
+
 	return &TokenGalleryRepository{
 		db:                                     db,
 		galleryRepo:                            galleryRepo,
@@ -120,6 +124,7 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 		setTokensAsUserMarkedSpamStmt:                       setTokensAsUserMarkedSpamStmt,
 		checkOwnTokensStmt:                                  checkOwnTokensStmt,
 		getByFullIdentifiersStmt:                            getByFullIdentifiersStmt,
+		deleteTokensOfContractBeforeTimeStampStmt:           removeTokensOfContractBeforeTimeStampStmt,
 	}
 
 }
@@ -249,21 +254,20 @@ func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID per
 
 // BulkUpsert upserts multiple tokens
 func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery) error {
+	return t.BulkUpsertWithTimeStamp(pCtx, pTokens, time.Now())
+}
+
+// BulkUpsertWithTimeStamp upserts multiple tokens with the given last updated timestamp
+func (t *TokenGalleryRepository) BulkUpsertWithTimeStamp(pCtx context.Context, pTokens []persist.TokenGallery, timeStamp time.Time) error {
+
 	if len(pTokens) == 0 {
 		return nil
 	}
 
-	logrus.Infof("Checking 0 quantities for tokens...")
-	newTokens := make([]persist.TokenGallery, len(pTokens))
-	for i, token := range pTokens {
-		if token.Quantity == "" || token.Quantity == "0" {
-			logger.For(pCtx).Warnf("Token %s has 0 quantity", token.Name)
-			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.Contract, token.OwnerUserID, token.Chain); err != nil {
-				return err
-			}
-			continue
-		}
-		newTokens[i] = token
+	logger.For(pCtx).Infof("Checking 0 quantities for tokens...")
+	newTokens, err := t.deleteZeroQuantityTokens(pCtx, pTokens)
+	if err != nil {
+		return err
 	}
 
 	if len(newTokens) == 0 {
@@ -280,7 +284,7 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 		logrus.Debugf("Chunking %d tokens recursively into %d queries", len(newTokens), len(newTokens)/rowsPerQuery)
 		next := newTokens[rowsPerQuery:]
 		current := newTokens[:rowsPerQuery]
-		if err := t.BulkUpsert(pCtx, next); err != nil {
+		if err := t.BulkUpsertWithTimeStamp(pCtx, next, timeStamp); err != nil {
 			return err
 		}
 		newTokens = current
@@ -292,21 +296,40 @@ func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []pers
 	vals := make([]interface{}, 0, len(newTokens)*paramsPerRow)
 	for i, token := range newTokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam)
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, timeStamp, token.Deleted, token.IsProviderMarkedSpam)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
 	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT,CHAIN,OWNER_USER_ID) WHERE DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,LAST_UPDATED = EXCLUDED.LAST_UPDATED,IS_USER_MARKED_SPAM = tokens.IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM;`
 
-	_, err := t.db.ExecContext(pCtx, sqlStr, vals...)
+	_, err = t.db.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		logrus.Debugf("SQL: %s", sqlStr)
 		return fmt.Errorf("failed to upsert tokens: %w", err)
 	}
 
 	return nil
+}
 
+func (t *TokenGalleryRepository) deleteZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
+	newTokens := make([]persist.TokenGallery, len(pTokens))
+	for i, token := range pTokens {
+		if token.Quantity == "" || token.Quantity == "0" {
+			logger.For(pCtx).Warnf("Token %s has 0 quantity", token.Name)
+			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.Contract, token.OwnerUserID, token.Chain); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		newTokens[i] = token
+	}
+	return newTokens, nil
+}
+
+func (t *TokenGalleryRepository) DeleteTokensOfContractBeforeTimeStamp(ctx context.Context, contractID persist.DBID, timeStamp time.Time) error {
+	_, err := t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(ctx, contractID, timeStamp)
+	return err
 }
 
 // UpdateByID updates a token by its ID

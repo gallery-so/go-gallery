@@ -93,7 +93,7 @@ type Contract struct {
 	Symbol           sql.NullString
 	Address          persist.Address
 	CreatorAddress   persist.Address
-	Chain            sql.NullInt32
+	Chain            persist.Chain
 	ProfileBannerUrl sql.NullString
 	ProfileImageUrl  sql.NullString
 	BadgeUrl         sql.NullString
@@ -123,7 +123,7 @@ type Event struct {
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
 	ExternalID     persist.NullString
-	Caption        sql.NullString
+	Caption        persist.NullString
 }
 
 type Feature struct {
@@ -161,7 +161,7 @@ type FeedEvent struct {
 	Deleted     bool
 	LastUpdated time.Time
 	CreatedAt   time.Time
-	Caption     sql.NullString
+	Caption     persist.NullString
 }
 
 type Follow struct {
@@ -231,7 +231,7 @@ type Nonce struct {
 	UserID      sql.NullString
 	Address     sql.NullString
 	Value       sql.NullString
-	Chain       sql.NullInt32
+	Chain       persist.Chain
 }
 
 type Notification struct {
@@ -271,7 +271,7 @@ type Token struct {
 	BlockNumber          sql.NullInt64
 	OwnerUserID          persist.DBID
 	OwnedByWallets       persist.DBIDList
-	Chain                sql.NullInt32
+	Chain                persist.Chain
 	Contract             persist.DBID
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
@@ -311,5 +311,5 @@ type Wallet struct {
 	Version     sql.NullInt32
 	Address     persist.Address
 	WalletType  persist.WalletType
-	Chain       sql.NullInt32
+	Chain       persist.Chain
 }

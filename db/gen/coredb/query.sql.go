@@ -201,7 +201,7 @@ type CreateCollectionEventParams struct {
 	ResourceTypeID persist.ResourceType
 	CollectionID   persist.DBID
 	Data           persist.EventData
-	Caption        sql.NullString
+	Caption        persist.NullString
 }
 
 func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
@@ -343,7 +343,7 @@ type CreateFeedEventParams struct {
 	Data      persist.FeedEventData
 	EventTime time.Time
 	EventIds  persist.DBIDList
-	Caption   sql.NullString
+	Caption   persist.NullString
 }
 
 func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams) (FeedEvent, error) {
@@ -879,7 +879,7 @@ type GetCommentsByFeedEventIDRow struct {
 	Deleted_2     bool
 	LastUpdated_2 time.Time
 	CreatedAt_2   time.Time
-	Caption       sql.NullString
+	Caption       persist.NullString
 }
 
 func (q *Queries) GetCommentsByFeedEventID(ctx context.Context, id persist.DBID) ([]GetCommentsByFeedEventIDRow, error) {
@@ -929,7 +929,7 @@ select id, deleted, version, created_at, last_updated, name, symbol, address, cr
 
 type GetContractByChainAddressParams struct {
 	Address persist.Address
-	Chain   sql.NullInt32
+	Chain   persist.Chain
 }
 
 func (q *Queries) GetContractByChainAddress(ctx context.Context, arg GetContractByChainAddressParams) (Contract, error) {
@@ -2158,7 +2158,7 @@ SELECT wallets.id, wallets.created_at, wallets.last_updated, wallets.deleted, wa
 
 type GetWalletByChainAddressParams struct {
 	Address persist.Address
-	Chain   sql.NullInt32
+	Chain   persist.Chain
 }
 
 func (q *Queries) GetWalletByChainAddress(ctx context.Context, arg GetWalletByChainAddressParams) (Wallet, error) {

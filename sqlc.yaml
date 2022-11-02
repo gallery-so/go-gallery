@@ -191,3 +191,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.media_url"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.caption"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.chain"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"

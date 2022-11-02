@@ -6,7 +6,6 @@ package coredb
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -568,7 +567,7 @@ type GetCommentsByFeedEventIDBatchRow struct {
 	Deleted_2     bool
 	LastUpdated_2 time.Time
 	CreatedAt_2   time.Time
-	Caption       sql.NullString
+	Caption       persist.NullString
 }
 
 func (q *Queries) GetCommentsByFeedEventIDBatch(ctx context.Context, id []persist.DBID) *GetCommentsByFeedEventIDBatchBatchResults {
@@ -642,7 +641,7 @@ type GetContractByChainAddressBatchBatchResults struct {
 
 type GetContractByChainAddressBatchParams struct {
 	Address persist.Address
-	Chain   sql.NullInt32
+	Chain   persist.Chain
 }
 
 func (q *Queries) GetContractByChainAddressBatch(ctx context.Context, arg []GetContractByChainAddressBatchParams) *GetContractByChainAddressBatchBatchResults {
@@ -1819,7 +1818,7 @@ type GetTokensByUserIdAndChainBatchBatchResults struct {
 
 type GetTokensByUserIdAndChainBatchParams struct {
 	OwnerUserID persist.DBID
-	Chain       sql.NullInt32
+	Chain       persist.Chain
 }
 
 func (q *Queries) GetTokensByUserIdAndChainBatch(ctx context.Context, arg []GetTokensByUserIdAndChainBatchParams) *GetTokensByUserIdAndChainBatchBatchResults {
@@ -2445,7 +2444,7 @@ type GetWalletByChainAddressBatchBatchResults struct {
 
 type GetWalletByChainAddressBatchParams struct {
 	Address persist.Address
-	Chain   sql.NullInt32
+	Chain   persist.Chain
 }
 
 func (q *Queries) GetWalletByChainAddressBatch(ctx context.Context, arg []GetWalletByChainAddressBatchParams) *GetWalletByChainAddressBatchBatchResults {
