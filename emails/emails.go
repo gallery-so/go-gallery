@@ -2,9 +2,7 @@ package emails
 
 import (
 	"context"
-	htmltemplate "html/template"
 	"net/http"
-	plaintemplate "text/template"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -38,16 +36,6 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	t, err := htmltemplate.ParseGlob("./emails/templates/html/*")
-	if err != nil {
-		logger.For(ctx).Fatalf("failed to parse templates: %s", err)
-	}
-
-	pt, err := plaintemplate.ParseGlob("./emails/templates/plain/*")
-	if err != nil {
-		logger.For(ctx).Fatalf("failed to parse templates: %s", err)
-	}
-
 	pgxClient := postgres.NewPgxClient()
 
 	queries := coredb.New(pgxClient)
@@ -69,7 +57,7 @@ func coreInitServer() *gin.Engine {
 
 	logger.For(ctx).Info("Registering handlers...")
 
-	return handlersInitServer(router, loaders, queries, client, t, pt)
+	return handlersInitServer(router, loaders, queries, client)
 }
 
 func setDefaults() {
@@ -86,6 +74,8 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_API_KEY", "")
 	viper.SetDefault("FROM_EMAIL", "test@gallery.so")
 	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "c63e40ab-5049-4ce1-9d14-8742a3c5c1a8")
+	viper.SetDefault("SENDGRID_NOTIFICATIONS_TEMPLATE_ID", "d-6135d8f36e9946979b0dcf1800363ab4")
+	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
 
 	viper.AutomaticEnv()
 

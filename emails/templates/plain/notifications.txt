@@ -1,1 +1,0 @@
-{{.Username}} {{range .Notifications}} {{.}} {{end}}

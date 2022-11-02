@@ -1,12 +1,9 @@
 package emails
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	htmltemplate "html/template"
 	"net/http"
-	plaintemplate "text/template"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +35,7 @@ type notificationsEmailTemplateData struct {
 	Notifications []string // TODO - this should be a struct with the notification data once that has been merged
 }
 
-func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client, htmltemplates *htmltemplate.Template, plaintemplates *plaintemplate.Template) gin.HandlerFunc {
+func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		var input VerificationEmailInput
@@ -65,71 +62,51 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 			return
 		}
 
-		plainBuf := new(bytes.Buffer)
-		htmlBuf := new(bytes.Buffer)
-
-		plaintemplates.ExecuteTemplate(plainBuf, "verification.txt", verificationEmailTemplateData{
-			Username: user.Username.String,
-			JWT:      j,
-		})
-
-		htmltemplates.ExecuteTemplate(htmlBuf, "verification.gohtml", verificationEmailTemplateData{
-			Username: user.Username.String,
-			JWT:      j,
-		})
-
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-		subject := "Gallery Verification"
 		to := mail.NewEmail(user.Username.String, user.Email.String())
-		plainTextContent := plainBuf.String()
-		htmlContent := htmlBuf.String()
-		message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+		m := mail.NewV3Mail()
+		m.SetFrom(from)
+		p := mail.NewPersonalization()
+		m.SetTemplateID(viper.GetString("SENDGRID_VERIFICATION_TEMPLATE_ID"))
+		p.DynamicTemplateData = map[string]interface{}{
+			"jwt": j,
+		}
+		m.AddPersonalizations(p)
+		p.AddTos(to)
 
-		_, err = s.Send(message)
+		response, err := s.Send(m)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
+		logger.For(c).Debugf("email sent: %+v", *response)
 
 		c.Status(http.StatusOK)
 	}
 }
 
-func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, htmltemplates *htmltemplate.Template, plaintemplates *plaintemplate.Template) gin.HandlerFunc {
+func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		err := runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.User) error {
 
-			plainBuf := new(bytes.Buffer)
-			htmlBuf := new(bytes.Buffer)
-
-			plaintemplates.ExecuteTemplate(plainBuf, "notifications.txt", notificationsEmailTemplateData{
-				Username:      u.Username.String,
-				Notifications: []string{"test", "wow", "cool"},
-			})
-
-			htmltemplates.ExecuteTemplate(htmlBuf, "notifications.gohtml", notificationsEmailTemplateData{
-				Username:      u.Username.String,
-				Notifications: []string{"test", "wow", "cool"},
-			})
-
 			from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-			subject := "Your Gallery Notifications"
 			to := mail.NewEmail(u.Username.String, u.Email.String())
-			plainTextContent := plainBuf.String()
-			htmlContent := htmlBuf.String()
+			m := mail.NewV3Mail()
+			m.SetFrom(from)
+			p := mail.NewPersonalization()
+			m.SetTemplateID(viper.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
+			p.DynamicTemplateData = map[string]interface{}{
+				"notifications": []string{"notification 1", "notification 2"},
+			}
+			m.AddPersonalizations(p)
+			p.AddTos(to)
 
-			logger.For(c).Debugf("sending email to %s", u.Email.String())
-			logger.For(c).Debugf("html: %s", htmlContent)
-			logger.For(c).Debugf("plain: %s", plainTextContent)
-
-			message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
-
-			resp, err := s.Send(message)
+			response, err := s.Send(m)
 			if err != nil {
 				return err
 			}
-			logger.For(c).Debugf("email sent: %+v", *resp)
+			logger.For(c).Debugf("email sent: %+v", *response)
 			return nil
 		})
 
