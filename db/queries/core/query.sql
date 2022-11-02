@@ -298,32 +298,42 @@ INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_eve
 SELECT * FROM events WHERE id = $1 AND deleted = false;
 
 -- name: GetEventsInWindow :many
-WITH RECURSIVE activity AS (
-    SELECT * FROM events WHERE events.id = $1 AND deleted = false
-    UNION
-    SELECT e.* FROM events e, activity a
-    WHERE e.actor_id = a.actor_id
-        AND e.action = a.action
-        AND e.created_at < a.created_at
-        AND e.created_at >= a.created_at - make_interval(secs => $2)
-        AND e.deleted = false
+with recursive activity as (
+    select * from events where events.id = $1 and deleted = false
+    union
+    select e.* from events e, activity a
+    where e.actor_id = a.actor_id
+        and e.action = any(@actions)
+        and e.created_at < a.created_at
+        and e.created_at >= a.created_at - make_interval(secs => $2)
+        and e.deleted = false
+        and e.caption is null
 )
-SELECT * FROM events WHERE id = ANY(SELECT id FROM activity) ORDER BY created_at DESC;
+select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
--- name: IsWindowActive :one
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND deleted = false
-    AND created_at > @window_start AND created_at <= @window_end
-    LIMIT 1
+-- name: IsActorActionActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and action = any(@actions)
+  and created_at > @window_start and created_at <= @window_end
 );
 
--- name: IsWindowActiveWithSubject :one
-SELECT EXISTS(
-    SELECT 1 FROM events
-    WHERE actor_id = $1 AND action = $2 AND subject_id = $3 AND deleted = false
-    AND created_at > @window_start AND created_at <= @window_end
-    LIMIT 1
+-- name: IsActorSubjectActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and subject_id = $2
+  and created_at > @window_start and created_at <= @window_end
+);
+
+-- name: IsActorSubjectActionActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and subject_id = $2
+  and action = any(@actions)
+  and created_at > @window_start and created_at <= @window_end
 );
 
 -- name: PaginateGlobalFeed :batchmany
@@ -357,26 +367,31 @@ SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 -- name: CreateFeedEvent :one
 INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
--- name: GeetFeedEventByID :one
-SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
-
--- name: GetLastFeedEvent :one
-SELECT * FROM feed_events
-    WHERE owner_id = $1 AND action = $2 AND event_time < $3 AND deleted = false
-    ORDER BY event_time DESC
-    LIMIT 1;
+-- name: GetLastFeedEventForUser :one
+select * from feed_events where deleted = false
+    and owner_id = $1
+    and action = any(@actions)
+    and event_time < $2
+    order by event_time desc
+    limit 1;
 
 -- name: GetLastFeedEventForToken :one
-SELECT * FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'token_id' = @token_id::varchar AND event_time < $3 AND deleted = false
-    ORDER BY event_time DESC
-    LIMIT 1;
+select * from feed_events where deleted = false
+    and owner_id = $1
+    and action = any(@actions)
+    and data ->> 'token_id' = @token_id::varchar
+    and event_time < $2
+    order by event_time desc
+    limit 1;
 
 -- name: GetLastFeedEventForCollection :one
-SELECT * FROM feed_events
-    WHERE owner_id = $1 and action = $2 AND data ->> 'collection_id' = @collection_id::varchar AND event_time < $3 AND deleted = false
-    ORDER BY event_time DESC
-    LIMIT 1;
+select * from feed_events where deleted = false
+    and owner_id = $1
+    and action = any(@actions)
+    and data ->> 'collection_id' = @collection_id
+    and event_time < $2
+    order by event_time desc
+    limit 1;
 
 -- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
