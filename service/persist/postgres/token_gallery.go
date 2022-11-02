@@ -397,11 +397,6 @@ func (t *TokenGalleryRepository) deleteZeroQuantityTokens(pCtx context.Context, 
 	return newTokens, nil
 }
 
-func (t *TokenGalleryRepository) DeleteTokensOfContractBeforeTimeStamp(ctx context.Context, contractID persist.DBID, timeStamp time.Time) error {
-	_, err := t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(ctx, contractID, timeStamp)
-	return err
-}
-
 // UpdateByID updates a token by its ID
 func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DBID, pUserID persist.DBID, pUpdate interface{}) error {
 	var res sql.Result
