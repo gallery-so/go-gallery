@@ -82,6 +82,18 @@ func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.
 	return resolveTokenSettingsByIDs(ctx, obj.TokenId, obj.CollectionId)
 }
 
+func (r *collectionUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
+}
+
+func (r *collectionUpdatedFeedEventDataResolver) Collection(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) (*model.Collection, error) {
+	return resolveCollectionByCollectionID(ctx, obj.Collection.Dbid)
+}
+
+func (r *collectionUpdatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) ([]*model.CollectionToken, error) {
+	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
+}
+
 func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
@@ -925,6 +937,10 @@ func (r *queryResolver) UserByID(ctx context.Context, id persist.DBID) (model.Us
 	return resolveGalleryUserByUserID(ctx, id)
 }
 
+func (r *queryResolver) UserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (model.UserByAddressOrError, error) {
+	return resolveGalleryUserByAddress(ctx, chainAddress)
+}
+
 func (r *queryResolver) UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error) {
 	return resolveGalleryUsersWithTrait(ctx, trait)
 }
@@ -1257,6 +1273,11 @@ func (r *Resolver) CollectionToken() generated.CollectionTokenResolver {
 	return &collectionTokenResolver{r}
 }
 
+// CollectionUpdatedFeedEventData returns generated.CollectionUpdatedFeedEventDataResolver implementation.
+func (r *Resolver) CollectionUpdatedFeedEventData() generated.CollectionUpdatedFeedEventDataResolver {
+	return &collectionUpdatedFeedEventDataResolver{r}
+}
+
 // CollectorsNoteAddedToCollectionFeedEventData returns generated.CollectorsNoteAddedToCollectionFeedEventDataResolver implementation.
 func (r *Resolver) CollectorsNoteAddedToCollectionFeedEventData() generated.CollectorsNoteAddedToCollectionFeedEventDataResolver {
 	return &collectorsNoteAddedToCollectionFeedEventDataResolver{r}
@@ -1404,6 +1425,7 @@ type admireFeedEventPayloadResolver struct{ *Resolver }
 type collectionResolver struct{ *Resolver }
 type collectionCreatedFeedEventDataResolver struct{ *Resolver }
 type collectionTokenResolver struct{ *Resolver }
+type collectionUpdatedFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToCollectionFeedEventDataResolver struct{ *Resolver }
 type collectorsNoteAddedToTokenFeedEventDataResolver struct{ *Resolver }
 type commentResolver struct{ *Resolver }

@@ -46,10 +46,6 @@ type HelperCollectionCreatedFeedEventDataData struct {
 	FeedEventID persist.DBID
 }
 
-type HelperFeedConnectionData struct {
-	UserId persist.DBID
-}
-
 type HelperGroupNotificationUsersConnectionData struct {
 	UserIDs persist.DBIDList
 }
@@ -84,8 +80,11 @@ type HelperSomeoneAdmiredYourFeedEventNotificationData struct {
 }
 
 type HelperNotificationsConnectionData struct {
-	UserId  persist.DBID
-	ByFirst bool
+	UserId persist.DBID
+}
+
+type HelperCollectionUpdatedFeedEventDataData struct {
+	FeedEventID persist.DBID
 }
 
 type HelperUserEmailData struct {

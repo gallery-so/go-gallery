@@ -199,3 +199,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.email_type"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailType"
+          - column: "*.actions"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ActionList"
+          - column: "*.collection_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"

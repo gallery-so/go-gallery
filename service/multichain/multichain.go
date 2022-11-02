@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const staleCommunityTime = time.Hour * 2
+const staleCommunityTime = time.Minute * 30
 
 const maxCommunitySize = 10_000
 
@@ -460,7 +460,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 
-				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateMediaInput{
+				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllURIDerivedFieldsInput{
 					Media:       token.Media,
 					Metadata:    token.TokenMetadata,
 					Name:        persist.NullString(token.Name),
@@ -842,7 +842,7 @@ func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainCont
 	for chain, addresses := range contractsForChain {
 		newContracts, err := d.Repos.ContractRepository.GetByAddresses(ctx, addresses, chain)
 		if err != nil {
-			return nil, fmt.Errorf("error upserting tokens: %s", err)
+			return nil, fmt.Errorf("error fetching contracts: %s", err)
 		}
 		for _, c := range newContracts {
 			addressesToContracts[c.Chain.NormalizeAddress(c.Address)] = c.ID
@@ -932,6 +932,19 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 	res := make([]persist.TokenGallery, len(seenTokens))
 	i := 0
 	for _, t := range seenTokens {
+		if t.Name == "" {
+			name, ok := util.GetValueFromMapUnsafe(t.TokenMetadata, "name", util.DefaultSearchDepth).(string)
+			if ok {
+				t.Name = persist.NullString(name)
+			}
+		}
+		if t.Description == "" {
+			description, ok := util.GetValueFromMapUnsafe(t.TokenMetadata, "description", util.DefaultSearchDepth).(string)
+			if ok {
+				t.Description = persist.NullString(description)
+			}
+		}
+
 		res[i] = t
 		i++
 	}

@@ -189,7 +189,14 @@ func (u *UserRepository) createWalletWithTx(ctx context.Context, tx *sql.Tx, cha
 
 		// If the wallet belongs to a user, its address can't be used to create a new wallet. Return an error.
 		if user.ID != "" {
-			return "", persist.ErrAddressOwnedByUser{ChainAddress: chainAddress, OwnerID: user.ID}
+			if user.Universal {
+				_, err = tx.StmtContext(ctx, u.deleteStmt).ExecContext(ctx, user.ID)
+				if err != nil {
+					return "", err
+				}
+			} else {
+				return "", persist.ErrAddressOwnedByUser{ChainAddress: chainAddress, OwnerID: user.ID}
+			}
 		}
 
 		logger.For(ctx).Infof("wallet %s already exists, but is not owned by a user", walletID)

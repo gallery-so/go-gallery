@@ -142,7 +142,7 @@ func coreInitServer() *gin.Engine {
 
 	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 
-	go processMedialessTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	go processIncompleteTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 

@@ -1343,14 +1343,16 @@ func (b *GetNotificationByIDBatchBatchResults) Close() error {
 }
 
 const getOwnersByContractIdBatchPaginate = `-- name: GetOwnersByContractIdBatchPaginate :batchmany
-SELECT DISTINCT ON (result.id) result.id, result.deleted, result.version, result.last_updated, result.created_at, result.username, result.username_idempotent, result.wallets, result.bio, result.traits, result.universal, result.notification_settings, result.email, result.email_verified, result.email_unsubscriptions FROM (SELECT users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email, users.email_verified, users.email_unsubscriptions FROM users, tokens
-    WHERE tokens.contract = $1 AND tokens.owner_user_id = users.id
-    AND (NOT $3::bool OR users.universal = false)
-    AND tokens.deleted = false AND users.deleted = false
-    AND (users.universal,users.created_at,users.id) < ($4, $5::timestamptz, $6)
-    AND (users.universal,users.created_at,users.id) > ($7, $8::timestamptz, $9)
-    ORDER BY CASE WHEN $10::bool THEN (users.universal,users.created_at,users.id) END ASC,
-        CASE WHEN NOT $10::bool THEN (users.universal,users.created_at,users.id) END DESC) AS result LIMIT $2
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email, users.email_verified, users.email_unsubscriptions from (
+    select distinct on (u.id) u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email, u.email_verified, u.email_unsubscriptions from users u, tokens t
+        where t.contract = $1 and t.owner_user_id = u.id
+        and (not $3::bool or u.universal = false)
+        and t.deleted = false and u.deleted = false
+    ) as users
+    where (users.universal,users.created_at,users.id) < ($4, $5::timestamptz, $6)
+    and (users.universal,users.created_at,users.id) > ($7, $8::timestamptz, $9)
+    order by case when $10::bool then (users.universal,users.created_at,users.id) end asc,
+         case when not $10::bool then (users.universal,users.created_at,users.id) end desc limit $2
 `
 
 type GetOwnersByContractIdBatchPaginateBatchResults struct {
@@ -1371,6 +1373,11 @@ type GetOwnersByContractIdBatchPaginateParams struct {
 	PagingForward      bool
 }
 
+// Note: sqlc has trouble recognizing that the output of the "select distinct" subquery below will
+//       return complete rows from the users table. As a workaround, aliasing the subquery to
+//       "users" seems to fix the issue (along with aliasing the users table inside the subquery
+//       to "u" to avoid confusion -- otherwise, sqlc creates a custom row type that includes
+//       all users.* fields twice).
 func (q *Queries) GetOwnersByContractIdBatchPaginate(ctx context.Context, arg []GetOwnersByContractIdBatchPaginateParams) *GetOwnersByContractIdBatchPaginateBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {
@@ -2120,6 +2127,74 @@ func (b *GetTokensByWalletIdsBatchBatchResults) Query(f func(int, []Token, error
 }
 
 func (b *GetTokensByWalletIdsBatchBatchResults) Close() error {
+	return b.br.Close()
+}
+
+const getUserByAddressBatch = `-- name: GetUserByAddressBatch :batchone
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email, users.email_verified, users.email_unsubscriptions
+from users, wallets
+where wallets.address = $1
+	and wallets.chain = $2::int
+	and array[wallets.id] <@ users.wallets
+	and wallets.deleted = false
+	and users.deleted = false
+`
+
+type GetUserByAddressBatchBatchResults struct {
+	br  pgx.BatchResults
+	ind int
+}
+
+type GetUserByAddressBatchParams struct {
+	Address persist.Address
+	Chain   int32
+}
+
+func (q *Queries) GetUserByAddressBatch(ctx context.Context, arg []GetUserByAddressBatchParams) *GetUserByAddressBatchBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Address,
+			a.Chain,
+		}
+		batch.Queue(getUserByAddressBatch, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetUserByAddressBatchBatchResults{br, 0}
+}
+
+func (b *GetUserByAddressBatchBatchResults) QueryRow(f func(int, User, error)) {
+	for {
+		row := b.br.QueryRow()
+		var i User
+		err := row.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+		)
+		if err != nil && (err.Error() == "no result" || err.Error() == "batch already closed") {
+			break
+		}
+		if f != nil {
+			f(b.ind, i, err)
+		}
+		b.ind++
+	}
+}
+
+func (b *GetUserByAddressBatchBatchResults) Close() error {
 	return b.br.Close()
 }
 

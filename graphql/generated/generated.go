@@ -44,6 +44,7 @@ type ResolverRoot interface {
 	Collection() CollectionResolver
 	CollectionCreatedFeedEventData() CollectionCreatedFeedEventDataResolver
 	CollectionToken() CollectionTokenResolver
+	CollectionUpdatedFeedEventData() CollectionUpdatedFeedEventDataResolver
 	CollectorsNoteAddedToCollectionFeedEventData() CollectorsNoteAddedToCollectionFeedEventDataResolver
 	CollectorsNoteAddedToTokenFeedEventData() CollectorsNoteAddedToTokenFeedEventDataResolver
 	Comment() CommentResolver
@@ -180,6 +181,16 @@ type ComplexityRoot struct {
 
 	CollectionTokenSettings struct {
 		RenderLive func(childComplexity int) int
+	}
+
+	CollectionUpdatedFeedEventData struct {
+		Action            func(childComplexity int) int
+		Collection        func(childComplexity int) int
+		EventTime         func(childComplexity int) int
+		IsNewCollection   func(childComplexity int) int
+		NewCollectorsNote func(childComplexity int) int
+		NewTokens         func(childComplexity int) int
+		Owner             func(childComplexity int) int
 	}
 
 	CollectorsNoteAddedToCollectionFeedEventData struct {
@@ -595,6 +606,7 @@ type ComplexityRoot struct {
 		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
 		Node                    func(childComplexity int, id model.GqlID) int
 		TokenByID               func(childComplexity int, id persist.DBID) int
+		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                func(childComplexity int, id persist.DBID) int
 		UserByUsername          func(childComplexity int, username string) int
 		UsersWithTrait          func(childComplexity int, trait string) int
@@ -898,6 +910,13 @@ type CollectionCreatedFeedEventDataResolver interface {
 type CollectionTokenResolver interface {
 	TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error)
 }
+type CollectionUpdatedFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) (*model.GalleryUser, error)
+
+	Collection(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) (*model.Collection, error)
+
+	NewTokens(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) ([]*model.CollectionToken, error)
+}
 type CollectorsNoteAddedToCollectionFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error)
 
@@ -995,6 +1014,7 @@ type QueryResolver interface {
 	Viewer(ctx context.Context) (model.ViewerOrError, error)
 	UserByUsername(ctx context.Context, username string) (model.UserByUsernameOrError, error)
 	UserByID(ctx context.Context, id persist.DBID) (model.UserByIDOrError, error)
+	UserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (model.UserByAddressOrError, error)
 	UsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error)
 	MembershipTiers(ctx context.Context, forceRefresh *bool) ([]*model.MembershipTier, error)
 	CollectionByID(ctx context.Context, id persist.DBID) (model.CollectionByIDOrError, error)
@@ -1438,6 +1458,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionTokenSettings.RenderLive(childComplexity), true
+
+	case "CollectionUpdatedFeedEventData.action":
+		if e.complexity.CollectionUpdatedFeedEventData.Action == nil {
+			break
+		}
+
+		return e.complexity.CollectionUpdatedFeedEventData.Action(childComplexity), true
+
+	case "CollectionUpdatedFeedEventData.collection":
+		if e.complexity.CollectionUpdatedFeedEventData.Collection == nil {
+			break
+		}
+
+		return e.complexity.CollectionUpdatedFeedEventData.Collection(childComplexity), true
+
+	case "CollectionUpdatedFeedEventData.eventTime":
+		if e.complexity.CollectionUpdatedFeedEventData.EventTime == nil {
+			break
+		}
+
+		return e.complexity.CollectionUpdatedFeedEventData.EventTime(childComplexity), true
+
+	case "CollectionUpdatedFeedEventData.isNewCollection":
+		if e.complexity.CollectionUpdatedFeedEventData.IsNewCollection == nil {
+			break
+		}
+
+		return e.complexity.CollectionUpdatedFeedEventData.IsNewCollection(childComplexity), true
+
+	case "CollectionUpdatedFeedEventData.newCollectorsNote":
+		if e.complexity.CollectionUpdatedFeedEventData.NewCollectorsNote == nil {
+			break
+		}
+
+		return e.complexity.CollectionUpdatedFeedEventData.NewCollectorsNote(childComplexity), true
+
+	case "CollectionUpdatedFeedEventData.newTokens":
+		if e.complexity.CollectionUpdatedFeedEventData.NewTokens == nil {
+			break
+		}
+
+		return e.complexity.CollectionUpdatedFeedEventData.NewTokens(childComplexity), true
+
+	case "CollectionUpdatedFeedEventData.owner":
+		if e.complexity.CollectionUpdatedFeedEventData.Owner == nil {
+			break
+		}
+
+		return e.complexity.CollectionUpdatedFeedEventData.Owner(childComplexity), true
 
 	case "CollectorsNoteAddedToCollectionFeedEventData.action":
 		if e.complexity.CollectorsNoteAddedToCollectionFeedEventData.Action == nil {
@@ -3267,6 +3336,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
 
+	case "Query.userByAddress":
+		if e.complexity.Query.UserByAddress == nil {
+			break
+		}
+
+		args, err := ec.field_Query_userByAddress_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UserByAddress(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
+
 	case "Query.userById":
 		if e.complexity.Query.UserByID == nil {
 			break
@@ -4563,7 +4644,6 @@ type ChainTokens {
     tokens: [Token]
 }
 
-
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
@@ -4969,6 +5049,8 @@ union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
+union UserByAddressOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
+
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
@@ -5133,6 +5215,16 @@ type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelpe
     isPreFeed: Boolean
 }
 
+type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+    collection: Collection @goField(forceResolver: true)
+    newCollectorsNote: String
+    newTokens: [CollectionToken] @goField(forceResolver: true)
+    isNewCollection: Boolean
+}
+
 type ErrUnknownAction implements Error {
     message: String!
 }
@@ -5175,6 +5267,7 @@ type Query {
     viewer: ViewerOrError @authRequired
     userByUsername(username: String!): UserByUsernameOrError
     userById(id: DBID!): UserByIdOrError
+    userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
     usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError
@@ -6808,6 +6901,21 @@ func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawA
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_userByAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.ChainAddress
+	if tmp, ok := rawArgs["chainAddress"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+		arg0, err = ec.unmarshalNChainAddressInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["chainAddress"] = arg0
 	return args, nil
 }
 
@@ -8687,6 +8795,230 @@ func (ec *executionContext) _CollectionTokenSettings_renderLive(ctx context.Cont
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.RenderLive, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CollectionUpdatedFeedEventData().Owner(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Action, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Action)
+	fc.Result = res
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData_collection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CollectionUpdatedFeedEventData().Collection(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Collection)
+	fc.Result = res
+	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewCollectorsNote, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData_newTokens(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.CollectionUpdatedFeedEventData().NewTokens(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CollectionToken)
+	fc.Result = res
+	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData_isNewCollection(ctx context.Context, field graphql.CollectedField, obj *model.CollectionUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CollectionUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsNewCollection, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16650,6 +16982,45 @@ func (ec *executionContext) _Query_userById(ctx context.Context, field graphql.C
 	res := resTmp.(model.UserByIDOrError)
 	fc.Result = res
 	return ec.marshalOUserByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByIDOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_userByAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_userByAddress_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().UserByAddress(rctx, args["chainAddress"].(persist.ChainAddress))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UserByAddressOrError)
+	fc.Result = res
+	return ec.marshalOUserByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByAddressOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_usersWithTrait(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -24632,6 +25003,13 @@ func (ec *executionContext) _FeedEventData(ctx context.Context, sel ast.Selectio
 			return graphql.Null
 		}
 		return ec._TokensAddedToCollectionFeedEventData(ctx, sel, obj)
+	case model.CollectionUpdatedFeedEventData:
+		return ec._CollectionUpdatedFeedEventData(ctx, sel, &obj)
+	case *model.CollectionUpdatedFeedEventData:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CollectionUpdatedFeedEventData(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -25758,6 +26136,36 @@ func (ec *executionContext) _UpdateUserInfoPayloadOrError(ctx context.Context, s
 	}
 }
 
+func (ec *executionContext) _UserByAddressOrError(ctx context.Context, sel ast.SelectionSet, obj model.UserByAddressOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GalleryUser:
+		return ec._GalleryUser(ctx, sel, &obj)
+	case *model.GalleryUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryUser(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UserByIdOrError(ctx context.Context, sel ast.SelectionSet, obj model.UserByIDOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -26656,6 +27064,106 @@ func (ec *executionContext) _CollectionTokenSettings(ctx context.Context, sel as
 		case "renderLive":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._CollectionTokenSettings_renderLive(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var collectionUpdatedFeedEventDataImplementors = []string{"CollectionUpdatedFeedEventData", "FeedEventData"}
+
+func (ec *executionContext) _CollectionUpdatedFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionUpdatedFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, collectionUpdatedFeedEventDataImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CollectionUpdatedFeedEventData")
+		case "eventTime":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionUpdatedFeedEventData_eventTime(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "owner":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionUpdatedFeedEventData_owner(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "action":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionUpdatedFeedEventData_action(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "collection":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionUpdatedFeedEventData_collection(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "newCollectorsNote":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionUpdatedFeedEventData_newCollectorsNote(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "newTokens":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionUpdatedFeedEventData_newTokens(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "isNewCollection":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CollectionUpdatedFeedEventData_isNewCollection(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -27697,7 +28205,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "UpdateEmailPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "UpdateEmailPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -27975,7 +28483,7 @@ func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.S
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)
@@ -28714,7 +29222,7 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError"}
+var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError"}
 
 func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryUserImplementors)
@@ -30021,6 +30529,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_userById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "userByAddress":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userByAddress(ctx, field)
 				return res
 			}
 
@@ -35540,6 +36068,13 @@ func (ec *executionContext) marshalOUpdateUserInfoPayloadOrError2githubᚗcomᚋ
 		return graphql.Null
 	}
 	return ec._UpdateUserInfoPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUserByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByAddressOrError(ctx context.Context, sel ast.SelectionSet, v model.UserByAddressOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UserByAddressOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUserByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserByIDOrError(ctx context.Context, sel ast.SelectionSet, v model.UserByIDOrError) graphql.Marshaler {

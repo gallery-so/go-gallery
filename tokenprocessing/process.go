@@ -53,14 +53,14 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 			}
 		}
 
-		innerWp := workerpool.New(100)
+		wp := workerpool.New(100)
 		for _, token := range filtered {
 			t := token
 			contract, err := contractRepo.GetByID(c, t.Contract)
 			if err != nil {
 				logger.For(c).Errorf("Error getting contract: %s", err)
 			}
-			innerWp.Submit(func() {
+			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
 				err := processToken(c, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
 				if err != nil {
@@ -69,7 +69,7 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 			})
 		}
 
-		innerWp.StopWait()
+		wp.StopWait()
 		logger.For(nil).Infof("Processing Media: %s - Finished", input.UserID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
@@ -146,7 +146,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	}
 	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTimeOfMedia))
 
-	up := persist.TokenUpdateMediaInput{
+	up := persist.TokenUpdateAllURIDerivedFieldsInput{
 		Media:       med,
 		Metadata:    t.TokenMetadata,
 		TokenURI:    t.TokenURI,

@@ -24,7 +24,7 @@ func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.Handler
 		}
 
 		builder := NewEventBuilder(queries, false)
-		event, err := builder.NewEventFromTask(c.Request.Context(), message)
+		event, err := builder.NewFeedEventFromTask(c.Request.Context(), message)
 
 		if err != nil {
 			logger.For(c).WithFields(logrus.Fields{"eventID": message.ID}).Debugf("failed to handle event: %s", err)

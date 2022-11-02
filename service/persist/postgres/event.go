@@ -6,7 +6,6 @@ import (
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
 )
 
 type EventRepository struct {
@@ -111,32 +110,39 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 	return &event, err
 }
 
-// WindowActive checks if there are more recent events with an action that matches the provided event.
-func (r *EventRepository) WindowActive(ctx context.Context, event db.Event) (bool, error) {
-	return r.Queries.IsWindowActive(ctx, db.IsWindowActiveParams{
+func (r *EventRepository) IsActorActionActive(ctx context.Context, event db.Event, actions persist.ActionList, windowSize time.Duration) (bool, error) {
+	return r.Queries.IsActorActionActive(ctx, db.IsActorActionActiveParams{
 		ActorID:     event.ActorID,
-		Action:      event.Action,
+		Actions:     actions,
 		WindowStart: event.CreatedAt,
-		WindowEnd:   event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second),
+		WindowEnd:   event.CreatedAt.Add(windowSize),
 	})
 }
 
-// WindowActiveForSubject checks if there are more recent events with an action on a specific resource such as
-// as a collection or a token.
-func (r *EventRepository) WindowActiveForSubject(ctx context.Context, event db.Event) (bool, error) {
-	return r.Queries.IsWindowActiveWithSubject(ctx, db.IsWindowActiveWithSubjectParams{
+func (r *EventRepository) IsActorSubjectActive(ctx context.Context, event db.Event, windowSize time.Duration) (bool, error) {
+	return r.Queries.IsActorSubjectActive(ctx, db.IsActorSubjectActiveParams{
 		ActorID:     event.ActorID,
-		Action:      event.Action,
 		SubjectID:   event.SubjectID,
 		WindowStart: event.CreatedAt,
-		WindowEnd:   event.CreatedAt.Add(time.Duration(viper.GetInt("FEED_WINDOW_SIZE")) * time.Second),
+		WindowEnd:   event.CreatedAt.Add(windowSize),
+	})
+}
+
+func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions persist.ActionList, windowSize time.Duration) (bool, error) {
+	return r.Queries.IsActorSubjectActionActive(ctx, db.IsActorSubjectActionActiveParams{
+		ActorID:     event.ActorID,
+		SubjectID:   event.SubjectID,
+		Actions:     actions,
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(windowSize),
 	})
 }
 
 // EventsInWindow returns events belonging to the same window of activity as the given eventID.
-func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int) ([]db.Event, error) {
+func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DBID, windowSeconds int, actions persist.ActionList) ([]db.Event, error) {
 	return r.Queries.GetEventsInWindow(ctx, db.GetEventsInWindowParams{
-		ID:   eventID,
-		Secs: float64(windowSeconds),
+		ID:      eventID,
+		Secs:    float64(windowSeconds),
+		Actions: actions,
 	})
 }

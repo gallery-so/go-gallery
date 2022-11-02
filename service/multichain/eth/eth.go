@@ -276,7 +276,7 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) error {
 
-	input := indexer.UpdateTokenMediaInput{
+	input := indexer.UpdateTokenInput{
 		OwnerAddress:    persist.EthereumAddress(ownerAddress.String()),
 		TokenID:         ti.TokenID,
 		ContractAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(ti.ContractAddress)),
@@ -340,7 +340,7 @@ func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Ethereum Blockchain
 func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 
-	input := indexer.UpdateTokenMediaInput{
+	input := indexer.UpdateTokenInput{
 		OwnerAddress: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(wallet)),
 		UpdateAll:    all,
 	}

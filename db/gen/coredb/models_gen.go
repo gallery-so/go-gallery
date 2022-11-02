@@ -62,7 +62,7 @@ type Collection struct {
 type CollectionEvent struct {
 	ID           persist.DBID
 	UserID       sql.NullString
-	CollectionID sql.NullString
+	CollectionID persist.DBID
 	Version      sql.NullInt32
 	EventCode    sql.NullInt32
 	CreatedAt    time.Time

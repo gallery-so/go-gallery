@@ -97,7 +97,6 @@ type ChainTokens {
     tokens: [Token]
 }
 
-
 input ChainAddressInput {
     address: Address! @goField(forceResolver: true)
     chain: Chain! @goField(forceResolver: true)
@@ -503,6 +502,8 @@ union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
 union UserByIdOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
+union UserByAddressOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
+
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
@@ -667,6 +668,16 @@ type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelpe
     isPreFeed: Boolean
 }
 
+type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
+    eventTime: Time
+    owner: GalleryUser @goField(forceResolver: true)
+    action: Action
+    collection: Collection @goField(forceResolver: true)
+    newCollectorsNote: String
+    newTokens: [CollectionToken] @goField(forceResolver: true)
+    isNewCollection: Boolean
+}
+
 type ErrUnknownAction implements Error {
     message: String!
 }
@@ -709,6 +720,7 @@ type Query {
     viewer: ViewerOrError @authRequired
     userByUsername(username: String!): UserByUsernameOrError
     userById(id: DBID!): UserByIdOrError
+    userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
     usersWithTrait(trait: String!): [GalleryUser]
     membershipTiers(forceRefresh: Boolean): [MembershipTier]
     collectionById(id: DBID!): CollectionByIdOrError

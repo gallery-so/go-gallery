@@ -135,6 +135,26 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.
 	return &user, nil
 }
 
+func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.User, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"chainAddress": {chainAddress, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	chain := chainAddress.Chain()
+	user, err := api.loaders.UserByAddress.Load(db.GetUserByAddressBatchParams{
+		Chain:   int32(chain),
+		Address: persist.Address(chain.NormalizeAddress(chainAddress.Address())),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.User, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{

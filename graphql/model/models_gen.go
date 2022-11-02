@@ -186,6 +186,10 @@ type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
 }
 
+type UserByAddressOrError interface {
+	IsUserByAddressOrError()
+}
+
 type UserByIDOrError interface {
 	IsUserByIDOrError()
 }
@@ -331,6 +335,19 @@ type CollectionTokenSettingsInput struct {
 	TokenID    persist.DBID `json:"tokenId"`
 	RenderLive bool         `json:"renderLive"`
 }
+
+type CollectionUpdatedFeedEventData struct {
+	HelperCollectionUpdatedFeedEventDataData
+	EventTime         *time.Time         `json:"eventTime"`
+	Owner             *GalleryUser       `json:"owner"`
+	Action            *persist.Action    `json:"action"`
+	Collection        *Collection        `json:"collection"`
+	NewCollectorsNote *string            `json:"newCollectorsNote"`
+	NewTokens         []*CollectionToken `json:"newTokens"`
+	IsNewCollection   *bool              `json:"isNewCollection"`
+}
+
+func (CollectionUpdatedFeedEventData) IsFeedEventData() {}
 
 type CollectorsNoteAddedToCollectionFeedEventData struct {
 	EventTime         *time.Time      `json:"eventTime"`
@@ -555,6 +572,7 @@ type ErrInvalidInput struct {
 
 func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
 func (ErrInvalidInput) IsUserByIDOrError()                        {}
+func (ErrInvalidInput) IsUserByAddressOrError()                   {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                  {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()              {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
@@ -655,6 +673,7 @@ type ErrUserNotFound struct {
 
 func (ErrUserNotFound) IsUserByUsernameOrError()      {}
 func (ErrUserNotFound) IsUserByIDOrError()            {}
+func (ErrUserNotFound) IsUserByAddressOrError()       {}
 func (ErrUserNotFound) IsError()                      {}
 func (ErrUserNotFound) IsLoginPayloadOrError()        {}
 func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
@@ -778,6 +797,7 @@ func (GalleryUser) IsGalleryUserOrWallet()   {}
 func (GalleryUser) IsGalleryUserOrAddress()  {}
 func (GalleryUser) IsUserByUsernameOrError() {}
 func (GalleryUser) IsUserByIDOrError()       {}
+func (GalleryUser) IsUserByAddressOrError()  {}
 
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`

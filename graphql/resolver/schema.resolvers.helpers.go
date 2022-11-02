@@ -150,51 +150,6 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 	return nil, false
 }
 
-func createDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
-	if !debugtools.Enabled || viper.GetString("ENV") != "local" {
-		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
-	}
-
-	if debugParams.AsUsername == nil {
-		if debugParams.ChainAddresses == nil {
-			return nil, fmt.Errorf("debug auth failed: either asUsername or chainAddresses must be specified")
-		}
-
-		userID := persist.DBID("")
-		if debugParams.UserID != nil {
-			userID = *debugParams.UserID
-		}
-
-		return debugtools.NewDebugAuthenticator(userID, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
-	}
-
-	if debugParams.UserID != nil || debugParams.ChainAddresses != nil {
-		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be used in conjunction with userId or chainAddresses parameters")
-	}
-
-	username := *debugParams.AsUsername
-	if username == "" {
-		return nil, fmt.Errorf("debug auth failed: asUsername parameter cannot be empty")
-	}
-
-	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
-	if err != nil {
-		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
-	}
-
-	wallets, err := publicapi.For(ctx).Wallet.GetWalletsByUserID(ctx, user.ID)
-	if err != nil {
-		return nil, fmt.Errorf("debug auth failed for user '%s': %w", username, err)
-	}
-
-	var addresses []persist.ChainAddress
-	for _, wallet := range wallets {
-		addresses = append(addresses, persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)))
-	}
-
-	return debugtools.NewDebugAuthenticator(user.ID, addresses), nil
-}
-
 // authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
 func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.AuthMechanism) (auth.Authenticator, error) {
 
@@ -202,7 +157,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 
 	if debugtools.Enabled {
 		if viper.GetString("ENV") == "local" && m.Debug != nil {
-			return createDebugAuthenticator(ctx, *m.Debug)
+			return authApi.NewDebugAuthenticator(ctx, *m.Debug)
 		}
 	}
 
@@ -220,6 +175,16 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 
 func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*model.GalleryUser, error) {
 	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return userToModel(ctx, *user), nil
+}
+
+func resolveGalleryUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*model.GalleryUser, error) {
+	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, chainAddress)
 
 	if err != nil {
 		return nil, err
@@ -633,7 +598,7 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 		return nil, err
 	}
 
-	return eventToModel(event)
+	return feedEventToModel(event)
 }
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
@@ -1000,12 +965,14 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 		return eventToCollectorsNoteAddedToCollectionFeedEventData(event), nil
 	case persist.ActionTokensAddedToCollection:
 		return eventToTokensAddedToCollectionFeedEventData(event), nil
+	case persist.ActionCollectionUpdated:
+		return eventToCollectionUpdatedFeedEventData(event), nil
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
 }
 
-func eventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
+func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
 	data, err := feedEventToDataModel(event)
 	if err != nil {
 		return nil, err
@@ -1103,12 +1070,27 @@ func eventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.Feed
 	}
 }
 
+func eventToCollectionUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
+	return model.CollectionUpdatedFeedEventData{
+		EventTime:         &event.EventTime,
+		Owner:             &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
+		Collection:        &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
+		Action:            &event.Action,
+		NewTokens:         nil, // handled by dedicated resolver
+		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
+		IsNewCollection:   util.BoolToPointer(event.Data.CollectionIsNew),
+		HelperCollectionUpdatedFeedEventDataData: model.HelperCollectionUpdatedFeedEventDataData{
+			FeedEventID: event.ID,
+		},
+	}
+}
+
 func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 	edges := make([]*model.FeedEdge, len(events))
 
 	for i, evt := range events {
 		var node model.FeedEventOrError
-		node, err := eventToModel(&evt)
+		node, err := feedEventToModel(&evt)
 
 		if e, ok := err.(*persist.ErrUnknownAction); ok {
 			node = model.ErrUnknownAction{Message: e.Error()}
@@ -1619,16 +1601,4 @@ func getInvalidMedia(ctx context.Context, media persist.Media) model.InvalidMedi
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
-}
-
-func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
-	addresses := make([]persist.ChainAddress, 0, len(chainAddresses))
-
-	for _, address := range chainAddresses {
-		if address != nil {
-			addresses = append(addresses, *address)
-		}
-	}
-
-	return addresses
 }

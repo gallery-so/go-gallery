@@ -36,15 +36,6 @@ abi-gen:
 	abigen --abi=./contracts/abi/Cryptopunks.abi --pkg=contracts --type=Cryptopunks > ./contracts/Cryptopunks.go
 	abigen --abi=./contracts/abi/Zora.abi --pkg=contracts --type=Zora > ./contracts/Zora.go
 
-g-docker:
-	docker-compose down
-	docker-compose build
-	docker build -t bcgallery/gallery-postgres -f docker/postgres/DOCKERFILE .
-	docker build -t bcgallery/gallery-postgres:circle -f docker/postgres/circle/DOCKERFILE .
-	docker push bcgallery/gallery-postgres
-	docker push bcgallery/gallery-postgres:circle
-	docker-compose up -d
-
 docker-start-clean:	docker-build
 	docker-compose up -d
 
@@ -63,9 +54,3 @@ cloud-tasks:
 		-queue projects/gallery-local/locations/here/queues/feed-event \
 		-queue projects/gallery-local/locations/here/queues/token-processing \
 		-queue projects/gallery-local/locations/here/queues/indexer-refreshes
-
-migrate-coredb:
-	migrate -path db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
-
-migrate-indexerdb:
-	migrate -path db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
