@@ -583,22 +583,24 @@ outer:
 	logger.For(ctx).Debug("creating tokens")
 	now := time.Now()
 
+	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
 	for userID, user := range users {
 		allUserTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, userID, -1, 0)
 		if err != nil {
 			return err
 		}
 
-		logger.For(ctx).Debugf("creating tokens for user %s", user.Username)
-		_, err = p.upsertTokensOfContract(ctx, chainTokensForUsers[userID], addressToContract, allUserTokens, user, now)
+		logger.For(ctx).Debugf("preparing tokens for user %s", user.Username)
+		tokens, err := p.prepareTokensOfContractForUser(ctx, chainTokensForUsers[userID], addressToContract, allUserTokens, user, now)
 		if err != nil {
 			return err
 		}
+		tokensToUpsert = append(tokensToUpsert, tokens...)
 
-		logger.For(ctx).Debugf("creating tokens for user %s done", user.Username)
+		logger.For(ctx).Debugf("preparing tokens for user %s done", user.Username)
 	}
 
-	if err := p.Repos.TokenRepository.DeleteTokensOfContractBeforeTimeStamp(ctx, contract.ID, now); err != nil {
+	if err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contract.ID, tokensToUpsert); err != nil {
 		return fmt.Errorf("error deleting tokens: %s", err)
 	}
 	return nil
@@ -832,15 +834,11 @@ func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, ad
 	return newTokens, nil
 }
 
-func (p *Provider) upsertTokensOfContract(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, timeStamp time.Time) ([]persist.TokenGallery, error) {
+func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, timeStamp time.Time) ([]persist.TokenGallery, error) {
 
 	newTokens, err := dedupeAndPrepareTokensForUpsert(ctx, allTokens, addressesToContracts, user, allUsersTokens)
 	if err != nil {
 		return nil, err
-	}
-
-	if err := p.Repos.TokenRepository.BulkUpsertWithTimeStamp(ctx, newTokens, timeStamp); err != nil {
-		return nil, fmt.Errorf("error upserting tokens: %s", err)
 	}
 
 	return newTokens, nil

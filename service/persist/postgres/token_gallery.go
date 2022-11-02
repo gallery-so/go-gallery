@@ -254,11 +254,69 @@ func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID per
 
 // BulkUpsert upserts multiple tokens
 func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery) error {
-	return t.BulkUpsertWithTimeStamp(pCtx, pTokens, time.Now())
+	if len(pTokens) == 0 {
+		return nil
+	}
+
+	logger.For(pCtx).Infof("Checking 0 quantities for tokens...")
+	newTokens, err := t.deleteZeroQuantityTokens(pCtx, pTokens)
+	if err != nil {
+		return err
+	}
+
+	if len(newTokens) == 0 {
+		return nil
+	}
+
+	// Postgres only allows 65535 parameters at a time.
+	// TODO: Consider trying this implementation at some point instead of chunking:
+	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
+	paramsPerRow := 22
+	rowsPerQuery := 65535 / paramsPerRow
+
+	if len(newTokens) > rowsPerQuery {
+		logrus.Debugf("Chunking %d tokens recursively into %d queries", len(newTokens), len(newTokens)/rowsPerQuery)
+		next := newTokens[rowsPerQuery:]
+		current := newTokens[:rowsPerQuery]
+		if err := t.BulkUpsert(pCtx, next); err != nil {
+			return err
+		}
+		newTokens = current
+	}
+
+	newTokens = t.dedupeTokens(newTokens)
+
+	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_PROVIDER_MARKED_SPAM) VALUES `
+	vals := make([]interface{}, 0, len(newTokens)*paramsPerRow)
+	for i, token := range newTokens {
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam)
+	}
+
+	sqlStr = sqlStr[:len(sqlStr)-1]
+
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT,CHAIN,OWNER_USER_ID) WHERE DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,LAST_UPDATED = EXCLUDED.LAST_UPDATED,IS_USER_MARKED_SPAM = tokens.IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM;`
+
+	_, err = t.db.ExecContext(pCtx, sqlStr, vals...)
+	if err != nil {
+		logrus.Debugf("SQL: %s", sqlStr)
+		return fmt.Errorf("failed to upsert tokens: %w", err)
+	}
+
+	return nil
 }
 
-// BulkUpsertWithTimeStamp upserts multiple tokens with the given last updated timestamp
-func (t *TokenGalleryRepository) BulkUpsertWithTimeStamp(pCtx context.Context, pTokens []persist.TokenGallery, timeStamp time.Time) error {
+// BulkUpsertTokensOfContract upserts all tokens of a contract and deletes the old tokens
+func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery) error {
+	return t.bulkUpsertTokensOfContract(pCtx, contractID, pTokens, false)
+}
+
+func (t *TokenGalleryRepository) bulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery, isRecursing bool) error {
+	now := time.Now()
+
+	if isRecursing {
+		return t.BulkUpsert(pCtx, pTokens)
+	}
 
 	if len(pTokens) == 0 {
 		return nil
@@ -284,7 +342,7 @@ func (t *TokenGalleryRepository) BulkUpsertWithTimeStamp(pCtx context.Context, p
 		logrus.Debugf("Chunking %d tokens recursively into %d queries", len(newTokens), len(newTokens)/rowsPerQuery)
 		next := newTokens[rowsPerQuery:]
 		current := newTokens[:rowsPerQuery]
-		if err := t.BulkUpsertWithTimeStamp(pCtx, next, timeStamp); err != nil {
+		if err := t.bulkUpsertTokensOfContract(pCtx, contractID, next, true); err != nil {
 			return err
 		}
 		newTokens = current
@@ -292,24 +350,36 @@ func (t *TokenGalleryRepository) BulkUpsertWithTimeStamp(pCtx context.Context, p
 
 	newTokens = t.dedupeTokens(newTokens)
 
+	tx, err := t.db.BeginTx(pCtx, nil)
+	if err != nil {
+		return err
+	}
+
 	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_PROVIDER_MARKED_SPAM) VALUES `
 	vals := make([]interface{}, 0, len(newTokens)*paramsPerRow)
 	for i, token := range newTokens {
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
-		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, timeStamp, token.Deleted, token.IsProviderMarkedSpam)
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, now, token.Deleted, token.IsProviderMarkedSpam)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
 	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT,CHAIN,OWNER_USER_ID) WHERE DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,LAST_UPDATED = EXCLUDED.LAST_UPDATED,IS_USER_MARKED_SPAM = tokens.IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM;`
 
-	_, err = t.db.ExecContext(pCtx, sqlStr, vals...)
+	_, err = tx.ExecContext(pCtx, sqlStr, vals...)
 	if err != nil {
 		logrus.Debugf("SQL: %s", sqlStr)
 		return fmt.Errorf("failed to upsert tokens: %w", err)
 	}
 
-	return nil
+	// delete tokens of contract before timestamp
+
+	_, err = tx.StmtContext(pCtx, t.deleteTokensOfContractBeforeTimeStampStmt).ExecContext(pCtx, contractID, now)
+	if err != nil {
+		return fmt.Errorf("failed to delete tokens: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 func (t *TokenGalleryRepository) deleteZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {

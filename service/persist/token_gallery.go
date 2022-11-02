@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/lib/pq"
 )
@@ -143,8 +142,7 @@ type TokenGalleryRepository interface {
 	GetByFullIdentifiers(context.Context, TokenID, Address, Chain, DBID) (TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	BulkUpsert(context.Context, []TokenGallery) error
-	BulkUpsertWithTimeStamp(context.Context, []TokenGallery, time.Time) error
-	DeleteTokensOfContractBeforeTimeStamp(context.Context, DBID, time.Time) error
+	BulkUpsertTokensOfContract(context.Context, DBID, []TokenGallery) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, Chain, interface{}) error
 	DeleteByID(context.Context, DBID) error
