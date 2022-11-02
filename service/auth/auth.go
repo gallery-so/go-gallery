@@ -325,7 +325,7 @@ func GetUserWithNonce(pCtx context.Context, pChainAddress persist.ChainAddress, 
 	if err != nil {
 		return nonceValue, user, err
 	}
-	if user.ID != "" {
+	if dbUser.ID != "" {
 		user = &dbUser
 	} else {
 		return nonceValue, user, persist.ErrUserNotFound{ChainAddress: pChainAddress}
