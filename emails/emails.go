@@ -25,7 +25,7 @@ import (
 // InitServer initializes the mediaprocessing server
 func InitServer() {
 	router := coreInitServer()
-	logger.For(nil).Info("Starting tokenprocessing server...")
+	logger.For(nil).Info("Starting emails server...")
 	http.Handle("/", router)
 }
 
