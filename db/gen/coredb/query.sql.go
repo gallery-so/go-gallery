@@ -7,6 +7,7 @@ package coredb
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jackc/pgtype"
@@ -843,74 +844,6 @@ func (q *Queries) GetCommentsByCommentIDs(ctx context.Context, commentIds persis
 			&i.Deleted,
 			&i.CreatedAt,
 			&i.LastUpdated,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getCommentsByFeedEventID = `-- name: GetCommentsByFeedEventID :many
-SELECT comments.id, comments.version, feed_event_id, actor_id, reply_to, comment, comments.deleted, comments.created_at, comments.last_updated, f.id, f.version, owner_id, action, data, event_time, event_ids, f.deleted, f.last_updated, f.created_at, caption FROM comments JOIN feed_events f on f.deleted = false AND f.id = $1 WHERE feed_event_id = $1 AND deleted = false ORDER BY created_at DESC
-`
-
-type GetCommentsByFeedEventIDRow struct {
-	ID            persist.DBID
-	Version       int32
-	FeedEventID   persist.DBID
-	ActorID       persist.DBID
-	ReplyTo       persist.DBID
-	Comment       string
-	Deleted       bool
-	CreatedAt     time.Time
-	LastUpdated   time.Time
-	ID_2          persist.DBID
-	Version_2     int32
-	OwnerID       persist.DBID
-	Action        persist.Action
-	Data          persist.FeedEventData
-	EventTime     time.Time
-	EventIds      persist.DBIDList
-	Deleted_2     bool
-	LastUpdated_2 time.Time
-	CreatedAt_2   time.Time
-	Caption       sql.NullString
-}
-
-func (q *Queries) GetCommentsByFeedEventID(ctx context.Context, id persist.DBID) ([]GetCommentsByFeedEventIDRow, error) {
-	rows, err := q.db.Query(ctx, getCommentsByFeedEventID, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetCommentsByFeedEventIDRow
-	for rows.Next() {
-		var i GetCommentsByFeedEventIDRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Version,
-			&i.FeedEventID,
-			&i.ActorID,
-			&i.ReplyTo,
-			&i.Comment,
-			&i.Deleted,
-			&i.CreatedAt,
-			&i.LastUpdated,
-			&i.ID_2,
-			&i.Version_2,
-			&i.OwnerID,
-			&i.Action,
-			&i.Data,
-			&i.EventTime,
-			&i.EventIds,
-			&i.Deleted_2,
-			&i.LastUpdated_2,
-			&i.CreatedAt_2,
-			&i.Caption,
 		); err != nil {
 			return nil, err
 		}

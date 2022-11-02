@@ -39,8 +39,6 @@ type UserRepository struct {
 	removeFollowerStmt       *sql.Stmt
 	followsUserStmt          *sql.Stmt
 	userHasTrait             *sql.Stmt
-
-	queries *coredb.Queries
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users

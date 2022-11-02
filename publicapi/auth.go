@@ -85,7 +85,7 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 
 	var addresses []persist.ChainAddress
 	for _, wallet := range wallets {
-		addresses = append(addresses, persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)))
+		addresses = append(addresses, persist.NewChainAddress(wallet.Address, wallet.Chain))
 	}
 
 	return debugtools.NewDebugAuthenticator(&user, addresses), nil

@@ -33,7 +33,7 @@ var errBadCursorFormat = errors.New("bad cursor format")
 const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
-	repos         *persist.Repositories
+	repos         *postgres.Repositories
 	queries       *db.Queries
 	loaders       *dataloader.Loaders
 	validator     *validator.Validate

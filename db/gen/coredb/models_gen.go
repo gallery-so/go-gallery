@@ -101,7 +101,7 @@ type Contract struct {
 }
 
 type EarlyAccess struct {
-	Address string
+	Address persist.Address
 }
 
 type Event struct {
@@ -189,7 +189,7 @@ type LoginAttempt struct {
 	Version            sql.NullInt32
 	CreatedAt          time.Time
 	LastUpdated        time.Time
-	Address            sql.NullString
+	Address            persist.Address
 	RequestHostAddress persist.Address
 	UserExists         sql.NullBool
 	Signature          sql.NullString
@@ -229,7 +229,7 @@ type Nonce struct {
 	LastUpdated time.Time
 	CreatedAt   time.Time
 	UserID      persist.DBID
-	Address     sql.NullString
+	Address     persist.Address
 	Value       sql.NullString
 	Chain       persist.Chain
 }
@@ -265,7 +265,7 @@ type Token struct {
 	TokenType            sql.NullString
 	TokenID              persist.TokenID
 	Quantity             sql.NullString
-	OwnershipHistory     []pgtype.JSONB
+	OwnershipHistory     persist.AddressAtBlockList
 	TokenMetadata        persist.TokenMetadata
 	ExternalUrl          sql.NullString
 	BlockNumber          sql.NullInt64

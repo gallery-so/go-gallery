@@ -512,7 +512,7 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	if err != nil {
 		return nil, err
 	}
-	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), before, after, first, last, onlyGalleryUsers)
+	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}
