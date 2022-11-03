@@ -8,7 +8,6 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
-	"github.com/gammazero/workerpool"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -18,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 type ProcessMediaForTokenInput struct {
@@ -36,12 +36,17 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
-		if err := throttler.Lock(c, input.UserID.String()); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
 
-		allTokens, err := tokenRepo.GetByUserID(c, input.UserID, -1, -1)
+		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
+		// XXX: span, ctx := tracing.StartSpan(ctx, "processMediaForUsersTokensOfChain", fmt.Sprintf("userID=%s;chain=%d", input.UserID, input.Chain))
+		// XXX: defer tracing.FinishSpan(span)
+
+		// XXX: if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
+		// XXX: 	util.ErrResponse(c, http.StatusOK, err)
+		// XXX: 	return
+		// XXX: }
+
+		allTokens, err := tokenRepo.GetByUserID(ctx, input.UserID, -1, -1)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -53,24 +58,44 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 			}
 		}
 
-		wp := workerpool.New(100)
+		var i int
 		for _, token := range filtered {
-			t := token
-			contract, err := contractRepo.GetByID(c, t.Contract)
-			if err != nil {
-				logger.For(c).Errorf("Error getting contract: %s", err)
+			i++
+			if i > 5 {
+				break
 			}
-			wp.Submit(func() {
-				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-				err := processToken(c, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
-				if err != nil {
-					logger.For(c).Errorf("Error processing token: %s", err)
-				}
-			})
+			t := token
+			contract, err := contractRepo.GetByID(ctx, t.Contract)
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("error getting contract")
+			}
+			key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
+			err = processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("error processing token")
+			}
 		}
 
-		wp.StopWait()
-		logger.For(nil).Infof("Processing Media: %s - Finished", input.UserID)
+		// XXX: wp := workerpool.New(100)
+		// XXX: wp := workerpool.New(13)
+		// XXX: for _, token := range filtered {
+		// XXX: 	t := token
+		// XXX: 	contract, err := contractRepo.GetByID(ctx, t.Contract)
+		// XXX: 	if err != nil {
+		// XXX: 		logger.For(ctx).WithError(err).Error("error getting contract")
+		// XXX: 	}
+		// XXX: 	wp.Submit(func() {
+		// XXX: 		key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
+		// XXX: 		ctx := sentryutil.NewSentryHubContext(c)
+		// XXX: 		err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+		// XXX: 		if err != nil {
+		// XXX: 			logger.For(ctx).WithError(err).Error("error processing token")
+		// XXX: 		}
+		// XXX: 	})
+		// XXX: }
+		// XXX:
+		// XXX: wp.StopWait()
+		logger.For(ctx).Info("processing media finished")
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
@@ -119,11 +144,16 @@ func processMediaForToken(tokenRepo persist.TokenGalleryRepository, userRepo per
 }
 
 func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo persist.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+	ctx := logger.NewContextWithFields(c, logrus.Fields{
+		"tokenID":         t.TokenID,
+		"contractAddress": contractAddress,
+		"chain":           t.Chain,
+	})
 	totalTime := time.Now()
-	ctx, cancel := context.WithTimeout(c, time.Minute*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", key, contractAddress, t.TokenID, t.Chain)
+	logger.For(ctx).Infof("processing media")
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
 	name, description := media.FindNameAndDescription(ctx, t.TokenMetadata)
@@ -139,12 +169,12 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	totalTimeOfMedia := time.Now()
 	med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
-		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
+		logger.For(ctx).WithError(err).Error("error processing media")
 		med = persist.Media{
 			MediaType: persist.MediaTypeUnknown,
 		}
 	}
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTimeOfMedia))
+	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
 
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
 		Media:       med,
@@ -155,15 +185,14 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		LastUpdated: persist.LastUpdatedTime{},
 	}
 	totalUpdateTime := time.Now()
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
+	logger.For(ctx).Infof("updating token in db")
 	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
-		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
+		logger.For(ctx).WithError(err).Errorf("error updating media")
 		return err
 	}
 
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
-
-	logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTime))
+	logger.For(ctx).Infof("db update took %s", time.Since(totalUpdateTime))
+	logger.For(ctx).Infof("total time took %s", time.Since(totalTime))
 	return nil
 }
 
@@ -189,12 +218,12 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persis
 		}
 
 		// do not unlock, let expiry handle the unlock
-		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
+		logger.For(c).Infof("processing collection refresh: %s")
 		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", key)
+		logger.For(c).Infof("finished collection refresh: %s", key)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
