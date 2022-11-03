@@ -12,7 +12,7 @@ COPY go.mod go.sum /app/
 RUN go mod download
 
 # Install certs
-ADD _local/root-certs /usr/local/share/ca-certificates/
+ADD _deploy/root-certs /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
 COPY . /app
