@@ -283,12 +283,12 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 			}
 
 			logger.For(ctx).WithFields(logrus.Fields{
-				"operationName": operationName,
-				"operationType": operationType,
-				"payloadType":   "response",
-				"gqlRequestId":  gqlRequestId,
-				"locatorId":     locatorID,
-				"response":      responseSizeLimited,
+				"gqlOperationName": operationName,
+				"gqlOperationType": operationType,
+				"gqlMessageType":   "response",
+				"gqlRequestId":     gqlRequestId,
+				"locatorId":        locatorID,
+				"response":         responseSizeLimited,
 			}).Info("Sending GraphQL response")
 		}
 
@@ -342,9 +342,9 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 			}
 
 			logger.For(ctx).WithFields(logrus.Fields{
-				"operationName":     operationName,
-				"operationType":     operationType,
-				"payloadType":       "request",
+				"gqlOperationName":  operationName,
+				"gqlOperationType":  operationType,
+				"gqlMessageType":    "request",
 				"gqlRequestId":      gqlRequestId,
 				"locatorId":         locatorID,
 				"scrubbedVariables": scrubbedVariables,
