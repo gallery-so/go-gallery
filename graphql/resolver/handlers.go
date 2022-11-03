@@ -36,6 +36,9 @@ const gqlRequestIdContextKey = "graphql.gqlRequestId"
 const noCachePublicAPIContextKey = "graphql.noCachePublicAPI"
 const maxSentryDataLength = 8 * 1024
 
+// Max log entry size is 256kB, but we want lots of headroom
+const maxCloudLoggingDataLength = 128 * 1024
+
 func getFieldName(fc *gqlgen.FieldContext) string {
 	if fc == nil {
 		return "UnknownField"
@@ -50,6 +53,14 @@ func getOperationName(oc *gqlgen.OperationContext) string {
 	}
 
 	return oc.Operation.Name
+}
+
+func getOperationType(oc *gqlgen.OperationContext) string {
+	if oc == nil || oc.Operation == nil {
+		return "UnknownType"
+	}
+
+	return string(oc.Operation.Operation)
 }
 
 func MutationCachingHandler(newPublicAPI func(context.Context, bool) *publicapi.PublicAPI) func(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
@@ -231,11 +242,14 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 
 func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
-		var span *sentry.Span
-		var responseLocatorId string
+		// Unique ID to make finding this particular log entry easy
+		locatorID := ksuid.New().String()
 
 		oc := gqlgen.GetOperationContext(ctx)
 		operationName := getOperationName(oc)
+		operationType := getOperationType(oc)
+
+		var span *sentry.Span
 
 		if trace {
 			span, ctx = tracing.StartSpan(ctx, "gql.response", operationName)
@@ -257,22 +271,29 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 			// requests and responses under the same ID.
 			gqlRequestId := ctx.Value(gqlRequestIdContextKey)
 
-			// Unique ID to make finding this particular log entry easy
-			responseLocatorId = ksuid.New().String()
+			// If the total log entry is larger than 256kB, Google Cloud Logging truncates it, at which point the
+			// entire log entry is no longer valid JSON and we can't search by JSON fields. To get around this,
+			// we log the response separately if it's too large.
+			responseSizeLimited, limited := limitFieldSize(len(*responseData), maxCloudLoggingDataLength, "response", locatorID, responseData)
+			if limited {
+				logger.For(ctx).WithFields(logrus.Fields{
+					"locatorId": locatorID,
+					"response":  responseData,
+				})
+			}
 
-			// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
-			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
-			// limit is 256kb per entry), we want to make sure all of our fields are visible.
 			logger.For(ctx).WithFields(logrus.Fields{
-				"operation":         operationName,
-				"gqlRequestId":      gqlRequestId,
-				"responseLocatorId": responseLocatorId,
-				"zzz_response":      responseData,
+				"operationName": operationName,
+				"operationType": operationType,
+				"payloadType":   "response",
+				"gqlRequestId":  gqlRequestId,
+				"locatorId":     locatorID,
+				"response":      responseSizeLimited,
 			}).Info("Sending GraphQL response")
 		}
 
 		if span != nil {
-			responseSizeLimited := limitEventDataSize(len(response.Data), maxSentryDataLength, "response", responseLocatorId, responseData)
+			responseSizeLimited, _ := limitFieldSize(len(*responseData), maxSentryDataLength, "response", locatorID, responseData)
 
 			tracing.AddEventDataToSpan(span, map[string]interface{}{
 				"response": responseSizeLimited,
@@ -287,12 +308,15 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 
 func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-		var span *sentry.Span
-		var requestLocatorId string
+		// Unique ID to make finding this particular log entry easy
+		locatorID := ksuid.New().String()
 
 		gc := util.GinContextFromContext(ctx)
 		oc := gqlgen.GetOperationContext(ctx)
 		operationName := getOperationName(oc)
+		operationType := getOperationType(oc)
+
+		var span *sentry.Span
 
 		if trace {
 			transactionName := fmt.Sprintf("%s %s (%s)", gc.Request.Method, gc.Request.URL.Path, operationName)
@@ -306,22 +330,29 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 			gqlRequestId := ksuid.New().String()
 			ctx = context.WithValue(ctx, gqlRequestIdContextKey, gqlRequestId)
 
-			// Unique ID to make finding this particular log entry easy
-			requestLocatorId = ksuid.New().String()
+			// If the total log entry is larger than 256kB, Google Cloud Logging truncates it, at which point the
+			// entire log entry is no longer valid JSON and we can't search by JSON fields. To get around this,
+			// we log the query separately if it's too large.
+			scrubbedQuerySizeLimited, limited := limitFieldSize(len(scrubbedQuery), maxCloudLoggingDataLength, "scrubbedQuery", locatorID, scrubbedQuery)
+			if limited {
+				logger.For(ctx).WithFields(logrus.Fields{
+					"locatorId":     locatorID,
+					"scrubbedQuery": scrubbedQuery,
+				})
+			}
 
-			// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
-			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
-			// limit is 256kb per entry), we want to make sure all of our fields are visible.
 			logger.For(ctx).WithFields(logrus.Fields{
-				"operation":         operationName,
+				"operationName":     operationName,
+				"operationType":     operationType,
+				"payloadType":       "request",
 				"gqlRequestId":      gqlRequestId,
-				"requestLocatorId":  requestLocatorId,
+				"locatorId":         locatorID,
 				"scrubbedVariables": scrubbedVariables,
-				"zzz_scrubbedQuery": scrubbedQuery,
+				"scrubbedQuery":     scrubbedQuerySizeLimited,
 			}).Info("Received GraphQL query")
 		}
 
-		scrubbedQuerySizeLimited := limitEventDataSize(len(scrubbedQuery), maxSentryDataLength, "scrubbedQuery", requestLocatorId, scrubbedQuery)
+		scrubbedQuerySizeLimited, _ := limitFieldSize(len(scrubbedQuery), maxSentryDataLength, "scrubbedQuery", locatorID, scrubbedQuery)
 
 		if hub := sentry.GetHubFromContext(ctx); hub != nil {
 			scrubbedVariablesJson := "error converting variables to JSON string"
@@ -358,9 +389,12 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 // data might be unparsed JSON bytes, truncation is a bad idea: we don't want to truncate bytes at
 // maxLength and try to parse invalid/incomplete data. Instead, we just replace the data with a
 // helpful placeholder message.
-func limitEventDataSize(length int, maxLength int, name string, locatorId string, data interface{}) interface{} {
+// We also use this function to omit large payloads in Google Cloud Logging fields, since the max
+// size for a Cloud Logging entry is 256kB, and entries larger than that will result in a broken
+// JSON payload that isn't searchable by its fields.
+func limitFieldSize(length int, maxLength int, name string, locatorId string, data interface{}) (output interface{}, limited bool) {
 	if length <= maxLength {
-		return data
+		return data, false
 	}
 
 	placeholder := fmt.Sprintf("%s omitted because it is too large (%d bytes)", name, length)
@@ -368,7 +402,7 @@ func limitEventDataSize(length int, maxLength int, name string, locatorId string
 		placeholder += fmt.Sprintf(", but it should be accessible by searching logs for this unique ID: %s", locatorId)
 	}
 
-	return placeholder
+	return placeholder, true
 }
 
 func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schema, allQueryVariables map[string]interface{}, scrubbedOutput map[string]interface{}) {
