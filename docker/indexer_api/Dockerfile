@@ -11,6 +11,10 @@ WORKDIR /app
 COPY go.mod go.sum /app/
 RUN go mod download
 
+# Install certs
+COPY _local/root-certs/sectigo.crt /usr/local/share/ca-certificates/sectigo.crt
+RUN update-ca-certificates
+
 COPY . /app
 RUN go build -o ./bin/indexer-api ./cmd/indexer/server/main.go
 
