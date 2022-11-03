@@ -203,7 +203,7 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 	}
 
 	// walk every file in the tls directory and add them to the cert pool
-	filepath.WalkDir("_local/root-certs", func(path string, d fs.DirEntry, err error) error {
+	filepath.WalkDir("_deploy/root-certs", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
