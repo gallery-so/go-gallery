@@ -133,14 +133,14 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		}
 		// }
 	} else {
-		remote := gc.RemoteIP()
+		remote, _ := gc.RemoteIP()
 
 		_, err := dispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
-			ExternalID:     persist.NullString(remote),
+			ExternalID:     persist.NullString(remote.String()),
 		}, api.validator, nil)
 		if err != nil {
 			return db.Gallery{}, err

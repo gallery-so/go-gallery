@@ -24,8 +24,7 @@ require (
 	github.com/gammazero/deque v0.1.1 // indirect
 	github.com/gammazero/workerpool v1.1.2
 	github.com/getsentry/sentry-go v0.13.0
-	github.com/gin-contrib/pprof v1.4.0 // indirect
-	github.com/gin-gonic/gin v1.8.1
+	github.com/gin-gonic/gin v1.7.7
 	github.com/go-playground/validator/v10 v10.10.1
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/golang-migrate/migrate/v4 v4.15.1
@@ -59,7 +58,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.7.0
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/vektah/gqlparser/v2 v2.4.1
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect

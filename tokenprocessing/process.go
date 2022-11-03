@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
+	"github.com/gammazero/workerpool"
 	"github.com/gin-gonic/gin"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -38,8 +39,6 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 		}
 
 		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
-		// XXX: span, ctx := tracing.StartSpan(ctx, "processMediaForUsersTokensOfChain", fmt.Sprintf("userID=%s;chain=%d", input.UserID, input.Chain))
-		// XXX: defer tracing.FinishSpan(span)
 
 		// XXX: if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
 		// XXX: 	util.ErrResponse(c, http.StatusOK, err)
@@ -58,43 +57,23 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 			}
 		}
 
-		var i int
+		wp := workerpool.New(100)
 		for _, token := range filtered {
-			i++
-			if i > 5 {
-				break
-			}
 			t := token
 			contract, err := contractRepo.GetByID(ctx, t.Contract)
 			if err != nil {
 				logger.For(ctx).WithError(err).Error("error getting contract")
 			}
-			key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-			err = processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("error processing token")
-			}
+			wp.Submit(func() {
+				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
+				err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+				if err != nil {
+					logger.For(ctx).WithError(err).Error("error processing token")
+				}
+			})
 		}
 
-		// XXX: wp := workerpool.New(100)
-		// XXX: wp := workerpool.New(13)
-		// XXX: for _, token := range filtered {
-		// XXX: 	t := token
-		// XXX: 	contract, err := contractRepo.GetByID(ctx, t.Contract)
-		// XXX: 	if err != nil {
-		// XXX: 		logger.For(ctx).WithError(err).Error("error getting contract")
-		// XXX: 	}
-		// XXX: 	wp.Submit(func() {
-		// XXX: 		key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-		// XXX: 		ctx := sentryutil.NewSentryHubContext(c)
-		// XXX: 		err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
-		// XXX: 		if err != nil {
-		// XXX: 			logger.For(ctx).WithError(err).Error("error processing token")
-		// XXX: 		}
-		// XXX: 	})
-		// XXX: }
-		// XXX:
-		// XXX: wp.StopWait()
+		wp.StopWait()
 		logger.For(ctx).Info("processing media finished")
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})

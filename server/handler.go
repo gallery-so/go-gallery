@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-contrib/pprof"
-
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/gorilla/websocket"
@@ -46,11 +44,6 @@ func handlersInit(router *gin.Engine, repos *persist.Repositories, queries *db.Q
 	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub)
 
 	router.GET("/alive", healthCheckHandler())
-
-	if viper.GetString("ENV") != "production" {
-		debugGroup := router.Group("/debug")
-		pprof.RouteRegister(debugGroup, "pprof")
-	}
 
 	return router
 }
