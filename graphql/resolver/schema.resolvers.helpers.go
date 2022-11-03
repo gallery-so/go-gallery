@@ -1030,7 +1030,6 @@ func eventToCollectionUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventD
 		Action:            &event.Action,
 		NewTokens:         nil, // handled by dedicated resolver
 		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
-		IsNewCollection:   util.BoolToPointer(event.Data.CollectionIsNew),
 		HelperCollectionUpdatedFeedEventDataData: model.HelperCollectionUpdatedFeedEventDataData{
 			FeedEventID: event.ID,
 		},
