@@ -234,9 +234,11 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 		var span *sentry.Span
 		var responseLocatorId string
 
+		oc := gqlgen.GetOperationContext(ctx)
+		operationName := getOperationName(oc)
+
 		if trace {
-			oc := gqlgen.GetOperationContext(ctx)
-			span, ctx = tracing.StartSpan(ctx, "gql.response", getOperationName(oc))
+			span, ctx = tracing.StartSpan(ctx, "gql.response", operationName)
 		}
 
 		response := next(ctx)
@@ -258,15 +260,11 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 			// Unique ID to make finding this particular log entry easy
 			responseLocatorId = ksuid.New().String()
 
-			gc := util.GinContextFromContext(ctx)
-			userId := auth.GetUserIDFromCtx(gc)
-
 			// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
 			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
 			// limit is 256kb per entry), we want to make sure all of our fields are visible.
 			logger.For(ctx).WithFields(logrus.Fields{
-				"authenticated":     userId != "",
-				"userId":            userId,
+				"operation":         operationName,
 				"gqlRequestId":      gqlRequestId,
 				"responseLocatorId": responseLocatorId,
 				"zzz_response":      responseData,
@@ -294,14 +292,13 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 
 		gc := util.GinContextFromContext(ctx)
 		oc := gqlgen.GetOperationContext(ctx)
+		operationName := getOperationName(oc)
 
 		if trace {
-			operationName := getOperationName(oc)
 			transactionName := fmt.Sprintf("%s %s (%s)", gc.Request.Method, gc.Request.URL.Path, operationName)
 			span, ctx = tracing.StartSpan(ctx, "gql.request", operationName, sentry.TransactionName(transactionName))
 		}
 
-		userId := auth.GetUserIDFromCtx(gc)
 		scrubbedQuery, scrubbedVariables := getScrubbedQuery(ctx, schema, oc.Doc, oc.RawQuery, oc.Variables)
 
 		if log {
@@ -316,8 +313,7 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
 			// limit is 256kb per entry), we want to make sure all of our fields are visible.
 			logger.For(ctx).WithFields(logrus.Fields{
-				"authenticated":     userId != "",
-				"userId":            userId,
+				"operation":         operationName,
 				"gqlRequestId":      gqlRequestId,
 				"requestLocatorId":  requestLocatorId,
 				"scrubbedVariables": scrubbedVariables,

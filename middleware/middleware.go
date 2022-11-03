@@ -135,7 +135,7 @@ func AddAuthToContext() gin.HandlerFunc {
 		// If we have a successfully authenticated user, add their ID to all subsequent logging
 		if err == nil {
 			loggerCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
-				"loggedInUserId": userID,
+				"authedUserId": userID,
 			})
 			c.Request = c.Request.WithContext(loggerCtx)
 		}
