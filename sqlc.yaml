@@ -137,3 +137,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.media_url"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.actions"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.ActionList"
+          - column: "*.collection_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"

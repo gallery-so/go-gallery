@@ -34,16 +34,6 @@ type Admire struct {
 	LastUpdated time.Time
 }
 
-type Backup struct {
-	ID          persist.DBID
-	Deleted     bool
-	Version     sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	GalleryID   persist.DBID
-	Gallery     pgtype.JSONB
-}
-
 type Collection struct {
 	ID             persist.DBID
 	Deleted        bool

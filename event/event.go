@@ -206,7 +206,7 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
 func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Event) (interface{}, error) {
-	return h.eventBuilder.NewEvent(ctx, persistedEvent)
+	return h.eventBuilder.NewFeedEventFromEvent(ctx, persistedEvent)
 }
 
 // notificationHandlers handles events for consumption as notifications.
