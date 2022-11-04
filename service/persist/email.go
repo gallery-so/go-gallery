@@ -71,6 +71,10 @@ func (e EmailVerificationStatus) String() string {
 	return emailVerificationStatuses[e]
 }
 
+func (e EmailVerificationStatus) IsVerified() bool {
+	return e == EmailVerificationStatusVerified || e == EmailVerificationStatusAdmin
+}
+
 func (e EmailVerificationStatus) MarshalGQL(w io.Writer) {
 	w.Write([]byte(fmt.Sprintf(`"%s"`, e.String())))
 }

@@ -534,7 +534,7 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 
 -- for some reason this query will not allow me to use @tags for $1
 -- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
--- name: GetUsersWithNotificationsOnForEmailType :many
+-- name: GetUsersWithEmailNotificationsOnForEmailType :many
 SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < (@cur_before_time, @cur_before_id)
     AND (created_at, id) > (@cur_after_time, @cur_after_id)
@@ -543,7 +543,7 @@ SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsu
     LIMIT $2;
 
 -- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
--- name: GetUsersWithNotificationsOn :many
+-- name: GetUsersWithEmailNotificationsOn :many
 SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < (@cur_before_time, @cur_before_id)
     AND (created_at, id) > (@cur_after_time, @cur_after_id)

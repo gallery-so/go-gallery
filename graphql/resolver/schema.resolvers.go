@@ -715,12 +715,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 		bioStr = *bio
 	}
 
-	emailStr := ""
-	if email != nil {
-		emailStr = *email
-	}
-
-	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, username, emailStr, bioStr)
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, username, email, bioStr)
 	if err != nil {
 		return nil, err
 	}

@@ -24,8 +24,6 @@ type VerifyEmailOutput struct {
 	Email  string       `json:"email"`
 }
 
-var errUserIDMismatch = fmt.Errorf("user ID mismatch")
-
 func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -45,6 +43,11 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 		user, err := queries.GetUserById(c, userID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		if user.EmailVerified.IsVerified() {
+			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email already verified"))
 			return
 		}
 

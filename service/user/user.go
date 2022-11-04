@@ -80,7 +80,7 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username, email, bio string, userRepo persist.UserRepository,
+func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *string, bio string, userRepo persist.UserRepository,
 	galleryRepo persist.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 

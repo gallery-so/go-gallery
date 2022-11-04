@@ -125,7 +125,7 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 	var lastCreatedAt time.Time
 	var endTime time.Time = time.Now().Add(24 * time.Hour)
 	for {
-		users, err := queries.GetUsersWithNotificationsOnForEmailType(ctx, coredb.GetUsersWithNotificationsOnForEmailTypeParams{
+		users, err := queries.GetUsersWithEmailNotificationsOnForEmailType(ctx, coredb.GetUsersWithEmailNotificationsOnForEmailTypeParams{
 			Limit:         emailsAtATime,
 			CurAfterTime:  lastCreatedAt,
 			CurBeforeTime: endTime,

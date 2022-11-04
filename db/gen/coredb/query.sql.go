@@ -2120,7 +2120,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 	return items, nil
 }
 
-const getUsersWithNotificationsOn = `-- name: GetUsersWithNotificationsOn :many
+const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
@@ -2129,7 +2129,7 @@ SELECT id, deleted, version, last_updated, created_at, username, username_idempo
     LIMIT $1
 `
 
-type GetUsersWithNotificationsOnParams struct {
+type GetUsersWithEmailNotificationsOnParams struct {
 	Limit         int32
 	CurBeforeTime time.Time
 	CurBeforeID   persist.DBID
@@ -2139,8 +2139,8 @@ type GetUsersWithNotificationsOnParams struct {
 }
 
 // verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
-func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersWithNotificationsOnParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getUsersWithNotificationsOn,
+func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetUsersWithEmailNotificationsOnParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOn,
 		arg.Limit,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
@@ -2182,7 +2182,7 @@ func (q *Queries) GetUsersWithNotificationsOn(ctx context.Context, arg GetUsersW
 	return items, nil
 }
 
-const getUsersWithNotificationsOnForEmailType = `-- name: GetUsersWithNotificationsOnForEmailType :many
+const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
@@ -2191,7 +2191,7 @@ SELECT id, deleted, version, last_updated, created_at, username, username_idempo
     LIMIT $2
 `
 
-type GetUsersWithNotificationsOnForEmailTypeParams struct {
+type GetUsersWithEmailNotificationsOnForEmailTypeParams struct {
 	Column1       string
 	Limit         int32
 	CurBeforeTime time.Time
@@ -2203,8 +2203,8 @@ type GetUsersWithNotificationsOnForEmailTypeParams struct {
 
 // for some reason this query will not allow me to use @tags for $1
 // verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
-func (q *Queries) GetUsersWithNotificationsOnForEmailType(ctx context.Context, arg GetUsersWithNotificationsOnForEmailTypeParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getUsersWithNotificationsOnForEmailType,
+func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Context, arg GetUsersWithEmailNotificationsOnForEmailTypeParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOnForEmailType,
 		arg.Column1,
 		arg.Limit,
 		arg.CurBeforeTime,

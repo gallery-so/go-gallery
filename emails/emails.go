@@ -89,11 +89,14 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		util.EnvVarMustExist("SENTRY_DSN", "")
 		util.EnvVarMustExist("VERSION", "")
+		util.EnvVarMustExist("SENDGRID_API_KEY", "")
+		util.EnvVarMustExist("JWT_SECRET", "")
+		util.EnvVarMustExist("FROM_EMAIL", "")
 	}
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleDB), time.Minute*5)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.EmailThrottleDB), time.Minute*5)
 }
 
 func initSentry() {
