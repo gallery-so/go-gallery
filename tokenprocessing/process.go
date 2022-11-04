@@ -168,7 +168,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	return nil
 }
 
-func processOwnersForContractTokens(mc *multichain.Provider, contractRepo postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
+func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingContractTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
