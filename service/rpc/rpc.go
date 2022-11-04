@@ -658,26 +658,50 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 }
 
 func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string) (io.ReadCloser, error) {
-	dataReader, err := ipfsClient.Cat(path)
-	if err != nil {
-		logger.For(pCtx).WithError(err).Errorf("error getting cat data from ipfs: %s", path)
+	// Either an io.ReadCloser or an error
+	responseCh := make(chan interface{})
 
+	// Via HTTP gateway
+	go func() {
 		url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
-
 		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 		if err != nil {
-			return nil, fmt.Errorf("error creating request: %s", err)
+			responseCh <- err
+			return
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("error getting data from http: %s", err)
+			responseCh <- err
+			return
 		}
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
+			responseCh <- ErrHTTP{Status: resp.StatusCode, URL: url}
 		}
-		return resp.Body, nil
+		responseCh <- resp.Body
+	}()
+
+	// Via IPFS cat
+	go func() {
+		if reader, err := ipfsClient.Cat(path); err != nil {
+			responseCh <- err
+		} else {
+			responseCh <- reader
+		}
+	}()
+
+	// Check if we can return the first reply
+	reply := <-responseCh
+	if result, ok := reply.(io.ReadCloser); ok {
+		return result, nil
 	}
-	return dataReader, nil
+
+	// Otherwise wait for the second reply
+	logger.For(pCtx).WithError(reply.(error)).Error("failed to fetch data from IPFS service, waiting for second")
+	reply = <-responseCh
+	if result, ok := reply.(io.ReadCloser); ok {
+		return result, nil
+	}
+	return nil, reply.(error)
 }
 
 func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {

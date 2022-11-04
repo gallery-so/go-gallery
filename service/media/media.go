@@ -158,7 +158,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res       persist.Media
 	)
 
-	if vidErr != nil {
+	if vidErr == nil {
 		mediaType = vidMediaType
 	} else {
 		mediaType = imgMediaType
@@ -201,7 +201,7 @@ func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, ar
 	errCh := make(chan error, 1)
 
 	go func() {
-		mediaType, err := downloadAndCache(ctx, imgURL, tokenObjectName, urlType, ipfsClient, arweaveClient, storageClient)
+		mediaType, err := downloadAndCache(context.Background(), imgURL, tokenObjectName, urlType, ipfsClient, arweaveClient, storageClient)
 		if err == nil {
 			mediaTypeCh <- mediaType
 			return

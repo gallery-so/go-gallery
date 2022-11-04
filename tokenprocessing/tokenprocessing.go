@@ -21,6 +21,7 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -48,7 +49,7 @@ func coreInitServer() *gin.Engine {
 		s = media.NewStorageClient(context.Background())
 	}
 
-	// XXX: http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
+	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
@@ -110,19 +111,17 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	// XXX: if viper.GetString("ENV") == "local" {
-	// XXX: 	logger.For(nil).Info("skipping sentry init")
-	// XXX: 	return
-	// XXX: }
+	if viper.GetString("ENV") == "local" {
+		logger.For(nil).Info("skipping sentry init")
+		return
+	}
 
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		// XXX: Dsn:         viper.GetString("SENTRY_DSN"),
-		Dsn:         "https://99bac248072f4f8187f9e98115e46229@o1135798.ingest.sentry.io/6771759",
-		Environment: viper.GetString("ENV"),
-		// XXX: TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
-		TracesSampleRate: 1,
+		Dsn:              viper.GetString("SENTRY_DSN"),
+		Environment:      viper.GetString("ENV"),
+		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
 		Release:          viper.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
