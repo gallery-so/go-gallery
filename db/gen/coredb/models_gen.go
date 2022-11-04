@@ -275,6 +275,7 @@ type Token struct {
 	Contract             persist.DBID
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
+	LastSynced           time.Time
 }
 
 type User struct {
