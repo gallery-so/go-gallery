@@ -150,7 +150,7 @@ type ComplexityRoot struct {
 		ID             func(childComplexity int) int
 		Layout         func(childComplexity int) int
 		Name           func(childComplexity int) int
-		Tokens         func(childComplexity int) int
+		Tokens         func(childComplexity int, limit *int) int
 		Version        func(childComplexity int) int
 	}
 
@@ -878,7 +878,7 @@ type AdmireFeedEventPayloadResolver interface {
 type CollectionResolver interface {
 	Gallery(ctx context.Context, obj *model.Collection) (*model.Gallery, error)
 
-	Tokens(ctx context.Context, obj *model.Collection) ([]*model.CollectionToken, error)
+	Tokens(ctx context.Context, obj *model.Collection, limit *int) ([]*model.CollectionToken, error)
 }
 type CollectionCreatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectionCreatedFeedEventData) (*model.GalleryUser, error)
@@ -1328,7 +1328,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Collection.Tokens(childComplexity), true
+		args, err := ec.field_Collection_tokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Collection.Tokens(childComplexity, args["limit"].(*int)), true
 
 	case "Collection.version":
 		if e.complexity.Collection.Version == nil {
@@ -4794,7 +4799,7 @@ type Collection implements Node {
     gallery: Gallery @goField(forceResolver: true)
     layout: CollectionLayout
     hidden: Boolean
-    tokens: [CollectionToken] @goField(forceResolver: true)
+    tokens(limit: Int): [CollectionToken] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
@@ -5770,6 +5775,21 @@ func (ec *executionContext) dir_restrictEnvironment_args(ctx context.Context, ra
 		}
 	}
 	args["allowed"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Collection_tokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg0, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg0
 	return args, nil
 }
 
@@ -8158,9 +8178,16 @@ func (ec *executionContext) _Collection_tokens(ctx context.Context, field graphq
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Collection_tokens_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Collection().Tokens(rctx, obj)
+		return ec.resolvers.Collection().Tokens(rctx, obj, args["limit"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

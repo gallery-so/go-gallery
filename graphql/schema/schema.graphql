@@ -344,7 +344,7 @@ type Collection implements Node {
     gallery: Gallery @goField(forceResolver: true)
     layout: CollectionLayout
     hidden: Boolean
-    tokens: [CollectionToken] @goField(forceResolver: true)
+    tokens(limit: Int): [CollectionToken] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {

@@ -43,8 +43,8 @@ func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection)
 	return galleryToModel(ctx, *gallery), nil
 }
 
-func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection) ([]*model.CollectionToken, error) {
-	tokens, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, obj.Dbid)
+func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection, limit *int) ([]*model.CollectionToken, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, obj.Dbid, limit)
 
 	if err != nil {
 		return nil, err
