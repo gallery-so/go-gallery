@@ -1,0 +1,9 @@
+{
+  "seed_phrase": "wide ill hood laundry genre soldier analyst always faith project eyebrow today",
+  "wallet_1": "0x6c96da184a426d381e2fcc3bf22f50dd079340c0",
+  "pk_1": "8847ef30721052d7c49fc6190a736022839daae999a0173d5151f27b7109ee8a",
+  "wallet_2": "0xe3e5549daa5ea2c1d451f352c63b13cb3920366f",
+  "pk_2": "ad3dc99f1af390345f493f3dcf65aa8087194994dd79718b06d8c07cfc3d691d",
+  "automated_test_wallet": "0xfddf7e6cb20f7fc160cf12d170a808535b0ccb36",
+  "pk_automated_test_wallet": "1994c45ce5f63efd600eb26583e177affdc14b367e0d7088e3f21bad5bcae49f"
+}
