@@ -378,9 +378,6 @@ func (t *TokenGalleryRepository) deleteZeroQuantityTokens(pCtx context.Context, 
 	for _, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
 			logger.For(pCtx).Warnf("Token %s has 0 quantity", token.Name)
-			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.Contract, token.OwnerUserID, token.Chain); err != nil {
-				return nil, err
-			}
 			continue
 		}
 		newTokens = append(newTokens, token)
