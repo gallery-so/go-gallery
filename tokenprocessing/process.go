@@ -3,6 +3,7 @@ package tokenprocessing
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"net/http"
 	"time"
 
@@ -29,7 +30,7 @@ type ProcessMediaForTokenInput struct {
 	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
 }
 
-func processMediaForUsersTokensOfChain(tokenRepo postgres.TokenGalleryRepository, contractRepo postgres.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -76,7 +77,7 @@ func processMediaForUsersTokensOfChain(tokenRepo postgres.TokenGalleryRepository
 	}
 }
 
-func processMediaForToken(tokenRepo postgres.TokenGalleryRepository, userRepo postgres.UserRepository, walletRepo postgres.WalletRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaForTokenInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -118,7 +119,7 @@ func processMediaForToken(tokenRepo postgres.TokenGalleryRepository, userRepo po
 	}
 }
 
-func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
 	totalTime := time.Now()
 	ctx, cancel := context.WithTimeout(c, time.Minute*10)
 	defer cancel()
