@@ -412,57 +412,43 @@ func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schem
 	}
 
 	definition := schema.Types[namedType]
-	scrubField := false
+	scrubFieldContents := false
 
 	for _, directive := range definition.Directives {
 		if directive.Name == scrubDirectiveName {
-			scrubField = true
+			scrubFieldContents = true
 			break
 		}
 	}
 
-	if scrubField {
+	if scrubFieldContents {
 		scrubbedOutput[variableDefinition.Variable] = scrubText
 	}
 
 	if definition == nil || len(definition.Fields) == 0 {
-		if !scrubField {
+		if !scrubFieldContents {
 			scrubbedOutput[variableDefinition.Variable] = allQueryVariables[variableDefinition.Variable]
 		}
 		return
 	}
 
-	outputForDefinition := make(map[string]interface{})
-	if !scrubField {
-		scrubbedOutput[variableDefinition.Variable] = outputForDefinition
-	}
-
-	varsInterface := allQueryVariables[variableDefinition.Variable]
-	varsForDefinition, ok := varsInterface.(map[string]interface{})
-	if !ok {
-		if varsInterface != nil {
-			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
-		}
-		return
-	}
-
-	for _, field := range definition.Fields {
-		scrubVariableField(schema, field, varsForDefinition, outputForDefinition)
+	if !scrubFieldContents {
+		scrubVariableChildFields(schema, definition, allQueryVariables[variableDefinition.Variable], scrubbedOutput, variableDefinition.Variable)
 	}
 }
 
 func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variables map[string]interface{}, scrubbedOutput map[string]interface{}) {
-	scrubField := false
+	scrubFieldContents := false
 	fieldValue, hasField := variables[field.Name]
 
 	for _, directive := range field.Directives {
 		if directive.Name == scrubDirectiveName {
-			scrubField = true
+			scrubFieldContents = true
 			break
 		}
 	}
 
-	if hasField && scrubField {
+	if hasField && scrubFieldContents {
 		scrubbedOutput[field.Name] = scrubText
 	}
 
@@ -474,30 +460,63 @@ func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variable
 	definition := schema.Types[namedType]
 
 	if definition == nil || len(definition.Fields) == 0 {
-		if hasField && !scrubField {
+		if hasField && !scrubFieldContents {
 			scrubbedOutput[field.Name] = fieldValue
 		}
 		return
 	}
 
-	outputForDefinition := make(map[string]interface{})
-
-	if hasField && !scrubField {
-		scrubbedOutput[field.Name] = outputForDefinition
+	if hasField && !scrubFieldContents {
+		scrubVariableChildFields(schema, definition, variables[field.Name], scrubbedOutput, field.Name)
 	}
+}
 
-	varsInterface := variables[field.Name]
-	varsForDefinition, ok := varsInterface.(map[string]interface{})
-	if !ok {
-		if varsInterface != nil {
-			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+func scrubVariableChildFields(schema *ast.Schema, definition *ast.Definition, varsInterface interface{}, scrubbedOutput map[string]interface{}, fieldName string) {
+	if varsForDefinition, ok := varsInterface.(map[string]interface{}); ok {
+		outputForDefinition := make(map[string]interface{})
+
+		for _, childField := range definition.Fields {
+			scrubVariableField(schema, childField, varsForDefinition, outputForDefinition)
 		}
+
+		scrubbedOutput[fieldName] = outputForDefinition
 		return
 	}
 
-	for _, childField := range definition.Fields {
-		scrubVariableField(schema, childField, varsForDefinition, outputForDefinition)
+	if varsForDefinition, ok := varsInterface.([]interface{}); ok {
+		scrubbedOutput[fieldName] = scrubVariableSlice(schema, definition, varsForDefinition)
+		return
 	}
+
+	if varsInterface != nil {
+		logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to usable type", varsInterface)
+	}
+}
+
+func scrubVariableSlice(schema *ast.Schema, definition *ast.Definition, varsForDefinition []interface{}) []interface{} {
+	outputForDefinition := make([]interface{}, 0, len(varsForDefinition))
+
+	for _, entry := range varsForDefinition {
+		if asSlice, ok := entry.([]interface{}); ok {
+			outputForDefinition = append(outputForDefinition, scrubVariableSlice(schema, definition, asSlice))
+			continue
+		}
+
+		if asMap, ok := entry.(map[string]interface{}); ok {
+			outputForEntry := make(map[string]interface{})
+			outputForDefinition = append(outputForDefinition, outputForEntry)
+			for _, childField := range definition.Fields {
+				scrubVariableField(schema, childField, asMap, outputForEntry)
+			}
+			continue
+		}
+
+		if entry != nil {
+			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to usable type", entry)
+		}
+	}
+
+	return outputForDefinition
 }
 
 func scrubChildren(value *ast.Value, schema *ast.Schema, positions map[int]*ast.Position) {
