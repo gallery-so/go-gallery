@@ -3,6 +3,7 @@ package tokenprocessing
 import (
 	"context"
 	"database/sql"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"net/http"
 	"time"
 
@@ -40,7 +41,7 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	repos := newRepos(postgres.NewClient())
+	repos := newRepos(postgres.NewClient(), postgres.NewPgxClient())
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
 		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
@@ -154,24 +155,21 @@ func initLogger() {
 	})
 }
 
-func newRepos(db *sql.DB) *postgres.Repositories {
-	galleriesCacheToken := redis.NewCache(1)
-	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
+func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
+	queries := coredb.New(pgx)
 
 	return &postgres.Repositories{
-		UserRepository:        postgres.NewUserRepository(db),
-		NonceRepository:       postgres.NewNonceRepository(db),
-		LoginRepository:       postgres.NewLoginRepository(db),
-		TokenRepository:       postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
-		GalleryRepository:     galleryTokenRepo,
-		ContractRepository:    postgres.NewContractGalleryRepository(db),
-		BackupRepository:      postgres.NewBackupRepository(db),
-		MembershipRepository:  postgres.NewMembershipRepository(db),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
-		WalletRepository:      postgres.NewWalletRepository(db),
-		AdmireRepository:      postgres.NewAdmireRepository(db),
-		CommentRepository:     postgres.NewCommentRepository(db),
+		UserRepository:        postgres.NewUserRepository(pq, queries),
+		NonceRepository:       postgres.NewNonceRepository(pq, queries),
+		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
+		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
+		GalleryRepository:     postgres.NewGalleryRepository(queries),
+		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
+		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
+		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
+		WalletRepository:      postgres.NewWalletRepository(pq, queries),
+		AdmireRepository:      postgres.NewAdmireRepository(queries),
+		CommentRepository:     postgres.NewCommentRepository(pq, queries),
 	}
 }
 
