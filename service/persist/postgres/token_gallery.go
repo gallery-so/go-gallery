@@ -257,16 +257,6 @@ func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID per
 	return tokens, nil
 }
 
-// BulkUpsert upserts multiple tokens
-func (t *TokenGalleryRepository) BulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery) error {
-	_, err := t.bulkUpsert(pCtx, pTokens)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // BulkUpsertByOwnerUserID upserts multiple tokens for a user and removes any tokens that are not in the list
 func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery) error {
 	now, err := t.bulkUpsert(pCtx, pTokens)
