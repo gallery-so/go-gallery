@@ -1,6 +1,0 @@
-# Environment variables for local dev environments
-
-RPC_URL: "https://eth-mainnet.g.alchemy.com/v2/AVV1MSY4uVGx6xYPjPFEjQna6l6WG9Na"
-IMGIX_API_KEY: "ak_f5cdacff6cf39c68922738ca6cf9bb23f3283faf92214b1f9b6eaa17d30141c1"
-IPFS_PROJECT_ID: "2BabvpcPhP9Rn2zayTSIy4nBHn5"
-IPFS_PROJECT_SECRET: "a13d2fe4ce978921c611035420efc467"
