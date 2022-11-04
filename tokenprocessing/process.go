@@ -62,19 +62,19 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 			t := token
 			contract, err := contractRepo.GetByID(ctx, t.Contract)
 			if err != nil {
-				logger.For(ctx).WithError(err).Error("error getting contract")
+				logger.For(ctx).Errorf("Error getting contract: %s", err)
 			}
 			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
 				err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
 				if err != nil {
-					logger.For(ctx).WithError(err).Error("error processing token")
+					logger.For(c).Errorf("Error processing token: %s", err)
 				}
 			})
 		}
 
 		wp.StopWait()
-		logger.For(ctx).Info("processing media finished")
+		logger.For(ctx).Infof("Processing Media: %s - Finished", input.UserID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
@@ -132,7 +132,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	logger.For(ctx).Infof("processing media")
+	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", key, contractAddress, t.TokenID, t.Chain)
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
 	name, description := media.FindNameAndDescription(ctx, t.TokenMetadata)
@@ -148,12 +148,12 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	totalTimeOfMedia := time.Now()
 	med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
-		logger.For(ctx).WithError(err).Error("error processing media")
+		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
 		med = persist.Media{
 			MediaType: persist.MediaTypeUnknown,
 		}
 	}
-	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
+	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTimeOfMedia))
 
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
 		Media:       med,
@@ -164,14 +164,15 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		LastUpdated: persist.LastUpdatedTime{},
 	}
 	totalUpdateTime := time.Now()
-	logger.For(ctx).Infof("updating token in db")
+	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
 	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
-		logger.For(ctx).WithError(err).Errorf("error updating media")
+		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
 		return err
 	}
 
-	logger.For(ctx).Infof("db update took %s", time.Since(totalUpdateTime))
-	logger.For(ctx).Infof("total time took %s", time.Since(totalTime))
+	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
+
+	logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTime))
 	return nil
 }
 
@@ -197,12 +198,12 @@ func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persis
 		}
 
 		// do not unlock, let expiry handle the unlock
-		logger.For(c).Infof("processing collection refresh: %s", key)
+		logger.For(c).Infof("Processing: %s - Processing Collection Refresh", key)
 		if err := mc.RefreshTokensForContract(c, contract.ContractIdentifiers()); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		logger.For(c).Infof("finished collection refresh: %s", key)
+		logger.For(c).Infof("Processing: %s - Finished Processing Collection Refresh", key)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}

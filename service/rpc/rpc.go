@@ -692,6 +692,15 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 	// Check if we can return the first reply
 	reply := <-responseCh
 	if result, ok := reply.(io.ReadCloser); ok {
+
+		// Close the second reply if we get one
+		go func() {
+			reply = <-responseCh
+			if result, ok := reply.(io.ReadCloser); ok {
+				result.Close()
+			}
+		}()
+
 		return result, nil
 	}
 
@@ -705,37 +714,13 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 }
 
 func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]byte, error) {
-	dataReader, err := ipfsClient.Cat(path)
+	response, err := GetIPFSResponse(pCtx, ipfsClient, path)
 	if err != nil {
-		logger.For(pCtx).WithError(err).Warnf("error getting cat data from ipfs: %s", path)
-
-		url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
-
-		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
-		if err != nil {
-			return nil, fmt.Errorf("error creating request: %s", err)
-		}
-		resp, err := defaultHTTPClient.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("error getting data from http: %s", err)
-		}
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
-		}
-		defer resp.Body.Close()
-
-		buf := &bytes.Buffer{}
-		err = util.CopyMax(buf, resp.Body, 1024*1024*1024)
-		if err != nil {
-			return nil, err
-		}
-
-		return buf.Bytes(), nil
+		return nil, err
 	}
-	defer dataReader.Close()
+	defer response.Close()
 	buf := &bytes.Buffer{}
-	err = util.CopyMax(buf, dataReader, 1024*1024*1024)
-	if err != nil {
+	if err := util.CopyMax(buf, response, 1024*1024*1024); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
