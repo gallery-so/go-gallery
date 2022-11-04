@@ -1,4 +1,4 @@
-/** @xstate-layout N4IgpgJg5mDOIC5QFEC2BDAlgGwAQDUwAnTAM0wGN0AXTAewDsA6AVQYDdizNIBiAYSJgaYXC1jFcAdUzUAFrjRZsAGkUYcBLuSq1GuADKYGAa0UAPAA6YhEANoAGALqJQlurFn0GrkOcQAjADsDkwATAAcAJwOQXEArBFB0Q4AbCogAJ6IEQDMAL75GUqahCQ6NN6sHNo8EAJCImISRNKyCiWqWuWUlfpGpgTo2Jj2zr7unno+SH6BIeEpcUGJyTHpWYEALAWFGQx0EHC+nd3culVsnD2QEx5ejL7+CFthGdkIMUwBqb9--78gnsQKcyuc+swAGLKW6zSYPGagZ6pAIBJhbVIOKLxMIrJLRALvHK5JjxYGg2oXRhMMHkWFue7TJ6IFFojFYnF4taEzYIAI7UnkjR4Wm9JlwxneZkIAC0Gw+csKhSAA */
+/** @xstate-layout N4IgpgJg5mDOIC5QFEC2BDAlgGwAQDUwAnTAM0wGN0AXTAewDsA6AVQYDdizNIBiAYSJgaYXC1jFcAdUzUAFrjRZsAGkUYcBLuSq1GuADKYGAa0UAPAA6YhEANoAGALqJQlurFn0GrkOcQAjABsAMxMDg4ArACcDiEBkQ4ATAEALJFJKiAAnoghQUyRiQDs0RlB0aWpCQC+NVlKmoQkOjTerBzaPBACQiJiEkTSsgqNqlotlG36RqYE6NiY9s6+7p56Pkh+gcUOTEHFqcXx0RUAHCGXxVm5CAlJ+6VJZ2dHxQHR1Ul1DRp4zdxdO0AGLKPgsSwQfpgP6OFxbNZeRi+fwIS4FaIhIqREJnIKpM6lM43RAAWkuTBS6VSSWKQRxF1SPxAYwmgOmzAB5HBkP6Yzhqw8SM2oFRkVehRK0U+NIclUyOUQSRS4Xe0Vp8UiqQcAQCITq9RADDoEDgvlZXKmGw6nEmkEF628KMQNJJCFiTGCQW9Pt9B2ZFq6QMYTFBOHtCKFG2dCCCuqYqSCcoyxXFxTO0QCbouhQDfzZrWtlojbijTq2qLjAQTSbKtLTGaziruqTCkTzygLVvLpcdyIrZKCbtJAWVlLSGTKkVTDm17YNQA */
 createMachine({
   context: {},
   schema: {
@@ -22,7 +22,19 @@ createMachine({
         },
       },
     },
-    Failed: {},
-    Verified: {},
+    Failed: {
+      on: {
+        "Update email": {
+          target: "Unverified",
+        },
+      },
+    },
+    Verified: {
+      on: {
+        "Update Email": {
+          target: "Unverified",
+        },
+      },
+    },
   },
 });
