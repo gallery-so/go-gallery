@@ -96,7 +96,7 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("mediaprocessing")
+		envFile := util.ResolveEnvFile("tokenprocessing")
 		util.LoadEnvFile(envFile)
 	}
 
