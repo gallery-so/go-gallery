@@ -271,6 +271,11 @@ func (n NullBool) Bool() bool {
 	return bool(n)
 }
 
+func (n NullBool) BoolPointer() *bool {
+	res := bool(n)
+	return &res
+}
+
 func (n NullBool) String() string {
 	return fmt.Sprint(n.Bool())
 }

@@ -275,6 +275,10 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
+	EmailNotificationSettings struct {
+		UnsubscribedFromAll func(childComplexity int) int
+	}
+
 	ErrAddressOwnedByUser struct {
 		Message func(childComplexity int) int
 	}
@@ -520,7 +524,7 @@ type ComplexityRoot struct {
 		ClearAllNotifications      func(childComplexity int) int
 		CommentOnFeedEvent         func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
 		CreateCollection           func(childComplexity int, input model.CreateCollectionInput) int
-		CreateUser                 func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string) int
+		CreateUser                 func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string, email *string) int
 		DeepRefresh                func(childComplexity int, input model.DeepRefreshInput) int
 		DeleteCollection           func(childComplexity int, collectionID persist.DBID) int
 		FollowUser                 func(childComplexity int, userID persist.DBID) int
@@ -539,10 +543,12 @@ type ComplexityRoot struct {
 		UpdateCollectionHidden     func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo       func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionTokens     func(childComplexity int, input model.UpdateCollectionTokensInput) int
+		UpdateEmail                func(childComplexity int, input model.UpdateEmailInput) int
 		UpdateGalleryCollections   func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
 		UpdateNotificationSettings func(childComplexity int, settings *model.NotificationSettingsInput) int
 		UpdateTokenInfo            func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserInfo             func(childComplexity int, input model.UpdateUserInfoInput) int
+		VerifyEmail                func(childComplexity int, token string) int
 		ViewGallery                func(childComplexity int, galleryID persist.DBID) int
 	}
 
@@ -556,7 +562,6 @@ type ComplexityRoot struct {
 		SomeoneCommentedOnYourUpdate func(childComplexity int) int
 		SomeoneFollowedYou           func(childComplexity int) int
 		SomeoneViewedYourGallery     func(childComplexity int) int
-		User                         func(childComplexity int) int
 	}
 
 	NotificationsConnection struct {
@@ -803,6 +808,10 @@ type ComplexityRoot struct {
 		FeedEvent  func(childComplexity int) int
 	}
 
+	UpdateEmailPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	UpdateGalleryCollectionsPayload struct {
 		Gallery func(childComplexity int) int
 	}
@@ -821,11 +830,21 @@ type ComplexityRoot struct {
 		Owner     func(childComplexity int) int
 	}
 
+	UserEmail struct {
+		Email                     func(childComplexity int) int
+		EmailNotificationSettings func(childComplexity int) int
+		VerificationStatus        func(childComplexity int) int
+	}
+
 	UserFollowedUsersFeedEventData struct {
 		Action    func(childComplexity int) int
 		EventTime func(childComplexity int) int
 		Followed  func(childComplexity int) int
 		Owner     func(childComplexity int) int
+	}
+
+	VerifyEmailPayload struct {
+		Email func(childComplexity int) int
 	}
 
 	VideoMedia struct {
@@ -847,6 +866,7 @@ type ComplexityRoot struct {
 	}
 
 	Viewer struct {
+		Email                func(childComplexity int) int
 		Feed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
 		NotificationSettings func(childComplexity int) int
 		Notifications        func(childComplexity int, before *string, after *string, first *int, last *int) int
@@ -970,7 +990,8 @@ type MutationResolver interface {
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
 	DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
-	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string) (model.CreateUserPayloadOrError, error)
+	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string, email *string) (model.CreateUserPayloadOrError, error)
+	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
@@ -982,6 +1003,7 @@ type MutationResolver interface {
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
 	ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error)
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
+	VerifyEmail(ctx context.Context, token string) (model.VerifyEmailPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -1068,6 +1090,7 @@ type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
 	Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
+	Email(ctx context.Context, obj *model.Viewer) (*model.UserEmail, error)
 	Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error)
 	NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error)
 }
@@ -1862,6 +1885,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.DeleteCollectionPayload.Gallery(childComplexity), true
+
+	case "EmailNotificationSettings.unsubscribedFromAll":
+		if e.complexity.EmailNotificationSettings.UnsubscribedFromAll == nil {
+			break
+		}
+
+		return e.complexity.EmailNotificationSettings.UnsubscribedFromAll(childComplexity), true
 
 	case "ErrAddressOwnedByUser.message":
 		if e.complexity.ErrAddressOwnedByUser.Message == nil {
@@ -2723,7 +2753,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string)), true
+		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string), args["email"].(*string)), true
 
 	case "Mutation.deepRefresh":
 		if e.complexity.Mutation.DeepRefresh == nil {
@@ -2936,6 +2966,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateCollectionTokens(childComplexity, args["input"].(model.UpdateCollectionTokensInput)), true
 
+	case "Mutation.updateEmail":
+		if e.complexity.Mutation.UpdateEmail == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateEmail_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateEmail(childComplexity, args["input"].(model.UpdateEmailInput)), true
+
 	case "Mutation.updateGalleryCollections":
 		if e.complexity.Mutation.UpdateGalleryCollections == nil {
 			break
@@ -2983,6 +3025,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateUserInfo(childComplexity, args["input"].(model.UpdateUserInfoInput)), true
+
+	case "Mutation.verifyEmail":
+		if e.complexity.Mutation.VerifyEmail == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyEmail_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyEmail(childComplexity, args["token"].(string)), true
 
 	case "Mutation.viewGallery":
 		if e.complexity.Mutation.ViewGallery == nil {
@@ -3037,13 +3091,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.NotificationSettings.SomeoneViewedYourGallery(childComplexity), true
-
-	case "NotificationSettings.user":
-		if e.complexity.NotificationSettings.User == nil {
-			break
-		}
-
-		return e.complexity.NotificationSettings.User(childComplexity), true
 
 	case "NotificationsConnection.edges":
 		if e.complexity.NotificationsConnection.Edges == nil {
@@ -4145,6 +4192,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateCollectionTokensPayload.FeedEvent(childComplexity), true
 
+	case "UpdateEmailPayload.viewer":
+		if e.complexity.UpdateEmailPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UpdateEmailPayload.Viewer(childComplexity), true
+
 	case "UpdateGalleryCollectionsPayload.gallery":
 		if e.complexity.UpdateGalleryCollectionsPayload.Gallery == nil {
 			break
@@ -4187,6 +4241,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserCreatedFeedEventData.Owner(childComplexity), true
 
+	case "UserEmail.email":
+		if e.complexity.UserEmail.Email == nil {
+			break
+		}
+
+		return e.complexity.UserEmail.Email(childComplexity), true
+
+	case "UserEmail.emailNotificationSettings":
+		if e.complexity.UserEmail.EmailNotificationSettings == nil {
+			break
+		}
+
+		return e.complexity.UserEmail.EmailNotificationSettings(childComplexity), true
+
+	case "UserEmail.verificationStatus":
+		if e.complexity.UserEmail.VerificationStatus == nil {
+			break
+		}
+
+		return e.complexity.UserEmail.VerificationStatus(childComplexity), true
+
 	case "UserFollowedUsersFeedEventData.action":
 		if e.complexity.UserFollowedUsersFeedEventData.Action == nil {
 			break
@@ -4214,6 +4289,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.UserFollowedUsersFeedEventData.Owner(childComplexity), true
+
+	case "VerifyEmailPayload.email":
+		if e.complexity.VerifyEmailPayload.Email == nil {
+			break
+		}
+
+		return e.complexity.VerifyEmailPayload.Email(childComplexity), true
 
 	case "VideoMedia.contentRenderURLs":
 		if e.complexity.VideoMedia.ContentRenderURLs == nil {
@@ -4277,6 +4359,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ViewGalleryPayload.Gallery(childComplexity), true
+
+	case "Viewer.email":
+		if e.complexity.Viewer.Email == nil {
+			break
+		}
+
+		return e.complexity.Viewer.Email(childComplexity), true
 
 	case "Viewer.feed":
 		if e.complexity.Viewer.Feed == nil {
@@ -4901,34 +4990,57 @@ type NotificationsConnection @goEmbedHelper {
 }
 
 type Viewer {
-    user: GalleryUser @goField(forceResolver: true)
-    viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
+  user: GalleryUser @goField(forceResolver: true)
+  viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+  feed(before: String, after: String, first: Int, last: Int): FeedConnection
+    @goField(forceResolver: true)
 
-    """
-    Returns a list of notifications in reverse chronological order.
-    Seen notifications come after unseen notifications
-    """
-    notifications(before: String, after: String, first: Int, last: Int): NotificationsConnection @goField(forceResolver: true)
+  email: UserEmail @goField(forceResolver: true)
+  """
+  Returns a list of notifications in reverse chronological order.
+  Seen notifications come after unseen notifications
+  """
+  notifications(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): NotificationsConnection @goField(forceResolver: true)
 
-    notificationSettings: NotificationSettings @goField(forceResolver: true)
+  notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
 
-type NotificationSettings @goEmbedHelper {
-    user: GalleryUser
-
-    someoneFollowedYou: Boolean
-    someoneAdmiredYourUpdate: Boolean
-    someoneCommentedOnYourUpdate: Boolean
-    someoneViewedYourGallery: Boolean
+type NotificationSettings {
+  someoneFollowedYou: Boolean
+  someoneAdmiredYourUpdate: Boolean
+  someoneCommentedOnYourUpdate: Boolean
+  someoneViewedYourGallery: Boolean
 }
 
 input NotificationSettingsInput {
-    someoneFollowedYou: Boolean
-    someoneAdmiredYourUpdate: Boolean
-    someoneCommentedOnYourUpdate: Boolean
-    someoneViewedYourGallery: Boolean
+  someoneFollowedYou: Boolean
+  someoneAdmiredYourUpdate: Boolean
+  someoneCommentedOnYourUpdate: Boolean
+  someoneViewedYourGallery: Boolean
 }
+
+enum EmailVerificationStatus {
+    Unverified
+    Verified
+    Failed
+    Admin
+}
+
+type UserEmail {
+    email: String
+    verificationStatus: EmailVerificationStatus
+    emailNotificationSettings: EmailNotificationSettings
+}
+
+type EmailNotificationSettings {
+    unsubscribedFromAll: Boolean
+}
+
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -5705,6 +5817,26 @@ union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
 
+type VerifyEmailPayload {
+    email: String
+}
+
+union VerifyEmailPayloadOrError =
+    VerifyEmailPayload
+    | ErrInvalidInput
+
+input UpdateEmailInput {
+    email: String!
+}
+
+type UpdateEmailPayload {
+    viewer: Viewer
+}
+
+union UpdateEmailPayloadOrError =
+    UpdateEmailPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -5733,7 +5865,8 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!, bio:String): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: String): CreateUserPayloadOrError
+    updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
@@ -5749,6 +5882,8 @@ type Mutation {
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
+
+    verifyEmail(token: String!): VerifyEmailPayloadOrError
 }
 
 type Subscription {
@@ -6204,6 +6339,15 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 		}
 	}
 	args["bio"] = arg2
+	var arg3 *string
+	if tmp, ok := rawArgs["email"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+		arg3, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["email"] = arg3
 	return args, nil
 }
 
@@ -6471,6 +6615,21 @@ func (ec *executionContext) field_Mutation_updateCollectionTokens_args(ctx conte
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_updateEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateEmailInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateGalleryCollections_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -6528,6 +6687,21 @@ func (ec *executionContext) field_Mutation_updateUserInfo_args(ctx context.Conte
 		}
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["token"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["token"] = arg0
 	return args, nil
 }
 
@@ -10570,6 +10744,38 @@ func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context
 	res := resTmp.(*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromAll(ctx context.Context, field graphql.CollectedField, obj *model.EmailNotificationSettings) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "EmailNotificationSettings",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UnsubscribedFromAll, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrAddressOwnedByUser_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAddressOwnedByUser) (ret graphql.Marshaler) {
@@ -15177,7 +15383,7 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string))
+		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string), args["email"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15189,6 +15395,65 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	res := resTmp.(model.CreateUserPayloadOrError)
 	fc.Result = res
 	return ec.marshalOCreateUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateEmail_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateEmail(rctx, args["input"].(model.UpdateEmailInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateEmailPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateEmailPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateEmailPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -15746,6 +16011,45 @@ func (ec *executionContext) _Mutation_updateNotificationSettings(ctx context.Con
 	return ec.marshalONotificationSettings2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNotificationSettings(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_verifyEmail_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().VerifyEmail(rctx, args["token"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.VerifyEmailPayloadOrError)
+	fc.Result = res
+	return ec.marshalOVerifyEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -15808,38 +16112,6 @@ func (ec *executionContext) _NotificationEdge_cursor(ctx context.Context, field 
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _NotificationSettings_user(ctx context.Context, field graphql.CollectedField, obj *model.NotificationSettings) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "NotificationSettings",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.GalleryUser)
-	fc.Result = res
-	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _NotificationSettings_someoneFollowedYou(ctx context.Context, field graphql.CollectedField, obj *model.NotificationSettings) (ret graphql.Marshaler) {
@@ -20897,6 +21169,38 @@ func (ec *executionContext) _UpdateCollectionTokensPayload_feedEvent(ctx context
 	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UpdateEmailPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateEmailPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateEmailPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UpdateGalleryCollectionsPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.UpdateGalleryCollectionsPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -21089,6 +21393,102 @@ func (ec *executionContext) _UserCreatedFeedEventData_action(ctx context.Context
 	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UserEmail_email(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UserEmail",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Email, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UserEmail_verificationStatus(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UserEmail",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.VerificationStatus, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.EmailVerificationStatus)
+	fc.Result = res
+	return ec.marshalOEmailVerificationStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmailVerificationStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UserEmail_emailNotificationSettings(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UserEmail",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EmailNotificationSettings, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.EmailNotificationSettings)
+	fc.Result = res
+	return ec.marshalOEmailNotificationSettings2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEmailNotificationSettings(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UserFollowedUsersFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.UserFollowedUsersFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -21215,6 +21615,38 @@ func (ec *executionContext) _UserFollowedUsersFeedEventData_followed(ctx context
 	res := resTmp.([]*model.FollowInfo)
 	fc.Result = res
 	return ec.marshalOFollowInfo2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _VerifyEmailPayload_email(ctx context.Context, field graphql.CollectedField, obj *model.VerifyEmailPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "VerifyEmailPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Email, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _VideoMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
@@ -21606,6 +22038,38 @@ func (ec *executionContext) _Viewer_feed(ctx context.Context, field graphql.Coll
 	res := resTmp.(*model.FeedConnection)
 	fc.Result = res
 	return ec.marshalOFeedConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Viewer_email(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Viewer().Email(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.UserEmail)
+	fc.Result = res
+	return ec.marshalOUserEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserEmail(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Viewer_notifications(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
@@ -23793,6 +24257,29 @@ func (ec *executionContext) unmarshalInputUpdateCollectionTokensInput(ctx contex
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUpdateEmailInput(ctx context.Context, obj interface{}) (model.UpdateEmailInput, error) {
+	var it model.UpdateEmailInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "email":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			it.Email, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx context.Context, obj interface{}) (model.UpdateGalleryCollectionsInput, error) {
 	var it model.UpdateGalleryCollectionsInput
 	asMap := map[string]interface{}{}
@@ -25515,6 +26002,29 @@ func (ec *executionContext) _UpdateCollectionTokensPayloadOrError(ctx context.Co
 	}
 }
 
+func (ec *executionContext) _UpdateEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateEmailPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateEmailPayload:
+		return ec._UpdateEmailPayload(ctx, sel, &obj)
+	case *model.UpdateEmailPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateEmailPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UpdateGalleryCollectionsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateGalleryCollectionsPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -25690,6 +26200,29 @@ func (ec *executionContext) _UserByUsernameOrError(ctx context.Context, sel ast.
 			return graphql.Null
 		}
 		return ec._ErrUserNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _VerifyEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.VerifyEmailPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.VerifyEmailPayload:
+		return ec._VerifyEmailPayload(ctx, sel, &obj)
+	case *model.VerifyEmailPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._VerifyEmailPayload(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -27344,6 +27877,34 @@ func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel as
 	return out
 }
 
+var emailNotificationSettingsImplementors = []string{"EmailNotificationSettings"}
+
+func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel ast.SelectionSet, obj *model.EmailNotificationSettings) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, emailNotificationSettingsImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("EmailNotificationSettings")
+		case "unsubscribedFromAll":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._EmailNotificationSettings_unsubscribedFromAll(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error"}
 
 func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressOwnedByUser) graphql.Marshaler {
@@ -27623,7 +28184,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "UpdateEmailPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -29444,6 +30005,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "updateEmail":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateEmail(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "login":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_login(ctx, field)
@@ -29521,6 +30089,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "verifyEmail":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyEmail(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -29577,13 +30152,6 @@ func (ec *executionContext) _NotificationSettings(ctx context.Context, sel ast.S
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("NotificationSettings")
-		case "user":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._NotificationSettings_user(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
 		case "someoneFollowedYou":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._NotificationSettings_someoneFollowedYou(ctx, field, obj)
@@ -31826,6 +32394,34 @@ func (ec *executionContext) _UpdateCollectionTokensPayload(ctx context.Context, 
 	return out
 }
 
+var updateEmailPayloadImplementors = []string{"UpdateEmailPayload", "UpdateEmailPayloadOrError"}
+
+func (ec *executionContext) _UpdateEmailPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateEmailPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateEmailPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateEmailPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateEmailPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var updateGalleryCollectionsPayloadImplementors = []string{"UpdateGalleryCollectionsPayload", "UpdateGalleryCollectionsPayloadOrError"}
 
 func (ec *executionContext) _UpdateGalleryCollectionsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateGalleryCollectionsPayload) graphql.Marshaler {
@@ -31962,6 +32558,48 @@ func (ec *executionContext) _UserCreatedFeedEventData(ctx context.Context, sel a
 	return out
 }
 
+var userEmailImplementors = []string{"UserEmail"}
+
+func (ec *executionContext) _UserEmail(ctx context.Context, sel ast.SelectionSet, obj *model.UserEmail) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userEmailImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserEmail")
+		case "email":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UserEmail_email(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "verificationStatus":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UserEmail_verificationStatus(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "emailNotificationSettings":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UserEmail_emailNotificationSettings(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var userFollowedUsersFeedEventDataImplementors = []string{"UserFollowedUsersFeedEventData", "FeedEventData"}
 
 func (ec *executionContext) _UserFollowedUsersFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.UserFollowedUsersFeedEventData) graphql.Marshaler {
@@ -32006,6 +32644,34 @@ func (ec *executionContext) _UserFollowedUsersFeedEventData(ctx context.Context,
 		case "followed":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UserFollowedUsersFeedEventData_followed(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var verifyEmailPayloadImplementors = []string{"VerifyEmailPayload", "VerifyEmailPayloadOrError"}
+
+func (ec *executionContext) _VerifyEmailPayload(ctx context.Context, sel ast.SelectionSet, obj *model.VerifyEmailPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, verifyEmailPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("VerifyEmailPayload")
+		case "email":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._VerifyEmailPayload_email(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -32201,6 +32867,23 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Viewer_feed(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "email":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_email(ctx, field, obj)
 				return res
 			}
 
@@ -33147,6 +33830,11 @@ func (ec *executionContext) unmarshalNUpdateCollectionTokensInput2githubᚗcom�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNUpdateEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailInput(ctx context.Context, v interface{}) (model.UpdateEmailInput, error) {
+	res, err := ec.unmarshalInputUpdateEmailInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNUpdateGalleryCollectionsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsInput(ctx context.Context, v interface{}) (model.UpdateGalleryCollectionsInput, error) {
 	res, err := ec.unmarshalInputUpdateGalleryCollectionsInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -34011,6 +34699,29 @@ func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcom�
 		return graphql.Null
 	}
 	return ec._DeleteCollectionPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOEmailNotificationSettings2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEmailNotificationSettings(ctx context.Context, sel ast.SelectionSet, v *model.EmailNotificationSettings) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._EmailNotificationSettings(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOEmailVerificationStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmailVerificationStatus(ctx context.Context, v interface{}) (*persist.EmailVerificationStatus, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(persist.EmailVerificationStatus)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOEmailVerificationStatus2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmailVerificationStatus(ctx context.Context, sel ast.SelectionSet, v *persist.EmailVerificationStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOEoaAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEoaAuth(ctx context.Context, v interface{}) (*model.EoaAuth, error) {
@@ -35310,6 +36021,13 @@ func (ec *executionContext) marshalOUpdateCollectionTokensPayloadOrError2github�
 	return ec._UpdateCollectionTokensPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOUpdateEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateEmailPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateEmailPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOUpdateGalleryCollectionsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateGalleryCollectionsPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -35350,6 +36068,20 @@ func (ec *executionContext) marshalOUserByUsernameOrError2githubᚗcomᚋmikeydu
 		return graphql.Null
 	}
 	return ec._UserByUsernameOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUserEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserEmail(ctx context.Context, sel ast.SelectionSet, v *model.UserEmail) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UserEmail(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOVerifyEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.VerifyEmailPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._VerifyEmailPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOVideoURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVideoURLSet(ctx context.Context, sel ast.SelectionSet, v *model.VideoURLSet) graphql.Marshaler {

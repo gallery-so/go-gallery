@@ -37,8 +37,14 @@ sql:
           # Users
           - column: "users.wallets"
             go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
+          - column: "users.email_unsubscriptions"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailUnsubscriptions"
           - column: "users.notification_settings"
             go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
+          - column: "users.email"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "users.email_verified"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
 
           # Galleries
           - column: "galleries.collections"
@@ -191,6 +197,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.media_url"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "*.email_type"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.EmailType"
           - column: "*.actions"
             go_type: "github.com/mikeydub/go-gallery/service/persist.ActionList"
           - column: "*.collection_id"

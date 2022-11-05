@@ -531,5 +531,31 @@ SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
 
+
+-- for some reason this query will not allow me to use @tags for $1
+-- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
+-- name: GetUsersWithEmailNotificationsOnForEmailType :many
+SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $2;
+
+-- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
+-- name: GetUsersWithEmailNotificationsOn :many
+SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
+    AND (created_at, id) < (@cur_before_time, @cur_before_id)
+    AND (created_at, id) > (@cur_after_time, @cur_after_id)
+    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
+    LIMIT $1;
+
+-- name: UpdateUserVerificationStatus :exec
+UPDATE users SET email_verified = $2 WHERE id = $1;
+
+-- name: UpdateUserEmail :exec
+UPDATE users SET email = $2, email_verified = 0 WHERE id = $1;
+
 -- name: GetUsersByChainAddresses :many
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;

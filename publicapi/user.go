@@ -13,6 +13,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -213,7 +214,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	return nil
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, bio string) (userID persist.DBID, galleryID persist.DBID, err error) {
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *string, bio string) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required,username"},
@@ -222,7 +223,18 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, bio, api.repos.UserRepository, api.repos.GalleryRepository)
+	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, api.repos.UserRepository, api.repos.GalleryRepository)
+	if err != nil {
+		return "", "", err
+	}
+
+	if email != nil && *email != "" {
+		// TODO email validation ahead of time
+		err = emails.RequestVerificationEmail(ctx, userID)
+		if err != nil {
+			return "", "", err
+		}
+	}
 
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
@@ -258,6 +270,36 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	}
 
 	err = user.UpdateUserInfo(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (api UserAPI) UpdateUserEmail(ctx context.Context, email string) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"email": {email, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
+		ID:    userID,
+		Email: persist.NullString(email),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	err = emails.RequestVerificationEmail(ctx, userID)
 	if err != nil {
 		return err
 	}

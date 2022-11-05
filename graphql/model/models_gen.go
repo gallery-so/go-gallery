@@ -170,6 +170,10 @@ type UpdateCollectionTokensPayloadOrError interface {
 	IsUpdateCollectionTokensPayloadOrError()
 }
 
+type UpdateEmailPayloadOrError interface {
+	IsUpdateEmailPayloadOrError()
+}
+
 type UpdateGalleryCollectionsPayloadOrError interface {
 	IsUpdateGalleryCollectionsPayloadOrError()
 }
@@ -192,6 +196,10 @@ type UserByIDOrError interface {
 
 type UserByUsernameOrError interface {
 	IsUserByUsernameOrError()
+}
+
+type VerifyEmailPayloadOrError interface {
+	IsVerifyEmailPayloadOrError()
 }
 
 type ViewGalleryPayloadOrError interface {
@@ -463,6 +471,10 @@ type DeleteCollectionPayload struct {
 
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
+type EmailNotificationSettings struct {
+	UnsubscribedFromAll *bool `json:"unsubscribedFromAll"`
+}
+
 type EoaAuth struct {
 	ChainPubKey *persist.ChainPubKey `json:"chainPubKey"`
 	Nonce       string               `json:"nonce"`
@@ -583,6 +595,8 @@ func (ErrInvalidInput) IsAdmireFeedEventPayloadOrError()          {}
 func (ErrInvalidInput) IsRemoveAdmirePayloadOrError()             {}
 func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()       {}
 func (ErrInvalidInput) IsRemoveCommentPayloadOrError()            {}
+func (ErrInvalidInput) IsVerifyEmailPayloadOrError()              {}
+func (ErrInvalidInput) IsUpdateEmailPayloadOrError()              {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -877,12 +891,10 @@ type NotificationEdge struct {
 }
 
 type NotificationSettings struct {
-	HelperNotificationSettingsData
-	User                         *GalleryUser `json:"user"`
-	SomeoneFollowedYou           *bool        `json:"someoneFollowedYou"`
-	SomeoneAdmiredYourUpdate     *bool        `json:"someoneAdmiredYourUpdate"`
-	SomeoneCommentedOnYourUpdate *bool        `json:"someoneCommentedOnYourUpdate"`
-	SomeoneViewedYourGallery     *bool        `json:"someoneViewedYourGallery"`
+	SomeoneFollowedYou           *bool `json:"someoneFollowedYou"`
+	SomeoneAdmiredYourUpdate     *bool `json:"someoneAdmiredYourUpdate"`
+	SomeoneCommentedOnYourUpdate *bool `json:"someoneCommentedOnYourUpdate"`
+	SomeoneViewedYourGallery     *bool `json:"someoneViewedYourGallery"`
 }
 
 type NotificationSettingsInput struct {
@@ -1195,6 +1207,16 @@ type UpdateCollectionTokensPayload struct {
 
 func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
 
+type UpdateEmailInput struct {
+	Email string `json:"email"`
+}
+
+type UpdateEmailPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateEmailPayload) IsUpdateEmailPayloadOrError() {}
+
 type UpdateGalleryCollectionsInput struct {
 	GalleryID   persist.DBID   `json:"galleryId"`
 	Collections []persist.DBID `json:"collections"`
@@ -1237,6 +1259,12 @@ type UserCreatedFeedEventData struct {
 
 func (UserCreatedFeedEventData) IsFeedEventData() {}
 
+type UserEmail struct {
+	Email                     *string                          `json:"email"`
+	VerificationStatus        *persist.EmailVerificationStatus `json:"verificationStatus"`
+	EmailNotificationSettings *EmailNotificationSettings       `json:"emailNotificationSettings"`
+}
+
 type UserFollowedUsersFeedEventData struct {
 	EventTime *time.Time      `json:"eventTime"`
 	Owner     *GalleryUser    `json:"owner"`
@@ -1245,6 +1273,12 @@ type UserFollowedUsersFeedEventData struct {
 }
 
 func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
+
+type VerifyEmailPayload struct {
+	Email *string `json:"email"`
+}
+
+func (VerifyEmailPayload) IsVerifyEmailPayloadOrError() {}
 
 type VideoMedia struct {
 	PreviewURLs       *PreviewURLSet `json:"previewURLs"`
@@ -1273,6 +1307,7 @@ type Viewer struct {
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 	Feed            *FeedConnection  `json:"feed"`
+	Email           *UserEmail       `json:"email"`
 	// Returns a list of notifications in reverse chronological order.
 	// Seen notifications come after unseen notifications
 	Notifications        *NotificationsConnection `json:"notifications"`
