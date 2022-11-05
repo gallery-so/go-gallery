@@ -675,7 +675,6 @@ type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
     collection: Collection @goField(forceResolver: true)
     newCollectorsNote: String
     newTokens: [CollectionToken] @goField(forceResolver: true)
-    isNewCollection: Boolean
 }
 
 type ErrUnknownAction implements Error {

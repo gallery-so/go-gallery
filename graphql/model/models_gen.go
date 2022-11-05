@@ -344,7 +344,6 @@ type CollectionUpdatedFeedEventData struct {
 	Collection        *Collection        `json:"collection"`
 	NewCollectorsNote *string            `json:"newCollectorsNote"`
 	NewTokens         []*CollectionToken `json:"newTokens"`
-	IsNewCollection   *bool              `json:"isNewCollection"`
 }
 
 func (CollectionUpdatedFeedEventData) IsFeedEventData() {}
