@@ -30,3 +30,5 @@ _local*
 refresh.json
 
 bin/*
+_origindeploy*
+_originlocal*
