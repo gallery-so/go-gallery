@@ -685,9 +685,9 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						contractsChan <- multichain.ChainAgnosticContract{}
 					}
 
-					tokenOwner := persist.Address(nft.Owner.Address)
+					tokenOwner := ownerAddress
 					if tokenOwner == "" {
-						tokenOwner = ownerAddress
+						tokenOwner = persist.Address(nft.Owner.Address)
 					}
 
 					tokensChan <- multichain.ChainAgnosticToken{
