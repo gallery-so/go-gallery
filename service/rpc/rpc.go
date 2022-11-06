@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -726,24 +727,73 @@ func GetIPFSData(pCtx context.Context, ipfsClient *shell.Shell, path string) ([]
 	return buf.Bytes(), nil
 }
 
-// GetIPFSHeaders returns the headers for the given IPFS hash
-func GetIPFSHeaders(pCtx context.Context, path string) (http.Header, error) {
-	url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
-
-	req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+func makeRequest(ctx context.Context, method, url string) (http.Header, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %s", err)
+		return nil, err
 	}
+
 	resp, err := defaultHTTPClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error getting data from http: %s", err)
+		return nil, err
 	}
+
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
 		return nil, ErrHTTP{Status: resp.StatusCode, URL: url}
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	return resp.Header, nil
+}
+
+func parseContentLength(contentLength string) (int64, error) {
+	if contentLength != "" {
+		contentLengthInt, err := strconv.Atoi(contentLength)
+		if err != nil {
+			return 0, err
+		}
+		return int64(contentLengthInt), nil
+	}
+	return 0, nil
+}
+
+func parseContentType(contentType string) string {
+	contentType = strings.TrimSpace(contentType)
+	whereCharset := strings.IndexByte(contentType, ';')
+	if whereCharset != -1 {
+		contentType = contentType[:whereCharset]
+	}
+	return contentType
+}
+
+func getContentHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
+	// Check if server supports HEAD
+	if headers, err := makeRequest(ctx, "HEAD", url); err == nil {
+		contentType = parseContentType(headers.Get("Content-Type"))
+		contentLength, err = parseContentLength(headers.Get("Content-Length"))
+		return contentType, contentLength, err
+	}
+
+	// Otherwise try GET
+	headers, err := makeRequest(ctx, "GET", url)
+	if err == nil {
+		contentType = parseContentType(headers.Get("Content-Type"))
+		contentLength, err = parseContentLength(headers.Get("Content-Length"))
+		return contentType, contentLength, err
+	}
+
+	return contentType, contentLength, err
+}
+
+// GetIPFSHeaders returns the headers for the given IPFS hash
+func GetIPFSHeaders(ctx context.Context, path string) (contentType string, contentLength int64, err error) {
+	url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+	return getContentHeaders(ctx, url)
+}
+
+// GetHTTPHeaders returns the headers for the given URL
+func GetHTTPHeaders(ctx context.Context, url string) (contentType string, contentLength int64, err error) {
+	return getContentHeaders(ctx, url)
 }
 
 // GetTokenURI returns metadata URI for a given token address.
