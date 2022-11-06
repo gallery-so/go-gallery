@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -472,7 +471,7 @@ func purgeIfExists(ctx context.Context, bucket string, fileName string, client *
 	}
 	if exists {
 		if err := mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName)); err != nil {
-			logger.For(ctx).WithError(err).Errorf("could not purge image %s", fileName)
+			logger.For(ctx).WithError(err).Errorf("could not purge file %s", fileName)
 		}
 	}
 
@@ -697,46 +696,17 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 	case persist.URITypeBase64BMP:
 		return persist.MediaTypeBase64BMP, "image/bmp", int64(len(asURI.String())), nil
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
-		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+		contentType, contentLength, err := rpc.GetHTTPHeaders(pCtx, url)
 		if err != nil {
 			return persist.MediaTypeUnknown, "", 0, err
 		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return persist.MediaTypeUnknown, "", 0, err
-		}
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return persist.MediaTypeUnknown, "", 0, rpc.ErrHTTP{Status: resp.StatusCode, URL: url}
-		}
-		contentType := resp.Header.Get("Content-Type")
-		contentType = strings.TrimSpace(contentType)
-		whereCharset := strings.IndexByte(contentType, ';')
-		if whereCharset != -1 {
-			contentType = contentType[:whereCharset]
-		}
-		contentLength := resp.ContentLength
 		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
 	case persist.URITypeIPFS:
-		path := strings.TrimPrefix(asURI.String(), "ipfs://")
-		headers, err := rpc.GetIPFSHeaders(pCtx, path)
+		contentType, contentLength, err := rpc.GetIPFSHeaders(pCtx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 		if err != nil {
 			return persist.MediaTypeUnknown, "", 0, err
 		}
-		contentType := headers.Get("Content-Type")
-		contentType = strings.TrimSpace(contentType)
-		whereCharset := strings.IndexByte(contentType, ';')
-		if whereCharset != -1 {
-			contentType = contentType[:whereCharset]
-		}
-		contentLength := headers.Get("Content-Length")
-		contentLengthInt := 0
-		if contentLength != "" {
-			contentLengthInt, err = strconv.Atoi(contentLength)
-			if err != nil {
-				return persist.MediaTypeUnknown, "", 0, err
-			}
-		}
-		return persist.MediaFromContentType(contentType), contentType, int64(contentLengthInt), nil
+		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
 	}
 	return persist.MediaTypeUnknown, "", 0, nil
 }
