@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -16,8 +17,8 @@ import (
 
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
-	db                                      *sql.DB
-	queries                                 *db.Queries
+	db                                                  *sql.DB
+	queries                                             *db.Queries
 	getByUserIDStmt                                     *sql.Stmt
 	getByUserIDPaginateStmt                             *sql.Stmt
 	getByTokenIDStmt                                    *sql.Stmt
@@ -109,8 +110,8 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	checkNoErr(err)
 
 	return &TokenGalleryRepository{
-		db:                                      db,
-		queries:                                 queries,
+		db:                                     db,
+		queries:                                queries,
 		getByUserIDStmt:                        getByUserIDStmt,
 		getByUserIDPaginateStmt:                getByUserIDPaginateStmt,
 		getByTokenIdentifiersStmt:              getByTokenIdentifiersStmt,
@@ -338,19 +339,14 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_PROVIDER_MARKED_SPAM,LAST_SYNCED) VALUES `
 	vals := make([]interface{}, 0, len(newTokens)*paramsPerRow)
 	for i, token := range newTokens {
-		// this is the index of last_synced, the param that we want set to now()
-		nows := []int{23}
-		if recursedSyncTime != nil {
-			token.LastSynced = persist.LastUpdatedTime(*recursedSyncTime)
-			nows = nil
-		}
-		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow, nows) + ","
+		// 23 is the index of last_synced, the param that we want set to now()
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow, []int{23}) + ","
 		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam, token.LastSynced)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT,CHAIN,OWNER_USER_ID) WHERE DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,LAST_UPDATED = EXCLUDED.LAST_UPDATED,IS_USER_MARKED_SPAM = tokens.IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM,LAST_SYNCED = EXCLUDED.LAST_SYNCED RETURNING LAST_SYNCED;`
+	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT,CHAIN,OWNER_USER_ID) WHERE DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,LAST_UPDATED = EXCLUDED.LAST_UPDATED,IS_USER_MARKED_SPAM = tokens.IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM,LAST_SYNCED = GREATEST(EXCLUDED.LAST_SYNCED,tokens.LAST_SYNCED) RETURNING LAST_SYNCED;`
 
 	var now time.Time
 	err = t.db.QueryRowContext(pCtx, sqlStr, vals...).Scan(&now)
@@ -361,6 +357,9 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 
 	logger.For(pCtx).Infof("upserted %d tokens", len(newTokens))
 
+	if recursedSyncTime != nil {
+		return *recursedSyncTime, nil
+	}
 	return now, nil
 }
 
