@@ -3,9 +3,10 @@ package tokenprocessing
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -19,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 )
 
 type ProcessMediaForTokenInput struct {
@@ -37,12 +39,15 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
-		if err := throttler.Lock(c, input.UserID.String()); err != nil {
+
+		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
+
+		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
 
-		allTokens, err := tokenRepo.GetByUserID(c, input.UserID, -1, -1)
+		allTokens, err := tokenRepo.GetByUserID(ctx, input.UserID, -1, -1)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -57,13 +62,13 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 		wp := workerpool.New(100)
 		for _, token := range filtered {
 			t := token
-			contract, err := contractRepo.GetByID(c, t.Contract)
+			contract, err := contractRepo.GetByID(ctx, t.Contract)
 			if err != nil {
-				logger.For(c).Errorf("Error getting contract: %s", err)
+				logger.For(ctx).Errorf("Error getting contract: %s", err)
 			}
 			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-				err := processToken(c, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+				err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
 				if err != nil {
 					logger.For(c).Errorf("Error processing token: %s", err)
 				}
@@ -71,7 +76,7 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 		}
 
 		wp.StopWait()
-		logger.For(nil).Infof("Processing Media: %s - Finished", input.UserID)
+		logger.For(ctx).Infof("Processing Media: %s - Finished", input.UserID)
 
 		c.JSON(http.StatusOK, util.SuccessResponse{Success: true})
 	}
@@ -120,8 +125,13 @@ func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *
 }
 
 func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+	ctx := logger.NewContextWithFields(c, logrus.Fields{
+		"tokenID":         t.TokenID,
+		"contractAddress": contractAddress,
+		"chain":           t.Chain,
+	})
 	totalTime := time.Now()
-	ctx, cancel := context.WithTimeout(c, time.Minute*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
 	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", key, contractAddress, t.TokenID, t.Chain)

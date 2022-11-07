@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -109,62 +108,43 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
 func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords Keywords) (persist.Media, error) {
-
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
-
 	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name, true)
 
 	logger.For(pCtx).Infof("imgURL: %s, vURL: %s", imgURL, vURL)
-
-	imgAsURI := persist.TokenURI(imgURL)
-	videoAsURI := persist.TokenURI(vURL)
-
 	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 100), "imgURL": truncateString(imgURL, 100), "vURL": truncateString(vURL, 100), "name": name}).Debug("MakePreviewsForMetadata initial")
 
-	var res persist.Media
-	var mediaType persist.MediaType
-	if imgURL != "" {
-		var err error
-		mediaType, err = downloadAndCache(pCtx, imgURL, name, "image", ipfsClient, arweaveClient, storageClient)
-		if err != nil {
-			switch err.(type) {
-			case rpc.ErrHTTP:
-				if err.(rpc.ErrHTTP).Status == http.StatusNotFound {
-					mediaType = persist.MediaTypeInvalid
-				} else {
-					return persist.Media{}, fmt.Errorf("HTTP error downloading img %s for %s: %s", imgAsURI, name, err)
-				}
-			case *net.DNSError:
-				mediaType = persist.MediaTypeInvalid
-				logger.For(pCtx).WithError(err).Warnf("DNS error downloading img %s for %s: %s", imgAsURI, name, err)
-			case errGeneratingThumbnail:
-				break
-			default:
-				return persist.Media{}, fmt.Errorf("error downloading img %s of type %s for %s: %s", imgAsURI, imgAsURI.Type(), name, err)
-			}
-		}
-	}
+	var (
+		imgCh, vidCh         chan cacheResult
+		imgResult, vidResult cacheResult
+		mediaType            persist.MediaType
+		res                  persist.Media
+	)
+
 	if vURL != "" {
-		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 50), "vURL": truncateString(vURL, 50), "name": name}).Debug("MakePreviewsForMetadata vURL valid")
-		var err error
-		mediaType, err = downloadAndCache(pCtx, vURL, name, "video", ipfsClient, arweaveClient, storageClient)
-		if err != nil {
-			switch err.(type) {
-			case rpc.ErrHTTP:
-				if err.(rpc.ErrHTTP).Status == http.StatusNotFound {
-					mediaType = persist.MediaTypeInvalid
-				} else {
-					return persist.Media{}, fmt.Errorf("HTTP error downloading video %s for %s: %s", videoAsURI, name, err)
-				}
-			case *net.DNSError:
-				mediaType = persist.MediaTypeInvalid
-				logger.For(pCtx).WithError(err).Warnf("DNS error downloading video %s for %s: %s", videoAsURI, name, err)
-			case errGeneratingThumbnail:
-				break
-			default:
-				return persist.Media{}, fmt.Errorf("error downloading video %s of type %s for %s: %s", videoAsURI, videoAsURI.Type(), name, err)
-			}
-		}
+		vidCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "video", vURL, name, tokenBucket)
+	}
+	if imgURL != "" {
+		imgCh = downloadMediaFromURL(pCtx, storageClient, arweaveClient, ipfsClient, "image", imgURL, name, tokenBucket)
+	}
+
+	if vidCh != nil {
+		vidResult = <-vidCh
+	}
+	if imgCh != nil {
+		imgResult = <-imgCh
+	}
+
+	// Neither download worked
+	if (vidResult.err != nil && vidResult.mediaType == "") && (imgResult.err != nil && imgResult.mediaType == "") {
+		return persist.Media{}, vidResult.err // Just use the video error
+	}
+
+	if imgResult.mediaType != "" {
+		mediaType = imgResult.mediaType
+	}
+	if vidResult.mediaType != "" {
+		mediaType = vidResult.mediaType
 	}
 
 	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 25), "imgURL": truncateString(imgURL, 25), "vURL": truncateString(vURL, 25), "mediaType": mediaType, "name": name}).Debug("MakePreviewsForMetadata mediaType")
@@ -181,22 +161,46 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	case persist.MediaTypeSVG:
 		res = getSvgMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
 	default:
-		res.MediaType = mediaType
-		if vURL != "" {
-			logger.For(pCtx).Infof("using vURL for %s: %s", name, vURL)
-			res.MediaURL = persist.NullString(vURL)
-			if imgURL != "" {
-				res.ThumbnailURL = persist.NullString(imgURL)
-			}
-		} else if imgURL != "" {
-			logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
-			res.MediaURL = persist.NullString(imgURL)
-		}
+		res = getRawMedia(pCtx, mediaType, name, vURL, imgURL)
 	}
 
 	logger.For(pCtx).Infof("media for %s of type %s: %+v", name, mediaType, res)
 
 	return remapMedia(res), nil
+}
+
+type cacheResult struct {
+	mediaType persist.MediaType
+	err       error
+}
+
+func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, arweaveClient *goar.Client, ipfsClient *shell.Shell, urlType, mediaURL, name, bucket string) chan cacheResult {
+	resultCh := make(chan cacheResult)
+
+	go func() {
+		mediaType, err := downloadAndCache(ctx, mediaURL, name, urlType, ipfsClient, arweaveClient, storageClient, bucket)
+		if err == nil {
+			resultCh <- cacheResult{mediaType, err}
+			return
+		}
+
+		switch err.(type) {
+		case rpc.ErrHTTP:
+			if err.(rpc.ErrHTTP).Status == http.StatusNotFound {
+				resultCh <- cacheResult{persist.MediaTypeInvalid, err}
+			} else {
+				resultCh <- cacheResult{mediaType, err}
+			}
+		case *net.DNSError:
+			resultCh <- cacheResult{persist.MediaTypeInvalid, err}
+		case errGeneratingThumbnail:
+			resultCh <- cacheResult{mediaType, err}
+		default:
+			resultCh <- cacheResult{mediaType, err}
+		}
+	}()
+
+	return resultCh
 }
 
 func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL string, imgURL string, mediaType persist.MediaType) persist.Media {
@@ -307,6 +311,22 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 	}
 	thumb := getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient)
 	res.ThumbnailURL = persist.NullString(thumb)
+	return res
+}
+
+func getRawMedia(pCtx context.Context, mediaType persist.MediaType, name, vURL, imgURL string) persist.Media {
+	var res persist.Media
+	res.MediaType = mediaType
+	if vURL != "" {
+		logger.For(pCtx).Infof("using vURL for %s: %s", name, vURL)
+		res.MediaURL = persist.NullString(vURL)
+		if imgURL != "" {
+			res.ThumbnailURL = persist.NullString(imgURL)
+		}
+	} else if imgURL != "" {
+		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
+		res.MediaURL = persist.NullString(imgURL)
+	}
 	return res
 }
 
@@ -435,78 +455,60 @@ func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgU
 	return ""
 }
 
-func objectExists(ctx context.Context, o *storage.ObjectHandle) (bool, error) {
-	_, err := o.Attrs(ctx)
+func objectExists(ctx context.Context, client *storage.Client, bucket, fileName string) (bool, error) {
+	o := client.Bucket(bucket).Object(fileName)
+	_, err := client.Bucket(bucket).Object(fileName).Attrs(ctx)
 	if err != nil && err != storage.ErrObjectNotExist {
 		return false, fmt.Errorf("could not get object attrs for %s: %s", o.ObjectName(), err)
 	}
 	return err != storage.ErrObjectNotExist, nil
 }
 
-func cacheRawSvgMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
-
-	o := client.Bucket(bucket).Object(fileName)
-
-	exists, err := objectExists(ctx, o)
+func purgeIfExists(ctx context.Context, bucket string, fileName string, client *storage.Client) error {
+	exists, err := objectExists(ctx, client, bucket, fileName)
 	if err != nil {
 		return err
 	}
-
-	sw := o.NewWriter(ctx)
-	_, err = io.Copy(sw, reader)
-	if err != nil {
-		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
-	}
-
-	if err := sw.Close(); err != nil {
-		return err
-	}
-
-	logrus.Infof("adding svg to attrs for %s", fileName)
-
-	// Update the object to set the metadata.
-	objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
-		ContentType:  "image/svg+xml",
-		CacheControl: "no-cache, no-store",
-	}
-	if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
-		return err
-	}
-
 	if exists {
-		err = mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
-		if err != nil {
-			logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
+		if err := mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName)); err != nil {
+			logger.For(ctx).WithError(err).Errorf("could not purge file %s", fileName)
 		}
 	}
+
 	return nil
 }
 
-func purgeIfExists(ctx context.Context, exists bool, bucket string, fileName string) error {
-	if exists {
-		err := mediamapper.PurgeImage(ctx, fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, fileName))
-		if err != nil {
-			logger.For(ctx).Errorf("could not purge image %s: %s", fileName, err)
-			return err
-		}
+func persistToStorage(ctx context.Context, client *storage.Client, reader io.Reader, bucket, fileName, contentType string) error {
+	writer := newObjectWriter(ctx, client, bucket, fileName, contentType)
+	if _, err := io.Copy(writer, reader); err != nil {
+		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
-	return nil
+	return writer.Close()
+}
+
+func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName string, contentType string, client *storage.Client) error {
+	err := persistToStorage(ctx, client, reader, bucket, fileName, contentType)
+	go purgeIfExists(context.Background(), bucket, fileName, client)
+	return err
+}
+
+func cacheRawSvgMedia(ctx context.Context, reader io.Reader, bucket, name string, client *storage.Client) error {
+	return cacheRawMedia(ctx, reader, bucket, fmt.Sprintf("svg-%s", name), "image/svg+xml", client)
+}
+
+func cacheRawVideoMedia(ctx context.Context, reader io.Reader, bucket, name, contentType string, client *storage.Client) error {
+	return cacheRawMedia(ctx, reader, bucket, fmt.Sprintf("video-%s", name), contentType, client)
+}
+
+func cacheRawImageMedia(ctx context.Context, reader io.Reader, bucket, name, contentType string, client *storage.Client) error {
+	return cacheRawMedia(ctx, reader, bucket, fmt.Sprintf("image-%s", name), contentType, client)
 }
 
 func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileName string, client *storage.Client) error {
-
-	o := client.Bucket(bucket).Object(fileName)
-
-	exists, err := objectExists(ctx, o)
-	if err != nil {
-		return err
-	}
-
-	sw := o.NewWriter(ctx)
-
+	sw := newObjectWriter(ctx, client, bucket, fileName, "")
 	writer := gzip.NewWriter(sw)
 
-	_, err = io.Copy(writer, reader)
+	_, err := io.Copy(writer, reader)
 	if err != nil {
 		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
 	}
@@ -519,97 +521,37 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileN
 		return err
 	}
 
-	// Update the object to set the metadata.
-	objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
-		CacheControl: "no-cache, no-store",
-	}
-	if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
-		return err
-	}
-
-	purgeIfExists(ctx, exists, bucket, fileName)
+	go purgeIfExists(context.Background(), bucket, fileName, client)
 	return nil
 }
 
-func cacheRawMedia(ctx context.Context, reader io.Reader, bucket, fileName string, contentType string, client *storage.Client) error {
-	logger.For(ctx).Infof("caching raw media for %s", fileName)
+func thumbnailAndCache(ctx context.Context, videoURL, bucket, name string, client *storage.Client) chan error {
+	errCh := make(chan error)
 
-	timeBeforeCopy := time.Now()
-	o := client.Bucket(bucket).Object(fileName)
+	go func() {
+		fileName := fmt.Sprintf("thumbnail-%s", name)
+		logger.For(ctx).Infof("caching raw media for %s", fileName)
+		defer close(errCh)
 
-	exists, err := objectExists(ctx, o)
-	if err != nil {
-		return err
-	}
-	sw := o.NewWriter(ctx)
-	_, err = io.Copy(sw, reader)
-	if err != nil {
-		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
-	}
+		timeBeforeCopy := time.Now()
 
-	if err := sw.Close(); err != nil {
-		return err
-	}
+		sw := newObjectWriter(ctx, client, bucket, fileName, "image/jpeg")
 
-	logger.For(ctx).Infof("storage copy took %s", time.Since(timeBeforeCopy))
+		logger.For(ctx).Infof("thumbnailing %s", videoURL)
+		if err := thumbnailVideoToWriter(videoURL, sw); err != nil {
+			errCh <- fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
+		}
 
-	timeBeforeUpdate := time.Now()
+		if err := sw.Close(); err != nil {
+			errCh <- err
+		}
 
-	// Update the object to set the metadata.
-	objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
-		CacheControl: "no-cache, no-store",
-	}
-	if contentType != "" {
-		objectAttrsToUpdate.ContentType = contentType
-	}
-	if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
-		return err
-	}
+		logger.For(ctx).Infof("storage copy took %s", time.Since(timeBeforeCopy))
 
-	logger.For(ctx).Infof("storage update took %s", time.Since(timeBeforeUpdate))
-	purgeIfExists(ctx, exists, bucket, fileName)
-	return nil
-}
+		go purgeIfExists(context.Background(), bucket, fileName, client)
+	}()
 
-func thumbnailAndCache(ctx context.Context, videoURL, bucket, fileName string, contentType string, client *storage.Client) error {
-	logger.For(ctx).Infof("caching raw media for %s", fileName)
-
-	timeBeforeCopy := time.Now()
-	o := client.Bucket(bucket).Object(fileName)
-
-	exists, err := objectExists(ctx, o)
-	if err != nil {
-		return err
-	}
-	sw := o.NewWriter(ctx)
-	logger.For(ctx).Infof("thumbnailing %s", videoURL)
-	err = thumbnailVideoToWriter(videoURL, sw)
-	if err != nil {
-		return fmt.Errorf("could not write to bucket %s for %s: %s", bucket, fileName, err)
-	}
-
-	if err := sw.Close(); err != nil {
-		return err
-	}
-
-	logger.For(ctx).Infof("storage copy took %s", time.Since(timeBeforeCopy))
-
-	timeBeforeUpdate := time.Now()
-
-	// Update the object to set the metadata.
-	objectAttrsToUpdate := storage.ObjectAttrsToUpdate{
-		CacheControl: "no-cache, no-store",
-	}
-	if contentType != "" {
-		objectAttrsToUpdate.ContentType = contentType
-	}
-	if _, err := o.Update(ctx, objectAttrsToUpdate); err != nil {
-		return err
-	}
-
-	logger.For(ctx).Infof("storage update took %s", time.Since(timeBeforeUpdate))
-	purgeIfExists(ctx, exists, bucket, fileName)
-	return nil
+	return errCh
 }
 
 func deleteMedia(ctx context.Context, bucket, fileName string, client *storage.Client) error {
@@ -617,16 +559,14 @@ func deleteMedia(ctx context.Context, bucket, fileName string, client *storage.C
 }
 
 func getMediaServingURL(pCtx context.Context, bucketID, objectID string, client *storage.Client) (string, error) {
-	objectName := fmt.Sprintf("/gs/%s/%s", bucketID, objectID)
-
-	_, err := client.Bucket(bucketID).Object(objectID).Attrs(pCtx)
-	if err != nil {
-		return "", fmt.Errorf("error getting attrs for %s: %s", objectName, err)
+	if exists, err := objectExists(pCtx, client, bucketID, objectID); err != nil || !exists {
+		objectName := fmt.Sprintf("/gs/%s/%s", bucketID, objectID)
+		return "", fmt.Errorf("failed to check if object %s exists: %s", objectName, err)
 	}
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucketID, objectID), nil
 }
 
-func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client) (persist.MediaType, error) {
+func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, bucket string) (persist.MediaType, error) {
 
 	asURI := persist.TokenURI(mediaURL)
 
@@ -651,11 +591,10 @@ outer:
 			logger.For(pCtx).Infof("uri for %s is of type %s: trying to cache", name, asURI.Type())
 			break outer
 		default:
-			timeBeforeDelete := time.Now()
 			// delete medias that are stored because the current media should be reflected directly in the metadata, not in GCP
-			deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
-			deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-			logger.For(pCtx).Infof("deleted medias for %s in %s", name, time.Since(timeBeforeDelete))
+			logger.For(pCtx).Infof("deleting medias for %s", name)
+			go deleteMedia(context.Background(), bucket, fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
+			go deleteMedia(context.Background(), bucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 			return mediaType, nil
 		}
 	}
@@ -670,38 +609,37 @@ outer:
 
 	if !mediaType.IsValid() {
 		timeBeforeSniff := time.Now()
-		mediaType, contentType = persist.SniffMediaType(reader.Headers())
+		bytesToSniff, _ := reader.Headers()
+		mediaType, contentType = persist.SniffMediaType(bytesToSniff)
 		logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
 	}
 
 	if mediaType != persist.MediaTypeVideo {
-		timeBeforeDeleteVideo := time.Now()
 		// only videos get thumbnails, if the NFT was previously a video however, it might still have a thumbnail
-		deleteMedia(pCtx, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), storageClient)
-		logger.For(pCtx).Infof("deleted thumbnail for %s in %s", name, time.Since(timeBeforeDeleteVideo))
+		logger.For(pCtx).Infof("deleting thumbnail for %s", name)
+		go deleteMedia(context.Background(), bucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 	}
 
 	switch mediaType {
 	case persist.MediaTypeVideo:
-		timeBeforeCacheVideo := time.Now()
-		err := cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("video-%s", name), contentType, storageClient)
-		if err != nil {
-			return mediaType, err
-		}
-		logger.For(pCtx).Infof("cached video for %s in %s", name, time.Since(timeBeforeCacheVideo))
-
-		videoURL := fmt.Sprintf("https://storage.googleapis.com/%s/video-%s", viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name)
-
 		timeBeforeCache := time.Now()
-		err = thumbnailAndCache(pCtx, videoURL, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("thumbnail-%s", name), "image/jpeg", storageClient)
+
+		videoURL := fmt.Sprintf("https://storage.googleapis.com/%s/video-%s", bucket, name)
+		thumbnailCh := thumbnailAndCache(pCtx, videoURL, bucket, name, storageClient)
+		err := cacheRawVideoMedia(pCtx, reader, bucket, name, contentType, storageClient)
+
 		if err != nil {
 			return mediaType, err
 		}
-		logger.For(pCtx).Infof("cached thumbnail for %s in %s", name, time.Since(timeBeforeCache))
+		if err := <-thumbnailCh; err != nil {
+			return mediaType, err
+		}
+
+		logger.For(pCtx).Infof("cached video and thumbnail for %s in %s", name, time.Since(timeBeforeCache))
 		return persist.MediaTypeVideo, nil
 	case persist.MediaTypeSVG:
 		timeBeforeCache := time.Now()
-		err = cacheRawSvgMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("svg-%s", name), storageClient)
+		err = cacheRawSvgMedia(pCtx, reader, bucket, name, storageClient)
 		if err != nil {
 			return mediaType, err
 		}
@@ -709,7 +647,7 @@ outer:
 		return persist.MediaTypeSVG, nil
 	case persist.MediaTypeBase64BMP:
 		timeBeforeCache := time.Now()
-		err = cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("image-%s", name), contentType, storageClient)
+		err = cacheRawImageMedia(pCtx, reader, bucket, name, contentType, storageClient)
 		if err != nil {
 			return mediaType, err
 		}
@@ -724,7 +662,7 @@ outer:
 			logger.For(pCtx).Infof("DECENTRALIZED STORAGE: caching %f mb of raw media with type %s for %s at %s-%s", float64(contentLength)/1024/1024, mediaType, mediaURL, ipfsPrefix, name)
 			if mediaType == persist.MediaTypeAnimation {
 				timeBeforeCache := time.Now()
-				err = cacheRawAnimationMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
+				err = cacheRawAnimationMedia(pCtx, reader, bucket, fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 				if err != nil {
 					return mediaType, err
 				}
@@ -732,7 +670,7 @@ outer:
 				return mediaType, nil
 			}
 			timeBeforeCache := time.Now()
-			err = cacheRawMedia(pCtx, reader, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), fmt.Sprintf("%s-%s", ipfsPrefix, name), contentType, storageClient)
+			err = cacheRawMedia(pCtx, reader, bucket, fmt.Sprintf("%s-%s", ipfsPrefix, name), contentType, storageClient)
 			if err != nil {
 				return mediaType, err
 			}
@@ -766,46 +704,17 @@ func PredictMediaType(pCtx context.Context, url string) (persist.MediaType, stri
 	case persist.URITypeBase64BMP:
 		return persist.MediaTypeBase64BMP, "image/bmp", int64(len(asURI.String())), nil
 	case persist.URITypeHTTP, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
-		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
+		contentType, contentLength, err := rpc.GetHTTPHeaders(pCtx, url)
 		if err != nil {
 			return persist.MediaTypeUnknown, "", 0, err
 		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return persist.MediaTypeUnknown, "", 0, err
-		}
-		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return persist.MediaTypeUnknown, "", 0, rpc.ErrHTTP{Status: resp.StatusCode, URL: url}
-		}
-		contentType := resp.Header.Get("Content-Type")
-		contentType = strings.TrimSpace(contentType)
-		whereCharset := strings.IndexByte(contentType, ';')
-		if whereCharset != -1 {
-			contentType = contentType[:whereCharset]
-		}
-		contentLength := resp.ContentLength
 		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
 	case persist.URITypeIPFS:
-		path := strings.TrimPrefix(asURI.String(), "ipfs://")
-		headers, err := rpc.GetIPFSHeaders(pCtx, path)
+		contentType, contentLength, err := rpc.GetIPFSHeaders(pCtx, strings.TrimPrefix(asURI.String(), "ipfs://"))
 		if err != nil {
 			return persist.MediaTypeUnknown, "", 0, err
 		}
-		contentType := headers.Get("Content-Type")
-		contentType = strings.TrimSpace(contentType)
-		whereCharset := strings.IndexByte(contentType, ';')
-		if whereCharset != -1 {
-			contentType = contentType[:whereCharset]
-		}
-		contentLength := headers.Get("Content-Length")
-		contentLengthInt := 0
-		if contentLength != "" {
-			contentLengthInt, err = strconv.Atoi(contentLength)
-			if err != nil {
-				return persist.MediaTypeUnknown, "", 0, err
-			}
-		}
-		return persist.MediaFromContentType(contentType), contentType, int64(contentLengthInt), nil
+		return persist.MediaFromContentType(contentType), contentType, contentLength, nil
 	}
 	return persist.MediaTypeUnknown, "", 0, nil
 }
@@ -916,4 +825,11 @@ func (e errUnsupportedMediaType) Error() string {
 
 func (e errGeneratingThumbnail) Error() string {
 	return fmt.Sprintf("error generating thumbnail for url %s: %s", e.url, e.err)
+}
+
+func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName, contentType string) *storage.Writer {
+	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
+	writer.ObjectAttrs.ContentType = contentType
+	writer.CacheControl = "no-cache, no-store"
+	return writer
 }
