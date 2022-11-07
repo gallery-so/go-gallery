@@ -1,7 +1,7 @@
 package util
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -39,31 +39,14 @@ const (
 // When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
 // so that the first 512 bytes are not lost
 type FileHeaderReader struct {
-	headers   *bytes.Buffer
-	reader    io.Reader
+	*bufio.Reader
+	headers   []byte
 	subreader io.Reader
 }
 
 // NewFileHeaderReader returns a new FileHeaderReader
-func NewFileHeaderReader(reader io.Reader) (FileHeaderReader, error) {
-	fi := FileHeaderReader{
-		headers:   bytes.NewBuffer(make([]byte, 0, 512)),
-		subreader: reader,
-	}
-	_, err := io.CopyN(fi.headers, reader, 512)
-	if err != nil {
-		if err == io.EOF {
-			fi.reader = fi.headers
-			return fi, nil
-		}
-		return FileHeaderReader{}, err
-	}
-	fi.reader = io.MultiReader(fi.headers, reader)
-	return fi, nil
-}
-
-func (f FileHeaderReader) Read(p []byte) (n int, err error) {
-	return f.reader.Read(p)
+func NewFileHeaderReader(reader io.Reader) *FileHeaderReader {
+	return &FileHeaderReader{bufio.NewReader(reader), nil, reader}
 }
 
 // Close closes the given io.Reader if it is also a closer
@@ -75,8 +58,18 @@ func (f FileHeaderReader) Close() error {
 }
 
 // Headers returns the first 512 bytes of the reader
-func (f FileHeaderReader) Headers() []byte {
-	return f.headers.Bytes()
+func (f FileHeaderReader) Headers() ([]byte, error) {
+	if f.headers != nil {
+		return f.headers, nil
+	}
+
+	byt, err := f.Peek(512)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	f.headers = byt
+	return f.headers, nil
 }
 
 // RemoveBOM removes the byte order mark from a byte array

@@ -470,7 +470,7 @@ func GetDataFromURI(ctx context.Context, turi persist.TokenURI, ipfsClient *shel
 }
 
 // GetDataFromURIAsReader calls URI and returns the data as an unread reader with the headers pre-read
-func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (util.FileHeaderReader, error) {
+func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClient *shell.Shell, arweaveClient *goar.Client) (*util.FileHeaderReader, error) {
 
 	d, _ := ctx.Deadline()
 	logger.For(ctx).Infof("Getting data from URI: %s -timeout: %s -type: %s", turi.String(), time.Until(d), turi.Type())
@@ -484,22 +484,22 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		if err != nil {
 			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
 			if err != nil {
-				return util.FileHeaderReader{}, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+				return nil, fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
 			}
 		}
 
 		buf := bytes.NewBuffer(util.RemoveBOM(decoded))
 
-		return util.NewFileHeaderReader(buf)
+		return util.NewFileHeaderReader(buf), nil
 	case persist.URITypeIPFS, persist.URITypeIPFSGateway:
 		path := util.GetURIPath(asString, true)
 
 		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
 		if err != nil {
-			return util.FileHeaderReader{}, err
+			return nil, err
 		}
 
-		return util.NewFileHeaderReader(resp)
+		return util.NewFileHeaderReader(resp), nil
 	case persist.URITypeArweave:
 		path := util.GetURIPath(asString, true)
 
@@ -507,68 +507,68 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		if err != nil {
 			resp, err := GetArweaveDataHTTPReader(ctx, path)
 			if err != nil {
-				return util.FileHeaderReader{}, err
+				return nil, err
 			}
-			return util.NewFileHeaderReader(resp)
+			return util.NewFileHeaderReader(resp), nil
 		}
 		buf := bytes.NewBuffer(util.RemoveBOM(bs))
-		return util.NewFileHeaderReader(buf)
+		return util.NewFileHeaderReader(buf), nil
 	case persist.URITypeHTTP:
 
 		req, err := http.NewRequestWithContext(ctx, "GET", asString, nil)
 		if err != nil {
-			return util.FileHeaderReader{}, fmt.Errorf("error creating request: %s", err)
+			return nil, fmt.Errorf("error creating request: %s", err)
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
-			return util.FileHeaderReader{}, fmt.Errorf("error getting data from http: %s", err)
+			return nil, fmt.Errorf("error getting data from http: %s", err)
 		}
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
-			return util.FileHeaderReader{}, ErrHTTP{Status: resp.StatusCode, URL: asString}
+			return nil, ErrHTTP{Status: resp.StatusCode, URL: asString}
 		}
-		return util.NewFileHeaderReader(resp.Body)
+		return util.NewFileHeaderReader(resp.Body), nil
 	case persist.URITypeIPFSAPI:
 		parsedURL, err := url.Parse(asString)
 		if err != nil {
-			return util.FileHeaderReader{}, err
+			return nil, err
 		}
 		path := parsedURL.Query().Get("arg")
 		resp, err := GetIPFSResponse(ctx, ipfsClient, path)
 		if err != nil {
-			return util.FileHeaderReader{}, err
+			return nil, err
 		}
 
-		return util.NewFileHeaderReader(resp)
+		return util.NewFileHeaderReader(resp), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
 		idx := strings.IndexByte(asString, ',')
 		if idx == -1 {
 			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString)))
-			return util.NewFileHeaderReader(buf)
+			return util.NewFileHeaderReader(buf), nil
 		}
 		buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString[idx+1:])))
-		return util.NewFileHeaderReader(buf)
+		return util.NewFileHeaderReader(buf), nil
 	case persist.URITypeBase64BMP:
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.RawStdEncoding.DecodeString(string(b64data))
 		if err != nil {
 			decoded, err = base64.StdEncoding.DecodeString(string(b64data))
 			if err != nil {
-				return util.FileHeaderReader{}, fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
+				return nil, fmt.Errorf("error decoding base64 bmp data: %s \n\n%s", err, b64data)
 			}
 		}
 		img, err := bmp.Decode(bytes.NewReader(decoded))
 		if err != nil {
-			return util.FileHeaderReader{}, fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
+			return nil, fmt.Errorf("error decoding bmp data: %s \n\n%s", err, b64data)
 		}
 		newImage := &bytes.Buffer{}
 		err = jpeg.Encode(newImage, img, nil)
 		if err != nil {
-			return util.FileHeaderReader{}, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
+			return nil, fmt.Errorf("error encoding jpeg data: %s \n\n%s", err, b64data)
 		}
-		return util.NewFileHeaderReader(newImage)
+		return util.NewFileHeaderReader(newImage), nil
 	default:
 		buf := bytes.NewBuffer([]byte(turi))
-		return util.NewFileHeaderReader(buf)
+		return util.NewFileHeaderReader(buf), nil
 	}
 
 }

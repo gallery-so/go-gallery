@@ -609,7 +609,8 @@ outer:
 
 	if !mediaType.IsValid() {
 		timeBeforeSniff := time.Now()
-		mediaType, contentType = persist.SniffMediaType(reader.Headers())
+		bytesToSniff, _ := reader.Headers()
+		mediaType, contentType = persist.SniffMediaType(bytesToSniff)
 		logger.For(pCtx).Infof("sniffed media type for %s: %s in %s", truncateString(mediaURL, 50), mediaType, time.Since(timeBeforeSniff))
 	}
 
