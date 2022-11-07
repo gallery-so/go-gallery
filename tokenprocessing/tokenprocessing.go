@@ -3,9 +3,10 @@ package tokenprocessing
 import (
 	"context"
 	"database/sql"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v4/pgxpool"
 
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
