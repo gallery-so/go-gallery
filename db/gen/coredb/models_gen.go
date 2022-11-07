@@ -18,7 +18,7 @@ type Access struct {
 	Version             sql.NullInt32
 	CreatedAt           time.Time
 	LastUpdated         time.Time
-	UserID              sql.NullString
+	UserID              persist.DBID
 	MostRecentBlock     sql.NullInt64
 	RequiredTokensOwned pgtype.JSONB
 	IsAdmin             sql.NullBool
@@ -32,16 +32,6 @@ type Admire struct {
 	Deleted     bool
 	CreatedAt   time.Time
 	LastUpdated time.Time
-}
-
-type Backup struct {
-	ID          persist.DBID
-	Deleted     bool
-	Version     sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	GalleryID   sql.NullString
-	Gallery     pgtype.JSONB
 }
 
 type Collection struct {
@@ -61,7 +51,7 @@ type Collection struct {
 
 type CollectionEvent struct {
 	ID           persist.DBID
-	UserID       sql.NullString
+	UserID       persist.DBID
 	CollectionID persist.DBID
 	Version      sql.NullInt32
 	EventCode    sql.NullInt32
@@ -93,7 +83,7 @@ type Contract struct {
 	Symbol           sql.NullString
 	Address          persist.Address
 	CreatorAddress   persist.Address
-	Chain            sql.NullInt32
+	Chain            persist.Chain
 	ProfileBannerUrl sql.NullString
 	ProfileImageUrl  sql.NullString
 	BadgeUrl         sql.NullString
@@ -101,7 +91,7 @@ type Contract struct {
 }
 
 type EarlyAccess struct {
-	Address string
+	Address persist.Address
 }
 
 type Event struct {
@@ -138,7 +128,7 @@ type Feature struct {
 	Name                sql.NullString
 	IsEnabled           sql.NullBool
 	AdminOnly           sql.NullBool
-	ForceEnabledUserIds []string
+	ForceEnabledUserIds persist.DBIDList
 }
 
 type FeedBlocklist struct {
@@ -189,8 +179,8 @@ type LoginAttempt struct {
 	Version            sql.NullInt32
 	CreatedAt          time.Time
 	LastUpdated        time.Time
-	Address            sql.NullString
-	RequestHostAddress sql.NullString
+	Address            persist.Address
+	RequestHostAddress persist.Address
 	UserExists         sql.NullBool
 	Signature          sql.NullString
 	SignatureValid     sql.NullBool
@@ -204,7 +194,7 @@ type Membership struct {
 	Version     sql.NullInt32
 	CreatedAt   time.Time
 	LastUpdated time.Time
-	TokenID     sql.NullString
+	TokenID     persist.DBID
 	Name        sql.NullString
 	AssetUrl    sql.NullString
 	Owners      persist.TokenHolderList
@@ -212,8 +202,8 @@ type Membership struct {
 
 type NftEvent struct {
 	ID          persist.DBID
-	UserID      sql.NullString
-	NftID       sql.NullString
+	UserID      persist.DBID
+	NftID       persist.DBID
 	Version     sql.NullInt32
 	EventCode   sql.NullInt32
 	CreatedAt   time.Time
@@ -228,10 +218,10 @@ type Nonce struct {
 	Version     sql.NullInt32
 	LastUpdated time.Time
 	CreatedAt   time.Time
-	UserID      sql.NullString
-	Address     sql.NullString
+	UserID      persist.DBID
+	Address     persist.Address
 	Value       sql.NullString
-	Chain       sql.NullInt32
+	Chain       persist.Chain
 }
 
 type Notification struct {
@@ -263,15 +253,15 @@ type Token struct {
 	Media                persist.Media
 	TokenUri             sql.NullString
 	TokenType            sql.NullString
-	TokenID              sql.NullString
+	TokenID              persist.TokenID
 	Quantity             sql.NullString
-	OwnershipHistory     []pgtype.JSONB
+	OwnershipHistory     persist.AddressAtBlockList
 	TokenMetadata        persist.TokenMetadata
 	ExternalUrl          sql.NullString
 	BlockNumber          sql.NullInt64
 	OwnerUserID          persist.DBID
 	OwnedByWallets       persist.DBIDList
-	Chain                sql.NullInt32
+	Chain                persist.Chain
 	Contract             persist.DBID
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
@@ -297,7 +287,7 @@ type User struct {
 
 type UserEvent struct {
 	ID          persist.DBID
-	UserID      sql.NullString
+	UserID      persist.DBID
 	Version     sql.NullInt32
 	EventCode   sql.NullInt32
 	CreatedAt   time.Time
@@ -314,5 +304,5 @@ type Wallet struct {
 	Version     sql.NullInt32
 	Address     persist.Address
 	WalletType  persist.WalletType
-	Chain       sql.NullInt32
+	Chain       persist.Chain
 }

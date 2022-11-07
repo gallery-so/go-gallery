@@ -36,6 +36,9 @@ const gqlRequestIdContextKey = "graphql.gqlRequestId"
 const noCachePublicAPIContextKey = "graphql.noCachePublicAPI"
 const maxSentryDataLength = 8 * 1024
 
+// Max log entry size is 256kB, but we want lots of headroom
+const maxCloudLoggingDataLength = 128 * 1024
+
 func getFieldName(fc *gqlgen.FieldContext) string {
 	if fc == nil {
 		return "UnknownField"
@@ -50,6 +53,14 @@ func getOperationName(oc *gqlgen.OperationContext) string {
 	}
 
 	return oc.Operation.Name
+}
+
+func getOperationType(oc *gqlgen.OperationContext) string {
+	if oc == nil || oc.Operation == nil {
+		return "UnknownType"
+	}
+
+	return string(oc.Operation.Operation)
 }
 
 func MutationCachingHandler(newPublicAPI func(context.Context, bool) *publicapi.PublicAPI) func(ctx context.Context, next gqlgen.Resolver) (res interface{}, err error) {
@@ -231,12 +242,17 @@ func FieldReporter(trace bool) func(ctx context.Context, next gqlgen.Resolver) (
 
 func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
 	return func(ctx context.Context, next gqlgen.ResponseHandler) *gqlgen.Response {
+		// Unique ID to make finding this particular log entry easy
+		locatorID := ksuid.New().String()
+
+		oc := gqlgen.GetOperationContext(ctx)
+		operationName := getOperationName(oc)
+		operationType := getOperationType(oc)
+
 		var span *sentry.Span
-		var responseLocatorId string
 
 		if trace {
-			oc := gqlgen.GetOperationContext(ctx)
-			span, ctx = tracing.StartSpan(ctx, "gql.response", getOperationName(oc))
+			span, ctx = tracing.StartSpan(ctx, "gql.response", operationName)
 		}
 
 		response := next(ctx)
@@ -255,26 +271,29 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 			// requests and responses under the same ID.
 			gqlRequestId := ctx.Value(gqlRequestIdContextKey)
 
-			// Unique ID to make finding this particular log entry easy
-			responseLocatorId = ksuid.New().String()
+			// If the total log entry is larger than 256kB, Google Cloud Logging truncates it, at which point the
+			// entire log entry is no longer valid JSON and we can't search by JSON fields. To get around this,
+			// we log the response separately if it's too large.
+			responseSizeLimited, limited := limitFieldSize(len(*responseData), maxCloudLoggingDataLength, "response", locatorID, responseData)
+			if limited {
+				logger.For(ctx).WithFields(logrus.Fields{
+					"locatorId": locatorID,
+					"response":  responseData,
+				}).Info("Sending GraphQL response")
+			}
 
-			gc := util.GinContextFromContext(ctx)
-			userId := auth.GetUserIDFromCtx(gc)
-
-			// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
-			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
-			// limit is 256kb per entry), we want to make sure all of our fields are visible.
 			logger.For(ctx).WithFields(logrus.Fields{
-				"authenticated":     userId != "",
-				"userId":            userId,
-				"gqlRequestId":      gqlRequestId,
-				"responseLocatorId": responseLocatorId,
-				"zzz_response":      responseData,
+				"gqlOperationName": operationName,
+				"gqlOperationType": operationType,
+				"gqlMessageType":   "response",
+				"gqlRequestId":     gqlRequestId,
+				"locatorId":        locatorID,
+				"response":         responseSizeLimited,
 			}).Info("Sending GraphQL response")
 		}
 
 		if span != nil {
-			responseSizeLimited := limitEventDataSize(len(response.Data), maxSentryDataLength, "response", responseLocatorId, responseData)
+			responseSizeLimited, _ := limitFieldSize(len(*responseData), maxSentryDataLength, "response", locatorID, responseData)
 
 			tracing.AddEventDataToSpan(span, map[string]interface{}{
 				"response": responseSizeLimited,
@@ -289,19 +308,21 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 
 func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
 	return func(ctx context.Context, next gqlgen.OperationHandler) gqlgen.ResponseHandler {
-		var span *sentry.Span
-		var requestLocatorId string
+		// Unique ID to make finding this particular log entry easy
+		locatorID := ksuid.New().String()
 
 		gc := util.GinContextFromContext(ctx)
 		oc := gqlgen.GetOperationContext(ctx)
+		operationName := getOperationName(oc)
+		operationType := getOperationType(oc)
+
+		var span *sentry.Span
 
 		if trace {
-			operationName := getOperationName(oc)
 			transactionName := fmt.Sprintf("%s %s (%s)", gc.Request.Method, gc.Request.URL.Path, operationName)
 			span, ctx = tracing.StartSpan(ctx, "gql.request", operationName, sentry.TransactionName(transactionName))
 		}
 
-		userId := auth.GetUserIDFromCtx(gc)
 		scrubbedQuery, scrubbedVariables := getScrubbedQuery(ctx, schema, oc.Doc, oc.RawQuery, oc.Variables)
 
 		if log {
@@ -309,23 +330,29 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 			gqlRequestId := ksuid.New().String()
 			ctx = context.WithValue(ctx, gqlRequestIdContextKey, gqlRequestId)
 
-			// Unique ID to make finding this particular log entry easy
-			requestLocatorId = ksuid.New().String()
+			// If the total log entry is larger than 256kB, Google Cloud Logging truncates it, at which point the
+			// entire log entry is no longer valid JSON and we can't search by JSON fields. To get around this,
+			// we log the query separately if it's too large.
+			scrubbedQuerySizeLimited, limited := limitFieldSize(len(scrubbedQuery), maxCloudLoggingDataLength, "scrubbedQuery", locatorID, scrubbedQuery)
+			if limited {
+				logger.For(ctx).WithFields(logrus.Fields{
+					"locatorId":     locatorID,
+					"scrubbedQuery": scrubbedQuery,
+				}).Info("Received GraphQL query")
+			}
 
-			// Fields are logged in alphabetical order, so scrubbedQuery is prefixed with a zzz_ to make sure
-			// it's last. In cases where a log entry is too large and gets truncated (e.g. Google Cloud Logging
-			// limit is 256kb per entry), we want to make sure all of our fields are visible.
 			logger.For(ctx).WithFields(logrus.Fields{
-				"authenticated":     userId != "",
-				"userId":            userId,
+				"gqlOperationName":  operationName,
+				"gqlOperationType":  operationType,
+				"gqlMessageType":    "request",
 				"gqlRequestId":      gqlRequestId,
-				"requestLocatorId":  requestLocatorId,
+				"locatorId":         locatorID,
 				"scrubbedVariables": scrubbedVariables,
-				"zzz_scrubbedQuery": scrubbedQuery,
+				"scrubbedQuery":     scrubbedQuerySizeLimited,
 			}).Info("Received GraphQL query")
 		}
 
-		scrubbedQuerySizeLimited := limitEventDataSize(len(scrubbedQuery), maxSentryDataLength, "scrubbedQuery", requestLocatorId, scrubbedQuery)
+		scrubbedQuerySizeLimited, _ := limitFieldSize(len(scrubbedQuery), maxSentryDataLength, "scrubbedQuery", locatorID, scrubbedQuery)
 
 		if hub := sentry.GetHubFromContext(ctx); hub != nil {
 			scrubbedVariablesJson := "error converting variables to JSON string"
@@ -362,9 +389,12 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 // data might be unparsed JSON bytes, truncation is a bad idea: we don't want to truncate bytes at
 // maxLength and try to parse invalid/incomplete data. Instead, we just replace the data with a
 // helpful placeholder message.
-func limitEventDataSize(length int, maxLength int, name string, locatorId string, data interface{}) interface{} {
+// We also use this function to omit large payloads in Google Cloud Logging fields, since the max
+// size for a Cloud Logging entry is 256kB, and entries larger than that will result in a broken
+// JSON payload that isn't searchable by its fields.
+func limitFieldSize(length int, maxLength int, name string, locatorId string, data interface{}) (output interface{}, limited bool) {
 	if length <= maxLength {
-		return data
+		return data, false
 	}
 
 	placeholder := fmt.Sprintf("%s omitted because it is too large (%d bytes)", name, length)
@@ -372,7 +402,7 @@ func limitEventDataSize(length int, maxLength int, name string, locatorId string
 		placeholder += fmt.Sprintf(", but it should be accessible by searching logs for this unique ID: %s", locatorId)
 	}
 
-	return placeholder
+	return placeholder, true
 }
 
 func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schema, allQueryVariables map[string]interface{}, scrubbedOutput map[string]interface{}) {
@@ -382,57 +412,43 @@ func scrubVariable(variableDefinition *ast.VariableDefinition, schema *ast.Schem
 	}
 
 	definition := schema.Types[namedType]
-	scrubField := false
+	scrubFieldContents := false
 
 	for _, directive := range definition.Directives {
 		if directive.Name == scrubDirectiveName {
-			scrubField = true
+			scrubFieldContents = true
 			break
 		}
 	}
 
-	if scrubField {
+	if scrubFieldContents {
 		scrubbedOutput[variableDefinition.Variable] = scrubText
 	}
 
 	if definition == nil || len(definition.Fields) == 0 {
-		if !scrubField {
+		if !scrubFieldContents {
 			scrubbedOutput[variableDefinition.Variable] = allQueryVariables[variableDefinition.Variable]
 		}
 		return
 	}
 
-	outputForDefinition := make(map[string]interface{})
-	if !scrubField {
-		scrubbedOutput[variableDefinition.Variable] = outputForDefinition
-	}
-
-	varsInterface := allQueryVariables[variableDefinition.Variable]
-	varsForDefinition, ok := varsInterface.(map[string]interface{})
-	if !ok {
-		if varsInterface != nil {
-			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
-		}
-		return
-	}
-
-	for _, field := range definition.Fields {
-		scrubVariableField(schema, field, varsForDefinition, outputForDefinition)
+	if !scrubFieldContents {
+		scrubVariableChildFields(schema, definition, allQueryVariables[variableDefinition.Variable], scrubbedOutput, variableDefinition.Variable)
 	}
 }
 
 func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variables map[string]interface{}, scrubbedOutput map[string]interface{}) {
-	scrubField := false
+	scrubFieldContents := false
 	fieldValue, hasField := variables[field.Name]
 
 	for _, directive := range field.Directives {
 		if directive.Name == scrubDirectiveName {
-			scrubField = true
+			scrubFieldContents = true
 			break
 		}
 	}
 
-	if hasField && scrubField {
+	if hasField && scrubFieldContents {
 		scrubbedOutput[field.Name] = scrubText
 	}
 
@@ -444,30 +460,63 @@ func scrubVariableField(schema *ast.Schema, field *ast.FieldDefinition, variable
 	definition := schema.Types[namedType]
 
 	if definition == nil || len(definition.Fields) == 0 {
-		if hasField && !scrubField {
+		if hasField && !scrubFieldContents {
 			scrubbedOutput[field.Name] = fieldValue
 		}
 		return
 	}
 
-	outputForDefinition := make(map[string]interface{})
-
-	if hasField && !scrubField {
-		scrubbedOutput[field.Name] = outputForDefinition
+	if hasField && !scrubFieldContents {
+		scrubVariableChildFields(schema, definition, variables[field.Name], scrubbedOutput, field.Name)
 	}
+}
 
-	varsInterface := variables[field.Name]
-	varsForDefinition, ok := varsInterface.(map[string]interface{})
-	if !ok {
-		if varsInterface != nil {
-			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to map[string]interface{}", varsForDefinition)
+func scrubVariableChildFields(schema *ast.Schema, definition *ast.Definition, varsInterface interface{}, scrubbedOutput map[string]interface{}, fieldName string) {
+	if varsForDefinition, ok := varsInterface.(map[string]interface{}); ok {
+		outputForDefinition := make(map[string]interface{})
+
+		for _, childField := range definition.Fields {
+			scrubVariableField(schema, childField, varsForDefinition, outputForDefinition)
 		}
+
+		scrubbedOutput[fieldName] = outputForDefinition
 		return
 	}
 
-	for _, childField := range definition.Fields {
-		scrubVariableField(schema, childField, varsForDefinition, outputForDefinition)
+	if varsForDefinition, ok := varsInterface.([]interface{}); ok {
+		scrubbedOutput[fieldName] = scrubVariableSlice(schema, definition, varsForDefinition)
+		return
 	}
+
+	if varsInterface != nil {
+		logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to usable type", varsInterface)
+	}
+}
+
+func scrubVariableSlice(schema *ast.Schema, definition *ast.Definition, varsForDefinition []interface{}) []interface{} {
+	outputForDefinition := make([]interface{}, 0, len(varsForDefinition))
+
+	for _, entry := range varsForDefinition {
+		if asSlice, ok := entry.([]interface{}); ok {
+			outputForDefinition = append(outputForDefinition, scrubVariableSlice(schema, definition, asSlice))
+			continue
+		}
+
+		if asMap, ok := entry.(map[string]interface{}); ok {
+			outputForEntry := make(map[string]interface{})
+			outputForDefinition = append(outputForDefinition, outputForEntry)
+			for _, childField := range definition.Fields {
+				scrubVariableField(schema, childField, asMap, outputForEntry)
+			}
+			continue
+		}
+
+		if entry != nil {
+			logger.For(nil).Warnf("scrubVariable: failed to convert variables '%v' to usable type", entry)
+		}
+	}
+
+	return outputForDefinition
 }
 
 func scrubChildren(value *ast.Value, schema *ast.Schema, positions map[int]*ast.Position) {

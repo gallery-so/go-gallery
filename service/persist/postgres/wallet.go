@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -10,7 +11,8 @@ import (
 
 // WalletRepository is a repository for wallets
 type WalletRepository struct {
-	db *sql.DB
+	db      *sql.DB
+	queries *db.Queries
 
 	insertStmt            *sql.Stmt
 	getByIDStmt           *sql.Stmt
@@ -19,7 +21,7 @@ type WalletRepository struct {
 }
 
 // NewWalletRepository creates a new postgres repository for interacting with wallets
-func NewWalletRepository(db *sql.DB) *WalletRepository {
+func NewWalletRepository(db *sql.DB, queries *db.Queries) *WalletRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -37,6 +39,7 @@ func NewWalletRepository(db *sql.DB) *WalletRepository {
 
 	return &WalletRepository{
 		db:                    db,
+		queries:               queries,
 		getByIDStmt:           getByIDStmt,
 		getByChainAddressStmt: getByChainAddressStmt,
 		getByUserIDStmt:       getByUserIDStmt,

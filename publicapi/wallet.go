@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -13,7 +14,7 @@ import (
 )
 
 type WalletAPI struct {
-	repos              *persist.Repositories
+	repos              *postgres.Repositories
 	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate

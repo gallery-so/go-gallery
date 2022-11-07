@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/validate"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -27,7 +27,7 @@ var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire c
 var ErrOnlyRemoveOwnComment = errors.New("only the actor who created the comment can remove it")
 
 type InteractionAPI struct {
-	repos     *persist.Repositories
+	repos     *postgres.Repositories
 	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate

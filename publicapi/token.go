@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 )
 
 type TokenAPI struct {
-	repos              *persist.Repositories
+	repos              *postgres.Repositories
 	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
@@ -341,7 +342,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		addresses = append(addresses, wa.Address)
 	}
 
-	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain), addresses)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -398,7 +399,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 				addresses = append(addresses, wa.Address)
 			}
 
-			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), persist.Chain(contract.Chain.Int32)), addresses)
+			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain), addresses)
 			if err != nil {
 				errChan <- ErrTokenRefreshFailed{Message: err.Error()}
 				return

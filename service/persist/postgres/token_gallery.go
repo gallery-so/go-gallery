@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/lib/pq"
@@ -15,8 +16,8 @@ import (
 
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
-	db                                                  *sql.DB
-	galleryRepo                                         *GalleryRepository
+	db                                      *sql.DB
+	queries                                 *db.Queries
 	getByUserIDStmt                                     *sql.Stmt
 	getByUserIDPaginateStmt                             *sql.Stmt
 	getByTokenIDStmt                                    *sql.Stmt
@@ -41,7 +42,7 @@ var errTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
 
 // NewTokenGalleryRepository creates a new TokenRepository
 // TODO joins on addresses
-func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *TokenGalleryRepository {
+func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -100,8 +101,8 @@ func NewTokenGalleryRepository(db *sql.DB, galleryRepo *GalleryRepository) *Toke
 	checkNoErr(err)
 
 	return &TokenGalleryRepository{
-		db:                                     db,
-		galleryRepo:                            galleryRepo,
+		db:                                      db,
+		queries:                                 queries,
 		getByUserIDStmt:                        getByUserIDStmt,
 		getByUserIDPaginateStmt:                getByUserIDPaginateStmt,
 		getByTokenIdentifiersStmt:              getByTokenIdentifiersStmt,
@@ -334,7 +335,7 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 	if rows == 0 {
 		return persist.ErrTokenNotFoundByID{ID: pID}
 	}
-	return t.galleryRepo.RefreshCache(pCtx, pUserID)
+	return nil
 }
 
 // UpdateByTokenIdentifiersUnsafe updates a token by its token identifiers without checking if it is owned by any given user
