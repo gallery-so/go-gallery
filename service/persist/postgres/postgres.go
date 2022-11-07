@@ -177,10 +177,22 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 	span.StartTime = time.Now().Add(-duration)
 }
 
-func generateValuesPlaceholders(l, offset int) string {
+func generateValuesPlaceholders(l, offset int, nows []int) string {
+	indexToNow := make(map[int]bool)
+	if nows != nil {
+		for _, i := range nows {
+			indexToNow[i] = true
+		}
+	}
 	values := "("
+	d := 0
 	for i := 0; i < l; i++ {
-		values += fmt.Sprintf("$%d,", i+1+offset)
+		if indexToNow[i] {
+			values += "now()"
+		} else {
+			values += fmt.Sprintf("$%d,", d+1+offset)
+			d++
+		}
 	}
 	return values[0:len(values)-1] + ")"
 }

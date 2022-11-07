@@ -113,7 +113,7 @@ type Event struct {
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
 	ExternalID     persist.NullString
-	Caption        sql.NullString
+	Caption        persist.NullString
 }
 
 type Feature struct {
@@ -151,7 +151,7 @@ type FeedEvent struct {
 	Deleted     bool
 	LastUpdated time.Time
 	CreatedAt   time.Time
-	Caption     sql.NullString
+	Caption     persist.NullString
 }
 
 type Follow struct {
@@ -265,6 +265,7 @@ type Token struct {
 	Contract             persist.DBID
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
+	LastSynced           time.Time
 }
 
 type User struct {

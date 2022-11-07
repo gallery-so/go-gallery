@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -185,9 +184,9 @@ func pushEvent(ctx context.Context, evt db.Event) {
 	}
 }
 
-func stringToNullable(caption *string) sql.NullString {
+func stringToNullable(caption *string) persist.NullString {
 	if caption == nil {
-		return sql.NullString{Valid: false}
+		return ""
 	}
-	return sql.NullString{String: *caption, Valid: true}
+	return persist.NullString(*caption)
 }

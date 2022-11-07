@@ -1234,7 +1234,7 @@ func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
 		Dbid:         wallet.ID,
 		WalletType:   &wallet.WalletType,
 		ChainAddress: &chainAddress,
-		Chain:        &chain,
+		Chain:        &wallet.Chain,
 		Tokens:       nil, // handled by dedicated resolver
 	}
 }
@@ -1248,7 +1248,7 @@ func contractToModel(ctx context.Context, contract db.Contract) *model.Contract 
 		Dbid:             contract.ID,
 		ContractAddress:  &addr,
 		CreatorAddress:   &creator,
-		Chain:            &chain,
+		Chain:            &contract.Chain,
 		Name:             &contract.Name.String,
 		LastUpdated:      &contract.LastUpdated,
 		ProfileImageURL:  &contract.ProfileImageUrl.String,

@@ -3,8 +3,9 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"

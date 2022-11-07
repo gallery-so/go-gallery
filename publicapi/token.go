@@ -3,9 +3,10 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"

@@ -282,7 +282,7 @@ outer:
 	if err != nil {
 		return err
 	}
-	newTokens, err := p.upsertTokens(ctx, allTokens, addressToContract, allUsersNFTs, user)
+	_, err = p.upsertTokens(ctx, allTokens, addressToContract, allUsersNFTs, user, chains)
 	if err != nil {
 		return err
 	}
@@ -295,27 +295,6 @@ outer:
 			return err
 		}
 
-	}
-
-	logger.For(ctx).Warn("preparing to delete old tokens")
-
-	// ensure all old tokens are deleted
-	ownedTokens := make(map[tokenIdentifiers]bool)
-	for _, t := range newTokens {
-		ownedTokens[tokenIdentifiers{chain: t.Chain, tokenID: t.TokenID, contract: t.Contract}] = true
-	}
-
-	for _, nft := range allUsersNFTs {
-		if !validChainsLookup[nft.Chain] {
-			continue
-		}
-		if !ownedTokens[tokenIdentifiers{chain: nft.Chain, tokenID: nft.TokenID, contract: nft.Contract}] {
-			logger.For(ctx).Warnf("deleting nft %d-%s-%s", nft.Chain, nft.TokenID, nft.Contract)
-			err := p.Repos.TokenRepository.DeleteByID(ctx, nft.ID)
-			if err != nil {
-				return err
-			}
-		}
 	}
 
 	return nil
@@ -573,21 +552,36 @@ outer:
 		return err
 	}
 
-	logger.For(ctx).Debug("creating tokens")
+	contract, err := p.Queries.GetContractByChainAddress(ctx, coredb.GetContractByChainAddressParams{
+		Address: ci.ContractAddress,
+		Chain:   ci.Chain,
+	})
+	if err != nil {
+		return err
+	}
 
+	logger.For(ctx).Debug("creating tokens")
+	now := time.Now()
+
+	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
 	for userID, user := range users {
 		allUserTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, userID, -1, 0)
 		if err != nil {
 			return err
 		}
 
-		logger.For(ctx).Debugf("creating tokens for user %s", user.Username)
-		_, err = p.upsertTokens(ctx, chainTokensForUsers[userID], addressToContract, allUserTokens, user)
+		logger.For(ctx).Debugf("preparing tokens for user %s", user.Username)
+		tokens, err := p.prepareTokensOfContractForUser(ctx, chainTokensForUsers[userID], addressToContract, allUserTokens, user, now)
 		if err != nil {
 			return err
 		}
+		tokensToUpsert = append(tokensToUpsert, tokens...)
 
-		logger.For(ctx).Debugf("creating tokens for user %s done", user.Username)
+		logger.For(ctx).Debugf("preparing tokens for user %s done", user.Username)
+	}
+
+	if err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contract.ID, tokensToUpsert); err != nil {
+		return fmt.Errorf("error deleting tokens: %s", err)
 	}
 	return nil
 }
@@ -808,18 +802,35 @@ outer:
 	return chainTokensForUser, users, nil
 }
 
-func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User) ([]persist.TokenGallery, error) {
+func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
+	newTokens, err := dedupeAndPrepareTokensForUpsert(ctx, allTokens, addressesToContracts, user, allUsersTokens)
+	if err != nil {
+		return nil, err
+	}
 
+	if err := p.Repos.TokenRepository.BulkUpsertByOwnerUserID(ctx, user.ID, chains, newTokens); err != nil {
+		return nil, fmt.Errorf("error upserting tokens: %s", err)
+	}
+	return newTokens, nil
+}
+
+func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, timeStamp time.Time) ([]persist.TokenGallery, error) {
+
+	newTokens, err := dedupeAndPrepareTokensForUpsert(ctx, allTokens, addressesToContracts, user, allUsersTokens)
+	if err != nil {
+		return nil, err
+	}
+
+	return newTokens, nil
+}
+
+func dedupeAndPrepareTokensForUpsert(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, allUsersTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
 	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
 	if err != nil {
 		return nil, err
 	}
 
 	newTokens = addExistingMedia(ctx, newTokens, allUsersTokens)
-
-	if err := p.Repos.TokenRepository.BulkUpsert(ctx, newTokens); err != nil {
-		return nil, fmt.Errorf("error upserting tokens: %s", err)
-	}
 	return newTokens, nil
 }
 
@@ -960,7 +971,6 @@ func addExistingMedia(ctx context.Context, providerTokens []persist.TokenGallery
 	}
 	res := make([]persist.TokenGallery, len(providerTokens))
 	for i, t := range providerTokens {
-		logger.For(ctx).Debugf("token: %s", t.Name)
 		if !t.Media.IsServable() {
 			if dbToken, ok := savedMap[t.TokenIdentifiers()]; ok && dbToken.Media.IsServable() {
 				t.Media = dbToken.Media
