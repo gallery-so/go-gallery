@@ -56,12 +56,13 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 			userID = *debugParams.UserID
 		}
 
-		user, err := api.repos.UserRepository.GetByID(ctx, userID)
-		if err != nil {
-			return nil, fmt.Errorf("debug auth failed: %w", err)
+		var user *persist.User
+		dbUser, err := api.repos.UserRepository.GetByID(ctx, userID)
+		if err == nil {
+			user = &dbUser
 		}
 
-		return debugtools.NewDebugAuthenticator(&user, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
+		return debugtools.NewDebugAuthenticator(user, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
 	}
 
 	if debugParams.UserID != nil || debugParams.ChainAddresses != nil {

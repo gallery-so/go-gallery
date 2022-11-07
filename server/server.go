@@ -165,6 +165,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
 	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
+	viper.SetDefault("EMAILS_HOST", "http://localhost:5500")
 
 	viper.AutomaticEnv()
 

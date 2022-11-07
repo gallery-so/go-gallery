@@ -4,17 +4,21 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"image/jpeg"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -192,9 +196,39 @@ func newClientForIPFS(projectID, projectSecret string, continueOnly bool) *http.
 
 // newHTTPClientForRPC returns an http.Client configured with default settings intended for RPC calls.
 func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *http.Client {
+	// get x509 cert pool
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		panic(err)
+	}
+
+	// walk every file in the tls directory and add them to the cert pool
+	filepath.WalkDir("_deploy/root-certs", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		bs, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		// append cert to pool
+		ok := pool.AppendCertsFromPEM(bs)
+		if !ok {
+			return fmt.Errorf("failed to append cert to pool")
+		}
+		return nil
+	})
+
 	return &http.Client{
 		Timeout: time.Second * defaultHTTPTimeout,
 		Transport: tracing.NewTracingTransport(&http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: pool,
+			},
 			Dial:                (&net.Dialer{KeepAlive: defaultHTTPKeepAlive * time.Second}).Dial,
 			MaxIdleConns:        defaultHTTPMaxIdleConns,
 			MaxIdleConnsPerHost: defaultHTTPMaxIdleConnsPerHost,

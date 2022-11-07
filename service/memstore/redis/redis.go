@@ -21,6 +21,7 @@ const (
 	IndexerServerThrottleDB   = 6
 	RefreshNFTsThrottleDB     = 7
 	TokenProcessingThrottleDB = 8
+	EmailThrottleDB           = 9
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.

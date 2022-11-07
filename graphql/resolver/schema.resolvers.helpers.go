@@ -13,6 +13,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -487,6 +488,33 @@ func resolveViewer(ctx context.Context) *model.Viewer {
 	return viewer
 }
 
+func resolveViewerEmail(ctx context.Context) *model.UserEmail {
+
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil
+	}
+
+	return userToEmailModel(user)
+
+}
+
+func userToEmailModel(user *db.User) *model.UserEmail {
+
+	email := user.Email.String()
+
+	return &model.UserEmail{
+		Email:              &email,
+		VerificationStatus: &user.EmailVerified,
+		EmailNotificationSettings: &model.EmailNotificationSettings{
+			UnsubscribedFromAll: user.EmailUnsubscriptions.All.BoolPointer(),
+		},
+	}
+
+}
+
 func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (*model.MembershipTier, error) {
 	tier, err := publicapi.For(ctx).User.GetMembershipByMembershipId(ctx, id)
 
@@ -724,10 +752,6 @@ func resolveViewerNotificationSettings(ctx context.Context) (*model.Notification
 func notificationSettingsToModel(ctx context.Context, user *db.User) *model.NotificationSettings {
 	settings := user.NotificationSettings
 	return &model.NotificationSettings{
-		HelperNotificationSettingsData: model.HelperNotificationSettingsData{
-			UserId: user.ID,
-		},
-		User:                         userToModel(ctx, *user),
 		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
 		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
 		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
@@ -901,6 +925,30 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 	}
 
 	return commentToModel(ctx, *comment), nil
+}
+
+func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {
+	output, err := emails.VerifyEmail(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.VerifyEmailPayload{
+		Email: &output.Email,
+	}, nil
+
+}
+
+func updateUserEmail(ctx context.Context, email string) (*model.UpdateEmailPayload, error) {
+	err := publicapi.For(ctx).User.UpdateUserEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.UpdateEmailPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+
 }
 
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {

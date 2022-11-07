@@ -162,7 +162,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 		FetchAssets(ctx, assetsChan, persist.EthereumAddress(address.String()), "", "", "", 0, nil)
 	}()
 
-	return assetsToTokens(ctx, assetsChan, p.ethClient)
+	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
 }
 
 // GetTokensByContractAddress returns a list of tokens for a contract address
@@ -172,7 +172,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 		defer close(assetsChan)
 		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(address), "", "", 0, nil)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -190,7 +190,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 		defer close(assetsChan)
 		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
 	}
@@ -207,7 +207,7 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 		defer close(assetsChan)
 		FetchAssets(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
 	}()
-	tokens, contracts, err := assetsToTokens(ctx, assetsChan, p.ethClient)
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -600,7 +600,7 @@ func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddr
 	return response, nil
 }
 
-func assetsToTokens(ctx context.Context, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 
 	block, err := ethClient.BlockNumber(ctx)
 	if err != nil {
@@ -685,13 +685,18 @@ func assetsToTokens(ctx context.Context, assetsChan <-chan assetsReceieved, ethC
 						contractsChan <- multichain.ChainAgnosticContract{}
 					}
 
+					tokenOwner := ownerAddress
+					if tokenOwner == "" {
+						tokenOwner = persist.Address(nft.Owner.Address)
+					}
+
 					tokensChan <- multichain.ChainAgnosticToken{
 						TokenType:       tokenType,
 						Name:            nft.Name,
 						Description:     nft.Description,
 						TokenURI:        persist.TokenURI(nft.TokenMetadataURL),
 						TokenID:         persist.TokenID(nft.TokenID.ToBase16()),
-						OwnerAddress:    persist.Address(nft.Owner.Address),
+						OwnerAddress:    tokenOwner,
 						ContractAddress: persist.Address(nft.Contract.ContractAddress.String()),
 						ExternalURL:     nft.ExternalURL,
 						BlockNumber:     persist.BlockNumber(block),

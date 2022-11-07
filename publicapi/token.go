@@ -56,7 +56,7 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 	return &token, nil
 }
 
-func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID) ([]db.Token, error) {
+func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
@@ -64,7 +64,10 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByCollectionID.Load(collectionID)
+	tokens, err := api.loaders.TokensByCollectionID.Load(dataloader.IDAndLimit{
+		ID:    collectionID,
+		Limit: limit,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +372,9 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 		return err
 	}
 
-	tokens, err := api.loaders.TokensByCollectionID.Load(collectionDBID)
+	tokens, err := api.loaders.TokensByCollectionID.Load(dataloader.IDAndLimit{
+		ID: collectionDBID,
+	})
 	if err != nil {
 		return err
 	}

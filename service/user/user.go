@@ -81,7 +81,7 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, bio string, userRepo *postgres.UserRepository,
+func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *string, bio string, userRepo *postgres.UserRepository,
 	galleryRepo *postgres.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
@@ -104,6 +104,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	user := persist.CreateUserInput{
 		Username:     username,
 		Bio:          bio,
+		Email:        email,
 		ChainAddress: wallet.ChainAddress,
 		WalletType:   wallet.WalletType,
 	}

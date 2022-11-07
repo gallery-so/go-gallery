@@ -1,28 +1,23 @@
-package tokenprocessing
+package emails
 
 import (
 	"context"
-	"database/sql"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/middleware"
-	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sendgrid/sendgrid-go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -30,7 +25,7 @@ import (
 // InitServer initializes the mediaprocessing server
 func InitServer() {
 	router := coreInitServer()
-	logger.For(nil).Info("Starting tokenprocessing server...")
+	logger.For(nil).Info("Starting emails server...")
 	http.Handle("/", router)
 }
 
@@ -41,17 +36,15 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	initLogger()
 
-	repos := newRepos(postgres.NewClient(), postgres.NewPgxClient())
-	var s *storage.Client
-	if viper.GetString("ENV") == "local" {
-		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
-	} else {
-		s = media.NewStorageClient(context.Background())
-	}
+	pgxClient := postgres.NewPgxClient()
+
+	queries := coredb.New(pgxClient)
+
+	loaders := dataloader.NewLoaders(ctx, queries, false)
+
+	client := sendgrid.NewSendClient(viper.GetString("SENDGRID_API_KEY"))
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
-	ipfsClient := rpc.NewIPFSShell()
-	arweaveClient := rpc.NewArweaveClient()
 
 	router := gin.Default()
 
@@ -64,22 +57,11 @@ func coreInitServer() *gin.Engine {
 
 	logger.For(ctx).Info("Registering handlers...")
 
-	t := newThrottler()
-	queries := coredb.New(postgres.NewPgxClient())
-	mc := server.NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), task.NewClient(context.Background()))
-
-	return handlersInitServer(router, mc, repos, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, loaders, queries, client)
 }
 
 func setDefaults() {
-	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
-	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
-	viper.SetDefault("IPFS_PROJECT_ID", "")
-	viper.SetDefault("IPFS_PROJECT_SECRET", "")
-	viper.SetDefault("CHAIN", 0)
 	viper.SetDefault("ENV", "local")
-	viper.SetDefault("GCLOUD_TOKEN_LOGS_BUCKET", "dev-eth-token-logs")
-	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
 	viper.SetDefault("POSTGRES_USER", "postgres")
@@ -88,26 +70,33 @@ func setDefaults() {
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
+	viper.SetDefault("SENDGRID_API_KEY", "")
+	viper.SetDefault("FROM_EMAIL", "test@gallery.so")
+	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "c63e40ab-5049-4ce1-9d14-8742a3c5c1a8")
+	viper.SetDefault("SENDGRID_NOTIFICATIONS_TEMPLATE_ID", "d-6135d8f36e9946979b0dcf1800363ab4")
+	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
 
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("tokenprocessing")
+		envFile := util.ResolveEnvFile("emails")
 		util.LoadEnvFile(envFile)
 	}
 
 	if viper.GetString("ENV") != "local" {
 		util.EnvVarMustExist("SENTRY_DSN", "")
 		util.EnvVarMustExist("VERSION", "")
+		util.EnvVarMustExist("SENDGRID_API_KEY", "")
+		util.EnvVarMustExist("JWT_SECRET", "")
+		util.EnvVarMustExist("FROM_EMAIL", "")
 	}
 }
 
 func newThrottler() *throttle.Locker {
-	return throttle.NewThrottleLocker(redis.NewCache(redis.TokenProcessingThrottleDB), time.Minute*30)
+	return throttle.NewThrottleLocker(redis.NewCache(redis.EmailThrottleDB), time.Minute*5)
 }
 
 func initSentry() {
@@ -153,24 +142,6 @@ func initLogger() {
 		}
 
 	})
-}
-
-func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
-	queries := coredb.New(pgx)
-
-	return &postgres.Repositories{
-		UserRepository:        postgres.NewUserRepository(pq, queries),
-		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
-		GalleryRepository:     postgres.NewGalleryRepository(queries),
-		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
-		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
-		WalletRepository:      postgres.NewWalletRepository(pq, queries),
-		AdmireRepository:      postgres.NewAdmireRepository(queries),
-		CommentRepository:     postgres.NewCommentRepository(pq, queries),
-	}
 }
 
 // configureRootContext configures the main context from which other contexts are derived.
