@@ -234,3 +234,10 @@ When testing the indexer locally, you may want to sync log data from the prod to
 # Do not switch the order of the buckets! Doing so may overwrite prod data.
 gsutil -m rsync -r gs://prod-eth-token-logs gs://dev-eth-token-logs
 ```
+
+### Root CAs for RPC
+
+These are the added certificates that are included in the `_deploy` folder. They are used to verify the SSL certificates of
+various HTTPS endpoints.
+
+- `sectigo.crt` - [Sectigo RSA Domain Validation Secure Server CA](https://support.sectigo.com/articles/Knowledge/Sectigo-Intermediate-Certificates) for example [vibes.art](https://vibes.art/vibes/jpg/8095.jpg)

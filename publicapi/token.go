@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+
 	"github.com/gammazero/workerpool"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -20,7 +22,7 @@ import (
 )
 
 type TokenAPI struct {
-	repos              *persist.Repositories
+	repos              *postgres.Repositories
 	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
@@ -55,7 +57,7 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 	return &token, nil
 }
 
-func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID) ([]db.Token, error) {
+func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"collectionID": {collectionID, "required"},
@@ -63,7 +65,10 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 		return nil, err
 	}
 
-	tokens, err := api.loaders.TokensByCollectionID.Load(collectionID)
+	tokens, err := api.loaders.TokensByCollectionID.Load(dataloader.IDAndLimit{
+		ID:    collectionID,
+		Limit: limit,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +343,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 		addresses = append(addresses, wa.Address)
 	}
 
-	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), contract.Chain), addresses)
+	err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain), addresses)
 	if err != nil {
 		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
@@ -368,7 +373,9 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 		return err
 	}
 
-	tokens, err := api.loaders.TokensByCollectionID.Load(collectionDBID)
+	tokens, err := api.loaders.TokensByCollectionID.Load(dataloader.IDAndLimit{
+		ID: collectionDBID,
+	})
 	if err != nil {
 		return err
 	}
@@ -393,7 +400,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 				addresses = append(addresses, wa.Address)
 			}
 
-			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, persist.TokenID(token.TokenID.String), contract.Chain), addresses)
+			err = api.multichainProvider.RefreshToken(ctx, persist.NewTokenIdentifiers(contract.Address, token.TokenID, contract.Chain), addresses)
 			if err != nil {
 				errChan <- ErrTokenRefreshFailed{Message: err.Error()}
 				return

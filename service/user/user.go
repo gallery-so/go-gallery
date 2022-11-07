@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -80,8 +81,8 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, bio string, userRepo persist.UserRepository,
-	galleryRepo persist.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
+func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *string, bio string, userRepo *postgres.UserRepository,
+	galleryRepo *postgres.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -103,6 +104,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	user := persist.CreateUserInput{
 		Username:     username,
 		Bio:          bio,
+		Email:        email,
 		ChainAddress: wallet.ChainAddress,
 		WalletType:   wallet.WalletType,
 	}
@@ -131,7 +133,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 }
 
 // RemoveWalletsFromUser removes any amount of addresses from a user in the DB
-func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletIDs []persist.DBID, userRepo persist.UserRepository) error {
+func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletIDs []persist.DBID, userRepo *postgres.UserRepository) error {
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
 		return err
@@ -151,7 +153,7 @@ func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletID
 
 // AddWalletToUser adds a single wallet to a user in the DB because a signature needs to be provided and validated per address
 func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, addressAuth auth.Authenticator,
-	userRepo persist.UserRepository, walletRepo persist.WalletRepository) error {
+	userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
 	if err != nil {
@@ -176,7 +178,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
 func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pInput RemoveUserAddressesInput,
-	userRepo persist.UserRepository) error {
+	userRepo postgres.UserRepository) error {
 
 	user, err := userRepo.GetByID(pCtx, pUserID)
 	if err != nil {
@@ -191,7 +193,7 @@ func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pI
 }
 
 // GetUser returns a user by ID or address or username
-func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRepository) (GetUserOutput, error) {
+func GetUser(pCtx context.Context, pInput GetUserInput, userRepo postgres.UserRepository) (GetUserOutput, error) {
 
 	//------------------
 
@@ -235,7 +237,7 @@ func GetUser(pCtx context.Context, pInput GetUserInput, userRepo persist.UserRep
 }
 
 // UpdateUserInfo updates a user by ID and ensures that if they are using an ENS name as a username that their address resolves to that ENS
-func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository persist.UserRepository, ethClient *ethclient.Client) error {
+func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, bio string, userRepository *postgres.UserRepository, ethClient *ethclient.Client) error {
 	if strings.HasSuffix(strings.ToLower(username), ".eth") {
 		user, err := userRepository.GetByID(pCtx, userID)
 		if err != nil {
@@ -270,7 +272,7 @@ func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, 
 
 // Not in use
 // // MergeUsers merges two users together
-// func MergeUsers(pCtx context.Context, userRepo persist.UserRepository, nonceRepo persist.NonceRepository, walletRepo persist.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
+// func MergeUsers(pCtx context.Context, userRepo postgres.UserRepository, nonceRepo postgres.NonceRepository, walletRepo postgres.WalletRepository, pUserID persist.DBID, pInput MergeUsersInput, multichainProvider *multichain.Provider) error {
 // 	chainAddress := persist.NewChainAddress(pInput.Address, pInput.Chain)
 // 	nonce, id, _ := auth.GetUserWithNonce(pCtx, chainAddress, userRepo, nonceRepo, walletRepo)
 // 	if nonce == "" {
@@ -300,7 +302,7 @@ func UpdateUserInfo(pCtx context.Context, userID persist.DBID, username string, 
 // }
 
 // TODO need interface for interacting with other chains for this
-func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo persist.UserRepository, tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
+func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo postgres.UserRepository, tokenRepo postgres.TokenGalleryRepository, contractRepo persist.ContractRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 	// input := indexer.ValidateUsersNFTsInput{
 	// 	UserID: pUserID,
 	// }
@@ -314,7 +316,7 @@ func validateNFTsForUser(pCtx context.Context, pUserID persist.DBID, userRepo pe
 }
 
 // TODO need interface for interacting with other chains for this
-func ensureMediaContent(pCtx context.Context, pChainAddress persist.ChainAddress, tokenRepo persist.TokenGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
+func ensureMediaContent(pCtx context.Context, pChainAddress persist.ChainAddress, tokenRepo postgres.TokenGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
 
 	// input := indexer.UpdateMediaInput{
 	// 	OwnerAddress: pAddress,
@@ -330,7 +332,7 @@ func ensureMediaContent(pCtx context.Context, pChainAddress persist.ChainAddress
 }
 
 // DoesUserOwnWallets checks if a user owns any wallets
-func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.DBID, userRepo persist.UserRepository) (bool, error) {
+func DoesUserOwnWallets(pCtx context.Context, userID persist.DBID, walletAddresses []persist.DBID, userRepo postgres.UserRepository) (bool, error) {
 	user, err := userRepo.GetByID(pCtx, userID)
 	if err != nil {
 		return false, err

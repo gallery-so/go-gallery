@@ -43,8 +43,8 @@ func (r *collectionResolver) Gallery(ctx context.Context, obj *model.Collection)
 	return galleryToModel(ctx, *gallery), nil
 }
 
-func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection) ([]*model.CollectionToken, error) {
-	tokens, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, obj.Dbid)
+func (r *collectionResolver) Tokens(ctx context.Context, obj *model.Collection, limit *int) ([]*model.CollectionToken, error) {
+	tokens, err := publicapi.For(ctx).Token.GetTokensByCollectionId(ctx, obj.Dbid, limit)
 
 	if err != nil {
 		return nil, err
@@ -704,7 +704,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persis
 	return output, nil
 }
 
-func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string) (model.CreateUserPayloadOrError, error) {
+func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string, email *string) (model.CreateUserPayloadOrError, error) {
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
@@ -715,7 +715,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 		bioStr = *bio
 	}
 
-	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, username, bioStr)
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, username, email, bioStr)
 	if err != nil {
 		return nil, err
 	}
@@ -727,6 +727,10 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 	}
 
 	return output, nil
+}
+
+func (r *mutationResolver) UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error) {
@@ -902,6 +906,10 @@ func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, setti
 		return nil, err
 	}
 	return resolveViewerNotificationSettings(ctx)
+}
+
+func (r *mutationResolver) VerifyEmail(ctx context.Context, token string) (model.VerifyEmailPayloadOrError, error) {
+	return verifyEmail(ctx, token)
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
@@ -1205,6 +1213,10 @@ func (r *viewerResolver) Feed(ctx context.Context, obj *model.Viewer, before *st
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+func (r *viewerResolver) Email(ctx context.Context, obj *model.Viewer) (*model.UserEmail, error) {
+	return resolveViewerEmail(ctx), nil
 }
 
 func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {

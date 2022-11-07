@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -18,7 +20,7 @@ import (
 )
 
 type ContractAPI struct {
-	repos              *persist.Repositories
+	repos              *postgres.Repositories
 	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
@@ -127,7 +129,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 		return err
 	}
 
-	im, anim := persist.Chain(contract.Chain).BaseKeywords()
+	im, anim := contract.Chain.BaseKeywords()
 
 	in := task.TokenProcessingContractTokensMessage{
 		ContractID:        contractID,

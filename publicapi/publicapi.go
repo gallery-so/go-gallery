@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -31,7 +32,7 @@ var errBadCursorFormat = errors.New("bad cursor format")
 const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
-	repos         *persist.Repositories
+	repos         *postgres.Repositories
 	queries       *db.Queries
 	loaders       *dataloader.Loaders
 	validator     *validator.Validate
@@ -48,7 +49,7 @@ type PublicAPI struct {
 	Interaction   *InteractionAPI
 }
 
-func New(ctx context.Context, disableDataloaderCaching bool, repos *persist.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
+func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)

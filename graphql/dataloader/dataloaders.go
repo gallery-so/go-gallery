@@ -14,6 +14,7 @@
 //go:generate go run github.com/gallery-so/dataloaden WalletsLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Wallet
 //go:generate go run github.com/gallery-so/dataloaden TokenLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID []github.com/mikeydub/go-gallery/db/gen/coredb.Token
+//go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndLimit github.com/mikeydub/go-gallery/graphql/dataloader.IDAndLimit []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByContractID github.com/mikeydub/go-gallery/db/gen/coredb.GetTokensByContractIdBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDTuple github.com/mikeydub/go-gallery/service/persist.DBIDTuple []github.com/mikeydub/go-gallery/db/gen/coredb.Token
 //go:generate go run github.com/gallery-so/dataloaden TokensLoaderByIDAndChain github.com/mikeydub/go-gallery/graphql/dataloader.IDAndChain []github.com/mikeydub/go-gallery/db/gen/coredb.Token
@@ -54,6 +55,11 @@ type IDAndChain struct {
 	Chain persist.Chain
 }
 
+type IDAndLimit struct {
+	ID    persist.DBID
+	Limit *int
+}
+
 // Loaders will cache and batch lookups. They are short-lived and should never persist beyond
 // a single request, nor should they be shared between requests (since the data returned is
 // relative to the current request context, including the user and their auth status).
@@ -73,7 +79,7 @@ type Loaders struct {
 	WalletByChainAddress             *WalletLoaderByChainAddress
 	TokenByTokenID                   *TokenLoaderByID
 	TokensByContractID               *TokensLoaderByID
-	TokensByCollectionID             *TokensLoaderByID
+	TokensByCollectionID             *TokensLoaderByIDAndLimit
 	TokensByWalletID                 *TokensLoaderByID
 	TokensByUserID                   *TokensLoaderByID
 	TokensByUserIDAndContractID      *TokensLoaderByIDTuple
@@ -208,7 +214,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		AutoCacheWithKey: func(token db.Token) persist.DBID { return token.ID },
 	})
 
-	loaders.TokensByCollectionID = NewTokensLoaderByID(defaults, loadTokensByCollectionID(q))
+	loaders.TokensByCollectionID = NewTokensLoaderByIDAndLimit(defaults, loadTokensByCollectionID(q))
 
 	loaders.TokensByWalletID = NewTokensLoaderByID(defaults, loadTokensByWalletID(q))
 
@@ -631,12 +637,24 @@ func loadTokenByTokenID(q *db.Queries) func(context.Context, []persist.DBID) ([]
 	}
 }
 
-func loadTokensByCollectionID(q *db.Queries) func(context.Context, []persist.DBID) ([][]db.Token, []error) {
-	return func(ctx context.Context, collectionIDs []persist.DBID) ([][]db.Token, []error) {
+func loadTokensByCollectionID(q *db.Queries) func(context.Context, []IDAndLimit) ([][]db.Token, []error) {
+	return func(ctx context.Context, collectionIDs []IDAndLimit) ([][]db.Token, []error) {
 		tokens := make([][]db.Token, len(collectionIDs))
 		errors := make([]error, len(collectionIDs))
 
-		b := q.GetTokensByCollectionIdBatch(ctx, collectionIDs)
+		params := make([]db.GetTokensByCollectionIdBatchParams, len(collectionIDs))
+		for i, collectionID := range collectionIDs {
+			maybeNull := sql.NullInt32{}
+			if collectionID.Limit != nil {
+				maybeNull = sql.NullInt32{Int32: int32(*collectionID.Limit), Valid: true}
+			}
+			params[i] = db.GetTokensByCollectionIdBatchParams{
+				ID:    collectionID.ID,
+				Limit: maybeNull,
+			}
+		}
+
+		b := q.GetTokensByCollectionIdBatch(ctx, params)
 		defer b.Close()
 
 		b.Query(func(i int, t []db.Token, err error) {

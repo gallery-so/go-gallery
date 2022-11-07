@@ -79,7 +79,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		panic(err)
 	}
 
-	repos := newRepos(pqClient)
+	repos := newRepos(pqClient, pgx)
 	ethClient := newEthClient()
 	httpClient := &http.Client{Timeout: 10 * time.Minute}
 	ipfsClient := rpc.NewIPFSShell()
@@ -165,6 +165,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
 	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
+	viper.SetDefault("EMAILS_HOST", "http://localhost:5500")
 
 	viper.AutomaticEnv()
 
@@ -183,24 +184,21 @@ func setDefaults() {
 	}
 }
 
-func newRepos(db *sql.DB) *persist.Repositories {
-	galleriesCacheToken := redis.NewCache(1)
-	galleryTokenRepo := postgres.NewGalleryRepository(db, galleriesCacheToken)
+func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
+	queries := db.New(pgx)
 
-	return &persist.Repositories{
-		UserRepository:        postgres.NewUserRepository(db),
-		NonceRepository:       postgres.NewNonceRepository(db),
-		LoginRepository:       postgres.NewLoginRepository(db),
-		TokenRepository:       postgres.NewTokenGalleryRepository(db, galleryTokenRepo),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(db, galleryTokenRepo),
-		GalleryRepository:     galleryTokenRepo,
-		ContractRepository:    postgres.NewContractGalleryRepository(db),
-		BackupRepository:      postgres.NewBackupRepository(db),
-		MembershipRepository:  postgres.NewMembershipRepository(db),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(db),
-		WalletRepository:      postgres.NewWalletRepository(db),
-		AdmireRepository:      postgres.NewAdmireRepository(db),
-		CommentRepository:     postgres.NewCommentRepository(db),
+	return &postgres.Repositories{
+		UserRepository:        postgres.NewUserRepository(pq, queries),
+		NonceRepository:       postgres.NewNonceRepository(pq, queries),
+		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
+		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
+		GalleryRepository:     postgres.NewGalleryRepository(queries),
+		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
+		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
+		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
+		WalletRepository:      postgres.NewWalletRepository(pq, queries),
+		AdmireRepository:      postgres.NewAdmireRepository(queries),
+		CommentRepository:     postgres.NewCommentRepository(pq, queries),
 	}
 }
 
@@ -255,7 +253,7 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(repos *persist.Repositories, queries *coredb.Queries, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
+func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)

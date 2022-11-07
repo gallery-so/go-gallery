@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -17,7 +18,7 @@ import (
 )
 
 type AuthAPI struct {
-	repos              *persist.Repositories
+	repos              *postgres.Repositories
 	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
@@ -55,12 +56,13 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 			userID = *debugParams.UserID
 		}
 
-		user, err := api.repos.UserRepository.GetByID(ctx, userID)
-		if err != nil {
-			return nil, fmt.Errorf("debug auth failed: %w", err)
+		var user *persist.User
+		dbUser, err := api.repos.UserRepository.GetByID(ctx, userID)
+		if err == nil {
+			user = &dbUser
 		}
 
-		return debugtools.NewDebugAuthenticator(&user, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
+		return debugtools.NewDebugAuthenticator(user, chainAddressPointersToChainAddresses(debugParams.ChainAddresses)), nil
 	}
 
 	if debugParams.UserID != nil || debugParams.ChainAddresses != nil {

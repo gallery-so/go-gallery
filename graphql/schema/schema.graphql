@@ -344,7 +344,7 @@ type Collection implements Node {
     gallery: Gallery @goField(forceResolver: true)
     layout: CollectionLayout
     hidden: Boolean
-    tokens: [CollectionToken] @goField(forceResolver: true)
+    tokens(limit: Int): [CollectionToken] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
@@ -446,34 +446,57 @@ type NotificationsConnection @goEmbedHelper {
 }
 
 type Viewer {
-    user: GalleryUser @goField(forceResolver: true)
-    viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
-    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
+  user: GalleryUser @goField(forceResolver: true)
+  viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
+  feed(before: String, after: String, first: Int, last: Int): FeedConnection
+    @goField(forceResolver: true)
 
-    """
-    Returns a list of notifications in reverse chronological order.
-    Seen notifications come after unseen notifications
-    """
-    notifications(before: String, after: String, first: Int, last: Int): NotificationsConnection @goField(forceResolver: true)
+  email: UserEmail @goField(forceResolver: true)
+  """
+  Returns a list of notifications in reverse chronological order.
+  Seen notifications come after unseen notifications
+  """
+  notifications(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): NotificationsConnection @goField(forceResolver: true)
 
-    notificationSettings: NotificationSettings @goField(forceResolver: true)
+  notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
 
-type NotificationSettings @goEmbedHelper {
-    user: GalleryUser
-
-    someoneFollowedYou: Boolean
-    someoneAdmiredYourUpdate: Boolean
-    someoneCommentedOnYourUpdate: Boolean
-    someoneViewedYourGallery: Boolean
+type NotificationSettings {
+  someoneFollowedYou: Boolean
+  someoneAdmiredYourUpdate: Boolean
+  someoneCommentedOnYourUpdate: Boolean
+  someoneViewedYourGallery: Boolean
 }
 
 input NotificationSettingsInput {
-    someoneFollowedYou: Boolean
-    someoneAdmiredYourUpdate: Boolean
-    someoneCommentedOnYourUpdate: Boolean
-    someoneViewedYourGallery: Boolean
+  someoneFollowedYou: Boolean
+  someoneAdmiredYourUpdate: Boolean
+  someoneCommentedOnYourUpdate: Boolean
+  someoneViewedYourGallery: Boolean
 }
+
+enum EmailVerificationStatus {
+    Unverified
+    Verified
+    Failed
+    Admin
+}
+
+type UserEmail {
+    email: String
+    verificationStatus: EmailVerificationStatus
+    emailNotificationSettings: EmailNotificationSettings
+}
+
+type EmailNotificationSettings {
+    unsubscribedFromAll: Boolean
+}
+
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -652,7 +675,6 @@ type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
     collection: Collection @goField(forceResolver: true)
     newCollectorsNote: String
     newTokens: [CollectionToken] @goField(forceResolver: true)
-    isNewCollection: Boolean
 }
 
 type ErrUnknownAction implements Error {
@@ -1251,6 +1273,26 @@ union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
 
+type VerifyEmailPayload {
+    email: String
+}
+
+union VerifyEmailPayloadOrError =
+    VerifyEmailPayload
+    | ErrInvalidInput
+
+input UpdateEmailInput {
+    email: String!
+}
+
+type UpdateEmailPayload {
+    viewer: Viewer
+}
+
+union UpdateEmailPayloadOrError =
+    UpdateEmailPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1279,7 +1321,8 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!, bio:String): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: String): CreateUserPayloadOrError
+    updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
@@ -1295,6 +1338,8 @@ type Mutation {
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
+
+    verifyEmail(token: String!): VerifyEmailPayloadOrError
 }
 
 type Subscription {

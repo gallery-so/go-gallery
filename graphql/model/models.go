@@ -20,10 +20,6 @@ func (r *Community) GetGqlIDField_Chain() string {
 	return fmt.Sprint(r.ContractAddress.Chain())
 }
 
-func (r *NotificationSettings) GetGqlIDField_UserID() string {
-	return fmt.Sprint(r.HelperNotificationSettingsData.UserId.String())
-}
-
 func (r *Community) GetGqlIDField_ContractAddress() string {
 	return r.ContractAddress.Address().String()
 }
@@ -89,6 +85,10 @@ type HelperNotificationsConnectionData struct {
 
 type HelperCollectionUpdatedFeedEventDataData struct {
 	FeedEventID persist.DBID
+}
+
+type HelperUserEmailData struct {
+	UserId persist.DBID
 }
 
 type ErrInvalidIDFormat struct {

@@ -1,7 +1,6 @@
 package persist
 
 import (
-	"context"
 	"fmt"
 )
 
@@ -40,17 +39,6 @@ type GalleryTokenUpdateInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
 
 	Collections []DBID `json:"collections"`
-}
-
-// GalleryRepository is an interface for interacting with the gallery persistence layer
-type GalleryRepository interface {
-	Create(context.Context, GalleryDB) (DBID, error)
-	Update(context.Context, DBID, DBID, GalleryTokenUpdateInput) error
-	UpdateUnsafe(context.Context, DBID, GalleryTokenUpdateInput) error
-	AddCollections(context.Context, DBID, DBID, []DBID) error
-	GetByUserID(context.Context, DBID) ([]Gallery, error)
-	GetByID(context.Context, DBID) (Gallery, error)
-	RefreshCache(context.Context, DBID) error
 }
 
 // ErrGalleryNotFoundByID is returned when a gallery is not found by its ID

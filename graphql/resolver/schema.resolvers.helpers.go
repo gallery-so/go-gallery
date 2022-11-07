@@ -13,6 +13,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -487,6 +488,33 @@ func resolveViewer(ctx context.Context) *model.Viewer {
 	return viewer
 }
 
+func resolveViewerEmail(ctx context.Context) *model.UserEmail {
+
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil
+	}
+
+	return userToEmailModel(user)
+
+}
+
+func userToEmailModel(user *db.User) *model.UserEmail {
+
+	email := user.Email.String()
+
+	return &model.UserEmail{
+		Email:              &email,
+		VerificationStatus: &user.EmailVerified,
+		EmailNotificationSettings: &model.EmailNotificationSettings{
+			UnsubscribedFromAll: user.EmailUnsubscriptions.All.BoolPointer(),
+		},
+	}
+
+}
+
 func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (*model.MembershipTier, error) {
 	tier, err := publicapi.For(ctx).User.GetMembershipByMembershipId(ctx, id)
 
@@ -724,10 +752,6 @@ func resolveViewerNotificationSettings(ctx context.Context) (*model.Notification
 func notificationSettingsToModel(ctx context.Context, user *db.User) *model.NotificationSettings {
 	settings := user.NotificationSettings
 	return &model.NotificationSettings{
-		HelperNotificationSettingsData: model.HelperNotificationSettingsData{
-			UserId: user.ID,
-		},
-		User:                         userToModel(ctx, *user),
 		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
 		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
 		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
@@ -903,6 +927,30 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 	return commentToModel(ctx, *comment), nil
 }
 
+func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {
+	output, err := emails.VerifyEmail(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.VerifyEmailPayload{
+		Email: &output.Email,
+	}, nil
+
+}
+
+func updateUserEmail(ctx context.Context, email string) (*model.UpdateEmailPayload, error) {
+	err := publicapi.For(ctx).User.UpdateUserEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.UpdateEmailPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+
+}
+
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
@@ -1030,7 +1078,6 @@ func eventToCollectionUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventD
 		Action:            &event.Action,
 		NewTokens:         nil, // handled by dedicated resolver
 		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
-		IsNewCollection:   util.BoolToPointer(event.Data.CollectionIsNew),
 		HelperCollectionUpdatedFeedEventDataData: model.HelperCollectionUpdatedFeedEventDataData{
 			FeedEventID: event.ID,
 		},
@@ -1180,7 +1227,8 @@ func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wal
 }
 
 func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
-	chainAddress := persist.NewChainAddress(wallet.Address, wallet.Chain)
+	chain := wallet.Chain
+	chainAddress := persist.NewChainAddress(wallet.Address, chain)
 
 	return &model.Wallet{
 		Dbid:         wallet.ID,
@@ -1192,8 +1240,9 @@ func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
 }
 
 func contractToModel(ctx context.Context, contract db.Contract) *model.Contract {
-	addr := persist.NewChainAddress(contract.Address, contract.Chain)
-	creator := persist.NewChainAddress(contract.CreatorAddress, contract.Chain)
+	chain := contract.Chain
+	addr := persist.NewChainAddress(contract.Address, chain)
+	creator := persist.NewChainAddress(contract.CreatorAddress, chain)
 
 	return &model.Contract{
 		Dbid:             contract.ID,
@@ -1242,7 +1291,7 @@ func membershipToModel(ctx context.Context, membershipTier db.Membership) *model
 		Dbid:     membershipTier.ID,
 		Name:     &membershipTier.Name.String,
 		AssetURL: &membershipTier.AssetUrl.String,
-		TokenID:  &membershipTier.TokenID.String,
+		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
 		Owners:   owners,
 	}
 }
@@ -1294,6 +1343,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 }
 
 func tokenToModel(ctx context.Context, token db.Token) *model.Token {
+	chain := token.Chain
 	metadata, _ := token.TokenMetadata.MarshallJSON()
 	metadataString := string(metadata)
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
@@ -1316,12 +1366,12 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 		CollectorsNote:   &token.CollectorsNote.String,
 		Media:            getMediaForToken(ctx, token),
 		TokenType:        &tokenType,
-		Chain:            &token.Chain,
+		Chain:            &chain,
 		Name:             &token.Name.String,
 		Description:      &token.Description.String,
 		OwnedByWallets:   nil, // handled by dedicated resolver
 		TokenURI:         &token.TokenUri.String,
-		TokenID:          &token.TokenID.String,
+		TokenID:          util.StringToPointer(token.TokenID.String()),
 		Quantity:         &token.Quantity.String,
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
@@ -1349,6 +1399,7 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 	lastUpdated := community.LastUpdated
 	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
 	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
+	chain := community.Chain
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{
 			ForceRefresh: forceRefresh,
@@ -1360,7 +1411,7 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		Name:            util.StringToPointer(community.Name.String),
 		Description:     util.StringToPointer(community.Description.String),
 		// PreviewImage:     util.StringToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
-		Chain:            &community.Chain,
+		Chain:            &chain,
 		ProfileImageURL:  util.StringToPointer(community.ProfileImageUrl.String),
 		ProfileBannerURL: util.StringToPointer(community.ProfileBannerUrl.String),
 		BadgeURL:         util.StringToPointer(community.BadgeUrl.String),

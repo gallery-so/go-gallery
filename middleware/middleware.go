@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 
@@ -33,7 +35,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 }
 
 // AuthRequired is a middleware that checks if the user is authenticated
-func AuthRequired(userRepository persist.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func AuthRequired(userRepository postgres.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		authHeaders := strings.Split(header, " ")
@@ -129,6 +131,15 @@ func AddAuthToContext() gin.HandlerFunc {
 
 		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
 		auth.SetAuthStateForCtx(c, userID, err)
+
+		// If we have a successfully authenticated user, add their ID to all subsequent logging
+		if err == nil {
+			loggerCtx := logger.NewContextWithFields(c.Request.Context(), logrus.Fields{
+				"authedUserId": userID,
+			})
+			c.Request = c.Request.WithContext(loggerCtx)
+		}
+
 		c.Next()
 	}
 }
