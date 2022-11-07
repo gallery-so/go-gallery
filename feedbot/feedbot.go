@@ -10,7 +10,6 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/shurcooL/graphql"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -18,7 +17,7 @@ func Init() {
 	setDefaults()
 
 	initSentry()
-	initLogger()
+	logger.InitWithGCPDefaults()
 
 	router := coreInit()
 	http.Handle("/", router)
@@ -56,23 +55,6 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		util.EnvVarMustExist("SENTRY_DSN", "")
 	}
-}
-
-func initLogger() {
-	logger.SetLoggerOptions(func(logger *logrus.Logger) {
-		logger.SetReportCaller(true)
-
-		if viper.GetString("ENV") != "production" {
-			logger.SetLevel(logrus.DebugLevel)
-		}
-
-		if viper.GetString("ENV") == "local" {
-			logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
-		} else {
-			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
-			logger.SetFormatter(&logrus.JSONFormatter{})
-		}
-	})
 }
 
 func initSentry() {

@@ -3,7 +3,9 @@ package logger
 import (
 	"context"
 	"fmt"
+	"github.com/spf13/viper"
 	"runtime"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -30,6 +32,61 @@ func NewContextWithLogger(parent context.Context, fields logrus.Fields, logger *
 
 func SetLoggerOptions(optionsFunc func(logger *logrus.Logger)) {
 	optionsFunc(defaultLogger)
+}
+
+// InitWithGCPDefaults initializes a logger suitable for most Google Cloud Logging purposes
+func InitWithGCPDefaults() {
+	SetLoggerOptions(func(logger *logrus.Logger) {
+		logger.SetReportCaller(true)
+
+		if viper.GetString("ENV") != "production" {
+			logger.SetLevel(logrus.DebugLevel)
+		}
+
+		if viper.GetString("ENV") == "local" {
+			logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
+		} else {
+			// Use a GCPFormatter for Google Cloud Logging
+			logger.SetFormatter(&GCPFormatter{})
+		}
+	})
+}
+
+// GCPFormatter is a logrus.JSONFormatter with additional handling to map log
+// severity and timestamps to the specific named JSON fields ("severity" and "time")
+// that Google Cloud Logging expects
+type GCPFormatter struct {
+	logrus.JSONFormatter
+}
+
+type gcpLogSeverity string
+
+// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
+const (
+	gcpSeverityDefault   gcpLogSeverity = "DEFAULT"
+	gcpSeverityDebug     gcpLogSeverity = "DEBUG"
+	gcpSeverityInfo      gcpLogSeverity = "INFO"
+	gcpSeverityNotice    gcpLogSeverity = "NOTICE"
+	gcpSeverityWarning   gcpLogSeverity = "WARNING"
+	gcpSeverityError     gcpLogSeverity = "ERROR"
+	gcpSeverityCritical  gcpLogSeverity = "CRITICAL"
+	gcpSeverityAlert     gcpLogSeverity = "ALERT"
+	gcpSeverityEmergency gcpLogSeverity = "EMERGENCY"
+)
+
+var logrusLevelToGCPSeverity = map[logrus.Level]gcpLogSeverity{
+	logrus.DebugLevel: gcpSeverityDebug,
+	logrus.InfoLevel:  gcpSeverityInfo,
+	logrus.WarnLevel:  gcpSeverityWarning,
+	logrus.ErrorLevel: gcpSeverityError,
+	logrus.FatalLevel: gcpSeverityCritical,
+	logrus.PanicLevel: gcpSeverityAlert,
+}
+
+func (f *GCPFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	entry.Data["severity"] = logrusLevelToGCPSeverity[entry.Level]
+	entry.Data["time"] = entry.Time.Format(time.RFC3339Nano)
+	return f.JSONFormatter.Format(entry)
 }
 
 func For(ctx context.Context) *logrus.Entry {
