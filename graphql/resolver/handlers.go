@@ -279,7 +279,7 @@ func ResponseReporter(log bool, trace bool) func(ctx context.Context, next gqlge
 				logger.For(ctx).WithFields(logrus.Fields{
 					"locatorId": locatorID,
 					"response":  responseData,
-				})
+				}).Info("Sending GraphQL response")
 			}
 
 			logger.For(ctx).WithFields(logrus.Fields{
@@ -338,7 +338,7 @@ func RequestReporter(schema *ast.Schema, log bool, trace bool) func(ctx context.
 				logger.For(ctx).WithFields(logrus.Fields{
 					"locatorId":     locatorID,
 					"scrubbedQuery": scrubbedQuery,
-				})
+				}).Info("Received GraphQL query")
 			}
 
 			logger.For(ctx).WithFields(logrus.Fields{
