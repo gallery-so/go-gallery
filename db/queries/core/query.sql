@@ -144,7 +144,7 @@ SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
 
 -- name: GetContractsDisplayedByUserIDBatch :batchmany
 select distinct on (contracts.id) contracts.* from contracts, tokens
-    inner join collections c on tokens.id = any(c.nfts) and c.hidden = false and c.deleted = false
+    inner join collections c on tokens.id = any(c.nfts) and c.deleted = false
     where tokens.owner_user_id = $1 and tokens.contract = contracts.id and c.owner_user_id = tokens.owner_user_id
     and tokens.deleted = false and contracts.deleted = false;
 
