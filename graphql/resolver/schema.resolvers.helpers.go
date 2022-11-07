@@ -540,7 +540,7 @@ func resolveCommunityOwnersByContractID(ctx context.Context, contractID persist.
 	if err != nil {
 		return nil, err
 	}
-	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32)), before, after, first, last, onlyGalleryUsers)
+	owners, pageInfo, err := publicapi.For(ctx).Contract.GetCommunityOwnersByContractAddress(ctx, persist.NewChainAddress(contract.Address, contract.Chain), before, after, first, last, onlyGalleryUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -1227,7 +1227,7 @@ func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wal
 }
 
 func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
-	chain := persist.Chain(wallet.Chain.Int32)
+	chain := wallet.Chain
 	chainAddress := persist.NewChainAddress(wallet.Address, chain)
 
 	return &model.Wallet{
@@ -1240,7 +1240,7 @@ func walletToModelSqlc(ctx context.Context, wallet db.Wallet) *model.Wallet {
 }
 
 func contractToModel(ctx context.Context, contract db.Contract) *model.Contract {
-	chain := persist.Chain(contract.Chain.Int32)
+	chain := contract.Chain
 	addr := persist.NewChainAddress(contract.Address, chain)
 	creator := persist.NewChainAddress(contract.CreatorAddress, chain)
 
@@ -1291,7 +1291,7 @@ func membershipToModel(ctx context.Context, membershipTier db.Membership) *model
 		Dbid:     membershipTier.ID,
 		Name:     &membershipTier.Name.String,
 		AssetURL: &membershipTier.AssetUrl.String,
-		TokenID:  &membershipTier.TokenID.String,
+		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
 		Owners:   owners,
 	}
 }
@@ -1343,7 +1343,7 @@ func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.To
 }
 
 func tokenToModel(ctx context.Context, token db.Token) *model.Token {
-	chain := persist.Chain(token.Chain.Int32)
+	chain := token.Chain
 	metadata, _ := token.TokenMetadata.MarshallJSON()
 	metadataString := string(metadata)
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
@@ -1371,7 +1371,7 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 		Description:      &token.Description.String,
 		OwnedByWallets:   nil, // handled by dedicated resolver
 		TokenURI:         &token.TokenUri.String,
-		TokenID:          &token.TokenID.String,
+		TokenID:          util.StringToPointer(token.TokenID.String()),
 		Quantity:         &token.Quantity.String,
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
@@ -1397,9 +1397,9 @@ func tokensToModel(ctx context.Context, token []db.Token) []*model.Token {
 
 func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {
 	lastUpdated := community.LastUpdated
-	contractAddress := persist.NewChainAddress(community.Address, persist.Chain(community.Chain.Int32))
-	creatorAddress := persist.NewChainAddress(community.CreatorAddress, persist.Chain(community.Chain.Int32))
-	chain := persist.Chain(community.Chain.Int32)
+	contractAddress := persist.NewChainAddress(community.Address, community.Chain)
+	creatorAddress := persist.NewChainAddress(community.CreatorAddress, community.Chain)
+	chain := community.Chain
 	return &model.Community{
 		HelperCommunityData: model.HelperCommunityData{
 			ForceRefresh: forceRefresh,

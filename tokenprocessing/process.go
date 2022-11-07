@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	"github.com/gammazero/workerpool"
@@ -30,7 +32,7 @@ type ProcessMediaForTokenInput struct {
 	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
 }
 
-func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository, contractRepo persist.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -80,7 +82,7 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 	}
 }
 
-func processMediaForToken(tokenRepo persist.TokenGalleryRepository, userRepo persist.UserRepository, walletRepo persist.WalletRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaForTokenInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -122,7 +124,7 @@ func processMediaForToken(tokenRepo persist.TokenGalleryRepository, userRepo per
 	}
 }
 
-func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo persist.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
 	ctx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenID":         t.TokenID,
 		"contractAddress": contractAddress,
@@ -176,7 +178,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	return nil
 }
 
-func processOwnersForContractTokens(mc *multichain.Provider, contractRepo persist.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
+func processOwnersForContractTokens(mc *multichain.Provider, contractRepo *postgres.ContractGalleryRepository, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingContractTokensMessage
 		if err := c.ShouldBindJSON(&input); err != nil {

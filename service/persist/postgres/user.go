@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 // UserRepository represents a user repository in the postgres database
 type UserRepository struct {
 	db                       *sql.DB
+	queries                  *db.Queries
 	updateInfoStmt           *sql.Stmt
 	createStmt               *sql.Stmt
 	getByIDStmt              *sql.Stmt
@@ -37,13 +39,11 @@ type UserRepository struct {
 	removeFollowerStmt       *sql.Stmt
 	followsUserStmt          *sql.Stmt
 	userHasTrait             *sql.Stmt
-
-	queries *coredb.Queries
 }
 
 // NewUserRepository creates a new postgres repository for interacting with users
 // TODO joins for users to wallets and wallets to addresses
-func NewUserRepository(db *sql.DB) *UserRepository {
+func NewUserRepository(db *sql.DB, queries *db.Queries) *UserRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -106,6 +106,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 	return &UserRepository{
 		db:                db,
+		queries:           queries,
 		updateInfoStmt:    updateInfoStmt,
 		createStmt:        createStmt,
 		getByIDStmt:       getByIDStmt,
