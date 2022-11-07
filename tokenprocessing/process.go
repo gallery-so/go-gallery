@@ -40,10 +40,10 @@ func processMediaForUsersTokensOfChain(tokenRepo persist.TokenGalleryRepository,
 
 		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
 
-		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
+		// XXX: if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
+		// XXX: 	util.ErrResponse(c, http.StatusOK, err)
+		// XXX: 	return
+		// XXX: }
 
 		allTokens, err := tokenRepo.GetByUserID(ctx, input.UserID, -1, -1)
 		if err != nil {
