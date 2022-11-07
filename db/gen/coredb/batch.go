@@ -7,6 +7,7 @@ package coredb
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jackc/pgx/v4"
