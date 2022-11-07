@@ -17,7 +17,7 @@ func TestIndexLogs_Success(t *testing.T) {
 	i := newMockIndexer(db, pgx)
 
 	// Run the Indexer
-	i.catchUp(configureRootContext(), eventsToTopics(i.eventHashes))
+	i.catchUp(context.Background(), eventsToTopics(i.eventHashes))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()

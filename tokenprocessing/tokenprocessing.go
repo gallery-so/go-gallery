@@ -36,8 +36,6 @@ func InitServer() {
 }
 
 func coreInitServer() *gin.Engine {
-	ctx := configureRootContext()
-
 	setDefaults()
 	initSentry()
 	logger.InitWithGCPDefaults()
@@ -63,7 +61,7 @@ func coreInitServer() *gin.Engine {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	logger.For(ctx).Info("Registering handlers...")
+	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
 	queries := coredb.New(postgres.NewPgxClient())
@@ -154,12 +152,4 @@ func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
 		AdmireRepository:      postgres.NewAdmireRepository(queries),
 		CommentRepository:     postgres.NewCommentRepository(pq, queries),
 	}
-}
-
-// configureRootContext configures the main context from which other contexts are derived.
-func configureRootContext() context.Context {
-	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
-	logger.For(ctx).Logger.SetReportCaller(true)
-	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
-	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())
 }
