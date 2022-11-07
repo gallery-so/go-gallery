@@ -42,6 +42,7 @@ package dataloader
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"time"
 
