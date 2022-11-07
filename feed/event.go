@@ -358,6 +358,16 @@ func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, eve
 	if len(addedTokens) < 1 && (merged.event.Data.CollectionCollectorsNote == "" || !noteChanged) {
 		return nil, nil
 	}
+	// Treat the event as a collector's note event if no new tokens were added.
+	if len(addedTokens) < 1 && (merged.event.Data.CollectionCollectorsNote != "" && noteChanged) {
+		merged.event.Action = persist.ActionCollectorsNoteAddedToCollection
+		return b.createFeedEvent(ctx, merged.event)
+	}
+	// Treat the event as a tokens added event if the note didn't change or is empty.
+	if len(addedTokens) > 0 && (merged.event.Data.CollectionCollectorsNote == "" || !noteChanged) {
+		merged.event.Action = persist.ActionTokensAddedToCollection
+		return b.createFeedEvent(ctx, merged.event)
+	}
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:        persist.GenerateID(),
