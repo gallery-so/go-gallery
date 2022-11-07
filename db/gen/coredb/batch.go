@@ -667,10 +667,10 @@ func (b *GetContractsByUserIDBatchBatchResults) Close() error {
 }
 
 const getContractsDisplayedByUserIDBatch = `-- name: GetContractsDisplayedByUserIDBatch :batchmany
-SELECT DISTINCT ON (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description FROM contracts, tokens
-JOIN collections c ON tokens.id = ANY(c.NFTS)
-WHERE tokens.owner_user_id = $1 AND tokens.contract = contracts.id AND c.owner_user_id = tokens.owner_user_id
-  AND tokens.deleted = false AND contracts.deleted = false
+select distinct on (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description from contracts, tokens
+    inner join collections c on tokens.id = any(c.nfts) and c.hidden = false and c.deleted = false
+    where tokens.owner_user_id = $1 and tokens.contract = contracts.id and c.owner_user_id = tokens.owner_user_id
+    and tokens.deleted = false and contracts.deleted = false
 `
 
 type GetContractsDisplayedByUserIDBatchBatchResults struct {
