@@ -967,7 +967,7 @@ func resendEmailVerification(ctx context.Context) (*model.ResendVerificationEmai
 func updateUserEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (*model.UpdateEmailNotificationSettingsPayload, error) {
 	err := publicapi.For(ctx).User.UpdateUserEmailNotificationSettings(ctx, persist.EmailUnsubscriptions{
 		All:           persist.NullBool(input.UnsubscribedFromAll),
-		Notifications: persist.NullBool(input.UnsubscribedFromAll),
+		Notifications: persist.NullBool(input.UnsubscribedFromNotifications),
 	})
 	if err != nil {
 		return nil, err
