@@ -39,7 +39,7 @@ func coreInitServer() *gin.Engine {
 
 	setDefaults()
 	initSentry()
-	initLogger()
+	logger.InitWithGCPDefaults()
 
 	repos := newRepos(postgres.NewClient(), postgres.NewPgxClient())
 	var s *storage.Client
@@ -135,24 +135,6 @@ func initSentry() {
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
-}
-
-func initLogger() {
-	logger.SetLoggerOptions(func(l *logrus.Logger) {
-		l.SetReportCaller(true)
-
-		if viper.GetString("ENV") != "production" {
-			l.SetLevel(logrus.DebugLevel)
-		}
-
-		if viper.GetString("ENV") == "local" {
-			l.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
-		} else {
-			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
-			l.SetFormatter(&logrus.JSONFormatter{})
-		}
-
-	})
 }
 
 func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
