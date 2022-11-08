@@ -3,6 +3,8 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -10,13 +12,12 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 )
 
 const maxCollectionsPerGallery = 1000
 
 type GalleryAPI struct {
-	repos     *persist.Repositories
+	repos     *postgres.Repositories
 	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
@@ -92,8 +93,6 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
-	backupGalleriesForUser(ctx, userID, api.repos)
-
 	return nil
 }
 
@@ -148,20 +147,4 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	}
 
 	return gallery, nil
-}
-
-func backupGalleriesForUser(ctx context.Context, userID persist.DBID, repos *persist.Repositories) {
-	ctxCopy := util.GinContextFromContext(ctx).Copy()
-
-	// TODO: Make sure backups still work here with our gin context retrieval
-	go func(ctx context.Context) {
-		galleries, err := repos.GalleryRepository.GetByUserID(ctx, userID)
-		if err != nil {
-			return
-		}
-
-		for _, gallery := range galleries {
-			repos.BackupRepository.Insert(ctx, gallery)
-		}
-	}(ctxCopy)
 }

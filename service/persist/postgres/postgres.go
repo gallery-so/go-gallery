@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"strings"
 	"time"
 
@@ -176,10 +177,22 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 	span.StartTime = time.Now().Add(-duration)
 }
 
-func generateValuesPlaceholders(l, offset int) string {
+func generateValuesPlaceholders(l, offset int, nows []int) string {
+	indexToNow := make(map[int]bool)
+	if nows != nil {
+		for _, i := range nows {
+			indexToNow[i] = true
+		}
+	}
 	values := "("
+	d := 0
 	for i := 0; i < l; i++ {
-		values += fmt.Sprintf("$%d,", i+1+offset)
+		if indexToNow[i] {
+			values += "now()"
+		} else {
+			values += fmt.Sprintf("$%d,", d+1+offset)
+			d++
+		}
 	}
 	return values[0:len(values)-1] + ")"
 }
@@ -188,4 +201,27 @@ func checkNoErr(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func dbidsToStrings(dbids []persist.DBID) []string {
+	strings := make([]string, len(dbids))
+	for i, dbid := range dbids {
+		strings[i] = string(dbid)
+	}
+	return strings
+}
+
+// Repositories is the set of all available persistence repositories
+type Repositories struct {
+	UserRepository        *UserRepository
+	NonceRepository       *NonceRepository
+	GalleryRepository     *GalleryRepository
+	TokenRepository       *TokenGalleryRepository
+	CollectionRepository  *CollectionTokenRepository
+	ContractRepository    *ContractGalleryRepository
+	MembershipRepository  *MembershipRepository
+	EarlyAccessRepository *EarlyAccessRepository
+	WalletRepository      *WalletRepository
+	AdmireRepository      *AdmireRepository
+	CommentRepository     *CommentRepository
 }

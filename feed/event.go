@@ -110,12 +110,12 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 	if useEvent, err := b.useEvent(ctx, event); err != nil || !useEvent {
 		return nil, err
 	}
-
-	if _, groupable := eventGroups[event.Action]; groupable {
-		return b.createGroupedFeedEvent(ctx, event)
+	_, groupable := eventGroups[event.Action]
+	// Events with a caption are treated as a singular event.
+	if event.Caption != "" || !groupable {
+		return b.createFeedEvent(ctx, event)
 	}
-
-	return b.createFeedEvent(ctx, event)
+	return b.createGroupedFeedEvent(ctx, event)
 }
 
 func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
@@ -357,6 +357,16 @@ func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, eve
 	// Skip storing the event if nothing interesting changed
 	if len(addedTokens) < 1 && (merged.event.Data.CollectionCollectorsNote == "" || !noteChanged) {
 		return nil, nil
+	}
+	// Treat the event as a collector's note event if no new tokens were added.
+	if len(addedTokens) < 1 && (merged.event.Data.CollectionCollectorsNote != "" && noteChanged) {
+		merged.event.Action = persist.ActionCollectorsNoteAddedToCollection
+		return b.createFeedEvent(ctx, merged.event)
+	}
+	// Treat the event as a tokens added event if the note didn't change or is empty.
+	if len(addedTokens) > 0 && (merged.event.Data.CollectionCollectorsNote == "" || !noteChanged) {
+		merged.event.Action = persist.ActionTokensAddedToCollection
+		return b.createFeedEvent(ctx, merged.event)
 	}
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{

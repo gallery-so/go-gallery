@@ -379,7 +379,7 @@ func (t *TokenRepository) upsertERC721Tokens(pCtx context.Context, pTokens []per
 	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_SPAM) VALUES `
 	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
 	for i, token := range pTokens {
-		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow, nil) + ","
 		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsSpam)
 	}
 
@@ -418,7 +418,7 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 	sqlStr := `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_SPAM) VALUES `
 	vals := make([]interface{}, 0, len(pTokens)*paramsPerRow)
 	for i, token := range pTokens {
-		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow) + ","
+		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow, nil) + ","
 		vals = append(vals, persist.GenerateID(), token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerAddress, pq.Array(token.OwnershipHistory), token.TokenMetadata, token.ContractAddress, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsSpam)
 	}
 

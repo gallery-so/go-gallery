@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -17,7 +18,7 @@ import (
 )
 
 type AuthAPI struct {
-	repos              *persist.Repositories
+	repos              *postgres.Repositories
 	queries            *db.Queries
 	loaders            *dataloader.Loaders
 	validator          *validator.Validate
@@ -85,7 +86,7 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 
 	var addresses []persist.ChainAddress
 	for _, wallet := range wallets {
-		addresses = append(addresses, persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32)))
+		addresses = append(addresses, persist.NewChainAddress(wallet.Address, wallet.Chain))
 	}
 
 	return debugtools.NewDebugAuthenticator(&user, addresses), nil

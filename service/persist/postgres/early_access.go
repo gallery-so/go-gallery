@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
 
 	"github.com/lib/pq"
@@ -11,10 +12,11 @@ import (
 
 type EarlyAccessRepository struct {
 	db                    *sql.DB
+	queries               *db.Queries
 	existsByAddressesStmt *sql.Stmt
 }
 
-func NewEarlyAccessRepository(db *sql.DB) *EarlyAccessRepository {
+func NewEarlyAccessRepository(db *sql.DB, queries *db.Queries) *EarlyAccessRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -23,6 +25,7 @@ func NewEarlyAccessRepository(db *sql.DB) *EarlyAccessRepository {
 
 	return &EarlyAccessRepository{
 		db:                    db,
+		queries:               queries,
 		existsByAddressesStmt: existsByAddressesStmt,
 	}
 }

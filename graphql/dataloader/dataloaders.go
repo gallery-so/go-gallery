@@ -203,7 +203,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.WalletByChainAddress = NewWalletLoaderByChainAddress(defaults, loadWalletByChainAddress(q), WalletLoaderByChainAddressCacheSubscriptions{
 		AutoCacheWithKey: func(wallet db.Wallet) persist.ChainAddress {
-			return persist.NewChainAddress(wallet.Address, persist.Chain(wallet.Chain.Int32))
+			return persist.NewChainAddress(wallet.Address, wallet.Chain)
 		},
 	})
 
@@ -243,7 +243,7 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 
 	loaders.ContractByChainAddress = NewContractLoaderByChainAddress(defaults, loadContractByChainAddress(q), ContractLoaderByChainAddressCacheSubscriptions{
 		AutoCacheWithKey: func(contract db.Contract) persist.ChainAddress {
-			return persist.NewChainAddress(contract.Address, persist.Chain(contract.Chain.Int32))
+			return persist.NewChainAddress(contract.Address, contract.Chain)
 		},
 	})
 
@@ -565,7 +565,7 @@ func loadWalletByChainAddress(q *db.Queries) func(context.Context, []persist.Cha
 		for i, chainAddress := range chainAddresses {
 			sqlChainAddress[i] = db.GetWalletByChainAddressBatchParams{
 				Address: chainAddress.Address(),
-				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain()), Valid: true},
+				Chain:   chainAddress.Chain(),
 			}
 		}
 
@@ -784,7 +784,7 @@ func loadTokensByUserIDAndChain(q *db.Queries) func(context.Context, []IDAndChai
 		for i, userIDAndChain := range userIDsAndChains {
 			params[i] = db.GetTokensByUserIdAndChainBatchParams{
 				OwnerUserID: userIDAndChain.ID,
-				Chain:       sql.NullInt32{Int32: int32(userIDAndChain.Chain), Valid: true},
+				Chain:       userIDAndChain.Chain,
 			}
 		}
 
@@ -851,7 +851,7 @@ func loadContractByChainAddress(q *db.Queries) func(context.Context, []persist.C
 		asParams := make([]db.GetContractByChainAddressBatchParams, len(chainAddresses))
 		for i, chainAddress := range chainAddresses {
 			asParams[i] = db.GetContractByChainAddressBatchParams{
-				Chain:   sql.NullInt32{Int32: int32(chainAddress.Chain()), Valid: true},
+				Chain:   chainAddress.Chain(),
 				Address: chainAddress.Address(),
 			}
 		}
