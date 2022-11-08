@@ -1428,7 +1428,7 @@ func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg G
 }
 
 const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false LIMIT $2
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false ORDER BY CREATED_AT DESC LIMIT $2
 `
 
 type GetRecentUnseenNotificationsParams struct {

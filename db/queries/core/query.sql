@@ -464,7 +464,7 @@ SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = f
     LIMIT $2;
 
 -- name: GetRecentUnseenNotifications :many
-SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false LIMIT $2;
+SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false ORDER BY CREATED_AT DESC LIMIT $2;
 
 -- name: GetUserNotificationsBatch :batchmany
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
