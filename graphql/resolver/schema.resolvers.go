@@ -1046,6 +1046,10 @@ func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (mod
 	return resolveFeedEventByEventID(ctx, id)
 }
 
+func (r *queryResolver) ListUsersByRole(ctx context.Context, role *model.Role) (*model.UsersByRoleConnection, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }

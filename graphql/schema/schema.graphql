@@ -56,6 +56,7 @@ type GalleryUser implements Node {
     bio: String
     traits: String
     universal: Boolean
+    roles: [Role]
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -719,6 +720,21 @@ type FeedConnection {
     pageInfo: PageInfo!
 }
 
+type UserEdge {
+    node: GalleryUser
+}
+
+type UsersByRoleConnection {
+    pageInfo: PageInfo
+    edges: UserEdge
+}
+
+enum Role {
+    STANDARD
+    BETA_TESTER
+    ADMIN
+}
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -736,6 +752,9 @@ type Query {
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
+
+    # Retool Specific
+    listUsersByRole(role: Role): UsersByRoleConnection
 }
 
 input CollectionLayoutInput {
@@ -1197,7 +1216,7 @@ type GroupNotificationUserEdge {
 }
 
 type GroupNotificationUsersConnection @goEmbedHelper {
-    edges:  [GroupNotificationUserEdge] 
+    edges:  [GroupNotificationUserEdge]
     pageInfo: PageInfo
 }
 
@@ -1355,7 +1374,7 @@ type Mutation {
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
-    
+
     viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired

@@ -284,6 +284,7 @@ type User struct {
 	Email                persist.NullString
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
+	Roles                []string
 }
 
 type UserEvent struct {

@@ -1182,12 +1182,22 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
+	roles := make([]*model.Role, 0, len(user.Roles))
+	for _, role := range user.Roles {
+		graphqlRole := roleToModel(role)
+
+		if graphqlRole.String() != "" {
+			roles = append(roles, graphqlRole)
+		}
+	}
+
 	return &model.GalleryUser{
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
 		Bio:       &user.Bio.String,
 		Wallets:   wallets,
 		Universal: &user.Universal,
+		Roles:     roles,
 
 		// each handled by dedicated resolver
 		Galleries: nil,
@@ -1240,6 +1250,21 @@ func commentsToModels(ctx context.Context, comment []db.Comment) []*model.Commen
 		result[i] = commentToModel(ctx, comment)
 	}
 	return result
+}
+
+func roleToModel(role string) *model.Role {
+	var returnRole model.Role
+
+	switch role {
+	case model.RoleStandard.String():
+		returnRole = model.RoleStandard
+	case model.RoleAdmin.String():
+		returnRole = model.RoleAdmin
+	case model.RoleBetaTester.String():
+		returnRole = model.RoleBetaTester
+	}
+
+	return &returnRole
 }
 
 func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wallet {
