@@ -29,7 +29,7 @@ import (
 func Init() {
 	router, i := coreInit()
 	logger.For(nil).Info("Starting indexer...")
-	go i.Start(configureRootContext())
+	go i.Start(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()))
 	http.Handle("/", router)
 }
 
@@ -45,6 +45,9 @@ func coreInit() (*gin.Engine, *indexer) {
 	setDefaults("indexer")
 	initSentry()
 	logger.InitWithGCPDefaults()
+	logger.SetLoggerOptions(func(logger *logrus.Logger) {
+		logger.AddHook(sentryutil.SentryLoggerHook)
+	})
 
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
@@ -142,7 +145,7 @@ func coreInitServer() *gin.Engine {
 
 	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
 
-	go processIncompleteTokens(configureRootContext(), queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	go processIncompleteTokens(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 
@@ -216,15 +219,4 @@ func initSentry() {
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
 	}
-}
-
-// configureRootContext configures the main context from which other contexts are derived.
-func configureRootContext() context.Context {
-	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
-	if viper.GetString("ENV") != "production" {
-		logger.For(ctx).Logger.SetLevel(logrus.DebugLevel)
-	}
-	logger.For(ctx).Logger.SetReportCaller(true)
-	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
-	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())
 }

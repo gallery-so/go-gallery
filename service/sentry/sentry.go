@@ -237,11 +237,6 @@ type sentryLoggerHook struct {
 	reportLevels    []logrus.Level
 }
 
-// SetSentryHookOptions configures the Sentry hook in the global namespace.
-func SetSentryHookOptions(optionsFunc func(hook *sentryLoggerHook)) {
-	optionsFunc(SentryLoggerHook)
-}
-
 // Levels returns the logging levels that the hook will fire on.
 func (h sentryLoggerHook) Levels() []logrus.Level {
 	return h.reportLevels

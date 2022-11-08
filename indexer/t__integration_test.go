@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
@@ -17,7 +18,7 @@ func TestIndexLogs_Success(t *testing.T) {
 	i := newMockIndexer(db, pgx)
 
 	// Run the Indexer
-	i.catchUp(configureRootContext(), eventsToTopics(i.eventHashes))
+	i.catchUp(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()), eventsToTopics(i.eventHashes))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()

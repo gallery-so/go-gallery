@@ -30,17 +30,15 @@ func InitServer() {
 }
 
 func coreInitServer() *gin.Engine {
-	ctx := configureRootContext()
-
 	setDefaults()
 	initSentry()
-	initLogger()
+	logger.InitWithGCPDefaults()
 
 	pgxClient := postgres.NewPgxClient()
 
 	queries := coredb.New(pgxClient)
 
-	loaders := dataloader.NewLoaders(ctx, queries, false)
+	loaders := dataloader.NewLoaders(context.Background(), queries, false)
 
 	client := sendgrid.NewSendClient(viper.GetString("SENDGRID_API_KEY"))
 
@@ -55,7 +53,7 @@ func coreInitServer() *gin.Engine {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	logger.For(ctx).Info("Registering handlers...")
+	logger.For(nil).Info("Registering handlers...")
 
 	return handlersInitServer(router, loaders, queries, client)
 }
@@ -142,12 +140,4 @@ func initLogger() {
 		}
 
 	})
-}
-
-// configureRootContext configures the main context from which other contexts are derived.
-func configureRootContext() context.Context {
-	ctx := logger.NewContextWithLogger(context.Background(), logrus.Fields{}, logrus.New())
-	logger.For(ctx).Logger.SetReportCaller(true)
-	logger.For(ctx).Logger.AddHook(sentryutil.SentryLoggerHook)
-	return sentry.SetHubOnContext(ctx, sentry.CurrentHub())
 }
