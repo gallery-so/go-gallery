@@ -1061,6 +1061,29 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 	return items, nil
 }
 
+const getFeedEventByID = `-- name: GetFeedEventByID :one
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE id = $1 AND deleted = false
+`
+
+func (q *Queries) GetFeedEventByID(ctx context.Context, id persist.DBID) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, getFeedEventByID, id)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Caption,
+	)
+	return i, err
+}
+
 const getGalleriesByUserId = `-- name: GetGalleriesByUserId :many
 SELECT id, deleted, last_updated, created_at, version, owner_user_id, collections FROM galleries WHERE owner_user_id = $1 AND deleted = false
 `
@@ -1397,6 +1420,50 @@ func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg G
 			return nil, err
 		}
 		items = append(items, thumbnail_url)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false LIMIT $2
+`
+
+type GetRecentUnseenNotificationsParams struct {
+	OwnerID persist.DBID
+	Limit   int32
+}
+
+func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecentUnseenNotificationsParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, getRecentUnseenNotifications, arg.OwnerID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1936,6 +2003,68 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 	return items, nil
 }
 
+const getUserUnseenNotifications = `-- name: GetUserUnseenNotifications :many
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $2
+`
+
+type GetUserUnseenNotificationsParams struct {
+	OwnerID       persist.DBID
+	Limit         int32
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUnseenNotificationsParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, getUserUnseenNotifications,
+		arg.OwnerID,
+		arg.Limit,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Notification
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.OwnerID,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Action,
+			&i.Data,
+			&i.EventIds,
+			&i.FeedEventID,
+			&i.CommentID,
+			&i.GalleryID,
+			&i.Seen,
+			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email, users.email_verified, users.email_unsubscriptions,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
 `
@@ -2065,15 +2194,16 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 }
 
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
-    AND (created_at, id) < ($2, $3)
-    AND (created_at, id) > ($4, $5)
-    ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $6::bool THEN (created_at, id) END DESC
-    LIMIT $1
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL AND email_verified = $1
+    AND (created_at, id) < ($3, $4)
+    AND (created_at, id) > ($5, $6)
+    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
+    LIMIT $2
 `
 
 type GetUsersWithEmailNotificationsOnParams struct {
+	EmailVerified persist.EmailVerificationStatus
 	Limit         int32
 	CurBeforeTime time.Time
 	CurBeforeID   persist.DBID
@@ -2085,6 +2215,7 @@ type GetUsersWithEmailNotificationsOnParams struct {
 // verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
 func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetUsersWithEmailNotificationsOnParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOn,
+		arg.EmailVerified,
 		arg.Limit,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
@@ -2127,16 +2258,17 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 }
 
 const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
-    AND (created_at, id) < ($3, $4)
-    AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-    LIMIT $2
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL AND email_verified = $2
+    AND (created_at, id) < ($4, $5)
+    AND (created_at, id) > ($6, $7)
+    ORDER BY CASE WHEN $8::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT $8::bool THEN (created_at, id) END DESC
+    LIMIT $3
 `
 
 type GetUsersWithEmailNotificationsOnForEmailTypeParams struct {
 	Column1       string
+	EmailVerified persist.EmailVerificationStatus
 	Limit         int32
 	CurBeforeTime time.Time
 	CurBeforeID   persist.DBID
@@ -2150,6 +2282,7 @@ type GetUsersWithEmailNotificationsOnForEmailTypeParams struct {
 func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Context, arg GetUsersWithEmailNotificationsOnForEmailTypeParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOnForEmailType,
 		arg.Column1,
+		arg.EmailVerified,
 		arg.Limit,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
@@ -2448,16 +2581,16 @@ func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg Update
 }
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec
-UPDATE users SET email = $2, email_verified = 0 WHERE id = $1
+UPDATE users SET email = $1, email_verified = 0 WHERE id = $2
 `
 
 type UpdateUserEmailParams struct {
-	ID    persist.DBID
 	Email persist.NullString
+	ID    persist.DBID
 }
 
 func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
-	_, err := q.db.Exec(ctx, updateUserEmail, arg.ID, arg.Email)
+	_, err := q.db.Exec(ctx, updateUserEmail, arg.Email, arg.ID)
 	return err
 }
 
