@@ -188,6 +188,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UnsubscribeFromEmailTypePayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UnsubscribeFromEmailTypePayloadOrError)
+		return obj, ok
+	},
+
 	"UpdateCollectionHiddenPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UpdateCollectionHiddenPayloadOrError)
 		return obj, ok

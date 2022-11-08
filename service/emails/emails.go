@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/mikeydub/go-gallery/emails"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
@@ -47,6 +48,39 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 	}
 
 	return output, nil
+}
+
+func UnsubscribeFromEmailTypes(ctx context.Context, userID persist.DBID, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
+	input := emails.UnsubscribeFromEmailTypeInput{
+		UserID:     userID,
+		JWT:        jwt,
+		EmailTypes: unsubTypes,
+	}
+
+	body, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(body)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/unsubscribe", viper.GetString("EMAILS_HOST")), buf)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return util.GetErrFromResp(resp)
+	}
+
+	return nil
 }
 
 func RequestVerificationEmail(ctx context.Context, userID persist.DBID) error {

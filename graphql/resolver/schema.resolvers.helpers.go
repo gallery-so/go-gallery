@@ -979,6 +979,20 @@ func updateUserEmailNotificationSettings(ctx context.Context, input model.Update
 
 }
 
+func unsubscribeFromEmailType(ctx context.Context, input model.UnsubscribeFromEmailTypeInput) (*model.UnsubscribeFromEmailTypePayload, error) {
+
+	// TODO this token needs to be added to the template data for the email in a future when the templates are all in place
+
+	if err := emails.UnsubscribeFromEmailTypes(ctx, "", input.Token, []model.EmailUnsubscriptionType{input.Type}); err != nil {
+		return nil, err
+	}
+
+	return &model.UnsubscribeFromEmailTypePayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+
+}
+
 func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 	switch event.Action {
 	case persist.ActionUserCreated:
