@@ -29,8 +29,7 @@ import (
 func Init() {
 	router, i := coreInit()
 	logger.For(nil).Info("Starting indexer...")
-	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
-	go i.Start(ctx)
+	go i.Start(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()))
 	http.Handle("/", router)
 }
 
