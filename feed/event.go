@@ -110,12 +110,12 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 	if useEvent, err := b.useEvent(ctx, event); err != nil || !useEvent {
 		return nil, err
 	}
-
-	if _, groupable := eventGroups[event.Action]; groupable {
-		return b.createGroupedFeedEvent(ctx, event)
+	_, groupable := eventGroups[event.Action]
+	// Events with a caption are treated as a singular event.
+	if event.Caption != "" || !groupable {
+		return b.createFeedEvent(ctx, event)
 	}
-
-	return b.createFeedEvent(ctx, event)
+	return b.createGroupedFeedEvent(ctx, event)
 }
 
 func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
