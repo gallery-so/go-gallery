@@ -94,6 +94,9 @@ models:
   Action:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Action
+  Role:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Role
 
 directives:
   goGqlId:

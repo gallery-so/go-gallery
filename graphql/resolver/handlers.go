@@ -2,12 +2,15 @@ package graphql
 
 import (
 	"context"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/publicapi"
 	"reflect"
+
+	"github.com/mikeydub/go-gallery/publicapi"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/getsentry/sentry-go"
@@ -142,14 +145,23 @@ func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, nex
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 		gc := util.GinContextFromContext(ctx)
 
-		authHeader := gc.GetHeader("Authorization")
-		validHeader := fmt.Sprintf("Basic %s", "UmV0b29sOk5WTW9tc1RrNlJYZDM3c0dkMmZQVGhoUmVac2ZINFlzQ2ZpR3F3aGNtQ25tNk5EeHNXWGQ3dEY5aWtjRkUycFc=")
+		authError := model.ErrNotAuthorized{
+			Message: "Not authorized",
+			Cause:   model.ErrInvalidToken{Message: "Retool: not authorized"},
+		}
 
-		if authHeader != validHeader {
-			return model.ErrNotAuthorized{
-				Message: "Retool try again",
-				Cause:   model.ErrInvalidToken{Message: "Retool try again"},
-			}, nil
+		parts := strings.SplitN(gc.GetHeader("Authorization"), "Basic ", 2)
+		if len(parts) != 2 {
+			return authError, nil
+		}
+
+		token, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil {
+			return authError, nil
+		}
+
+		if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("RETOOL_AUTH_TOKEN")), token); cmp != 1 {
+			return authError, nil
 		}
 
 		return next(ctx)

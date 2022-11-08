@@ -558,4 +558,4 @@ UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
 
 -- name: UpdateUserRoles :one
-UPDATE users set roles = $1 where id = $2 RETURNING *;
+UPDATE users set roles = @roles where id = $1 RETURNING *;

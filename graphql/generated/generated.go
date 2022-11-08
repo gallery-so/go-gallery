@@ -522,7 +522,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddRolesToUser                  func(childComplexity int, userID persist.DBID, roles []*model.Role) int
+		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
 		ClearAllNotifications           func(childComplexity int) int
@@ -542,7 +542,7 @@ type ComplexityRoot struct {
 		RemoveComment                   func(childComplexity int, commentID persist.DBID) int
 		RemoveUserWallets               func(childComplexity int, walletIds []persist.DBID) int
 		ResendVerificationEmail         func(childComplexity int) int
-		RevokeRolesFromUser             func(childComplexity int, userID persist.DBID, roles []*model.Role) int
+		RevokeRolesFromUser             func(childComplexity int, username string, roles []*persist.Role) int
 		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
 		SyncTokens                      func(childComplexity int, chains []persist.Chain, userID *persist.DBID) int
 		UnfollowUser                    func(childComplexity int, userID persist.DBID) int
@@ -615,7 +615,7 @@ type ComplexityRoot struct {
 		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                func(childComplexity int, id persist.DBID) int
 		UserByUsername          func(childComplexity int, username string) int
-		UsersByRole             func(childComplexity int, role *model.Role) int
+		UsersByRole             func(childComplexity int, role *persist.Role) int
 		UsersWithTrait          func(childComplexity int, trait string) int
 		Viewer                  func(childComplexity int) int
 	}
@@ -847,7 +847,8 @@ type ComplexityRoot struct {
 	}
 
 	UserEdge struct {
-		Node func(childComplexity int) int
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
 	}
 
 	UserEmail struct {
@@ -863,7 +864,7 @@ type ComplexityRoot struct {
 		Owner     func(childComplexity int) int
 	}
 
-	UsersByRoleConnection struct {
+	UsersConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
 	}
@@ -1031,8 +1032,8 @@ type MutationResolver interface {
 	ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error)
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
 	VerifyEmail(ctx context.Context, token string) (model.VerifyEmailPayloadOrError, error)
-	AddRolesToUser(ctx context.Context, userID persist.DBID, roles []*model.Role) (model.AddRolesToUserPayloadOrError, error)
-	RevokeRolesFromUser(ctx context.Context, userID persist.DBID, roles []*model.Role) (model.RevokeRolesFromUserPayloadOrError, error)
+	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
+	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -1054,7 +1055,7 @@ type QueryResolver interface {
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
-	UsersByRole(ctx context.Context, role *model.Role) (*model.UsersByRoleConnection, error)
+	UsersByRole(ctx context.Context, role *persist.Role) (*model.UsersConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -2742,7 +2743,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AddRolesToUser(childComplexity, args["userId"].(persist.DBID), args["roles"].([]*model.Role)), true
+		return e.complexity.Mutation.AddRolesToUser(childComplexity, args["username"].(string), args["roles"].([]*persist.Role)), true
 
 	case "Mutation.addUserWallet":
 		if e.complexity.Mutation.AddUserWallet == nil {
@@ -2967,7 +2968,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RevokeRolesFromUser(childComplexity, args["userId"].(persist.DBID), args["roles"].([]*model.Role)), true
+		return e.complexity.Mutation.RevokeRolesFromUser(childComplexity, args["username"].(string), args["roles"].([]*persist.Role)), true
 
 	case "Mutation.setSpamPreference":
 		if e.complexity.Mutation.SetSpamPreference == nil {
@@ -3466,7 +3467,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.UsersByRole(childComplexity, args["role"].(*model.Role)), true
+		return e.complexity.Query.UsersByRole(childComplexity, args["role"].(*persist.Role)), true
 
 	case "Query.usersWithTrait":
 		if e.complexity.Query.UsersWithTrait == nil {
@@ -4354,6 +4355,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserCreatedFeedEventData.Owner(childComplexity), true
 
+	case "UserEdge.cursor":
+		if e.complexity.UserEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.UserEdge.Cursor(childComplexity), true
+
 	case "UserEdge.node":
 		if e.complexity.UserEdge.Node == nil {
 			break
@@ -4410,19 +4418,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserFollowedUsersFeedEventData.Owner(childComplexity), true
 
-	case "UsersByRoleConnection.edges":
-		if e.complexity.UsersByRoleConnection.Edges == nil {
+	case "UsersConnection.edges":
+		if e.complexity.UsersConnection.Edges == nil {
 			break
 		}
 
-		return e.complexity.UsersByRoleConnection.Edges(childComplexity), true
+		return e.complexity.UsersConnection.Edges(childComplexity), true
 
-	case "UsersByRoleConnection.pageInfo":
-		if e.complexity.UsersByRoleConnection.PageInfo == nil {
+	case "UsersConnection.pageInfo":
+		if e.complexity.UsersConnection.PageInfo == nil {
 			break
 		}
 
-		return e.complexity.UsersByRoleConnection.PageInfo(childComplexity), true
+		return e.complexity.UsersConnection.PageInfo(childComplexity), true
 
 	case "VerifyEmailPayload.email":
 		if e.complexity.VerifyEmailPayload.Email == nil {
@@ -5402,17 +5410,17 @@ type FeedConnection {
 
 type UserEdge {
     node: GalleryUser
+    cursor: String
 }
 
-type UsersByRoleConnection {
-    pageInfo: PageInfo
-    edges: UserEdge
+type UsersConnection {
+    edges: [UserEdge]
+    pageInfo: PageInfo!
 }
 
 enum Role {
-    STANDARD
-    BETA_TESTER
     ADMIN
+    BETA_TESTER
 }
 
 type Query {
@@ -5434,7 +5442,7 @@ type Query {
     feedEventById(id: DBID!): FeedEventByIdOrError
 
     # Retool Specific
-    usersByRole(role: Role): UsersByRoleConnection
+    usersByRole(role: Role): UsersConnection
 }
 
 input CollectionLayoutInput {
@@ -6067,8 +6075,8 @@ type Mutation {
     verifyEmail(token: String!): VerifyEmailPayloadOrError
 
     # Retool Specific Mutations
-    addRolesToUser(userId: DBID!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
-    revokeRolesFromUser(userId: DBID!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
+    addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+    revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 }
 
 type Subscription {
@@ -6410,19 +6418,19 @@ func (ec *executionContext) field_GalleryUser_tokensByChain_args(ctx context.Con
 func (ec *executionContext) field_Mutation_addRolesToUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["userId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+	var arg0 string
+	if tmp, ok := rawArgs["username"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["userId"] = arg0
-	var arg1 []*model.Role
+	args["username"] = arg0
+	var arg1 []*persist.Role
 	if tmp, ok := rawArgs["roles"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("roles"))
-		arg1, err = ec.unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, tmp)
+		arg1, err = ec.unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -6728,19 +6736,19 @@ func (ec *executionContext) field_Mutation_removeUserWallets_args(ctx context.Co
 func (ec *executionContext) field_Mutation_revokeRolesFromUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.DBID
-	if tmp, ok := rawArgs["userId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+	var arg0 string
+	if tmp, ok := rawArgs["username"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["userId"] = arg0
-	var arg1 []*model.Role
+	args["username"] = arg0
+	var arg1 []*persist.Role
 	if tmp, ok := rawArgs["roles"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("roles"))
-		arg1, err = ec.unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, tmp)
+		arg1, err = ec.unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -7211,10 +7219,10 @@ func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context,
 func (ec *executionContext) field_Query_usersByRole_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *model.Role
+	var arg0 *persist.Role
 	if tmp, ok := rawArgs["role"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
-		arg0, err = ec.unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, tmp)
+		arg0, err = ec.unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -13399,9 +13407,9 @@ func (ec *executionContext) _GalleryUser_roles(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Role)
+	res := resTmp.([]*persist.Role)
 	fc.Result = res
-	return ec.marshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, field.Selections, res)
+	return ec.marshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -16520,7 +16528,7 @@ func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AddRolesToUser(rctx, args["userId"].(persist.DBID), args["roles"].([]*model.Role))
+			return ec.resolvers.Mutation().AddRolesToUser(rctx, args["username"].(string), args["roles"].([]*persist.Role))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {
@@ -16579,7 +16587,7 @@ func (ec *executionContext) _Mutation_revokeRolesFromUser(ctx context.Context, f
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RevokeRolesFromUser(rctx, args["userId"].(persist.DBID), args["roles"].([]*model.Role))
+			return ec.resolvers.Mutation().RevokeRolesFromUser(rctx, args["username"].(string), args["roles"].([]*persist.Role))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {
@@ -18011,7 +18019,7 @@ func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphq
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().UsersByRole(rctx, args["role"].(*model.Role))
+		return ec.resolvers.Query().UsersByRole(rctx, args["role"].(*persist.Role))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -18020,9 +18028,9 @@ func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.UsersByRoleConnection)
+	res := resTmp.(*model.UsersConnection)
 	fc.Result = res
-	return ec.marshalOUsersByRoleConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersByRoleConnection(ctx, field.Selections, res)
+	return ec.marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -22090,6 +22098,38 @@ func (ec *executionContext) _UserEdge_node(ctx context.Context, field graphql.Co
 	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UserEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.UserEdge) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UserEdge",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UserEmail_email(ctx context.Context, field graphql.CollectedField, obj *model.UserEmail) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -22314,7 +22354,7 @@ func (ec *executionContext) _UserFollowedUsersFeedEventData_followed(ctx context
 	return ec.marshalOFollowInfo2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowInfo(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _UsersByRoleConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.UsersByRoleConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _UsersConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.UsersConnection) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -22322,39 +22362,7 @@ func (ec *executionContext) _UsersByRoleConnection_pageInfo(ctx context.Context,
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "UsersByRoleConnection",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.PageInfo, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.PageInfo)
-	fc.Result = res
-	return ec.marshalOPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _UsersByRoleConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.UsersByRoleConnection) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "UsersByRoleConnection",
+		Object:     "UsersConnection",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -22373,9 +22381,44 @@ func (ec *executionContext) _UsersByRoleConnection_edges(ctx context.Context, fi
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.UserEdge)
+	res := resTmp.([]*model.UserEdge)
 	fc.Result = res
-	return ec.marshalOUserEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserEdge(ctx, field.Selections, res)
+	return ec.marshalOUserEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserEdge(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UsersConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.UsersConnection) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UsersConnection",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _VerifyEmailPayload_email(ctx context.Context, field graphql.CollectedField, obj *model.VerifyEmailPayload) (ret graphql.Marshaler) {
@@ -33583,6 +33626,13 @@ func (ec *executionContext) _UserEdge(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "cursor":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UserEdge_cursor(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -33695,30 +33745,33 @@ func (ec *executionContext) _UserFollowedUsersFeedEventData(ctx context.Context,
 	return out
 }
 
-var usersByRoleConnectionImplementors = []string{"UsersByRoleConnection"}
+var usersConnectionImplementors = []string{"UsersConnection"}
 
-func (ec *executionContext) _UsersByRoleConnection(ctx context.Context, sel ast.SelectionSet, obj *model.UsersByRoleConnection) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, usersByRoleConnectionImplementors)
+func (ec *executionContext) _UsersConnection(ctx context.Context, sel ast.SelectionSet, obj *model.UsersConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, usersConnectionImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("UsersByRoleConnection")
-		case "pageInfo":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UsersByRoleConnection_pageInfo(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
+			out.Values[i] = graphql.MarshalString("UsersConnection")
 		case "edges":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._UsersByRoleConnection_edges(ctx, field, obj)
+				return ec._UsersConnection_edges(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "pageInfo":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UsersConnection_pageInfo(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -36783,7 +36836,7 @@ func (ec *executionContext) marshalORevokeRolesFromUserPayloadOrError2githubᚗc
 	return ec._RevokeRolesFromUserPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx context.Context, v interface{}) ([]*model.Role, error) {
+func (ec *executionContext) unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx context.Context, v interface{}) ([]*persist.Role, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -36792,10 +36845,10 @@ func (ec *executionContext) unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 		vSlice = graphql.CoerceList(v)
 	}
 	var err error
-	res := make([]*model.Role, len(vSlice))
+	res := make([]*persist.Role, len(vSlice))
 	for i := range vSlice {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, vSlice[i])
+		res[i], err = ec.unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, vSlice[i])
 		if err != nil {
 			return nil, err
 		}
@@ -36803,7 +36856,7 @@ func (ec *executionContext) unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 	return res, nil
 }
 
-func (ec *executionContext) marshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx context.Context, sel ast.SelectionSet, v []*model.Role) graphql.Marshaler {
+func (ec *executionContext) marshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx context.Context, sel ast.SelectionSet, v []*persist.Role) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -36830,7 +36883,7 @@ func (ec *executionContext) marshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑga
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, sel, v[i])
+			ret[i] = ec.marshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -36844,16 +36897,16 @@ func (ec *executionContext) marshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑga
 	return ret
 }
 
-func (ec *executionContext) unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx context.Context, v interface{}) (*model.Role, error) {
+func (ec *executionContext) unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx context.Context, v interface{}) (*persist.Role, error) {
 	if v == nil {
 		return nil, nil
 	}
-	var res = new(model.Role)
+	var res = new(persist.Role)
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx context.Context, sel ast.SelectionSet, v *model.Role) graphql.Marshaler {
+func (ec *executionContext) marshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx context.Context, sel ast.SelectionSet, v *persist.Role) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -37251,6 +37304,47 @@ func (ec *executionContext) marshalOUserByUsernameOrError2githubᚗcomᚋmikeydu
 	return ec._UserByUsernameOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOUserEdge2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserEdge(ctx context.Context, sel ast.SelectionSet, v []*model.UserEdge) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOUserEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
 func (ec *executionContext) marshalOUserEdge2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserEdge(ctx context.Context, sel ast.SelectionSet, v *model.UserEdge) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -37265,11 +37359,11 @@ func (ec *executionContext) marshalOUserEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑ
 	return ec._UserEmail(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOUsersByRoleConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersByRoleConnection(ctx context.Context, sel ast.SelectionSet, v *model.UsersByRoleConnection) graphql.Marshaler {
+func (ec *executionContext) marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx context.Context, sel ast.SelectionSet, v *model.UsersConnection) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._UsersByRoleConnection(ctx, sel, v)
+	return ec._UsersConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOVerifyEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.VerifyEmailPayloadOrError) graphql.Marshaler {

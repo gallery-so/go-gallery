@@ -84,9 +84,8 @@ func RegisterCustomValidators(v *validator.Validate) {
 }
 
 var IsValidRole validator.Func = func(fl validator.FieldLevel) bool {
-	role := fl.Field().String()
-
-	return role == "ADMIN" || role == "STANDARD" || role == "BETA_TESTER"
+	role := persist.Role(fl.Field().String())
+	return role == persist.RoleAdmin || role == persist.RoleBetaTester
 }
 
 func ChainAddressValidator(sl validator.StructLevel) {

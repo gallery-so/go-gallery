@@ -166,6 +166,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 	viper.SetDefault("EMAILS_HOST", "http://localhost:5500")
+	viper.SetDefault("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 
 	viper.AutomaticEnv()
 
@@ -181,6 +182,7 @@ func setDefaults() {
 		util.EnvVarMustExist("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.EnvVarMustExist("SENTRY_DSN", "")
 		util.EnvVarMustExist("GAE_VERSION", "")
+		util.EnvVarMustExist("RETOOL_AUTH_TOKEN", "")
 	}
 }
 

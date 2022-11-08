@@ -208,6 +208,10 @@ func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.G
 	return models, nil
 }
 
+func resolveGalleryUsersWithRole(ctx context.Context, role persist.Role) ([]*model.GalleryUser, error) {
+	panic("not implemented")
+}
+
 func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
 	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
 
@@ -1182,13 +1186,10 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
-	roles := make([]*model.Role, 0, len(user.Roles))
-	for _, role := range user.Roles {
-		graphqlRole := roleToModel(role)
-
-		if graphqlRole.String() != "" {
-			roles = append(roles, graphqlRole)
-		}
+	roles := make([]*persist.Role, len(user.Roles))
+	for i, role := range user.Roles {
+		r := role
+		roles[i] = &r
 	}
 
 	return &model.GalleryUser{
@@ -1250,21 +1251,6 @@ func commentsToModels(ctx context.Context, comment []db.Comment) []*model.Commen
 		result[i] = commentToModel(ctx, comment)
 	}
 	return result
-}
-
-func roleToModel(role string) *model.Role {
-	var returnRole model.Role
-
-	switch role {
-	case model.RoleStandard.String():
-		returnRole = model.RoleStandard
-	case model.RoleAdmin.String():
-		returnRole = model.RoleAdmin
-	case model.RoleBetaTester.String():
-		returnRole = model.RoleBetaTester
-	}
-
-	return &returnRole
 }
 
 func walletToModelPersist(ctx context.Context, wallet persist.Wallet) *model.Wallet {

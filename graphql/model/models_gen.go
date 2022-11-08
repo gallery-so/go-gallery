@@ -801,7 +801,7 @@ type GalleryUser struct {
 	Bio                 *string         `json:"bio"`
 	Traits              *string         `json:"traits"`
 	Universal           *bool           `json:"universal"`
-	Roles               []*Role         `json:"roles"`
+	Roles               []*persist.Role `json:"roles"`
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
@@ -1301,7 +1301,8 @@ type UserCreatedFeedEventData struct {
 func (UserCreatedFeedEventData) IsFeedEventData() {}
 
 type UserEdge struct {
-	Node *GalleryUser `json:"node"`
+	Node   *GalleryUser `json:"node"`
+	Cursor *string      `json:"cursor"`
 }
 
 type UserEmail struct {
@@ -1319,9 +1320,9 @@ type UserFollowedUsersFeedEventData struct {
 
 func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
 
-type UsersByRoleConnection struct {
-	PageInfo *PageInfo `json:"pageInfo"`
-	Edges    *UserEdge `json:"edges"`
+type UsersConnection struct {
+	Edges    []*UserEdge `json:"edges"`
+	PageInfo *PageInfo   `json:"pageInfo"`
 }
 
 type VerifyEmailPayload struct {
@@ -1380,49 +1381,6 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
-
-type Role string
-
-const (
-	RoleStandard   Role = "STANDARD"
-	RoleBetaTester Role = "BETA_TESTER"
-	RoleAdmin      Role = "ADMIN"
-)
-
-var AllRole = []Role{
-	RoleStandard,
-	RoleBetaTester,
-	RoleAdmin,
-}
-
-func (e Role) IsValid() bool {
-	switch e {
-	case RoleStandard, RoleBetaTester, RoleAdmin:
-		return true
-	}
-	return false
-}
-
-func (e Role) String() string {
-	return string(e)
-}
-
-func (e *Role) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = Role(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid Role", str)
-	}
-	return nil
-}
-
-func (e Role) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
 
 type TokenType string
 

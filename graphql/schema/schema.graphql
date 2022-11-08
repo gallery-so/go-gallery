@@ -724,17 +724,17 @@ type FeedConnection {
 
 type UserEdge {
     node: GalleryUser
+    cursor: String
 }
 
-type UsersByRoleConnection {
-    pageInfo: PageInfo
-    edges: UserEdge
+type UsersConnection {
+    edges: [UserEdge]
+    pageInfo: PageInfo!
 }
 
 enum Role {
-    STANDARD
-    BETA_TESTER
     ADMIN
+    BETA_TESTER
 }
 
 type Query {
@@ -756,7 +756,7 @@ type Query {
     feedEventById(id: DBID!): FeedEventByIdOrError
 
     # Retool Specific
-    usersByRole(role: Role): UsersByRoleConnection
+    usersByRole(role: Role): UsersConnection
 }
 
 input CollectionLayoutInput {
@@ -1389,8 +1389,8 @@ type Mutation {
     verifyEmail(token: String!): VerifyEmailPayloadOrError
 
     # Retool Specific Mutations
-    addRolesToUser(userId: DBID!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
-    revokeRolesFromUser(userId: DBID!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
+    addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+    revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 }
 
 type Subscription {

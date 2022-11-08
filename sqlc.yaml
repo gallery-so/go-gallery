@@ -45,6 +45,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "users.email_verified"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
+          - column: "users.roles"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
 
           # Galleries
           - column: "galleries.collections"

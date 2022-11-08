@@ -5,7 +5,10 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
+
+	"github.com/lib/pq"
 )
 
 type Traits map[string]interface{}
@@ -191,4 +194,65 @@ type ErrWalletCreateFailed struct {
 
 func (e ErrWalletCreateFailed) Error() string {
 	return fmt.Sprintf("wallet create failed: address: %s, walletID: %s, error: %s", e.ChainAddress, e.WalletID, e.Err)
+}
+
+type Role string
+
+const (
+	RoleAdmin      Role = "ADMIN"
+	RoleBetaTester      = "BETA_TESTER"
+)
+
+// Scan implements the database/sql Scanner interface for the DBID type
+func (r *Role) Scan(i interface{}) error {
+	if i == nil {
+		return nil
+	}
+	if it, ok := i.([]uint8); ok {
+		*r = Role(it)
+		return nil
+	}
+	*r = Role(i.(string))
+	return nil
+}
+
+// Value implements the database/sql driver Valuer interface for the DBID type
+func (r *Role) Value() (driver.Value, error) {
+	return r, nil
+}
+
+// UnmarshalGQL implements the graphql.Unmarshaler interface
+func (r *Role) UnmarshalGQL(v interface{}) error {
+	n, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("Role must be a string")
+	}
+
+	switch strings.ToLower(n) {
+	case "admin":
+		*r = RoleAdmin
+	case "beta_tester":
+		*r = RoleBetaTester
+	}
+	return nil
+}
+
+// MarshalGQL implements the graphql.Marshaler interface
+func (r Role) MarshalGQL(w io.Writer) {
+	switch r {
+	case RoleAdmin:
+		w.Write([]byte(`"ADMIN"`))
+	case RoleBetaTester:
+		w.Write([]byte(`"BETA_TESTER"`))
+	}
+}
+
+type RoleList []Role
+
+func (l RoleList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+func (l *RoleList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
 }
