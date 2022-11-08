@@ -3,6 +3,11 @@
 package model
 
 var typeConversionMap = map[string]func(object interface{}) (objectAsType interface{}, ok bool){
+	"AddRolesToUserPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AddRolesToUserPayloadOrError)
+		return obj, ok
+	},
+
 	"AddUserWalletPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AddUserWalletPayloadOrError)
 		return obj, ok
@@ -165,6 +170,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"ResendVerificationEmailPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(ResendVerificationEmailPayloadOrError)
+		return obj, ok
+	},
+
+	"RevokeRolesFromUserPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RevokeRolesFromUserPayloadOrError)
 		return obj, ok
 	},
 

@@ -920,6 +920,36 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, token string) (model
 	return verifyEmail(ctx, token)
 }
 
+func (r *mutationResolver) AddRolesToUser(ctx context.Context, userID persist.DBID, roles []*model.Role) (model.AddRolesToUserPayloadOrError, error) {
+	modelRoles := make([]string, len(roles))
+	for i, role := range roles {
+		modelRoles[i] = role.String()
+	}
+
+	dbUser, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, userID, modelRoles)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return userToModel(ctx, *dbUser), nil
+}
+
+func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, userID persist.DBID, roles []*model.Role) (model.RevokeRolesFromUserPayloadOrError, error) {
+	modelRoles := make([]string, len(roles))
+	for i, role := range roles {
+		modelRoles[i] = role.String()
+	}
+
+	dbUser, err := publicapi.For(ctx).Admin.RemoveRolesFromUser(ctx, userID, modelRoles)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return userToModel(ctx, *dbUser), nil
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -1046,7 +1076,7 @@ func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (mod
 	return resolveFeedEventByEventID(ctx, id)
 }
 
-func (r *queryResolver) ListUsersByRole(ctx context.Context, role *model.Role) (*model.UsersByRoleConnection, error) {
+func (r *queryResolver) UsersByRole(ctx context.Context, role *model.Role) (*model.UsersByRoleConnection, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
@@ -1467,3 +1497,13 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *queryResolver) ListUsersByRole(ctx context.Context, role *model.Role) (*model.UsersByRoleConnection, error) {
+	panic(fmt.Errorf("not implemented"))
+}

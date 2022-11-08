@@ -2484,6 +2484,39 @@ func (q *Queries) UpdateUserEmailUnsubscriptions(ctx context.Context, arg Update
 	return err
 }
 
+const updateUserRoles = `-- name: UpdateUserRoles :one
+UPDATE users set roles = $1 where id = $2 RETURNING id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles
+`
+
+type UpdateUserRolesParams struct {
+	Roles []string
+	ID    persist.DBID
+}
+
+func (q *Queries) UpdateUserRoles(ctx context.Context, arg UpdateUserRolesParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserRoles, arg.Roles, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Username,
+		&i.UsernameIdempotent,
+		&i.Wallets,
+		&i.Bio,
+		&i.Traits,
+		&i.Universal,
+		&i.NotificationSettings,
+		&i.Email,
+		&i.EmailVerified,
+		&i.EmailUnsubscriptions,
+		&i.Roles,
+	)
+	return i, err
+}
+
 const updateUserVerificationStatus = `-- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1
 `

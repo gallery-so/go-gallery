@@ -138,6 +138,24 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 	return res, err
 }
 
+func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+		gc := util.GinContextFromContext(ctx)
+
+		authHeader := gc.GetHeader("Authorization")
+		validHeader := fmt.Sprintf("Basic %s", "UmV0b29sOk5WTW9tc1RrNlJYZDM3c0dkMmZQVGhoUmVac2ZINFlzQ2ZpR3F3aGNtQ25tNk5EeHNXWGQ3dEY5aWtjRkUycFc=")
+
+		if authHeader != validHeader {
+			return model.ErrNotAuthorized{
+				Message: "Retool try again",
+				Cause:   model.ErrInvalidToken{Message: "Retool try again"},
+			}, nil
+		}
+
+		return next(ctx)
+	}
+}
+
 func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {

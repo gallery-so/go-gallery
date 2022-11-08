@@ -11,6 +11,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+type AddRolesToUserPayloadOrError interface {
+	IsAddRolesToUserPayloadOrError()
+}
+
 type AddUserWalletPayloadOrError interface {
 	IsAddUserWalletPayloadOrError()
 }
@@ -144,6 +148,10 @@ type RemoveUserWalletsPayloadOrError interface {
 
 type ResendVerificationEmailPayloadOrError interface {
 	IsResendVerificationEmailPayloadOrError()
+}
+
+type RevokeRolesFromUserPayloadOrError interface {
+	IsRevokeRolesFromUserPayloadOrError()
 }
 
 type SetSpamPreferencePayloadOrError interface {
@@ -643,6 +651,8 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
 func (ErrNotAuthorized) IsError()                                  {}
 func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
+func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()           {}
+func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()      {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -803,12 +813,14 @@ type GalleryUser struct {
 	Feed                *FeedConnection `json:"feed"`
 }
 
-func (GalleryUser) IsNode()                  {}
-func (GalleryUser) IsGalleryUserOrWallet()   {}
-func (GalleryUser) IsGalleryUserOrAddress()  {}
-func (GalleryUser) IsUserByUsernameOrError() {}
-func (GalleryUser) IsUserByIDOrError()       {}
-func (GalleryUser) IsUserByAddressOrError()  {}
+func (GalleryUser) IsNode()                              {}
+func (GalleryUser) IsGalleryUserOrWallet()               {}
+func (GalleryUser) IsGalleryUserOrAddress()              {}
+func (GalleryUser) IsUserByUsernameOrError()             {}
+func (GalleryUser) IsUserByIDOrError()                   {}
+func (GalleryUser) IsUserByAddressOrError()              {}
+func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
+func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`

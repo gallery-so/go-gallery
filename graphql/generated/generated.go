@@ -84,6 +84,7 @@ type ResolverRoot interface {
 type DirectiveRoot struct {
 	AuthRequired        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 	RestrictEnvironment func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
+	RetoolAuth          func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -521,6 +522,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		AddRolesToUser                  func(childComplexity int, userID persist.DBID, roles []*model.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
 		ClearAllNotifications           func(childComplexity int) int
@@ -540,6 +542,7 @@ type ComplexityRoot struct {
 		RemoveComment                   func(childComplexity int, commentID persist.DBID) int
 		RemoveUserWallets               func(childComplexity int, walletIds []persist.DBID) int
 		ResendVerificationEmail         func(childComplexity int) int
+		RevokeRolesFromUser             func(childComplexity int, userID persist.DBID, roles []*model.Role) int
 		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
 		SyncTokens                      func(childComplexity int, chains []persist.Chain, userID *persist.DBID) int
 		UnfollowUser                    func(childComplexity int, userID persist.DBID) int
@@ -606,13 +609,13 @@ type ComplexityRoot struct {
 		GalleryOfTheWeekWinners func(childComplexity int) int
 		GeneralAllowlist        func(childComplexity int) int
 		GlobalFeed              func(childComplexity int, before *string, after *string, first *int, last *int) int
-		ListUsersByRole         func(childComplexity int, role *model.Role) int
 		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
 		Node                    func(childComplexity int, id model.GqlID) int
 		TokenByID               func(childComplexity int, id persist.DBID) int
 		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                func(childComplexity int, id persist.DBID) int
 		UserByUsername          func(childComplexity int, username string) int
+		UsersByRole             func(childComplexity int, role *model.Role) int
 		UsersWithTrait          func(childComplexity int, trait string) int
 		Viewer                  func(childComplexity int) int
 	}
@@ -1028,6 +1031,8 @@ type MutationResolver interface {
 	ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error)
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
 	VerifyEmail(ctx context.Context, token string) (model.VerifyEmailPayloadOrError, error)
+	AddRolesToUser(ctx context.Context, userID persist.DBID, roles []*model.Role) (model.AddRolesToUserPayloadOrError, error)
+	RevokeRolesFromUser(ctx context.Context, userID persist.DBID, roles []*model.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -1049,7 +1054,7 @@ type QueryResolver interface {
 	GalleryOfTheWeekWinners(ctx context.Context) ([]*model.GalleryUser, error)
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
-	ListUsersByRole(ctx context.Context, role *model.Role) (*model.UsersByRoleConnection, error)
+	UsersByRole(ctx context.Context, role *model.Role) (*model.UsersByRoleConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -2727,6 +2732,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MembershipTier.TokenID(childComplexity), true
 
+	case "Mutation.addRolesToUser":
+		if e.complexity.Mutation.AddRolesToUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_addRolesToUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AddRolesToUser(childComplexity, args["userId"].(persist.DBID), args["roles"].([]*model.Role)), true
+
 	case "Mutation.addUserWallet":
 		if e.complexity.Mutation.AddUserWallet == nil {
 			break
@@ -2939,6 +2956,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.ResendVerificationEmail(childComplexity), true
+
+	case "Mutation.revokeRolesFromUser":
+		if e.complexity.Mutation.RevokeRolesFromUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_revokeRolesFromUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RevokeRolesFromUser(childComplexity, args["userId"].(persist.DBID), args["roles"].([]*model.Role)), true
 
 	case "Mutation.setSpamPreference":
 		if e.complexity.Mutation.SetSpamPreference == nil {
@@ -3355,18 +3384,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.GlobalFeed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
-	case "Query.listUsersByRole":
-		if e.complexity.Query.ListUsersByRole == nil {
-			break
-		}
-
-		args, err := ec.field_Query_listUsersByRole_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.ListUsersByRole(childComplexity, args["role"].(*model.Role)), true
-
 	case "Query.membershipTiers":
 		if e.complexity.Query.MembershipTiers == nil {
 			break
@@ -3438,6 +3455,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.UserByUsername(childComplexity, args["username"].(string)), true
+
+	case "Query.usersByRole":
+		if e.complexity.Query.UsersByRole == nil {
+			break
+		}
+
+		args, err := ec.field_Query_usersByRole_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UsersByRole(childComplexity, args["role"].(*model.Role)), true
 
 	case "Query.usersWithTrait":
 		if e.complexity.Query.UsersWithTrait == nil {
@@ -4661,6 +4690,8 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -5403,7 +5434,7 @@ type Query {
     feedEventById(id: DBID!): FeedEventByIdOrError
 
     # Retool Specific
-    listUsersByRole(role: Role): UsersByRoleConnection
+    usersByRole(role: Role): UsersByRoleConnection
 }
 
 input CollectionLayoutInput {
@@ -5982,6 +6013,9 @@ union UpdateEmailNotificationSettingsPayloadOrError =
     UpdateEmailNotificationSettingsPayload
     | ErrInvalidInput
 
+union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
+union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -6031,6 +6065,10 @@ type Mutation {
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
     verifyEmail(token: String!): VerifyEmailPayloadOrError
+
+    # Retool Specific Mutations
+    addRolesToUser(userId: DBID!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+    revokeRolesFromUser(userId: DBID!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 }
 
 type Subscription {
@@ -6369,6 +6407,30 @@ func (ec *executionContext) field_GalleryUser_tokensByChain_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_addRolesToUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["userId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["userId"] = arg0
+	var arg1 []*model.Role
+	if tmp, ok := rawArgs["roles"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("roles"))
+		arg1, err = ec.unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["roles"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_addUserWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -6660,6 +6722,30 @@ func (ec *executionContext) field_Mutation_removeUserWallets_args(ctx context.Co
 		}
 	}
 	args["walletIds"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_revokeRolesFromUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["userId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["userId"] = arg0
+	var arg1 []*model.Role
+	if tmp, ok := rawArgs["roles"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("roles"))
+		arg1, err = ec.unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["roles"] = arg1
 	return args, nil
 }
 
@@ -7032,21 +7118,6 @@ func (ec *executionContext) field_Query_globalFeed_args(ctx context.Context, raw
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_listUsersByRole_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *model.Role
-	if tmp, ok := rawArgs["role"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
-		arg0, err = ec.unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["role"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Query_membershipTiers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -7134,6 +7205,21 @@ func (ec *executionContext) field_Query_userByUsername_args(ctx context.Context,
 		}
 	}
 	args["username"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_usersByRole_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.Role
+	if tmp, ok := rawArgs["role"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+		arg0, err = ec.unmarshalORole2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["role"] = arg0
 	return args, nil
 }
 
@@ -16408,6 +16494,124 @@ func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field gra
 	return ec.marshalOVerifyEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_addRolesToUser_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AddRolesToUser(rctx, args["userId"].(persist.DBID), args["roles"].([]*model.Role))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.AddRolesToUserPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AddRolesToUserPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.AddRolesToUserPayloadOrError)
+	fc.Result = res
+	return ec.marshalOAddRolesToUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddRolesToUserPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_revokeRolesFromUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_revokeRolesFromUser_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().RevokeRolesFromUser(rctx, args["userId"].(persist.DBID), args["roles"].([]*model.Role))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.RevokeRolesFromUserPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.RevokeRolesFromUserPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.RevokeRolesFromUserPayloadOrError)
+	fc.Result = res
+	return ec.marshalORevokeRolesFromUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRevokeRolesFromUserPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -17782,7 +17986,7 @@ func (ec *executionContext) _Query_feedEventById(ctx context.Context, field grap
 	return ec.marshalOFeedEventByIdOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventByIDOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_listUsersByRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -17799,7 +18003,7 @@ func (ec *executionContext) _Query_listUsersByRole(ctx context.Context, field gr
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Query_listUsersByRole_args(ctx, rawArgs)
+	args, err := ec.field_Query_usersByRole_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -17807,7 +18011,7 @@ func (ec *executionContext) _Query_listUsersByRole(ctx context.Context, field gr
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().ListUsersByRole(rctx, args["role"].(*model.Role))
+		return ec.resolvers.Query().UsersByRole(rctx, args["role"].(*model.Role))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -24973,6 +25177,29 @@ func (ec *executionContext) unmarshalInputUpdateUserInfoInput(ctx context.Contex
 
 // region    ************************** interface.gotpl ***************************
 
+func (ec *executionContext) _AddRolesToUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AddRolesToUserPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GalleryUser:
+		return ec._GalleryUser(ctx, sel, &obj)
+	case *model.GalleryUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryUser(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _AddUserWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AddUserWalletPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -26405,6 +26632,29 @@ func (ec *executionContext) _ResendVerificationEmailPayloadOrError(ctx context.C
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _RevokeRolesFromUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.RevokeRolesFromUserPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GalleryUser:
+		return ec._GalleryUser(ctx, sel, &obj)
+	case *model.GalleryUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryUser(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -28944,7 +29194,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -29848,7 +30098,7 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError"}
+var galleryUserImplementors = []string{"GalleryUser", "Node", "GalleryUserOrWallet", "GalleryUserOrAddress", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError"}
 
 func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryUserImplementors)
@@ -30764,6 +31014,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "addRolesToUser":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_addRolesToUser(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "revokeRolesFromUser":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_revokeRolesFromUser(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -31426,7 +31690,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
-		case "listUsersByRole":
+		case "usersByRole":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -31435,7 +31699,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_listUsersByRole(ctx, field)
+				res = ec._Query_usersByRole(ctx, field)
 				return res
 			}
 
@@ -34932,6 +35196,13 @@ func (ec *executionContext) marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgal
 	return res
 }
 
+func (ec *executionContext) marshalOAddRolesToUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddRolesToUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AddRolesToUserPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AddRolesToUserPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOAddUserWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddUserWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AddUserWalletPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -36503,6 +36774,13 @@ func (ec *executionContext) marshalOResendVerificationEmailPayloadOrError2github
 		return graphql.Null
 	}
 	return ec._ResendVerificationEmailPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORevokeRolesFromUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRevokeRolesFromUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.RevokeRolesFromUserPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RevokeRolesFromUserPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRole(ctx context.Context, v interface{}) ([]*model.Role, error) {

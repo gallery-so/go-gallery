@@ -12,6 +12,8 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -754,7 +756,7 @@ type Query {
     feedEventById(id: DBID!): FeedEventByIdOrError
 
     # Retool Specific
-    listUsersByRole(role: Role): UsersByRoleConnection
+    usersByRole(role: Role): UsersByRoleConnection
 }
 
 input CollectionLayoutInput {
@@ -1333,6 +1335,9 @@ union UpdateEmailNotificationSettingsPayloadOrError =
     UpdateEmailNotificationSettingsPayload
     | ErrInvalidInput
 
+union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
+union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1382,6 +1387,10 @@ type Mutation {
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
     verifyEmail(token: String!): VerifyEmailPayloadOrError
+
+    # Retool Specific Mutations
+    addRolesToUser(userId: DBID!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+    revokeRolesFromUser(userId: DBID!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 }
 
 type Subscription {
