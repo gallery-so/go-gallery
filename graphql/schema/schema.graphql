@@ -494,9 +494,14 @@ type UserEmail {
 }
 
 type EmailNotificationSettings {
-    unsubscribedFromAll: Boolean
+    unsubscribedFromAll: Boolean!
+    unsubscribedFromNotifications: Boolean!
 }
 
+input UpdateEmailNotificationSettingsInput {
+    unsubscribedFromAll: Boolean!
+    unsubscribedFromNotifications: Boolean!
+}
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -1293,6 +1298,22 @@ union UpdateEmailPayloadOrError =
     UpdateEmailPayload
     | ErrInvalidInput
 
+type ResendVerificationEmailPayload {
+    viewer: Viewer
+}
+
+union ResendVerificationEmailPayloadOrError =
+    ResendVerificationEmailPayload
+    | ErrInvalidInput
+
+type UpdateEmailNotificationSettingsPayload {
+    viewer: Viewer
+}
+
+union UpdateEmailNotificationSettingsPayloadOrError =
+    UpdateEmailNotificationSettingsPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1323,6 +1344,8 @@ type Mutation {
 
     createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: String): CreateUserPayloadOrError
     updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
+    resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
+    updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 

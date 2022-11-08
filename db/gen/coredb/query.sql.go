@@ -2461,6 +2461,20 @@ func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams
 	return err
 }
 
+const updateUserEmailUnsubscriptions = `-- name: UpdateUserEmailUnsubscriptions :exec
+UPDATE users SET email_unsubscriptions = $2 WHERE id = $1
+`
+
+type UpdateUserEmailUnsubscriptionsParams struct {
+	ID                   persist.DBID
+	EmailUnsubscriptions persist.EmailUnsubscriptions
+}
+
+func (q *Queries) UpdateUserEmailUnsubscriptions(ctx context.Context, arg UpdateUserEmailUnsubscriptionsParams) error {
+	_, err := q.db.Exec(ctx, updateUserEmailUnsubscriptions, arg.ID, arg.EmailUnsubscriptions)
+	return err
+}
+
 const updateUserVerificationStatus = `-- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1
 `

@@ -142,6 +142,10 @@ type RemoveUserWalletsPayloadOrError interface {
 	IsRemoveUserWalletsPayloadOrError()
 }
 
+type ResendVerificationEmailPayloadOrError interface {
+	IsResendVerificationEmailPayloadOrError()
+}
+
 type SetSpamPreferencePayloadOrError interface {
 	IsSetSpamPreferencePayloadOrError()
 }
@@ -168,6 +172,10 @@ type UpdateCollectionInfoPayloadOrError interface {
 
 type UpdateCollectionTokensPayloadOrError interface {
 	IsUpdateCollectionTokensPayloadOrError()
+}
+
+type UpdateEmailNotificationSettingsPayloadOrError interface {
+	IsUpdateEmailNotificationSettingsPayloadOrError()
 }
 
 type UpdateEmailPayloadOrError interface {
@@ -472,7 +480,8 @@ type DeleteCollectionPayload struct {
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
 type EmailNotificationSettings struct {
-	UnsubscribedFromAll *bool `json:"unsubscribedFromAll"`
+	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
 }
 
 type EoaAuth struct {
@@ -569,34 +578,36 @@ type ErrInvalidInput struct {
 	Reasons    []string `json:"reasons"`
 }
 
-func (ErrInvalidInput) IsUserByUsernameOrError()                  {}
-func (ErrInvalidInput) IsUserByIDOrError()                        {}
-func (ErrInvalidInput) IsUserByAddressOrError()                   {}
-func (ErrInvalidInput) IsCollectionByIDOrError()                  {}
-func (ErrInvalidInput) IsCommunityByAddressOrError()              {}
-func (ErrInvalidInput) IsCreateCollectionPayloadOrError()         {}
-func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()         {}
-func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()     {}
-func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()   {}
-func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()   {}
-func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError() {}
-func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()          {}
-func (ErrInvalidInput) IsAddUserWalletPayloadOrError()            {}
-func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()        {}
-func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()           {}
-func (ErrInvalidInput) IsRefreshTokenPayloadOrError()             {}
-func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()        {}
-func (ErrInvalidInput) IsRefreshContractPayloadOrError()          {}
-func (ErrInvalidInput) IsError()                                  {}
-func (ErrInvalidInput) IsCreateUserPayloadOrError()               {}
-func (ErrInvalidInput) IsFollowUserPayloadOrError()               {}
-func (ErrInvalidInput) IsUnfollowUserPayloadOrError()             {}
-func (ErrInvalidInput) IsAdmireFeedEventPayloadOrError()          {}
-func (ErrInvalidInput) IsRemoveAdmirePayloadOrError()             {}
-func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()       {}
-func (ErrInvalidInput) IsRemoveCommentPayloadOrError()            {}
-func (ErrInvalidInput) IsVerifyEmailPayloadOrError()              {}
-func (ErrInvalidInput) IsUpdateEmailPayloadOrError()              {}
+func (ErrInvalidInput) IsUserByUsernameOrError()                         {}
+func (ErrInvalidInput) IsUserByIDOrError()                               {}
+func (ErrInvalidInput) IsUserByAddressOrError()                          {}
+func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
+func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
+func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
+func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
+func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
+func (ErrInvalidInput) IsUpdateCollectionTokensPayloadOrError()          {}
+func (ErrInvalidInput) IsUpdateCollectionHiddenPayloadOrError()          {}
+func (ErrInvalidInput) IsUpdateGalleryCollectionsPayloadOrError()        {}
+func (ErrInvalidInput) IsUpdateTokenInfoPayloadOrError()                 {}
+func (ErrInvalidInput) IsAddUserWalletPayloadOrError()                   {}
+func (ErrInvalidInput) IsRemoveUserWalletsPayloadOrError()               {}
+func (ErrInvalidInput) IsUpdateUserInfoPayloadOrError()                  {}
+func (ErrInvalidInput) IsRefreshTokenPayloadOrError()                    {}
+func (ErrInvalidInput) IsRefreshCollectionPayloadOrError()               {}
+func (ErrInvalidInput) IsRefreshContractPayloadOrError()                 {}
+func (ErrInvalidInput) IsError()                                         {}
+func (ErrInvalidInput) IsCreateUserPayloadOrError()                      {}
+func (ErrInvalidInput) IsFollowUserPayloadOrError()                      {}
+func (ErrInvalidInput) IsUnfollowUserPayloadOrError()                    {}
+func (ErrInvalidInput) IsAdmireFeedEventPayloadOrError()                 {}
+func (ErrInvalidInput) IsRemoveAdmirePayloadOrError()                    {}
+func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()              {}
+func (ErrInvalidInput) IsRemoveCommentPayloadOrError()                   {}
+func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                     {}
+func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
+func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
+func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -973,6 +984,12 @@ type RemoveUserWalletsPayload struct {
 
 func (RemoveUserWalletsPayload) IsRemoveUserWalletsPayloadOrError() {}
 
+type ResendVerificationEmailPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (ResendVerificationEmailPayload) IsResendVerificationEmailPayloadOrError() {}
+
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`
 	IsSpam bool           `json:"isSpam"`
@@ -1210,6 +1227,17 @@ func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
 type UpdateEmailInput struct {
 	Email string `json:"email"`
 }
+
+type UpdateEmailNotificationSettingsInput struct {
+	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
+	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
+}
+
+type UpdateEmailNotificationSettingsPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateEmailNotificationSettingsPayload) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 
 type UpdateEmailPayload struct {
 	Viewer *Viewer `json:"viewer"`

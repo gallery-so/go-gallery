@@ -551,5 +551,8 @@ UPDATE users SET email_verified = $2 WHERE id = $1;
 -- name: UpdateUserEmail :exec
 UPDATE users SET email = $2, email_verified = 0 WHERE id = $1;
 
+-- name: UpdateUserEmailUnsubscriptions :exec
+UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
+
 -- name: GetUsersByChainAddresses :many
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;

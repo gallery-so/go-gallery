@@ -163,6 +163,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"ResendVerificationEmailPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ResendVerificationEmailPayloadOrError)
+		return obj, ok
+	},
+
 	"SetSpamPreferencePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SetSpamPreferencePayloadOrError)
 		return obj, ok
@@ -195,6 +200,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"UpdateCollectionTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UpdateCollectionTokensPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateEmailNotificationSettingsPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateEmailNotificationSettingsPayloadOrError)
 		return obj, ok
 	},
 
