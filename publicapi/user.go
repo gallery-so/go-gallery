@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
@@ -296,6 +297,48 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email string) error {
 		Email: persist.NullString(email),
 	})
 
+	if err != nil {
+		return err
+	}
+
+	err = emails.RequestVerificationEmail(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, settings persist.EmailUnsubscriptions) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"settings": {settings, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.UpdateUserEmailUnsubscriptions(ctx, db.UpdateUserEmailUnsubscriptionsParams{
+		ID:                   userID,
+		EmailUnsubscriptions: settings,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// TODO notify email service of change so that it can add to necessary unsubscribe lists
+
+	return nil
+}
+
+func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
+
+	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return err
 	}

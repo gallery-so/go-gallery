@@ -730,7 +730,15 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 }
 
 func (r *mutationResolver) UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error) {
-	panic(fmt.Errorf("not implemented"))
+	return updateUserEmail(ctx, input.Email)
+}
+
+func (r *mutationResolver) ResendVerificationEmail(ctx context.Context) (model.ResendVerificationEmailPayloadOrError, error) {
+	return resendEmailVerification(ctx)
+}
+
+func (r *mutationResolver) UpdateEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (model.UpdateEmailNotificationSettingsPayloadOrError, error) {
+	return updateUserEmailNotificationSettings(ctx, input)
 }
 
 func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error) {

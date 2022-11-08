@@ -276,7 +276,8 @@ type ComplexityRoot struct {
 	}
 
 	EmailNotificationSettings struct {
-		UnsubscribedFromAll func(childComplexity int) int
+		UnsubscribedFromAll           func(childComplexity int) int
+		UnsubscribedFromNotifications func(childComplexity int) int
 	}
 
 	ErrAddressOwnedByUser struct {
@@ -519,37 +520,39 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddUserWallet              func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
-		AdmireFeedEvent            func(childComplexity int, feedEventID persist.DBID) int
-		ClearAllNotifications      func(childComplexity int) int
-		CommentOnFeedEvent         func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
-		CreateCollection           func(childComplexity int, input model.CreateCollectionInput) int
-		CreateUser                 func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string, email *string) int
-		DeepRefresh                func(childComplexity int, input model.DeepRefreshInput) int
-		DeleteCollection           func(childComplexity int, collectionID persist.DBID) int
-		FollowUser                 func(childComplexity int, userID persist.DBID) int
-		GetAuthNonce               func(childComplexity int, chainAddress persist.ChainAddress) int
-		Login                      func(childComplexity int, authMechanism model.AuthMechanism) int
-		Logout                     func(childComplexity int) int
-		RefreshCollection          func(childComplexity int, collectionID persist.DBID) int
-		RefreshContract            func(childComplexity int, contractID persist.DBID) int
-		RefreshToken               func(childComplexity int, tokenID persist.DBID) int
-		RemoveAdmire               func(childComplexity int, admireID persist.DBID) int
-		RemoveComment              func(childComplexity int, commentID persist.DBID) int
-		RemoveUserWallets          func(childComplexity int, walletIds []persist.DBID) int
-		SetSpamPreference          func(childComplexity int, input model.SetSpamPreferenceInput) int
-		SyncTokens                 func(childComplexity int, chains []persist.Chain, userID *persist.DBID) int
-		UnfollowUser               func(childComplexity int, userID persist.DBID) int
-		UpdateCollectionHidden     func(childComplexity int, input model.UpdateCollectionHiddenInput) int
-		UpdateCollectionInfo       func(childComplexity int, input model.UpdateCollectionInfoInput) int
-		UpdateCollectionTokens     func(childComplexity int, input model.UpdateCollectionTokensInput) int
-		UpdateEmail                func(childComplexity int, input model.UpdateEmailInput) int
-		UpdateGalleryCollections   func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
-		UpdateNotificationSettings func(childComplexity int, settings *model.NotificationSettingsInput) int
-		UpdateTokenInfo            func(childComplexity int, input model.UpdateTokenInfoInput) int
-		UpdateUserInfo             func(childComplexity int, input model.UpdateUserInfoInput) int
-		VerifyEmail                func(childComplexity int, token string) int
-		ViewGallery                func(childComplexity int, galleryID persist.DBID) int
+		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
+		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
+		ClearAllNotifications           func(childComplexity int) int
+		CommentOnFeedEvent              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
+		CreateCollection                func(childComplexity int, input model.CreateCollectionInput) int
+		CreateUser                      func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string, email *string) int
+		DeepRefresh                     func(childComplexity int, input model.DeepRefreshInput) int
+		DeleteCollection                func(childComplexity int, collectionID persist.DBID) int
+		FollowUser                      func(childComplexity int, userID persist.DBID) int
+		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
+		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
+		Logout                          func(childComplexity int) int
+		RefreshCollection               func(childComplexity int, collectionID persist.DBID) int
+		RefreshContract                 func(childComplexity int, contractID persist.DBID) int
+		RefreshToken                    func(childComplexity int, tokenID persist.DBID) int
+		RemoveAdmire                    func(childComplexity int, admireID persist.DBID) int
+		RemoveComment                   func(childComplexity int, commentID persist.DBID) int
+		RemoveUserWallets               func(childComplexity int, walletIds []persist.DBID) int
+		ResendVerificationEmail         func(childComplexity int) int
+		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
+		SyncTokens                      func(childComplexity int, chains []persist.Chain, userID *persist.DBID) int
+		UnfollowUser                    func(childComplexity int, userID persist.DBID) int
+		UpdateCollectionHidden          func(childComplexity int, input model.UpdateCollectionHiddenInput) int
+		UpdateCollectionInfo            func(childComplexity int, input model.UpdateCollectionInfoInput) int
+		UpdateCollectionTokens          func(childComplexity int, input model.UpdateCollectionTokensInput) int
+		UpdateEmail                     func(childComplexity int, input model.UpdateEmailInput) int
+		UpdateEmailNotificationSettings func(childComplexity int, input model.UpdateEmailNotificationSettingsInput) int
+		UpdateGalleryCollections        func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
+		UpdateNotificationSettings      func(childComplexity int, settings *model.NotificationSettingsInput) int
+		UpdateTokenInfo                 func(childComplexity int, input model.UpdateTokenInfoInput) int
+		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
+		VerifyEmail                     func(childComplexity int, token string) int
+		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
 	}
 
 	NotificationEdge struct {
@@ -636,6 +639,10 @@ type ComplexityRoot struct {
 	}
 
 	RemoveUserWalletsPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
+	ResendVerificationEmailPayload struct {
 		Viewer func(childComplexity int) int
 	}
 
@@ -806,6 +813,10 @@ type ComplexityRoot struct {
 	UpdateCollectionTokensPayload struct {
 		Collection func(childComplexity int) int
 		FeedEvent  func(childComplexity int) int
+	}
+
+	UpdateEmailNotificationSettingsPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
 	UpdateEmailPayload struct {
@@ -992,6 +1003,8 @@ type MutationResolver interface {
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
 	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string, email *string) (model.CreateUserPayloadOrError, error)
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
+	ResendVerificationEmail(ctx context.Context) (model.ResendVerificationEmailPayloadOrError, error)
+	UpdateEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (model.UpdateEmailNotificationSettingsPayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
@@ -1892,6 +1905,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.EmailNotificationSettings.UnsubscribedFromAll(childComplexity), true
+
+	case "EmailNotificationSettings.unsubscribedFromNotifications":
+		if e.complexity.EmailNotificationSettings.UnsubscribedFromNotifications == nil {
+			break
+		}
+
+		return e.complexity.EmailNotificationSettings.UnsubscribedFromNotifications(childComplexity), true
 
 	case "ErrAddressOwnedByUser.message":
 		if e.complexity.ErrAddressOwnedByUser.Message == nil {
@@ -2894,6 +2914,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RemoveUserWallets(childComplexity, args["walletIds"].([]persist.DBID)), true
 
+	case "Mutation.resendVerificationEmail":
+		if e.complexity.Mutation.ResendVerificationEmail == nil {
+			break
+		}
+
+		return e.complexity.Mutation.ResendVerificationEmail(childComplexity), true
+
 	case "Mutation.setSpamPreference":
 		if e.complexity.Mutation.SetSpamPreference == nil {
 			break
@@ -2977,6 +3004,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateEmail(childComplexity, args["input"].(model.UpdateEmailInput)), true
+
+	case "Mutation.updateEmailNotificationSettings":
+		if e.complexity.Mutation.UpdateEmailNotificationSettings == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateEmailNotificationSettings_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateEmailNotificationSettings(childComplexity, args["input"].(model.UpdateEmailNotificationSettingsInput)), true
 
 	case "Mutation.updateGalleryCollections":
 		if e.complexity.Mutation.UpdateGalleryCollections == nil {
@@ -3450,6 +3489,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RemoveUserWalletsPayload.Viewer(childComplexity), true
+
+	case "ResendVerificationEmailPayload.viewer":
+		if e.complexity.ResendVerificationEmailPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.ResendVerificationEmailPayload.Viewer(childComplexity), true
 
 	case "SetSpamPreferencePayload.tokens":
 		if e.complexity.SetSpamPreferencePayload.Tokens == nil {
@@ -4191,6 +4237,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.UpdateCollectionTokensPayload.FeedEvent(childComplexity), true
+
+	case "UpdateEmailNotificationSettingsPayload.viewer":
+		if e.complexity.UpdateEmailNotificationSettingsPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UpdateEmailNotificationSettingsPayload.Viewer(childComplexity), true
 
 	case "UpdateEmailPayload.viewer":
 		if e.complexity.UpdateEmailPayload.Viewer == nil {
@@ -5024,6 +5077,7 @@ input NotificationSettingsInput {
   someoneViewedYourGallery: Boolean
 }
 
+
 enum EmailVerificationStatus {
     Unverified
     Verified
@@ -5038,9 +5092,14 @@ type UserEmail {
 }
 
 type EmailNotificationSettings {
-    unsubscribedFromAll: Boolean
+    unsubscribedFromAll: Boolean!
+    unsubscribedFromNotifications: Boolean!
 }
 
+input UpdateEmailNotificationSettingsInput {
+    unsubscribedFromAll: Boolean!
+    unsubscribedFromNotifications: Boolean!
+}
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 
@@ -5837,6 +5896,22 @@ union UpdateEmailPayloadOrError =
     UpdateEmailPayload
     | ErrInvalidInput
 
+type ResendVerificationEmailPayload {
+    viewer: Viewer
+}
+
+union ResendVerificationEmailPayloadOrError =
+    ResendVerificationEmailPayload
+    | ErrInvalidInput
+
+type UpdateEmailNotificationSettingsPayload {
+    viewer: Viewer
+}
+
+union UpdateEmailNotificationSettingsPayloadOrError =
+    UpdateEmailNotificationSettingsPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -5867,6 +5942,8 @@ type Mutation {
 
     createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: String): CreateUserPayloadOrError
     updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
+    resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
+    updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
@@ -6607,6 +6684,21 @@ func (ec *executionContext) field_Mutation_updateCollectionTokens_args(ctx conte
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalNUpdateCollectionTokensInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionTokensInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateEmailNotificationSettings_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateEmailNotificationSettingsInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateEmailNotificationSettingsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailNotificationSettingsInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -10771,11 +10863,49 @@ func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromAll(ctx c
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(bool)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromNotifications(ctx context.Context, field graphql.CollectedField, obj *model.EmailNotificationSettings) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "EmailNotificationSettings",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UnsubscribedFromNotifications, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _ErrAddressOwnedByUser_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrAddressOwnedByUser) (ret graphql.Marshaler) {
@@ -15456,6 +15586,117 @@ func (ec *executionContext) _Mutation_updateEmail(ctx context.Context, field gra
 	return ec.marshalOUpdateEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_resendVerificationEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ResendVerificationEmail(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.ResendVerificationEmailPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ResendVerificationEmailPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.ResendVerificationEmailPayloadOrError)
+	fc.Result = res
+	return ec.marshalOResendVerificationEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐResendVerificationEmailPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateEmailNotificationSettings(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateEmailNotificationSettings_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateEmailNotificationSettings(rctx, args["input"].(model.UpdateEmailNotificationSettingsInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateEmailNotificationSettingsPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateEmailNotificationSettingsPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateEmailNotificationSettingsPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateEmailNotificationSettingsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailNotificationSettingsPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -17760,6 +18001,38 @@ func (ec *executionContext) _RemoveUserWalletsPayload_viewer(ctx context.Context
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "RemoveUserWalletsPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ResendVerificationEmailPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.ResendVerificationEmailPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ResendVerificationEmailPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -21169,6 +21442,38 @@ func (ec *executionContext) _UpdateCollectionTokensPayload_feedEvent(ctx context
 	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UpdateEmailNotificationSettingsPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateEmailNotificationSettingsPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateEmailNotificationSettingsPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UpdateEmailPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateEmailPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -24280,6 +24585,37 @@ func (ec *executionContext) unmarshalInputUpdateEmailInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(ctx context.Context, obj interface{}) (model.UpdateEmailNotificationSettingsInput, error) {
+	var it model.UpdateEmailNotificationSettingsInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "unsubscribedFromAll":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unsubscribedFromAll"))
+			it.UnsubscribedFromAll, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "unsubscribedFromNotifications":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unsubscribedFromNotifications"))
+			it.UnsubscribedFromNotifications, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx context.Context, obj interface{}) (model.UpdateGalleryCollectionsInput, error) {
 	var it model.UpdateGalleryCollectionsInput
 	asMap := map[string]interface{}{}
@@ -25799,6 +26135,29 @@ func (ec *executionContext) _RemoveUserWalletsPayloadOrError(ctx context.Context
 	}
 }
 
+func (ec *executionContext) _ResendVerificationEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ResendVerificationEmailPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ResendVerificationEmailPayload:
+		return ec._ResendVerificationEmailPayload(ctx, sel, &obj)
+	case *model.ResendVerificationEmailPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ResendVerificationEmailPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _SetSpamPreferencePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SetSpamPreferencePayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -25990,6 +26349,29 @@ func (ec *executionContext) _UpdateCollectionTokensPayloadOrError(ctx context.Co
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UpdateEmailNotificationSettingsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateEmailNotificationSettingsPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateEmailNotificationSettingsPayload:
+		return ec._UpdateEmailNotificationSettingsPayload(ctx, sel, &obj)
+	case *model.UpdateEmailNotificationSettingsPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateEmailNotificationSettingsPayload(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -27894,6 +28276,19 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 
 			out.Values[i] = innerFunc(ctx)
 
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "unsubscribedFromNotifications":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._EmailNotificationSettings_unsubscribedFromNotifications(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -28184,7 +28579,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "UpdateEmailPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -30012,6 +30407,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "resendVerificationEmail":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_resendVerificationEmail(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateEmailNotificationSettings":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateEmailNotificationSettings(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "login":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_login(ctx, field)
@@ -30977,6 +31386,34 @@ func (ec *executionContext) _RemoveUserWalletsPayload(ctx context.Context, sel a
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._RemoveUserWalletsPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var resendVerificationEmailPayloadImplementors = []string{"ResendVerificationEmailPayload", "ResendVerificationEmailPayloadOrError"}
+
+func (ec *executionContext) _ResendVerificationEmailPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ResendVerificationEmailPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, resendVerificationEmailPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ResendVerificationEmailPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ResendVerificationEmailPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -32383,6 +32820,34 @@ func (ec *executionContext) _UpdateCollectionTokensPayload(ctx context.Context, 
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updateEmailNotificationSettingsPayloadImplementors = []string{"UpdateEmailNotificationSettingsPayload", "UpdateEmailNotificationSettingsPayloadOrError"}
+
+func (ec *executionContext) _UpdateEmailNotificationSettingsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateEmailNotificationSettingsPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateEmailNotificationSettingsPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateEmailNotificationSettingsPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateEmailNotificationSettingsPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -33832,6 +34297,11 @@ func (ec *executionContext) unmarshalNUpdateCollectionTokensInput2githubᚗcom�
 
 func (ec *executionContext) unmarshalNUpdateEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailInput(ctx context.Context, v interface{}) (model.UpdateEmailInput, error) {
 	res, err := ec.unmarshalInputUpdateEmailInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateEmailNotificationSettingsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailNotificationSettingsInput(ctx context.Context, v interface{}) (model.UpdateEmailNotificationSettingsInput, error) {
+	res, err := ec.unmarshalInputUpdateEmailNotificationSettingsInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -35686,6 +36156,13 @@ func (ec *executionContext) marshalORemoveUserWalletsPayloadOrError2githubᚗcom
 	return ec._RemoveUserWalletsPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOResendVerificationEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐResendVerificationEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ResendVerificationEmailPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ResendVerificationEmailPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOSetSpamPreferencePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSetSpamPreferencePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.SetSpamPreferencePayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -36019,6 +36496,13 @@ func (ec *executionContext) marshalOUpdateCollectionTokensPayloadOrError2github�
 		return graphql.Null
 	}
 	return ec._UpdateCollectionTokensPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdateEmailNotificationSettingsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailNotificationSettingsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateEmailNotificationSettingsPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateEmailNotificationSettingsPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateEmailPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateEmailPayloadOrError) graphql.Marshaler {

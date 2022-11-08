@@ -509,7 +509,8 @@ func userToEmailModel(user *db.User) *model.UserEmail {
 		Email:              &email,
 		VerificationStatus: &user.EmailVerified,
 		EmailNotificationSettings: &model.EmailNotificationSettings{
-			UnsubscribedFromAll: user.EmailUnsubscriptions.All.BoolPointer(),
+			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
+			UnsubscribedFromNotifications: user.EmailUnsubscriptions.Notifications.Bool(),
 		},
 	}
 
@@ -946,6 +947,33 @@ func updateUserEmail(ctx context.Context, email string) (*model.UpdateEmailPaylo
 	}
 
 	return &model.UpdateEmailPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+
+}
+
+func resendEmailVerification(ctx context.Context) (*model.ResendVerificationEmailPayload, error) {
+	err := publicapi.For(ctx).User.ResendEmailVerification(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.ResendVerificationEmailPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+
+}
+
+func updateUserEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (*model.UpdateEmailNotificationSettingsPayload, error) {
+	err := publicapi.For(ctx).User.UpdateUserEmailNotificationSettings(ctx, persist.EmailUnsubscriptions{
+		All:           persist.NullBool(input.UnsubscribedFromAll),
+		Notifications: persist.NullBool(input.UnsubscribedFromAll),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.UpdateEmailNotificationSettingsPayload{
 		Viewer: resolveViewer(ctx),
 	}, nil
 
