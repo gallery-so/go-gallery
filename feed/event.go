@@ -112,7 +112,7 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 	}
 	_, groupable := eventGroups[event.Action]
 	// Events with a caption are treated as a singular event.
-	if event.Caption != "" || !groupable {
+	if event.Caption.String != "" || !groupable {
 		return b.createFeedEvent(ctx, event)
 	}
 	return b.createGroupedFeedEvent(ctx, event)

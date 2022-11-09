@@ -167,7 +167,7 @@ func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, cap
 	}
 
 	if caption != nil {
-		evt.Caption = stringToNullable(caption)
+		evt.Caption = persist.StrToNullStr(caption)
 		return event.DispatchImmediate(ctx, evt)
 	}
 
@@ -183,11 +183,4 @@ func pushEvent(ctx context.Context, evt db.Event) {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
 	}
-}
-
-func stringToNullable(caption *string) persist.NullString {
-	if caption == nil {
-		return ""
-	}
-	return persist.NullString(*caption)
 }

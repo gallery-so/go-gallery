@@ -165,7 +165,6 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 		CreatedAfter: beginningOfDay(time.Now()),
 	})
 	if notifs == nil || len(notifs) == 0 {
-		panic(1)
 		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 	}
 
@@ -220,11 +219,7 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	if time.Since(mostRecentNotif.CreatedAt) < window {
 		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub)
 	}
-	err := insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
-	if err != nil {
-		panic(err)
-	}
-	panic("all god")
+	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 }
 
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {

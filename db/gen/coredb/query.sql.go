@@ -201,7 +201,7 @@ type CreateCollectionEventParams struct {
 	ResourceTypeID persist.ResourceType
 	CollectionID   persist.DBID
 	Data           persist.EventData
-	Caption        persist.NullString
+	Caption        sql.NullString
 }
 
 func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
@@ -343,7 +343,7 @@ type CreateFeedEventParams struct {
 	Data      persist.FeedEventData
 	EventTime time.Time
 	EventIds  persist.DBIDList
-	Caption   persist.NullString
+	Caption   sql.NullString
 }
 
 func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams) (FeedEvent, error) {

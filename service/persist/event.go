@@ -77,16 +77,25 @@ func (e ErrUnknownResourceType) Error() string {
 	return fmt.Sprintf("unknown resource type: %v", e.ResourceType)
 }
 
-func DBIDToNullStr(id DBID) sql.NullString {
-	if id == "" {
+func StrToNullStr(s *string) sql.NullString {
+	if s == nil {
 		return sql.NullString{}
 	}
-	return sql.NullString{Valid: true, String: id.String()}
+	return sql.NullString{Valid: true, String: *s}
 }
 
-func NullStrToDBID(s sql.NullString) DBID {
+func NullStrToStr(s sql.NullString) string {
 	if !s.Valid {
 		return ""
 	}
-	return DBID(s.String)
+	return s.String
+}
+
+func DBIDToNullStr(id DBID) sql.NullString {
+	s := id.String()
+	return StrToNullStr(&s)
+}
+
+func NullStrToDBID(s sql.NullString) DBID {
+	return DBID(NullStrToStr(s))
 }
