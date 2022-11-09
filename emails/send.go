@@ -103,7 +103,7 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.Han
 			p.DynamicTemplateData = map[string]interface{}{
 				"notifications": []string{"notification 1", "notification 2"},
 			}
-			m.Asm.GroupID = viper.GetInt("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")
+			m.Asm = &mail.Asm{GroupID: viper.GetInt("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")}
 			m.AddPersonalizations(p)
 			p.AddTos(to)
 
