@@ -155,12 +155,20 @@ func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, nex
 			return authError, nil
 		}
 
-		token, err := base64.StdEncoding.DecodeString(parts[1])
+		usernameAndPassword, err := base64.StdEncoding.DecodeString(parts[1])
 		if err != nil {
 			return authError, nil
 		}
 
-		if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("RETOOL_AUTH_TOKEN")), token); cmp != 1 {
+		usernameAndPasswordParts := strings.SplitN(string(usernameAndPassword), ":", 2)
+		if len(usernameAndPasswordParts) != 2 {
+			return authError, nil
+		}
+
+		password := usernameAndPasswordParts[1]
+		passwordBytes := []byte(password)
+
+		if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("RETOOL_AUTH_TOKEN")), passwordBytes); cmp != 1 {
 			return authError, nil
 		}
 
