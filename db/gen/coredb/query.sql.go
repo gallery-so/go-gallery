@@ -2199,6 +2199,70 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 	return items, nil
 }
 
+const getUsersWithRolePaginate = `-- name: GetUsersWithRolePaginate :many
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles from users where array[$2::varchar] <@ roles and deleted = false
+    and (username_idempotent, id) < ($3::varchar, $4)
+    and (username_idempotent, id) > ($5::varchar, $6)
+    order by case when $7::bool then (username_idempotent, id) end asc,
+             case when not $7::bool then (username_idempotent, id) end desc
+    limit $1
+`
+
+type GetUsersWithRolePaginateParams struct {
+	Limit         int32
+	Role          string
+	CurBeforeKey  string
+	CurBeforeID   persist.DBID
+	CurAfterKey   string
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWithRolePaginateParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersWithRolePaginate,
+		arg.Limit,
+		arg.Role,
+		arg.CurBeforeKey,
+		arg.CurBeforeID,
+		arg.CurAfterKey,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.Roles,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `

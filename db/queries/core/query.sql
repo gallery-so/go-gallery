@@ -545,6 +545,14 @@ SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsu
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
     LIMIT $1;
 
+-- name: GetUsersWithRolePaginate :many
+select * from users where array[@role::varchar] <@ roles and deleted = false
+    and (username_idempotent, id) < (@cur_before_key::varchar, @cur_before_id)
+    and (username_idempotent, id) > (@cur_after_key::varchar, @cur_after_id)
+    order by case when @paging_forward::bool then (username_idempotent, id) end asc,
+             case when not @paging_forward::bool then (username_idempotent, id) end desc
+    limit $1;
+
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
 

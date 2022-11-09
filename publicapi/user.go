@@ -173,6 +173,63 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 	return users, nil
 }
 
+func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) ([]db.User, PageInfo, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"role": {role, "required,role"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params lexicalPagingParams) ([]interface{}, error) {
+		keys, err := api.queries.GetUsersWithRolePaginate(ctx, db.GetUsersWithRolePaginateParams{
+			Role:          string(role),
+			Limit:         params.Limit,
+			CurBeforeKey:  params.CursorBeforeKey,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterKey:   params.CursorAfterKey,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]interface{}, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
+	}
+
+	cursorFunc := func(i interface{}) (string, persist.DBID, error) {
+		if row, ok := i.(db.User); ok {
+			return row.UsernameIdempotent.String, row.ID, nil
+		}
+		return "", "", fmt.Errorf("interface{} is not a db.User")
+	}
+
+	paginator := lexicalPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	users := make([]db.User, len(results))
+	for i, result := range results {
+		users[i] = result.(db.User)
+	}
+
+	return users, pageInfo, err
+}
+
 func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{

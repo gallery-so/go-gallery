@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/validate"
-	"time"
 )
 
 type PageInfo struct {
@@ -331,6 +333,105 @@ func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int
 		}
 
 		return p.encodeCursor(nodeBool, nodeTime, nodeID)
+	}
+
+	paginator := keysetPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  p.CountFunc,
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
+type lexicalPaginator struct {
+	// QueryFunc returns paginated results for the given paging parameters
+	QueryFunc func(params lexicalPagingParams) ([]interface{}, error)
+
+	// CursorFunc returns a time and DBID that will be encoded into a cursor string
+	CursorFunc func(node interface{}) (string, persist.DBID, error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
+}
+
+type lexicalPagingParams struct {
+	Limit           int32
+	CursorBeforeKey string
+	CursorBeforeID  persist.DBID
+	CursorAfterKey  string
+	CursorAfterID   persist.DBID
+	PagingForward   bool
+}
+
+func (p *lexicalPaginator) encodeCursor(sortKey string, id persist.DBID) (string, error) {
+	encoder := newCursorEncoder()
+	encoder.appendString(sortKey)
+	encoder.appendDBID(id)
+	return encoder.AsBase64(), nil
+}
+
+func (p *lexicalPaginator) decodeCursor(cursor string) (string, persist.DBID, error) {
+	decoder, err := newCursorDecoder(cursor)
+	if err != nil {
+		return "", "", err
+	}
+
+	sortKey, err := decoder.readString()
+	if err != nil {
+		return "", "", err
+	}
+
+	id, err := decoder.readDBID()
+	if err != nil {
+		return "", "", err
+	}
+
+	return sortKey, id, nil
+}
+
+func (p *lexicalPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+		curBeforeKey := strings.Repeat("Z", 255)
+		curBeforeID := persist.DBID("")
+		curAfterKey := ""
+		curAfterID := persist.DBID("")
+
+		var err error
+		if before != nil {
+			curBeforeKey, curBeforeID, err = p.decodeCursor(*before)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if after != nil {
+			curAfterKey, curAfterID, err = p.decodeCursor(*after)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		queryParams := lexicalPagingParams{
+			Limit:           limit,
+			CursorBeforeKey: curBeforeKey,
+			CursorBeforeID:  curBeforeID,
+			CursorAfterKey:  curAfterKey,
+			CursorAfterID:   curAfterID,
+			PagingForward:   pagingForward,
+		}
+
+		return p.QueryFunc(queryParams)
+	}
+
+	cursorFunc := func(node interface{}) (string, error) {
+		nodeKey, nodeID, err := p.CursorFunc(node)
+		if err != nil {
+			return "", err
+		}
+
+		return p.encodeCursor(nodeKey, nodeID)
 	}
 
 	paginator := keysetPaginator{

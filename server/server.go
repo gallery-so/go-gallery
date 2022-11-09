@@ -182,7 +182,7 @@ func setDefaults() {
 		util.EnvVarMustExist("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.EnvVarMustExist("SENTRY_DSN", "")
 		util.EnvVarMustExist("GAE_VERSION", "")
-		util.EnvVarMustExist("RETOOL_AUTH_TOKEN", "")
+		util.EnvVarMustExist("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 	}
 }
 

@@ -208,10 +208,6 @@ func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.G
 	return models, nil
 }
 
-func resolveGalleryUsersWithRole(ctx context.Context, role persist.Role) ([]*model.GalleryUser, error) {
-	panic("not implemented")
-}
-
 func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.Badge, error) {
 	contracts, err := publicapi.For(ctx).Contract.GetContractsDisplayedByUserID(ctx, userID)
 

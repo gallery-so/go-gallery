@@ -756,7 +756,7 @@ type Query {
     feedEventById(id: DBID!): FeedEventByIdOrError
 
     # Retool Specific
-    usersByRole(role: Role): UsersConnection
+    usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
 }
 
 input CollectionLayoutInput {
