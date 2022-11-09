@@ -109,7 +109,7 @@ func main() {
 		}
 		event := coredb.Event{
 			ID:             persist.GenerateID(),
-			ActorID:        id,
+			ActorID:        persist.DBIDToNullStr(id),
 			ResourceTypeID: resource,
 			SubjectID:      subject,
 			Action:         action,
