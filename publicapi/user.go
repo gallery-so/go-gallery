@@ -332,7 +332,7 @@ func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, sett
 
 	unsubs := getNewUnsubscriptions(curUser.EmailUnsubscriptions, settings)
 
-	return emails.UnsubscribeFromEmailTypes(ctx, userID, "", unsubs)
+	return emails.UnsubscribeFromEmailTypesByUserID(ctx, userID, unsubs)
 }
 
 func getNewUnsubscriptions(oldSettings persist.EmailUnsubscriptions, newSettings persist.EmailUnsubscriptions) []model.EmailUnsubscriptionType {

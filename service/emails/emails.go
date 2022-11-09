@@ -50,6 +50,13 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 	return output, nil
 }
 
+func UnsubscribeFromEmailTypesByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
+	return UnsubscribeFromEmailTypes(ctx, "", jwt, unsubTypes)
+}
+
+func UnsubscribeFromEmailTypesByUserID(ctx context.Context, userID persist.DBID, unsubTypes []model.EmailUnsubscriptionType) error {
+	return UnsubscribeFromEmailTypes(ctx, userID, "", unsubTypes)
+}
 func UnsubscribeFromEmailTypes(ctx context.Context, userID persist.DBID, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
 	input := emails.UnsubscribeFromEmailTypeInput{
 		UserID:     userID,

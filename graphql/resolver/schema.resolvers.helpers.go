@@ -983,7 +983,7 @@ func unsubscribeFromEmailType(ctx context.Context, input model.UnsubscribeFromEm
 
 	// TODO this token needs to be added to the template data for the email in a future when the templates are all in place
 
-	if err := emails.UnsubscribeFromEmailTypes(ctx, "", input.Token, []model.EmailUnsubscriptionType{input.Type}); err != nil {
+	if err := emails.UnsubscribeFromEmailTypesByJWT(ctx, input.Token, []model.EmailUnsubscriptionType{input.Type}); err != nil {
 		return nil, err
 	}
 
