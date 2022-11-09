@@ -159,13 +159,13 @@ func beginningOfDay(t time.Time) time.Time {
 // this handler will still group notifications in the usual window, but it will also ensure that each viewer does
 // does not show up mutliple times in a week
 func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-
 	notifs, _ := h.queries.GetNotificationsByOwnerIDForActionAfter(ctx, db.GetNotificationsByOwnerIDForActionAfterParams{
 		OwnerID:      notif.OwnerID,
 		Action:       notif.Action,
 		CreatedAfter: beginningOfDay(time.Now()),
 	})
 	if notifs == nil || len(notifs) == 0 {
+		panic(1)
 		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 	}
 
@@ -220,7 +220,11 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	if time.Since(mostRecentNotif.CreatedAt) < window {
 		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub)
 	}
-	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
+	err := insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
+	if err != nil {
+		panic(err)
+	}
+	panic("all god")
 }
 
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
@@ -328,7 +332,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	if err != nil {
 		return fmt.Errorf("error updating notification: %w", err)
 	}
-	updatedNotif, err := queries.GetNotificationByID(ctx, notif.ID)
+	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
 	if err != nil {
 		return err
 	}

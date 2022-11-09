@@ -145,7 +145,7 @@ func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db
 }
 
 func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, error) {
-	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, event.ActorID, event.Action)
+	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, persist.NullStrToDBID(event.ActorID), event.Action)
 	if err != nil || blocked {
 		return false, err
 	}
@@ -178,7 +178,7 @@ func (b *EventBuilder) isStillEditing(ctx context.Context, event db.Event) (bool
 }
 
 func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, event.ActorID, event.CreatedAt, persist.ActionList{event.Action})
+	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, persist.NullStrToDBID(event.ActorID), event.CreatedAt, persist.ActionList{event.Action})
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:        persist.GenerateID(),
-		OwnerID:   event.ActorID,
+		OwnerID:   persist.NullStrToDBID(event.ActorID),
 		Action:    event.Action,
 		EventTime: event.CreatedAt,
 		Data:      persist.FeedEventData{UserBio: event.Data.UserBio},
@@ -211,7 +211,7 @@ func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, eve
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:        persist.GenerateID(),
-		OwnerID:   merged.event.ActorID,
+		OwnerID:   persist.NullStrToDBID(merged.event.ActorID),
 		Action:    merged.event.Action,
 		EventTime: merged.event.CreatedAt,
 		EventIds:  merged.eventIDs,
@@ -233,7 +233,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 		return nil, nil
 	}
 
-	priorEvent, err := b.feedRepo.LastPublishedTokenFeedEvent(ctx, event.ActorID, event.TokenID, event.CreatedAt, collectionCollectorsNoteActions)
+	priorEvent, err := b.feedRepo.LastPublishedTokenFeedEvent(ctx, persist.NullStrToDBID(event.ActorID), event.TokenID, event.CreatedAt, collectionCollectorsNoteActions)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			TokenID:                event.SubjectID,
@@ -266,7 +266,7 @@ func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, eve
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:                event.SubjectID,
@@ -292,7 +292,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionFeedEvent(ctx contex
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:                event.SubjectID,
@@ -317,7 +317,7 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
-		OwnerID: event.ActorID,
+		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
 			CollectionID:          event.SubjectID,
@@ -371,7 +371,7 @@ func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, eve
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:        persist.GenerateID(),
-		OwnerID:   merged.event.ActorID,
+		OwnerID:   persist.NullStrToDBID(merged.event.ActorID),
 		Action:    merged.event.Action,
 		EventTime: merged.event.CreatedAt,
 		EventIds:  merged.eventIDs,
@@ -387,7 +387,7 @@ func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, eve
 
 // getAddedTokens returns the new tokens that were added since the last published feed event.
 func getAddedTokens(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (added []persist.DBID, hasPrior bool, err error) {
-	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.CollectionID, event.CreatedAt, collectionTokensAddedActions)
+	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, persist.NullStrToDBID(event.ActorID), event.CollectionID, event.CreatedAt, collectionTokensAddedActions)
 	if err != nil {
 		return added, true, err
 	}
@@ -404,7 +404,7 @@ func getAddedTokens(ctx context.Context, feedRepo *postgres.FeedRepository, even
 
 // isCollectionCollectorsNoteChanged returns true if the collector's note differs from the last published feed event.
 func isCollectionCollectorsNoteChanged(ctx context.Context, feedRepo *postgres.FeedRepository, event db.Event) (bool, error) {
-	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, event.ActorID, event.CollectionID, event.CreatedAt, collectionCollectorsNoteActions)
+	priorEvent, err := feedRepo.LastPublishedCollectionFeedEvent(ctx, persist.NullStrToDBID(event.ActorID), event.CollectionID, event.CreatedAt, collectionCollectorsNoteActions)
 	if err != nil {
 		return false, err
 	}

@@ -97,7 +97,7 @@ type EarlyAccess struct {
 type Event struct {
 	ID             persist.DBID
 	Version        int32
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	ResourceTypeID persist.ResourceType
 	SubjectID      persist.DBID
 	UserID         persist.DBID

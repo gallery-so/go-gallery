@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/validate"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -379,7 +380,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
 
 	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        userID,
+		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
@@ -480,7 +481,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 	}
 
 	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        actor,
+		ActorID:        persist.DBIDToNullStr(actor),
 		ResourceTypeID: persist.ResourceTypeComment,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,

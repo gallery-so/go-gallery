@@ -446,7 +446,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        userID,
+		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
 		TokenID:        tokenID,
