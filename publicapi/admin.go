@@ -76,7 +76,7 @@ func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, r
 		delete(roleMap, *role)
 	}
 	// Build new role array
-	newRoles := make(persist.RoleList, 0, len(roles)+len(user.Roles))
+	newRoles := make(persist.RoleList, 0, len(roleMap))
 	for role := range roleMap {
 		newRoles = append(newRoles, role)
 	}
