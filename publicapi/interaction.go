@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/mikeydub/go-gallery/validate"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -16,12 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
-
-// Some date that comes before any other valid timestamps in our database
-var defaultCursorAfterTime = time.Date(1970, 1, 1, 1, 1, 1, 1, time.UTC)
-
-// Some date that comes after any other valid timestamps in our database
-var defaultCursorBeforeTime = time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC)
 
 var ErrOnlyRemoveOwnAdmire = errors.New("only the actor who created the admire can remove it")
 var ErrOnlyRemoveOwnComment = errors.New("only the actor who created the comment can remove it")

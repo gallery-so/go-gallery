@@ -13,6 +13,20 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
+var (
+	defaultCursorBeforeID = persist.DBID("")
+	defaultCursorAfterID  = persist.DBID("")
+
+	// Some date that comes after any other valid timestamps in our database
+	defaultCursorBeforeTime = time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC)
+	// Some date that comes before any other valid timestamps in our database
+	defaultCursorAfterTime = time.Date(1970, 1, 1, 1, 1, 1, 1, time.UTC)
+
+	// Some value that comes after any other sequence of characters
+	defaultCursorBeforeKey = strings.Repeat("Z", 255)
+	defaultCursorAfterKey  = ""
+)
+
 type PageInfo struct {
 	Total           *int
 	Size            int
@@ -291,9 +305,9 @@ func (p *boolTimeIDPaginator) decodeCursor(cursor string) (bool, time.Time, pers
 func (p *boolTimeIDPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
 		curBeforeTime := defaultCursorBeforeTime
-		curBeforeID := persist.DBID("")
+		curBeforeID := defaultCursorBeforeID
 		curAfterTime := defaultCursorAfterTime
-		curAfterID := persist.DBID("")
+		curAfterID := defaultCursorAfterID
 		curBeforeBool := true
 		curAfterBool := false
 
@@ -393,10 +407,10 @@ func (p *lexicalPaginator) decodeCursor(cursor string) (string, persist.DBID, er
 
 func (p *lexicalPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		curBeforeKey := strings.Repeat("Z", 255)
-		curBeforeID := persist.DBID("")
-		curAfterKey := ""
-		curAfterID := persist.DBID("")
+		curBeforeKey := defaultCursorBeforeKey
+		curBeforeID := defaultCursorBeforeID
+		curAfterKey := defaultCursorAfterKey
+		curAfterID := defaultCursorAfterID
 
 		var err error
 		if before != nil {
