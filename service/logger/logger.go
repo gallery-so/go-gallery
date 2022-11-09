@@ -39,7 +39,7 @@ func InitWithGCPDefaults() {
 			logger.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
 		} else {
 			// Use a GCPFormatter for Google Cloud Logging
-			logger.SetFormatter(&GCPFormatter{})
+			logger.SetFormatter(NewGCPFormatter())
 		}
 	})
 }
@@ -49,6 +49,20 @@ func InitWithGCPDefaults() {
 // that Google Cloud Logging expects
 type GCPFormatter struct {
 	logrus.JSONFormatter
+}
+
+func NewGCPFormatter() *GCPFormatter {
+	return &GCPFormatter{
+		JSONFormatter: logrus.JSONFormatter{
+			// GCP parses timestamps in RFC3339 format
+			TimestampFormat: time.RFC3339Nano,
+
+			// GCP expects log messages in a "message" field instead of the default logrus "msg" field
+			FieldMap: logrus.FieldMap{
+				logrus.FieldKeyMsg: "message",
+			},
+		},
+	}
 }
 
 type gcpLogSeverity string
@@ -76,8 +90,10 @@ var logrusLevelToGCPSeverity = map[logrus.Level]gcpLogSeverity{
 }
 
 func (f *GCPFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	// We can't use the JSONFormatter FieldMap to map logrus' levels to GCP levels,
+	// because GCP doesn't have levels named "fatal" or "panic". Instead, we map
+	// log levels manually to make sure all levels are accounted for.
 	entry.Data["severity"] = logrusLevelToGCPSeverity[entry.Level]
-	entry.Data["time"] = entry.Time.Format(time.RFC3339Nano)
 	return f.JSONFormatter.Format(entry)
 }
 
