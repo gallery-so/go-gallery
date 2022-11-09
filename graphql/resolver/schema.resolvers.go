@@ -283,6 +283,21 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
+	dbRoles, err := publicapi.For(ctx).Admin.GetUserRolesByUserID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	roles := make([]*persist.Role, len(dbRoles))
+	for i, role := range dbRoles {
+		r := role
+		roles[i] = &r
+	}
+
+	return roles, nil
+}
+
 func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
 	return resolveTokensByUserID(ctx, obj.Dbid)
 }

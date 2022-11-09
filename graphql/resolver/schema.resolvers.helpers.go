@@ -1182,19 +1182,12 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		wallets[i] = walletToModelPersist(ctx, wallet)
 	}
 
-	roles := make([]*persist.Role, len(user.Roles))
-	for i, role := range user.Roles {
-		r := role
-		roles[i] = &r
-	}
-
 	return &model.GalleryUser{
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
 		Bio:       &user.Bio.String,
 		Wallets:   wallets,
 		Universal: &user.Universal,
-		Roles:     roles,
 
 		// each handled by dedicated resolver
 		Galleries: nil,
@@ -1202,6 +1195,7 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		Following: nil,
 		Tokens:    nil,
 		Badges:    nil,
+		Roles:     nil,
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}

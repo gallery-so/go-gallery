@@ -187,7 +187,7 @@ func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role,
 
 	queryFunc := func(params lexicalPagingParams) ([]interface{}, error) {
 		keys, err := api.queries.GetUsersWithRolePaginate(ctx, db.GetUsersWithRolePaginateParams{
-			Role:          string(role),
+			Role:          role,
 			Limit:         params.Limit,
 			CurBeforeKey:  params.CursorBeforeKey,
 			CurBeforeID:   params.CursorBeforeID,

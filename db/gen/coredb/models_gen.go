@@ -284,7 +284,6 @@ type User struct {
 	Email                persist.NullString
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
-	Roles                persist.RoleList
 }
 
 type UserEvent struct {
@@ -296,6 +295,16 @@ type UserEvent struct {
 	LastUpdated time.Time
 	Data        pgtype.JSONB
 	Sent        sql.NullBool
+}
+
+type UserRole struct {
+	ID          persist.DBID
+	UserID      persist.DBID
+	Role        persist.Role
+	Version     int32
+	Deleted     bool
+	CreatedAt   time.Time
+	LastUpdated time.Time
 }
 
 type Wallet struct {

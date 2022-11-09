@@ -45,8 +45,6 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "users.email_verified"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
-          - column: "users.roles"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
 
           # Galleries
           - column: "galleries.collections"
@@ -155,3 +153,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.ActionList"
           - column: "*.collection_id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
+          - column: "*.role"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Role"
+          - column: "*.roles"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"

@@ -58,7 +58,7 @@ type GalleryUser implements Node {
     bio: String
     traits: String
     universal: Boolean
-    roles: [Role]
+    roles: [Role] @goField(forceResolver: true)
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token

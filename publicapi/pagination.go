@@ -24,7 +24,8 @@ var (
 
 	// Some value that comes after any other sequence of characters
 	defaultCursorBeforeKey = strings.Repeat("Z", 255)
-	defaultCursorAfterKey  = ""
+	// Some value that comes before any other sequence of characters
+	defaultCursorAfterKey = ""
 )
 
 type PageInfo struct {

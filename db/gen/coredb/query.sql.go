@@ -14,6 +14,23 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const addUserRoles = `-- name: AddUserRoles :exec
+insert into user_roles (id, user_id, role, created_at, last_updated)
+select unnest($2::varchar[]), $1, unnest($3::varchar[]), now(), now()
+on conflict (user_id, role) do update set deleted = false, last_updated = now()
+`
+
+type AddUserRolesParams struct {
+	UserID persist.DBID
+	Ids    []string
+	Roles  []string
+}
+
+func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) error {
+	_, err := q.db.Exec(ctx, addUserRoles, arg.UserID, arg.Ids, arg.Roles)
+	return err
+}
+
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
 UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
 `
@@ -594,6 +611,20 @@ func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateV
 		&i.Amount,
 	)
 	return i, err
+}
+
+const deleteUserRoles = `-- name: DeleteUserRoles :exec
+update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any($2)
+`
+
+type DeleteUserRolesParams struct {
+	UserID persist.DBID
+	Roles  persist.RoleList
+}
+
+func (q *Queries) DeleteUserRoles(ctx context.Context, arg DeleteUserRolesParams) error {
+	_, err := q.db.Exec(ctx, deleteUserRoles, arg.UserID, arg.Roles)
+	return err
 }
 
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
@@ -1441,7 +1472,7 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email, u.email_verified, u.email_unsubscriptions, u.roles FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email, u.email_verified, u.email_unsubscriptions FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -1465,7 +1496,6 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 		&i.Email,
 		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
-		&i.Roles,
 	)
 	return i, err
 }
@@ -1822,7 +1852,7 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -1844,13 +1874,12 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.Email,
 		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
-		&i.Roles,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -1872,7 +1901,6 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Email,
 		&i.EmailVerified,
 		&i.EmailUnsubscriptions,
-		&i.Roles,
 	)
 	return i, err
 }
@@ -1939,8 +1967,32 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 	return items, nil
 }
 
+const getUserRolesByUserId = `-- name: GetUserRolesByUserId :many
+select role from user_roles where user_id = $1 and deleted = false
+`
+
+func (q *Queries) GetUserRolesByUserId(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
+	rows, err := q.db.Query(ctx, getUserRolesByUserId, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.Role
+	for rows.Next() {
+		var role persist.Role
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		items = append(items, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email, users.email_verified, users.email_unsubscriptions, users.roles,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email, users.email_verified, users.email_unsubscriptions,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
 `
 
 type GetUsersByChainAddressesParams struct {
@@ -1964,7 +2016,6 @@ type GetUsersByChainAddressesRow struct {
 	Email                persist.NullString
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
-	Roles                persist.RoleList
 	Address              persist.Address
 }
 
@@ -1993,7 +2044,6 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
-			&i.Roles,
 			&i.Address,
 		); err != nil {
 			return nil, err
@@ -2007,7 +2057,7 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles FROM users WHERE id = ANY($2) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE id = ANY($2) AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -2058,7 +2108,6 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
-			&i.Roles,
 		); err != nil {
 			return nil, err
 		}
@@ -2071,7 +2120,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 }
 
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < ($2, $3)
     AND (created_at, id) > ($4, $5)
     ORDER BY CASE WHEN $6::bool THEN (created_at, id) END ASC,
@@ -2121,7 +2170,6 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
-			&i.Roles,
 		); err != nil {
 			return nil, err
 		}
@@ -2134,7 +2182,7 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 }
 
 const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL -- AND email_verified = true
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -2187,7 +2235,6 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
-			&i.Roles,
 		); err != nil {
 			return nil, err
 		}
@@ -2200,17 +2247,18 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 }
 
 const getUsersWithRolePaginate = `-- name: GetUsersWithRolePaginate :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles from users where array[$2::varchar] <@ roles and deleted = false
-    and (username_idempotent, id) < ($3::varchar, $4)
-    and (username_idempotent, id) > ($5::varchar, $6)
-    order by case when $7::bool then (username_idempotent, id) end asc,
-             case when not $7::bool then (username_idempotent, id) end desc
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email, u.email_verified, u.email_unsubscriptions from users u, user_roles ur where u.deleted = false and ur.deleted = false
+    and u.id = ur.user_id and ur.role = $2
+    and (u.username_idempotent, u.id) < ($3::varchar, $4)
+    and (u.username_idempotent, u.id) > ($5::varchar, $6)
+    order by case when $7::bool then (u.username_idempotent, u.id) end asc,
+             case when not $7::bool then (u.username_idempotent, u.id) end desc
     limit $1
 `
 
 type GetUsersWithRolePaginateParams struct {
 	Limit         int32
-	Role          string
+	Role          persist.Role
 	CurBeforeKey  string
 	CurBeforeID   persist.DBID
 	CurAfterKey   string
@@ -2251,7 +2299,6 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
-			&i.Roles,
 		); err != nil {
 			return nil, err
 		}
@@ -2264,7 +2311,7 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 }
 
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -2292,7 +2339,6 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.Email,
 			&i.EmailVerified,
 			&i.EmailUnsubscriptions,
-			&i.Roles,
 		); err != nil {
 			return nil, err
 		}
@@ -2546,39 +2592,6 @@ type UpdateUserEmailUnsubscriptionsParams struct {
 func (q *Queries) UpdateUserEmailUnsubscriptions(ctx context.Context, arg UpdateUserEmailUnsubscriptionsParams) error {
 	_, err := q.db.Exec(ctx, updateUserEmailUnsubscriptions, arg.ID, arg.EmailUnsubscriptions)
 	return err
-}
-
-const updateUserRoles = `-- name: UpdateUserRoles :one
-UPDATE users set roles = $2 where id = $1 RETURNING id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions, roles
-`
-
-type UpdateUserRolesParams struct {
-	ID    persist.DBID
-	Roles persist.RoleList
-}
-
-func (q *Queries) UpdateUserRoles(ctx context.Context, arg UpdateUserRolesParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserRoles, arg.ID, arg.Roles)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.Version,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Username,
-		&i.UsernameIdempotent,
-		&i.Wallets,
-		&i.Bio,
-		&i.Traits,
-		&i.Universal,
-		&i.NotificationSettings,
-		&i.Email,
-		&i.EmailVerified,
-		&i.EmailUnsubscriptions,
-		&i.Roles,
-	)
-	return i, err
 }
 
 const updateUserVerificationStatus = `-- name: UpdateUserVerificationStatus :exec

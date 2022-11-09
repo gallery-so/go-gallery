@@ -20,33 +20,30 @@ type AdminAPI struct {
 func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required"},
-		"roles":    {roles, "required,dive,role"},
+		"roles":    {roles, "required,unique,dive,role"},
 	}); err != nil {
 		return nil, err
 	}
 
 	user, err := api.queries.GetUserByUsername(ctx, username)
-
 	if err != nil {
 		return nil, err
 	}
 
-	// Dedupe roles
-	roleMap := map[persist.Role]bool{}
-	for _, role := range roles {
-		roleMap[*role] = true
-	}
-	for _, role := range user.Roles {
-		roleMap[role] = true
-	}
-	newRoles := make(persist.RoleList, 0, len(roles)+len(user.Roles))
-	for role := range roleMap {
-		newRoles = append(newRoles, role)
+	newRoles := make([]string, len(roles))
+	for i, role := range roles {
+		newRoles[i] = string(*role)
 	}
 
-	user, err = api.queries.UpdateUserRoles(ctx, db.UpdateUserRolesParams{
-		Roles: newRoles,
-		ID:    user.ID,
+	ids := make([]string, len(roles))
+	for i := range roles {
+		ids[i] = persist.GenerateID().String()
+	}
+
+	err = api.queries.AddUserRoles(ctx, db.AddUserRolesParams{
+		UserID: user.ID,
+		Ids:    ids,
+		Roles:  newRoles,
 	})
 
 	return &user, err
@@ -55,36 +52,29 @@ func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles 
 func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required"},
-		"roles":    {roles, "required,dive,role"},
+		"roles":    {roles, "required,unique,dive,role"},
 	}); err != nil {
 		return nil, err
 	}
 
 	user, err := api.queries.GetUserByUsername(ctx, username)
-
 	if err != nil {
 		return nil, err
 	}
 
-	roleMap := map[persist.Role]bool{}
-	// Add existing roles to map
-	for _, role := range user.Roles {
-		roleMap[role] = true
-	}
-	// Remove unwanted roles from map
-	for _, role := range roles {
-		delete(roleMap, *role)
-	}
-	// Build new role array
-	newRoles := make(persist.RoleList, 0, len(roleMap))
-	for role := range roleMap {
-		newRoles = append(newRoles, role)
+	deleteRoles := make([]persist.Role, len(roles))
+	for i, role := range roles {
+		deleteRoles[i] = *role
 	}
 
-	user, err = api.queries.UpdateUserRoles(ctx, db.UpdateUserRolesParams{
-		Roles: newRoles,
-		ID:    user.ID,
+	err = api.queries.DeleteUserRoles(ctx, db.DeleteUserRolesParams{
+		Roles:  deleteRoles,
+		UserID: user.ID,
 	})
 
 	return &user, err
+}
+
+func (api *AdminAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
+	return api.queries.GetUserRolesByUserId(ctx, userID)
 }

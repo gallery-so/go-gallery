@@ -988,6 +988,7 @@ type GalleryResolver interface {
 	Collections(ctx context.Context, obj *model.Gallery) ([]*model.Collection, error)
 }
 type GalleryUserResolver interface {
+	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
@@ -4744,7 +4745,7 @@ type GalleryUser implements Node {
     bio: String
     traits: String
     universal: Boolean
-    roles: [Role]
+    roles: [Role] @goField(forceResolver: true)
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -5442,7 +5443,7 @@ type Query {
     feedEventById(id: DBID!): FeedEventByIdOrError
 
     # Retool Specific
-    usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
+    usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth
 }
 
 input CollectionLayoutInput {
@@ -13427,14 +13428,14 @@ func (ec *executionContext) _GalleryUser_roles(ctx context.Context, field graphq
 		Object:     "GalleryUser",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Roles, nil
+		return ec.resolvers.GalleryUser().Roles(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -18054,8 +18055,28 @@ func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphq
 	}
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().UsersByRole(rctx, args["role"].(persist.Role), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().UsersByRole(rctx, args["role"].(persist.Role), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.UsersConnection); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.UsersConnection`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -30236,12 +30257,22 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = innerFunc(ctx)
 
 		case "roles":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryUser_roles(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_roles(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "tokens":
 			field := field
 
