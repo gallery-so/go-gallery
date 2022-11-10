@@ -206,7 +206,7 @@ func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.
 		}
 		collection, _ := queries.GetCollectionById(ctx, feedEvent.Data.CollectionID)
 		data := notificationEmailDynamicTemplateData{}
-		if collection.ID != "" {
+		if collection.ID != "" && collection.Name.String != "" {
 			data.CollectionID = collection.ID
 			data.CollectionName = collection.Name.String
 			data.Action = "admired your additions to"
