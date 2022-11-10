@@ -35,6 +35,10 @@ const (
 	EB = 1024 * PB
 )
 
+type Cleanupper interface {
+	Cleanup() error
+}
+
 // FileHeaderReader is a struct that wraps an io.Reader and pre-reads the first 512 bytes of the reader
 // When the reader is read, the first 512 bytes are returned first, then the rest of the reader is read,
 // so that the first 512 bytes are not lost

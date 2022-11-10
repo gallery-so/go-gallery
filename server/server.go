@@ -43,6 +43,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Cleanuppers are functions that are called when the server is shutting down
+var Cleanuppers = make([]util.Cleanupper, 0, 5)
+
 // Init initializes the server
 func Init() {
 
@@ -54,6 +57,7 @@ func Init() {
 	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
 
 	http.Handle("/", router)
+
 }
 
 // CoreInit initializes core server functionality. This is abstracted

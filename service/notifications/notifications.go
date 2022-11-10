@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
 )
 
 const window = 10 * time.Minute
@@ -25,6 +26,7 @@ type NotificationHandlers struct {
 	UserNewNotifications     map[persist.DBID]chan db.Notification
 	UserUpdatedNotifications map[persist.DBID]chan db.Notification
 	pubSub                   *pubsub.Client
+	pubsubSubscriptions      []*pubsub.Subscription
 }
 
 // New registers specific notification handlers
@@ -223,9 +225,21 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 }
 
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
-	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_SUB_NEW_NOTIFICATIONS"))
+	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("new-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
+		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS")),
+	})
+	if err != nil {
+		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
+		panic(err)
+	}
 
-	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+	n.pubsubSubscriptions = append(n.pubsubSubscriptions, sub)
+
+	logger.For(nil).Info("subscribing to new notifications pubsub topic")
+
+	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+
+		logger.For(ctx).Debugf("received new notification from pubsub: %s", string(msg.Data))
 
 		defer msg.Ack()
 		notif := db.Notification{}
@@ -256,9 +270,21 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 }
 
 func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
-	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_SUB_UPDATED_NOTIFICATIONS"))
+	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("updated-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
+		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS")),
+	})
+	if err != nil {
+		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
+		panic(err)
+	}
 
-	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+	n.pubsubSubscriptions = append(n.pubsubSubscriptions, sub)
+
+	logger.For(nil).Infof("subscribed to updated notifications pubsub")
+
+	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+
+		logger.For(ctx).Debugf("received updated notification from pubsub: %s", string(msg.Data))
 
 		defer msg.Ack()
 		notif := db.Notification{}
@@ -299,6 +325,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 		return err
 	}
 	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
+	// t.PublishSettings.FlowControlSettings.MaxOutstandingMessages = 2
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})
@@ -336,6 +363,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 		return err
 	}
 	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
+	// t.PublishSettings.FlowControlSettings.MaxOutstandingMessages = 1
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})
@@ -392,4 +420,18 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
+}
+
+func (n *NotificationHandlers) Cleanup() error {
+	errGroup := new(errgroup.Group)
+	for _, s := range n.pubsubSubscriptions {
+		sub := s
+		errGroup.Go(func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			logger.For(ctx).Infof("deleting pubsub subscription: %s", sub.String())
+			return sub.Delete(ctx)
+		})
+	}
+	return errGroup.Wait()
 }
