@@ -8,3 +8,4 @@ create table if not exists user_roles (
     last_updated  timestamptz not null default current_timestamp,
     unique (user_id, role)
 );
+create index if not exists user_roles_role_idx on user_roles (role) where deleted = false;
