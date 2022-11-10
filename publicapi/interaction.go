@@ -374,7 +374,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 	admireID, err := api.repos.AdmireRepository.CreateAdmire(ctx, feedEventID, userID)
 
 	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        userID,
+		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,
@@ -475,7 +475,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 	}
 
 	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        actor,
+		ActorID:        persist.DBIDToNullStr(actor),
 		ResourceTypeID: persist.ResourceTypeComment,
 		SubjectID:      feedEventID,
 		FeedEventID:    feedEventID,

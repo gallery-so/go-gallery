@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -174,7 +175,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 	// Send event
 	feedEvent, err := dispatchEvent(ctx, db.Event{
-		ActorID:        userID,
+		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
@@ -240,7 +241,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        userID,
+		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
@@ -308,13 +309,13 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 
 	// Send event
 	return dispatchEvent(ctx, db.Event{
-		ActorID:        userID,
+		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
-		Caption:        stringToNullable(caption),
+		Caption:        persist.StrToNullStr(caption),
 	}, api.validator, caption)
 }
 

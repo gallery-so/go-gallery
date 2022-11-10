@@ -490,6 +490,11 @@ enum EmailVerificationStatus {
     Admin
 }
 
+enum EmailUnsubscriptionType {
+    All
+    Notifications
+}
+
 type UserEmail {
     email: String
     verificationStatus: EmailVerificationStatus
@@ -504,6 +509,11 @@ type EmailNotificationSettings {
 input UpdateEmailNotificationSettingsInput {
     unsubscribedFromAll: Boolean!
     unsubscribedFromNotifications: Boolean!
+}
+
+input UnsubscribeFromEmailTypeInput {
+    type: EmailUnsubscriptionType!
+    token: String!
 }
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
@@ -1335,6 +1345,14 @@ union UpdateEmailNotificationSettingsPayloadOrError =
     UpdateEmailNotificationSettingsPayload
     | ErrInvalidInput
 
+type UnsubscribeFromEmailTypePayload {
+    viewer: Viewer
+}
+
+union UnsubscribeFromEmailTypePayloadOrError =
+    UnsubscribeFromEmailTypePayload
+    | ErrInvalidInput
+
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
 
@@ -1370,6 +1388,7 @@ type Mutation {
     updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
     updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
+    unsubscribeFromEmailType(input: UnsubscribeFromEmailTypeInput!): UnsubscribeFromEmailTypePayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 

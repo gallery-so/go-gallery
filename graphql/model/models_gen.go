@@ -170,6 +170,10 @@ type UnfollowUserPayloadOrError interface {
 	IsUnfollowUserPayloadOrError()
 }
 
+type UnsubscribeFromEmailTypePayloadOrError interface {
+	IsUnsubscribeFromEmailTypePayloadOrError()
+}
+
 type UpdateCollectionHiddenPayloadOrError interface {
 	IsUpdateCollectionHiddenPayloadOrError()
 }
@@ -616,6 +620,7 @@ func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
+func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1199,6 +1204,17 @@ type UnknownMedia struct {
 func (UnknownMedia) IsMediaSubtype() {}
 func (UnknownMedia) IsMedia()        {}
 
+type UnsubscribeFromEmailTypeInput struct {
+	Type  EmailUnsubscriptionType `json:"type"`
+	Token string                  `json:"token"`
+}
+
+type UnsubscribeFromEmailTypePayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UnsubscribeFromEmailTypePayload) IsUnsubscribeFromEmailTypePayloadOrError() {}
+
 type UpdateCollectionHiddenInput struct {
 	CollectionID persist.DBID `json:"collectionId"`
 	Hidden       bool         `json:"hidden"`
@@ -1381,6 +1397,47 @@ type Wallet struct {
 
 func (Wallet) IsNode()                {}
 func (Wallet) IsGalleryUserOrWallet() {}
+
+type EmailUnsubscriptionType string
+
+const (
+	EmailUnsubscriptionTypeAll           EmailUnsubscriptionType = "All"
+	EmailUnsubscriptionTypeNotifications EmailUnsubscriptionType = "Notifications"
+)
+
+var AllEmailUnsubscriptionType = []EmailUnsubscriptionType{
+	EmailUnsubscriptionTypeAll,
+	EmailUnsubscriptionTypeNotifications,
+}
+
+func (e EmailUnsubscriptionType) IsValid() bool {
+	switch e {
+	case EmailUnsubscriptionTypeAll, EmailUnsubscriptionTypeNotifications:
+		return true
+	}
+	return false
+}
+
+func (e EmailUnsubscriptionType) String() string {
+	return string(e)
+}
+
+func (e *EmailUnsubscriptionType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = EmailUnsubscriptionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid EmailUnsubscriptionType", str)
+	}
+	return nil
+}
+
+func (e EmailUnsubscriptionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
 
 type TokenType string
 

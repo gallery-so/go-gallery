@@ -1,6 +1,7 @@
 package persist
 
 import (
+	"database/sql"
 	"fmt"
 )
 
@@ -74,4 +75,27 @@ type ErrUnknownResourceType struct {
 
 func (e ErrUnknownResourceType) Error() string {
 	return fmt.Sprintf("unknown resource type: %v", e.ResourceType)
+}
+
+func StrToNullStr(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{Valid: true, String: *s}
+}
+
+func NullStrToStr(s sql.NullString) string {
+	if !s.Valid {
+		return ""
+	}
+	return s.String
+}
+
+func DBIDToNullStr(id DBID) sql.NullString {
+	s := id.String()
+	return StrToNullStr(&s)
+}
+
+func NullStrToDBID(s sql.NullString) DBID {
+	return DBID(NullStrToStr(s))
 }

@@ -74,6 +74,7 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "c63e40ab-5049-4ce1-9d14-8742a3c5c1a8")
 	viper.SetDefault("SENDGRID_NOTIFICATIONS_TEMPLATE_ID", "d-6135d8f36e9946979b0dcf1800363ab4")
 	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
+	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
 
 	viper.AutomaticEnv()
 
@@ -140,4 +141,8 @@ func initLogger() {
 		}
 
 	})
+}
+
+func isDevEnv() bool {
+	return viper.GetString("ENV") != "production"
 }

@@ -100,6 +100,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullInt"
           - column: "events.external_id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+          - column: "events.actor_id"
+            go_type: "database/sql.NullString"
 
           # Comments
           - column: "comments.reply_to"
@@ -142,8 +144,6 @@ sql:
           - column: "*.thumbnail_url"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.media_url"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
-          - column: "*.caption"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "*.chain"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Chain"
