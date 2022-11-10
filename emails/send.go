@@ -35,6 +35,10 @@ type notificationsEmailTemplateData struct {
 	Notifications []string // TODO - this should be a struct with the notification data once that has been merged
 }
 
+type errNoEmailSet struct {
+	userID persist.DBID
+}
+
 func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -52,7 +56,7 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 		}
 
 		if user.Email == "" {
-			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("user %s has no email", input.UserID))
+			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID: input.UserID})
 			return
 		}
 
@@ -99,6 +103,7 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.Han
 			p.DynamicTemplateData = map[string]interface{}{
 				"notifications": []string{"notification 1", "notification 2"},
 			}
+			m.Asm = &mail.Asm{GroupID: viper.GetInt("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")}
 			m.AddPersonalizations(p)
 			p.AddTos(to)
 
@@ -160,4 +165,8 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 	}
 
 	return errGroup.Wait()
+}
+
+func (e errNoEmailSet) Error() string {
+	return fmt.Sprintf("user %s has no email", e.userID)
 }
