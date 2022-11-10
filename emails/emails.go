@@ -142,3 +142,7 @@ func initLogger() {
 
 	})
 }
+
+func isDevEnv() bool {
+	return viper.GetString("ENV") != "production"
+}

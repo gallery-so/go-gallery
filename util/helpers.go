@@ -381,3 +381,10 @@ func LoadEnvFile(fileName string) {
 		panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
 	}
 }
+
+func TruncateWithEllipsis(s string, length int) string {
+	if len(s) <= length {
+		return s
+	}
+	return s[:length] + "..."
+}

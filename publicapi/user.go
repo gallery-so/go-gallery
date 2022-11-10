@@ -292,12 +292,10 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email string) error {
 	if err != nil {
 		return err
 	}
-
 	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
 		ID:    userID,
 		Email: persist.NullString(email),
 	})
-
 	if err != nil {
 		return err
 	}
