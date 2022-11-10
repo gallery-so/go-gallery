@@ -741,6 +741,10 @@ func (r *mutationResolver) UpdateEmailNotificationSettings(ctx context.Context, 
 	return updateUserEmailNotificationSettings(ctx, input)
 }
 
+func (r *mutationResolver) UnsubscribeFromEmailType(ctx context.Context, input model.UnsubscribeFromEmailTypeInput) (model.UnsubscribeFromEmailTypePayloadOrError, error) {
+	return unsubscribeFromEmailType(ctx, input)
+}
+
 func (r *mutationResolver) Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error) {
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
