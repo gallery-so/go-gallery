@@ -58,8 +58,8 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") != "local" {
-		util.EnvVarMustExist("SENTRY_DSN", "")
-		util.EnvVarMustExist("GAE_VERSION", "")
+		util.VarNotSetTo("SENTRY_DSN", "")
+		util.VarNotSetTo("GAE_VERSION", "")
 	}
 }
 

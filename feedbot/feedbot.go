@@ -51,9 +51,9 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	util.EnvVarMustExist("BOT_TOKEN", "")
+	util.VarNotSetTo("BOT_TOKEN", "")
 	if viper.GetString("ENV") != "local" {
-		util.EnvVarMustExist("SENTRY_DSN", "")
+		util.VarNotSetTo("SENTRY_DSN", "")
 	}
 }
 

@@ -286,7 +286,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
 
 -- name: CreateGalleryEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
 
 -- name: CreateAdmireEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;

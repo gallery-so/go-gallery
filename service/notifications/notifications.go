@@ -171,26 +171,26 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	mostRecentNotif := notifs[0]
 
 	if notif.Data.UnauthedViewerIDs != nil && len(notif.Data.UnauthedViewerIDs) > 0 {
-		externalsToAdd := map[persist.NullString]bool{}
-		for _, ip := range notif.Data.UnauthedViewerIDs {
-			externalsToAdd[ip] = true
+		externalsToAdd := map[string]bool{}
+		for _, id := range notif.Data.UnauthedViewerIDs {
+			externalsToAdd[id] = true
 		}
-		for _, ip := range notif.Data.UnauthedViewerIDs {
+		for _, id := range notif.Data.UnauthedViewerIDs {
 		firstInner:
 			for _, n := range notifs {
-				if persist.ContainsNullString(n.Data.UnauthedViewerIDs, ip) {
-					externalsToAdd[ip] = false
+				if util.ContainsString(n.Data.UnauthedViewerIDs, id) {
+					externalsToAdd[id] = false
 					break firstInner
 				}
 			}
 		}
-		resultIPs := []persist.NullString{}
-		for ip, add := range externalsToAdd {
+		resultIDs := []string{}
+		for id, add := range externalsToAdd {
 			if add {
-				resultIPs = append(resultIPs, ip)
+				resultIDs = append(resultIDs, id)
 			}
 		}
-		notif.Data.UnauthedViewerIDs = resultIPs
+		notif.Data.UnauthedViewerIDs = resultIDs
 	}
 
 	if notif.Data.AuthedViewerIDs != nil && len(notif.Data.AuthedViewerIDs) > 0 {

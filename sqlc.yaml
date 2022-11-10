@@ -99,7 +99,7 @@ sql:
           - column: "events.feed_window_size"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullInt"
           - column: "events.external_id"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
+            go_type: "database/sql.NullString"
           - column: "events.actor_id"
             go_type: "database/sql.NullString"
 

@@ -86,11 +86,11 @@ func setDefaults() {
 	}
 
 	if viper.GetString("ENV") != "local" {
-		util.EnvVarMustExist("SENTRY_DSN", "")
-		util.EnvVarMustExist("VERSION", "")
-		util.EnvVarMustExist("SENDGRID_API_KEY", "")
-		util.EnvVarMustExist("JWT_SECRET", "")
-		util.EnvVarMustExist("FROM_EMAIL", "")
+		util.VarNotSetTo("SENTRY_DSN", "")
+		util.VarNotSetTo("VERSION", "")
+		util.VarNotSetTo("SENDGRID_API_KEY", "")
+		util.VarNotSetTo("JWT_SECRET", "")
+		util.VarNotSetTo("FROM_EMAIL", "")
 	}
 }
 

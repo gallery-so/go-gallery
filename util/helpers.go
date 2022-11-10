@@ -327,9 +327,10 @@ func FindFirstFieldFromMap(it map[string]interface{}, fields ...string) interfac
 	return nil
 }
 
-// EnvVarMustExist panics if an environment variable is not set.
-func EnvVarMustExist(envVar, emptyVal string) {
-	if viper.GetString(envVar) == emptyVal {
+// VarNotSetTo panics if an environment variable is not set or set to `emptyVal`.
+func VarNotSetTo(envVar, emptyVal string) {
+	setTo := viper.GetString(envVar)
+	if setTo == emptyVal || setTo == "" {
 		panic(fmt.Sprintf("%s must be set", envVar))
 	}
 }

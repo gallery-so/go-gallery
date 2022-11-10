@@ -112,7 +112,7 @@ type Event struct {
 	CommentID      persist.DBID
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
-	ExternalID     persist.NullString
+	ExternalID     sql.NullString
 	Caption        sql.NullString
 }
 

@@ -106,6 +106,7 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 		ResourceTypeID: event.ResourceTypeID,
 		GalleryID:      event.SubjectID,
 		Data:           event.Data,
+		ExternalID:     event.ExternalID,
 	})
 	return &event, err
 }

@@ -356,12 +356,3 @@ func ContainsDBID(pSrc []DBID, pID DBID) bool {
 	}
 	return false
 }
-
-func ContainsNullString(pSrc []NullString, pStr NullString) bool {
-	for _, v := range pSrc {
-		if v == pStr {
-			return true
-		}
-	}
-	return false
-}
