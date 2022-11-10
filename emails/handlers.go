@@ -13,8 +13,8 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	sendGroup.POST("/notifications", sendNotificationEmails(queries, s))
 	sendGroup.POST("/verification", sendVerificationEmail(loaders, queries, s))
 
-	sendGroup.POST("/unsubscribe", unsubscribeFromEmailType(queries))
-	sendGroup.POST("/resubscribe", resubscribeFromEmailType(queries))
+	router.POST("/unsubscribe", unsubscribeFromEmailType(queries))
+	router.POST("/resubscribe", resubscribeFromEmailType(queries))
 
 	router.POST("/verify", verifyEmail(queries))
 	return router
