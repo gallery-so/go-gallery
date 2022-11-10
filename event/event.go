@@ -241,19 +241,19 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 func (h notificationHandler) createNotificationDataForEvent(event db.Event) (data persist.NotificationData) {
 	switch event.Action {
 	case persist.ActionViewedGallery:
-		if event.ActorID != "" {
-			data.AuthedViewerIDs = []persist.DBID{event.ActorID}
+		if event.ActorID.String != "" {
+			data.AuthedViewerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}
 		if event.ExternalID != "" {
 			data.UnauthedViewerIDs = []persist.NullString{event.ExternalID}
 		}
 	case persist.ActionAdmiredFeedEvent:
-		if event.ActorID != "" {
-			data.AdmirerIDs = []persist.DBID{event.ActorID}
+		if event.ActorID.String != "" {
+			data.AdmirerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}
 	case persist.ActionUserFollowedUsers:
-		if event.ActorID != "" {
-			data.FollowerIDs = []persist.DBID{event.ActorID}
+		if event.ActorID.String != "" {
+			data.FollowerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}
 		data.FollowedBack = persist.NullBool(event.Data.UserFollowedBack)
 		data.Refollowed = persist.NullBool(event.Data.UserRefollowed)

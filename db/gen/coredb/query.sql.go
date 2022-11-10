@@ -105,7 +105,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_even
 
 type CreateAdmireEventParams struct {
 	ID             persist.DBID
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
 	AdmireID       persist.DBID
@@ -196,12 +196,12 @@ INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subje
 
 type CreateCollectionEventParams struct {
 	ID             persist.DBID
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
 	CollectionID   persist.DBID
 	Data           persist.EventData
-	Caption        persist.NullString
+	Caption        sql.NullString
 }
 
 func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectionEventParams) (Event, error) {
@@ -245,7 +245,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_eve
 
 type CreateCommentEventParams struct {
 	ID             persist.DBID
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
 	CommentID      persist.DBID
@@ -343,7 +343,7 @@ type CreateFeedEventParams struct {
 	Data      persist.FeedEventData
 	EventTime time.Time
 	EventIds  persist.DBIDList
-	Caption   persist.NullString
+	Caption   sql.NullString
 }
 
 func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams) (FeedEvent, error) {
@@ -419,7 +419,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_
 
 type CreateGalleryEventParams struct {
 	ID             persist.DBID
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
 	GalleryID      persist.DBID
@@ -466,7 +466,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id
 
 type CreateTokenEventParams struct {
 	ID             persist.DBID
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
 	TokenID        persist.DBID
@@ -513,7 +513,7 @@ INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id,
 
 type CreateUserEventParams struct {
 	ID             persist.DBID
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	Action         persist.Action
 	ResourceTypeID persist.ResourceType
 	UserID         persist.DBID
@@ -2452,7 +2452,7 @@ select exists(
 `
 
 type IsActorActionActiveParams struct {
-	ActorID     persist.DBID
+	ActorID     sql.NullString
 	Actions     persist.ActionList
 	WindowStart time.Time
 	WindowEnd   time.Time
@@ -2481,7 +2481,7 @@ select exists(
 `
 
 type IsActorSubjectActionActiveParams struct {
-	ActorID     persist.DBID
+	ActorID     sql.NullString
 	SubjectID   persist.DBID
 	Actions     persist.ActionList
 	WindowStart time.Time
@@ -2511,7 +2511,7 @@ select exists(
 `
 
 type IsActorSubjectActiveParams struct {
-	ActorID     persist.DBID
+	ActorID     sql.NullString
 	SubjectID   persist.DBID
 	WindowStart time.Time
 	WindowEnd   time.Time

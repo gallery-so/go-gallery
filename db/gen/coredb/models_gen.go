@@ -97,7 +97,7 @@ type EarlyAccess struct {
 type Event struct {
 	ID             persist.DBID
 	Version        int32
-	ActorID        persist.DBID
+	ActorID        sql.NullString
 	ResourceTypeID persist.ResourceType
 	SubjectID      persist.DBID
 	UserID         persist.DBID
@@ -113,7 +113,7 @@ type Event struct {
 	AdmireID       persist.DBID
 	FeedEventID    persist.DBID
 	ExternalID     persist.NullString
-	Caption        persist.NullString
+	Caption        sql.NullString
 }
 
 type Feature struct {
@@ -151,7 +151,7 @@ type FeedEvent struct {
 	Deleted     bool
 	LastUpdated time.Time
 	CreatedAt   time.Time
-	Caption     persist.NullString
+	Caption     sql.NullString
 }
 
 type Follow struct {

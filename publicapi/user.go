@@ -241,7 +241,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        userID,
+		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionUserCreated,
 		ResourceTypeID: persist.ResourceTypeUser,
 		UserID:         userID,
@@ -491,7 +491,7 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 	}
 
 	pushEvent(ctx, db.Event{
-		ActorID:        curUserID,
+		ActorID:        persist.DBIDToNullStr(curUserID),
 		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeUser,
 		UserID:         curUserID,

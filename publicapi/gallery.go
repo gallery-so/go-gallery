@@ -3,6 +3,8 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 
@@ -10,7 +12,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -121,7 +122,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		// only view gallery if the user hasn't already viewed it in this most recent notification period
 
 		_, err = dispatchEvent(ctx, db.Event{
-			ActorID:        userID,
+			ActorID:        persist.DBIDToNullStr(userID),
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
