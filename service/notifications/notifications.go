@@ -325,7 +325,6 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 		return err
 	}
 	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
-	// t.PublishSettings.FlowControlSettings.MaxOutstandingMessages = 2
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})
@@ -363,7 +362,6 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 		return err
 	}
 	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
-	// t.PublishSettings.FlowControlSettings.MaxOutstandingMessages = 1
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})
