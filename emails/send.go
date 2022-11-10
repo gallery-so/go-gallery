@@ -153,6 +153,10 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.Han
 				}
 			}
 
+			if len(data.Notifications) == 0 {
+				return nil
+			}
+
 			asJSON, err := json.Marshal(data)
 			if err != nil {
 				return err
