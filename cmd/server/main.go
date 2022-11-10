@@ -20,9 +20,8 @@ func main() {
 	graceFullShutdown := make(chan os.Signal, 1)
 	signal.Notify(graceFullShutdown, os.Interrupt, syscall.SIGTERM)
 
+	cleanuppers := server.Init()
 	go func() {
-		server.Init()
-
 		if appengine.IsAppEngine() {
 			logger.For(nil).Info("Running in App Engine Mode")
 			appengine.Main()
@@ -34,7 +33,7 @@ func main() {
 
 	<-graceFullShutdown
 	errGroup := new(errgroup.Group)
-	for _, s := range server.Cleanuppers {
+	for _, s := range cleanuppers {
 		errGroup.Go(s.Cleanup)
 	}
 	if err := errGroup.Wait(); err != nil {

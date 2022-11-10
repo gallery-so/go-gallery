@@ -43,26 +43,24 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Cleanuppers are functions that are called when the server is shutting down
-var Cleanuppers = make([]util.Cleanupper, 0, 5)
-
 // Init initializes the server
-func Init() {
+func Init() []util.Cleanupper {
 
 	setDefaults()
 
 	logger.InitWithGCPDefaults()
 	initSentry()
 
-	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+	router, cleanuppers := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
 
 	http.Handle("/", router)
 
+	return cleanuppers
 }
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
+func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) (*gin.Engine, []util.Cleanupper) {
 	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
