@@ -542,6 +542,7 @@ type ComplexityRoot struct {
 		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
 		SyncTokens                      func(childComplexity int, chains []persist.Chain, userID *persist.DBID) int
 		UnfollowUser                    func(childComplexity int, userID persist.DBID) int
+		UnsubscribeFromEmailType        func(childComplexity int, input model.UnsubscribeFromEmailTypeInput) int
 		UpdateCollectionHidden          func(childComplexity int, input model.UpdateCollectionHiddenInput) int
 		UpdateCollectionInfo            func(childComplexity int, input model.UpdateCollectionInfoInput) int
 		UpdateCollectionTokens          func(childComplexity int, input model.UpdateCollectionTokensInput) int
@@ -802,6 +803,10 @@ type ComplexityRoot struct {
 		PreviewURLs      func(childComplexity int) int
 	}
 
+	UnsubscribeFromEmailTypePayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	UpdateCollectionHiddenPayload struct {
 		Collection func(childComplexity int) int
 	}
@@ -1005,6 +1010,7 @@ type MutationResolver interface {
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
 	ResendVerificationEmail(ctx context.Context) (model.ResendVerificationEmailPayloadOrError, error)
 	UpdateEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (model.UpdateEmailNotificationSettingsPayloadOrError, error)
+	UnsubscribeFromEmailType(ctx context.Context, input model.UnsubscribeFromEmailTypeInput) (model.UnsubscribeFromEmailTypePayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
@@ -2957,6 +2963,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UnfollowUser(childComplexity, args["userId"].(persist.DBID)), true
 
+	case "Mutation.unsubscribeFromEmailType":
+		if e.complexity.Mutation.UnsubscribeFromEmailType == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unsubscribeFromEmailType_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnsubscribeFromEmailType(childComplexity, args["input"].(model.UnsubscribeFromEmailTypeInput)), true
+
 	case "Mutation.updateCollectionHidden":
 		if e.complexity.Mutation.UpdateCollectionHidden == nil {
 			break
@@ -4210,6 +4228,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UnknownMedia.PreviewURLs(childComplexity), true
 
+	case "UnsubscribeFromEmailTypePayload.viewer":
+		if e.complexity.UnsubscribeFromEmailTypePayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UnsubscribeFromEmailTypePayload.Viewer(childComplexity), true
+
 	case "UpdateCollectionHiddenPayload.collection":
 		if e.complexity.UpdateCollectionHiddenPayload.Collection == nil {
 			break
@@ -5077,12 +5102,16 @@ input NotificationSettingsInput {
   someoneViewedYourGallery: Boolean
 }
 
-
 enum EmailVerificationStatus {
     Unverified
     Verified
     Failed
     Admin
+}
+
+enum EmailUnsubscriptionType {
+    All
+    Notifications
 }
 
 type UserEmail {
@@ -5099,6 +5128,11 @@ type EmailNotificationSettings {
 input UpdateEmailNotificationSettingsInput {
     unsubscribedFromAll: Boolean!
     unsubscribedFromNotifications: Boolean!
+}
+
+input UnsubscribeFromEmailTypeInput {
+    type: EmailUnsubscriptionType!
+    token: String!
 }
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
@@ -5912,6 +5946,14 @@ union UpdateEmailNotificationSettingsPayloadOrError =
     UpdateEmailNotificationSettingsPayload
     | ErrInvalidInput
 
+type UnsubscribeFromEmailTypePayload {
+    viewer: Viewer
+}
+
+union UnsubscribeFromEmailTypePayloadOrError =
+    UnsubscribeFromEmailTypePayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -5944,6 +5986,7 @@ type Mutation {
     updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
     updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
+    unsubscribeFromEmailType(input: UnsubscribeFromEmailTypeInput!): UnsubscribeFromEmailTypePayloadOrError
     login(authMechanism: AuthMechanism!): LoginPayloadOrError
     logout: LogoutPayload
 
@@ -6644,6 +6687,21 @@ func (ec *executionContext) field_Mutation_unfollowUser_args(ctx context.Context
 		}
 	}
 	args["userId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unsubscribeFromEmailType_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UnsubscribeFromEmailTypeInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUnsubscribeFromEmailTypeInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnsubscribeFromEmailTypeInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -15697,6 +15755,45 @@ func (ec *executionContext) _Mutation_updateEmailNotificationSettings(ctx contex
 	return ec.marshalOUpdateEmailNotificationSettingsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateEmailNotificationSettingsPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_unsubscribeFromEmailType(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_unsubscribeFromEmailType_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UnsubscribeFromEmailType(rctx, args["input"].(model.UnsubscribeFromEmailTypeInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UnsubscribeFromEmailTypePayloadOrError)
+	fc.Result = res
+	return ec.marshalOUnsubscribeFromEmailTypePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnsubscribeFromEmailTypePayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -21314,6 +21411,38 @@ func (ec *executionContext) _UnknownMedia_contentRenderURL(ctx context.Context, 
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UnsubscribeFromEmailTypePayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnsubscribeFromEmailTypePayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UnsubscribeFromEmailTypePayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UpdateCollectionHiddenPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.UpdateCollectionHiddenPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -24437,6 +24566,37 @@ func (ec *executionContext) unmarshalInputSetSpamPreferenceInput(ctx context.Con
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUnsubscribeFromEmailTypeInput(ctx context.Context, obj interface{}) (model.UnsubscribeFromEmailTypeInput, error) {
+	var it model.UnsubscribeFromEmailTypeInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "type":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			it.Type, err = ec.unmarshalNEmailUnsubscriptionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEmailUnsubscriptionType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			it.Token, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateCollectionHiddenInput(ctx context.Context, obj interface{}) (model.UpdateCollectionHiddenInput, error) {
 	var it model.UpdateCollectionHiddenInput
 	asMap := map[string]interface{}{}
@@ -26259,6 +26419,29 @@ func (ec *executionContext) _UnfollowUserPayloadOrError(ctx context.Context, sel
 			return graphql.Null
 		}
 		return ec._ErrUserNotFound(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UnsubscribeFromEmailTypePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UnsubscribeFromEmailTypePayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UnsubscribeFromEmailTypePayload:
+		return ec._UnsubscribeFromEmailTypePayload(ctx, sel, &obj)
+	case *model.UnsubscribeFromEmailTypePayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UnsubscribeFromEmailTypePayload(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -28579,7 +28762,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -30417,6 +30600,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateEmailNotificationSettings":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateEmailNotificationSettings(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "unsubscribeFromEmailType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unsubscribeFromEmailType(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -32730,6 +32920,34 @@ func (ec *executionContext) _UnknownMedia(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var unsubscribeFromEmailTypePayloadImplementors = []string{"UnsubscribeFromEmailTypePayload", "UnsubscribeFromEmailTypePayloadOrError"}
+
+func (ec *executionContext) _UnsubscribeFromEmailTypePayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnsubscribeFromEmailTypePayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, unsubscribeFromEmailTypePayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UnsubscribeFromEmailTypePayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UnsubscribeFromEmailTypePayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var updateCollectionHiddenPayloadImplementors = []string{"UpdateCollectionHiddenPayload", "UpdateCollectionHiddenPayloadOrError"}
 
 func (ec *executionContext) _UpdateCollectionHiddenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateCollectionHiddenPayload) graphql.Marshaler {
@@ -34119,6 +34337,16 @@ func (ec *executionContext) unmarshalNDeepRefreshInput2githubᚗcomᚋmikeydub�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNEmailUnsubscriptionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEmailUnsubscriptionType(ctx context.Context, v interface{}) (model.EmailUnsubscriptionType, error) {
+	var res model.EmailUnsubscriptionType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNEmailUnsubscriptionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEmailUnsubscriptionType(ctx context.Context, sel ast.SelectionSet, v model.EmailUnsubscriptionType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v *model.GalleryUser) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -34278,6 +34506,11 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNUnsubscribeFromEmailTypeInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnsubscribeFromEmailTypeInput(ctx context.Context, v interface{}) (model.UnsubscribeFromEmailTypeInput, error) {
+	res, err := ec.unmarshalInputUnsubscribeFromEmailTypeInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdateCollectionHiddenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenInput(ctx context.Context, v interface{}) (model.UpdateCollectionHiddenInput, error) {
@@ -36475,6 +36708,13 @@ func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmi
 		return graphql.Null
 	}
 	return ec._UnfollowUserPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUnsubscribeFromEmailTypePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnsubscribeFromEmailTypePayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnsubscribeFromEmailTypePayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UnsubscribeFromEmailTypePayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateCollectionHiddenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionHiddenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateCollectionHiddenPayloadOrError) graphql.Marshaler {
