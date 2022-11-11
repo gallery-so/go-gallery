@@ -556,6 +556,15 @@ SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsu
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
     LIMIT $2;
 
+-- name: GetUsersWithRolePaginate :many
+select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = false
+    and u.id = ur.user_id and ur.role = @role
+    and (u.username_idempotent, u.id) < (@cur_before_key::varchar, @cur_before_id)
+    and (u.username_idempotent, u.id) > (@cur_after_key::varchar, @cur_after_id)
+    order by case when @paging_forward::bool then (u.username_idempotent, u.id) end asc,
+             case when not @paging_forward::bool then (u.username_idempotent, u.id) end desc
+    limit $1;
+
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
 
@@ -570,3 +579,14 @@ select users.*,wallets.address from users, wallets where wallets.address = ANY(@
 
 -- name: GetFeedEventByID :one
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
+
+-- name: AddUserRoles :exec
+insert into user_roles (id, user_id, role, created_at, last_updated)
+select unnest(@ids::varchar[]), $1, unnest(@roles::varchar[]), now(), now()
+on conflict (user_id, role) do update set deleted = false, last_updated = now();
+
+-- name: DeleteUserRoles :exec
+update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any(@roles);
+
+-- name: GetUserRolesByUserId :many
+select role from user_roles where user_id = $1 and deleted = false;

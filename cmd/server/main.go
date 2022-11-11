@@ -14,7 +14,6 @@ func main() {
 	defer sentryutil.RecoverAndRaise(nil)
 
 	server.Init()
-
 	if appengine.IsAppEngine() {
 		logger.For(nil).Info("Running in App Engine Mode")
 		appengine.Main()
@@ -22,4 +21,5 @@ func main() {
 		logger.For(nil).Info("Running in Default Mode")
 		http.ListenAndServe(":4000", nil)
 	}
+
 }

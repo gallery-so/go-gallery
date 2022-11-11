@@ -48,6 +48,7 @@ type PublicAPI struct {
 	Feed          *FeedAPI
 	Notifications *NotificationsAPI
 	Interaction   *InteractionAPI
+	Admin         *AdminAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
@@ -72,6 +73,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
+		Admin:         &AdminAPI{queries: queries, loaders: loaders, validator: validator},
 	}
 }
 

@@ -11,6 +11,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+type AddRolesToUserPayloadOrError interface {
+	IsAddRolesToUserPayloadOrError()
+}
+
 type AddUserWalletPayloadOrError interface {
 	IsAddUserWalletPayloadOrError()
 }
@@ -144,6 +148,10 @@ type RemoveUserWalletsPayloadOrError interface {
 
 type ResendVerificationEmailPayloadOrError interface {
 	IsResendVerificationEmailPayloadOrError()
+}
+
+type RevokeRolesFromUserPayloadOrError interface {
+	IsRevokeRolesFromUserPayloadOrError()
 }
 
 type SetSpamPreferencePayloadOrError interface {
@@ -648,6 +656,8 @@ func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
 func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
 func (ErrNotAuthorized) IsError()                                  {}
 func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
+func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()           {}
+func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()      {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -796,6 +806,7 @@ type GalleryUser struct {
 	Bio                 *string         `json:"bio"`
 	Traits              *string         `json:"traits"`
 	Universal           *bool           `json:"universal"`
+	Roles               []*persist.Role `json:"roles"`
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
@@ -807,12 +818,14 @@ type GalleryUser struct {
 	Feed                *FeedConnection `json:"feed"`
 }
 
-func (GalleryUser) IsNode()                  {}
-func (GalleryUser) IsGalleryUserOrWallet()   {}
-func (GalleryUser) IsGalleryUserOrAddress()  {}
-func (GalleryUser) IsUserByUsernameOrError() {}
-func (GalleryUser) IsUserByIDOrError()       {}
-func (GalleryUser) IsUserByAddressOrError()  {}
+func (GalleryUser) IsNode()                              {}
+func (GalleryUser) IsGalleryUserOrWallet()               {}
+func (GalleryUser) IsGalleryUserOrAddress()              {}
+func (GalleryUser) IsUserByUsernameOrError()             {}
+func (GalleryUser) IsUserByIDOrError()                   {}
+func (GalleryUser) IsUserByAddressOrError()              {}
+func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
+func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
 type GltfMedia struct {
 	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
@@ -1303,6 +1316,11 @@ type UserCreatedFeedEventData struct {
 
 func (UserCreatedFeedEventData) IsFeedEventData() {}
 
+type UserEdge struct {
+	Node   *GalleryUser `json:"node"`
+	Cursor *string      `json:"cursor"`
+}
+
 type UserEmail struct {
 	Email                     *string                          `json:"email"`
 	VerificationStatus        *persist.EmailVerificationStatus `json:"verificationStatus"`
@@ -1317,6 +1335,11 @@ type UserFollowedUsersFeedEventData struct {
 }
 
 func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
+
+type UsersConnection struct {
+	Edges    []*UserEdge `json:"edges"`
+	PageInfo *PageInfo   `json:"pageInfo"`
+}
 
 type VerifyEmailPayload struct {
 	Email *string `json:"email"`

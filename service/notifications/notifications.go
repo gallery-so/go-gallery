@@ -223,9 +223,19 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 }
 
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
-	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_SUB_NEW_NOTIFICATIONS"))
+	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("new-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
+		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS")),
+	})
+	if err != nil {
+		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
+		panic(err)
+	}
 
-	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+	logger.For(nil).Info("subscribing to new notifications pubsub topic")
+
+	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+
+		logger.For(ctx).Debugf("received new notification from pubsub: %s", string(msg.Data))
 
 		defer msg.Ack()
 		notif := db.Notification{}
@@ -256,9 +266,19 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 }
 
 func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
-	sub := n.pubSub.Subscription(viper.GetString("PUBSUB_SUB_UPDATED_NOTIFICATIONS"))
+	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("updated-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
+		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS")),
+	})
+	if err != nil {
+		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
+		panic(err)
+	}
 
-	err := sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+	logger.For(nil).Infof("subscribed to updated notifications pubsub")
+
+	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+
+		logger.For(ctx).Debugf("received updated notification from pubsub: %s", string(msg.Data))
 
 		defer msg.Ack()
 		notif := db.Notification{}

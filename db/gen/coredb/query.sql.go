@@ -14,6 +14,23 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const addUserRoles = `-- name: AddUserRoles :exec
+insert into user_roles (id, user_id, role, created_at, last_updated)
+select unnest($2::varchar[]), $1, unnest($3::varchar[]), now(), now()
+on conflict (user_id, role) do update set deleted = false, last_updated = now()
+`
+
+type AddUserRolesParams struct {
+	UserID persist.DBID
+	Ids    []string
+	Roles  []string
+}
+
+func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) error {
+	_, err := q.db.Exec(ctx, addUserRoles, arg.UserID, arg.Ids, arg.Roles)
+	return err
+}
+
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
 UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
 `
@@ -596,6 +613,20 @@ func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateV
 		&i.Amount,
 	)
 	return i, err
+}
+
+const deleteUserRoles = `-- name: DeleteUserRoles :exec
+update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any($2)
+`
+
+type DeleteUserRolesParams struct {
+	UserID persist.DBID
+	Roles  persist.RoleList
+}
+
+func (q *Queries) DeleteUserRoles(ctx context.Context, arg DeleteUserRolesParams) error {
+	_, err := q.db.Exec(ctx, deleteUserRoles, arg.UserID, arg.Roles)
+	return err
 }
 
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
@@ -2005,6 +2036,30 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 	return items, nil
 }
 
+const getUserRolesByUserId = `-- name: GetUserRolesByUserId :many
+select role from user_roles where user_id = $1 and deleted = false
+`
+
+func (q *Queries) GetUserRolesByUserId(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
+	rows, err := q.db.Query(ctx, getUserRolesByUserId, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.Role
+	for rows.Next() {
+		var role persist.Role
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		items = append(items, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserUnseenNotifications = `-- name: GetUserUnseenNotifications :many
 SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
     AND (created_at, id) < ($3, $4)
@@ -2289,6 +2344,70 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
 		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.Email,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersWithRolePaginate = `-- name: GetUsersWithRolePaginate :many
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email, u.email_verified, u.email_unsubscriptions from users u, user_roles ur where u.deleted = false and ur.deleted = false
+    and u.id = ur.user_id and ur.role = $2
+    and (u.username_idempotent, u.id) < ($3::varchar, $4)
+    and (u.username_idempotent, u.id) > ($5::varchar, $6)
+    order by case when $7::bool then (u.username_idempotent, u.id) end asc,
+             case when not $7::bool then (u.username_idempotent, u.id) end desc
+    limit $1
+`
+
+type GetUsersWithRolePaginateParams struct {
+	Limit         int32
+	Role          persist.Role
+	CurBeforeKey  string
+	CurBeforeID   persist.DBID
+	CurAfterKey   string
+	CurAfterID    persist.DBID
+	PagingForward bool
+}
+
+func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWithRolePaginateParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersWithRolePaginate,
+		arg.Limit,
+		arg.Role,
+		arg.CurBeforeKey,
+		arg.CurBeforeID,
+		arg.CurAfterKey,
 		arg.CurAfterID,
 		arg.PagingForward,
 	)

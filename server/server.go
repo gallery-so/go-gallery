@@ -54,6 +54,7 @@ func Init() {
 	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
 
 	http.Handle("/", router)
+
 }
 
 // CoreInit initializes core server functionality. This is abstracted
@@ -166,6 +167,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 	viper.SetDefault("EMAILS_HOST", "http://localhost:5500")
+	viper.SetDefault("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
 
 	viper.AutomaticEnv()
@@ -182,6 +184,7 @@ func setDefaults() {
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")
+		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 	}
 }

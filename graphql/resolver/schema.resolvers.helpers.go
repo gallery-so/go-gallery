@@ -59,35 +59,50 @@ var nodeFetcher = model.NodeFetcher{
 		if err != nil {
 			return nil, err
 		}
-		return notif.(*model.SomeoneAdmiredYourFeedEventNotification), nil
+
+		notifConverted := notif.(model.SomeoneAdmiredYourFeedEventNotification)
+
+		return &notifConverted, nil
 	},
 	OnSomeoneCommentedOnYourFeedEventNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneCommentedOnYourFeedEventNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {
 			return nil, err
 		}
-		return notif.(*model.SomeoneCommentedOnYourFeedEventNotification), nil
+
+		notifConverted := notif.(model.SomeoneCommentedOnYourFeedEventNotification)
+
+		return &notifConverted, nil
 	},
 	OnSomeoneFollowedYouBackNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouBackNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {
 			return nil, err
 		}
-		return notif.(*model.SomeoneFollowedYouBackNotification), nil
+
+		notifConverted := notif.(model.SomeoneFollowedYouBackNotification)
+
+		return &notifConverted, nil
 	},
 	OnSomeoneFollowedYouNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneFollowedYouNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {
 			return nil, err
 		}
-		return notif.(*model.SomeoneFollowedYouNotification), nil
+
+		notifConverted := notif.(model.SomeoneFollowedYouNotification)
+
+		return &notifConverted, nil
 	},
 	OnSomeoneViewedYourGalleryNotification: func(ctx context.Context, dbid persist.DBID) (*model.SomeoneViewedYourGalleryNotification, error) {
 		notif, err := resolveNotificationByID(ctx, dbid)
 		if err != nil {
 			return nil, err
 		}
-		return notif.(*model.SomeoneViewedYourGalleryNotification), nil
+
+		notifConverted := notif.(model.SomeoneViewedYourGalleryNotification)
+
+		return &notifConverted, nil
 	},
 }
 
@@ -1209,6 +1224,7 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		Following: nil,
 		Tokens:    nil,
 		Badges:    nil,
+		Roles:     nil,
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}

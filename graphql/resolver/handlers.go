@@ -2,12 +2,15 @@ package graphql
 
 import (
 	"context"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/mikeydub/go-gallery/publicapi"
 	"reflect"
+
+	"github.com/mikeydub/go-gallery/publicapi"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
 	"github.com/getsentry/sentry-go"
@@ -136,6 +139,41 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 
 	sentryutil.ReportError(ctx, err)
 	return res, err
+}
+
+func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+		gc := util.GinContextFromContext(ctx)
+
+		authError := model.ErrNotAuthorized{
+			Message: "Not authorized",
+			Cause:   model.ErrInvalidToken{Message: "Retool: not authorized"},
+		}
+
+		parts := strings.SplitN(gc.GetHeader("Authorization"), "Basic ", 2)
+		if len(parts) != 2 {
+			return authError, nil
+		}
+
+		usernameAndPassword, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil {
+			return authError, nil
+		}
+
+		usernameAndPasswordParts := strings.SplitN(string(usernameAndPassword), ":", 2)
+		if len(usernameAndPasswordParts) != 2 {
+			return authError, nil
+		}
+
+		password := usernameAndPasswordParts[1]
+		passwordBytes := []byte(password)
+
+		if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("RETOOL_AUTH_TOKEN")), passwordBytes); cmp != 1 {
+			return authError, nil
+		}
+
+		return next(ctx)
+	}
 }
 
 func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
