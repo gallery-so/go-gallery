@@ -12,6 +12,8 @@ directive @goField(
 # arguments that specify the level of access required.
 directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -56,6 +58,7 @@ type GalleryUser implements Node {
     bio: String
     traits: String
     universal: Boolean
+    roles: [Role] @goField(forceResolver: true)
 
     # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
     # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -729,6 +732,21 @@ type FeedConnection {
     pageInfo: PageInfo!
 }
 
+type UserEdge {
+    node: GalleryUser
+    cursor: String
+}
+
+type UsersConnection {
+    edges: [UserEdge]
+    pageInfo: PageInfo!
+}
+
+enum Role {
+    ADMIN
+    BETA_TESTER
+}
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -746,6 +764,9 @@ type Query {
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
+
+    # Retool Specific
+    usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth
 }
 
 input CollectionLayoutInput {
@@ -1207,7 +1228,7 @@ type GroupNotificationUserEdge {
 }
 
 type GroupNotificationUsersConnection @goEmbedHelper {
-    edges:  [GroupNotificationUserEdge] 
+    edges:  [GroupNotificationUserEdge]
     pageInfo: PageInfo
 }
 
@@ -1332,6 +1353,9 @@ union UnsubscribeFromEmailTypePayloadOrError =
     UnsubscribeFromEmailTypePayload
     | ErrInvalidInput
 
+union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
+union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1374,7 +1398,7 @@ type Mutation {
     removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
     commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
-    
+
     viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
@@ -1382,6 +1406,10 @@ type Mutation {
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
     verifyEmail(token: String!): VerifyEmailPayloadOrError
+
+    # Retool Specific Mutations
+    addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+    revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 }
 
 type Subscription {

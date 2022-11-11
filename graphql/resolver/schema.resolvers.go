@@ -283,6 +283,21 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
+	dbRoles, err := publicapi.For(ctx).Admin.GetUserRolesByUserID(ctx, obj.Dbid)
+	if err != nil {
+		return nil, err
+	}
+
+	roles := make([]*persist.Role, len(dbRoles))
+	for i, role := range dbRoles {
+		r := role
+		roles[i] = &r
+	}
+
+	return roles, nil
+}
+
 func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
 	return resolveTokensByUserID(ctx, obj.Dbid)
 }
@@ -924,6 +939,26 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, token string) (model
 	return verifyEmail(ctx, token)
 }
 
+func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
+	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return userToModel(ctx, *user), nil
+}
+
+func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error) {
+	user, err := publicapi.For(ctx).Admin.RemoveRolesFromUser(ctx, username, roles)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return userToModel(ctx, *user), nil
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -1048,6 +1083,26 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
+}
+
+func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.UserEdge, len(users))
+	for i, user := range users {
+		edges[i] = &model.UserEdge{
+			Node:   userToModel(ctx, user),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.UsersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {

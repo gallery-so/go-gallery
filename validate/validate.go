@@ -74,6 +74,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("username", UsernameValidator)
 	v.RegisterValidation("sorted_asc", SortedAscValidator)
 	v.RegisterValidation("chain", ChainValidator)
+	v.RegisterValidation("role", IsValidRole)
 	v.RegisterAlias("collection_name", "max=200")
 	v.RegisterAlias("collection_note", "max=600")
 	v.RegisterAlias("token_note", "max=1200")
@@ -84,6 +85,11 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterStructValidation(ConnectionPaginationParamsValidator, ConnectionPaginationParams{})
 	v.RegisterStructValidation(CollectionTokenSettingsParamsValidator, CollectionTokenSettingsParams{})
 	v.RegisterStructValidation(EventValidator, coredb.Event{})
+}
+
+var IsValidRole validator.Func = func(fl validator.FieldLevel) bool {
+	role := persist.Role(fl.Field().String())
+	return role == persist.RoleAdmin || role == persist.RoleBetaTester
 }
 
 func ChainAddressValidator(sl validator.StructLevel) {

@@ -1224,6 +1224,7 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 		Following: nil,
 		Tokens:    nil,
 		Badges:    nil,
+		Roles:     nil,
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
