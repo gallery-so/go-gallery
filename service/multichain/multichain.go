@@ -141,7 +141,7 @@ type nameResolver interface {
 	GetDisplayNameByAddress(context.Context, persist.Address) string
 }
 
-// verifier can verify that a signature is signed by the given key
+// verifier can verify that a signature is signed by a given key
 type verifier interface {
 	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
 }
@@ -150,12 +150,18 @@ type verifier interface {
 type tokensFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
 // tokenRefresher supports refreshes of a token
 type tokenRefresher interface {
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
-	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
+}
+
+// tokenFetcherRefresher is the interface that combines the tokenFetcher and tokenRefresher interface
+type tokenFetcherRefresher interface {
+	tokensFetcher
+	tokenRefresher
 }
 
 // contractRefresher supports refreshes of a contract
@@ -447,7 +453,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 	for i, provider := range providers {
-		refresher, ok := provider.(tokenRefresher)
+		refresher, ok := provider.(tokenFetcherRefresher)
 		if !ok {
 			continue
 		}
