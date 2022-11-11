@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"math/big"
 	"net/http"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
@@ -130,10 +131,34 @@ type errWithPriority struct {
 	priority int
 }
 
+// syncer supports fetching tokens for syncing
+type syncer interface {
+	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+}
+
+func isSyncer(i interface{}) bool {
+	if _, ok := i.(syncer); ok {
+		return true
+	}
+	return false
+}
+
+// deepRefresher can replay token history
+type deepRefresher interface {
+	DeepRefresh(ctx context.Context, address persist.Address) error
+}
+
+func isDeepRefresher(i interface{}) bool {
+	if _, ok := i.(deepRefresher); ok {
+		return true
+	}
+	return false
+}
+
 // ChainProvider is an interface for retrieving data from a chain
 type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
-	GetTokensByWalletAddress(context.Context, persist.Address, int, int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(context.Context, persist.Address, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
@@ -222,17 +247,19 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				subWg := &sync.WaitGroup{}
 				subWg.Add(len(providers))
 				for i, p := range providers {
-					go func(provider ChainProvider, priority int) {
-						defer subWg.Done()
-						tokens, contracts, err := provider.GetTokensByWalletAddress(ctx, addr, 0, 0)
-						if err != nil {
-							errChan <- errWithPriority{err: err, priority: priority}
-							return
-						}
+					if isSyncer(p) {
+						go func(syncer syncer, priority int) {
+							defer subWg.Done()
+							tokens, contracts, err := syncer.GetTokensByWalletAddress(ctx, addr, 0, 0)
+							if err != nil {
+								errChan <- errWithPriority{err: err, priority: priority}
+								return
+							}
 
-						incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
-						incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
-					}(p, i)
+							incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
+							incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
+						}(p, i)
+					}
 				}
 				subWg.Wait()
 				logger.For(ctx).Debugf("updated media for user %s wallet %s in %s", user.Username, addr, time.Since(start))
@@ -396,8 +423,10 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 
 	for _, provider := range d.Chains[chain] {
 		for _, wallet := range addresses {
-			if err := provider.DeepRefresh(ctx, wallet); err != nil {
-				return err
+			if isDeepRefresher(provider) {
+				if err := provider.DeepRefresh(ctx, wallet); err != nil {
+					return err
+				}
 			}
 		}
 	}
