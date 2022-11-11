@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"

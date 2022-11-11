@@ -54,6 +54,7 @@ func Init() {
 	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
 
 	http.Handle("/", router)
+
 }
 
 // CoreInit initializes core server functionality. This is abstracted
