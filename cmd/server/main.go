@@ -8,7 +8,6 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/mikeydub/go-gallery/server"
 	"google.golang.org/appengine"
@@ -20,23 +19,13 @@ func main() {
 	graceFullShutdown := make(chan os.Signal, 1)
 	signal.Notify(graceFullShutdown, os.Interrupt, syscall.SIGTERM)
 
-	cleanuppers := server.Init()
-	go func() {
-		if appengine.IsAppEngine() {
-			logger.For(nil).Info("Running in App Engine Mode")
-			appengine.Main()
-		} else {
-			logger.For(nil).Info("Running in Default Mode")
-			http.ListenAndServe(":4000", nil)
-		}
-	}()
+	server.Init()
+	if appengine.IsAppEngine() {
+		logger.For(nil).Info("Running in App Engine Mode")
+		appengine.Main()
+	} else {
+		logger.For(nil).Info("Running in Default Mode")
+		http.ListenAndServe(":4000", nil)
+	}
 
-	<-graceFullShutdown
-	errGroup := new(errgroup.Group)
-	for _, s := range cleanuppers {
-		errGroup.Go(s.Cleanup)
-	}
-	if err := errGroup.Wait(); err != nil {
-		panic(err)
-	}
 }

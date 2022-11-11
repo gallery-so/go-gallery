@@ -14,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
-	"golang.org/x/sync/errgroup"
 )
 
 const window = 10 * time.Minute
@@ -26,7 +25,6 @@ type NotificationHandlers struct {
 	UserNewNotifications     map[persist.DBID]chan db.Notification
 	UserUpdatedNotifications map[persist.DBID]chan db.Notification
 	pubSub                   *pubsub.Client
-	pubsubSubscriptions      []*pubsub.Subscription
 }
 
 // New registers specific notification handlers
@@ -233,8 +231,6 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 		panic(err)
 	}
 
-	n.pubsubSubscriptions = append(n.pubsubSubscriptions, sub)
-
 	logger.For(nil).Info("subscribing to new notifications pubsub topic")
 
 	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
@@ -277,8 +273,6 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
 		panic(err)
 	}
-
-	n.pubsubSubscriptions = append(n.pubsubSubscriptions, sub)
 
 	logger.For(nil).Infof("subscribed to updated notifications pubsub")
 
@@ -418,18 +412,4 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
-}
-
-func (n *NotificationHandlers) Cleanup() error {
-	errGroup := new(errgroup.Group)
-	for _, s := range n.pubsubSubscriptions {
-		sub := s
-		errGroup.Go(func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			logger.For(ctx).Infof("deleting pubsub subscription: %s", sub.String())
-			return sub.Delete(ctx)
-		})
-	}
-	return errGroup.Wait()
 }

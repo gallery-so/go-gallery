@@ -44,23 +44,23 @@ import (
 )
 
 // Init initializes the server
-func Init() []util.Cleanupper {
+func Init() {
 
 	setDefaults()
 
 	logger.InitWithGCPDefaults()
 	initSentry()
 
-	router, cleanuppers := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
 
 	http.Handle("/", router)
 
-	return cleanuppers
+	return
 }
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) (*gin.Engine, []util.Cleanupper) {
+func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
