@@ -2,9 +2,6 @@ package main
 
 import (
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -15,9 +12,6 @@ import (
 
 func main() {
 	defer sentryutil.RecoverAndRaise(nil)
-
-	graceFullShutdown := make(chan os.Signal, 1)
-	signal.Notify(graceFullShutdown, os.Interrupt, syscall.SIGTERM)
 
 	server.Init()
 	if appengine.IsAppEngine() {

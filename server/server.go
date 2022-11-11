@@ -55,7 +55,6 @@ func Init() {
 
 	http.Handle("/", router)
 
-	return
 }
 
 // CoreInit initializes core server functionality. This is abstracted
