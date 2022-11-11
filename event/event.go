@@ -244,8 +244,8 @@ func (h notificationHandler) createNotificationDataForEvent(event db.Event) (dat
 		if event.ActorID.String != "" {
 			data.AuthedViewerIDs = []persist.DBID{persist.NullStrToDBID(event.ActorID)}
 		}
-		if event.ExternalID != "" {
-			data.UnauthedViewerIDs = []persist.NullString{event.ExternalID}
+		if event.ExternalID.String != "" {
+			data.UnauthedViewerIDs = []string{persist.NullStrToStr(event.ExternalID)}
 		}
 	case persist.ActionAdmiredFeedEvent:
 		if event.ActorID.String != "" {

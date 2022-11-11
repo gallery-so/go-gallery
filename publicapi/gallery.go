@@ -2,11 +2,15 @@ package publicapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/spf13/viper"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -133,14 +137,12 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 		}
 		// }
 	} else {
-		remote, _ := gc.RemoteIP()
-
 		_, err := dispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
-			ExternalID:     persist.NullString(remote.String()),
+			ExternalID:     persist.StrToNullStr(util.StringToPointer(getExternalID(ctx))),
 		}, api.validator, nil)
 		if err != nil {
 			return db.Gallery{}, err
@@ -148,4 +150,12 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	}
 
 	return gallery, nil
+}
+
+func getExternalID(ctx context.Context) string {
+	remote, _ := util.GinContextFromContext(ctx).RemoteIP()
+	hash := sha256.New()
+	hash.Write([]byte(viper.GetString("BACKEND_SECRET") + remote.String()))
+	res, _ := hash.(encoding.BinaryMarshaler).MarshalBinary()
+	return base64.StdEncoding.EncodeToString(res)
 }

@@ -179,9 +179,9 @@ func setDefaults(service string) {
 		util.LoadEnvFile(envFile)
 	}
 
-	util.EnvVarMustExist("RPC_URL", "")
+	util.VarNotSetTo("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
-		util.EnvVarMustExist("SENTRY_DSN", "")
+		util.VarNotSetTo("SENTRY_DSN", "")
 	}
 }
 

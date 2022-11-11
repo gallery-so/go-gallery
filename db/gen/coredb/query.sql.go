@@ -431,7 +431,7 @@ func (q *Queries) CreateFollowNotification(ctx context.Context, arg CreateFollow
 }
 
 const createGalleryEvent = `-- name: CreateGalleryEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
 `
 
 type CreateGalleryEventParams struct {
@@ -441,6 +441,7 @@ type CreateGalleryEventParams struct {
 	ResourceTypeID persist.ResourceType
 	GalleryID      persist.DBID
 	Data           persist.EventData
+	ExternalID     sql.NullString
 }
 
 func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEventParams) (Event, error) {
@@ -451,6 +452,7 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 		arg.ResourceTypeID,
 		arg.GalleryID,
 		arg.Data,
+		arg.ExternalID,
 	)
 	var i Event
 	err := row.Scan(

@@ -168,6 +168,7 @@ func setDefaults() {
 	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
 	viper.SetDefault("EMAILS_HOST", "http://localhost:5500")
 	viper.SetDefault("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
+	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
 
 	viper.AutomaticEnv()
 
@@ -178,12 +179,13 @@ func setDefaults() {
 		util.LoadEnvFile(envFile)
 	}
 
-	util.EnvVarMustExist("IMGIX_SECRET", "")
+	util.VarNotSetTo("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {
-		util.EnvVarMustExist("ADMIN_PASS", "TEST_ADMIN_PASS")
-		util.EnvVarMustExist("SENTRY_DSN", "")
-		util.EnvVarMustExist("GAE_VERSION", "")
-		util.EnvVarMustExist("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
+		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
+		util.VarNotSetTo("SENTRY_DSN", "")
+		util.VarNotSetTo("GAE_VERSION", "")
+		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
+		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 	}
 }
 
