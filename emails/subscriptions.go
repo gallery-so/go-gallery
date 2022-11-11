@@ -10,6 +10,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/sendgrid-go"
@@ -17,39 +18,103 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type UnsubscribeFromEmailTypeInput struct {
-	JWT        string                          `json:"jwt,omitempty"`
-	UserID     persist.DBID                    `json:"user_id,omitempty"`
-	EmailTypes []model.EmailUnsubscriptionType `json:"email_types" binding:"required"`
+var emailTypes = []model.EmailUnsubscriptionType{model.EmailUnsubscriptionTypeAll, model.EmailUnsubscriptionTypeNotifications}
+
+type UpdateSubscriptionsTypeInput struct {
+	UserID persist.DBID                 `json:"user_id,required"`
+	Unsubs persist.EmailUnsubscriptions `json:"unsubscriptions" binding:"required"`
 }
 
-type ResubscribeFromEmailTypeInput struct {
-	JWT       string                          `json:"jwt,omitempty"`
-	UserID    persist.DBID                    `json:"user_id,omitempty"`
-	EmailType []model.EmailUnsubscriptionType `json:"email_types" binding:"required"`
+type UnsubInput struct {
+	JWT    string                          `json:"jwt,omiterequiredmpty"`
+	Unsubs []model.EmailUnsubscriptionType `json:"unsubscriptions" binding:"required"`
 }
 
-func unsubscribeFromEmailType(queries *coredb.Queries) gin.HandlerFunc {
+type ResubInput struct {
+	JWT    string                          `json:"jwt,required"`
+	Resubs []model.EmailUnsubscriptionType `json:"resubscriptions" binding:"required"`
+}
+
+func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input UnsubscribeFromEmailTypeInput
+		var input UpdateSubscriptionsTypeInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		if input.JWT == "" && input.UserID == "" {
-			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("jwt or user_id must be provided"))
+		user, err := queries.GetUserById(c, input.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		userID := input.UserID
-		if input.JWT != "" {
-			userID, err = auth.JWTParse(input.JWT, viper.GetString("JWT_SECRET"))
-			if err != nil {
-				util.ErrResponse(c, http.StatusBadRequest, err)
+
+		if user.Email == "" {
+			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{input.UserID})
+			return
+		}
+
+		errGroup := new(errgroup.Group)
+
+		for _, emailType := range emailTypes {
+			switch emailType {
+			case model.EmailUnsubscriptionTypeAll:
+				errGroup.Go(func() error {
+					if input.Unsubs.All {
+						return addEmailToGlobalUnsubscribeGroup(c, user.Email.String())
+					}
+					return removeEmailFromGlobalUnsubscribeGroup(c, user.Email.String())
+				})
+
+			case model.EmailUnsubscriptionTypeNotifications:
+
+				errGroup.Go(func() error {
+					if input.Unsubs.Notifications {
+						return addEmailToUnsubscribeGroup(c, user.Email.String(), viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+					}
+					return removeEmailFromUnsubscribeGroup(c, user.Email.String(), viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+				})
+			default:
+				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
 				return
 			}
+
+		}
+
+		logger.For(c).Infof("unsubscribing user %s from email types: %+v", input.UserID, input.Unsubs)
+		err = queries.UpdateUserEmailUnsubscriptions(c, coredb.UpdateUserEmailUnsubscriptionsParams{
+			ID:                   input.UserID,
+			EmailUnsubscriptions: input.Unsubs,
+		})
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := errGroup.Wait(); err != nil {
+			logger.For(c).Errorf("error unsubscribing user %s from email types %+v: %s", input.UserID, input.Unsubs, err)
+		}
+
+		c.Status(http.StatusOK)
+	}
+}
+
+func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+		var input UnsubInput
+		err := c.ShouldBindJSON(&input)
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		userID, err := auth.JWTParse(input.JWT, viper.GetString("JWT_SECRET"))
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
 		}
 
 		user, err := queries.GetUserById(c, userID)
@@ -67,7 +132,7 @@ func unsubscribeFromEmailType(queries *coredb.Queries) gin.HandlerFunc {
 
 		errGroup := new(errgroup.Group)
 
-		for _, emailType := range input.EmailTypes {
+		for _, emailType := range input.Unsubs {
 			switch emailType {
 			case model.EmailUnsubscriptionTypeAll:
 				unsubs.All = true
@@ -86,6 +151,8 @@ func unsubscribeFromEmailType(queries *coredb.Queries) gin.HandlerFunc {
 			}
 
 		}
+
+		logger.For(c).Infof("unsubscribing user %s from email types: %+v", userID, unsubs)
 		err = queries.UpdateUserEmailUnsubscriptions(c, coredb.UpdateUserEmailUnsubscriptionsParams{
 			ID:                   userID,
 			EmailUnsubscriptions: unsubs,
@@ -96,34 +163,27 @@ func unsubscribeFromEmailType(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		if err := errGroup.Wait(); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
+			logger.For(c).Errorf("error unsubscribing user %s from email types %+v: %s", userID, input.Unsubs, err)
 		}
 
 		c.Status(http.StatusOK)
 	}
 }
-func resubscribeFromEmailType(queries *coredb.Queries) gin.HandlerFunc {
+
+func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		var input ResubscribeFromEmailTypeInput
+		var input ResubInput
 		err := c.ShouldBindJSON(&input)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		if input.JWT == "" && input.UserID == "" {
-			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("jwt or user_id must be provided"))
+		userID, err := auth.JWTParse(input.JWT, viper.GetString("JWT_SECRET"))
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
-		}
-		userID := input.UserID
-		if input.JWT != "" {
-			userID, err = auth.JWTParse(input.JWT, viper.GetString("JWT_SECRET"))
-			if err != nil {
-				util.ErrResponse(c, http.StatusBadRequest, err)
-				return
-			}
 		}
 
 		user, err := queries.GetUserById(c, userID)
@@ -137,29 +197,31 @@ func resubscribeFromEmailType(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		errGroup := new(errgroup.Group)
-
 		unsubs := user.EmailUnsubscriptions
 
-		for _, emailType := range input.EmailType {
+		errGroup := new(errgroup.Group)
+
+		for _, emailType := range input.Resubs {
 			switch emailType {
 			case model.EmailUnsubscriptionTypeAll:
 				unsubs.All = false
 				errGroup.Go(func() error {
 					return removeEmailFromGlobalUnsubscribeGroup(c, user.Email.String())
 				})
+
 			case model.EmailUnsubscriptionTypeNotifications:
 				unsubs.Notifications = false
 				errGroup.Go(func() error {
 					return removeEmailFromUnsubscribeGroup(c, user.Email.String(), viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
 			default:
-				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", input.EmailType))
+				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
 				return
 			}
 
 		}
 
+		logger.For(c).Infof("unsubscribing user %s from email types: %+v", userID, unsubs)
 		err = queries.UpdateUserEmailUnsubscriptions(c, coredb.UpdateUserEmailUnsubscriptionsParams{
 			ID:                   userID,
 			EmailUnsubscriptions: unsubs,
@@ -170,8 +232,7 @@ func resubscribeFromEmailType(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		if err := errGroup.Wait(); err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
+			logger.For(c).Errorf("error unsubscribing user %s from email types %+v: %s", userID, input.Resubs, err)
 		}
 
 		c.Status(http.StatusOK)

@@ -31,11 +31,6 @@ type verificationEmailTemplateData struct {
 	JWT      string
 }
 
-type notificationsEmailTemplateData struct {
-	Username      string
-	Notifications []string // TODO - this should be a struct with the notification data once that has been merged
-}
-
 type errNoEmailSet struct {
 	userID persist.DBID
 }
@@ -101,8 +96,9 @@ type notificationEmailDynamicTemplateData struct {
 	PreviewText    string       `json:"previewText"`
 }
 type notificationsEmailDynamicTemplateData struct {
-	Notifications []notificationEmailDynamicTemplateData `json:"notifications"`
-	Username      string                                 `json:"username"`
+	Notifications    []notificationEmailDynamicTemplateData `json:"notifications"`
+	Username         string                                 `json:"username"`
+	UnsubscribeToken string                                 `json:"unsubscribeToken"`
 }
 
 func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
@@ -125,9 +121,14 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.Han
 			if err != nil {
 				return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
 			}
+			j, err := auth.JWTGeneratePipeline(c, u.ID)
+			if err != nil {
+				return fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
+			}
 			data := notificationsEmailDynamicTemplateData{
-				Notifications: make([]notificationEmailDynamicTemplateData, 0, resultLimit),
-				Username:      u.Username.String,
+				Notifications:    make([]notificationEmailDynamicTemplateData, 0, resultLimit),
+				Username:         u.Username.String,
+				UnsubscribeToken: j,
 			}
 			notifTemplates := make(chan notificationEmailDynamicTemplateData)
 			errChan := make(chan error)
