@@ -1428,7 +1428,6 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 		Name:             &token.Name.String,
 		Description:      &token.Description.String,
 		OwnedByWallets:   nil, // handled by dedicated resolver
-		TokenURI:         &token.TokenUri.String,
 		TokenID:          util.StringToPointer(token.TokenID.String()),
 		Quantity:         &token.Quantity.String,
 		Owner:            nil, // handled by dedicated resolver

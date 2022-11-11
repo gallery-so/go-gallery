@@ -1127,7 +1127,6 @@ type Token struct {
 	Chain                 *persist.Chain        `json:"chain"`
 	Name                  *string               `json:"name"`
 	Description           *string               `json:"description"`
-	TokenURI              *string               `json:"tokenUri"`
 	TokenID               *string               `json:"tokenId"`
 	Quantity              *string               `json:"quantity"`
 	Owner                 *GalleryUser          `json:"owner"`

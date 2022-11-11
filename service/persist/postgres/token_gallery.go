@@ -73,13 +73,13 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE ID = $3 AND OWNER_USER_ID = $4;`)
 	checkNoErr(err)
 
-	updateMediaStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, LAST_UPDATED = $4 WHERE ID = $5 AND OWNER_USER_ID = $6;`)
+	updateMediaStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = '', TOKEN_METADATA = $2, LAST_UPDATED = $3 WHERE ID = $4 AND OWNER_USER_ID = $5;`)
 	checkNoErr(err)
 
 	updateInfoByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
 	checkNoErr(err)
 
-	updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE TOKEN_ID = $7 AND CONTRACT = $8 AND DELETED = false;`)
+	updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = '', TOKEN_METADATA = $2, NAME = $3, DESCRIPTION = $4, LAST_UPDATED = $5 WHERE TOKEN_ID = $6 AND CONTRACT = $7 AND DELETED = false;`)
 	checkNoErr(err)
 
 	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
@@ -341,7 +341,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	for i, token := range newTokens {
 		// 23 is the index of last_synced, the param that we want set to now()
 		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow, []int{23}) + ","
-		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, token.TokenURI, token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam, token.LastSynced)
+		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, "", token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam, token.LastSynced)
 	}
 
 	sqlStr = sqlStr[:len(sqlStr)-1]
@@ -386,7 +386,7 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 		res, err = t.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pID, pUserID)
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pID, pUserID)
+		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.Metadata, update.LastUpdated, pID, pUserID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
@@ -419,7 +419,7 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pTokenID, contractID)
