@@ -386,7 +386,7 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 		res, err = t.updateInfoStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pID, pUserID)
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.LastUpdated, pID, pUserID)
+		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.Metadata, update.LastUpdated, pID, pUserID)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
@@ -419,7 +419,7 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pTokenID, contractID)
