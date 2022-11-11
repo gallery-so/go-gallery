@@ -131,51 +131,41 @@ type errWithPriority struct {
 	priority int
 }
 
-// syncer supports fetching tokens for syncing
-type syncer interface {
-	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
-}
-
-func isSyncer(i interface{}) bool {
-	if _, ok := i.(syncer); ok {
-		return true
-	}
-	return false
-}
-
-// deepRefresher can replay token history
-type deepRefresher interface {
-	DeepRefresh(ctx context.Context, address persist.Address) error
-}
-
-func isDeepRefresher(i interface{}) bool {
-	if _, ok := i.(deepRefresher); ok {
-		return true
-	}
-	return false
-}
-
 // ChainProvider is an interface for retrieving data from a chain
 type ChainProvider interface {
 	GetBlockchainInfo(context.Context) (BlockchainInfo, error)
-	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
-	GetTokensByContractAddress(context.Context, persist.Address, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiers(context.Context, ChainAgnosticIdentifiers, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
-	GetOwnedTokensByContract(context.Context, persist.Address, persist.Address, int, int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
-	GetContractByAddress(context.Context, persist.Address) (ChainAgnosticContract, error)
-	GetCommunityOwners(context.Context, persist.Address, int, int) ([]ChainAgnosticCommunityOwner, error)
+}
+
+// nameResolver is able to resolve an address to a friendly display name
+type nameResolver interface {
 	GetDisplayNameByAddress(context.Context, persist.Address) string
+}
+
+// verifier can verify that a signature is signed by the given key
+type verifier interface {
+	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
+}
+
+// tokensFetcher supports fetching tokens for syncing
+type tokensFetcher interface {
+	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
+	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+}
+
+// tokenRefresher supports refreshes of a token
+type tokenRefresher interface {
 	RefreshToken(context.Context, ChainAgnosticIdentifiers, persist.Address) error
+	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
+}
+
+// contractRefresher supports refreshes of a contract
+type contractRefresher interface {
 	RefreshContract(context.Context, persist.Address) error
+}
+
+// deepRefresher supports deep refreshes
+type deepRefresher interface {
 	DeepRefresh(ctx context.Context, address persist.Address) error
-	// bool is whether or not to update all media content, including the tokens that already have media content
-	UpdateMediaForWallet(context.Context, persist.Address, bool) error
-	// do we want to return the tokens we validate?
-	// bool is whether or not to update all of the tokens regardless of whether we know they exist already
-	ValidateTokensForWallet(context.Context, persist.Address, bool) error
-	// ctx, address, chain, wallet type, nonce, sig
-	VerifySignature(context.Context, persist.PubKey, persist.WalletType, string, string) (bool, error)
 }
 
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
@@ -247,8 +237,8 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				subWg := &sync.WaitGroup{}
 				subWg.Add(len(providers))
 				for i, p := range providers {
-					if isSyncer(p) {
-						go func(syncer syncer, priority int) {
+					if fetcher, ok := p.(tokensFetcher); ok {
+						go func(syncer tokensFetcher, priority int) {
 							defer subWg.Done()
 							tokens, contracts, err := syncer.GetTokensByWalletAddress(ctx, addr, 0, 0)
 							if err != nil {
@@ -258,7 +248,7 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 
 							incomingTokens <- chainTokens{chain: chain, tokens: tokens, priority: priority}
 							incomingContracts <- chainContracts{chain: chain, contracts: contracts, priority: priority}
-						}(p, i)
+						}(fetcher, i)
 					}
 				}
 				subWg.Wait()
@@ -423,8 +413,8 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 
 	for _, provider := range d.Chains[chain] {
 		for _, wallet := range addresses {
-			if isDeepRefresher(provider) {
-				if err := provider.DeepRefresh(ctx, wallet); err != nil {
+			if refresher, ok := provider.(deepRefresher); ok {
+				if err := refresher.DeepRefresh(ctx, wallet); err != nil {
 					return err
 				}
 			}
@@ -441,8 +431,10 @@ func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce stri
 		return false, ErrChainNotFound{Chain: pChainAddress.Chain()}
 	}
 	for _, provider := range providers {
-		if valid, err := provider.VerifySignature(ctx, pChainAddress.PubKey(), pWalletType, pNonce, pSig); err != nil || !valid {
-			return false, err
+		if verifier, ok := provider.(verifier); ok {
+			if valid, err := verifier.VerifySignature(ctx, pChainAddress.PubKey(), pWalletType, pNonce, pSig); err != nil || !valid {
+				return false, err
+			}
 		}
 	}
 	return true, nil
@@ -455,16 +447,21 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 		return err
 	}
 	for i, provider := range providers {
+		refresher, ok := provider.(tokenRefresher)
+		if !ok {
+			continue
+		}
+
 		id := ChainAgnosticIdentifiers{ContractAddress: ti.ContractAddress, TokenID: ti.TokenID}
 		for _, ownerAddress := range ownerAddresses {
-			if err := provider.RefreshToken(ctx, id, ownerAddress); err != nil {
+			if err := refresher.RefreshToken(ctx, id, ownerAddress); err != nil {
 				return err
 			}
 		}
 
 		if i == 0 {
 			for _, ownerAddress := range ownerAddresses {
-				token, contract, err := provider.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
+				token, contract, err := refresher.GetTokensByTokenIdentifiersAndOwner(ctx, id, ownerAddress)
 				if err != nil {
 					return err
 				}
@@ -510,8 +507,10 @@ func (p *Provider) RefreshContract(ctx context.Context, ci persist.ContractIdent
 		return err
 	}
 	for _, provider := range providers {
-		if err := provider.RefreshContract(ctx, ci.ContractAddress); err != nil {
-			return err
+		if refresher, ok := provider.(contractRefresher); ok {
+			if err := refresher.RefreshContract(ctx, ci.ContractAddress); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -533,17 +532,19 @@ func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.Cont
 	wg := &sync.WaitGroup{}
 	wg.Add(len(providers))
 	for i, provider := range providers {
-		go func(priority int, p ChainProvider) {
-			defer wg.Done()
-			tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress, maxCommunitySize, 0)
-			if err != nil {
-				errChan <- errWithPriority{priority: priority, err: err}
-				return
-			}
-			tokensReceive <- chainTokens{chain: ci.Chain, tokens: tokens, priority: priority}
-			contractsReceive <- chainContracts{chain: ci.Chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
+		if fetcher, ok := provider.(tokensFetcher); ok {
+			go func(priority int, p tokensFetcher) {
+				defer wg.Done()
+				tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress, maxCommunitySize, 0)
+				if err != nil {
+					errChan <- errWithPriority{priority: priority, err: err}
+					return
+				}
+				tokensReceive <- chainTokens{chain: ci.Chain, tokens: tokens, priority: priority}
+				contractsReceive <- chainContracts{chain: ci.Chain, contracts: []ChainAgnosticContract{contract}, priority: priority}
 
-		}(i, provider)
+			}(i, fetcher)
+		}
 	}
 	go func() {
 		defer close(done)
@@ -719,18 +720,20 @@ func (p *Provider) createUsersForTokens(ctx context.Context, tokens []chainToken
 				if !ok {
 					username := t.OwnerAddress.String()
 					for _, provider := range providers {
-						doBreak := func() bool {
-							displayCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-							defer cancel()
-							display := provider.GetDisplayNameByAddress(displayCtx, t.OwnerAddress)
-							if display != "" {
-								username = display
-								return true
+						if resolver, ok := provider.(nameResolver); ok {
+							doBreak := func() bool {
+								displayCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+								defer cancel()
+								display := resolver.GetDisplayNameByAddress(displayCtx, t.OwnerAddress)
+								if display != "" {
+									username = display
+									return true
+								}
+								return false
+							}()
+							if doBreak {
+								break
 							}
-							return false
-						}()
-						if doBreak {
-							break
 						}
 					}
 					func() {

@@ -229,29 +229,6 @@ func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Ad
 	}
 	return contractToContract(ctx, c, p.ethClient)
 }
-
-// UpdateMediaForWallet updates media for a wallet address
-// bool is whether or not to update all media content, including the tokens that already have media content
-func (p *Provider) UpdateMediaForWallet(context.Context, persist.Address, bool) error {
-	return nil
-}
-
-// ValidateTokensForWallet validates tokens for a wallet address
-// bool is whether or not to update all of the tokens regardless of whether we know they exist already
-func (p *Provider) ValidateTokensForWallet(context.Context, persist.Address, bool) error {
-	return nil
-}
-
-// RefreshToken refreshes the metadata for a given token.
-func (p *Provider) RefreshToken(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) error {
-	return nil
-}
-
-// RefreshContract refreshses the metadata for a contract
-func (p *Provider) RefreshContract(context.Context, persist.Address) error {
-	return nil
-}
-
 func (d *Provider) GetCommunityOwners(ctx context.Context, communityID persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
 	return []multichain.ChainAgnosticCommunityOwner{}, nil
 }

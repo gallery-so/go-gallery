@@ -326,32 +326,6 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 	return addr.String()
 }
 
-// RefreshToken refreshes the metadata for a given token.
-func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
-	return nil
-}
-
-// UpdateMediaForWallet updates media for the tokens owned by a wallet on the Poap Blockchain
-func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
-	return nil
-}
-
-// RefreshContract refreshes the metadata for a contract
-func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) error {
-	return nil
-}
-
-// ValidateTokensForWallet validates tokens for a wallet address on the Poap Blockchain
-func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.Address, all bool) error {
-	return nil
-
-}
-
-// VerifySignature does nothing because POAPs are not really on a blockchain with a wallet
-func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
-	return true, nil
-}
-
 // we should assume when using this function that the array is all of the tokens un paginated and we will need to paginate it with the offset and limit
 func (d *Provider) poapsToTokens(pPoap []poapToken, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract) {
 	tokens := make([]multichain.ChainAgnosticToken, 0, len(pPoap))
