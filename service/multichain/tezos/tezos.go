@@ -69,19 +69,6 @@ type tzAccount struct {
 type tokenID string
 type balance string
 
-type tzktToken struct {
-	ID       uint64 `json:"id"`
-	Contract struct {
-		Alias   string          `json:"alias"`
-		Address persist.Address `json:"address"`
-	} `json:"contract"`
-	TokenID    tokenID       `json:"tokenId"`
-	Standard   tokenStandard `json:"standard"`
-	Metadata   tzMetadata    `json:"metadata"`
-	FirstLevel uint64        `json:"firstLevel"`
-	LastLevel  uint64        `json:"lastLevel"`
-}
-
 type tzktBalanceToken struct {
 	ID      uint64 `json:"id"`
 	Account struct {
@@ -114,8 +101,8 @@ type tzktContract struct {
 	} `json:"creator"`
 }
 
-// TezosProvider is an the struct for retrieving data from the Tezos blockchain
-type TezosProvider struct {
+// Provider is an the struct for retrieving data from the Tezos blockchain
+type Provider struct {
 	apiURL         string
 	mediaURL       string
 	ipfsGatewayURL string
@@ -128,8 +115,8 @@ type TezosProvider struct {
 }
 
 // NewProvider creates a new Tezos Provider
-func NewProvider(tezosAPIUrl, mediaURL, ipfsGatewayURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *TezosProvider {
-	return &TezosProvider{
+func NewProvider(tezosAPIUrl, mediaURL, ipfsGatewayURL string, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) *Provider {
+	return &Provider{
 		apiURL:         tezosAPIUrl,
 		mediaURL:       mediaURL,
 		ipfsGatewayURL: ipfsGatewayURL,
@@ -143,7 +130,7 @@ func NewProvider(tezosAPIUrl, mediaURL, ipfsGatewayURL string, httpClient *http.
 }
 
 // GetBlockchainInfo retrieves blockchain info for Tezos
-func (d *TezosProvider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
+func (d *Provider) GetBlockchainInfo(ctx context.Context) (multichain.BlockchainInfo, error) {
 	return multichain.BlockchainInfo{
 		Chain:   persist.ChainTezos,
 		ChainID: 0,
@@ -151,7 +138,7 @@ func (d *TezosProvider) GetBlockchainInfo(ctx context.Context) (multichain.Block
 }
 
 // GetTokensByWalletAddress retrieves tokens for a wallet address on the Tezos Blockchain
-func (d *TezosProvider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, maxLimit, startingOffset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Address, maxLimit, startingOffset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tzAddr, err := toTzAddress(addr)
 	if err != nil {
 		return nil, nil, err
@@ -200,7 +187,7 @@ func (d *TezosProvider) GetTokensByWalletAddress(ctx context.Context, addr persi
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Tezos Blockchain
-func (d *TezosProvider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 
 	offset := startOffset
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
@@ -253,7 +240,7 @@ func (d *TezosProvider) GetTokensByContractAddress(ctx context.Context, contract
 }
 
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
-func (d *TezosProvider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := startOffset
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
 	if limit < 1 {
@@ -307,7 +294,7 @@ func (d *TezosProvider) GetTokensByTokenIdentifiers(ctx context.Context, tokenId
 
 }
 
-func (d *TezosProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?token.standard=fa2&token.tokenId=%s&token.contract=%s&account=%s&limit=1", d.apiURL, tokenIdentifiers.TokenID.Base10String(), tokenIdentifiers.ContractAddress, ownerAddress), nil)
 	if err != nil {
@@ -345,7 +332,7 @@ func (d *TezosProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context,
 }
 
 // GetContractByAddress retrieves an Tezos contract by address
-func (d *TezosProvider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Address) (multichain.ChainAgnosticContract, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/contracts/%s?type=contract", d.apiURL, addr.String()), nil)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
@@ -367,7 +354,7 @@ func (d *TezosProvider) GetContractByAddress(ctx context.Context, addr persist.A
 
 }
 
-func (d *TezosProvider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress persist.Address, ownerAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := 0
 	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
 	if limit < 1 {
@@ -418,7 +405,7 @@ func (d *TezosProvider) GetOwnedTokensByContract(ctx context.Context, contractAd
 	return tokens, contract, nil
 }
 
-func (d *TezosProvider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, maxLimit, maxOffset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
+func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, maxLimit, maxOffset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
 	tokens, _, err := d.GetTokensByContractAddress(ctx, contractAddress, maxLimit, maxOffset)
 	if err != nil {
 		return nil, err
@@ -499,7 +486,7 @@ type tezDomainResponse struct {
 	} `json:"data"`
 }
 
-func (d *TezosProvider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
+func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Address) string {
 	req := graphql.NewRequest(fmt.Sprintf(`{
 	  "query": "query ($addresses: [String!]) {
 		reverseRecords(
@@ -535,29 +522,29 @@ func (d *TezosProvider) GetDisplayNameByAddress(ctx context.Context, addr persis
 }
 
 // RefreshToken refreshes the metadata for a given token.
-func (d *TezosProvider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
+func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, owner persist.Address) error {
 	return nil
 }
 
 // UpdateMediaForWallet updates media for the tokens owned by a wallet on the Tezos Blockchain
-func (d *TezosProvider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
+func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 	return nil
 }
 
 // RefreshContract refreshes the metadata for a contract
-func (d *TezosProvider) RefreshContract(ctx context.Context, addr persist.Address) error {
+func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) error {
 	return nil
 }
 
 // ValidateTokensForWallet validates tokens for a wallet address on the Tezos Blockchain
-func (d *TezosProvider) ValidateTokensForWallet(ctx context.Context, wallet persist.Address, all bool) error {
+func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.Address, all bool) error {
 	return nil
 
 }
 
 // VerifySignature will verify a signature using the ed25519 algorithm
 // the address provided must be the tezos public key, not the hashed address
-func (d *TezosProvider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
+func (d *Provider) VerifySignature(pCtx context.Context, pPubKey persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
 	key, err := tezos.ParseKey(pPubKey.String())
 	if err != nil {
 		return false, err
@@ -588,7 +575,7 @@ func (d *TezosProvider) VerifySignature(pCtx context.Context, pPubKey persist.Pu
 	return key.Verify(hash.Sum(nil), sig) == nil, nil
 }
 
-func (d *TezosProvider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzktBalanceToken, mediaKey string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzktBalanceToken, mediaKey string) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	tzTokens = dedupeBalances(tzTokens)
 	seenContracts := map[string]bool{}
 	contractsLock := &sync.Mutex{}
@@ -675,7 +662,7 @@ func (d *TezosProvider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens [
 	}
 }
 
-func (d *TezosProvider) makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, name string) persist.Media {
+func (d *Provider) makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, name string) persist.Media {
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
@@ -720,7 +707,7 @@ func dedupeBalances(tzTokens []tzktBalanceToken) []tzktBalanceToken {
 	return result
 }
 
-func (d *TezosProvider) getPublicKeyFromAddress(ctx context.Context, address persist.Address) (persist.Address, error) {
+func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address persist.Address) (persist.Address, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/accounts/%s", d.apiURL, address), nil)
 	if err != nil {
 		return "", err
@@ -747,7 +734,7 @@ func (d *TezosProvider) getPublicKeyFromAddress(ctx context.Context, address per
 	return persist.Address(account.Public), nil
 }
 
-func (d *TezosProvider) tzContractToContract(ctx context.Context, tzContract tzktContract) multichain.ChainAgnosticContract {
+func (d *Provider) tzContractToContract(ctx context.Context, tzContract tzktContract) multichain.ChainAgnosticContract {
 	return multichain.ChainAgnosticContract{
 		Address:        persist.Address(tzContract.Address),
 		CreatorAddress: persist.Address(tzContract.Creator.Address),
