@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/pubsub"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -107,86 +108,8 @@ type notificationsEmailDynamicTemplateData struct {
 
 func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
-	searchLimit := int32(10)
-	resultLimit := 5
 	return func(c *gin.Context) {
-		err := runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.User) error {
-
-			from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-			to := mail.NewEmail(u.Username.String, u.Email.String())
-			m := mail.NewV3Mail()
-			m.SetFrom(from)
-			p := mail.NewPersonalization()
-			m.SetTemplateID(viper.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
-			notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
-				OwnerID: u.ID,
-				Limit:   searchLimit,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
-			}
-			data := notificationsEmailDynamicTemplateData{
-				Notifications: make([]notificationEmailDynamicTemplateData, 0, resultLimit),
-				Username:      u.Username.String,
-			}
-			notifTemplates := make(chan notificationEmailDynamicTemplateData)
-			errChan := make(chan error)
-
-			for _, n := range notifs {
-				notif := n
-				go func() {
-					notifTemplate, err := notifToTemplateData(c, queries, notif)
-					if err != nil {
-						errChan <- err
-						return
-					}
-					notifTemplates <- notifTemplate
-				}()
-			}
-
-		outer:
-			for i := 0; i < len(notifs); i++ {
-				select {
-				case err := <-errChan:
-					logger.For(c).Errorf("failed to get notification template data: %v", err)
-				case notifTemplate := <-notifTemplates:
-					data.Notifications = append(data.Notifications, notifTemplate)
-					if len(data.Notifications) >= resultLimit {
-						break outer
-					}
-				}
-			}
-
-			if len(data.Notifications) == 0 {
-				return nil
-			}
-
-			asJSON, err := json.Marshal(data)
-			if err != nil {
-				return err
-			}
-			asMap := make(map[string]interface{})
-			err = json.Unmarshal(asJSON, &asMap)
-			if err != nil {
-				return err
-			}
-
-			logger.For(c).Debugf("sending notifications email to %s with data %+v", u.Email, asMap)
-
-			p.DynamicTemplateData = asMap
-
-			m.Asm = &mail.Asm{GroupID: viper.GetInt("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")}
-			m.AddPersonalizations(p)
-			p.AddTos(to)
-
-			response, err := s.Send(m)
-			if err != nil {
-				return err
-			}
-			logger.For(c).Debugf("email sent: %d", *&response.StatusCode)
-			return nil
-		})
-
+		err := sendNotificationEmailsToAllUsers(c, queries, s)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -194,6 +117,102 @@ func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.Han
 
 		c.Status(http.StatusOK)
 	}
+}
+
+func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client) error {
+	sub := psub.Subscription(viper.GetString("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
+
+	ctx := context.Background()
+	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		err := sendNotificationEmailsToAllUsers(ctx, queries, s)
+		if err != nil {
+			logger.For(ctx).Errorf("error sending notification emails: %s", err)
+			msg.Nack()
+			return
+		}
+		msg.Ack()
+	})
+}
+
+func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client) error {
+	searchLimit := int32(10)
+	resultLimit := 5
+	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.User) error {
+
+		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
+		to := mail.NewEmail(u.Username.String, u.Email.String())
+		m := mail.NewV3Mail()
+		m.SetFrom(from)
+		p := mail.NewPersonalization()
+		m.SetTemplateID(viper.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
+		notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
+			OwnerID: u.ID,
+			Limit:   searchLimit,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
+		}
+		data := notificationsEmailDynamicTemplateData{
+			Notifications: make([]notificationEmailDynamicTemplateData, 0, resultLimit),
+			Username:      u.Username.String,
+		}
+		notifTemplates := make(chan notificationEmailDynamicTemplateData)
+		errChan := make(chan error)
+
+		for _, n := range notifs {
+			notif := n
+			go func() {
+				notifTemplate, err := notifToTemplateData(c, queries, notif)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				notifTemplates <- notifTemplate
+			}()
+		}
+
+	outer:
+		for i := 0; i < len(notifs); i++ {
+			select {
+			case err := <-errChan:
+				logger.For(c).Errorf("failed to get notification template data: %v", err)
+			case notifTemplate := <-notifTemplates:
+				data.Notifications = append(data.Notifications, notifTemplate)
+				if len(data.Notifications) >= resultLimit {
+					break outer
+				}
+			}
+		}
+
+		if len(data.Notifications) == 0 {
+			return nil
+		}
+
+		asJSON, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		asMap := make(map[string]interface{})
+		err = json.Unmarshal(asJSON, &asMap)
+		if err != nil {
+			return err
+		}
+
+		logger.For(c).Debugf("sending notifications email to %s with data %+v", u.Email, asMap)
+
+		p.DynamicTemplateData = asMap
+
+		m.Asm = &mail.Asm{GroupID: viper.GetInt("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")}
+		m.AddPersonalizations(p)
+		p.AddTos(to)
+
+		response, err := s.Send(m)
+		if err != nil {
+			return err
+		}
+		logger.For(c).Debugf("email sent: %d", *&response.StatusCode)
+		return nil
+	})
 }
 
 func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (notificationEmailDynamicTemplateData, error) {
