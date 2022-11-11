@@ -752,7 +752,6 @@ type ComplexityRoot struct {
 		TokenID               func(childComplexity int) int
 		TokenMetadata         func(childComplexity int) int
 		TokenType             func(childComplexity int) int
-		TokenURI              func(childComplexity int) int
 	}
 
 	TokenEdge struct {
@@ -4053,13 +4052,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Token.TokenType(childComplexity), true
 
-	case "Token.tokenUri":
-		if e.complexity.Token.TokenURI == nil {
-			break
-		}
-
-		return e.complexity.Token.TokenURI(childComplexity), true
-
 	case "TokenEdge.cursor":
 		if e.complexity.TokenEdge.Cursor == nil {
 			break
@@ -4907,7 +4899,6 @@ type Token implements Node {
     chain: Chain
     name: String
     description: String
-    tokenUri: String
     tokenId: String
     quantity: String # source is a hex string
     owner: GalleryUser @goField(forceResolver: true)
@@ -20157,38 +20148,6 @@ func (ec *executionContext) _Token_description(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Token_tokenUri(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Token",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.TokenURI, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _Token_tokenId(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -32368,13 +32327,6 @@ func (ec *executionContext) _Token(ctx context.Context, sel ast.SelectionSet, ob
 		case "description":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Token_description(ctx, field, obj)
-			}
-
-			out.Values[i] = innerFunc(ctx)
-
-		case "tokenUri":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Token_tokenUri(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

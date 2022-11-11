@@ -285,7 +285,6 @@ type Token implements Node {
     chain: Chain
     name: String
     description: String
-    tokenUri: String
     tokenId: String
     quantity: String # source is a hex string
     owner: GalleryUser @goField(forceResolver: true)
