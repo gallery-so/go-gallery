@@ -249,13 +249,18 @@ func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries
 	openseaProvider := opensea.NewProvider(ethClient, httpClient)
 	tezosProvider := tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 	tezosObjktProvider := tezos.NewObjktProvider()
+	tezosFallbackProvider := multichain.FallbackFetcher{
+		Fetchers: []multichain.TokensFetcher{tezosProvider, tezosObjktProvider},
+		ChainInfoFn: func(context.Context) (multichain.BlockchainInfo, error) {
+			return multichain.BlockchainInfo{persist.ChainTezos, 0}, nil
+		},
+	}
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
 	return multichain.NewProvider(context.Background(), repos, queries, cache, taskClient,
 		overrides,
 		ethProvider,
 		openseaProvider,
-		tezosProvider,
-		tezosObjktProvider,
+		tezosFallbackProvider,
 		poapProvider,
 	)
 }

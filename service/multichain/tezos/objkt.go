@@ -26,6 +26,8 @@ type TezosObjktProvider struct {
 type tokensByAddressQuery struct {
 }
 
+// Objkt's API has pretty strict usage limits (120 requests/minute, and 500 results per page)
+// so its best used as a fallback.
 func NewObjktProvider() *TezosObjktProvider {
 	return &TezosObjktProvider{
 		gql: graphql.NewClient(objktEndpoint, http.DefaultClient),
@@ -63,4 +65,12 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, addre
 	// XXX: resultTokens := []objktToken{}
 	return nil, nil, nil
 	// XXX: return p.tokensToAgnosticTokensAndContracts(ctx, resultTokens)
+}
+
+func (d *TezosObjktProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	panic("not implemented")
+}
+
+func (d *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	panic("not implemented")
 }

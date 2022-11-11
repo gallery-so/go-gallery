@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -146,8 +147,8 @@ type verifier interface {
 	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
 }
 
-// tokensFetcher supports fetching tokens for syncing
-type tokensFetcher interface {
+// TokensFetcher supports fetching tokens for syncing
+type TokensFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
@@ -160,7 +161,7 @@ type tokenRefresher interface {
 
 // tokenFetcherRefresher is the interface that combines the tokenFetcher and tokenRefresher interface
 type tokenFetcherRefresher interface {
-	tokensFetcher
+	TokensFetcher
 	tokenRefresher
 }
 
@@ -243,10 +244,10 @@ func (p *Provider) SyncTokens(ctx context.Context, userID persist.DBID, chains [
 				subWg := &sync.WaitGroup{}
 				subWg.Add(len(providers))
 				for i, p := range providers {
-					if fetcher, ok := p.(tokensFetcher); ok {
-						go func(syncer tokensFetcher, priority int) {
+					if fetcher, ok := p.(TokensFetcher); ok {
+						go func(fetcher TokensFetcher, priority int) {
 							defer subWg.Done()
-							tokens, contracts, err := syncer.GetTokensByWalletAddress(ctx, addr, 0, 0)
+							tokens, contracts, err := fetcher.GetTokensByWalletAddress(ctx, addr, 0, 0)
 							if err != nil {
 								errChan <- errWithPriority{err: err, priority: priority}
 								return
@@ -538,8 +539,8 @@ func (p *Provider) RefreshTokensForContract(ctx context.Context, ci persist.Cont
 	wg := &sync.WaitGroup{}
 	wg.Add(len(providers))
 	for i, provider := range providers {
-		if fetcher, ok := provider.(tokensFetcher); ok {
-			go func(priority int, p tokensFetcher) {
+		if fetcher, ok := provider.(TokensFetcher); ok {
+			go func(priority int, p TokensFetcher) {
 				defer wg.Done()
 				tokens, contract, err := p.GetTokensByContractAddress(ctx, ci.ContractAddress, maxCommunitySize, 0)
 				if err != nil {
@@ -1137,4 +1138,33 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	}
 
 	return ret
+}
+
+// FallbackFetcher evaluates a token with each of its providers until it
+// recieves a usable response
+type FallbackFetcher struct {
+	Fetchers    []TokensFetcher
+	ChainInfoFn func(context.Context) (BlockchainInfo, error)
+}
+
+func (f FallbackFetcher) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
+	return f.ChainInfoFn(ctx)
+}
+
+func (f *FallbackFetcher) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+	if len(f.Fetchers) < 1 {
+		return nil, nil, errors.New("no available fetchers")
+	}
+
+	// XXX: fetcher := f.fetchers[0]
+	// XXX: fallbacks := f.fetchers[1:]
+	return nil, nil, nil
+}
+
+func (f *FallbackFetcher) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
+	panic("not implemented")
+}
+func (f *FallbackFetcher) GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
+	panic("not implemented")
+
 }
