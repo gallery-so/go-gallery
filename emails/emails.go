@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/pubsub"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -20,6 +21,7 @@ import (
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"google.golang.org/api/option"
 )
 
 // InitServer initializes the mediaprocessing server
@@ -40,7 +42,7 @@ func coreInitServer() *gin.Engine {
 
 	loaders := dataloader.NewLoaders(context.Background(), queries, false)
 
-	client := sendgrid.NewSendClient(viper.GetString("SENDGRID_API_KEY"))
+	sendgridClient := sendgrid.NewSendClient(viper.GetString("SENDGRID_API_KEY"))
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
@@ -55,7 +57,23 @@ func coreInitServer() *gin.Engine {
 
 	logger.For(nil).Info("Registering handlers...")
 
-	return handlersInitServer(router, loaders, queries, client)
+	var pub *pubsub.Client
+	var err error
+	if viper.GetString("ENV") == "local" {
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"))
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	go autoSendNotificationEmails(queries, sendgridClient, pub)
+
+	return handlersInitServer(router, loaders, queries, sendgridClient)
 }
 
 func setDefaults() {
@@ -75,6 +93,8 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_NOTIFICATIONS_TEMPLATE_ID", "d-6135d8f36e9946979b0dcf1800363ab4")
 	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
+	viper.SetDefault("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "notifications-email-sub")
+	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "")
 
 	viper.AutomaticEnv()
 
