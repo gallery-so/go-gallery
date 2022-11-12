@@ -148,10 +148,16 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 		if err != nil {
 			return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
 		}
+
+		j, err := auth.JWTGeneratePipeline(c, u.ID)
+		if err != nil {
+			return fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
+		}
+
 		data := notificationsEmailDynamicTemplateData{
-			Notifications: make([]notificationEmailDynamicTemplateData, 0, resultLimit),
-			Username:      u.Username.String,
-      UnsubscribeToken: j,
+			Notifications:    make([]notificationEmailDynamicTemplateData, 0, resultLimit),
+			Username:         u.Username.String,
+			UnsubscribeToken: j,
 		}
 		notifTemplates := make(chan notificationEmailDynamicTemplateData)
 		errChan := make(chan error)
