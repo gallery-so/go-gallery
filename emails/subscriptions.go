@@ -26,7 +26,7 @@ type UpdateSubscriptionsTypeInput struct {
 }
 
 type UnsubInput struct {
-	JWT    string                          `json:"jwt,omiterequiredmpty"`
+	JWT    string                          `json:"jwt,required"`
 	Unsubs []model.EmailUnsubscriptionType `json:"unsubscriptions" binding:"required"`
 }
 
