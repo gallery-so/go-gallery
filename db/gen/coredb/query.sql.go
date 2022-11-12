@@ -116,6 +116,17 @@ func (q *Queries) CountUserNotifications(ctx context.Context, ownerID persist.DB
 	return count, err
 }
 
+const countUserUnseenNotifications = `-- name: CountUserUnseenNotifications :one
+SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false
+`
+
+func (q *Queries) CountUserUnseenNotifications(ctx context.Context, ownerID persist.DBID) (int64, error) {
+	row := q.db.QueryRow(ctx, countUserUnseenNotifications, ownerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAdmireEvent = `-- name: CreateAdmireEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
 `

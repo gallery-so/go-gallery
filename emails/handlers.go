@@ -16,8 +16,9 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	}
 	sendGroup.POST("/verification", middleware.RateLimited(), sendVerificationEmail(loaders, queries, s))
 
-	router.POST("/unsubscribe", unsubscribeFromEmailType(queries))
-	router.POST("/resubscribe", resubscribeFromEmailType(queries))
+	router.POST("/subscriptions", updateSubscriptions(queries))
+	router.POST("/unsubscribe", unsubscribe(queries))
+	router.POST("/resubscribe", resubscribe(queries))
 
 	router.POST("/verify", verifyEmail(queries))
 	return router

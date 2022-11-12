@@ -619,7 +619,7 @@ func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*mode
 
 func resolveViewerNotifications(ctx context.Context, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error) {
 
-	notifs, pageInfo, err := publicapi.For(ctx).Notifications.GetViewerNotifications(ctx, before, after, first, last)
+	notifs, pageInfo, unseen, err := publicapi.For(ctx).Notifications.GetViewerNotifications(ctx, before, after, first, last)
 
 	if err != nil {
 		return nil, err
@@ -630,8 +630,6 @@ func resolveViewerNotifications(ctx context.Context, before *string, after *stri
 	if err != nil {
 		return nil, err
 	}
-
-	unseen := unseenNotifications(notifs)
 
 	return &model.NotificationsConnection{
 		Edges:       edges,
@@ -738,17 +736,6 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 	default:
 		return nil, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
-}
-
-func unseenNotifications(notifs []db.Notification) int {
-	count := 0
-	for _, notif := range notifs {
-		if !notif.Seen {
-			count++
-		}
-	}
-
-	return count
 }
 
 func resolveViewerNotificationSettings(ctx context.Context) (*model.NotificationSettings, error) {
@@ -996,9 +983,7 @@ func updateUserEmailNotificationSettings(ctx context.Context, input model.Update
 
 func unsubscribeFromEmailType(ctx context.Context, input model.UnsubscribeFromEmailTypeInput) (*model.UnsubscribeFromEmailTypePayload, error) {
 
-	// TODO this token needs to be added to the template data for the email in a future when the templates are all in place
-
-	if err := emails.UnsubscribeFromEmailTypesByJWT(ctx, input.Token, []model.EmailUnsubscriptionType{input.Type}); err != nil {
+	if err := emails.UnsubscribeByJWT(ctx, input.Token, []model.EmailUnsubscriptionType{input.Type}); err != nil {
 		return nil, err
 	}
 

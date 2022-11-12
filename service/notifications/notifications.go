@@ -16,7 +16,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-const window = 10 * time.Minute
+const viewWindow = 24 * time.Hour
+const groupedWindow = 10 * time.Minute
 const notificationTimeout = 10 * time.Second
 const NotificationHandlerContextKey = "notification.notificationHandlers"
 
@@ -135,7 +136,7 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		OwnerID: notif.OwnerID,
 		Action:  notif.Action,
 	})
-	if time.Since(curNotif.CreatedAt) < window {
+	if time.Since(curNotif.CreatedAt) < groupedWindow {
 		return updateAndPublishNotif(ctx, curNotif, notif, h.queries, h.pubSub)
 	}
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
@@ -216,7 +217,7 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 		notif.Data.AuthedViewerIDs = resultIDs
 	}
 
-	if time.Since(mostRecentNotif.CreatedAt) < window {
+	if time.Since(mostRecentNotif.CreatedAt) < viewWindow {
 		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub)
 	}
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)

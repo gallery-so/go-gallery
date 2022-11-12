@@ -50,18 +50,10 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 	return output, nil
 }
 
-func UnsubscribeFromEmailTypesByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
-	return UnsubscribeFromEmailTypes(ctx, "", jwt, unsubTypes)
-}
-
-func UnsubscribeFromEmailTypesByUserID(ctx context.Context, userID persist.DBID, unsubTypes []model.EmailUnsubscriptionType) error {
-	return UnsubscribeFromEmailTypes(ctx, userID, "", unsubTypes)
-}
-func UnsubscribeFromEmailTypes(ctx context.Context, userID persist.DBID, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
-	input := emails.UnsubscribeFromEmailTypeInput{
-		UserID:     userID,
-		JWT:        jwt,
-		EmailTypes: unsubTypes,
+func UnsubscribeByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
+	input := emails.UnsubInput{
+		JWT:    jwt,
+		Unsubs: unsubTypes,
 	}
 
 	body, err := json.Marshal(input)
@@ -72,6 +64,38 @@ func UnsubscribeFromEmailTypes(ctx context.Context, userID persist.DBID, jwt str
 	buf := bytes.NewBuffer(body)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/unsubscribe", viper.GetString("EMAILS_HOST")), buf)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return util.GetErrFromResp(resp)
+	}
+
+	return nil
+}
+
+func UpdateUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID, unsubTypes persist.EmailUnsubscriptions) error {
+	input := emails.UpdateSubscriptionsTypeInput{
+		UserID: userID,
+		Unsubs: unsubTypes,
+	}
+
+	body, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(body)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/subscriptions", viper.GetString("EMAILS_HOST")), buf)
 	if err != nil {
 		return err
 	}

@@ -14,7 +14,6 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/membership"
@@ -378,29 +377,10 @@ func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, sett
 		return err
 	}
 
-	curUser, err := api.loaders.UserByUserID.Load(userID)
-	if err != nil {
-		return err
-	}
-
 	// update unsubscriptions
 
-	unsubs := getNewUnsubscriptions(curUser.EmailUnsubscriptions, settings)
+	return emails.UpdateUnsubscriptionsByUserID(ctx, userID, settings)
 
-	return emails.UnsubscribeFromEmailTypesByUserID(ctx, userID, unsubs)
-}
-
-func getNewUnsubscriptions(oldSettings persist.EmailUnsubscriptions, newSettings persist.EmailUnsubscriptions) []model.EmailUnsubscriptionType {
-	result := make([]model.EmailUnsubscriptionType, 0, 2)
-	if newSettings.All && !oldSettings.All {
-		result = append(result, model.EmailUnsubscriptionTypeAll)
-	}
-
-	if newSettings.Notifications && !oldSettings.Notifications {
-		result = append(result, model.EmailUnsubscriptionTypeNotifications)
-	}
-
-	return result
 }
 
 func (api UserAPI) ResendEmailVerification(ctx context.Context) error {

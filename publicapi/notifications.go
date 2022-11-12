@@ -17,21 +17,21 @@ type NotificationsAPI struct {
 	validator *validator.Validate
 }
 
-func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, after *string, first *int, last *int) ([]db.Notification, PageInfo, error) {
+func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, after *string, first *int, last *int) ([]db.Notification, PageInfo, int, error) {
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
-		return nil, PageInfo{}, err
+		return nil, PageInfo{}, 0, err
 	}
 
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
-		return nil, PageInfo{}, err
+		return nil, PageInfo{}, 0, err
 	}
 
 	if err := validatePaginationParams(api.validator, first, last); err != nil {
-		return nil, PageInfo{}, err
+		return nil, PageInfo{}, 0, err
 	}
 
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
@@ -78,7 +78,7 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
 
 	if err != nil {
-		return nil, PageInfo{}, err
+		return nil, PageInfo{}, 0, err
 	}
 
 	notifications := make([]db.Notification, len(results))
@@ -86,11 +86,16 @@ func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, 
 		if notification, ok := result.(db.Notification); ok {
 			notifications[i] = notification
 		} else {
-			return nil, PageInfo{}, fmt.Errorf("interface{} is not a notification: %T", result)
+			return nil, PageInfo{}, 0, fmt.Errorf("interface{} is not a notification: %T", result)
 		}
 	}
 
-	return notifications, pageInfo, err
+	count, err := api.queries.CountUserUnseenNotifications(ctx, userID)
+	if err != nil {
+		return nil, PageInfo{}, 0, err
+	}
+
+	return notifications, pageInfo, int(count), err
 }
 
 func (api NotificationsAPI) GetByID(ctx context.Context, id persist.DBID) (db.Notification, error) {

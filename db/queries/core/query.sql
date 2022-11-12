@@ -477,6 +477,9 @@ SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
 -- name: CountUserNotifications :one
 SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false;
 
+-- name: CountUserUnseenNotifications :one
+SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false;
+
 -- name: GetNotificationByID :one
 SELECT * FROM notifications WHERE id = $1 AND deleted = false;
 
