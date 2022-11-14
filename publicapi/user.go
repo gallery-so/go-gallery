@@ -69,6 +69,10 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 		return nil, PageInfo{}, err
 	}
 
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
 	queryFunc := func(params timeIDPagingParams) ([]interface{}, error) {
 
 		users, err := api.queries.GetUsersByIDs(ctx, db.GetUsersByIDsParams{
