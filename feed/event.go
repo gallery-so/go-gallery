@@ -26,7 +26,6 @@ var (
 
 var (
 	eventSegments = map[persist.Action]segment{
-		persist.ActionUserCreated:                     noSegment,
 		persist.ActionUserFollowedUsers:               actorActionSegment,
 		persist.ActionCollectorsNoteAddedToToken:      actorSubjectActionSegment,
 		persist.ActionCollectionCreated:               actorSubjectActionSegment,
@@ -127,8 +126,6 @@ func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Even
 
 func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	switch event.Action {
-	case persist.ActionUserCreated:
-		return b.createUserCreatedFeedEvent(ctx, event)
 	case persist.ActionUserFollowedUsers:
 		return b.createUserFollowedUsersFeedEvent(ctx, event)
 	case persist.ActionCollectorsNoteAddedToToken:
@@ -175,27 +172,6 @@ func (b *EventBuilder) isStillEditing(ctx context.Context, event db.Event) (bool
 	default:
 		return false, nil
 	}
-}
-
-func (b *EventBuilder) createUserCreatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	priorEvent, err := b.feedRepo.LastPublishedUserFeedEvent(ctx, persist.NullStrToDBID(event.ActorID), event.CreatedAt, persist.ActionList{event.Action})
-	if err != nil {
-		return nil, err
-	}
-
-	// only want to store this event type once
-	if priorEvent != nil {
-		return nil, nil
-	}
-
-	return b.feedRepo.Add(ctx, db.FeedEvent{
-		ID:        persist.GenerateID(),
-		OwnerID:   persist.NullStrToDBID(event.ActorID),
-		Action:    event.Action,
-		EventTime: event.CreatedAt,
-		Data:      persist.FeedEventData{UserBio: event.Data.UserBio},
-		EventIds:  persist.DBIDList{event.ID},
-	})
 }
 
 func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
