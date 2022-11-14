@@ -6,6 +6,8 @@ import (
 	"encoding"
 	"encoding/base64"
 	"fmt"
+	"net"
+	"strings"
 
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -142,7 +144,7 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 			SubjectID:      galleryID,
 			Action:         persist.ActionViewedGallery,
 			GalleryID:      galleryID,
-			ExternalID:     persist.StrToNullStr(util.StringToPointer(getExternalID(ctx))),
+			ExternalID:     persist.StrToNullStr(getExternalID(ctx)),
 		}, api.validator, nil)
 		if err != nil {
 			return db.Gallery{}, err
@@ -152,10 +154,54 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	return gallery, nil
 }
 
-func getExternalID(ctx context.Context) string {
-	remote, _ := util.GinContextFromContext(ctx).RemoteIP()
-	hash := sha256.New()
-	hash.Write([]byte(viper.GetString("BACKEND_SECRET") + remote.String()))
-	res, _ := hash.(encoding.BinaryMarshaler).MarshalBinary()
-	return base64.StdEncoding.EncodeToString(res)
+func getExternalID(ctx context.Context) *string {
+	gc := util.GinContextFromContext(ctx)
+
+	// It's possible that there are multiple X-Forwaded-For
+	// headers in the request so we first combine it into a single slice.
+	forwarded := make([]string, 0)
+	for _, header := range gc.Request.Header["X-Forwarded-For"] {
+		header = strings.ReplaceAll(header, " ", "")
+		proxied := strings.Split(header, ",")
+		forwarded = append(forwarded, proxied...)
+	}
+
+	// Find the first valid, non-private IP that is
+	// closest to the client from left to right.
+	for _, address := range forwarded {
+		if ip := net.ParseIP(address); ip != nil && !IsPrivate(ip) {
+			hash := sha256.New()
+			hash.Write([]byte(viper.GetString("BACKEND_SECRET") + ip.String()))
+			res, _ := hash.(encoding.BinaryMarshaler).MarshalBinary()
+			externalID := base64.StdEncoding.EncodeToString(res)
+			return &externalID
+		}
+	}
+
+	return nil
+}
+
+// The below code is modified from the IsPrivate() method of the 'net' standard library package
+// available in go versions > 1.17.
+//
+// TODO: Remove when backend is upgraded from 1.16 in favor of ip.IsPrivate()
+//
+// IsPrivate reports whether ip is a private address, according to
+// RFC 1918 (IPv4 addresses) and RFC 4193 (IPv6 addresses).
+func IsPrivate(ip net.IP) bool {
+	if ip4 := ip.To4(); ip4 != nil {
+		// Following RFC 1918, Section 3. Private Address Space which says:
+		//   The Internet Assigned Numbers Authority (IANA) has reserved the
+		//   following three blocks of the IP address space for private internets:
+		//     10.0.0.0        -   10.255.255.255  (10/8 prefix)
+		//     172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+		//     192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+		return ip4[0] == 10 ||
+			(ip4[0] == 172 && ip4[1]&0xf0 == 16) ||
+			(ip4[0] == 192 && ip4[1] == 168)
+	}
+	// Following RFC 4193, Section 8. IANA Considerations which says:
+	//   The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
+	IPv6len := 16
+	return len(ip) == IPv6len && ip[0]&0xfe == 0xfc
 }
