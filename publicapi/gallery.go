@@ -202,6 +202,6 @@ func IsPrivate(ip net.IP) bool {
 	}
 	// Following RFC 4193, Section 8. IANA Considerations which says:
 	//   The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
-	IPv6len := 16
-	return len(ip) == IPv6len && ip[0]&0xfe == 0xfc
+	IPv6Len := 16
+	return len(ip) == IPv6Len && ip[0]&0xfe == 0xfc
 }
