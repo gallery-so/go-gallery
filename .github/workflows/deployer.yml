@@ -336,3 +336,85 @@ jobs:
         run: |
           cd _deploy
           make deploy-prod-emails
+  deploy-dev-feed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump GitHub context
+        run: echo "$GITHUB_CONTEXT"
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+      - uses: actions/checkout@v2
+      - name: "Update apt"
+        run: sudo apt-get update
+      - name: "Download Keybase"
+        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
+      - name: "Install Sentry CLI"
+        run: curl -sL https://sentry.io/get-cli/ | bash
+      - name: "Install Keybase"
+        run: sudo apt-get install ./keybase_amd64.deb unzip
+      - name: "Run keybase globally"
+        run: run_keybase -g
+      - name: "Oneshot Keybase"
+        run: keybase oneshot
+        env:
+          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
+          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "ls"
+        run: ls
+      - name: "Decrypt secrets"
+        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
+      - name: "Unzip"
+        run: echo "A" | unzip _deploy.zip -d _deploy
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_DEV_CREDENTIALS }}"
+      - name: "Install gcloud cli"
+        uses: google-github-actions/setup-gcloud@v0
+      - name: "Docker auth"
+        run: gcloud auth configure-docker us-west2-docker.pkg.dev
+      - name: "Deploy"
+        run: |
+          cd _deploy
+          make deploy-dev-feed
+  deploy-prod-feed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump GitHub context
+        run: echo "$GITHUB_CONTEXT"
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+      - uses: actions/checkout@v2
+      - name: "Update apt"
+        run: sudo apt-get update
+      - name: "Download Keybase"
+        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
+      - name: "Install Sentry CLI"
+        run: curl -sL https://sentry.io/get-cli/ | bash
+      - name: "Install Keybase"
+        run: sudo apt-get install ./keybase_amd64.deb unzip
+      - name: "Run keybase globally"
+        run: run_keybase -g
+      - name: "Oneshot Keybase"
+        run: keybase oneshot
+        env:
+          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
+          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "ls"
+        run: ls
+      - name: "Decrypt secrets"
+        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
+      - name: "Unzip"
+        run: echo "A" | unzip _deploy.zip -d _deploy
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_PROD_CREDENTIALS }}"
+      - name: "Install gcloud cli"
+        uses: google-github-actions/setup-gcloud@v0
+      - name: "Docker auth"
+        run: gcloud auth configure-docker us-west2-docker.pkg.dev
+      - name: "Deploy"
+        run: |
+          cd _deploy
+          make deploy-prod-feed
