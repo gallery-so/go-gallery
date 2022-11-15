@@ -1289,9 +1289,13 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   seen: Boolean
   creationTime: Time
   updatedTime: Time
+  # the total count of notifications grouped, despite uniqueness of the viewers and whether they are logged in or not
   count: Int
 
+  # unique user viewers, use PageInfo.Total to get the total unique user viewers
   userViewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+
+  # count of unique non-user viewers
   nonUserViewerCount: Int
   gallery: Gallery @goField(forceResolver: true)
 }
