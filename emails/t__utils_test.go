@@ -134,6 +134,7 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 	}
 
 	event, err := q.CreateCollectionEvent(ctx, coredb.CreateCollectionEventParams{
+		ID:             persist.GenerateID(),
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
@@ -145,6 +146,7 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 	}
 
 	feedEvent, err = q.CreateFeedEvent(ctx, coredb.CreateFeedEventParams{
+		ID:      persist.GenerateID(),
 		OwnerID: userID,
 		Action:  persist.ActionCollectionCreated,
 		Data: persist.FeedEventData{
@@ -177,6 +179,7 @@ func seedAdmireNotif(ctx context.Context, t *testing.T, q *coredb.Queries, userI
 	}
 
 	admireEvent, err := q.CreateAdmireEvent(ctx, coredb.CreateAdmireEventParams{
+		ID:             persist.GenerateID(),
 		ActorID:        persist.DBIDToNullStr(userID2),
 		Action:         persist.ActionAdmiredFeedEvent,
 		ResourceTypeID: persist.ResourceTypeAdmire,
@@ -189,6 +192,7 @@ func seedAdmireNotif(ctx context.Context, t *testing.T, q *coredb.Queries, userI
 	}
 
 	admireNotif, err = q.CreateAdmireNotification(ctx, coredb.CreateAdmireNotificationParams{
+		ID:          persist.GenerateID(),
 		OwnerID:     userID,
 		Action:      persist.ActionAdmiredFeedEvent,
 		EventIds:    []persist.DBID{admireEvent.ID},
@@ -219,6 +223,7 @@ func seedCommentNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repo
 	}
 
 	commentEvent, err := q.CreateCommentEvent(ctx, coredb.CreateCommentEventParams{
+		ID:             persist.GenerateID(),
 		ActorID:        persist.DBIDToNullStr(userID2),
 		Action:         persist.ActionCommentedOnFeedEvent,
 		ResourceTypeID: persist.ResourceTypeAdmire,
@@ -231,6 +236,7 @@ func seedCommentNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repo
 	}
 
 	commentNotif, err = q.CreateCommentNotification(ctx, coredb.CreateCommentNotificationParams{
+		ID:          persist.GenerateID(),
 		OwnerID:     userID,
 		Action:      persist.ActionCommentedOnFeedEvent,
 		EventIds:    []persist.DBID{commentEvent.ID},
@@ -247,6 +253,7 @@ func seedCommentNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repo
 func seedViewNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos *postgres.Repositories, userID persist.DBID, userID2 persist.DBID) {
 
 	viewEvent, err := q.CreateGalleryEvent(ctx, coredb.CreateGalleryEventParams{
+		ID:             persist.GenerateID(),
 		ActorID:        persist.DBIDToNullStr(userID2),
 		Action:         persist.ActionViewedGallery,
 		ResourceTypeID: persist.ResourceTypeAdmire,
@@ -258,6 +265,7 @@ func seedViewNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos *
 	}
 
 	viewNotif, err = q.CreateViewGalleryNotification(ctx, coredb.CreateViewGalleryNotificationParams{
+		ID:       persist.GenerateID(),
 		OwnerID:  userID,
 		Action:   persist.ActionViewedGallery,
 		EventIds: []persist.DBID{viewEvent.ID},
@@ -276,6 +284,7 @@ func seedViewNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos *
 func seedFollowNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos *postgres.Repositories, userID persist.DBID, userID2 persist.DBID) {
 
 	viewEvent, err := q.CreateUserEvent(ctx, coredb.CreateUserEventParams{
+		ID:             persist.GenerateID(),
 		ActorID:        persist.DBIDToNullStr(userID2),
 		Action:         persist.ActionAdmiredFeedEvent,
 		ResourceTypeID: persist.ResourceTypeAdmire,
@@ -287,6 +296,7 @@ func seedFollowNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos
 	}
 
 	followNotif, err = q.CreateFollowNotification(ctx, coredb.CreateFollowNotificationParams{
+		ID:       persist.GenerateID(),
 		OwnerID:  userID,
 		Action:   persist.ActionAdmiredFeedEvent,
 		EventIds: []persist.DBID{viewEvent.ID},
