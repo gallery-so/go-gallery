@@ -90,6 +90,10 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 		OwnerUserID: userID,
 	})
 
+	if err != nil {
+		t.Fatalf("failed to create collection: %s", err)
+	}
+
 	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{collID}}
 
 	galleryID, err := repos.GalleryRepository.Create(ctx, galleryInsert)
