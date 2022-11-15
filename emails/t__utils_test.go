@@ -101,9 +101,9 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 		t.Fatalf("failed to create gallery: %s", err)
 	}
 
-	galleryInsert.OwnerUserID = userID2
+	galleryInsert2 := persist.GalleryDB{OwnerUserID: userID2}
 
-	_, err = repos.GalleryRepository.Create(ctx, galleryInsert)
+	_, err = repos.GalleryRepository.Create(ctx, galleryInsert2)
 	if err != nil {
 		t.Fatalf("failed to create gallery: %s", err)
 	}
