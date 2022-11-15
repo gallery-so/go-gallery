@@ -825,6 +825,12 @@ func resolveUpdatedNotificationSubscription(ctx context.Context) <-chan model.No
 }
 
 func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userIDs persist.DBIDList, before *string, after *string, first *int, last *int) (*model.GroupNotificationUsersConnection, error) {
+	if len(userIDs) == 0 {
+		return &model.GroupNotificationUsersConnection{
+			Edges: []*model.GroupNotificationUserEdge{}
+			PageInfo: &model.PageInfo{},
+		}, nil
+	}
 	users, pageInfo, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, userIDs, before, after, first, last)
 	if err != nil {
 		return nil, err
