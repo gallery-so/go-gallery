@@ -141,6 +141,7 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 	seedAdmireNotif(ctx, t, q, userID, userID2)
 	seedCommentNotif(ctx, t, q, repos, userID, userID2)
 	seedViewNotif(ctx, t, q, repos, userID, userID2)
+	seedFollowNotif(ctx, t, q, repos, userID, userID2)
 
 }
 
