@@ -147,16 +147,19 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		mediaType = vidResult.mediaType
 	}
 
+	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached image
 	if !imgResult.cached && imgResult.mediaType.IsImageLike() {
 		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 100), "imgURL": truncateString(imgURL, 100), "vURL": truncateString(vURL, 100), "name": name}).Debug("MakePreviewsForMetadata imgResult not cached, deleting cached version if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
 	}
+	// if nothing was cached in the video step and the video step did process a video type, delete the now stale cached video
 	if !vidResult.cached && vidResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 100), "imgURL": truncateString(imgURL, 100), "vURL": truncateString(vURL, 100), "name": name}).Debug("MakePreviewsForMetadata vidResult not cached, deleting cached version if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
 	}
 
-	if !imgResult.cached && !vidResult.cached {
+	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed any thumbnail is stale
+	if (imgResult.cached || vidResult.cached) && (!imgResult.mediaType.IsAnimationLike() && !vidResult.mediaType.IsAnimationLike()) {
 		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 100), "imgURL": truncateString(imgURL, 100), "vURL": truncateString(vURL, 100), "name": name}).Debug("MakePreviewsForMetadata neither cached, deleting thumbnail if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
 	}
