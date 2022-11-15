@@ -85,7 +85,12 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 
 	testUser2.ID = userID2
 
-	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
+	collID, err := repos.CollectionRepository.Create(ctx, persist.CollectionDB{
+		Name:        "test coll",
+		OwnerUserID: userID,
+	})
+
+	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{collID}}
 
 	galleryID, err := repos.GalleryRepository.Create(ctx, galleryInsert)
 	if err != nil {
