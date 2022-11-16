@@ -1149,6 +1149,11 @@ type FallbackFetcher struct {
 	EvalToken func(ChainAgnosticToken) bool
 }
 
+type fallbackResult struct {
+	i     int
+	token ChainAgnosticToken
+}
+
 func (f FallbackFetcher) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
 	return f.Primary.GetBlockchainInfo(ctx)
 }
@@ -1158,16 +1163,8 @@ func (f *FallbackFetcher) GetTokensByWalletAddress(ctx context.Context, address 
 	if err != nil {
 		return nil, nil, err
 	}
-
-	usableTokens := make([]ChainAgnosticToken, 0, len(tokens))
-	for i, token := range tokens {
-		if !f.EvalToken(token) {
-			token = f.callFallback(ctx, token)
-		}
-		usableTokens[i] = token
-	}
-
-	return usableTokens, contracts, nil
+	tokens = f.resolveTokens(ctx, tokens)
+	return tokens, contracts, nil
 }
 
 func (f *FallbackFetcher) GetTokensByContractAddress(ctx context.Context, tokenContract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
@@ -1175,16 +1172,8 @@ func (f *FallbackFetcher) GetTokensByContractAddress(ctx context.Context, tokenC
 	if err != nil {
 		return nil, ChainAgnosticContract{}, nil
 	}
-
-	usableTokens := make([]ChainAgnosticToken, 0, len(tokens))
-	for i, token := range tokens {
-		if !f.EvalToken(token) {
-			token = f.callFallback(ctx, token)
-		}
-		usableTokens[i] = token
-	}
-
-	return usableTokens, contract, nil
+	tokens = f.resolveTokens(ctx, tokens)
+	return tokens, contract, nil
 }
 
 func (f *FallbackFetcher) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
@@ -1193,6 +1182,31 @@ func (f *FallbackFetcher) GetTokensByTokenIdentifiersAndOwner(ctx context.Contex
 		return token, contract, nil
 	}
 	return f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+}
+
+func (f *FallbackFetcher) resolveTokens(ctx context.Context, tokens []ChainAgnosticToken) []ChainAgnosticToken {
+	fallbackCh := make(chan fallbackResult)
+	usableTokens := make([]ChainAgnosticToken, 0, len(tokens))
+	var wg sync.WaitGroup
+
+	for i, token := range tokens {
+		usableTokens[i] = token
+		// Attempt to get a valid token through the fallback
+		if !f.EvalToken(token) {
+			go func() {
+				wg.Add(1)
+				fallbackCh <- fallbackResult{i, f.callFallback(ctx, token)}
+			}()
+		}
+	}
+
+	wg.Wait()
+	close(fallbackCh)
+
+	for result := range fallbackCh {
+		usableTokens[result.i] = result.token
+	}
+	return usableTokens
 }
 
 func (f *FallbackFetcher) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {

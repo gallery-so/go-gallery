@@ -39,6 +39,14 @@ const (
 
 const tezosNoncePrepend = "Tezos Signed Message: "
 
+type ErrNoTokensFoundByIdentifiers struct {
+	tokenIdentifiers multichain.ChainAgnosticIdentifiers
+}
+
+func (e ErrNoTokensFoundByIdentifiers) Error() string {
+	return fmt.Sprintf("no token found for token identifiers: %s", e.tokenIdentifiers.String())
+}
+
 type tzMetadata struct {
 	Date               string      `json:"date"`
 	Name               string      `json:"name"`
@@ -325,7 +333,7 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	if len(tokens) > 0 {
 		token = tokens[0]
 	} else {
-		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no token found for token identifiers: %s", tokenIdentifiers.String())
+		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, ErrNoTokensFoundByIdentifiers{tokenIdentifiers}
 	}
 
 	return token, contract, nil
@@ -604,7 +612,7 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 				return
 			}
 			tid := persist.TokenID(tzToken.Token.TokenID.toBase16String())
-			med := d.makeTempMedia(ctx, tid, tzToken.Token.Contract.Address, agnosticMetadata, fmt.Sprintf("%s/%s-%s", mediaKey, tzToken.Token.Contract.Address, tzToken.Token.TokenID))
+			med := makeTempMedia(ctx, tid, tzToken.Token.Contract.Address, agnosticMetadata, d.ipfsGatewayURL)
 
 			agnostic := multichain.ChainAgnosticToken{
 				TokenType:       persist.TokenTypeERC1155,
@@ -662,27 +670,27 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 	}
 }
 
-func (d *Provider) makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, name string) persist.Media {
+func makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, ipfsGatewayURL string) persist.Media {
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
 	imKeywords, animKeywords := persist.ChainTezos.BaseKeywords()
-	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(imKeywords), media.TezImageKeywords(animKeywords), name, false)
+	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(imKeywords), media.TezImageKeywords(animKeywords), false)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
-		anim = fmt.Sprintf("%s/ipfs/%s", d.ipfsGatewayURL, removedIPFS)
+		anim = fmt.Sprintf("%s/ipfs/%s", ipfsGatewayURL, removedIPFS)
 	}
 	if persist.TokenURI(img).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(img, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
-		img = fmt.Sprintf("%s/ipfs/%s", d.ipfsGatewayURL, removedIPFS)
+		img = fmt.Sprintf("%s/ipfs/%s", ipfsGatewayURL, removedIPFS)
 	}
 	if anim != "" {
 		if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 			removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 			removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
-			anim = fmt.Sprintf("%s/ipfs/%s", d.ipfsGatewayURL, removedIPFS)
+			anim = fmt.Sprintf("%s/ipfs/%s", ipfsGatewayURL, removedIPFS)
 		}
 		med.MediaURL = persist.NullString(anim)
 		if img != "" {

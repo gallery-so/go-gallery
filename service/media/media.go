@@ -109,7 +109,7 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
 func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, turi persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords Keywords) (persist.Media, error) {
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
-	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, name, true)
+	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, turi, animationKeywords, imageKeywords, true)
 
 	logger.For(pCtx).Infof("imgURL: %s, vURL: %s", imgURL, vURL)
 	logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 100), "imgURL": truncateString(imgURL, 100), "vURL": truncateString(vURL, 100), "name": name}).Debug("MakePreviewsForMetadata initial")
@@ -367,10 +367,10 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords Keywords, name string, predict bool) (imgURL string, vURL string) {
-
+func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, turi persist.TokenURI, animationKeywords, imageKeywords Keywords, predict bool) (imgURL string, vURL string) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
 	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
-		logger.For(nil).Infof("found media metadata for %s: %s", name, metaMedia)
+		logger.For(ctx).Infof("found media metadata: %s", metaMedia)
 		var mediaType persist.MediaType
 
 		if mime, ok := metaMedia["mimeType"].(string); ok {
@@ -388,7 +388,7 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range animationKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
-			logger.For(ctx).Infof("found initial animation url for %s with keyword %s: %s", name, keyword, it)
+			logger.For(ctx).Infof("found initial animation url for with keyword %s: %s", keyword, it)
 			vURL = it
 			break
 		}
@@ -396,14 +396,14 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range imageKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
-			logger.For(ctx).Infof("found initial image url for %s with keyword %s: %s", name, keyword, it)
+			logger.For(ctx).Infof("found initial image url for with keyword %s: %s", keyword, it)
 			imgURL = it
 			break
 		}
 	}
 
 	if imgURL == "" && vURL == "" {
-		logger.For(ctx).Infof("no image url found for %s - using token URI %s", name, turi)
+		logger.For(ctx).Infof("no image url found, using token URI: %s", turi)
 		imgURL = turi.String()
 	}
 
