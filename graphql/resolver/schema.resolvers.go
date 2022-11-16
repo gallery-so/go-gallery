@@ -954,7 +954,7 @@ func (r *mutationResolver) PreverifyEmail(ctx context.Context, email string) (mo
 	case emailService.PreverifyEmailResultRisky:
 		modelResult = model.PreverifyEmailResultRisky
 	default:
-		return nil, fmt.Errorf("unknown preverify result: %s", result.Result)
+		return nil, fmt.Errorf("unknown preverify result: %d", result.Result)
 	}
 
 	return model.PreverifyEmailPayload{
