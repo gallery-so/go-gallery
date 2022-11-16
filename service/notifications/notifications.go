@@ -121,7 +121,8 @@ func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notifica
 	if handler, ok := d.handlers[notif.Action]; ok {
 		l, err := d.lock.Obtain(ctx, lockKey{ownerID: notif.OwnerID, action: notif.Action}.String(), maxLockTimeout, &redislock.Options{RetryStrategy: redislock.LinearBackoff(1 * time.Second)})
 		if err != nil {
-			return err
+			logger.For(ctx).Errorf("failed to obtain lock for notification: %s", err)
+			return fmt.Errorf("failed to obtain lock for notification: %s", err)
 		}
 		defer l.Release(ctx)
 		return handler.Handle(ctx, notif)
@@ -150,8 +151,10 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		Action:  notif.Action,
 	})
 	if time.Since(curNotif.CreatedAt) < groupedWindow {
-		return updateAndPublishNotif(ctx, curNotif, notif, h.queries, h.pubSub)
+		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
+		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub)
 	}
+	logger.For(ctx).Infof("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 
 }
@@ -339,7 +342,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 
 	_, err = result.Get(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to publish new notification: %w", err)
 	}
 
 	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
@@ -364,7 +367,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	}
 	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting updated notification by %s: %w", mostRecentNotif.ID, err)
 	}
 	marshalled, err := json.Marshal(updatedNotif)
 	if err != nil {
@@ -376,7 +379,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	})
 	_, err = result.Get(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("error publishing updated notification: %w", err)
 	}
 
 	logger.For(ctx).Infof("pushed updated notification to pubsub: %s", updatedNotif.OwnerID)
