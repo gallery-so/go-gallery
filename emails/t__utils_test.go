@@ -286,7 +286,7 @@ func seedFollowNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos
 	viewEvent, err := q.CreateUserEvent(ctx, coredb.CreateUserEventParams{
 		ID:             persist.GenerateID(),
 		ActorID:        persist.DBIDToNullStr(userID2),
-		Action:         persist.ActionAdmiredFeedEvent,
+		Action:         persist.ActionUserFollowedUsers,
 		ResourceTypeID: persist.ResourceTypeAdmire,
 		UserID:         userID,
 	})
@@ -298,7 +298,7 @@ func seedFollowNotif(ctx context.Context, t *testing.T, q *coredb.Queries, repos
 	followNotif, err = q.CreateFollowNotification(ctx, coredb.CreateFollowNotificationParams{
 		ID:       persist.GenerateID(),
 		OwnerID:  userID,
-		Action:   persist.ActionAdmiredFeedEvent,
+		Action:   persist.ActionUserFollowedUsers,
 		EventIds: []persist.DBID{viewEvent.ID},
 		Data: persist.NotificationData{
 			FollowerIDs: []persist.DBID{userID2},
