@@ -158,7 +158,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
 	}
 
-	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed any thumbnail is stale
+	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed therefore any thumbnail is stale
 	if (imgResult.cached || vidResult.cached) && (!imgResult.mediaType.IsAnimationLike() && !vidResult.mediaType.IsAnimationLike()) {
 		logger.For(pCtx).WithFields(logrus.Fields{"tokenURI": truncateString(turi.String(), 100), "imgURL": truncateString(imgURL, 100), "vURL": truncateString(vURL, 100), "name": name}).Debug("MakePreviewsForMetadata neither cached, deleting thumbnail if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
@@ -666,7 +666,7 @@ outer:
 				timeBeforeCache := time.Now()
 				err = cacheRawAnimationMedia(pCtx, reader, bucket, fmt.Sprintf("%s-%s", ipfsPrefix, name), storageClient)
 				if err != nil {
-					return mediaType, true, err
+					return mediaType, false, err
 				}
 				logger.For(pCtx).Infof("cached animation for %s in %s", name, time.Since(timeBeforeCache))
 				return mediaType, true, nil
@@ -674,7 +674,7 @@ outer:
 			timeBeforeCache := time.Now()
 			err = cacheRawMedia(pCtx, reader, bucket, fmt.Sprintf("%s-%s", ipfsPrefix, name), contentType, storageClient)
 			if err != nil {
-				return mediaType, true, err
+				return mediaType, false, err
 			}
 			logger.For(pCtx).Infof("cached raw media for %s in %s", name, time.Since(timeBeforeCache))
 			return mediaType, true, nil
