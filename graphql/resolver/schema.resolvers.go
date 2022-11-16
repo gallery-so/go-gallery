@@ -9,9 +9,11 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	emailService "github.com/mikeydub/go-gallery/emails"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
+	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -933,6 +935,32 @@ func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, setti
 		return nil, err
 	}
 	return resolveViewerNotificationSettings(ctx)
+}
+
+func (r *mutationResolver) PreverifyEmail(ctx context.Context, email string) (model.PreverifyEmailPayloadOrError, error) {
+	// todo we could have the frontend send the source? right now I don't see any other sources of verification other than signing up
+	result, err := emails.PreverifyEmail(ctx, email, "signup")
+	if err != nil {
+		return nil, err
+	}
+
+	var modelResult model.PreverifyEmailResult
+
+	switch result.Result {
+	case emailService.PreverifyEmailResultValid:
+		modelResult = model.PreverifyEmailResultValid
+	case emailService.PreverifyEmailResultInvalid:
+		modelResult = model.PreverifyEmailResultInvalid
+	case emailService.PreverifyEmailResultRisky:
+		modelResult = model.PreverifyEmailResultRisky
+	default:
+		return nil, fmt.Errorf("unknown preverify result: %s", result.Result)
+	}
+
+	return model.PreverifyEmailPayload{
+		Email:  email,
+		Result: modelResult,
+	}, nil
 }
 
 func (r *mutationResolver) VerifyEmail(ctx context.Context, token string) (model.VerifyEmailPayloadOrError, error) {

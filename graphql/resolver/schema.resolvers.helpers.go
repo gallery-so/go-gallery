@@ -943,7 +943,7 @@ func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, 
 	}
 
 	return &model.VerifyEmailPayload{
-		Email: &output.Email,
+		Email: output.Email,
 	}, nil
 
 }

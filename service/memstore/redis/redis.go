@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bsm/redislock"
 	"github.com/mikeydub/go-gallery/service/memstore"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v9"
 	"github.com/spf13/viper"
 )
 
@@ -22,6 +23,7 @@ const (
 	RefreshNFTsThrottleDB     = 7
 	TokenProcessingThrottleDB = 8
 	EmailThrottleDB           = 9
+	NotificationLockDB        = 10
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.
@@ -111,4 +113,21 @@ func (c *Cache) Close(clear bool) error {
 		}
 	}
 	return c.client.Close()
+}
+
+func NewLockClient(pCtx context.Context, db int) *redislock.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	redisURL := viper.GetString("REDIS_URL")
+	redisPass := viper.GetString("REDIS_PASS")
+	client := redis.NewClient(&redis.Options{
+		Addr:     redisURL,
+		Password: redisPass,
+		DB:       db,
+	})
+	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
+	if err := client.Ping(ctx).Err(); err != nil {
+		panic(err)
+	}
+	return redislock.New(client)
 }

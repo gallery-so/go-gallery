@@ -1313,11 +1313,26 @@ union ViewGalleryPayloadOrError =
     | ErrAuthenticationFailed
 
 type VerifyEmailPayload {
-    email: String
+    email: String!
 }
 
 union VerifyEmailPayloadOrError =
     VerifyEmailPayload
+    | ErrInvalidInput
+
+enum PreverifyEmailResult {
+    Invalid
+    Risky
+    Valid
+}
+
+type PreverifyEmailPayload {
+    email: String!
+    result: PreverifyEmailResult!
+}
+
+union PreverifyEmailPayloadOrError =
+    PreverifyEmailPayload
     | ErrInvalidInput
 
 input UpdateEmailInput {
@@ -1408,6 +1423,8 @@ type Mutation {
 
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
+
+    preverifyEmail(email: String!): PreverifyEmailPayloadOrError
     verifyEmail(token: String!): VerifyEmailPayloadOrError
 
     # Retool Specific Mutations

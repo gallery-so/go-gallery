@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -36,6 +35,10 @@ type errNoEmailSet struct {
 	userID persist.DBID
 }
 
+type errEmailMismatch struct {
+	userID persist.DBID
+}
+
 func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -57,7 +60,7 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 			return
 		}
 
-		j, err := auth.JWTGeneratePipeline(c, input.UserID)
+		j, err := jwtGenerate(input.UserID, user.Email.String())
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -149,7 +152,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 			return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
 		}
 
-		j, err := auth.JWTGeneratePipeline(c, u.ID)
+		j, err := jwtGenerate(u.ID, u.Email.String())
 		if err != nil {
 			return fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
 		}
@@ -188,6 +191,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 		}
 
 		if len(data.Notifications) == 0 {
+			logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.Email)
 			return nil
 		}
 
@@ -375,4 +379,8 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 
 func (e errNoEmailSet) Error() string {
 	return fmt.Sprintf("user %s has no email", e.userID)
+}
+
+func (e errEmailMismatch) Error() string {
+	return fmt.Sprintf("wrong email for user %s", e.userID)
 }

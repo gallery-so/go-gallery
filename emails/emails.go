@@ -88,6 +88,7 @@ func setDefaults() {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("VERSION", "")
 	viper.SetDefault("SENDGRID_API_KEY", "")
+	viper.SetDefault("SENDGRID_VALIDATION_KEY", "")
 	viper.SetDefault("FROM_EMAIL", "test@gallery.so")
 	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "c63e40ab-5049-4ce1-9d14-8742a3c5c1a8")
 	viper.SetDefault("SENDGRID_NOTIFICATIONS_TEMPLATE_ID", "d-6135d8f36e9946979b0dcf1800363ab4")

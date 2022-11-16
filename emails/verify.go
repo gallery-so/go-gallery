@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/sendgrid-go"
@@ -24,6 +24,58 @@ type VerifyEmailOutput struct {
 	Email  string       `json:"email"`
 }
 
+type PreverifyEmailInput struct {
+	Email  string `form:"email" binding:"required"`
+	Source string `form:"source" binding:"required"`
+}
+
+type PreverifyEmailOutput struct {
+	Result PreverifyEmailResult `json:"result"`
+}
+
+type PreverifyEmailResult int
+
+const (
+	PreverifyEmailResultInvalid PreverifyEmailResult = iota
+	PreverifyEmailResultRisky
+	PreverifyEmailResultValid
+)
+
+func preverifyEmail() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input PreverifyEmailInput
+		err := c.ShouldBindQuery(&input)
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		result, err := validateEmail(c, input.Email, input.Source)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		var preverifyEmailResult PreverifyEmailResult
+
+		switch strings.ToLower(result.Result.Verdict) {
+		case "valid":
+			preverifyEmailResult = PreverifyEmailResultValid
+		case "risky":
+			preverifyEmailResult = PreverifyEmailResultRisky
+		case "invalid":
+			preverifyEmailResult = PreverifyEmailResultInvalid
+		default:
+			preverifyEmailResult = PreverifyEmailResultInvalid
+		}
+
+		c.JSON(http.StatusOK, PreverifyEmailOutput{
+			Result: preverifyEmailResult,
+		})
+
+	}
+}
+
 func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -34,7 +86,7 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, err := auth.JWTParse(input.JWT, viper.GetString("JWT_SECRET"))
+		userID, email, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -48,6 +100,11 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 
 		if user.EmailVerified.IsVerified() {
 			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email already verified"))
+			return
+		}
+
+		if !strings.EqualFold(user.Email.String(), email) {
+			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email does not match"))
 			return
 		}
 
@@ -141,5 +198,101 @@ func addEmailToSendgridList(ctx context.Context, email string, listID string) er
 	}
 
 	return nil
+
+}
+
+type sendgridEmailValidation struct {
+	Email  string `json:"email"`
+	Source string `json:"source"`
+}
+
+/*
+{
+   "result":{
+      "email":"bc@gallery.so",
+      "verdict":"Risky",
+      "score":0.21029,
+      "local":"bc",
+      "host":"gallery.so",
+      "checks":{
+         "domain":{
+            "has_valid_address_syntax":true,
+            "has_mx_or_a_record":true,
+            "is_suspected_disposable_address":false
+         },
+         "local_part":{
+            "is_suspected_role_address":false
+         },
+         "additional":{
+            "has_known_bounces":false,
+            "has_suspected_bounces":true
+         }
+      },
+      "source":"SIGNUP",
+      "ip_address":"172.119.250.71"
+   }
+}
+*/
+
+type sendgridEmailValidationResult struct {
+	Result struct {
+		Email   string  `json:"email"`
+		Verdict string  `json:"verdict"`
+		Score   float64 `json:"score"`
+		Local   string  `json:"local"`
+		Host    string  `json:"host"`
+		Checks  struct {
+			Domain struct {
+				HasValidAddressSyntax        bool `json:"has_valid_address_syntax"`
+				HasMxOrARecord               bool `json:"has_mx_or_a_record"`
+				IsSuspectedDisposableAddress bool `json:"is_suspected_disposable_address"`
+			} `json:"domain"`
+			LocalPart struct {
+				IsSuspectedRoleAddress bool `json:"is_suspected_role_address"`
+			} `json:"local_part"`
+			Additional struct {
+				HasKnownBounces     bool `json:"has_known_bounces"`
+				HasSuspectedBounces bool `json:"has_suspected_bounces"`
+			} `json:"additional"`
+		} `json:"checks"`
+		Source    string `json:"source"`
+		IPAddress string `json:"ip_address"`
+	} `json:"result"`
+}
+
+func validateEmail(ctx context.Context, email, source string) (sendgridEmailValidationResult, error) {
+
+	var result sendgridEmailValidationResult
+
+	request := sendgrid.GetRequest(viper.GetString("SENDGRID_VALIDATION_KEY"), "/v3/validations/email", "https://api.sendgrid.com")
+	request.Method = "POST"
+
+	val := sendgridEmailValidation{
+		Email:  email,
+		Source: source,
+	}
+
+	body, err := json.Marshal(val)
+	if err != nil {
+		return result, err
+	}
+
+	request.Body = body
+
+	response, err := sendgrid.API(request)
+	if err != nil {
+		return result, err
+	}
+
+	if response.StatusCode != 200 {
+		return result, fmt.Errorf("verify email returned: %+v", response)
+	}
+
+	err = json.Unmarshal([]byte(response.Body), &result)
+	if err != nil {
+		return result, err
+	}
+
+	return result, nil
 
 }

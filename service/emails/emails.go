@@ -50,6 +50,33 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 	return output, nil
 }
 
+func PreverifyEmail(ctx context.Context, email string, source string) (emails.PreverifyEmailOutput, error) {
+	var result emails.PreverifyEmailOutput
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/preverify?email=%s&source=%s", viper.GetString("EMAILS_HOST"), email, source), nil)
+	if err != nil {
+		return result, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return result, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return result, util.GetErrFromResp(resp)
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return result, err
+	}
+
+	return result, nil
+}
+
 func UnsubscribeByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailUnsubscriptionType) error {
 	input := emails.UnsubInput{
 		JWT:    jwt,

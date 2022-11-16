@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v9"
 )
 
 func NewRedisHook(db int, dbName string, continueOnly bool) redis.Hook {
@@ -33,7 +33,7 @@ var _ redis.Hook = redisHook{}
 
 type spanContextKey struct{}
 
-func (r redisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
+func (r redisHook) beforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
 	if r.continueOnly {
 		transaction := sentry.TransactionFromContext(ctx)
 		if transaction == nil {
@@ -56,7 +56,7 @@ func (r redisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.
 	return ctx, nil
 }
 
-func (redisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
+func (redisHook) afterProcess(ctx context.Context, cmd redis.Cmder) error {
 	if span, ok := ctx.Value(spanContextKey{}).(*sentry.Span); ok {
 		if err := cmd.Err(); err != nil {
 			AddEventDataToSpan(span, map[string]interface{}{
@@ -70,7 +70,7 @@ func (redisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	return nil
 }
 
-func (r redisHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
+func (r redisHook) beforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
 	if r.continueOnly {
 		transaction := sentry.TransactionFromContext(ctx)
 		if transaction == nil {
@@ -90,12 +90,38 @@ func (r redisHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder
 	return ctx, nil
 }
 
-func (redisHook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
+func (redisHook) afterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
 	if span, ok := ctx.Value(spanContextKey{}).(*sentry.Span); ok {
 		FinishSpan(span)
 	}
 
 	return nil
+}
+
+func (redisHook) DialHook(hook redis.DialHook) redis.DialHook {
+	return hook
+}
+
+func (r redisHook) ProcessHook(hook redis.ProcessHook) redis.ProcessHook {
+	return func(ctx context.Context, cmd redis.Cmder) error {
+		newCtx, err := r.beforeProcess(ctx, cmd)
+		if err != nil {
+			return err
+		}
+		err = hook(newCtx, cmd)
+		return r.afterProcess(ctx, cmd)
+	}
+}
+
+func (r redisHook) ProcessPipelineHook(hook redis.ProcessPipelineHook) redis.ProcessPipelineHook {
+	return func(ctx context.Context, cmds []redis.Cmder) error {
+		newCtx, err := r.beforeProcessPipeline(ctx, cmds)
+		if err != nil {
+			return err
+		}
+		err = hook(newCtx, cmds)
+		return r.afterProcessPipeline(ctx, cmds)
+	}
 }
 
 func appendCmd(b []byte, cmd redis.Cmder) []byte {

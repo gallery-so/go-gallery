@@ -16,6 +16,7 @@ require (
 	github.com/asottile/dockerfile v3.1.0+incompatible
 	github.com/benny-conn/go-ens v1.1.0
 	github.com/bits-and-blooms/bloom v2.0.3+incompatible
+	github.com/bsm/redislock v0.8.2
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.16
@@ -26,7 +27,7 @@ require (
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-playground/validator/v10 v10.10.1
-	github.com/go-redis/redis/v8 v8.11.4
+	github.com/go-redis/redis/v9 v9.0.0-rc.1
 	github.com/golang-migrate/migrate/v4 v4.15.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/hamba/avro v1.6.6 // indirect
@@ -58,13 +59,13 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.0
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/vektah/gqlparser/v2 v2.4.1
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
-	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858
 	google.golang.org/api v0.85.0
 	google.golang.org/appengine v1.6.7
