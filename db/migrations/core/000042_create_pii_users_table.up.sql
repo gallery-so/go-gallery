@@ -20,6 +20,3 @@ create view users_with_pii as
     select users.*, pii_users.pii_email_address from users left join pii_users on users.id = pii_users.user_id and pii_users.deleted = false;
 
 drop index if exists users_email_idx;
-
-select users.*, pii_users.pii_email_address from users left join pii_users on users.id = pii_users.user_id and pii_users.deleted = false where users.id = '2HeDCiABJjh71BinQ12wCpgyzTz';
-select * from users where id = '2HeDCiABJjh71BinQ12wCpgyzTz';
