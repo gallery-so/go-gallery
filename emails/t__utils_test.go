@@ -19,13 +19,13 @@ import (
 var testUser = coredb.User{
 	Username:           sql.NullString{String: "test1", Valid: true},
 	UsernameIdempotent: sql.NullString{String: "test1", Valid: true},
-	Email:              persist.NullString("bc@gallery.so"),
+	Email:              persist.Email("bc@gallery.so"),
 }
 
 var testUser2 = coredb.User{
 	Username:           sql.NullString{String: "test2", Valid: true},
 	UsernameIdempotent: sql.NullString{String: "test2", Valid: true},
-	Email:              persist.NullString("bcc@gallery.so"),
+	Email:              persist.Email("bcc@gallery.so"),
 }
 
 var admireNotif coredb.Notification
@@ -89,13 +89,13 @@ func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
 
 func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, repos *postgres.Repositories) {
 
-	email := testUser.Email.String()
+	email := testUser.Email
 	userID, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser.Username.String, Email: &email, ChainAddress: persist.NewChainAddress("0x8914496dc01efcc49a2fa340331fb90969b6f1d2", persist.ChainETH)})
 	if err != nil {
 		t.Fatalf("failed to create user: %s", err)
 	}
 
-	email2 := testUser2.Email.String()
+	email2 := testUser2.Email
 	userID2, err := repos.UserRepository.Create(ctx, persist.CreateUserInput{Username: testUser2.Username.String, Email: &email2, ChainAddress: persist.NewChainAddress("0x9a3f9764b21adaf3c6fdf6f947e6d3340a3f8ac5", persist.ChainETH)})
 	if err != nil {
 		t.Fatalf("failed to create user: %s", err)
