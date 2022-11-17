@@ -67,7 +67,7 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 			return
 		}
 
-		logger.For(c).Debugf("sending verification email to %s with token %s", emailAddress, j)
+		//logger.For(c).Debugf("sending verification email to %s with token %s", emailAddress, j)
 
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
 		to := mail.NewEmail(userWithPII.Username.String, emailAddress)
@@ -82,12 +82,12 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 		m.AddPersonalizations(p)
 		p.AddTos(to)
 
-		response, err := s.Send(m)
+		_, err = s.Send(m)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
-		logger.For(c).Debugf("email sent: %+v", *response)
+		//logger.For(c).Debugf("email sent: %+v", *response)
 
 		c.Status(http.StatusOK)
 	}
@@ -192,7 +192,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 		}
 
 		if len(data.Notifications) == 0 {
-			logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.PiiEmailAddress.String())
+			//logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.PiiEmailAddress.String())
 			return nil
 		}
 
@@ -206,7 +206,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 			return err
 		}
 
-		logger.For(c).Debugf("sending notifications email to %s with data %+v", u.PiiEmailAddress.String(), asMap)
+		//logger.For(c).Debugf("sending notifications email to %s with data %+v", u.PiiEmailAddress.String(), asMap)
 
 		p.DynamicTemplateData = asMap
 
