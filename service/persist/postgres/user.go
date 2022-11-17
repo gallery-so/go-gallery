@@ -50,7 +50,7 @@ func NewUserRepository(db *sql.DB, queries *db.Queries) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, EMAIL, BIO, WALLETS, UNIVERSAL, EMAIL_UNSUBSCRIPTIONS) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS, UNIVERSAL, EMAIL_UNSUBSCRIPTIONS) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
@@ -246,13 +246,27 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	}
 
 	var id persist.DBID
-	err = tx.StmtContext(pCtx, u.createStmt).QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Email, pUser.Bio, []persist.DBID{walletID}, pUser.Universal, pUser.EmailNotificationsSettings).Scan(&id)
+	err = tx.StmtContext(pCtx, u.createStmt).QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Bio, []persist.DBID{walletID}, pUser.Universal, pUser.EmailNotificationsSettings).Scan(&id)
 	if err != nil {
 		return "", err
 	}
 
 	if err := tx.Commit(); err != nil {
 		return "", err
+	}
+
+	// TODO: Put this in the above transaction when refactoring UserRepository to use pgx+sqlc.
+	// At the moment, we'd have to mix sql.Tx and pgx.Tx, and it's easier just to assume
+	// for the time being that these inserts will work. Worst case scenario: the user has
+	// to enter their email address again after successfully creating an account.
+	if pUser.Email != nil {
+		err := u.queries.UpdateUserEmail(pCtx, coredb.UpdateUserEmailParams{
+			UserID:       id,
+			EmailAddress: sql.NullString{Valid: true, String: *pUser.Email},
+		})
+		if err != nil {
+			logger.For(pCtx).Error("failed to insert email address when creating new user with userID=%s\n", id)
+		}
 	}
 
 	return id, nil

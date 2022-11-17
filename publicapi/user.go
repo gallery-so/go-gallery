@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -59,6 +60,22 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 	}
 
 	return &user, nil
+}
+
+func (api UserAPI) GetUserWithPIIById(ctx context.Context, userID persist.DBID) (*db.UsersWithPii, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	userWithPII, err := api.queries.GetUserWithPIIByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &userWithPII, nil
 }
 
 func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
@@ -353,17 +370,17 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email string) error {
 		return err
 	}
 	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
-		ID:    userID,
-		Email: persist.NullString(email),
+		UserID:       userID,
+		EmailAddress: sql.NullString{Valid: true, String: email},
 	})
 	if err != nil {
 		return err
 	}
 
-	err = emails.RequestVerificationEmail(ctx, userID)
-	if err != nil {
-		return err
-	}
+	//err = emails.RequestVerificationEmail(ctx, userID)
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }

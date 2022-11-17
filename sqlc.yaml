@@ -35,15 +35,14 @@ sql:
           # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
           # the override should come _before_ the * entry
           # Users
-          - column: "users.wallets"
+          # "users*" wildcards are so these mappings will also apply to the "users_with_pii" view
+          - column: "users*.wallets"
             go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
-          - column: "users.email_unsubscriptions"
+          - column: "users*.email_unsubscriptions"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailUnsubscriptions"
-          - column: "users.notification_settings"
+          - column: "users*.notification_settings"
             go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
-          - column: "users.email"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
-          - column: "users.email_verified"
+          - column: "users*.email_verified"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
 
           # Galleries
@@ -125,6 +124,10 @@ sql:
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
+          - column: "*.email_address"
+            go_type: "database/sql.NullString"
+          - column: "*.*_email_address"
+            go_type: "database/sql.NullString"
           - column: "*.id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "*.*_id"

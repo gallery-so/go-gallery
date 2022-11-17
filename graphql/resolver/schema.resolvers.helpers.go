@@ -507,18 +507,18 @@ func resolveViewerEmail(ctx context.Context) *model.UserEmail {
 
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 
-	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	userWithPII, err := publicapi.For(ctx).User.GetUserWithPIIById(ctx, userID)
 	if err != nil {
 		return nil
 	}
 
-	return userToEmailModel(user)
+	return userWithPIIToEmailModel(userWithPII)
 
 }
 
-func userToEmailModel(user *db.User) *model.UserEmail {
+func userWithPIIToEmailModel(user *db.UsersWithPii) *model.UserEmail {
 
-	email := user.Email.String()
+	email := user.PiiEmailAddress.String
 
 	return &model.UserEmail{
 		Email:              &email,

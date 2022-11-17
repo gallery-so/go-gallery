@@ -1,6 +1,9 @@
 -- name: GetUserById :one
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
+-- name: GetUserWithPIIByID :one
+select * from users_with_pii where id = @user_id and deleted = false;
+
 -- name: GetUserByIdBatch :batchone
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
@@ -541,23 +544,27 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 
 
 -- for some reason this query will not allow me to use @tags for $1
--- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many
-SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL AND email_verified = $2
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
-    LIMIT $3;
+select * from users_with_pii
+    where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
+    and (email_unsubscriptions->>$1::varchar = 'false' or email_unsubscriptions->>$1::varchar is null)
+    and deleted = false and pii_email_address is not null and email_verified = $2
+    and (created_at, id) < (@cur_before_time, @cur_before_id)
+    and (created_at, id) > (@cur_after_time, @cur_after_id)
+    order by case when @paging_forward::bool then (created_at, id) end asc,
+             case when not @paging_forward::bool then (created_at, id) end desc
+    limit $3;
 
--- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
 -- name: GetUsersWithEmailNotificationsOn :many
-SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND deleted = false AND email IS NOT NULL AND email_verified = $1
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
-    LIMIT $2;
+-- TODO: Does not appear to be used
+select * from users_with_pii
+    where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
+    and deleted = false and pii_email_address is not null and email_verified = $1
+    and (created_at, id) < (@cur_before_time, @cur_before_id)
+    and (created_at, id) > (@cur_after_time, @cur_after_id)
+    order by case when @paging_forward::bool then (created_at, id) end asc,
+             case when not @paging_forward::bool then (created_at, id) end desc
+    limit $2;
 
 -- name: GetUsersWithRolePaginate :many
 select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = false
@@ -572,7 +579,19 @@ select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = 
 UPDATE users SET email_verified = $2 WHERE id = $1;
 
 -- name: UpdateUserEmail :exec
-UPDATE users SET email = @email, email_verified = 0 WHERE id = @id;
+with upsert_pii as (
+    insert into pii_users (user_id, pii_email_address) values (@user_id, @email_address)
+        on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
+    returning @user_id
+),
+
+upsert_metadata as (
+    insert into dev_metadata_users (user_id, has_email_address) values (@user_id, (@email_address is not null))
+        on conflict (user_id) do update set has_email_address = excluded.has_email_address
+    returning @user_id
+)
+
+update users set email_verified = 0 from upsert_pii, upsert_metadata where users.id = @user_id;
 
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;

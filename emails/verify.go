@@ -40,18 +40,18 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		user, err := queries.GetUserById(c, userID)
+		userWithPII, err := queries.GetUserWithPIIByID(c, userID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		if user.EmailVerified.IsVerified() {
+		if userWithPII.EmailVerified.IsVerified() {
 			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email already verified"))
 			return
 		}
 
-		err = addEmailToSendgridList(c, user.Email.String(), viper.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String, viper.GetString("SENDGRID_DEFAULT_LIST_ID"))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -67,8 +67,8 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, VerifyEmailOutput{
-			UserID: user.ID,
-			Email:  user.Email.String(),
+			UserID: userWithPII.ID,
+			Email:  userWithPII.PiiEmailAddress.String,
 		})
 	}
 }
