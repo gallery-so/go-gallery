@@ -959,6 +959,10 @@ type PageInfo struct {
 	EndCursor       string `json:"endCursor"`
 }
 
+type PreverifyEmailInput struct {
+	Email persist.Email `json:"email"`
+}
+
 type PreverifyEmailPayload struct {
 	Email  persist.Email        `json:"email"`
 	Result PreverifyEmailResult `json:"result"`
@@ -1350,6 +1354,10 @@ func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
 type UsersConnection struct {
 	Edges    []*UserEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`
+}
+
+type VerifyEmailInput struct {
+	Token string `json:"token"`
 }
 
 type VerifyEmailPayload struct {

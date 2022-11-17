@@ -535,7 +535,7 @@ type ComplexityRoot struct {
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                          func(childComplexity int) int
-		PreverifyEmail                  func(childComplexity int, email persist.Email) int
+		PreverifyEmail                  func(childComplexity int, input model.PreverifyEmailInput) int
 		RefreshCollection               func(childComplexity int, collectionID persist.DBID) int
 		RefreshContract                 func(childComplexity int, contractID persist.DBID) int
 		RefreshToken                    func(childComplexity int, tokenID persist.DBID) int
@@ -557,7 +557,7 @@ type ComplexityRoot struct {
 		UpdateNotificationSettings      func(childComplexity int, settings *model.NotificationSettingsInput) int
 		UpdateTokenInfo                 func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
-		VerifyEmail                     func(childComplexity int, token string) int
+		VerifyEmail                     func(childComplexity int, input model.VerifyEmailInput) int
 		ViewGallery                     func(childComplexity int, galleryID persist.DBID) int
 	}
 
@@ -1043,8 +1043,8 @@ type MutationResolver interface {
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
 	ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error)
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
-	PreverifyEmail(ctx context.Context, email persist.Email) (model.PreverifyEmailPayloadOrError, error)
-	VerifyEmail(ctx context.Context, token string) (model.VerifyEmailPayloadOrError, error)
+	PreverifyEmail(ctx context.Context, input model.PreverifyEmailInput) (model.PreverifyEmailPayloadOrError, error)
+	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (model.VerifyEmailPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 }
@@ -2902,7 +2902,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.PreverifyEmail(childComplexity, args["email"].(persist.Email)), true
+		return e.complexity.Mutation.PreverifyEmail(childComplexity, args["input"].(model.PreverifyEmailInput)), true
 
 	case "Mutation.refreshCollection":
 		if e.complexity.Mutation.RefreshCollection == nil {
@@ -3161,7 +3161,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.VerifyEmail(childComplexity, args["token"].(string)), true
+		return e.complexity.Mutation.VerifyEmail(childComplexity, args["input"].(model.VerifyEmailInput)), true
 
 	case "Mutation.viewGallery":
 		if e.complexity.Mutation.ViewGallery == nil {
@@ -5250,7 +5250,7 @@ input UpdateEmailNotificationSettingsInput {
 
 input UnsubscribeFromEmailTypeInput {
     type: EmailUnsubscriptionType!
-    token: String!
+    token: String! @scrub
 }
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
@@ -6050,6 +6050,11 @@ union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
 
+
+input VerifyEmailInput {
+    token: String! @scrub
+}
+
 type VerifyEmailPayload {
     email: Email!
 }
@@ -6057,6 +6062,10 @@ type VerifyEmailPayload {
 union VerifyEmailPayloadOrError =
     VerifyEmailPayload
     | ErrInvalidInput
+
+input PreverifyEmailInput {
+    email: Email! @scrub
+}
 
 enum PreverifyEmailResult {
     Invalid
@@ -6074,7 +6083,7 @@ union PreverifyEmailPayloadOrError =
     | ErrInvalidInput
 
 input UpdateEmailInput {
-    email: Email!
+    email: Email! @scrub
 }
 
 type UpdateEmailPayload {
@@ -6162,8 +6171,8 @@ type Mutation {
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
 
-    preverifyEmail(email: Email!): PreverifyEmailPayloadOrError
-    verifyEmail(token: String!): VerifyEmailPayloadOrError
+    preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
+    verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
 
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
@@ -6737,15 +6746,15 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 func (ec *executionContext) field_Mutation_preverifyEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 persist.Email
-	if tmp, ok := rawArgs["email"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
-		arg0, err = ec.unmarshalNEmail2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx, tmp)
+	var arg0 model.PreverifyEmailInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNPreverifyEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreverifyEmailInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["email"] = arg0
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -7070,15 +7079,15 @@ func (ec *executionContext) field_Mutation_updateUserInfo_args(ctx context.Conte
 func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["token"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg0 model.VerifyEmailInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNVerifyEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["token"] = arg0
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -16684,7 +16693,7 @@ func (ec *executionContext) _Mutation_preverifyEmail(ctx context.Context, field 
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().PreverifyEmail(rctx, args["email"].(persist.Email))
+		return ec.resolvers.Mutation().PreverifyEmail(rctx, args["input"].(model.PreverifyEmailInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16723,7 +16732,7 @@ func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field gra
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().VerifyEmail(rctx, args["token"].(string))
+		return ec.resolvers.Mutation().VerifyEmail(rctx, args["input"].(model.VerifyEmailInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -25233,6 +25242,29 @@ func (ec *executionContext) unmarshalInputNotificationSettingsInput(ctx context.
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputPreverifyEmailInput(ctx context.Context, obj interface{}) (model.PreverifyEmailInput, error) {
+	var it model.PreverifyEmailInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "email":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			it.Email, err = ec.unmarshalNEmail2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputSetSpamPreferenceInput(ctx context.Context, obj interface{}) (model.SetSpamPreferenceInput, error) {
 	var it model.SetSpamPreferenceInput
 	asMap := map[string]interface{}{}
@@ -25566,6 +25598,29 @@ func (ec *executionContext) unmarshalInputUpdateUserInfoInput(ctx context.Contex
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bio"))
 			it.Bio, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputVerifyEmailInput(ctx context.Context, obj interface{}) (model.VerifyEmailInput, error) {
+	var it model.VerifyEmailInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			it.Token, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -35391,6 +35446,11 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑg
 	return ec._PageInfo(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNPreverifyEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreverifyEmailInput(ctx context.Context, v interface{}) (model.PreverifyEmailInput, error) {
+	res, err := ec.unmarshalInputPreverifyEmailInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNPreverifyEmailResult2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreverifyEmailResult(ctx context.Context, v interface{}) (model.PreverifyEmailResult, error) {
 	var res model.PreverifyEmailResult
 	err := res.UnmarshalGQL(v)
@@ -35521,6 +35581,11 @@ func (ec *executionContext) unmarshalNUpdateTokenInfoInput2githubᚗcomᚋmikeyd
 
 func (ec *executionContext) unmarshalNUpdateUserInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateUserInfoInput(ctx context.Context, v interface{}) (model.UpdateUserInfoInput, error) {
 	res, err := ec.unmarshalInputUpdateUserInfoInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailInput(ctx context.Context, v interface{}) (model.VerifyEmailInput, error) {
+	res, err := ec.unmarshalInputVerifyEmailInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 

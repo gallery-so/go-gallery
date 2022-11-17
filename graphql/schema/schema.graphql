@@ -513,7 +513,7 @@ input UpdateEmailNotificationSettingsInput {
 
 input UnsubscribeFromEmailTypeInput {
     type: EmailUnsubscriptionType!
-    token: String!
+    token: String! @scrub
 }
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
@@ -1313,6 +1313,11 @@ union ViewGalleryPayloadOrError =
     ViewGalleryPayload
     | ErrAuthenticationFailed
 
+
+input VerifyEmailInput {
+    token: String! @scrub
+}
+
 type VerifyEmailPayload {
     email: Email!
 }
@@ -1320,6 +1325,10 @@ type VerifyEmailPayload {
 union VerifyEmailPayloadOrError =
     VerifyEmailPayload
     | ErrInvalidInput
+
+input PreverifyEmailInput {
+    email: Email! @scrub
+}
 
 enum PreverifyEmailResult {
     Invalid
@@ -1337,7 +1346,7 @@ union PreverifyEmailPayloadOrError =
     | ErrInvalidInput
 
 input UpdateEmailInput {
-    email: Email!
+    email: Email! @scrub
 }
 
 type UpdateEmailPayload {
@@ -1425,8 +1434,8 @@ type Mutation {
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
 
-    preverifyEmail(email: Email!): PreverifyEmailPayloadOrError
-    verifyEmail(token: String!): VerifyEmailPayloadOrError
+    preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
+    verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
 
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
