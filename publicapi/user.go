@@ -376,10 +376,10 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 		return err
 	}
 
-	//err = emails.RequestVerificationEmail(ctx, userID)
-	//if err != nil {
-	//	return err
-	//}
+	err = emails.RequestVerificationEmail(ctx, userID)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
