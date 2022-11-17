@@ -144,10 +144,26 @@ type groupedNotificationHandler struct {
 }
 
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
-	curNotif, _ := h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
-		OwnerID: notif.OwnerID,
-		Action:  notif.Action,
-	})
+	var curNotif db.Notification
+
+	switch notif.Action {
+	// Follows aren't in response to a feed event
+	case persist.ActionUserFollowedUsers:
+		curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
+			OwnerID:          notif.OwnerID,
+			Action:           notif.Action,
+			OnlyForFeedEvent: false,
+		})
+	// Otherwise find the relevant feed event
+	default:
+		curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
+			OwnerID:          notif.OwnerID,
+			Action:           notif.Action,
+			OnlyForFeedEvent: true,
+			FeedEventID:      notif.FeedEventID,
+		})
+	}
+
 	if time.Since(curNotif.CreatedAt) < groupedWindow {
 		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
 		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub)
