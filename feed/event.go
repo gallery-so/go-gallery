@@ -175,7 +175,7 @@ func (b *EventBuilder) isStillEditing(ctx context.Context, event db.Event) (bool
 }
 
 func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), persist.ActionList{event.Action})
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), persist.ActionList{event.Action}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 }
 
 func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionCollectionUpdated])
+	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionCollectionUpdated], true)
 	if err != nil {
 		return nil, err
 	}

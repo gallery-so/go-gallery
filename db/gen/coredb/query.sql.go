@@ -1055,18 +1055,25 @@ with recursive activity as (
         and e.created_at >= a.created_at - make_interval(secs => $2)
         and e.deleted = false
         and e.caption is null
+        and (not $4::bool or e.subject_id = a.subject_id)
 )
 select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption from events where id = any(select id from activity) order by (created_at, id) asc
 `
 
 type GetEventsInWindowParams struct {
-	ID      persist.DBID
-	Secs    float64
-	Actions persist.ActionList
+	ID             persist.DBID
+	Secs           float64
+	Actions        persist.ActionList
+	IncludeSubject bool
 }
 
 func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, getEventsInWindow, arg.ID, arg.Secs, arg.Actions)
+	rows, err := q.db.Query(ctx, getEventsInWindow,
+		arg.ID,
+		arg.Secs,
+		arg.Actions,
+		arg.IncludeSubject,
+	)
 	if err != nil {
 		return nil, err
 	}
