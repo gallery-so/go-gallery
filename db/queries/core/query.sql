@@ -308,6 +308,7 @@ with recursive activity as (
         and e.created_at >= a.created_at - make_interval(secs => $2)
         and e.deleted = false
         and e.caption is null
+        and (not @include_subject::bool or e.subject_id = a.subject_id)
 )
 select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
