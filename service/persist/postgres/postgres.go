@@ -166,9 +166,11 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 		spanData["rowCount"] = rows
 	}
 
-	if args, ok := data["args"]; ok {
-		spanData["sql args"] = args
-	}
+	// Current disabled; re-enable if/when we have handling for sensitive information.
+	// Otherwise, we'll send every SQL parameter to Sentry, which could contain PII.
+	//if args, ok := data["args"]; ok {
+	//	spanData["sql args"] = args
+	//}
 
 	tracing.AddEventDataToSpan(span, spanData)
 
