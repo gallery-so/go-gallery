@@ -504,16 +504,12 @@ func resolveViewer(ctx context.Context) *model.Viewer {
 }
 
 func resolveViewerEmail(ctx context.Context) *model.UserEmail {
-
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-
-	userWithPII, err := publicapi.For(ctx).User.GetUserWithPIIById(ctx, userID)
+	userWithPII, err := publicapi.For(ctx).User.GetUserWithPII(ctx)
 	if err != nil {
 		return nil
 	}
 
 	return userWithPIIToEmailModel(userWithPII)
-
 }
 
 func userWithPIIToEmailModel(user *db.UsersWithPii) *model.UserEmail {

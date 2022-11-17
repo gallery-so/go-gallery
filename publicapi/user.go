@@ -61,11 +61,12 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 	return &user, nil
 }
 
-func (api UserAPI) GetUserWithPIIById(ctx context.Context, userID persist.DBID) (*db.UsersWithPii, error) {
-	// Validate
-	if err := validateFields(api.validator, validationMap{
-		"userID": {userID, "required"},
-	}); err != nil {
+// GetUserWithPII returns the current user and their associated personally identifiable information
+func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.UsersWithPii, error) {
+	// Nothing to validate
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
 		return nil, err
 	}
 
