@@ -491,10 +491,13 @@ SELECT * FROM notifications WHERE id = $1 AND deleted = false;
 SELECT * FROM notifications WHERE id = $1 AND deleted = false;
 
 -- name: GetMostRecentNotificationByOwnerIDForAction :one
-SELECT * FROM notifications
-    WHERE owner_id = $1 AND action = $2 AND deleted = false
-    ORDER BY created_at DESC
-    LIMIT 1;
+select * from notifications
+    where owner_id = $1
+    and action = $2
+    and deleted = false
+    and (not @only_for_feed_event::bool or feed_event_id = $3)
+    order by created_at desc
+    limit 1;
 
 -- name: GetNotificationsByOwnerIDForActionAfter :many
 SELECT * FROM notifications

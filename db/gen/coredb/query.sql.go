@@ -1343,19 +1343,29 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 }
 
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications
-    WHERE owner_id = $1 AND action = $2 AND deleted = false
-    ORDER BY created_at DESC
-    LIMIT 1
+select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount from notifications
+    where owner_id = $1
+    and action = $2
+    and deleted = false
+    and (not $4::bool or feed_event_id = $3)
+    order by created_at desc
+    limit 1
 `
 
 type GetMostRecentNotificationByOwnerIDForActionParams struct {
-	OwnerID persist.DBID
-	Action  persist.Action
+	OwnerID          persist.DBID
+	Action           persist.Action
+	FeedEventID      persist.DBID
+	OnlyForFeedEvent bool
 }
 
 func (q *Queries) GetMostRecentNotificationByOwnerIDForAction(ctx context.Context, arg GetMostRecentNotificationByOwnerIDForActionParams) (Notification, error) {
-	row := q.db.QueryRow(ctx, getMostRecentNotificationByOwnerIDForAction, arg.OwnerID, arg.Action)
+	row := q.db.QueryRow(ctx, getMostRecentNotificationByOwnerIDForAction,
+		arg.OwnerID,
+		arg.Action,
+		arg.FeedEventID,
+		arg.OnlyForFeedEvent,
+	)
 	var i Notification
 	err := row.Scan(
 		&i.ID,

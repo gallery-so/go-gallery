@@ -286,7 +286,7 @@ func (h notificationHandler) findOwnerForNotificationFromEvent(event db.Event) (
 		}
 		return feedEvent.OwnerID, nil
 	case persist.ResourceTypeUser:
-		return event.UserID, nil
+		return event.SubjectID, nil
 	}
 
 	return "", fmt.Errorf("no owner found for event: %s", event.Action)
