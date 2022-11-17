@@ -51,12 +51,12 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if util.IsNullOrEmpty(userWithPII.PiiEmailAddress) {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{input.UserID})
 			return
 		}
 
-		emailAddress := userWithPII.PiiEmailAddress.String
+		emailAddress := userWithPII.PiiEmailAddress.String()
 
 		errGroup := new(errgroup.Group)
 
@@ -113,7 +113,7 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, email, err := jwtParse(input.JWT)
+		userID, emailFromToken, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -125,18 +125,16 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if util.IsNullOrEmpty(userWithPII.PiiEmailAddress) {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID})
 			return
 		}
 
-		emailAddress := userWithPII.PiiEmailAddress.String
-		if !strings.EqualFold(emailAddress, email) {
+		emailAddress := userWithPII.PiiEmailAddress.String()
+		if !strings.EqualFold(emailAddress, emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
 			return
 		}
-
-		unsubs := user.EmailUnsubscriptions
 
 		unsubs := userWithPII.EmailUnsubscriptions
 
@@ -190,7 +188,7 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, email, err := jwtParse(input.JWT)
+		userID, emailFromToken, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -202,18 +200,16 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		if util.IsNullOrEmpty(userWithPII.PiiEmailAddress) {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID})
 			return
 		}
 
-		emailAddress := userWithPII.PiiEmailAddress.String
-		if !strings.EqualFold(emailAddress, email) {
+		emailAddress := userWithPII.PiiEmailAddress.String()
+		if !strings.EqualFold(emailAddress, emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
 			return
 		}
-
-		unsubs := user.EmailUnsubscriptions
 
 		unsubs := userWithPII.EmailUnsubscriptions
 

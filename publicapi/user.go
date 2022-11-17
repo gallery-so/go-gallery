@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -370,8 +369,8 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 		return err
 	}
 	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
-		ID:    userID,
-		Email: email,
+		UserID:       userID,
+		EmailAddress: email,
 	})
 	if err != nil {
 		return err

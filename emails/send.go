@@ -55,12 +55,12 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 			return
 		}
 
-		if util.IsNullOrEmpty(userWithPII.PiiEmailAddress) {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID: input.UserID})
 			return
 		}
 
-		emailAddress := userWithPII.PiiEmailAddress.String
+		emailAddress := userWithPII.PiiEmailAddress.String()
 		j, err := jwtGenerate(input.UserID, emailAddress)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
@@ -140,7 +140,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.UsersWithPii) error {
 
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(u.Username.String, u.PiiEmailAddress.String)
+		to := mail.NewEmail(u.Username.String, u.PiiEmailAddress.String())
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
@@ -153,7 +153,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 			return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
 		}
 
-		j, err := jwtGenerate(u.ID, u.Email.String())
+		j, err := jwtGenerate(u.ID, u.PiiEmailAddress.String())
 		if err != nil {
 			return fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
 		}
@@ -192,7 +192,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 		}
 
 		if len(data.Notifications) == 0 {
-			logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.Email)
+			logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.PiiEmailAddress.String())
 			return nil
 		}
 

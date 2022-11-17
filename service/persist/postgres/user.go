@@ -262,7 +262,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	if pUser.Email != nil {
 		err := u.queries.UpdateUserEmail(pCtx, coredb.UpdateUserEmailParams{
 			UserID:       id,
-			EmailAddress: sql.NullString{Valid: true, String: *pUser.Email},
+			EmailAddress: *pUser.Email,
 		})
 		if err != nil {
 			logger.For(pCtx).Error("failed to insert email address when creating new user with userID=%s\n", id)

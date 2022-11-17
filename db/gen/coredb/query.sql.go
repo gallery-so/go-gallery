@@ -2179,10 +2179,6 @@ type GetUsersByChainAddressesRow struct {
 	Traits               pgtype.JSONB
 	Universal            bool
 	NotificationSettings persist.UserNotificationSettings
-<<<<<<< HEAD
-=======
-	Email                persist.Email
->>>>>>> main
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	Address              persist.Address
@@ -2353,48 +2349,39 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 }
 
 const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
-<<<<<<< HEAD
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, pii_email_address from users_with_pii
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
-    and (email_unsubscriptions->>$1::varchar = 'false' or email_unsubscriptions->>$1::varchar is null)
-    and deleted = false and pii_email_address is not null and email_verified = $2
+    and (email_unsubscriptions->>$3::varchar = 'false' or email_unsubscriptions->>$3::varchar is null)
+    and deleted = false and pii_email_address is not null and email_verified = $1
     and (created_at, id) < ($4, $5)
     and (created_at, id) > ($6, $7)
     order by case when $8::bool then (created_at, id) end asc,
              case when not $8::bool then (created_at, id) end desc
-    limit $3
-=======
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email, email_verified, email_unsubscriptions FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL AND email_verified = $2
-    AND (created_at, id) < ($3, $4)
-    AND (created_at, id) > ($5, $6)
-    ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT $7::bool THEN (created_at, id) END DESC
-    LIMIT $8
->>>>>>> main
+    limit $2
 `
 
 type GetUsersWithEmailNotificationsOnForEmailTypeParams struct {
-	EmailUnsubscription string
 	EmailVerified       persist.EmailVerificationStatus
+	Limit               int32
+	EmailUnsubscription string
 	CurBeforeTime       time.Time
 	CurBeforeID         persist.DBID
 	CurAfterTime        time.Time
 	CurAfterID          persist.DBID
 	PagingForward       bool
-	Limit               int32
 }
 
 // for some reason this query will not allow me to use @tags for $1
 func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Context, arg GetUsersWithEmailNotificationsOnForEmailTypeParams) ([]UsersWithPii, error) {
 	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOnForEmailType,
-		arg.EmailUnsubscription,
 		arg.EmailVerified,
+		arg.Limit,
+		arg.EmailUnsubscription,
 		arg.CurBeforeTime,
 		arg.CurBeforeID,
 		arg.CurAfterTime,
 		arg.CurAfterID,
 		arg.PagingForward,
-		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -2765,13 +2752,8 @@ update users set email_verified = 0 from upsert_pii, upsert_metadata where users
 `
 
 type UpdateUserEmailParams struct {
-<<<<<<< HEAD
 	UserID       persist.DBID
-	EmailAddress sql.NullString
-=======
-	Email persist.Email
-	ID    persist.DBID
->>>>>>> main
+	EmailAddress persist.Email
 }
 
 func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {

@@ -914,35 +914,11 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var items []User
-<<<<<<< HEAD
-		for rows.Next() {
-			var i User
-			if err := rows.Scan(
-				&i.ID,
-				&i.Deleted,
-				&i.Version,
-				&i.LastUpdated,
-				&i.CreatedAt,
-				&i.Username,
-				&i.UsernameIdempotent,
-				&i.Wallets,
-				&i.Bio,
-				&i.Traits,
-				&i.Universal,
-				&i.NotificationSettings,
-				&i.EmailVerified,
-				&i.EmailUnsubscriptions,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-=======
 		if b.closed {
 			if f != nil {
 				f(t, items, errors.New("batch already closed"))
 			}
 			continue
->>>>>>> main
 		}
 		err := func() error {
 			rows, err := b.br.Query()
@@ -965,7 +941,6 @@ func (b *GetFollowersByUserIdBatchBatchResults) Query(f func(int, []User, error)
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.Email,
 					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 				); err != nil {
@@ -1015,35 +990,11 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var items []User
-<<<<<<< HEAD
-		for rows.Next() {
-			var i User
-			if err := rows.Scan(
-				&i.ID,
-				&i.Deleted,
-				&i.Version,
-				&i.LastUpdated,
-				&i.CreatedAt,
-				&i.Username,
-				&i.UsernameIdempotent,
-				&i.Wallets,
-				&i.Bio,
-				&i.Traits,
-				&i.Universal,
-				&i.NotificationSettings,
-				&i.EmailVerified,
-				&i.EmailUnsubscriptions,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-=======
 		if b.closed {
 			if f != nil {
 				f(t, items, errors.New("batch already closed"))
 			}
 			continue
->>>>>>> main
 		}
 		err := func() error {
 			rows, err := b.br.Query()
@@ -1066,7 +1017,6 @@ func (b *GetFollowingByUserIdBatchBatchResults) Query(f func(int, []User, error)
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.Email,
 					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 				); err != nil {
@@ -1524,35 +1474,11 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var items []User
-<<<<<<< HEAD
-		for rows.Next() {
-			var i User
-			if err := rows.Scan(
-				&i.ID,
-				&i.Deleted,
-				&i.Version,
-				&i.LastUpdated,
-				&i.CreatedAt,
-				&i.Username,
-				&i.UsernameIdempotent,
-				&i.Wallets,
-				&i.Bio,
-				&i.Traits,
-				&i.Universal,
-				&i.NotificationSettings,
-				&i.EmailVerified,
-				&i.EmailUnsubscriptions,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-=======
 		if b.closed {
 			if f != nil {
 				f(t, items, errors.New("batch already closed"))
 			}
 			continue
->>>>>>> main
 		}
 		err := func() error {
 			rows, err := b.br.Query()
@@ -1575,7 +1501,6 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.Email,
 					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 				); err != nil {
@@ -2689,35 +2614,11 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
 		var items []User
-<<<<<<< HEAD
-		for rows.Next() {
-			var i User
-			if err := rows.Scan(
-				&i.ID,
-				&i.Deleted,
-				&i.Version,
-				&i.LastUpdated,
-				&i.CreatedAt,
-				&i.Username,
-				&i.UsernameIdempotent,
-				&i.Wallets,
-				&i.Bio,
-				&i.Traits,
-				&i.Universal,
-				&i.NotificationSettings,
-				&i.EmailVerified,
-				&i.EmailUnsubscriptions,
-			); err != nil {
-				break
-			}
-			items = append(items, i)
-=======
 		if b.closed {
 			if f != nil {
 				f(t, items, errors.New("batch already closed"))
 			}
 			continue
->>>>>>> main
 		}
 		err := func() error {
 			rows, err := b.br.Query()
@@ -2740,7 +2641,6 @@ func (b *GetUsersWithTraitBatchBatchResults) Query(f func(int, []User, error)) {
 					&i.Traits,
 					&i.Universal,
 					&i.NotificationSettings,
-					&i.Email,
 					&i.EmailVerified,
 					&i.EmailUnsubscriptions,
 				); err != nil {

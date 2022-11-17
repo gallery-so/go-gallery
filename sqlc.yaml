@@ -124,10 +124,6 @@ sql:
 
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
-          - column: "*.email_address"
-            go_type: "database/sql.NullString"
-          - column: "*.*_email_address"
-            go_type: "database/sql.NullString"
           - column: "*.id"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
           - column: "*.*_id"
@@ -136,6 +132,10 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "*.*_ids"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.email_address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"
+          - column: "*.*_email_address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"
           - column: "*.address"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
           - column: "*.*_address"
@@ -160,5 +160,3 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.Role"
           - column: "*.roles"
             go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
-          - column: "*.email"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"

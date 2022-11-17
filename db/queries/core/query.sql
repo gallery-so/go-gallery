@@ -547,13 +547,13 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many
 select * from users_with_pii
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
-    and (email_unsubscriptions->>$1::varchar = 'false' or email_unsubscriptions->>$1::varchar is null)
-    and deleted = false and pii_email_address is not null and email_verified = $2
+    and (email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar = 'false' or email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar is null)
+    and deleted = false and pii_email_address is not null and email_verified = $1
     and (created_at, id) < (@cur_before_time, @cur_before_id)
     and (created_at, id) > (@cur_after_time, @cur_after_id)
     order by case when @paging_forward::bool then (created_at, id) end asc,
              case when not @paging_forward::bool then (created_at, id) end desc
-    limit $3;
+    limit $2;
 
 -- name: GetUsersWithEmailNotificationsOn :many
 -- TODO: Does not appear to be used

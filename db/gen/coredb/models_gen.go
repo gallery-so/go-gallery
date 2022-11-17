@@ -92,8 +92,8 @@ type Contract struct {
 
 type DevMetadataUser struct {
 	UserID          persist.DBID
-	HasEmailAddress sql.NullString
-	Deleted         sql.NullBool
+	HasEmailAddress persist.Email
+	Deleted         bool
 }
 
 type EarlyAccess struct {
@@ -249,8 +249,8 @@ type Notification struct {
 
 type PiiUser struct {
 	UserID          persist.DBID
-	PiiEmailAddress sql.NullString
-	Deleted         sql.NullBool
+	PiiEmailAddress persist.Email
+	Deleted         bool
 }
 
 type Token struct {
@@ -293,10 +293,6 @@ type User struct {
 	Traits               pgtype.JSONB
 	Universal            bool
 	NotificationSettings persist.UserNotificationSettings
-<<<<<<< HEAD
-=======
-	Email                persist.Email
->>>>>>> main
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 }
@@ -337,7 +333,7 @@ type UsersWithPii struct {
 	NotificationSettings persist.UserNotificationSettings
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
-	PiiEmailAddress      sql.NullString
+	PiiEmailAddress      persist.Email
 }
 
 type Wallet struct {

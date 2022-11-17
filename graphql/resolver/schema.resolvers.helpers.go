@@ -518,10 +518,8 @@ func resolveViewerEmail(ctx context.Context) *model.UserEmail {
 
 func userWithPIIToEmailModel(user *db.UsersWithPii) *model.UserEmail {
 
-	email := user.PiiEmailAddress.String
-
 	return &model.UserEmail{
-		Email:              &user.Email,
+		Email:              &user.PiiEmailAddress,
 		VerificationStatus: &user.EmailVerified,
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
