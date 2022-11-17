@@ -12,6 +12,8 @@ type EmailType string
 
 type EmailVerificationStatus int
 
+type Email string
+
 var emailVerificationStatuses = []string{"Unverified", "Verified", "Failed", "Admin"}
 
 const (
@@ -93,4 +95,20 @@ func (e *EmailVerificationStatus) UnmarshalGQL(v interface{}) error {
 	default:
 		return nil
 	}
+}
+
+func (e Email) String() string {
+	return strings.ToLower(string(e))
+}
+
+func (e Email) Value() (driver.Value, error) {
+	return e.String(), nil
+}
+
+func (e *Email) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	*e = Email(src.(string))
+	return nil
 }

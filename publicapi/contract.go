@@ -2,6 +2,7 @@ package publicapi
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -166,7 +167,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 
 		owners, err := api.loaders.OwnersByContractID.Load(db.GetOwnersByContractIdBatchPaginateParams{
 			Contract:           contract.ID,
-			Limit:              params.Limit,
+			Limit:              sql.NullInt32{Int32: int32(params.Limit), Valid: true},
 			GalleryUsersOnly:   ogu,
 			CurBeforeUniversal: params.CursorBeforeBool,
 			CurAfterUniversal:  params.CursorAfterBool,

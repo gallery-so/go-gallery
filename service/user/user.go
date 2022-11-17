@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"strings"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -81,7 +82,7 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *string, bio string, userRepo *postgres.UserRepository,
+func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string, userRepo *postgres.UserRepository,
 	galleryRepo *postgres.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 

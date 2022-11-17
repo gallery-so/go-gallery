@@ -138,6 +138,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"PreverifyEmailPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PreverifyEmailPayloadOrError)
+		return obj, ok
+	},
+
 	"RefreshCollectionPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RefreshCollectionPayloadOrError)
 		return obj, ok

@@ -53,7 +53,7 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 
 	start := strings.Index(turi.String(), ",") + 1
 	if start == -1 {
-		return turi, nil, fmt.Errorf("invalid colorglyphs tokenURI")
+		return turi, nil, fmt.Errorf("invalid autoglyphs tokenURI")
 	}
 	glyph := turi.String()[start:]
 
@@ -178,19 +178,22 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	spl[0] = strings.ReplaceAll(spl[0], "%0A", "")
 	spl[0] = spl[0][start:]
 
-	allColors := make([]color.RGBA, 35)
+	allColorsArray := make([]color.RGBA, 35)
 	for i := 0; i < 35; i++ {
 		col, err := parseHexColor(spl[2][i : i+6])
 		if err != nil {
 			panic(err)
 		}
-		allColors[i] = col
+		allColorsArray[i] = col
 	}
+
+	allColors := allColorsArray[:]
 
 	// sort colors by value
 	sort.SliceStable(allColors, func(i, j int) bool {
 		return getLightness(allColors[i]) > getLightness(allColors[j])
 	})
+
 	lightestColor := allColors[0]
 	secondLightestColor := allColors[1]
 	thirdLightestColor := allColors[2]
@@ -199,23 +202,34 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	darkestColor := allColors[34]
 
 	sort.SliceStable(allColors, func(i, j int) bool {
-		return allColors[i].R-allColors[i].G-allColors[i].B < allColors[j].R-allColors[j].G-allColors[j].B
+		initialR, initialG, initialB, _ := allColors[i].RGBA()
+		secondR, secondG, secondB, _ := allColors[j].RGBA()
+
+		return initialR-initialG-initialB < secondR-secondG-secondB
 	})
 	reddestColor := allColors[0]
 	sort.SliceStable(allColors, func(i, j int) bool {
-		return allColors[i].R-allColors[i].B > allColors[j].R-allColors[j].B
+		initialR, _, initialB, _ := allColors[i].RGBA()
+		secondR, _, secondB, _ := allColors[j].RGBA()
+		return initialR-initialB > secondR-secondB
 	})
 	orangestColor := allColors[0]
 	sort.SliceStable(allColors, func(i, j int) bool {
-		return allColors[i].R+allColors[i].G-allColors[i].B > allColors[j].R+allColors[j].G-allColors[j].B
+		initialR, initialG, initialB, _ := allColors[i].RGBA()
+		secondR, secondG, secondB, _ := allColors[j].RGBA()
+		return initialR+initialG-initialB > secondR+secondG-secondB
 	})
 	yellowestColor := allColors[0]
 	sort.SliceStable(allColors, func(i, j int) bool {
-		return allColors[i].G-allColors[i].R-allColors[i].B > allColors[j].G-allColors[j].R-allColors[j].B
+		initialR, initialG, initialB, _ := allColors[i].RGBA()
+		secondR, secondG, secondB, _ := allColors[j].RGBA()
+		return initialG-initialR-initialB > secondG-secondR-secondB
 	})
 	greenestColor := allColors[0]
 	sort.SliceStable(allColors, func(i, j int) bool {
-		return allColors[i].B-allColors[i].G-allColors[i].R > allColors[j].B-allColors[j].G-allColors[j].R
+		initialR, initialG, initialB, _ := allColors[i].RGBA()
+		secondR, secondG, secondB, _ := allColors[j].RGBA()
+		return initialB-initialG-initialR > secondB-secondG-secondR
 	})
 	bluestColor := allColors[0]
 
@@ -301,10 +315,9 @@ func colorglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethere
 	}, nil
 }
 
-func getLightness(c color.RGBA) float64 {
-	newColor, _ := colorful.MakeColor(c)
-	_, _, l := newColor.Hsl()
-	return l
+func getLightness(c color.RGBA) uint32 {
+	r, g, b, _ := c.RGBA()
+	return r + g + b
 }
 
 func parseHexColor(s string) (c color.RGBA, err error) {
@@ -314,8 +327,8 @@ func parseHexColor(s string) (c color.RGBA, err error) {
 		return c, err
 	}
 
-	r, g, b, a := h.RGBA()
-	return color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}, nil
+	r, g, b := h.RGB255()
+	return color.RGBA{r, g, b, 255}, nil
 
 }
 

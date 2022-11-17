@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -113,7 +113,7 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, err := auth.JWTParse(input.JWT, viper.GetString("JWT_SECRET"))
+		userID, email, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -131,6 +131,12 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		emailAddress := userWithPII.PiiEmailAddress.String
+		if !strings.EqualFold(emailAddress, email) {
+			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
+			return
+		}
+
+		unsubs := user.EmailUnsubscriptions
 
 		unsubs := userWithPII.EmailUnsubscriptions
 
@@ -184,7 +190,7 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, err := auth.JWTParse(input.JWT, viper.GetString("JWT_SECRET"))
+		userID, email, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
@@ -202,6 +208,12 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		emailAddress := userWithPII.PiiEmailAddress.String
+		if !strings.EqualFold(emailAddress, email) {
+			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
+			return
+		}
+
+		unsubs := user.EmailUnsubscriptions
 
 		unsubs := userWithPII.EmailUnsubscriptions
 

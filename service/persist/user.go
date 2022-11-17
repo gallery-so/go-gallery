@@ -58,7 +58,7 @@ type UserNotificationSettings struct {
 type CreateUserInput struct {
 	Username                   string
 	Bio                        string
-	Email                      *string
+	Email                      *Email
 	ChainAddress               ChainAddress
 	WalletType                 WalletType
 	Universal                  bool

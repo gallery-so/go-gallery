@@ -21,5 +21,6 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 	router.POST("/resubscribe", resubscribe(queries))
 
 	router.POST("/verify", verifyEmail(queries))
+	router.GET("/preverify", preverifyEmail())
 	return router
 }

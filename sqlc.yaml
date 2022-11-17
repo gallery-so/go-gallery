@@ -160,3 +160,5 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.Role"
           - column: "*.roles"
             go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
+          - column: "*.email"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"
