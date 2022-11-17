@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -28,6 +29,12 @@ func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.Handler
 
 		if err != nil {
 			logger.For(c).WithFields(logrus.Fields{"eventID": message.ID}).Debugf("failed to handle event: %s", err)
+
+			if errors.Is(err, errUnhandledSingleEvent) || errors.Is(err, errUnhandledGroupedEvent) {
+				c.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("event=%s is unhandable", message.ID)})
+				return
+			}
+
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
