@@ -210,7 +210,6 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 
 		p.DynamicTemplateData = asMap
 
-		m.Asm = &mail.Asm{GroupID: viper.GetInt("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID")}
 		m.AddPersonalizations(p)
 		p.AddTos(to)
 
