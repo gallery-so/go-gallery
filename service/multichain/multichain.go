@@ -67,6 +67,10 @@ type ChainAgnosticToken struct {
 	IsSpam      *bool               `json:"is_spam"`
 }
 
+func (c ChainAgnosticToken) hasMetadata() bool {
+	return len(c.TokenMetadata) > 0
+}
+
 // ChainAgnosticAddressAtBlock is an address at a block
 type ChainAgnosticAddressAtBlock struct {
 	Address persist.Address     `json:"address"`
@@ -1138,27 +1142,26 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	return ret
 }
 
-// FallbackFetcher evaluates a token and calls its fallback if Primary's response
-// is invalid based on evaluating the response with EvalToken
-type FallbackFetcher struct {
+// FallbackProvider will calls its fallback if the first token
+// response is missing metadata
+type FallbackProvider struct {
 	Primary interface {
 		configurer
 		tokensFetcher
 	}
-	Fallback  tokensFetcher
-	EvalToken func(ChainAgnosticToken) bool
+	Fallback tokensFetcher
 }
 
-type fallbackResult struct {
+type fetchResult struct {
 	i     int
 	token ChainAgnosticToken
 }
 
-func (f FallbackFetcher) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
+func (f FallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
 	return f.Primary.GetBlockchainInfo(ctx)
 }
 
-func (f *FallbackFetcher) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
+func (f FallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
 	tokens, contracts, err := f.Primary.GetTokensByWalletAddress(ctx, address, limit, offset)
 	if err != nil {
 		return nil, nil, err
@@ -1167,57 +1170,65 @@ func (f *FallbackFetcher) GetTokensByWalletAddress(ctx context.Context, address 
 	return tokens, contracts, nil
 }
 
-func (f *FallbackFetcher) GetTokensByContractAddress(ctx context.Context, tokenContract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
-	tokens, contract, err := f.Primary.GetTokensByContractAddress(ctx, tokenContract, limit, offset)
+func (f FallbackProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
+	tokens, agnosticContract, err := f.Primary.GetTokensByContractAddress(ctx, contract, limit, offset)
 	if err != nil {
-		return nil, ChainAgnosticContract{}, nil
+		return nil, ChainAgnosticContract{}, err
 	}
 	tokens = f.resolveTokens(ctx, tokens)
-	return tokens, contract, nil
+	return tokens, agnosticContract, nil
 }
 
-func (f *FallbackFetcher) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
+func (f FallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, id ChainAgnosticIdentifiers, address persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error) {
 	token, contract, err := f.Primary.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
-	if err == nil && f.EvalToken(token) {
-		return token, contract, nil
+	if err != nil {
+		return ChainAgnosticToken{}, ChainAgnosticContract{}, err
 	}
-	return f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, address)
+	if !token.hasMetadata() {
+		token.TokenMetadata = f.callFallback(ctx, token).TokenMetadata
+	}
+	return token, contract, nil
 }
 
-func (f *FallbackFetcher) resolveTokens(ctx context.Context, tokens []ChainAgnosticToken) []ChainAgnosticToken {
-	fallbackCh := make(chan fallbackResult)
-	usableTokens := make([]ChainAgnosticToken, 0, len(tokens))
+func (f FallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnosticToken) []ChainAgnosticToken {
+	resultCh := make(chan fetchResult)
+	doneCh := make(chan struct{})
+
+	usableTokens := make([]ChainAgnosticToken, len(tokens))
+
 	var wg sync.WaitGroup
+
+	go func() {
+		for result := range resultCh {
+			usableTokens[result.i].TokenMetadata = result.token.TokenMetadata
+		}
+		doneCh <- struct{}{}
+	}()
 
 	for i, token := range tokens {
 		usableTokens[i] = token
-		// Attempt to get a valid token through the fallback
-		if !f.EvalToken(token) {
+		if !token.hasMetadata() {
+			wg.Add(1)
 			go func() {
-				wg.Add(1)
-				fallbackCh <- fallbackResult{i, f.callFallback(ctx, token)}
+				defer wg.Done()
+				resultCh <- fetchResult{i, f.callFallback(ctx, token)}
 			}()
 		}
 	}
 
 	wg.Wait()
-	close(fallbackCh)
+	close(resultCh)
+	<-doneCh
 
-	for result := range fallbackCh {
-		usableTokens[result.i] = result.token
-	}
 	return usableTokens
 }
 
-func (f *FallbackFetcher) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
+func (f *FallbackProvider) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
 	id := ChainAgnosticIdentifiers{primary.ContractAddress, primary.TokenID}
 	backup, _, err := f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, primary.OwnerAddress)
-	if err == nil && f.EvalToken(backup) {
+	if err == nil && backup.hasMetadata() {
 		return backup
 	}
+	logger.For(ctx).WithError(err).Warn("failed to call fallback")
 	return primary
-}
-
-func HasMetadata(token ChainAgnosticToken) bool {
-	return len(token.TokenMetadata) > 0
 }

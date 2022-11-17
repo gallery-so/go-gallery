@@ -388,7 +388,7 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range animationKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
-			logger.For(ctx).Infof("found initial animation url for with keyword %s: %s", keyword, it)
+			logger.For(ctx).Infof("found initial animation url with keyword %s: %s", keyword, it)
 			vURL = it
 			break
 		}
@@ -396,7 +396,7 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range imageKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
-			logger.For(ctx).Infof("found initial image url for with keyword %s: %s", keyword, it)
+			logger.For(ctx).Infof("found initial image url with keyword %s: %s", keyword, it)
 			imgURL = it
 			break
 		}
