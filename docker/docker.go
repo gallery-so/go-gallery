@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/asottile/dockerfile"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
@@ -133,11 +134,15 @@ func InitPostgres() (resource *dockertest.Resource, callback func()) {
 	}
 	pool.MaxWait = 3 * time.Minute
 
+	logger.For(nil).Info("starting postgres")
+
 	apps := loadComposeFile()
 	imgAndVer, err := getBuildImage(apps.Services["postgres"])
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	logger.For(nil).Info("building postgres image")
 
 	pg, err := pool.RunWithOptions(
 		&dockertest.RunOptions{
@@ -149,6 +154,7 @@ func InitPostgres() (resource *dockertest.Resource, callback func()) {
 	if err != nil {
 		log.Fatalf("could not start postgres: %s", err)
 	}
+	logger.For(nil).Info("postgres started")
 
 	// Patch environment to use container
 	pgHost := viper.GetString("POSTGRES_HOST")
