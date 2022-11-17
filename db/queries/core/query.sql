@@ -580,7 +580,7 @@ UPDATE users SET email_verified = $2 WHERE id = $1;
 
 -- name: UpdateUserEmail :exec
 with upsert_pii as (
-    insert into pii_users (user_id, pii_email_address) values (@user_id, @email_address)
+    insert into pii_for_users (user_id, pii_email_address) values (@user_id, @email_address)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
 ),
 

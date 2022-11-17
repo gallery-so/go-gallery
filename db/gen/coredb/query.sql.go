@@ -2737,18 +2737,16 @@ func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg Update
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec
 with upsert_pii as (
-    insert into pii_users (user_id, pii_email_address) values ($1, $2)
+    insert into pii_for_users (user_id, pii_email_address) values ($1, $2)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
-    returning $1
 ),
 
 upsert_metadata as (
     insert into dev_metadata_users (user_id, has_email_address) values ($1, ($2 is not null))
         on conflict (user_id) do update set has_email_address = excluded.has_email_address
-    returning $1
 )
 
-update users set email_verified = 0 from upsert_pii, upsert_metadata where users.id = $1
+update users set email_verified = 0 where users.id = $1
 `
 
 type UpdateUserEmailParams struct {

@@ -247,7 +247,7 @@ type Notification struct {
 	Amount      int32
 }
 
-type PiiUser struct {
+type PiiForUser struct {
 	UserID          persist.DBID
 	PiiEmailAddress persist.Email
 	Deleted         bool
