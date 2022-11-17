@@ -504,22 +504,18 @@ func resolveViewer(ctx context.Context) *model.Viewer {
 }
 
 func resolveViewerEmail(ctx context.Context) *model.UserEmail {
-
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
-
-	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	userWithPII, err := publicapi.For(ctx).User.GetUserWithPII(ctx)
 	if err != nil {
 		return nil
 	}
 
-	return userToEmailModel(user)
-
+	return userWithPIIToEmailModel(userWithPII)
 }
 
-func userToEmailModel(user *db.User) *model.UserEmail {
+func userWithPIIToEmailModel(user *db.UsersWithPii) *model.UserEmail {
 
 	return &model.UserEmail{
-		Email:              &user.Email,
+		Email:              &user.PiiEmailAddress,
 		VerificationStatus: &user.EmailVerified,
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),

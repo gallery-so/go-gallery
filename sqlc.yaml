@@ -35,13 +35,14 @@ sql:
           # Overrides are prioritized from top to bottom, so if we need to override one of the * entries (like *.id),
           # the override should come _before_ the * entry
           # Users
-          - column: "users.wallets"
+          # "users*" wildcards are so these mappings will also apply to the "users_with_pii" view
+          - column: "users*.wallets"
             go_type: "github.com/mikeydub/go-gallery/service/persist.WalletList"
-          - column: "users.email_unsubscriptions"
+          - column: "users*.email_unsubscriptions"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailUnsubscriptions"
-          - column: "users.notification_settings"
+          - column: "users*.notification_settings"
             go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
-          - column: "users.email_verified"
+          - column: "users*.email_verified"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
 
           # Galleries
@@ -131,6 +132,10 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "*.*_ids"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
+          - column: "*.email_address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"
+          - column: "*.*_email_address"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"
           - column: "*.address"
             go_type: "github.com/mikeydub/go-gallery/service/persist.Address"
           - column: "*.*_address"
@@ -155,5 +160,3 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.Role"
           - column: "*.roles"
             go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
-          - column: "*.email"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"

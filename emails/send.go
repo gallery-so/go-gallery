@@ -49,33 +49,34 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 			return
 		}
 
-		user, err := dataloaders.UserByUserID.Load(input.UserID)
+		userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		if user.Email == "" {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID: input.UserID})
 			return
 		}
 
-		j, err := jwtGenerate(input.UserID, user.Email.String())
+		emailAddress := userWithPII.PiiEmailAddress.String()
+		j, err := jwtGenerate(input.UserID, emailAddress)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		logger.For(c).Debugf("sending verification email to %s with token %s", user.Email, j)
+		logger.For(c).Debugf("sending verification email to %s with token %s", emailAddress, j)
 
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(user.Username.String, user.Email.String())
+		to := mail.NewEmail(userWithPII.Username.String, emailAddress)
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
 		m.SetTemplateID(viper.GetString("SENDGRID_VERIFICATION_TEMPLATE_ID"))
 		p.DynamicTemplateData = map[string]interface{}{
-			"username":          user.Username.String,
+			"username":          userWithPII.Username.String,
 			"verificationToken": j,
 		}
 		m.AddPersonalizations(p)
@@ -136,10 +137,10 @@ func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psu
 func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client) error {
 	searchLimit := int32(10)
 	resultLimit := 5
-	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.User) error {
+	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.UsersWithPii) error {
 
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(u.Username.String, u.Email.String())
+		to := mail.NewEmail(u.Username.String, u.PiiEmailAddress.String())
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
@@ -152,7 +153,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 			return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
 		}
 
-		j, err := jwtGenerate(u.ID, u.Email.String())
+		j, err := jwtGenerate(u.ID, u.PiiEmailAddress.String())
 		if err != nil {
 			return fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
 		}
@@ -191,7 +192,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 		}
 
 		if len(data.Notifications) == 0 {
-			logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.Email)
+			logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.PiiEmailAddress.String())
 			return nil
 		}
 
@@ -205,7 +206,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 			return err
 		}
 
-		logger.For(c).Debugf("sending notifications email to %s with data %+v", u.Email, asMap)
+		logger.For(c).Debugf("sending notifications email to %s with data %+v", u.PiiEmailAddress.String(), asMap)
 
 		p.DynamicTemplateData = asMap
 
@@ -329,7 +330,8 @@ func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.
 	}
 }
 
-func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.User) error) error {
+func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries,
+	fn func(u coredb.UsersWithPii) error) error {
 	errGroup := new(errgroup.Group)
 	var lastID persist.DBID
 	var lastCreatedAt time.Time

@@ -61,6 +61,23 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 	return &user, nil
 }
 
+// GetUserWithPII returns the current user and their associated personally identifiable information
+func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.UsersWithPii, error) {
+	// Nothing to validate
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userWithPII, err := api.queries.GetUserWithPIIByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &userWithPII, nil
+}
+
 func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -353,8 +370,8 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 		return err
 	}
 	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
-		ID:    userID,
-		Email: email,
+		UserID:       userID,
+		EmailAddress: email,
 	})
 	if err != nil {
 		return err

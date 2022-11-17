@@ -86,29 +86,29 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, email, err := jwtParse(input.JWT)
+		userID, emailFromToken, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		user, err := queries.GetUserById(c, userID)
+		userWithPII, err := queries.GetUserWithPIIByID(c, userID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		if user.EmailVerified.IsVerified() {
+		if userWithPII.EmailVerified.IsVerified() {
 			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email already verified"))
 			return
 		}
 
-		if !strings.EqualFold(user.Email.String(), email) {
+		if !strings.EqualFold(userWithPII.PiiEmailAddress.String(), emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("email does not match"))
 			return
 		}
 
-		err = addEmailToSendgridList(c, user.Email.String(), viper.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), viper.GetString("SENDGRID_DEFAULT_LIST_ID"))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -124,8 +124,8 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, VerifyEmailOutput{
-			UserID: user.ID,
-			Email:  user.Email,
+			UserID: userWithPII.ID,
+			Email:  userWithPII.PiiEmailAddress,
 		})
 	}
 }

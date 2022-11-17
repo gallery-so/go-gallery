@@ -90,6 +90,12 @@ type Contract struct {
 	Description      sql.NullString
 }
 
+type DevMetadataUser struct {
+	UserID          persist.DBID
+	HasEmailAddress persist.Email
+	Deleted         bool
+}
+
 type EarlyAccess struct {
 	Address persist.Address
 }
@@ -241,6 +247,12 @@ type Notification struct {
 	Amount      int32
 }
 
+type PiiForUser struct {
+	UserID          persist.DBID
+	PiiEmailAddress persist.Email
+	Deleted         bool
+}
+
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -281,7 +293,6 @@ type User struct {
 	Traits               pgtype.JSONB
 	Universal            bool
 	NotificationSettings persist.UserNotificationSettings
-	Email                persist.Email
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 }
@@ -305,6 +316,24 @@ type UserRole struct {
 	Deleted     bool
 	CreatedAt   time.Time
 	LastUpdated time.Time
+}
+
+type UsersWithPii struct {
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	Universal            bool
+	NotificationSettings persist.UserNotificationSettings
+	EmailVerified        persist.EmailVerificationStatus
+	EmailUnsubscriptions persist.EmailUnsubscriptions
+	PiiEmailAddress      persist.Email
 }
 
 type Wallet struct {

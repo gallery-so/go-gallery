@@ -3,6 +3,7 @@ package util
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -388,4 +389,8 @@ func TruncateWithEllipsis(s string, length int) string {
 		return s
 	}
 	return s[:length] + "..."
+}
+
+func IsNullOrEmpty(s sql.NullString) bool {
+	return !s.Valid || s.String == ""
 }

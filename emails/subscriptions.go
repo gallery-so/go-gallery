@@ -45,16 +45,18 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		user, err := queries.GetUserById(c, input.UserID)
+		userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		if user.Email == "" {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{input.UserID})
 			return
 		}
+
+		emailAddress := userWithPII.PiiEmailAddress.String()
 
 		errGroup := new(errgroup.Group)
 
@@ -63,18 +65,18 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 			case model.EmailUnsubscriptionTypeAll:
 				errGroup.Go(func() error {
 					if input.Unsubs.All {
-						return addEmailToGlobalUnsubscribeGroup(c, user.Email.String())
+						return addEmailToGlobalUnsubscribeGroup(c, emailAddress)
 					}
-					return removeEmailFromGlobalUnsubscribeGroup(c, user.Email.String())
+					return removeEmailFromGlobalUnsubscribeGroup(c, emailAddress)
 				})
 
 			case model.EmailUnsubscriptionTypeNotifications:
 
 				errGroup.Go(func() error {
 					if input.Unsubs.Notifications {
-						return addEmailToUnsubscribeGroup(c, user.Email.String(), viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+						return addEmailToUnsubscribeGroup(c, emailAddress, viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 					}
-					return removeEmailFromUnsubscribeGroup(c, user.Email.String(), viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+					return removeEmailFromUnsubscribeGroup(c, emailAddress, viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
@@ -111,29 +113,30 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, email, err := jwtParse(input.JWT)
+		userID, emailFromToken, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		user, err := queries.GetUserById(c, userID)
+		userWithPII, err := queries.GetUserWithPIIByID(c, userID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		if user.Email == "" {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID})
 			return
 		}
 
-		if !strings.EqualFold(user.Email.String(), email) {
+		emailAddress := userWithPII.PiiEmailAddress.String()
+		if !strings.EqualFold(emailAddress, emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
 			return
 		}
 
-		unsubs := user.EmailUnsubscriptions
+		unsubs := userWithPII.EmailUnsubscriptions
 
 		errGroup := new(errgroup.Group)
 
@@ -142,13 +145,13 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			case model.EmailUnsubscriptionTypeAll:
 				unsubs.All = true
 				errGroup.Go(func() error {
-					return addEmailToGlobalUnsubscribeGroup(c, user.Email.String())
+					return addEmailToGlobalUnsubscribeGroup(c, emailAddress)
 				})
 
 			case model.EmailUnsubscriptionTypeNotifications:
 				unsubs.Notifications = true
 				errGroup.Go(func() error {
-					return addEmailToUnsubscribeGroup(c, user.Email.String(), viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+					return addEmailToUnsubscribeGroup(c, emailAddress, viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
@@ -185,29 +188,30 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		userID, email, err := jwtParse(input.JWT)
+		userID, emailFromToken, err := jwtParse(input.JWT)
 		if err != nil {
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		user, err := queries.GetUserById(c, userID)
+		userWithPII, err := queries.GetUserWithPIIByID(c, userID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		if user.Email == "" {
+		if userWithPII.PiiEmailAddress.String() == "" {
 			util.ErrResponse(c, http.StatusBadRequest, errNoEmailSet{userID})
 			return
 		}
 
-		if !strings.EqualFold(user.Email.String(), email) {
+		emailAddress := userWithPII.PiiEmailAddress.String()
+		if !strings.EqualFold(emailAddress, emailFromToken) {
 			util.ErrResponse(c, http.StatusBadRequest, errEmailMismatch{userID})
 			return
 		}
 
-		unsubs := user.EmailUnsubscriptions
+		unsubs := userWithPII.EmailUnsubscriptions
 
 		errGroup := new(errgroup.Group)
 
@@ -216,13 +220,13 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			case model.EmailUnsubscriptionTypeAll:
 				unsubs.All = false
 				errGroup.Go(func() error {
-					return removeEmailFromGlobalUnsubscribeGroup(c, user.Email.String())
+					return removeEmailFromGlobalUnsubscribeGroup(c, emailAddress)
 				})
 
 			case model.EmailUnsubscriptionTypeNotifications:
 				unsubs.Notifications = false
 				errGroup.Go(func() error {
-					return removeEmailFromUnsubscribeGroup(c, user.Email.String(), viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+					return removeEmailFromUnsubscribeGroup(c, emailAddress, viper.GetString("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
