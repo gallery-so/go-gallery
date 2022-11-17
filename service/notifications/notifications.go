@@ -119,12 +119,10 @@ func (d *notificationDispatcher) AddHandler(action persist.Action, handler notif
 
 func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notification) error {
 	if handler, ok := d.handlers[notif.Action]; ok {
-		l, err := d.lock.Obtain(ctx, lockKey{ownerID: notif.OwnerID, action: notif.Action}.String(), maxLockTimeout, &redislock.Options{RetryStrategy: redislock.LinearBackoff(1 * time.Second)})
-		if err != nil {
-			logger.For(ctx).Errorf("failed to obtain lock for notification: %s", err)
-			return fmt.Errorf("failed to obtain lock for notification: %s", err)
+		l, _ := d.lock.Obtain(ctx, lockKey{ownerID: notif.OwnerID, action: notif.Action}.String(), maxLockTimeout, &redislock.Options{RetryStrategy: redislock.LinearBackoff(5 * time.Second)})
+		if l != nil {
+			defer l.Release(ctx)
 		}
-		defer l.Release(ctx)
 		return handler.Handle(ctx, notif)
 	}
 	logger.For(ctx).Warnf("no handler registered for action: %s", notif.Action)
