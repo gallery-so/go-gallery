@@ -265,7 +265,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 			EmailAddress: *pUser.Email,
 		})
 		if err != nil {
-			logger.For(pCtx).Error("failed to insert email address when creating new user with userID=%s\n", id)
+			logger.For(pCtx).Errorf("failed to insert email address when creating new user with userID=%s\n", id)
 		}
 	}
 
