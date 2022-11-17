@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub"
+	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -16,9 +17,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+type lockKey struct {
+	ownerID persist.DBID
+	action  persist.Action
+}
+
 const viewWindow = 24 * time.Hour
 const groupedWindow = 10 * time.Minute
 const notificationTimeout = 10 * time.Second
+const maxLockTimeout = 2 * time.Minute
 const NotificationHandlerContextKey = "notification.notificationHandlers"
 
 type NotificationHandlers struct {
@@ -29,8 +36,8 @@ type NotificationHandlers struct {
 }
 
 // New registers specific notification handlers
-func New(queries *db.Queries, pub *pubsub.Client) *NotificationHandlers {
-	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}}
+func New(queries *db.Queries, pub *pubsub.Client, lock *redislock.Client) *NotificationHandlers {
+	notifDispatcher := notificationDispatcher{handlers: map[persist.Action]notificationHandler{}, lock: lock}
 
 	def := defaultNotificationHandler{queries: queries, pubSub: pub}
 	group := groupedNotificationHandler{queries: queries, pubSub: pub}
@@ -103,6 +110,7 @@ type notificationHandler interface {
 
 type notificationDispatcher struct {
 	handlers map[persist.Action]notificationHandler
+	lock     *redislock.Client
 }
 
 func (d *notificationDispatcher) AddHandler(action persist.Action, handler notificationHandler) {
@@ -111,6 +119,10 @@ func (d *notificationDispatcher) AddHandler(action persist.Action, handler notif
 
 func (d *notificationDispatcher) Dispatch(ctx context.Context, notif db.Notification) error {
 	if handler, ok := d.handlers[notif.Action]; ok {
+		l, _ := d.lock.Obtain(ctx, lockKey{ownerID: notif.OwnerID, action: notif.Action}.String(), maxLockTimeout, &redislock.Options{RetryStrategy: redislock.LinearBackoff(5 * time.Second)})
+		if l != nil {
+			defer l.Release(ctx)
+		}
 		return handler.Handle(ctx, notif)
 	}
 	logger.For(ctx).Warnf("no handler registered for action: %s", notif.Action)
@@ -137,8 +149,10 @@ func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notific
 		Action:  notif.Action,
 	})
 	if time.Since(curNotif.CreatedAt) < groupedWindow {
-		return updateAndPublishNotif(ctx, curNotif, notif, h.queries, h.pubSub)
+		logger.For(ctx).Infof("grouping notification %s: %s-%s", curNotif.ID, notif.Action, notif.OwnerID)
+		return updateAndPublishNotif(ctx, notif, curNotif, h.queries, h.pubSub)
 	}
+	logger.For(ctx).Infof("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 
 }
@@ -326,7 +340,7 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 
 	_, err = result.Get(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to publish new notification: %w", err)
 	}
 
 	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
@@ -341,8 +355,9 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	err := queries.UpdateNotification(ctx, db.UpdateNotificationParams{
 		ID: mostRecentNotif.ID,
 		// this concat will put the notif.Data values at the beginning of the array, sorted from most recently added to oldest added
-		Data:     mostRecentNotif.Data.Concat(notif.Data),
-		Amount:   amount,
+		Data:   mostRecentNotif.Data.Concat(notif.Data),
+		Amount: amount,
+		// this will also get concatenated at the DB level
 		EventIds: notif.EventIds,
 	})
 	if err != nil {
@@ -350,7 +365,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	}
 	updatedNotif, err := queries.GetNotificationByID(ctx, mostRecentNotif.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting updated notification by %s: %w", mostRecentNotif.ID, err)
 	}
 	marshalled, err := json.Marshal(updatedNotif)
 	if err != nil {
@@ -362,7 +377,7 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 	})
 	_, err = result.Get(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("error publishing updated notification: %w", err)
 	}
 
 	logger.For(ctx).Infof("pushed updated notification to pubsub: %s", updatedNotif.OwnerID)
@@ -413,4 +428,8 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 	default:
 		return db.Notification{}, fmt.Errorf("unknown notification action: %s", notif.Action)
 	}
+}
+
+func (l lockKey) String() string {
+	return fmt.Sprintf("%s:%s", l.ownerID, l.action)
 }

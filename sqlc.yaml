@@ -41,8 +41,6 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailUnsubscriptions"
           - column: "users.notification_settings"
             go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
-          - column: "users.email"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
           - column: "users.email_verified"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
 
@@ -157,3 +155,5 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.Role"
           - column: "*.roles"
             go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
+          - column: "*.email"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Email"

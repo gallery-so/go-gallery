@@ -42,6 +42,7 @@ scalar Time
 scalar Address
 scalar PubKey
 scalar DBID
+scalar Email
 
 interface Node {
     id: ID!
@@ -495,7 +496,7 @@ enum EmailUnsubscriptionType {
 }
 
 type UserEmail {
-    email: String
+    email: Email
     verificationStatus: EmailVerificationStatus
     emailNotificationSettings: EmailNotificationSettings
 }
@@ -1313,15 +1314,30 @@ union ViewGalleryPayloadOrError =
     | ErrAuthenticationFailed
 
 type VerifyEmailPayload {
-    email: String
+    email: Email!
 }
 
 union VerifyEmailPayloadOrError =
     VerifyEmailPayload
     | ErrInvalidInput
 
+enum PreverifyEmailResult {
+    Invalid
+    Risky
+    Valid
+}
+
+type PreverifyEmailPayload {
+    email: Email!
+    result: PreverifyEmailResult!
+}
+
+union PreverifyEmailPayloadOrError =
+    PreverifyEmailPayload
+    | ErrInvalidInput
+
 input UpdateEmailInput {
-    email: String!
+    email: Email!
 }
 
 type UpdateEmailPayload {
@@ -1387,7 +1403,7 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: String): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: Email): CreateUserPayloadOrError
     updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
     updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
@@ -1408,6 +1424,8 @@ type Mutation {
 
     updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
+
+    preverifyEmail(email: Email!): PreverifyEmailPayloadOrError
     verifyEmail(token: String!): VerifyEmailPayloadOrError
 
     # Retool Specific Mutations

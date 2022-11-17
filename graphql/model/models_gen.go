@@ -122,6 +122,10 @@ type Notification interface {
 	IsNotification()
 }
 
+type PreverifyEmailPayloadOrError interface {
+	IsPreverifyEmailPayloadOrError()
+}
+
 type RefreshCollectionPayloadOrError interface {
 	IsRefreshCollectionPayloadOrError()
 }
@@ -617,6 +621,7 @@ func (ErrInvalidInput) IsRemoveAdmirePayloadOrError()                    {}
 func (ErrInvalidInput) IsCommentOnFeedEventPayloadOrError()              {}
 func (ErrInvalidInput) IsRemoveCommentPayloadOrError()                   {}
 func (ErrInvalidInput) IsVerifyEmailPayloadOrError()                     {}
+func (ErrInvalidInput) IsPreverifyEmailPayloadOrError()                  {}
 func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
@@ -954,6 +959,13 @@ type PageInfo struct {
 	EndCursor       string `json:"endCursor"`
 }
 
+type PreverifyEmailPayload struct {
+	Email  persist.Email        `json:"email"`
+	Result PreverifyEmailResult `json:"result"`
+}
+
+func (PreverifyEmailPayload) IsPreverifyEmailPayloadOrError() {}
+
 type PreviewURLSet struct {
 	Raw       *string `json:"raw"`
 	Thumbnail *string `json:"thumbnail"`
@@ -1253,7 +1265,7 @@ type UpdateCollectionTokensPayload struct {
 func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
 
 type UpdateEmailInput struct {
-	Email string `json:"email"`
+	Email persist.Email `json:"email"`
 }
 
 type UpdateEmailNotificationSettingsInput struct {
@@ -1321,7 +1333,7 @@ type UserEdge struct {
 }
 
 type UserEmail struct {
-	Email                     *string                          `json:"email"`
+	Email                     *persist.Email                   `json:"email"`
 	VerificationStatus        *persist.EmailVerificationStatus `json:"verificationStatus"`
 	EmailNotificationSettings *EmailNotificationSettings       `json:"emailNotificationSettings"`
 }
@@ -1341,7 +1353,7 @@ type UsersConnection struct {
 }
 
 type VerifyEmailPayload struct {
-	Email *string `json:"email"`
+	Email persist.Email `json:"email"`
 }
 
 func (VerifyEmailPayload) IsVerifyEmailPayloadOrError() {}
@@ -1435,6 +1447,49 @@ func (e *EmailUnsubscriptionType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e EmailUnsubscriptionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type PreverifyEmailResult string
+
+const (
+	PreverifyEmailResultInvalid PreverifyEmailResult = "Invalid"
+	PreverifyEmailResultRisky   PreverifyEmailResult = "Risky"
+	PreverifyEmailResultValid   PreverifyEmailResult = "Valid"
+)
+
+var AllPreverifyEmailResult = []PreverifyEmailResult{
+	PreverifyEmailResultInvalid,
+	PreverifyEmailResultRisky,
+	PreverifyEmailResultValid,
+}
+
+func (e PreverifyEmailResult) IsValid() bool {
+	switch e {
+	case PreverifyEmailResultInvalid, PreverifyEmailResultRisky, PreverifyEmailResultValid:
+		return true
+	}
+	return false
+}
+
+func (e PreverifyEmailResult) String() string {
+	return string(e)
+}
+
+func (e *PreverifyEmailResult) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PreverifyEmailResult(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PreverifyEmailResult", str)
+	}
+	return nil
+}
+
+func (e PreverifyEmailResult) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

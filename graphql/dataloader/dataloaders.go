@@ -650,8 +650,8 @@ func loadTokensByCollectionID(q *db.Queries) func(context.Context, []IDAndLimit)
 				maybeNull = sql.NullInt32{Int32: int32(*collectionID.Limit), Valid: true}
 			}
 			params[i] = db.GetTokensByCollectionIdBatchParams{
-				ID:    collectionID.ID,
-				Limit: maybeNull,
+				CollectionID: collectionID.ID,
+				Limit:        maybeNull,
 			}
 		}
 
