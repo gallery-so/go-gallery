@@ -349,13 +349,21 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 
 func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecentNotif db.Notification, queries *db.Queries, ps *pubsub.Client) error {
 	amount := notif.Amount
-	if amount < 1 {
-		amount = 1
+	resultData := mostRecentNotif.Data.Concat(notif.Data)
+	switch notif.Action {
+	case persist.ActionAdmiredFeedEvent:
+		amount = int32(len(resultData.AdmirerIDs))
+	case persist.ActionViewedGallery:
+		amount = int32(len(resultData.AuthedViewerIDs) + len(resultData.UnauthedViewerIDs))
+	case persist.ActionUserFollowedUsers:
+		amount = int32(len(resultData.FollowerIDs))
+	default:
+		amount = mostRecentNotif.Amount + notif.Amount
 	}
 	err := queries.UpdateNotification(ctx, db.UpdateNotificationParams{
 		ID: mostRecentNotif.ID,
 		// this concat will put the notif.Data values at the beginning of the array, sorted from most recently added to oldest added
-		Data:   mostRecentNotif.Data.Concat(notif.Data),
+		Data:   resultData,
 		Amount: amount,
 		// this will also get concatenated at the DB level
 		EventIds: notif.EventIds,
