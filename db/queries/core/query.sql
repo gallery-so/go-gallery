@@ -582,16 +582,14 @@ UPDATE users SET email_verified = $2 WHERE id = $1;
 with upsert_pii as (
     insert into pii_users (user_id, pii_email_address) values (@user_id, @email_address)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
-    returning @user_id
 ),
 
 upsert_metadata as (
     insert into dev_metadata_users (user_id, has_email_address) values (@user_id, (@email_address is not null))
         on conflict (user_id) do update set has_email_address = excluded.has_email_address
-    returning @user_id
 )
 
-update users set email_verified = 0 from upsert_pii, upsert_metadata where users.id = @user_id;
+update users set email_verified = 0 where users.id = @user_id;
 
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
