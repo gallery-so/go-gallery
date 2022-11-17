@@ -206,7 +206,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 			return err
 		}
 
-		logger.For(c).Debugf("sending notifications email to %s with data %+v", u.PiiEmailAddress.String, asMap)
+		logger.For(c).Debugf("sending notifications email to %s with data %+v", u.PiiEmailAddress.String(), asMap)
 
 		p.DynamicTemplateData = asMap
 
