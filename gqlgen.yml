@@ -55,6 +55,9 @@ models:
   EmailVerificationStatus:
     model:
       - github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus
+  Email:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.Email
   ChainAddress:
     model:
       - github.com/mikeydub/go-gallery/service/persist.ChainAddress

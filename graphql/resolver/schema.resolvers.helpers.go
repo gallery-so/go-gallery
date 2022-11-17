@@ -518,10 +518,8 @@ func resolveViewerEmail(ctx context.Context) *model.UserEmail {
 
 func userToEmailModel(user *db.User) *model.UserEmail {
 
-	email := user.Email.String()
-
 	return &model.UserEmail{
-		Email:              &email,
+		Email:              &user.Email,
 		VerificationStatus: &user.EmailVerified,
 		EmailNotificationSettings: &model.EmailNotificationSettings{
 			UnsubscribedFromAll:           user.EmailUnsubscriptions.All.Bool(),
@@ -948,7 +946,7 @@ func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, 
 
 }
 
-func updateUserEmail(ctx context.Context, email string) (*model.UpdateEmailPayload, error) {
+func updateUserEmail(ctx context.Context, email persist.Email) (*model.UpdateEmailPayload, error) {
 	err := publicapi.For(ctx).User.UpdateUserEmail(ctx, email)
 	if err != nil {
 		return nil, err

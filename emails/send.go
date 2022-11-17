@@ -340,13 +340,13 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 	}
 	for {
 		users, err := queries.GetUsersWithEmailNotificationsOnForEmailType(ctx, coredb.GetUsersWithEmailNotificationsOnForEmailTypeParams{
-			Limit:         emailsAtATime,
-			CurAfterTime:  lastCreatedAt,
-			CurBeforeTime: endTime,
-			CurAfterID:    lastID,
-			PagingForward: true,
-			EmailVerified: requiredStatus,
-			Column1:       emailType.String(),
+			Limit:               emailsAtATime,
+			CurAfterTime:        lastCreatedAt,
+			CurBeforeTime:       endTime,
+			CurAfterID:          lastID,
+			PagingForward:       true,
+			EmailVerified:       requiredStatus,
+			EmailUnsubscription: emailType.String(),
 		})
 		if err != nil {
 			return err

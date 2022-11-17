@@ -50,7 +50,7 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 	return output, nil
 }
 
-func PreverifyEmail(ctx context.Context, email string, source string) (emails.PreverifyEmailOutput, error) {
+func PreverifyEmail(ctx context.Context, email persist.Email, source string) (emails.PreverifyEmailOutput, error) {
 	var result emails.PreverifyEmailOutput
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/preverify?email=%s&source=%s", viper.GetString("EMAILS_HOST"), email, source), nil)

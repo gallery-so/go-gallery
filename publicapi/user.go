@@ -277,7 +277,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	return nil
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *string, bio string) (userID persist.DBID, galleryID persist.DBID, err error) {
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required,username"},
@@ -340,7 +340,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	return nil
 }
 
-func (api UserAPI) UpdateUserEmail(ctx context.Context, email string) error {
+func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"email": {email, "required"},
@@ -354,7 +354,7 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email string) error {
 	}
 	err = api.queries.UpdateUserEmail(ctx, db.UpdateUserEmailParams{
 		ID:    userID,
-		Email: persist.NullString(email),
+		Email: email,
 	})
 	if err != nil {
 		return err

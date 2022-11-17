@@ -13,7 +13,7 @@ SELECT * FROM users WHERE id = ANY(@user_ids) AND deleted = false
     LIMIT $1;
 
 -- name: GetUserByUsername :one
-SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg(username)) AND deleted = false;
+SELECT * FROM users WHERE username_idempotent = lower(sqlc.arg('username')) AND deleted = false;
 
 -- name: GetUserByUsernameBatch :batchone
 SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
@@ -21,8 +21,8 @@ SELECT * FROM users WHERE username_idempotent = lower($1) AND deleted = false;
 -- name: GetUserByAddressBatch :batchone
 select users.*
 from users, wallets
-where wallets.address = $1
-	and wallets.chain = @chain::int
+where wallets.address = sqlc.arg('address')
+	and wallets.chain = sqlc.arg('chain')::int
 	and array[wallets.id] <@ users.wallets
 	and wallets.deleted = false
 	and users.deleted = false;
@@ -80,14 +80,14 @@ SELECT t.* FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
-    AND c.id = $1 AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord LIMIT sqlc.narg('limit');
+    AND c.id = sqlc.arg('collection_id') AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord LIMIT sqlc.narg('limit');
 
 -- name: GetTokensByCollectionIdBatch :batchmany
 SELECT t.* FROM users u, collections c, unnest(c.nfts)
     WITH ORDINALITY AS x(nft_id, nft_ord)
     INNER JOIN tokens t ON t.id = x.nft_id
     WHERE u.id = t.owner_user_id AND t.owned_by_wallets && u.wallets
-    AND c.id = $1 AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord LIMIT sqlc.narg('limit');
+    AND c.id = sqlc.arg('collection_id') AND u.deleted = false AND c.deleted = false AND t.deleted = false ORDER BY x.nft_ord LIMIT sqlc.narg('limit');
 
 -- name: GetNewTokensByFeedEventIdBatch :batchmany
 WITH new_tokens AS (
@@ -190,13 +190,13 @@ SELECT t.* FROM tokens t
 -- name: GetTokensByContractIdBatchPaginate :batchmany
 SELECT t.* FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
-    WHERE t.contract = $1 AND t.deleted = false
+    WHERE t.contract = sqlc.arg('contract') AND t.deleted = false
     AND (NOT @gallery_users_only::bool OR u.universal = false)
     AND (u.universal,t.created_at,t.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     AND (u.universal,t.created_at,t.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (u.universal,t.created_at,t.id) END ASC,
              CASE WHEN NOT @paging_forward::bool THEN (u.universal,t.created_at,t.id) END DESC
-    LIMIT $2;
+    LIMIT sqlc.arg('limit');
 
 -- name: CountTokensByContractId :one
 SELECT count(*) FROM tokens JOIN users ON users.id = tokens.owner_user_id WHERE contract = $1 AND (NOT @gallery_users_only::bool OR users.universal = false) AND tokens.deleted = false;
@@ -209,14 +209,14 @@ SELECT count(*) FROM tokens JOIN users ON users.id = tokens.owner_user_id WHERE 
 --       all users.* fields twice).
 select users.* from (
     select distinct on (u.id) u.* from users u, tokens t
-        where t.contract = $1 and t.owner_user_id = u.id
+        where t.contract = sqlc.arg('contract') and t.owner_user_id = u.id
         and (not @gallery_users_only::bool or u.universal = false)
         and t.deleted = false and u.deleted = false
     ) as users
     where (users.universal,users.created_at,users.id) < (@cur_before_universal, @cur_before_time::timestamptz, @cur_before_id)
     and (users.universal,users.created_at,users.id) > (@cur_after_universal, @cur_after_time::timestamptz, @cur_after_id)
     order by case when @paging_forward::bool then (users.universal,users.created_at,users.id) end asc,
-         case when not @paging_forward::bool then (users.universal,users.created_at,users.id) end desc limit $2;
+         case when not @paging_forward::bool then (users.universal,users.created_at,users.id) end desc limit sqlc.narg('limit');
 
 
 -- name: CountOwnersByContractId :one
@@ -338,28 +338,28 @@ select exists(
 
 -- name: PaginateGlobalFeed :batchmany
 SELECT * FROM feed_events WHERE deleted = false
-    AND (event_time, id) < (@cur_before_time, @cur_before_id)
-    AND (event_time, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (event_time, id) END ASC,
-            CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
-    LIMIT $1;
+    AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (event_time, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (event_time, id) END DESC
+    LIMIT sqlc.arg('limit');
 
 -- name: PaginatePersonalFeedByUserID :batchmany
 SELECT fe.* FROM feed_events fe, follows fl WHERE fe.deleted = false AND fl.deleted = false
-    AND fe.owner_id = fl.followee AND fl.follower = $1
-    AND (fe.event_time, fe.id) < (@cur_before_time, @cur_before_id)
-    AND (fe.event_time, fe.id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (fe.event_time, fe.id) END ASC,
-            CASE WHEN NOT @paging_forward::bool THEN (fe.event_time, fe.id) END DESC
-    LIMIT $2;
+    AND fe.owner_id = fl.followee AND fl.follower = sqlc.arg('follower')
+    AND (fe.event_time, fe.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (fe.event_time, fe.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (fe.event_time, fe.id) END ASC,
+            CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (fe.event_time, fe.id) END DESC
+    LIMIT sqlc.arg('limit');
 
 -- name: PaginateUserFeedByUserID :batchmany
-SELECT * FROM feed_events WHERE owner_id = $1 AND deleted = false
-    AND (event_time, id) < (@cur_before_time, @cur_before_id)
-    AND (event_time, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (event_time, id) END ASC,
-            CASE WHEN NOT @paging_forward::bool THEN (event_time, id) END DESC
-    LIMIT $2;
+SELECT * FROM feed_events WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
+    AND (event_time, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (event_time, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (event_time, id) END ASC,
+            CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (event_time, id) END DESC
+    LIMIT sqlc.arg('limit');
 
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
@@ -412,11 +412,11 @@ SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_a
 SELECT * FROM admires WHERE actor_id = $1 AND deleted = false ORDER BY created_at DESC;
 
 -- name: PaginateAdmiresByFeedEventIDBatch :batchmany
-SELECT * FROM admires WHERE feed_event_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id) AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
-    LIMIT $2;
+SELECT * FROM admires WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
 
 -- name: CountAdmiresByFeedEventIDBatch :batchone
 SELECT count(*) FROM admires WHERE feed_event_id = $1 AND deleted = false;
@@ -431,12 +431,12 @@ SELECT * from comments WHERE id = ANY(@comment_ids) AND deleted = false;
 SELECT * FROM comments WHERE id = $1 AND deleted = false;
 
 -- name: PaginateCommentsByFeedEventIDBatch :batchmany
-SELECT * FROM comments WHERE feed_event_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
-    LIMIT $2;
+SELECT * FROM comments WHERE feed_event_id = sqlc.arg('feed_event_id') AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
 
 -- name: CountCommentsByFeedEventIDBatch :batchone
 SELECT count(*) FROM comments WHERE feed_event_id = $1 AND deleted = false;
@@ -467,12 +467,12 @@ SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = f
 SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false ORDER BY CREATED_AT DESC LIMIT $2;
 
 -- name: GetUserNotificationsBatch :batchmany
-SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false
-    AND (created_at, id) < (@cur_before_time, @cur_before_id)
-    AND (created_at, id) > (@cur_after_time, @cur_after_id)
-    ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-             CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
-    LIMIT $2;
+SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
+    AND (created_at, id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+    AND (created_at, id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+    ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+    LIMIT sqlc.arg('limit');
 
 -- name: CountUserNotifications :one
 SELECT count(*) FROM notifications WHERE owner_id = $1 AND deleted = false;
@@ -520,21 +520,21 @@ UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURN
 
 -- name: PaginateInteractionsByFeedEventIDBatch :batchmany
 SELECT interactions.created_At, interactions.id, interactions.tag FROM (
-    SELECT t.created_at, t.id, @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
-        AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
+    SELECT t.created_at, t.id, sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
+        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
                                                                     UNION
-    SELECT t.created_at, t.id, @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
-        AND (t.created_at, t.id) < (@cur_before_time, @cur_before_id) AND (t.created_at, t.id) > (@cur_after_time, @cur_after_id)
+    SELECT t.created_at, t.id, sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
+        AND (t.created_at, t.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id')) AND (t.created_at, t.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
 ) as interactions
 
-ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
-         CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
-LIMIT $2;
+ORDER BY CASE WHEN sqlc.arg('paging_forward')::bool THEN (created_at, id) END ASC,
+         CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (created_at, id) END DESC
+LIMIT sqlc.arg('limit');
 
 -- name: CountInteractionsByFeedEventIDBatch :batchmany
-SELECT count(*), @admire_tag::int as tag FROM admires t WHERE @admire_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false
+SELECT count(*), sqlc.arg('admire_tag')::int as tag FROM admires t WHERE sqlc.arg('admire_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false
                                                         UNION
-SELECT count(*), @comment_tag::int as tag FROM comments t WHERE @comment_tag != 0 AND t.feed_event_id = $1 AND t.deleted = false;
+SELECT count(*), sqlc.arg('comment_tag')::int as tag FROM comments t WHERE sqlc.arg('comment_tag') != 0 AND t.feed_event_id = sqlc.arg('feed_event_id') AND t.deleted = false;
 
 -- name: GetAdmireByActorIDAndFeedEventID :batchone
 SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = false;
@@ -543,12 +543,12 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 -- for some reason this query will not allow me to use @tags for $1
 -- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many
-SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>$1::varchar = 'false' OR email_unsubscriptions->>$1::varchar IS NULL) AND deleted = false AND email IS NOT NULL AND email_verified = $2
+SELECT * FROM users WHERE (email_unsubscriptions->>'all' = 'false' OR email_unsubscriptions->>'all' IS NULL) AND (email_unsubscriptions->>sqlc.arg('email_unsubscription')::varchar = 'false' OR email_unsubscriptions->>sqlc.arg('email_unsubscription')::varchar IS NULL) AND deleted = false AND email IS NOT NULL AND email_verified = sqlc.arg('email_verified')
     AND (created_at, id) < (@cur_before_time, @cur_before_id)
     AND (created_at, id) > (@cur_after_time, @cur_after_id)
     ORDER BY CASE WHEN @paging_forward::bool THEN (created_at, id) END ASC,
              CASE WHEN NOT @paging_forward::bool THEN (created_at, id) END DESC
-    LIMIT $3;
+    LIMIT sqlc.arg('limit');
 
 -- verified is commented out for testing purposes so I don't have to verify an email to send stuff to it
 -- name: GetUsersWithEmailNotificationsOn :many

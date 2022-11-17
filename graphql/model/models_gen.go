@@ -960,7 +960,7 @@ type PageInfo struct {
 }
 
 type PreverifyEmailPayload struct {
-	Email  string               `json:"email"`
+	Email  persist.Email        `json:"email"`
 	Result PreverifyEmailResult `json:"result"`
 }
 
@@ -1265,7 +1265,7 @@ type UpdateCollectionTokensPayload struct {
 func (UpdateCollectionTokensPayload) IsUpdateCollectionTokensPayloadOrError() {}
 
 type UpdateEmailInput struct {
-	Email string `json:"email"`
+	Email persist.Email `json:"email"`
 }
 
 type UpdateEmailNotificationSettingsInput struct {
@@ -1333,7 +1333,7 @@ type UserEdge struct {
 }
 
 type UserEmail struct {
-	Email                     *string                          `json:"email"`
+	Email                     *persist.Email                   `json:"email"`
 	VerificationStatus        *persist.EmailVerificationStatus `json:"verificationStatus"`
 	EmailNotificationSettings *EmailNotificationSettings       `json:"emailNotificationSettings"`
 }
@@ -1353,7 +1353,7 @@ type UsersConnection struct {
 }
 
 type VerifyEmailPayload struct {
-	Email string `json:"email"`
+	Email persist.Email `json:"email"`
 }
 
 func (VerifyEmailPayload) IsVerifyEmailPayloadOrError() {}

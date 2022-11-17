@@ -20,13 +20,13 @@ type VerifyEmailInput struct {
 }
 
 type VerifyEmailOutput struct {
-	UserID persist.DBID `json:"user_id"`
-	Email  string       `json:"email"`
+	UserID persist.DBID  `json:"user_id"`
+	Email  persist.Email `json:"email"`
 }
 
 type PreverifyEmailInput struct {
-	Email  string `form:"email" binding:"required"`
-	Source string `form:"source" binding:"required"`
+	Email  persist.Email `form:"email" binding:"required"`
+	Source string        `form:"source" binding:"required"`
 }
 
 type PreverifyEmailOutput struct {
@@ -125,7 +125,7 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, VerifyEmailOutput{
 			UserID: user.ID,
-			Email:  user.Email.String(),
+			Email:  user.Email,
 		})
 	}
 }
@@ -202,8 +202,8 @@ func addEmailToSendgridList(ctx context.Context, email string, listID string) er
 }
 
 type sendgridEmailValidation struct {
-	Email  string `json:"email"`
-	Source string `json:"source"`
+	Email  persist.Email `json:"email"`
+	Source string        `json:"source"`
 }
 
 /*
@@ -260,7 +260,7 @@ type sendgridEmailValidationResult struct {
 	} `json:"result"`
 }
 
-func validateEmail(ctx context.Context, email, source string) (sendgridEmailValidationResult, error) {
+func validateEmail(ctx context.Context, email persist.Email, source string) (sendgridEmailValidationResult, error) {
 
 	var result sendgridEmailValidationResult
 

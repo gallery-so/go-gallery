@@ -721,7 +721,7 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persis
 	return output, nil
 }
 
-func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string, email *string) (model.CreateUserPayloadOrError, error) {
+func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string, email *persist.Email) (model.CreateUserPayloadOrError, error) {
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
@@ -937,7 +937,7 @@ func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, setti
 	return resolveViewerNotificationSettings(ctx)
 }
 
-func (r *mutationResolver) PreverifyEmail(ctx context.Context, email string) (model.PreverifyEmailPayloadOrError, error) {
+func (r *mutationResolver) PreverifyEmail(ctx context.Context, email persist.Email) (model.PreverifyEmailPayloadOrError, error) {
 	// todo we could have the frontend send the source? right now I don't see any other sources of verification other than signing up
 	result, err := emails.PreverifyEmail(ctx, email, "signup")
 	if err != nil {
