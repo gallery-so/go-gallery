@@ -1,56 +1,57 @@
 package middleware
 
 import (
-	"sync"
+	"context"
+	"fmt"
+	"log"
+	"time"
 
-	"golang.org/x/time/rate"
+	"github.com/benny-conn/limiters"
+	"github.com/go-redis/redis/v8"
+	gredis "github.com/mikeydub/go-gallery/service/memstore/redis"
 )
 
-// ipRateLimiter .
-type ipRateLimiter struct {
-	ips map[string]*rate.Limiter
-	mu  *sync.RWMutex
-	r   rate.Limit
-	b   int
+// KeyRateLimiter .
+type KeyRateLimiter struct {
+	rateDuration time.Duration
+	rateAmount   int64
+	reg          *limiters.Registry
+	red          *redis.Client
+	clock        *limiters.SystemClock
+	logger       *limiters.StdLogger
+	lock         *gredis.GlobalLock
 }
 
-// newIPRateLimiter .
-func newIPRateLimiter(r rate.Limit, b int) *ipRateLimiter {
-	i := &ipRateLimiter{
-		ips: make(map[string]*rate.Limiter),
-		mu:  &sync.RWMutex{},
-		r:   r,
-		b:   b,
+// NewKeyRateLimiter .
+func NewKeyRateLimiter(rateAmount int64, every time.Duration, red *redis.Client) *KeyRateLimiter {
+
+	i := &KeyRateLimiter{
+		rateDuration: every,
+		rateAmount:   rateAmount,
+		reg:          limiters.NewRegistry(),
+		clock:        limiters.NewSystemClock(),
+		logger:       limiters.NewStdLogger(),
+		red:          red,
+		lock:         gredis.NewGlobalLock(gredis.NewLockClient(gredis.EmailRateLimiterDB), every*time.Duration(rateAmount)),
 	}
 
 	return i
 }
 
-// addIP creates a new rate limiter and adds it to the ips map,
-// using the IP address as the key
-func (i *ipRateLimiter) addIP(ip string) *rate.Limiter {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+// ForIP will check if the IP address has exceeded the rate limit
+func (i *KeyRateLimiter) ForIP(ctx context.Context, ip string) (bool, time.Duration, error) {
+	bucket := i.reg.GetOrCreate(ip, func() interface{} {
+		return limiters.NewTokenBucket(i.rateAmount, i.rateDuration, i.lock, limiters.NewTokenBucketRedis(i.red, fmt.Sprintf("limiter:%s", ip), i.rateDuration, false), i.clock, i.logger)
+	}, time.Duration(i.rateAmount), i.clock.Now())
 
-	limiter := rate.NewLimiter(i.r, i.b)
-
-	i.ips[ip] = limiter
-
-	return limiter
-}
-
-// getLimiter returns the rate limiter for the provided IP address if it exists.
-// Otherwise calls AddIP to add IP address to the map
-func (i *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
-	i.mu.Lock()
-	limiter, exists := i.ips[ip]
-
-	if !exists {
-		i.mu.Unlock()
-		return i.addIP(ip)
+	w, err := bucket.(*limiters.TokenBucket).Limit(ctx)
+	if err == limiters.ErrLimitExhausted {
+		return false, w, nil
+	} else if err != nil {
+		// The limiter failed. This error should be logged and examined.
+		log.Println(err)
+		return false, 0, fmt.Errorf("rate limiting err: %s", err)
 	}
 
-	i.mu.Unlock()
-
-	return limiter
+	return true, 0, nil
 }

@@ -15,6 +15,7 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
 	github.com/asottile/dockerfile v3.1.0+incompatible
 	github.com/benny-conn/go-ens v1.1.0
+	github.com/benny-conn/limiters v0.0.1
 	github.com/bits-and-blooms/bloom v2.0.3+incompatible
 	github.com/bsm/redislock v0.7.2
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect

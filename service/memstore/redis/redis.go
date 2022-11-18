@@ -24,6 +24,7 @@ const (
 	TokenProcessingThrottleDB = 8
 	EmailThrottleDB           = 9
 	NotificationLockDB        = 10
+	EmailRateLimiterDB        = 11
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.
@@ -45,13 +46,7 @@ func GetNameForDatabase(databaseId int) string {
 	return fmt.Sprintf("db %d", databaseId)
 }
 
-// Cache represents an abstraction over a redist client
-type Cache struct {
-	client *redis.Client
-}
-
-// NewCache creates a new redis cache
-func NewCache(db int) *Cache {
+func NewClient(db int) *redis.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	redisURL := viper.GetString("REDIS_URL")
@@ -65,21 +60,24 @@ func NewCache(db int) *Cache {
 	if err := client.Ping(ctx).Err(); err != nil {
 		panic(err)
 	}
-	return &Cache{client: client}
+	return client
+}
+
+// Cache represents an abstraction over a redist client
+type Cache struct {
+	client *redis.Client
+}
+
+// NewCache creates a new redis cache
+func NewCache(db int) *Cache {
+	return &Cache{client: NewClient(db)}
 }
 
 // ClearCache deletes the entire cache
 func ClearCache(db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	redisURL := viper.GetString("REDIS_URL")
-	redisPass := viper.GetString("REDIS_PASS")
-	client := redis.NewClient(&redis.Options{
-		Addr:     redisURL,
-		Password: redisPass,
-		DB:       db,
-	})
-	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
+	client := NewClient(db)
 	return client.FlushAll(ctx).Err()
 }
 
@@ -115,19 +113,31 @@ func (c *Cache) Close(clear bool) error {
 	return c.client.Close()
 }
 
-func NewLockClient(pCtx context.Context, db int) *redislock.Client {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	redisURL := viper.GetString("REDIS_URL")
-	redisPass := viper.GetString("REDIS_PASS")
-	client := redis.NewClient(&redis.Options{
-		Addr:     redisURL,
-		Password: redisPass,
-		DB:       db,
-	})
-	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
-	if err := client.Ping(ctx).Err(); err != nil {
-		panic(err)
+func NewLockClient(db int) *redislock.Client {
+	return redislock.New(NewClient(db))
+}
+
+type GlobalLock struct {
+	client *redislock.Client
+	ttl    time.Duration
+	ctx    context.Context
+	lock   *redislock.Lock
+}
+
+func NewGlobalLock(client *redislock.Client, ttl time.Duration) *GlobalLock {
+	return &GlobalLock{client: client, ttl: ttl}
+}
+
+func (l *GlobalLock) Lock(ctx context.Context) error {
+	lock, err := l.client.Obtain(ctx, "lock", l.ttl, &redislock.Options{RetryStrategy: redislock.LimitRetry(redislock.LinearBackoff(100*time.Millisecond), 3)})
+	if err != nil {
+		return err
 	}
-	return redislock.New(client)
+	l.lock = lock
+	l.ctx = ctx
+	return nil
+}
+
+func (l *GlobalLock) Unlock() error {
+	return l.lock.Release(l.ctx)
 }

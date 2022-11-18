@@ -101,7 +101,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		}
 	}
 	taskClient := task.NewClient(context.Background())
-	lock := redis.NewLockClient(context.Background(), redis.NotificationLockDB)
+	lock := redis.NewLockClient(redis.NotificationLockDB)
 
 	queries := db.New(pgx)
 

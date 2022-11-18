@@ -8,13 +8,13 @@ import (
 	"github.com/sendgrid/sendgrid-go"
 )
 
-func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client) *gin.Engine {
+func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries *coredb.Queries, s *sendgrid.Client, lim *middleware.KeyRateLimiter) *gin.Engine {
 
 	sendGroup := router.Group("/send")
 	if isDevEnv() {
-		sendGroup.POST("/notifications", middleware.RateLimited(), sendNotificationEmails(queries, s))
+		sendGroup.POST("/notifications", middleware.RateLimited(lim), sendNotificationEmails(queries, s))
 	}
-	sendGroup.POST("/verification", middleware.RateLimited(), sendVerificationEmail(loaders, queries, s))
+	sendGroup.POST("/verification", middleware.RateLimited(lim), sendVerificationEmail(loaders, queries, s))
 
 	router.POST("/subscriptions", updateSubscriptions(queries))
 	router.POST("/unsubscribe", unsubscribe(queries))
