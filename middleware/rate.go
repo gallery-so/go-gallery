@@ -43,7 +43,7 @@ func NewKeyRateLimiter(rateAmount int64, every time.Duration, red *redis.Client)
 func (i *KeyRateLimiter) ForKey(ctx context.Context, key string) (bool, time.Duration, error) {
 	bucket := i.reg.GetOrCreate(key, func() interface{} {
 		return limiters.NewTokenBucket(i.rateAmount, i.rateDuration, i.lock, limiters.NewTokenBucketRedis(i.red, fmt.Sprintf("limiter:%s", key), i.rateDuration, false), i.clock, i.logger)
-	}, time.Duration(i.rateAmount), i.clock.Now())
+	}, i.rateDuration, i.clock.Now())
 
 	w, err := bucket.(*limiters.TokenBucket).Limit(ctx)
 	if err == limiters.ErrLimitExhausted {
