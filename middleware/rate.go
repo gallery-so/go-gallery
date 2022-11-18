@@ -33,7 +33,7 @@ func NewKeyRateLimiter(rateAmount int64, every time.Duration, red *redis.Client)
 		clock:        limiters.NewSystemClock(),
 		logger:       limiters.NewStdLogger(),
 		red:          red,
-		lock:         gredis.NewGlobalLock(gredis.NewLockClient(gredis.EmailRateLimiterDB), every*time.Duration(rateAmount)),
+		lock:         gredis.NewGlobalLock(gredis.NewLockClient(red.Options().DB), every*time.Duration(rateAmount)),
 	}
 
 	return i

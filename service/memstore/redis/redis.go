@@ -123,7 +123,6 @@ func NewLockClient(db int) *redislock.Client {
 type GlobalLock struct {
 	client *redislock.Client
 	ttl    time.Duration
-	ctx    context.Context
 	lock   *redislock.Lock
 }
 
@@ -137,10 +136,9 @@ func (l *GlobalLock) Lock(ctx context.Context) error {
 		return err
 	}
 	l.lock = lock
-	l.ctx = ctx
 	return nil
 }
 
-func (l *GlobalLock) Unlock() error {
-	return l.lock.Release(l.ctx)
+func (l *GlobalLock) Unlock(ctx context.Context) error {
+	return l.lock.Release(ctx)
 }

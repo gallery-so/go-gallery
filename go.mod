@@ -15,7 +15,7 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
 	github.com/asottile/dockerfile v3.1.0+incompatible
 	github.com/benny-conn/go-ens v1.1.0
-	github.com/benny-conn/limiters v0.0.1
+	github.com/benny-conn/limiters v0.0.2
 	github.com/bits-and-blooms/bloom v2.0.3+incompatible
 	github.com/bsm/redislock v0.7.2
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
@@ -67,7 +67,6 @@ require (
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/time v0.0.0-20220609170525-579cf78fd858
 	google.golang.org/api v0.85.0
 	google.golang.org/appengine v1.6.7
 	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad

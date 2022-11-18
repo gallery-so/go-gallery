@@ -330,8 +330,8 @@ github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/benny-conn/go-ens v1.1.0 h1:c/5gbyRtVWM/rD7fNaNHUNZlqXmFP10Ds09paBwOmos=
 github.com/benny-conn/go-ens v1.1.0/go.mod h1:INN/FO27oLFWTHtVGRnakaaqplZJx8d/XbqnrmYFbTA=
-github.com/benny-conn/limiters v0.0.1 h1:qOkBsmxrgUDcXAhCw4f5lcPtsUG/s66drZAPpiNH2/M=
-github.com/benny-conn/limiters v0.0.1/go.mod h1:2z9mjQGbpS5gj/NtFNAWnfIRV5HSSSgHyH0YaKgh60g=
+github.com/benny-conn/limiters v0.0.2 h1:ZKfEy/4SYJrZtqCs2QYTmxVcFR4AoawFmY8cwjZTgFw=
+github.com/benny-conn/limiters v0.0.2/go.mod h1:2z9mjQGbpS5gj/NtFNAWnfIRV5HSSSgHyH0YaKgh60g=
 github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
