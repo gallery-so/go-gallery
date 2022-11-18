@@ -117,6 +117,9 @@ func NewLockClient(db int) *redislock.Client {
 	return redislock.New(NewClient(db))
 }
 
+// A global lock is a distributed lock that does not depend on a key.
+// It can store its own context and lock because we can assume that there never be more than one global lock in use at a time
+// and therefore no concurrency issues with overwriting the context and lock.
 type GlobalLock struct {
 	client *redislock.Client
 	ttl    time.Duration

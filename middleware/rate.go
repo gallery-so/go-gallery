@@ -22,7 +22,8 @@ type KeyRateLimiter struct {
 	lock         *gredis.GlobalLock
 }
 
-// NewKeyRateLimiter .
+// NewKeyRateLimiter creates a new rate limiter that will limit to `rateAmount` requests `every` duration
+// uses redis in the backend
 func NewKeyRateLimiter(rateAmount int64, every time.Duration, red *redis.Client) *KeyRateLimiter {
 
 	i := &KeyRateLimiter{
