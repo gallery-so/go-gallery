@@ -132,7 +132,7 @@ func NewGlobalLock(client *redislock.Client, ttl time.Duration) *GlobalLock {
 }
 
 func (l *GlobalLock) Lock(ctx context.Context) error {
-	lock, err := l.client.Obtain(ctx, "lock", l.ttl, &redislock.Options{RetryStrategy: redislock.LimitRetry(redislock.LinearBackoff(100*time.Millisecond), 3)})
+	lock, err := l.client.Obtain(ctx, "lock", l.ttl, &redislock.Options{RetryStrategy: redislock.LimitRetry(redislock.LinearBackoff(time.Second), 10)})
 	if err != nil {
 		return err
 	}
