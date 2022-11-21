@@ -1142,14 +1142,15 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	return ret
 }
 
-// FallbackProvider will calls its fallback if the first token
-// response is missing metadata
+// FallbackProvider will call its fallback if the primary Provider's token
+// response is unsuitable based on Eval
 type FallbackProvider struct {
 	Primary interface {
 		configurer
-		tokensFetcher
+		tokenFetcherRefresher
 	}
 	Fallback tokensFetcher
+	Eval     func(context.Context, ChainAgnosticToken) bool
 }
 
 type fetchResult struct {
@@ -1159,6 +1160,10 @@ type fetchResult struct {
 
 func (f FallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
 	return f.Primary.GetBlockchainInfo(ctx)
+}
+
+func (f FallbackProvider) RefreshToken(ctx context.Context, tokenIdentifiers ChainAgnosticIdentifiers, owner persist.Address) error {
+	return f.Primary.RefreshToken(ctx, tokenIdentifiers, owner)
 }
 
 func (f FallbackProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error) {
@@ -1184,7 +1189,7 @@ func (f FallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Contex
 	if err != nil {
 		return ChainAgnosticToken{}, ChainAgnosticContract{}, err
 	}
-	if !token.hasMetadata() {
+	if !f.Eval(ctx, token) {
 		token.TokenMetadata = f.callFallback(ctx, token).TokenMetadata
 	}
 	return token, contract, nil
@@ -1207,7 +1212,7 @@ func (f FallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnos
 
 	for i, token := range tokens {
 		usableTokens[i] = token
-		if !token.hasMetadata() {
+		if !f.Eval(ctx, token) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -1226,9 +1231,29 @@ func (f FallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnos
 func (f *FallbackProvider) callFallback(ctx context.Context, primary ChainAgnosticToken) ChainAgnosticToken {
 	id := ChainAgnosticIdentifiers{primary.ContractAddress, primary.TokenID}
 	backup, _, err := f.Fallback.GetTokensByTokenIdentifiersAndOwner(ctx, id, primary.OwnerAddress)
-	if err == nil && backup.hasMetadata() {
+	if err == nil && f.Eval(ctx, backup) {
 		return backup
 	}
 	logger.For(ctx).WithError(err).Warn("failed to call fallback")
 	return primary
+}
+
+// ContainsTezosKeywords returns true if the token's metadata has at least one non-empty Tezos keyword.
+func ContainsTezosKeywords(ctx context.Context, token ChainAgnosticToken) bool {
+	imageKeywords, animationKeywords := persist.ChainTezos.BaseKeywords()
+	for field, val := range token.TokenMetadata {
+
+		for _, keyword := range imageKeywords {
+			if field == keyword && (val != nil && val != "") {
+				return true
+			}
+		}
+
+		for _, keyword := range animationKeywords {
+			if field == keyword && (val != nil && val != "") {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -250,6 +250,7 @@ func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries
 	tezosProvider := multichain.FallbackProvider{
 		Primary:  tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket),
 		Fallback: tezos.NewObjktProvider(viper.GetString("IPFS_URL")),
+		Eval:     multichain.ContainsTezosKeywords,
 	}
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
 	return multichain.NewProvider(context.Background(), repos, queries, cache, taskClient,
