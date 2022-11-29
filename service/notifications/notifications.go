@@ -146,16 +146,14 @@ type groupedNotificationHandler struct {
 func (h groupedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
 	var curNotif db.Notification
 
-	switch notif.Action {
-	// Follows aren't in response to a feed event
-	case persist.ActionUserFollowedUsers:
+	// Bucket notifications on the feed event if it has one
+	if notif.FeedEventID == "" {
 		curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
 			OwnerID:          notif.OwnerID,
 			Action:           notif.Action,
 			OnlyForFeedEvent: false,
 		})
-	// Otherwise find the relevant feed event
-	default:
+	} else {
 		curNotif, _ = h.queries.GetMostRecentNotificationByOwnerIDForAction(ctx, db.GetMostRecentNotificationByOwnerIDForActionParams{
 			OwnerID:          notif.OwnerID,
 			Action:           notif.Action,
