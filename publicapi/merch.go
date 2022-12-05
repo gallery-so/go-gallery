@@ -11,6 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/spf13/viper"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
@@ -24,8 +25,6 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
-
-const merchAddress = "0x8a9c"
 
 type MerchAPI struct {
 	repos              *postgres.Repositories
@@ -55,8 +54,10 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, err
 	}
 
+	merchAddress := viper.GetString("MERCH_CONTRACT_ADDRESS")
+
 	contract, err := api.queries.GetContractByChainAddress(ctx, db.GetContractByChainAddressParams{
-		Address: merchAddress,
+		Address: persist.Address(merchAddress),
 		Chain:   persist.ChainETH,
 	})
 	if err != nil {
