@@ -126,6 +126,10 @@ type PreverifyEmailPayloadOrError interface {
 	IsPreverifyEmailPayloadOrError()
 }
 
+type RedeemMerchPayloadOrError interface {
+	IsRedeemMerchPayloadOrError()
+}
+
 type RefreshCollectionPayloadOrError interface {
 	IsRefreshCollectionPayloadOrError()
 }
@@ -626,6 +630,7 @@ func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
+func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -978,6 +983,19 @@ type PreviewURLSet struct {
 	Large     *string `json:"large"`
 	SrcSet    *string `json:"srcSet"`
 }
+
+type RedeemMerchInput struct {
+	TokenIds   []string              `json:"tokenIds"`
+	Address    *persist.ChainAddress `json:"address"`
+	WalletType persist.WalletType    `json:"walletType"`
+	Signature  string                `json:"signature"`
+}
+
+type RedeemMerchPayload struct {
+	DiscountCodes []string `json:"discountCodes"`
+}
+
+func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}
 
 type RefreshCollectionPayload struct {
 	Collection *Collection `json:"collection"`

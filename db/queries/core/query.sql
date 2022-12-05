@@ -614,3 +614,12 @@ update user_roles set deleted = true, last_updated = now() where user_id = $1 an
 
 -- name: GetUserRolesByUserId :many
 select role from user_roles where user_id = $1 and deleted = false;
+
+-- name: RedeemMerch :one
+update merch set redeemed = true where token_id = @token_hex returning discount_code;
+
+-- name: RedeemMerchMany :many
+update merch set redeemed = true where token_id = any(@tokens_hex) returning discount_code;
+
+-- name: GetUserOwnsTokenByIdentifiers :one
+select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract) as owns_token;

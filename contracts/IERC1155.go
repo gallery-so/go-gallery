@@ -961,3 +961,4 @@ func (_IERC1155 *IERC1155Filterer) ParseURI(log types.Log) (*IERC1155URI, error)
 	event.Raw = log
 	return event, nil
 }
+

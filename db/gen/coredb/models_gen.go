@@ -206,6 +206,17 @@ type Membership struct {
 	Owners      persist.TokenHolderList
 }
 
+type Merch struct {
+	ID           persist.DBID
+	Deleted      bool
+	Version      sql.NullInt32
+	CreatedAt    time.Time
+	LastUpdated  time.Time
+	TokenID      persist.TokenID
+	DiscountCode sql.NullString
+	Redeemed     bool
+}
+
 type NftEvent struct {
 	ID          persist.DBID
 	UserID      persist.DBID

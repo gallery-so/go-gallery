@@ -4,11 +4,11 @@ go 1.16
 
 require (
 	blockwatch.cc/tzgo v1.13.2
-	cloud.google.com/go/cloudtasks v1.3.0
+	cloud.google.com/go/cloudtasks v1.7.0
 	cloud.google.com/go/profiler v0.3.0
 	cloud.google.com/go/pubsub v1.24.0
-	cloud.google.com/go/secretmanager v1.3.0
-	cloud.google.com/go/storage v1.22.1
+	cloud.google.com/go/secretmanager v1.9.0
+	cloud.google.com/go/storage v1.27.0
 	github.com/99designs/gqlgen v0.17.1
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
@@ -66,12 +66,12 @@ require (
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	google.golang.org/api v0.85.0
+	golang.org/x/sync v0.1.0
+	google.golang.org/api v0.102.0
 	google.golang.org/appengine v1.6.7
-	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad
-	google.golang.org/grpc v1.47.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/genproto v0.0.0-20221027153422-115e99e71e1c
+	google.golang.org/grpc v1.50.1
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 )

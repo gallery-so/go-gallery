@@ -2061,6 +2061,23 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 	return items, nil
 }
 
+const getUserOwnsTokenByIdentifiers = `-- name: GetUserOwnsTokenByIdentifiers :one
+select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3) as owns_token
+`
+
+type GetUserOwnsTokenByIdentifiersParams struct {
+	UserID   persist.DBID
+	TokenHex persist.TokenID
+	Contract persist.DBID
+}
+
+func (q *Queries) GetUserOwnsTokenByIdentifiers(ctx context.Context, arg GetUserOwnsTokenByIdentifiersParams) (bool, error) {
+	row := q.db.QueryRow(ctx, getUserOwnsTokenByIdentifiers, arg.UserID, arg.TokenHex, arg.Contract)
+	var owns_token bool
+	err := row.Scan(&owns_token)
+	return owns_token, err
+}
+
 const getUserRolesByUserId = `-- name: GetUserRolesByUserId :many
 select role from user_roles where user_id = $1 and deleted = false
 `
@@ -2715,6 +2732,41 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const redeemMerch = `-- name: RedeemMerch :one
+update merch set redeemed = true where token_id = $1 returning discount_code
+`
+
+func (q *Queries) RedeemMerch(ctx context.Context, tokenHex persist.TokenID) (sql.NullString, error) {
+	row := q.db.QueryRow(ctx, redeemMerch, tokenHex)
+	var discount_code sql.NullString
+	err := row.Scan(&discount_code)
+	return discount_code, err
+}
+
+const redeemMerchMany = `-- name: RedeemMerchMany :many
+update merch set redeemed = true where token_id = any($1) returning discount_code
+`
+
+func (q *Queries) RedeemMerchMany(ctx context.Context, tokensHex persist.TokenIDList) ([]sql.NullString, error) {
+	rows, err := q.db.Query(ctx, redeemMerchMany, tokensHex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []sql.NullString
+	for rows.Next() {
+		var discount_code sql.NullString
+		if err := rows.Scan(&discount_code); err != nil {
+			return nil, err
+		}
+		items = append(items, discount_code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateNotification = `-- name: UpdateNotification :exec

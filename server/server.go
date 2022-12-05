@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
@@ -101,23 +103,24 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		}
 	}
 	taskClient := task.NewClient(context.Background())
+	secretClient := newSecretsClient()
 	lock := redis.NewLockClient(redis.NotificationLockDB)
 
 	queries := db.New(pgx)
 
-	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub, lock)
+	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub, lock, secretClient)
 }
 
-func newTasksClient() *cloudtasks.Client {
-	var c *cloudtasks.Client
+func newSecretsClient() *secretmanager.Client {
+	var c *secretmanager.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
-		c, err = cloudtasks.NewClient(context.Background())
+		c, err = secretmanager.NewClient(context.Background())
 	} else {
-		c, err = cloudtasks.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		c, err = secretmanager.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
 	}
 	if err != nil {
-		logger.For(nil).Errorf("error creating tasks client: %v", err)
+		panic(fmt.Sprintf("error creating secrets client: %v", err))
 	}
 	return c
 }

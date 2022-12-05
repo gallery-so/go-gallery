@@ -271,3 +271,4 @@ func (_CryptopunksData *CryptopunksDataSession) PunkImageSvg(index uint16) (stri
 func (_CryptopunksData *CryptopunksDataCallerSession) PunkImageSvg(index uint16) (string, error) {
 	return _CryptopunksData.Contract.PunkImageSvg(&_CryptopunksData.CallOpts, index)
 }
+
