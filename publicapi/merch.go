@@ -114,7 +114,15 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, err
 	}
 
-	keytransactor, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1))
+	chainID, err := api.ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	keytransactor, err := bind.NewKeyedTransactorWithChainID(key, chainID)
+	if err != nil {
+		return nil, err
+	}
 
 	asBigs := make([]*big.Int, 0, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
