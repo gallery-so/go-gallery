@@ -8,6 +8,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -36,7 +38,7 @@ type MerchAPI struct {
 	secrets            *secretmanager.Client
 }
 
-func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainPubKey, sig string, walletType persist.WalletType) ([]string, error) {
+func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainPubKey, sig string, walletType persist.WalletType) ([]*model.DiscountCode, error) {
 
 	if err := validateFields(api.validator, validationMap{
 		"tokenIDs": {tokenIDs, "required"},
@@ -94,10 +96,10 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, err
 	}
 
-	result := make([]string, 0, len(discountCodes))
+	result := make([]*model.DiscountCode, 0, len(discountCodes))
 	for _, discountCode := range discountCodes {
-		if discountCode.Valid {
-			result = append(result, discountCode.String)
+		if discountCode.DiscountCode.Valid {
+			result = append(result, &model.DiscountCode{Code: discountCode.DiscountCode.String, TokenID: discountCode.TokenID.String()})
 		}
 	}
 
@@ -136,7 +138,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	err = api.ethClient.SendTransaction(ctx, tx)
 	if err != nil {
-		return nil, err
+		logger.For(ctx).Errorf("failed to send transaction: %v", err)
 	}
 
 	return result, nil

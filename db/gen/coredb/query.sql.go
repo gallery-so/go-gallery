@@ -2735,33 +2735,43 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const redeemMerch = `-- name: RedeemMerch :one
-update merch set redeemed = true where token_id = $1 returning discount_code
+update merch set redeemed = true where token_id = $1 returning token_id,discount_code
 `
 
-func (q *Queries) RedeemMerch(ctx context.Context, tokenHex persist.TokenID) (sql.NullString, error) {
+type RedeemMerchRow struct {
+	TokenID      persist.TokenID
+	DiscountCode sql.NullString
+}
+
+func (q *Queries) RedeemMerch(ctx context.Context, tokenHex persist.TokenID) (RedeemMerchRow, error) {
 	row := q.db.QueryRow(ctx, redeemMerch, tokenHex)
-	var discount_code sql.NullString
-	err := row.Scan(&discount_code)
-	return discount_code, err
+	var i RedeemMerchRow
+	err := row.Scan(&i.TokenID, &i.DiscountCode)
+	return i, err
 }
 
 const redeemMerchMany = `-- name: RedeemMerchMany :many
-update merch set redeemed = true where token_id = any($1) returning discount_code
+update merch set redeemed = true where token_id = any($1) returning token_id,discount_code
 `
 
-func (q *Queries) RedeemMerchMany(ctx context.Context, tokensHex persist.TokenIDList) ([]sql.NullString, error) {
+type RedeemMerchManyRow struct {
+	TokenID      persist.TokenID
+	DiscountCode sql.NullString
+}
+
+func (q *Queries) RedeemMerchMany(ctx context.Context, tokensHex persist.TokenIDList) ([]RedeemMerchManyRow, error) {
 	rows, err := q.db.Query(ctx, redeemMerchMany, tokensHex)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []sql.NullString
+	var items []RedeemMerchManyRow
 	for rows.Next() {
-		var discount_code sql.NullString
-		if err := rows.Scan(&discount_code); err != nil {
+		var i RedeemMerchManyRow
+		if err := rows.Scan(&i.TokenID, &i.DiscountCode); err != nil {
 			return nil, err
 		}
-		items = append(items, discount_code)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

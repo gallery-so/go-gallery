@@ -988,7 +988,6 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 }
 
 func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
-
 	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
 	for i, id := range input.TokenIds {
 		tokenIDList[i] = persist.TokenID(id)
