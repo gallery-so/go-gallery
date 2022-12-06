@@ -959,6 +959,16 @@ type PageInfo struct {
 	EndCursor       string `json:"endCursor"`
 }
 
+type PDFMedia struct {
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
+}
+
+func (PDFMedia) IsMediaSubtype() {}
+func (PDFMedia) IsMedia()        {}
+
 type PreverifyEmailInput struct {
 	Email persist.Email `json:"email"`
 }
