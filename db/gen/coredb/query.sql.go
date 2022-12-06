@@ -2735,7 +2735,7 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const redeemMerch = `-- name: RedeemMerch :one
-update merch set redeemed = true where token_id = $1 returning token_id,discount_code
+update merch set redeemed = true, last_updated = now() where token_id = $1 returning token_id,discount_code
 `
 
 type RedeemMerchRow struct {
@@ -2751,7 +2751,7 @@ func (q *Queries) RedeemMerch(ctx context.Context, tokenHex persist.TokenID) (Re
 }
 
 const redeemMerchMany = `-- name: RedeemMerchMany :many
-update merch set redeemed = true where token_id = any($1) returning token_id,discount_code
+update merch set redeemed = true, last_updated = now() where token_id = any($1) returning token_id,discount_code
 `
 
 type RedeemMerchManyRow struct {
