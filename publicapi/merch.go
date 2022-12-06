@@ -59,6 +59,16 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, err
 	}
 
+	// check for duplicate tokenIDs
+	seen := map[persist.TokenID]bool{}
+	for _, tokenID := range tokenIDs {
+		if !seen[tokenID] {
+			seen[tokenID] = true
+		} else {
+			return nil, fmt.Errorf("duplicate token ID %v", tokenID)
+		}
+	}
+
 	// check if user owns tokens
 
 	userID, err := getAuthenticatedUser(ctx)
@@ -129,8 +139,10 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		objectType, ok := uriToMerchType[uri]
 		if ok {
 
+			// first check if the token ID has already been redeemed, then just return the code
 			discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, tokenID)
 			if err != nil {
+				// if not, redeem it
 				discountCode, err = api.queries.RedeemMerch(ctx, db.RedeemMerchParams{
 					TokenHex:   tokenID,
 					ObjectType: int32(objectType),
@@ -138,6 +150,10 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 				if err != nil {
 					return nil, err
 				}
+			} else {
+				// override what the blockchain says about redeemed status, if the DB says it is redeemed then there is probably
+				// a transaction in progress for redeeming it, so don't kick off another redeem transaction for this token
+				redeemed[tokenID] = true
 			}
 
 			if discountCode.Valid {
@@ -182,6 +198,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 	asBigs := make([]*big.Int, 0, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
 		if redeemed[tokenID] {
+			// if the token is redeemed, don't try to redeem it again
 			continue
 		}
 		asBigs = append(asBigs, tokenID.BigInt())
