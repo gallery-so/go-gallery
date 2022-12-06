@@ -30,7 +30,7 @@ var (
 
 // MerchMetaData contains all meta data concerning the Merch contract.
 var MerchMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"tokenIDs\",\"type\":\"uint256[]\"}],\"name\":\"redeem\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"isRedeemed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"tokenIDs\",\"type\":\"uint256[]\"}],\"name\":\"redeem\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"tokenURI\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // MerchABI is the input ABI used to generate the binding from.
@@ -177,6 +177,68 @@ func (_Merch *MerchTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Tran
 // Transact invokes the (paid) contract method with params as input values.
 func (_Merch *MerchTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
 	return _Merch.Contract.contract.Transact(opts, method, params...)
+}
+
+// IsRedeemed is a free data retrieval call binding the contract method 0x32d33cd0.
+//
+// Solidity: function isRedeemed(uint256 tokenId) view returns(bool)
+func (_Merch *MerchCaller) IsRedeemed(opts *bind.CallOpts, tokenId *big.Int) (bool, error) {
+	var out []interface{}
+	err := _Merch.contract.Call(opts, &out, "isRedeemed", tokenId)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+// IsRedeemed is a free data retrieval call binding the contract method 0x32d33cd0.
+//
+// Solidity: function isRedeemed(uint256 tokenId) view returns(bool)
+func (_Merch *MerchSession) IsRedeemed(tokenId *big.Int) (bool, error) {
+	return _Merch.Contract.IsRedeemed(&_Merch.CallOpts, tokenId)
+}
+
+// IsRedeemed is a free data retrieval call binding the contract method 0x32d33cd0.
+//
+// Solidity: function isRedeemed(uint256 tokenId) view returns(bool)
+func (_Merch *MerchCallerSession) IsRedeemed(tokenId *big.Int) (bool, error) {
+	return _Merch.Contract.IsRedeemed(&_Merch.CallOpts, tokenId)
+}
+
+// TokenURI is a free data retrieval call binding the contract method 0xc87b56dd.
+//
+// Solidity: function tokenURI(uint256 tokenId) view returns(string)
+func (_Merch *MerchCaller) TokenURI(opts *bind.CallOpts, tokenId *big.Int) (string, error) {
+	var out []interface{}
+	err := _Merch.contract.Call(opts, &out, "tokenURI", tokenId)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// TokenURI is a free data retrieval call binding the contract method 0xc87b56dd.
+//
+// Solidity: function tokenURI(uint256 tokenId) view returns(string)
+func (_Merch *MerchSession) TokenURI(tokenId *big.Int) (string, error) {
+	return _Merch.Contract.TokenURI(&_Merch.CallOpts, tokenId)
+}
+
+// TokenURI is a free data retrieval call binding the contract method 0xc87b56dd.
+//
+// Solidity: function tokenURI(uint256 tokenId) view returns(string)
+func (_Merch *MerchCallerSession) TokenURI(tokenId *big.Int) (string, error) {
+	return _Merch.Contract.TokenURI(&_Merch.CallOpts, tokenId)
 }
 
 // Redeem is a paid mutator transaction binding the contract method 0xf9afb26a.

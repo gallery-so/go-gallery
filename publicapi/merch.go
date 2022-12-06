@@ -26,6 +26,18 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const (
+	merchTypeTShirt = iota
+	merchTypeHat
+	merchTypeCard
+)
+
+var uriToMerchType = map[string]int{
+	"ipfs://QmSWiQSXkxXhaoMJ2m9goR9DVXnyijdozE57jEsAwqLNZY": merchTypeTShirt,
+	"ipfs://QmVXF8H7Xcnqr4oQXGEtoMCMnah8d6fBZuQQ5tcv9nL8Po": merchTypeHat,
+	"ipfs://QmSPdA9Gg8xAdVxWvUyGkdFKQ8YMVYnGjYcr3cGMcBH1ae": merchTypeCard,
+}
+
 type MerchAPI struct {
 	repos              *postgres.Repositories
 	queries            *db.Queries
@@ -91,25 +103,62 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, auth.ErrSignatureInvalid
 	}
 
-	// redeem and return codes in DB
-
-	discountCodes, err := api.queries.RedeemMerchMany(ctx, tokenIDs)
+	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]*model.DiscountCode, 0, len(discountCodes))
-	for _, discountCode := range discountCodes {
-		if discountCode.DiscountCode.Valid {
-			result = append(result, &model.DiscountCode{Code: discountCode.DiscountCode.String, TokenID: discountCode.TokenID.String()})
+	// redeem and return codes in DB
+
+	redeemed := map[persist.TokenID]bool{}
+
+	result := make([]*model.DiscountCode, 0, len(tokenIDs))
+	for _, tokenID := range tokenIDs {
+
+		t, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, tokenID.BigInt())
+		if err != nil {
+			return nil, err
 		}
+		redeemed[tokenID] = t
+
+		uri, err := mer.TokenURI(&bind.CallOpts{Context: ctx}, tokenID.BigInt())
+		if err != nil {
+			return nil, err
+		}
+
+		objectType, ok := uriToMerchType[uri]
+		if ok {
+
+			discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, tokenID)
+			if err != nil {
+				discountCode, err = api.queries.RedeemMerch(ctx, db.RedeemMerchParams{
+					TokenHex:   tokenID,
+					ObjectType: int32(objectType),
+				})
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			if discountCode.Valid {
+				result = append(result, &model.DiscountCode{Code: discountCode.String, TokenID: tokenID.String()})
+			}
+		} else {
+			logger.For(ctx).Errorf("unknown merch type for %v", uri)
+		}
+
 	}
 
 	// redeem tokens on chain
 
-	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
+	chainID, err := api.ethClient.ChainID(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if chainID.Cmp(big.NewInt(1)) == 0 && viper.GetString("ENV") != "production" {
+		// if we're on mainnet but not on production, don't actually redeem
+		return result, nil
 	}
 
 	privateKey, err := api.secrets.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
@@ -124,30 +173,26 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, err
 	}
 
-	chainID, err := api.ethClient.ChainID(ctx)
+	auth, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
 		return nil, err
 	}
-
-	keytransactor, err := bind.NewKeyedTransactorWithChainID(key, chainID)
-	if err != nil {
-		return nil, err
-	}
+	auth.Context = ctx
 
 	asBigs := make([]*big.Int, 0, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
+		if redeemed[tokenID] {
+			continue
+		}
 		asBigs = append(asBigs, tokenID.BigInt())
 	}
 
-	tx, err := mer.Redeem(keytransactor, asBigs)
+	tx, err := mer.Redeem(auth, asBigs)
 	if err != nil {
 		return nil, err
 	}
 
-	err = api.ethClient.SendTransaction(ctx, tx)
-	if err != nil {
-		logger.For(ctx).Errorf("failed to send transaction: %v", err)
-	}
+	logger.For(ctx).Infof("redeemed merch items with tx: %s", tx.Hash())
 
 	return result, nil
 }

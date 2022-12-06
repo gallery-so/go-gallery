@@ -213,6 +213,7 @@ type Merch struct {
 	CreatedAt    time.Time
 	LastUpdated  time.Time
 	TokenID      persist.TokenID
+	ObjectType   int32
 	DiscountCode sql.NullString
 	Redeemed     bool
 }
