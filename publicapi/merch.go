@@ -126,7 +126,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 	for _, tokenID := range tokenIDs {
 
 		t, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, tokenID.BigInt())
-		if err == nil {
+		if err != nil {
 			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", tokenID, err)
 		}
 		redeemed[tokenID] = t
