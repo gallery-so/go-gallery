@@ -6,12 +6,16 @@ import (
 	"time"
 
 	"github.com/bsm/redislock"
-	"github.com/mikeydub/go-gallery/service/memstore"
+
 	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/viper"
 )
+
+type ErrKeyNotFound struct {
+	Key string
+}
 
 const (
 	GalleriesDB               = 0
@@ -91,7 +95,7 @@ func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
 	bs, err := c.client.Get(pCtx, key).Bytes()
 	if err != nil {
 		if err == redis.Nil {
-			return nil, memstore.ErrKeyNotFound{Key: key}
+			return nil, ErrKeyNotFound{Key: key}
 		}
 		return nil, err
 	}
@@ -141,4 +145,8 @@ func (l *GlobalLock) Lock(ctx context.Context) error {
 
 func (l *GlobalLock) Unlock(ctx context.Context) error {
 	return l.lock.Release(ctx)
+}
+
+func (e ErrKeyNotFound) Error() string {
+	return fmt.Sprintf("key %s not found", e.Key)
 }

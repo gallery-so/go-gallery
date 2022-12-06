@@ -8,7 +8,7 @@ import (
 
 	"github.com/benny-conn/limiters"
 	"github.com/go-redis/redis/v8"
-	gredis "github.com/mikeydub/go-gallery/service/memstore/redis"
+	gredis "github.com/mikeydub/go-gallery/service/redis"
 )
 
 // KeyRateLimiter .
