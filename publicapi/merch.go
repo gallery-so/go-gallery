@@ -40,10 +40,9 @@ type MerchAPI struct {
 func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainPubKey, sig string, walletType persist.WalletType) ([]*model.DiscountCode, error) {
 
 	if err := validateFields(api.validator, validationMap{
-		"tokenIDs":   {tokenIDs, "required"},
-		"address":    {address, "required"},
-		"sig":        {sig, "required"},
-		"walletType": {walletType, "required"},
+		"tokenIDs": {tokenIDs, "required"},
+		"address":  {address, "required"},
+		"sig":      {sig, "required"},
 	}); err != nil {
 		return nil, err
 	}
@@ -109,10 +108,16 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 	// redeem tokens on chain
 
 	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
+	if err != nil {
+		return nil, err
+	}
 
 	privateKey, err := api.secrets.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
 		Name: "backend-eth-private-key",
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	key, err := x509.ParseECPrivateKey(privateKey.Payload.Data)
 	if err != nil {
