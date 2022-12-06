@@ -40,9 +40,10 @@ type MerchAPI struct {
 func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainPubKey, sig string, walletType persist.WalletType) ([]*model.DiscountCode, error) {
 
 	if err := validateFields(api.validator, validationMap{
-		"tokenIDs": {tokenIDs, "required"},
-		"address":  {address, "required"},
-		"sig":      {sig, "required"},
+		"tokenIDs":   {tokenIDs, "required"},
+		"address":    {address, "required"},
+		"sig":        {sig, "required"},
+		"walletType": {walletType, "required"},
 	}); err != nil {
 		return nil, err
 	}
