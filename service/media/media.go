@@ -782,8 +782,8 @@ func (d DefaultKeywords) ForToken(tokenID persist.TokenID, contract persist.Addr
 
 const (
 	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
-	FxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
-	FxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
+	fxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
+	fxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
 )
 
 func IsHicEtNunc(contract persist.Address) bool {
@@ -791,7 +791,7 @@ func IsHicEtNunc(contract persist.Address) bool {
 }
 
 func IsFxHash(contract persist.Address) bool {
-	return contract == FxHash || contract == FxHash2
+	return contract == fxHash || contract == fxHash2
 }
 
 func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
