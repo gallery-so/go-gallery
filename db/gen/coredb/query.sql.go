@@ -2062,17 +2062,23 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 }
 
 const getUserOwnsTokenByIdentifiers = `-- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3) as owns_token
+select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4) as owns_token
 `
 
 type GetUserOwnsTokenByIdentifiersParams struct {
 	UserID   persist.DBID
 	TokenHex persist.TokenID
 	Contract persist.DBID
+	Chain    persist.Chain
 }
 
 func (q *Queries) GetUserOwnsTokenByIdentifiers(ctx context.Context, arg GetUserOwnsTokenByIdentifiersParams) (bool, error) {
-	row := q.db.QueryRow(ctx, getUserOwnsTokenByIdentifiers, arg.UserID, arg.TokenHex, arg.Contract)
+	row := q.db.QueryRow(ctx, getUserOwnsTokenByIdentifiers,
+		arg.UserID,
+		arg.TokenHex,
+		arg.Contract,
+		arg.Chain,
+	)
 	var owns_token bool
 	err := row.Scan(&owns_token)
 	return owns_token, err

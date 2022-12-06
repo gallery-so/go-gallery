@@ -69,6 +69,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 			UserID:   userID,
 			TokenHex: tokenID,
 			Contract: contract.ID,
+			Chain:    persist.ChainETH,
 		})
 		if err != nil {
 			return nil, err

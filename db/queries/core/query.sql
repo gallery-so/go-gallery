@@ -622,4 +622,4 @@ update merch set redeemed = true, last_updated = now() where token_id = @token_h
 update merch set redeemed = true, last_updated = now() where token_id = any(@tokens_hex) returning token_id,discount_code;
 
 -- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract) as owns_token;
+select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain) as owns_token;
