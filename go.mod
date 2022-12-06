@@ -4,9 +4,9 @@ go 1.16
 
 require (
 	blockwatch.cc/tzgo v1.13.2
-	cloud.google.com/go/cloudtasks v1.7.0
+	cloud.google.com/go/cloudtasks v1.8.0
 	cloud.google.com/go/profiler v0.3.0
-	cloud.google.com/go/pubsub v1.24.0
+	cloud.google.com/go/pubsub v1.28.0
 	cloud.google.com/go/secretmanager v1.9.0
 	cloud.google.com/go/storage v1.27.0
 	github.com/99designs/gqlgen v0.17.1
@@ -60,16 +60,16 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/vektah/gqlparser/v2 v2.4.1
 	github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b // indirect
 	golang.org/x/crypto v0.0.0-20220313003712-b769efc7c000
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
 	golang.org/x/sync v0.1.0
-	google.golang.org/api v0.102.0
+	google.golang.org/api v0.103.0
 	google.golang.org/appengine v1.6.7
-	google.golang.org/genproto v0.0.0-20221027153422-115e99e71e1c
+	google.golang.org/genproto v0.0.0-20221202195650-67e5cbc046fd
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/ini.v1 v1.66.4 // indirect
