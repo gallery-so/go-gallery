@@ -128,7 +128,8 @@ type indexer struct {
 	tokenRepo         persist.TokenRepository
 	contractRepo      persist.ContractRepository
 	addressFilterRepo refresh.AddressFilterRepository
-	dbMu              *sync.Mutex
+	dbMu              *sync.Mutex // Manages writes to the db
+	stateMu           *sync.Mutex // Manages updates to the indexer's state
 
 	tokenBucket string
 
@@ -139,11 +140,11 @@ type indexer struct {
 	polledLogs   []types.Log
 	lastSavedLog uint64
 
-	mostRecentBlock uint64
-	lastSyncedBlock uint64
-	maxBlock        *uint64
+	mostRecentBlock uint64  // Current height of the blockchain
+	lastSyncedBlock uint64  // Last block handled by the indexer
+	maxBlock        *uint64 // If provided, the indexer will only index up to maxBlock
 
-	isListening bool
+	isListening bool // Indicates if the indexer is waiting for new blocks
 
 	uniqueMetadatas uniqueMetadatas
 	getLogsFunc     getLogsFunc
@@ -163,6 +164,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		contractRepo:      contractRepo,
 		addressFilterRepo: addressFilterRepo,
 		dbMu:              &sync.Mutex{},
+		stateMu:           &sync.Mutex{},
 
 		tokenBucket: viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
@@ -235,6 +237,7 @@ func (i *indexer) Start(ctx context.Context) {
 	topics := eventsToTopics(i.eventHashes)
 
 	logger.For(ctx).Info("Catching up to latest block")
+	i.isListening = false
 	i.catchUp(ctx, topics)
 	i.lastSavedLog = i.lastSyncedBlock
 
@@ -244,6 +247,7 @@ func (i *indexer) Start(ctx context.Context) {
 	}
 
 	logger.For(ctx).Info("Subscribing to new logs")
+	i.isListening = true
 	i.waitForBlocks(ctx, topics)
 }
 
@@ -252,14 +256,16 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 	wp := workerpool.New(defaultWorkerPoolSize)
 	defer wp.StopWait()
 
-	for ; i.lastSyncedBlock < atomic.LoadUint64(&i.mostRecentBlock); i.lastSyncedBlock += blocksPerLogsCall {
-		input := i.lastSyncedBlock
+	from := i.lastSyncedBlock
+	for ; from < atomic.LoadUint64(&i.mostRecentBlock); from += blocksPerLogsCall {
+		input := from
 		toQueue := func() {
 			workerCtx := sentryutil.NewSentryHubContext(ctx)
 			defer recoverAndWait(workerCtx)
 			defer sentryutil.RecoverAndRaise(workerCtx)
 			logger.For(workerCtx).Infof("Indexing block range starting at %d", input)
 			i.startPipeline(workerCtx, persist.BlockNumber(input), topics)
+			i.updateLastSynced(input + blocksPerLogsCall)
 			logger.For(workerCtx).Infof("Finished indexing block range starting at %d", input)
 		}
 		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
@@ -268,6 +274,14 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 			wp.Submit(toQueue)
 		}
 	}
+}
+
+func (i *indexer) updateLastSynced(block uint64) {
+	i.stateMu.Lock()
+	if i.lastSyncedBlock < block {
+		i.lastSyncedBlock = block
+	}
+	i.stateMu.Unlock()
 }
 
 // waitForBlocks polls for new blocks.
@@ -285,7 +299,6 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	defer tracing.FinishSpan(span)
 
 	startTime := time.Now()
-	i.isListening = false
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
@@ -300,9 +313,6 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, plugins.refresh.out)
-	if i.lastSyncedBlock < start.Uint64() {
-		i.lastSyncedBlock = start.Uint64()
-	}
 	logger.For(ctx).Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
 
@@ -310,7 +320,6 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "startNewBlocksPipeline", sentry.TransactionName("indexer-main:startNewBlocksPipeline"))
 	defer tracing.FinishSpan(span)
 
-	i.isListening = true
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
