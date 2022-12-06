@@ -39,23 +39,6 @@ var logToSentryLevel = map[logrus.Level]sentry.Level{
 }
 var sentryTrailLimit = 8
 
-type authContext struct {
-	UserID        string
-	Authenticated bool
-	AuthError     error
-}
-
-type errorContext struct {
-	Mapped   bool
-	MappedTo string
-}
-
-type eventContext struct {
-	ActorID   persist.DBID
-	SubjectID persist.DBID
-	Action    persist.Action
-}
-
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
 	hub := sentry.GetHubFromContext(ctx)
 	if hub == nil {
@@ -154,15 +137,20 @@ func UpdateLogErrorEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Ev
 }
 
 func SetAuthContext(scope *sentry.Scope, gc *gin.Context) {
-	var authCtx authContext
+	var authCtx sentry.Context
 	var userCtx sentry.User
 
 	if auth.GetUserAuthedFromCtx(gc) {
 		userID := string(auth.GetUserIDFromCtx(gc))
-		authCtx = authContext{Authenticated: true, UserID: userID}
+		authCtx = sentry.Context{
+			"Authenticated": true,
+			"UserID":        userID,
+		}
 		userCtx = sentry.User{ID: userID}
 	} else {
-		authCtx = authContext{AuthError: auth.GetAuthErrorFromCtx(gc)}
+		authCtx = sentry.Context{
+			"AuthError": auth.GetAuthErrorFromCtx(gc),
+		}
 		userCtx = sentry.User{}
 	}
 
@@ -171,19 +159,19 @@ func SetAuthContext(scope *sentry.Scope, gc *gin.Context) {
 }
 
 func SetErrorContext(scope *sentry.Scope, mapped bool, mappedTo string) {
-	errCtx := errorContext{
-		Mapped:   mapped,
-		MappedTo: mappedTo,
+	errCtx := sentry.Context{
+		"Mapped":   mapped,
+		"MappedTo": mappedTo,
 	}
 
 	scope.SetContext(errorContextName, errCtx)
 }
 
 func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, action persist.Action) {
-	eventCtx := eventContext{
-		ActorID:   actorID,
-		SubjectID: subjectID,
-		Action:    action,
+	eventCtx := sentry.Context{
+		"ActorID":   actorID,
+		"SubjectID": subjectID,
+		"Action":    action,
 	}
 
 	scope.SetContext(eventContextName, eventCtx)
