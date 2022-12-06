@@ -20661,9 +20661,9 @@ func (ec *executionContext) _Token_tokenType(ctx context.Context, field graphql.
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.TokenType)
+	res := resTmp.(*persist.TokenType)
 	fc.Result = res
-	return ec.marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx, field.Selections, res)
+	return ec.marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenType(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Token_chain(ctx context.Context, field graphql.CollectedField, obj *model.Token) (ret graphql.Marshaler) {
@@ -37831,16 +37831,16 @@ func (ec *executionContext) marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmik
 	return ec._TokenHoldersConnection(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx context.Context, v interface{}) (*model.TokenType, error) {
+func (ec *executionContext) unmarshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenType(ctx context.Context, v interface{}) (*persist.TokenType, error) {
 	if v == nil {
 		return nil, nil
 	}
-	var res = new(model.TokenType)
+	var res = new(persist.TokenType)
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenType(ctx context.Context, sel ast.SelectionSet, v *model.TokenType) graphql.Marshaler {
+func (ec *executionContext) marshalOTokenType2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐTokenType(ctx context.Context, sel ast.SelectionSet, v *persist.TokenType) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

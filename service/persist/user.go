@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
@@ -221,6 +222,16 @@ func (r *Role) Value() (driver.Value, error) {
 	return r, nil
 }
 
+var roleNames = map[Role]string{
+	RoleAdmin:      "ADMIN",
+	RoleBetaTester: "BETA_TESTER",
+}
+
+var roles = map[string]Role{
+	"admin":       RoleAdmin,
+	"beta_tester": RoleBetaTester,
+}
+
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (r *Role) UnmarshalGQL(v interface{}) error {
 	n, ok := v.(string)
@@ -228,23 +239,18 @@ func (r *Role) UnmarshalGQL(v interface{}) error {
 		return fmt.Errorf("Role must be a string")
 	}
 
-	switch strings.ToLower(n) {
-	case "admin":
-		*r = RoleAdmin
-	case "beta_tester":
-		*r = RoleBetaTester
+	if role, ok := roles[strings.ToLower(n)]; ok {
+		*r = role
+	} else {
+		return fmt.Errorf("invalid Role: %s", n)
 	}
+
 	return nil
 }
 
 // MarshalGQL implements the graphql.Marshaler interface
 func (r Role) MarshalGQL(w io.Writer) {
-	switch r {
-	case RoleAdmin:
-		w.Write([]byte(`"ADMIN"`))
-	case RoleBetaTester:
-		w.Write([]byte(`"BETA_TESTER"`))
-	}
+	fmt.Fprint(w, strconv.Quote(roleNames[r]))
 }
 
 type RoleList []Role

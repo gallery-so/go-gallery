@@ -292,6 +292,16 @@ const (
 	MinInteractionTypeValue = InteractionTypeAdmire
 )
 
+var interactionTypeNames = map[InteractionType]string{
+	InteractionTypeAdmire:  "Admire",
+	InteractionTypeComment: "Comment",
+}
+
+var interactionTypes = map[string]InteractionType{
+	"admire":  InteractionTypeAdmire,
+	"comment": InteractionTypeComment,
+}
+
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (i *InteractionType) UnmarshalGQL(v interface{}) error {
 	n, ok := v.(string)
@@ -299,11 +309,10 @@ func (i *InteractionType) UnmarshalGQL(v interface{}) error {
 		return fmt.Errorf("InteractionType must be an string")
 	}
 
-	switch strings.ToLower(n) {
-	case "admire":
-		*i = InteractionTypeAdmire
-	case "comment":
-		*i = InteractionTypeComment
+	if val, ok := interactionTypes[strings.ToLower(n)]; ok {
+		*i = val
+	} else {
+		return fmt.Errorf("invalid InteractionType: %s", n)
 	}
 	return nil
 }

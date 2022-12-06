@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"blockwatch.cc/tzgo/tezos"
@@ -253,20 +254,34 @@ func (w Wallet) Value() (driver.Value, error) {
 	return w.ID.String(), nil
 }
 
+var walletTypeNames = map[WalletType]string{
+	WalletTypeEOA:    "EOA",
+	WalletTypeGnosis: "Gnosis",
+}
+
+var walletTypes = map[string]WalletType{
+	"eoa":    WalletTypeEOA,
+	"gnosis": WalletTypeGnosis,
+}
+
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (wa *WalletType) UnmarshalGQL(v interface{}) error {
-	n, ok := v.(int)
+	n, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("Chain must be an int")
 	}
 
-	*wa = WalletType(n)
+	if t, ok := walletTypes[strings.ToLower(n)]; ok {
+		*wa = t
+	} else {
+		return fmt.Errorf("invalid wallet type: %s", n)
+	}
 	return nil
 }
 
 // MarshalGQL implements the graphql.Marshaler interface
 func (wa WalletType) MarshalGQL(w io.Writer) {
-	w.Write([]byte{uint8(wa)})
+	fmt.Fprint(w, strconv.Quote(walletTypeNames[wa]))
 }
 
 func (n Address) String() string {

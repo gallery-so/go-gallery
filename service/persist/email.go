@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -13,8 +14,6 @@ type EmailType string
 type EmailVerificationStatus int
 
 type Email string
-
-var emailVerificationStatuses = []string{"Unverified", "Verified", "Failed", "Admin"}
 
 const (
 	EmailTypeNotifications EmailType = "notifications"
@@ -70,30 +69,43 @@ func (e *EmailVerificationStatus) Scan(src interface{}) error {
 }
 
 func (e EmailVerificationStatus) String() string {
-	return emailVerificationStatuses[e]
+	return emailVerificationStatusNames[e]
 }
 
 func (e EmailVerificationStatus) IsVerified() bool {
 	return e == EmailVerificationStatusVerified || e == EmailVerificationStatusAdmin
 }
 
+var emailVerificationStatusNames = map[EmailVerificationStatus]string{
+	EmailVerificationStatusUnverified: "Unverified",
+	EmailVerificationStatusVerified:   "Verified",
+	EmailVerificationStatusFailed:     "Failed",
+	EmailVerificationStatusAdmin:      "Admin",
+}
+
+var emailVerificationStatuses = map[string]EmailVerificationStatus{
+	"unverified": EmailVerificationStatusUnverified,
+	"verified":   EmailVerificationStatusVerified,
+	"failed":     EmailVerificationStatusFailed,
+	"admin":      EmailVerificationStatusAdmin,
+}
+
 func (e EmailVerificationStatus) MarshalGQL(w io.Writer) {
-	w.Write([]byte(fmt.Sprintf(`"%s"`, e.String())))
+	fmt.Fprint(w, strconv.Quote(emailVerificationStatusNames[e]))
 }
 
 func (e *EmailVerificationStatus) UnmarshalGQL(v interface{}) error {
 	switch v := v.(type) {
 	case string:
 		lower := strings.ToLower(v)
-		for i, s := range emailVerificationStatuses {
-			if strings.EqualFold(s, lower) {
-				*e = EmailVerificationStatus(i)
-				return nil
-			}
+		if t, ok := emailVerificationStatuses[lower]; ok {
+			*e = t
+		} else {
+			return fmt.Errorf("invalid email verification status: %s", v)
 		}
 		return nil
 	default:
-		return nil
+		return fmt.Errorf("wrong type for email verification status: %T", v)
 	}
 }
 

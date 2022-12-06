@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
@@ -494,6 +495,24 @@ func (c *Chain) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+var chainNames = map[Chain]string{
+	ChainETH:      "Ethereum",
+	ChainArbitrum: "Arbitrum",
+	ChainPolygon:  "Polygon",
+	ChainOptimism: "Optimism",
+	ChainTezos:    "Tezos",
+	ChainPOAP:     "POAP",
+}
+
+var chains = map[string]Chain{
+	"ethereum": ChainETH,
+	"arbitrum": ChainArbitrum,
+	"polygon":  ChainPolygon,
+	"optimism": ChainOptimism,
+	"tezos":    ChainTezos,
+	"poap":     ChainPOAP,
+}
+
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (c *Chain) UnmarshalGQL(v interface{}) error {
 	n, ok := v.(string)
@@ -501,33 +520,17 @@ func (c *Chain) UnmarshalGQL(v interface{}) error {
 		return fmt.Errorf("Chain must be an string")
 	}
 
-	switch strings.ToLower(n) {
-	case "ethereum":
-		*c = ChainETH
-	case "arbitrum":
-		*c = ChainArbitrum
-	case "polygon":
-		*c = ChainPolygon
-	case "optimism":
-		*c = ChainOptimism
-	case "tezos":
-		*c = ChainTezos
-	case "poap":
-		*c = ChainPOAP
+	if chain, ok := chains[strings.ToLower(n)]; ok {
+		*c = chain
+	} else {
+		return fmt.Errorf("invalid Chain %s", n)
 	}
 	return nil
 }
 
 // MarshalGQL implements the graphql.Marshaler interface
 func (c Chain) MarshalGQL(w io.Writer) {
-	switch c {
-	case ChainETH:
-		w.Write([]byte(`"Ethereum"`))
-	case ChainTezos:
-		w.Write([]byte(`"Tezos"`))
-	case ChainPOAP:
-		w.Write([]byte(`"POAP"`))
-	}
+	fmt.Fprint(w, strconv.Quote(chainNames[c]))
 }
 
 // URL turns a token's URI into a URL
@@ -901,6 +904,20 @@ func (t *TokenType) Scan(src interface{}) error {
 	}
 	*t = TokenType(src.(string))
 	return nil
+}
+
+func (t TokenType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strings.ReplaceAll(strconv.Quote(t.String()), "-", ""))
+}
+
+func (t *TokenType) UnmarshalGQL(v interface{}) error {
+	switch v := v.(type) {
+	case string:
+		*t = TokenType(v)
+		return nil
+	default:
+		return fmt.Errorf("%T is not a string", v)
+	}
 }
 
 func (c *NFTContract) Scan(src interface{}) error {

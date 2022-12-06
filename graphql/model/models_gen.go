@@ -1139,7 +1139,7 @@ type Token struct {
 	LastUpdated           *time.Time            `json:"lastUpdated"`
 	CollectorsNote        *string               `json:"collectorsNote"`
 	Media                 MediaSubtype          `json:"media"`
-	TokenType             *TokenType            `json:"tokenType"`
+	TokenType             *persist.TokenType    `json:"tokenType"`
 	Chain                 *persist.Chain        `json:"chain"`
 	Name                  *string               `json:"name"`
 	Description           *string               `json:"description"`
@@ -1498,48 +1498,5 @@ func (e *PreverifyEmailResult) UnmarshalGQL(v interface{}) error {
 }
 
 func (e PreverifyEmailResult) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
-type TokenType string
-
-const (
-	TokenTypeErc721  TokenType = "ERC721"
-	TokenTypeErc1155 TokenType = "ERC1155"
-	TokenTypeErc20   TokenType = "ERC20"
-)
-
-var AllTokenType = []TokenType{
-	TokenTypeErc721,
-	TokenTypeErc1155,
-	TokenTypeErc20,
-}
-
-func (e TokenType) IsValid() bool {
-	switch e {
-	case TokenTypeErc721, TokenTypeErc1155, TokenTypeErc20:
-		return true
-	}
-	return false
-}
-
-func (e TokenType) String() string {
-	return string(e)
-}
-
-func (e *TokenType) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = TokenType(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid TokenType", str)
-	}
-	return nil
-}
-
-func (e TokenType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

@@ -1390,7 +1390,7 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 	metadata, _ := token.TokenMetadata.MarshallJSON()
 	metadataString := string(metadata)
 	blockNumber := fmt.Sprint(token.BlockNumber.Int64)
-	tokenType := model.TokenType(token.TokenType.String)
+	tokenType := persist.TokenType(token.TokenType.String)
 
 	var isSpamByUser *bool
 	if token.IsUserMarkedSpam.Valid {

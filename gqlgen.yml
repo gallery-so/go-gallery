@@ -52,6 +52,9 @@ models:
   Chain:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Chain
+  TokenType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.TokenType
   EmailVerificationStatus:
     model:
       - github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus
