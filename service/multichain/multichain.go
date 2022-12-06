@@ -1153,11 +1153,6 @@ type FallbackProvider struct {
 	Eval     func(context.Context, ChainAgnosticToken) bool
 }
 
-type fetchResult struct {
-	i     int
-	token ChainAgnosticToken
-}
-
 func (f FallbackProvider) GetBlockchainInfo(ctx context.Context) (BlockchainInfo, error) {
 	return f.Primary.GetBlockchainInfo(ctx)
 }
@@ -1196,34 +1191,21 @@ func (f FallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Contex
 }
 
 func (f FallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnosticToken) []ChainAgnosticToken {
-	resultCh := make(chan fetchResult)
-	doneCh := make(chan struct{})
-
 	usableTokens := make([]ChainAgnosticToken, len(tokens))
-
 	var wg sync.WaitGroup
 
-	go func() {
-		for result := range resultCh {
-			usableTokens[result.i].TokenMetadata = result.token.TokenMetadata
-		}
-		doneCh <- struct{}{}
-	}()
-
 	for i, token := range tokens {
-		usableTokens[i] = token
-		if !f.Eval(ctx, token) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				resultCh <- fetchResult{i, f.callFallback(ctx, token)}
-			}()
-		}
+		wg.Add(1)
+		go func(i int, token ChainAgnosticToken) {
+			defer wg.Done()
+			usableTokens[i] = token
+			if !f.Eval(ctx, token) {
+				usableTokens[i].TokenMetadata = f.callFallback(ctx, token).TokenMetadata
+			}
+		}(i, token)
 	}
 
 	wg.Wait()
-	close(resultCh)
-	<-doneCh
 
 	return usableTokens
 }
