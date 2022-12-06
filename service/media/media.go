@@ -74,6 +74,7 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 	"glb":  {persist.MediaTypeAnimation, "model/gltf-binary"},
 	"gltf": {persist.MediaTypeAnimation, "model/gltf+json"},
 	"svg":  {persist.MediaTypeImage, "image/svg+xml"},
+	"pdf":  {persist.MediaTypePDF, "application/pdf"},
 }
 
 func NewLocalStorageClient(ctx context.Context, keyPath string) *storage.Client {
@@ -169,7 +170,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeAnimation:
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypePDF, persist.MediaTypeAnimation:
 		res = getAuxilaryMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL, mediaType)
 	case persist.MediaTypeHTML:
 		res = getHTMLMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)

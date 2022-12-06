@@ -127,6 +127,7 @@ union MediaSubtype =
   | VideoMedia
   | AudioMedia
   | TextMedia
+  | PdfMedia
   | HtmlMedia
   | JsonMedia
   | GltfMedia
@@ -203,6 +204,14 @@ type TextMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type PdfMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type HtmlMedia implements Media {

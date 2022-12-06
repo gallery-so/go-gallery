@@ -593,6 +593,13 @@ type ComplexityRoot struct {
 		Total           func(childComplexity int) int
 	}
 
+	PdfMedia struct {
+		ContentRenderURL func(childComplexity int) int
+		MediaType        func(childComplexity int) int
+		MediaURL         func(childComplexity int) int
+		PreviewURLs      func(childComplexity int) int
+	}
+
 	PreverifyEmailPayload struct {
 		Email  func(childComplexity int) int
 		Result func(childComplexity int) int
@@ -3294,6 +3301,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PageInfo.Total(childComplexity), true
 
+	case "PdfMedia.contentRenderURL":
+		if e.complexity.PdfMedia.ContentRenderURL == nil {
+			break
+		}
+
+		return e.complexity.PdfMedia.ContentRenderURL(childComplexity), true
+
+	case "PdfMedia.mediaType":
+		if e.complexity.PdfMedia.MediaType == nil {
+			break
+		}
+
+		return e.complexity.PdfMedia.MediaType(childComplexity), true
+
+	case "PdfMedia.mediaURL":
+		if e.complexity.PdfMedia.MediaURL == nil {
+			break
+		}
+
+		return e.complexity.PdfMedia.MediaURL(childComplexity), true
+
+	case "PdfMedia.previewURLs":
+		if e.complexity.PdfMedia.PreviewURLs == nil {
+			break
+		}
+
+		return e.complexity.PdfMedia.PreviewURLs(childComplexity), true
+
 	case "PreverifyEmailPayload.email":
 		if e.complexity.PreverifyEmailPayload.Email == nil {
 			break
@@ -4864,6 +4899,7 @@ union MediaSubtype =
   | VideoMedia
   | AudioMedia
   | TextMedia
+  | PdfMedia
   | HtmlMedia
   | JsonMedia
   | GltfMedia
@@ -4940,6 +4976,14 @@ type TextMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type PdfMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type HtmlMedia implements Media {
@@ -17423,6 +17467,134 @@ func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graph
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _PdfMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.PDFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PdfMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PreviewURLs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.PreviewURLSet)
+	fc.Result = res
+	return ec.marshalOPreviewURLSet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPreviewURLSet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PdfMedia_mediaURL(ctx context.Context, field graphql.CollectedField, obj *model.PDFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PdfMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PdfMedia_mediaType(ctx context.Context, field graphql.CollectedField, obj *model.PDFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PdfMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MediaType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PdfMedia_contentRenderURL(ctx context.Context, field graphql.CollectedField, obj *model.PDFMedia) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PdfMedia",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContentRenderURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _PreverifyEmailPayload_email(ctx context.Context, field graphql.CollectedField, obj *model.PreverifyEmailPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -26543,6 +26715,13 @@ func (ec *executionContext) _Media(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._TextMedia(ctx, sel, obj)
+	case model.PDFMedia:
+		return ec._PdfMedia(ctx, sel, &obj)
+	case *model.PDFMedia:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._PdfMedia(ctx, sel, obj)
 	case model.HTMLMedia:
 		return ec._HtmlMedia(ctx, sel, &obj)
 	case *model.HTMLMedia:
@@ -26629,6 +26808,13 @@ func (ec *executionContext) _MediaSubtype(ctx context.Context, sel ast.Selection
 			return graphql.Null
 		}
 		return ec._TextMedia(ctx, sel, obj)
+	case model.PDFMedia:
+		return ec._PdfMedia(ctx, sel, &obj)
+	case *model.PDFMedia:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._PdfMedia(ctx, sel, obj)
 	case model.HTMLMedia:
 		return ec._HtmlMedia(ctx, sel, &obj)
 	case *model.HTMLMedia:
@@ -31804,6 +31990,55 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var pdfMediaImplementors = []string{"PdfMedia", "MediaSubtype", "Media"}
+
+func (ec *executionContext) _PdfMedia(ctx context.Context, sel ast.SelectionSet, obj *model.PDFMedia) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pdfMediaImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PdfMedia")
+		case "previewURLs":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PdfMedia_previewURLs(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "mediaURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PdfMedia_mediaURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "mediaType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PdfMedia_mediaType(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "contentRenderURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PdfMedia_contentRenderURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
