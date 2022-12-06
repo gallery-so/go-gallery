@@ -33,7 +33,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	discountCodeFile, err := os.Open("discount_codes.json")
+	discountCodeFile, err := os.Open("./discount_codes.json")
 	if err != nil {
 		panic(err)
 	}
@@ -44,22 +44,24 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Printf("codes: %+v", discountCodes)
+
 	for _, code := range discountCodes.TShirts {
-		_, err = pg.Exec(ctx, "INSERT INTO discount_codes (id, discount_code, object_type) VALUES ($1, $2, $3)", persist.GenerateID(), code, 0)
+		_, err = pg.Exec(ctx, "INSERT INTO merch (id, discount_code, object_type) VALUES ($1, $2, $3)", persist.GenerateID(), code, 0)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	for _, code := range discountCodes.Hats {
-		_, err = pg.Exec(ctx, "INSERT INTO discount_codes (id, discount_code, object_type) VALUES ($1, $2, $3)", persist.GenerateID(), code, 1)
+		_, err = pg.Exec(ctx, "INSERT INTO merch (id, discount_code, object_type) VALUES ($1, $2, $3)", persist.GenerateID(), code, 1)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	for _, code := range discountCodes.Cards {
-		_, err = pg.Exec(ctx, "INSERT INTO discount_codes (id, discount_code, object_type) VALUES ($1, $2, $3)", persist.GenerateID(), code, 2)
+		_, err = pg.Exec(ctx, "INSERT INTO merch (id, discount_code, object_type) VALUES ($1, $2, $3)", persist.GenerateID(), code, 2)
 		if err != nil {
 			panic(err)
 		}

@@ -83,7 +83,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		Chain:   persist.ChainETH,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get contract by address %s: %w", merchAddress, err)
 	}
 
 	for _, tokenID := range tokenIDs {
@@ -115,7 +115,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to instantiate a Merch contract: %w", err)
 	}
 
 	// redeem and return codes in DB
@@ -126,14 +126,14 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 	for _, tokenID := range tokenIDs {
 
 		t, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, tokenID.BigInt())
-		if err != nil {
-			return nil, err
+		if err == nil {
+			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", tokenID, err)
 		}
 		redeemed[tokenID] = t
 
 		uri, err := mer.TokenURI(&bind.CallOpts{Context: ctx}, tokenID.BigInt())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get token URI for token %v: %w", tokenID, err)
 		}
 
 		objectType, ok := uriToMerchType[uri]
@@ -142,13 +142,14 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 			// first check if the token ID has already been redeemed, then just return the code
 			discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, tokenID)
 			if err != nil {
+				logger.For(ctx).Debugf("failed to get discount code for token %v: %v", tokenID, err)
 				// if not, redeem it
 				discountCode, err = api.queries.RedeemMerch(ctx, db.RedeemMerchParams{
 					TokenHex:   tokenID,
 					ObjectType: int32(objectType),
 				})
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to redeem token %v: %w", tokenID, err)
 				}
 			} else {
 				// override what the blockchain says about redeemed status, if the DB says it is redeemed then there is probably
@@ -169,7 +170,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	chainID, err := api.ethClient.ChainID(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
 	if chainID.Cmp(big.NewInt(1)) == 0 && viper.GetString("ENV") != "production" {
@@ -191,7 +192,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	auth, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create authorized transactor: %w", err)
 	}
 	auth.Context = ctx
 
@@ -206,7 +207,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	tx, err := mer.Redeem(auth, asBigs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to redeem tokens: %w", err)
 	}
 
 	logger.For(ctx).Infof("redeemed merch items with tx: %s", tx.Hash())
