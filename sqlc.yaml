@@ -122,6 +122,10 @@ sql:
           - column: "notifications.data"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NotificationData"
 
+          # Merch
+          - column: "merch.token_id"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+
           # Wildcards
           # Note: to override one of these wildcard entries, add a more specific entry (like some_table.id) above
           - column: "*.id"
@@ -160,3 +164,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.Role"
           - column: "*.roles"
             go_type: "github.com/mikeydub/go-gallery/service/persist.RoleList"
+          - column: "*.tokens_hex"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenIDList"
+          - column: "*.token_hex"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"

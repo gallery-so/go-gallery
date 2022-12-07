@@ -1393,6 +1393,26 @@ union UnsubscribeFromEmailTypePayloadOrError =
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
 
+input RedeemMerchInput {
+    tokenIds: [String!]!
+    address: ChainAddressInput!
+    walletType: WalletType!
+    signature: String!
+}
+
+type DiscountCode {
+    code: String!
+    tokenId: String!
+}
+
+type RedeemMerchPayload {
+    discountCodes: [DiscountCode!]
+}
+
+union RedeemMerchPayloadOrError =
+    RedeemMerchPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1449,6 +1469,8 @@ type Mutation {
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
+
+    redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 }
 
 type Subscription {

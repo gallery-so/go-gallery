@@ -240,3 +240,4 @@ func (_Zora *ZoraSession) TokenURI(tokenId *big.Int) (string, error) {
 func (_Zora *ZoraCallerSession) TokenURI(tokenId *big.Int) (string, error) {
 	return _Zora.Contract.TokenURI(&_Zora.CallOpts, tokenId)
 }
+

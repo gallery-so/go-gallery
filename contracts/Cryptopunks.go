@@ -209,3 +209,4 @@ func (_Cryptopunks *CryptopunksSession) PunkIndexToAddress(_punkIndex *big.Int) 
 func (_Cryptopunks *CryptopunksCallerSession) PunkIndexToAddress(_punkIndex *big.Int) (common.Address, error) {
 	return _Cryptopunks.Contract.PunkIndexToAddress(&_Cryptopunks.CallOpts, _punkIndex)
 }
+

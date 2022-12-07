@@ -170,6 +170,16 @@ type Chain int
 // TokenID represents the ID of a token
 type TokenID string
 
+type TokenIDList []TokenID
+
+func (l TokenIDList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+func (l *TokenIDList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
+}
+
 // TokenURI represents the URI for an Ethereum token
 type TokenURI string
 

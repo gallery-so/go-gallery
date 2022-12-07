@@ -1223,3 +1223,4 @@ func (_IENS *IENSFilterer) ParseTransfer(log types.Log) (*IENSTransfer, error) {
 	event.Raw = log
 	return event, nil
 }
+

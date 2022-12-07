@@ -987,6 +987,22 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 	return userToModel(ctx, *user), nil
 }
 
+func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
+	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
+	for i, id := range input.TokenIds {
+		tokenIDList[i] = persist.TokenID(id)
+	}
+	codes, err := publicapi.For(ctx).Merch.RedeemMerchItems(ctx, tokenIDList, persist.NewChainPubKey(persist.PubKey(input.Address.String()), input.Address.Chain()), input.Signature, input.WalletType)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RedeemMerchPayload{
+		DiscountCodes: codes,
+	}
+	return output, nil
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }

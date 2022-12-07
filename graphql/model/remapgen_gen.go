@@ -143,6 +143,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"RedeemMerchPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RedeemMerchPayloadOrError)
+		return obj, ok
+	},
+
 	"RefreshCollectionPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RefreshCollectionPayloadOrError)
 		return obj, ok
