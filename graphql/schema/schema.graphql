@@ -1400,13 +1400,13 @@ input RedeemMerchInput {
     signature: String!
 }
 
-type DiscountCode {
+type MerchDiscountCode {
     code: String!
-    tokenId: String!
+    tokenId: String
 }
 
 type RedeemMerchPayload {
-    discountCodes: [DiscountCode!]
+    discountCodes: [MerchDiscountCode!]
 }
 
 union RedeemMerchPayloadOrError =

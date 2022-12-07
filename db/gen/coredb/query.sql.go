@@ -1343,7 +1343,7 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 }
 
 const getMerchDiscountCodeByTokenID = `-- name: GetMerchDiscountCodeByTokenID :one
-select discount_code from merch where token_id = $1 and redeemed = true
+select discount_code from merch where token_id = $1 and redeemed = true and deleted = false
 `
 
 func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex persist.TokenID) (sql.NullString, error) {
@@ -2073,7 +2073,7 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 }
 
 const getUserOwnsTokenByIdentifiers = `-- name: GetUserOwnsTokenByIdentifiers :one
-select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4) as owns_token
+select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4 and deleted = false) as owns_token
 `
 
 type GetUserOwnsTokenByIdentifiersParams struct {
@@ -2752,7 +2752,7 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const redeemMerch = `-- name: RedeemMerch :one
-update merch set redeemed = true, token_id = $1, last_updated = now() where id = (select m.id from merch m where m.object_type = $2 and m.token_id is null limit 1) returning discount_code
+update merch set redeemed = true, token_id = $1, last_updated = now() where id = (select m.id from merch m where m.object_type = $2 and m.token_id is null and m.redeemed = false and m.deleted = false order by m.id limit 1) and token_id is null and redeemed = false returning discount_code
 `
 
 type RedeemMerchParams struct {

@@ -499,11 +499,6 @@ type DeleteCollectionPayload struct {
 
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
-type DiscountCode struct {
-	Code    string `json:"code"`
-	TokenID string `json:"tokenId"`
-}
-
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
 	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
@@ -929,6 +924,11 @@ type MembershipTier struct {
 
 func (MembershipTier) IsNode() {}
 
+type MerchDiscountCode struct {
+	Code    string  `json:"code"`
+	TokenID *string `json:"tokenId"`
+}
+
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
 	Cursor *string      `json:"cursor"`
@@ -1007,7 +1007,7 @@ type RedeemMerchInput struct {
 }
 
 type RedeemMerchPayload struct {
-	DiscountCodes []*DiscountCode `json:"discountCodes"`
+	DiscountCodes []*MerchDiscountCode `json:"discountCodes"`
 }
 
 func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}
