@@ -790,7 +790,7 @@ func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Add
 	switch contract {
 
 	case hicEtNunc:
-		return []string{"displayUri", "image", "artifactUri"}
+		return []string{"artifactUri", "displayUri", "image"}
 		// fxhash
 	case fxHash, fxHash2:
 		return []string{"displayUri", "artifactUri", "image", "uri"}
