@@ -102,9 +102,11 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	taskClient := task.NewClient(context.Background())
 	lock := redis.NewLockClient(redis.NotificationLockDB)
 
+	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
+
 	queries := db.New(pgx)
 
-	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub, lock)
+	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub, lock, graphqlAPQCache)
 }
 
 func newTasksClient() *cloudtasks.Client {
