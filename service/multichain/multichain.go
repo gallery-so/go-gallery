@@ -1219,23 +1219,3 @@ func (f *FallbackProvider) callFallback(ctx context.Context, primary ChainAgnost
 	logger.For(ctx).WithError(err).Warn("failed to call fallback")
 	return primary
 }
-
-// ContainsTezosKeywords returns true if the token's metadata has at least one non-empty Tezos keyword.
-func ContainsTezosKeywords(ctx context.Context, token ChainAgnosticToken) bool {
-	imageKeywords, animationKeywords := persist.ChainTezos.BaseKeywords()
-	for field, val := range token.TokenMetadata {
-
-		for _, keyword := range imageKeywords {
-			if field == keyword && (val != nil && val != "") {
-				return true
-			}
-		}
-
-		for _, keyword := range animationKeywords {
-			if field == keyword && (val != nil && val != "") {
-				return true
-			}
-		}
-	}
-	return false
-}
