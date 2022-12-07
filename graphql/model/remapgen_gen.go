@@ -248,6 +248,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UploadPersistedQueriesPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UploadPersistedQueriesPayloadOrError)
+		return obj, ok
+	},
+
 	"UserByAddressOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UserByAddressOrError)
 		return obj, ok
