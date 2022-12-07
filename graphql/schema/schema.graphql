@@ -1393,6 +1393,16 @@ union UnsubscribeFromEmailTypePayloadOrError =
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
 
+input UploadPersistedQueriesInput {
+    persistedQueries: String
+}
+
+union UploadPersistedQueriesPayloadOrError = UploadPersistedQueriesPayload | ErrNotAuthorized
+
+type UploadPersistedQueriesPayload {
+    message: String
+}
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1449,6 +1459,9 @@ type Mutation {
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
+
+    # Gallery Frontend Deploy Persisted Queries
+    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
 }
 
 type Subscription {
