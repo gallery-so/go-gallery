@@ -30,7 +30,7 @@ var (
 
 // MerchMetaData contains all meta data concerning the Merch contract.
 var MerchMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"isRedeemed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"tokenIDs\",\"type\":\"uint256[]\"}],\"name\":\"redeem\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"tokenURI\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"isRedeemed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"ownerOf\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"tokenIDs\",\"type\":\"uint256[]\"}],\"name\":\"redeemAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"tokenURI\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // MerchABI is the input ABI used to generate the binding from.
@@ -210,6 +210,37 @@ func (_Merch *MerchCallerSession) IsRedeemed(tokenId *big.Int) (bool, error) {
 	return _Merch.Contract.IsRedeemed(&_Merch.CallOpts, tokenId)
 }
 
+// OwnerOf is a free data retrieval call binding the contract method 0x6352211e.
+//
+// Solidity: function ownerOf(uint256 tokenId) view returns(address owner)
+func (_Merch *MerchCaller) OwnerOf(opts *bind.CallOpts, tokenId *big.Int) (common.Address, error) {
+	var out []interface{}
+	err := _Merch.contract.Call(opts, &out, "ownerOf", tokenId)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// OwnerOf is a free data retrieval call binding the contract method 0x6352211e.
+//
+// Solidity: function ownerOf(uint256 tokenId) view returns(address owner)
+func (_Merch *MerchSession) OwnerOf(tokenId *big.Int) (common.Address, error) {
+	return _Merch.Contract.OwnerOf(&_Merch.CallOpts, tokenId)
+}
+
+// OwnerOf is a free data retrieval call binding the contract method 0x6352211e.
+//
+// Solidity: function ownerOf(uint256 tokenId) view returns(address owner)
+func (_Merch *MerchCallerSession) OwnerOf(tokenId *big.Int) (common.Address, error) {
+	return _Merch.Contract.OwnerOf(&_Merch.CallOpts, tokenId)
+}
+
 // TokenURI is a free data retrieval call binding the contract method 0xc87b56dd.
 //
 // Solidity: function tokenURI(uint256 tokenId) view returns(string)
@@ -241,24 +272,24 @@ func (_Merch *MerchCallerSession) TokenURI(tokenId *big.Int) (string, error) {
 	return _Merch.Contract.TokenURI(&_Merch.CallOpts, tokenId)
 }
 
-// Redeem is a paid mutator transaction binding the contract method 0xf9afb26a.
+// RedeemAdmin is a paid mutator transaction binding the contract method 0x9fbd2952.
 //
-// Solidity: function redeem(uint256[] tokenIDs) returns()
-func (_Merch *MerchTransactor) Redeem(opts *bind.TransactOpts, tokenIDs []*big.Int) (*types.Transaction, error) {
-	return _Merch.contract.Transact(opts, "redeem", tokenIDs)
+// Solidity: function redeemAdmin(uint256[] tokenIDs) returns()
+func (_Merch *MerchTransactor) RedeemAdmin(opts *bind.TransactOpts, tokenIDs []*big.Int) (*types.Transaction, error) {
+	return _Merch.contract.Transact(opts, "redeemAdmin", tokenIDs)
 }
 
-// Redeem is a paid mutator transaction binding the contract method 0xf9afb26a.
+// RedeemAdmin is a paid mutator transaction binding the contract method 0x9fbd2952.
 //
-// Solidity: function redeem(uint256[] tokenIDs) returns()
-func (_Merch *MerchSession) Redeem(tokenIDs []*big.Int) (*types.Transaction, error) {
-	return _Merch.Contract.Redeem(&_Merch.TransactOpts, tokenIDs)
+// Solidity: function redeemAdmin(uint256[] tokenIDs) returns()
+func (_Merch *MerchSession) RedeemAdmin(tokenIDs []*big.Int) (*types.Transaction, error) {
+	return _Merch.Contract.RedeemAdmin(&_Merch.TransactOpts, tokenIDs)
 }
 
-// Redeem is a paid mutator transaction binding the contract method 0xf9afb26a.
+// RedeemAdmin is a paid mutator transaction binding the contract method 0x9fbd2952.
 //
-// Solidity: function redeem(uint256[] tokenIDs) returns()
-func (_Merch *MerchTransactorSession) Redeem(tokenIDs []*big.Int) (*types.Transaction, error) {
-	return _Merch.Contract.Redeem(&_Merch.TransactOpts, tokenIDs)
+// Solidity: function redeemAdmin(uint256[] tokenIDs) returns()
+func (_Merch *MerchTransactorSession) RedeemAdmin(tokenIDs []*big.Int) (*types.Transaction, error) {
+	return _Merch.Contract.RedeemAdmin(&_Merch.TransactOpts, tokenIDs)
 }
 

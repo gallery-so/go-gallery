@@ -11,4 +11,4 @@ create table if not exists merch
     redeemed boolean default false not null
 );
 
-create unique index if not exists merch_token_id_idx on merch (token_id);
+create unique index if not exists merch_token_id_idx on merch (token_id) where deleted = false;
