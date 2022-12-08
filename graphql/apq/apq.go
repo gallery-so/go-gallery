@@ -3,7 +3,6 @@ package apq
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"time"
 )
@@ -13,7 +12,6 @@ type APQCache struct {
 }
 
 func (c *APQCache) Add(ctx context.Context, key string, value interface{}) {
-	fmt.Printf("ADD: Underlying Type: %T\n", value)
 	resultingString, ok := value.(string)
 
 	if !ok {
