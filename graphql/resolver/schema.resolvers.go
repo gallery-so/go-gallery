@@ -987,6 +987,18 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 	return userToModel(ctx, *user), nil
 }
 
+func (r *mutationResolver) GetMerchTokens(ctx context.Context, wallet persist.Address) (*model.MerchTokensPayload, error) {
+	tokens, err := publicapi.For(ctx).Merch.GetMerchTokens(ctx, wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.MerchTokensPayload{
+		Tokens: tokens,
+	}
+	return output, nil
+}
+
 func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
 	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
 	for i, id := range input.TokenIds {

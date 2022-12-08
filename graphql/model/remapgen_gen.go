@@ -128,6 +128,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"MerchTokensPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(MerchTokensPayloadOrError)
+		return obj, ok
+	},
+
 	"Node": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Node)
 		return obj, ok

@@ -526,6 +526,17 @@ type ComplexityRoot struct {
 		TokenID func(childComplexity int) int
 	}
 
+	MerchToken struct {
+		DiscountCode func(childComplexity int) int
+		ObjectType   func(childComplexity int) int
+		Redeemed     func(childComplexity int) int
+		TokenID      func(childComplexity int) int
+	}
+
+	MerchTokensPayload struct {
+		Tokens func(childComplexity int) int
+	}
+
 	Mutation struct {
 		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
@@ -538,6 +549,7 @@ type ComplexityRoot struct {
 		DeleteCollection                func(childComplexity int, collectionID persist.DBID) int
 		FollowUser                      func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
+		GetMerchTokens                  func(childComplexity int, wallet persist.Address) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                          func(childComplexity int) int
 		PreverifyEmail                  func(childComplexity int, input model.PreverifyEmailInput) int
@@ -1064,6 +1076,7 @@ type MutationResolver interface {
 	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (model.VerifyEmailPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
+	GetMerchTokens(ctx context.Context, wallet persist.Address) (*model.MerchTokensPayload, error)
 	RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
@@ -2778,6 +2791,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MerchDiscountCode.TokenID(childComplexity), true
 
+	case "MerchToken.discountCode":
+		if e.complexity.MerchToken.DiscountCode == nil {
+			break
+		}
+
+		return e.complexity.MerchToken.DiscountCode(childComplexity), true
+
+	case "MerchToken.objectType":
+		if e.complexity.MerchToken.ObjectType == nil {
+			break
+		}
+
+		return e.complexity.MerchToken.ObjectType(childComplexity), true
+
+	case "MerchToken.redeemed":
+		if e.complexity.MerchToken.Redeemed == nil {
+			break
+		}
+
+		return e.complexity.MerchToken.Redeemed(childComplexity), true
+
+	case "MerchToken.tokenId":
+		if e.complexity.MerchToken.TokenID == nil {
+			break
+		}
+
+		return e.complexity.MerchToken.TokenID(childComplexity), true
+
+	case "MerchTokensPayload.tokens":
+		if e.complexity.MerchTokensPayload.Tokens == nil {
+			break
+		}
+
+		return e.complexity.MerchTokensPayload.Tokens(childComplexity), true
+
 	case "Mutation.addRolesToUser":
 		if e.complexity.Mutation.AddRolesToUser == nil {
 			break
@@ -2904,6 +2952,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.GetAuthNonce(childComplexity, args["chainAddress"].(persist.ChainAddress)), true
+
+	case "Mutation.getMerchTokens":
+		if e.complexity.Mutation.GetMerchTokens == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_getMerchTokens_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.GetMerchTokens(childComplexity, args["wallet"].(persist.Address)), true
 
 	case "Mutation.login":
 		if e.complexity.Mutation.Login == nil {
@@ -6229,6 +6289,27 @@ union RedeemMerchPayloadOrError =
     RedeemMerchPayload
     | ErrInvalidInput
 
+enum MerchType {
+    TShirt
+    Hat
+    Card
+}
+
+type MerchToken {
+    tokenId: String!
+    objectType: MerchType!
+    discountCode: String
+    redeemed: Boolean!
+}
+
+type MerchTokensPayload {
+    tokens: [MerchToken!]
+}
+
+union MerchTokensPayloadOrError =
+    MerchTokensPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -6285,7 +6366,8 @@ type Mutation {
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
-
+    
+    getMerchTokens(wallet: Address!): MerchTokensPayload
     redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 }
 
@@ -6835,6 +6917,21 @@ func (ec *executionContext) field_Mutation_getAuthNonce_args(ctx context.Context
 		}
 	}
 	args["chainAddress"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_getMerchTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.Address
+	if tmp, ok := rawArgs["wallet"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("wallet"))
+		arg0, err = ec.unmarshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["wallet"] = arg0
 	return args, nil
 }
 
@@ -15134,6 +15231,175 @@ func (ec *executionContext) _MerchDiscountCode_tokenId(ctx context.Context, fiel
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _MerchToken_tokenId(ctx context.Context, field graphql.CollectedField, obj *model.MerchToken) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MerchToken",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TokenID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MerchToken_objectType(ctx context.Context, field graphql.CollectedField, obj *model.MerchToken) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MerchToken",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ObjectType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.MerchType)
+	fc.Result = res
+	return ec.marshalNMerchType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MerchToken_discountCode(ctx context.Context, field graphql.CollectedField, obj *model.MerchToken) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MerchToken",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DiscountCode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MerchToken_redeemed(ctx context.Context, field graphql.CollectedField, obj *model.MerchToken) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MerchToken",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Redeemed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MerchTokensPayload_tokens(ctx context.Context, field graphql.CollectedField, obj *model.MerchTokensPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MerchTokensPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Tokens, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.MerchToken)
+	fc.Result = res
+	return ec.marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokenᚄ(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_addUserWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -17054,6 +17320,45 @@ func (ec *executionContext) _Mutation_revokeRolesFromUser(ctx context.Context, f
 	res := resTmp.(model.RevokeRolesFromUserPayloadOrError)
 	fc.Result = res
 	return ec.marshalORevokeRolesFromUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐRevokeRolesFromUserPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_getMerchTokens(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_getMerchTokens_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().GetMerchTokens(rctx, args["wallet"].(persist.Address))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MerchTokensPayload)
+	fc.Result = res
+	return ec.marshalOMerchTokensPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokensPayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_redeemMerch(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -27148,6 +27453,29 @@ func (ec *executionContext) _MediaSubtype(ctx context.Context, sel ast.Selection
 	}
 }
 
+func (ec *executionContext) _MerchTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.MerchTokensPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.MerchTokensPayload:
+		return ec._MerchTokensPayload(ctx, sel, &obj)
+	case *model.MerchTokensPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._MerchTokensPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj model.Node) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -30079,7 +30407,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "MerchTokensPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -31810,6 +32138,92 @@ func (ec *executionContext) _MerchDiscountCode(ctx context.Context, sel ast.Sele
 	return out
 }
 
+var merchTokenImplementors = []string{"MerchToken"}
+
+func (ec *executionContext) _MerchToken(ctx context.Context, sel ast.SelectionSet, obj *model.MerchToken) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, merchTokenImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MerchToken")
+		case "tokenId":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MerchToken_tokenId(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "objectType":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MerchToken_objectType(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "discountCode":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MerchToken_discountCode(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "redeemed":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MerchToken_redeemed(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var merchTokensPayloadImplementors = []string{"MerchTokensPayload", "MerchTokensPayloadOrError"}
+
+func (ec *executionContext) _MerchTokensPayload(ctx context.Context, sel ast.SelectionSet, obj *model.MerchTokensPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, merchTokensPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MerchTokensPayload")
+		case "tokens":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MerchTokensPayload_tokens(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -32084,6 +32498,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "revokeRolesFromUser":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_revokeRolesFromUser(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "getMerchTokens":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_getMerchTokens(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -36063,6 +36484,26 @@ func (ec *executionContext) marshalNMerchDiscountCode2ᚖgithubᚗcomᚋmikeydub
 	return ec._MerchDiscountCode(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNMerchToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx context.Context, sel ast.SelectionSet, v *model.MerchToken) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._MerchToken(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNMerchType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchType(ctx context.Context, v interface{}) (model.MerchType, error) {
+	var res model.MerchType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNMerchType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchType(ctx context.Context, sel ast.SelectionSet, v model.MerchType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -37896,6 +38337,60 @@ func (ec *executionContext) marshalOMerchDiscountCode2ᚕᚖgithubᚗcomᚋmikey
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokenᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MerchToken) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNMerchToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalOMerchTokensPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokensPayload(ctx context.Context, sel ast.SelectionSet, v *model.MerchTokensPayload) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MerchTokensPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalONode2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNode(ctx context.Context, sel ast.SelectionSet, v model.Node) graphql.Marshaler {

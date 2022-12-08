@@ -153,6 +153,7 @@ type verifier interface {
 type tokensFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
 	GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
+	GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error)
 	GetTokensByTokenIdentifiersAndOwner(context.Context, ChainAgnosticIdentifiers, persist.Address) (ChainAgnosticToken, ChainAgnosticContract, error)
 }
 
@@ -399,6 +400,56 @@ func (p *Provider) GetCommunityOwners(ctx context.Context, communityIdentifiers 
 		return nil, err
 	}
 	return holders, nil
+}
+
+func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAddress persist.Address, wallet persist.ChainAddress, limit, offset int) ([]persist.TokenGallery, error) {
+
+	providers, err := p.getProvidersForChain(wallet.Chain())
+	if err != nil {
+		return nil, err
+	}
+
+	cha := make([]chainTokens, 0, len(providers))
+	contracts := make([]chainContracts, 0, len(providers))
+	for i, prov := range providers {
+		tFetcher, ok := prov.(tokensFetcher)
+		if !ok {
+			continue
+		}
+		tokensOfOwner, contract, err := tFetcher.GetTokensByContractAddressAndOwner(ctx, wallet.Address(), contractAddress, limit, offset)
+		if err != nil {
+			return nil, err
+		}
+
+		contracts = append(contracts, chainContracts{
+			priority:  i,
+			chain:     wallet.Chain(),
+			contracts: []ChainAgnosticContract{contract},
+		})
+
+		cha = append(cha, chainTokens{
+			priority: i,
+			chain:    wallet.Chain(),
+			tokens:   tokensOfOwner,
+		})
+	}
+
+	addressToContracts, err := p.upsertContracts(ctx, contracts)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := p.Repos.UserRepository.GetByChainAddress(ctx, wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.upsertTokens(ctx, cha, addressToContracts, allUsersNFTs, user, []persist.Chain{wallet.Chain()})
 }
 
 // DeepRefresh re-indexes a user's wallets.
@@ -844,7 +895,7 @@ outer:
 }
 
 func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, chains []persist.Chain) ([]persist.TokenGallery, error) {
-	newTokens, err := dedupeAndPrepareTokensForUpsert(ctx, allTokens, addressesToContracts, user, allUsersTokens)
+	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -857,7 +908,7 @@ func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, ad
 
 func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, timeStamp time.Time) ([]persist.TokenGallery, error) {
 
-	newTokens, err := dedupeAndPrepareTokensForUpsert(ctx, allTokens, addressesToContracts, user, allUsersTokens)
+	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -865,8 +916,8 @@ func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens
 	return newTokens, nil
 }
 
-func dedupeAndPrepareTokensForUpsert(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, allUsersTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
+func dedupeAndPrepareTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, allUsersTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user, allUsersTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -904,7 +955,7 @@ func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainCont
 	return addressesToContracts, nil
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User, allUsersTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
@@ -1000,6 +1051,13 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 
 		res[i] = t
 		i++
+	}
+
+	// include user's current tokens in upsert
+	for _, t := range allUsersTokens {
+		if _, ok := seenTokens[t.TokenIdentifiers()]; !ok {
+			res = append(res, t)
+		}
 	}
 
 	return res, nil

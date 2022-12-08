@@ -337,6 +337,86 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 	return returnTokens, agnosticContract, nil
 }
 
+func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, maxLimit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"contractAddress": contractAddress, "owner": owner})
+
+	pageSize := maxPageSize
+	if maxLimit > 0 && maxLimit < maxPageSize {
+		pageSize = maxLimit
+	}
+
+	// Paginate results
+	var query tokensByContractQuery
+	tokens := make([]token, 0, maxLimit)
+	for {
+		if err := p.gql.Query(ctx, &query, inputArgs{
+			"contractAddress": graphql.String(contractAddress),
+			"ownerAddress":    graphql.String(owner),
+			"limit":           graphql.Int(pageSize),
+			"offset":          graphql.Int(offset),
+		}); err != nil {
+			return nil, multichain.ChainAgnosticContract{}, err
+		}
+
+		// No more results
+		if len(query.Fa) < 1 || len(query.Fa[0].Tokens) < 1 {
+			break
+		}
+
+		// Exceeded fetch size
+		tokens = append(tokens, query.Fa[0].Tokens...)
+		if maxLimit > 0 && len(tokens) >= maxLimit {
+			break
+		}
+
+		offset += len(query.Fa[0].Tokens)
+	}
+
+	// No matching query results
+	if len(tokens) < 1 {
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for contract")
+	}
+
+	// Truncate tokens if there is a max limit
+	if maxLimit > 0 && len(tokens) > maxLimit {
+		tokens = tokens[:maxLimit]
+	}
+
+	agnosticContract := multichain.ChainAgnosticContract{
+		Address:        tokens[0].Fa.Contract,
+		Symbol:         tokens[0].Symbol,
+		Name:           tokens[0].Fa.Name,
+		Description:    tokens[0].Fa.Description,
+		CreatorAddress: tokens[0].Fa.Creator_Address,
+		LatestBlock:    persist.BlockNumber(tokens[0].Fa.Level),
+	}
+
+	returnTokens := make([]multichain.ChainAgnosticToken, 0, len(tokens))
+	for _, token := range tokens {
+		tokenID := persist.TokenID(token.Token_ID.toBase16String())
+		metadata := createMetadata(token)
+		media := makeTempMedia(ctx, tokenID, agnosticContract.Address, metadata, p.ipfsGatewayURL)
+		// Create token per holder
+		for _, holder := range token.Holders {
+			agnosticToken := multichain.ChainAgnosticToken{
+				TokenType:       persist.TokenTypeERC1155,
+				Description:     token.Description,
+				Name:            token.Name,
+				TokenID:         tokenID,
+				Media:           media,
+				ContractAddress: agnosticContract.Address,
+				Quantity:        persist.HexString(fmt.Sprintf("%x", holder.Quantity)),
+				TokenMetadata:   metadata,
+				OwnerAddress:    holder.Holder_Address,
+				BlockNumber:     persist.BlockNumber(token.Level),
+			}
+			returnTokens = append(returnTokens, agnosticToken)
+		}
+	}
+
+	return returnTokens, agnosticContract, nil
+}
+
 func createMetadata(t token) persist.TokenMetadata {
 	metadata := persist.TokenMetadata{}
 	metadata["name"] = t.Name

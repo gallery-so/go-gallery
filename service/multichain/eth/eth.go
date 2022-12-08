@@ -115,6 +115,36 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	return tokensToChainAgnostic(tokens.NFTs), contract, nil
 }
 
+// GetTokensByContractAddressAndOwner retrieves tokens for a contract address owned by owner on the Ethereum Blockchain
+func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&address=%s&limit=%d&offset=%d", d.indexerBaseURL, contractAddress, owner, limit, offset), nil)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	res, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(res)
+	}
+
+	var tokens indexer.GetTokensOutput
+	err = json.NewDecoder(res.Body).Decode(&tokens)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+
+	contract := multichain.ChainAgnosticContract{}
+	if len(tokens.Contracts) > 0 {
+		contract = contractToChainAgnostic(tokens.Contracts[0])
+	}
+	return tokensToChainAgnostic(tokens.NFTs), contract, nil
+}
+
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Ethereum Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 

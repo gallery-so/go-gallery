@@ -1413,6 +1413,27 @@ union RedeemMerchPayloadOrError =
     RedeemMerchPayload
     | ErrInvalidInput
 
+enum MerchType {
+    TShirt
+    Hat
+    Card
+}
+
+type MerchToken {
+    tokenId: String!
+    objectType: MerchType!
+    discountCode: String
+    redeemed: Boolean!
+}
+
+type MerchTokensPayload {
+    tokens: [MerchToken!]
+}
+
+union MerchTokensPayloadOrError =
+    MerchTokensPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1469,7 +1490,8 @@ type Mutation {
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
-
+    
+    getMerchTokens(wallet: Address!): MerchTokensPayload
     redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 }
 

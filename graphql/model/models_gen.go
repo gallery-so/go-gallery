@@ -113,6 +113,10 @@ type MediaSubtype interface {
 	IsMediaSubtype()
 }
 
+type MerchTokensPayloadOrError interface {
+	IsMerchTokensPayloadOrError()
+}
+
 type Node interface {
 	IsNode()
 }
@@ -631,6 +635,7 @@ func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
 func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
+func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -928,6 +933,19 @@ type MerchDiscountCode struct {
 	Code    string  `json:"code"`
 	TokenID *string `json:"tokenId"`
 }
+
+type MerchToken struct {
+	TokenID      string    `json:"tokenId"`
+	ObjectType   MerchType `json:"objectType"`
+	DiscountCode *string   `json:"discountCode"`
+	Redeemed     bool      `json:"redeemed"`
+}
+
+type MerchTokensPayload struct {
+	Tokens []*MerchToken `json:"tokens"`
+}
+
+func (MerchTokensPayload) IsMerchTokensPayloadOrError() {}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
@@ -1488,6 +1506,49 @@ func (e *EmailUnsubscriptionType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e EmailUnsubscriptionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type MerchType string
+
+const (
+	MerchTypeTShirt MerchType = "TShirt"
+	MerchTypeHat    MerchType = "Hat"
+	MerchTypeCard   MerchType = "Card"
+)
+
+var AllMerchType = []MerchType{
+	MerchTypeTShirt,
+	MerchTypeHat,
+	MerchTypeCard,
+}
+
+func (e MerchType) IsValid() bool {
+	switch e {
+	case MerchTypeTShirt, MerchTypeHat, MerchTypeCard:
+		return true
+	}
+	return false
+}
+
+func (e MerchType) String() string {
+	return string(e)
+}
+
+func (e *MerchType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MerchType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MerchType", str)
+	}
+	return nil
+}
+
+func (e MerchType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
