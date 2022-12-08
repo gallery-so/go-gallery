@@ -23,4 +23,4 @@ ENV VERSION=$VERSION
 
 EXPOSE 6000
 USER nobody
-ENTRYPOINT ["./bin/indexer", "server"]
+ENTRYPOINT ["./bin/indexer", "server", "--enable-rpc"]
