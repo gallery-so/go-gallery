@@ -24,6 +24,12 @@ func (c *APQCache) Add(ctx context.Context, key string, value interface{}) {
 func (c *APQCache) Get(ctx context.Context, key string) (interface{}, bool) {
 	value, _ := c.Cache.Get(ctx, key)
 
+	result := string(value)
+
+	if result == "" {
+		return struct{}{}, false
+	}
+
 	return string(value), true
 }
 
