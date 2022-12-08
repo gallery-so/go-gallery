@@ -143,7 +143,7 @@ func NewEthSocketClient() *ethclient.Client {
 	}
 
 	log.Root().SetHandler(log.FilterHandler(func(r *log.Record) bool {
-		if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil {
+		if reqID := valFromSlice(r.Ctx, "reqid"); reqID == nil || r.Msg != "Handled RPC response" {
 			return false
 		}
 		return true
@@ -156,9 +156,8 @@ func NewEthSocketClient() *ethclient.Client {
 type metricsHandler struct{}
 
 // Log sends trace information to Sentry.
-// Geth logs the duration of each RPC call: https://github.com/ethereum/go-ethereum/blob/master/rpc/handler.go#L242
-// We take advantage of this by configuring the root logger with a custom handler that parses records
-// that have useful metrics data attached such as the duration and the request id.
+// Geth logs each response it receives in the handleImmediate method of handler: https://github.com/ethereum/go-ethereum/blob/master/rpc/handler.go
+// We take advantage of this by configuring the client's root logger with a custom handler that sends a span to Sentry each time we get the log message.
 func (h metricsHandler) Log(r *log.Record) error {
 	reqID := valFromSlice(r.Ctx, "reqid")
 
@@ -168,11 +167,9 @@ func (h metricsHandler) Log(r *log.Record) error {
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"reqID": reqID})
 	defer tracing.FinishSpan(span)
 
-	if d := valFromSlice(r.Ctx, "duration"); d != nil {
-		d := d.(time.Duration)
-		span.StartTime = r.Time.Add(-d)
-		span.EndTime = r.Time
-	}
+	// Fix the duration to 100ms because there isn't a useful duration to use
+	span.EndTime = r.Time
+	span.StartTime = r.Time.Add(time.Millisecond * -100)
 
 	return nil
 }
@@ -940,21 +937,21 @@ func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAdd
 }
 
 /*
-{
-  "manifest": "arweave/paths",
-  "version": "0.1.0",
-  "index": { "path": "0" },
-  "paths": {
-    "0": { "id": "4vdubhlnXQp7jGjEjXwWjOa-6Pm44zOF7o6lAHEAYB4" },
-    "1": { "id": "O6ZosH1YVePA7n31UVKJLY9OORIs2ukxwarxE7JYJdY" },
-    "2": { "id": "1ROXHTSaTTKSCpPVlDhRpxEJ6JE3WQ5ZAgfglo_z4W8" },
-    "3": { "id": "LF7g-RV4dob0yNAjIaPEjxs8UgXShJI4GFxx6CjVavM" },
-    "4": { "id": "fudz-Ig2CtM4ZhZcwEn9jnWFWH9S4loZ2taoJoQP1b8" },
-    "5": { "id": "qYaBEv7QaBKeXPZP9LohHHzr1rwYWMY3bJrDaRoRQ2Q" },
-    "6": { "id": "jI-4Q2_Z9ZpefzBVBeowpDizAmFtXFSe7w5eOP_CCvA" },
-    "7": { "id": "2B_s60w4ZS0_QdO6dd0qi0GKqAkYeTJ_bL05kr_tkgk" }
-  }
-}
+	{
+	  "manifest": "arweave/paths",
+	  "version": "0.1.0",
+	  "index": { "path": "0" },
+	  "paths": {
+	    "0": { "id": "4vdubhlnXQp7jGjEjXwWjOa-6Pm44zOF7o6lAHEAYB4" },
+	    "1": { "id": "O6ZosH1YVePA7n31UVKJLY9OORIs2ukxwarxE7JYJdY" },
+	    "2": { "id": "1ROXHTSaTTKSCpPVlDhRpxEJ6JE3WQ5ZAgfglo_z4W8" },
+	    "3": { "id": "LF7g-RV4dob0yNAjIaPEjxs8UgXShJI4GFxx6CjVavM" },
+	    "4": { "id": "fudz-Ig2CtM4ZhZcwEn9jnWFWH9S4loZ2taoJoQP1b8" },
+	    "5": { "id": "qYaBEv7QaBKeXPZP9LohHHzr1rwYWMY3bJrDaRoRQ2Q" },
+	    "6": { "id": "jI-4Q2_Z9ZpefzBVBeowpDizAmFtXFSe7w5eOP_CCvA" },
+	    "7": { "id": "2B_s60w4ZS0_QdO6dd0qi0GKqAkYeTJ_bL05kr_tkgk" }
+	  }
+	}
 */
 type arweaveManifest struct {
 	Manifest string `json:"manifest"`

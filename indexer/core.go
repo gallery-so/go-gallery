@@ -3,8 +3,6 @@ package indexer
 import (
 	"context"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -26,27 +24,30 @@ import (
 )
 
 // Init initializes the indexer
-func Init() {
-	router, i := coreInit()
+func Init(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) {
+	router, i := coreInit(fromBlock, toBlock, quietLogs, enableRPC)
 	logger.For(nil).Info("Starting indexer...")
 	go i.Start(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()))
 	http.Handle("/", router)
 }
 
 // InitServer initializes the indexer server
-func InitServer() {
-	router := coreInitServer()
+func InitServer(keyFile string, quietLogs, enableRPC bool) {
+	router := coreInitServer(keyFile, quietLogs, enableRPC)
 	logger.For(nil).Info("Starting indexer server...")
 	http.Handle("/", router)
 }
 
-func coreInit() (*gin.Engine, *indexer) {
-
+func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engine, *indexer) {
 	setDefaults("indexer")
 	initSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.AddHook(sentryutil.SentryLoggerHook)
+		logger.SetLevel(logrus.InfoLevel)
+		if viper.GetString("ENV") != "production" && !quietLogs {
+			logger.SetLevel(logrus.DebugLevel)
+		}
 	})
 
 	var s *storage.Client
@@ -60,14 +61,11 @@ func coreInit() (*gin.Engine, *indexer) {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	// overrides for where the indexer starts and stops
-	startingBlock, maxBlock := getBlockRangeFromArgs()
-
-	if viper.GetString("ENV") == "production" {
+	if viper.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, startingBlock, maxBlock)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -75,44 +73,23 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	logger.For(nil).Info("Registering handlers...")
 	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
 }
 
-func getBlockRangeFromArgs() (*uint64, *uint64) {
-	var startingBlock, maxBlock *uint64
-	if len(os.Args) > 1 {
-		start, err := strconv.ParseUint(os.Args[1], 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		startingBlock = &start
-	}
-	if len(os.Args) > 2 {
-		max, err := strconv.ParseUint(os.Args[2], 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		maxBlock = &max
-	}
-	return startingBlock, maxBlock
-}
-
-func coreInitServer() *gin.Engine {
+func coreInitServer(localKeyPath string, quietLogs, enableRPC bool) *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
-
-	localKeyPath := "./_deploy/service-key-dev.json"
-	if len(os.Args) > 1 {
-		if os.Args[1] == "prod" {
-			localKeyPath = "./_deploy/service-key.json"
-		}
-	}
 	setDefaults("indexer-server")
 	initSentry()
 	logger.InitWithGCPDefaults()
+	logger.SetLoggerOptions(func(logger *logrus.Logger) {
+		logger.SetLevel(logrus.InfoLevel)
+		if viper.GetString("ENV") != "production" && !quietLogs {
+			logger.SetLevel(logrus.DebugLevel)
+		}
+	})
 
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
@@ -125,7 +102,7 @@ func coreInitServer() *gin.Engine {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	if viper.GetString("ENV") == "production" {
+	if viper.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
