@@ -214,6 +214,10 @@ type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
 }
 
+type UploadPersistedQueriesPayloadOrError interface {
+	IsUploadPersistedQueriesPayloadOrError()
+}
+
 type UserByAddressOrError interface {
 	IsUserByAddressOrError()
 }
@@ -668,6 +672,7 @@ func (ErrNotAuthorized) IsError()                                  {}
 func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()           {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()      {}
+func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()   {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1355,6 +1360,16 @@ type UpdateUserInfoPayload struct {
 }
 
 func (UpdateUserInfoPayload) IsUpdateUserInfoPayloadOrError() {}
+
+type UploadPersistedQueriesInput struct {
+	PersistedQueries *string `json:"persistedQueries"`
+}
+
+type UploadPersistedQueriesPayload struct {
+	Message *string `json:"message"`
+}
+
+func (UploadPersistedQueriesPayload) IsUploadPersistedQueriesPayloadOrError() {}
 
 type UserCreatedFeedEventData struct {
 	EventTime *time.Time      `json:"eventTime"`

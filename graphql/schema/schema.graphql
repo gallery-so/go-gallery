@@ -14,6 +14,8 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -1393,6 +1395,16 @@ union UnsubscribeFromEmailTypePayloadOrError =
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
 
+input UploadPersistedQueriesInput {
+    persistedQueries: String
+}
+
+union UploadPersistedQueriesPayloadOrError = UploadPersistedQueriesPayload | ErrNotAuthorized
+
+type UploadPersistedQueriesPayload {
+    message: String
+}
+
 input RedeemMerchInput {
     tokenIds: [String!]!
     address: ChainAddressInput!
@@ -1466,11 +1478,14 @@ type Mutation {
     preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
     verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
 
+    redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
+
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 
-    redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
+    # Gallery Frontend Deploy Persisted Queries
+    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
 }
 
 type Subscription {
