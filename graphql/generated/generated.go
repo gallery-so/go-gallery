@@ -83,6 +83,7 @@ type ResolverRoot interface {
 
 type DirectiveRoot struct {
 	AuthRequired        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	FrontendBuildAuth   func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 	RestrictEnvironment func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
 	RetoolAuth          func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
@@ -4811,6 +4812,8 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -6258,7 +6261,7 @@ type Mutation {
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 
     # Gallery Frontend Deploy Persisted Queries
-    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
+    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
 }
 
 type Subscription {
@@ -16985,8 +16988,28 @@ func (ec *executionContext) _Mutation_uploadPersistedQueries(ctx context.Context
 	}
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UploadPersistedQueries(rctx, args["input"].(*model.UploadPersistedQueriesInput))
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UploadPersistedQueries(rctx, args["input"].(*model.UploadPersistedQueriesInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.FrontendBuildAuth == nil {
+				return nil, errors.New("directive frontendBuildAuth is not implemented")
+			}
+			return ec.directives.FrontendBuildAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UploadPersistedQueriesPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UploadPersistedQueriesPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
