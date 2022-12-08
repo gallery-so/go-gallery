@@ -646,7 +646,7 @@ outer:
 	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
 	for userID, user := range users {
 		logger.For(ctx).Debugf("preparing tokens for user %s", user.Username)
-		tokens, err := p.prepareTokensOfContractForUser(ctx, chainTokensForUsers[userID], addressToContract, user, now, false)
+		tokens, err := p.prepareTokensOfContractForUser(ctx, chainTokensForUsers[userID], addressToContract, user, now)
 		if err != nil {
 			return err
 		}
@@ -655,7 +655,7 @@ outer:
 		logger.For(ctx).Debugf("preparing tokens for user %s done", user.Username)
 	}
 
-	if err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contract.ID, tokensToUpsert); err != nil {
+	if err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contract.ID, tokensToUpsert, false); err != nil {
 		return fmt.Errorf("error deleting tokens: %s", err)
 	}
 	return nil
@@ -879,30 +879,30 @@ outer:
 	return chainTokensForUser, users, nil
 }
 
-func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, chains []persist.Chain, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
+func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, chains []persist.Chain, skipDelete bool) ([]persist.TokenGallery, error) {
 
 	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
 	if err != nil {
 		return nil, err
 	}
-	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersNFTs, includeCurrentTokens)
+	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersNFTs)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := p.Repos.TokenRepository.BulkUpsertByOwnerUserID(ctx, user.ID, chains, newTokens); err != nil {
+	if err := p.Repos.TokenRepository.BulkUpsertByOwnerUserID(ctx, user.ID, chains, newTokens, skipDelete); err != nil {
 		return nil, fmt.Errorf("error upserting tokens: %s", err)
 	}
 	return newTokens, nil
 }
 
-func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, timeStamp time.Time, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
+func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, timeStamp time.Time) ([]persist.TokenGallery, error) {
 
 	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
 	if err != nil {
 		return nil, err
 	}
-	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersNFTs, includeCurrentTokens)
+	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersNFTs)
 	if err != nil {
 		return nil, err
 	}
@@ -910,8 +910,8 @@ func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens
 	return newTokens, nil
 }
 
-func dedupeAndPrepareTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, allUsersTokens []persist.TokenGallery, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
-	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user, allUsersTokens, includeCurrentTokens)
+func dedupeAndPrepareTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, allUsersTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
+	newTokens, err := tokensToNewDedupedTokens(ctx, allTokens, addressesToContracts, user)
 	if err != nil {
 		return nil, err
 	}
@@ -949,7 +949,7 @@ func (d *Provider) upsertContracts(ctx context.Context, allContracts []chainCont
 	return addressesToContracts, nil
 }
 
-func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User, allUsersTokens []persist.TokenGallery, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
+func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contractAddressIDs map[string]persist.DBID, ownerUser persist.User) ([]persist.TokenGallery, error) {
 	seenTokens := make(map[persist.TokenIdentifiers]persist.TokenGallery)
 
 	seenWallets := make(map[persist.TokenIdentifiers][]persist.Wallet)
@@ -1045,15 +1045,6 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 
 		res[i] = t
 		i++
-	}
-
-	if includeCurrentTokens {
-		// include user's current tokens in upsert
-		for _, t := range allUsersTokens {
-			if _, ok := seenTokens[t.TokenIdentifiers()]; !ok {
-				res = append(res, t)
-			}
-		}
 	}
 
 	return res, nil

@@ -75,7 +75,7 @@ type tokensByWalletQuery struct {
 
 type tokensByContractQuery struct {
 	Fa []struct {
-		Tokens []token `graphql:"tokens(limit: $limit, offset: $offset, distinct_on: token_id)"`
+		Tokens []token `graphql:"tokens(limit: $limit, offset: $offset, distinct_on: token_id, where: {holders: holder_address: {_eq: $ownerAddress}})"`
 	} `graphql:"fa(where: {contract: {_eq: $contractAddress}, type: {_eq: fa2}})"`
 }
 

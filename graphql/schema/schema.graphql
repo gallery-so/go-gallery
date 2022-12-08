@@ -792,7 +792,7 @@ type Query {
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
-    getMerchTokens(wallet: Address!): MerchTokensPayload
+    getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
 
     # Retool Specific
     usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth
