@@ -14,6 +14,8 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -1461,7 +1463,7 @@ type Mutation {
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
 
     # Gallery Frontend Deploy Persisted Queries
-    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
+    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
 }
 
 type Subscription {
