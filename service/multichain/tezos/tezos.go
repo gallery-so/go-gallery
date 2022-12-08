@@ -247,6 +247,59 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	return tokens, contract, nil
 }
 
+// GetTokensByContractAddressAndOwner retrieves tokens for a contract address and owner on the Tezos Blockchain
+func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+
+	offset := startOffset
+	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	if limit < 1 {
+		limit = pageSize
+	}
+	resultTokens := []tzktBalanceToken{}
+
+	for {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?account=%s&token.standard=fa2&token.contract=%s&limit=%d&offset=%d", d.apiURL, owner, contractAddress.String(), limit, offset), nil)
+		if err != nil {
+			return nil, multichain.ChainAgnosticContract{}, err
+		}
+		resp, err := d.httpClient.Do(req)
+		if err != nil {
+			return nil, multichain.ChainAgnosticContract{}, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+		}
+		var tzktBalances []tzktBalanceToken
+		if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
+			return nil, multichain.ChainAgnosticContract{}, err
+		}
+		resultTokens = append(resultTokens, tzktBalances...)
+
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
+			break
+		}
+
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
+			limit = maxLimit - len(resultTokens)
+		}
+
+		offset += limit
+	}
+
+	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, resultTokens, contractAddress.String())
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	if len(contractAddress) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address: %s", contractAddress)
+	}
+	contract := contracts[0]
+
+	return tokens, contract, nil
+}
+
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := startOffset

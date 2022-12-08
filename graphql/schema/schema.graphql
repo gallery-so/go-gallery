@@ -758,6 +758,25 @@ enum Role {
     BETA_TESTER
 }
 
+enum MerchType {
+  TShirt
+  Hat
+  Card
+}
+
+type MerchToken {
+  tokenId: String!
+  objectType: MerchType!
+  discountCode: String
+  redeemed: Boolean!
+}
+
+type MerchTokensPayload {
+  tokens: [MerchToken!]
+}
+
+union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -775,6 +794,7 @@ type Query {
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
+    getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
 
     # Retool Specific
     usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth

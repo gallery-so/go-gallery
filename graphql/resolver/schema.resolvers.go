@@ -1141,6 +1141,18 @@ func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (mod
 	return resolveFeedEventByEventID(ctx, id)
 }
 
+func (r *queryResolver) GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error) {
+	tokens, err := publicapi.For(ctx).Merch.GetMerchTokens(ctx, wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.MerchTokensPayload{
+		Tokens: tokens,
+	}
+	return output, nil
+}
+
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
 	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
 	if err != nil {
