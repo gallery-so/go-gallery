@@ -63,6 +63,7 @@ func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, 
 func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache) gin.HandlerFunc {
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler()
+	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
 	config.Directives.RetoolAuth = graphql.RetoolAuthDirectiveHandler()
 	config.Directives.FrontendBuildAuth = graphql.FrontendBuildAuthDirectiveHandler()
 
@@ -78,16 +79,14 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 	h.AddTransport(transport.MultipartForm{})
 
 	apqCache := &apq.APQCache{Cache: graphqlAPQCache}
-	h.Use(extension.AutomaticPersistedQuery{
-		Cache: apqCache,
-	})
 
 	h.SetQueryCache(lru.New(1000))
 
 	h.Use(extension.Introspection{})
 	h.Use(extension.AutomaticPersistedQuery{
-		Cache: lru.New(100),
+		Cache: apqCache,
 	})
+
 	// End code stolen from handler.NewDefaultServer
 
 	h.AddTransport(&transport.Websocket{
