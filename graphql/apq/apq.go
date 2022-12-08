@@ -18,7 +18,7 @@ func (c *APQCache) Add(ctx context.Context, key string, value interface{}) {
 		return
 	}
 
-	c.Cache.Set(ctx, key, []byte(resultingString), time.Hour*24)
+	c.Cache.Set(ctx, key, []byte(resultingString), time.Hour*24*7)
 }
 
 func (c *APQCache) Get(ctx context.Context, key string) (interface{}, bool) {
