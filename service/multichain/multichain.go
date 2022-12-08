@@ -300,16 +300,11 @@ outer:
 		}
 	}
 
-	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, userID, 0, 0)
-	if err != nil {
-		return err
-	}
-
 	addressToContract, err := p.upsertContracts(ctx, allContracts)
 	if err != nil {
 		return err
 	}
-	_, err = p.upsertTokens(ctx, allTokens, addressToContract, allUsersNFTs, user, chains, false)
+	_, err = p.upsertTokens(ctx, allTokens, addressToContract, user, chains, false)
 	if err != nil {
 		return err
 	}
@@ -444,12 +439,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 		return nil, err
 	}
 
-	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return p.upsertTokens(ctx, cha, addressToContracts, allUsersNFTs, user, []persist.Chain{wallet.Chain()}, true)
+	return p.upsertTokens(ctx, cha, addressToContracts, user, []persist.Chain{wallet.Chain()}, true)
 }
 
 // DeepRefresh re-indexes a user's wallets.
@@ -655,13 +645,8 @@ outer:
 
 	tokensToUpsert := make([]persist.TokenGallery, 0, len(chainTokensForUsers)*3)
 	for userID, user := range users {
-		allUserTokens, err := p.Repos.TokenRepository.GetByUserID(ctx, userID, -1, 0)
-		if err != nil {
-			return err
-		}
-
 		logger.For(ctx).Debugf("preparing tokens for user %s", user.Username)
-		tokens, err := p.prepareTokensOfContractForUser(ctx, chainTokensForUsers[userID], addressToContract, allUserTokens, user, now, false)
+		tokens, err := p.prepareTokensOfContractForUser(ctx, chainTokensForUsers[userID], addressToContract, user, now, false)
 		if err != nil {
 			return err
 		}
@@ -894,8 +879,13 @@ outer:
 	return chainTokensForUser, users, nil
 }
 
-func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, chains []persist.Chain, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
-	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersTokens, includeCurrentTokens)
+func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, chains []persist.Chain, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
+
+	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersNFTs, includeCurrentTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -906,9 +896,13 @@ func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, ad
 	return newTokens, nil
 }
 
-func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, allUsersTokens []persist.TokenGallery, user persist.User, timeStamp time.Time, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
+func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, timeStamp time.Time, includeCurrentTokens bool) ([]persist.TokenGallery, error) {
 
-	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersTokens, includeCurrentTokens)
+	allUsersNFTs, err := p.Repos.TokenRepository.GetByUserID(ctx, user.ID, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	newTokens, err := dedupeAndPrepareTokens(ctx, allTokens, addressesToContracts, user, allUsersNFTs, includeCurrentTokens)
 	if err != nil {
 		return nil, err
 	}
