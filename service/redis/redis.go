@@ -83,7 +83,7 @@ func ClearCache(db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	client := NewClient(db)
-	return client.FlushAll(ctx).Err()
+	return client.FlushDB(ctx).Err()
 }
 
 // Set sets a value in the redis cache

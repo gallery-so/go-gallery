@@ -245,6 +245,13 @@ func Tracing() gin.HandlerFunc {
 			sentry.ContinueFromRequest(c.Request),
 		)
 
+		if c.Request.Method == "OPTIONS" {
+			// Don't sample OPTIONS requests; there's nothing to trace and they eat up our Sentry quota.
+			// Using a sampling decision here (instead of simply omitting the span) ensures that any
+			// child spans will also be filtered out.
+			span.Sampled = sentry.SampledFalse
+		}
+
 		defer tracing.FinishSpan(span)
 
 		c.Request = c.Request.WithContext(ctx)

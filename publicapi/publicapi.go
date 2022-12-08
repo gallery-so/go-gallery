@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/event"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
@@ -52,10 +53,11 @@ type PublicAPI struct {
 	Notifications *NotificationsAPI
 	Interaction   *InteractionAPI
 	Admin         *AdminAPI
+	Merch         *MerchAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, apq *apq.APQCache) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := newValidator()
@@ -79,6 +81,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 		Admin:         &AdminAPI{queries: queries, loaders: loaders, validator: validator},
+		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }
 

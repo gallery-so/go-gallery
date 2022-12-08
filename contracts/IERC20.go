@@ -642,3 +642,4 @@ func (_IERC20 *IERC20Filterer) ParseTransfer(log types.Log) (*IERC20Transfer, er
 	event.Raw = log
 	return event, nil
 }
+

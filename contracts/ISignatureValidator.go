@@ -209,3 +209,4 @@ func (_ISignatureValidator *ISignatureValidatorSession) IsValidSignature(_data [
 func (_ISignatureValidator *ISignatureValidatorCallerSession) IsValidSignature(_data [32]byte, _signature []byte) ([4]byte, error) {
 	return _ISignatureValidator.Contract.IsValidSignature(&_ISignatureValidator.CallOpts, _data, _signature)
 }
+

@@ -967,6 +967,23 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEm
 	return verifyEmail(ctx, input.Token)
 }
 
+func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
+	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
+	for i, id := range input.TokenIds {
+		tokenIDList[i] = persist.TokenID(id)
+	}
+	codes, err := publicapi.For(ctx).Merch.RedeemMerchItems(ctx, tokenIDList, persist.NewChainPubKey(persist.PubKey(input.Address.String()), input.Address.Chain()), input.Signature, input.WalletType)
+
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RedeemMerchPayload{
+		DiscountCodes: codes,
+	}
+	return output, nil
+}
+
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
 
