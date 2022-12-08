@@ -77,8 +77,9 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 	h.AddTransport(transport.POST{})
 	h.AddTransport(transport.MultipartForm{})
 
+	apqCache := &apq.APQCache{Cache: graphqlAPQCache}
 	h.Use(extension.AutomaticPersistedQuery{
-		Cache: &apq.APQCache{Cache: graphqlAPQCache},
+		Cache: apqCache,
 	})
 
 	h.SetQueryCache(lru.New(1000))
@@ -117,7 +118,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 	h.AroundFields(graphql.RemapAndReportErrors)
 
 	newPublicAPI := func(ctx context.Context, disableDataloaderCaching bool) *publicapi.PublicAPI {
-		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, taskClient, throttler)
+		return publicapi.New(ctx, disableDataloaderCaching, repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mp, taskClient, throttler, apqCache)
 	}
 
 	notificationsHandler := notifications.New(queries, pub, lock)
