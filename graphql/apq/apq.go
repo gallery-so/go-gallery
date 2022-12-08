@@ -2,6 +2,7 @@ package apq
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"time"
@@ -26,4 +27,20 @@ func (c *APQCache) Get(ctx context.Context, key string) (interface{}, bool) {
 	value, _ := c.Cache.Get(ctx, key)
 
 	return string(value), true
+}
+
+func (c *APQCache) UploadPersistedQueries(ctx context.Context, persistedQueriesString string) error {
+	persistedQueries := map[string]string{}
+
+	err := json.Unmarshal([]byte(persistedQueriesString), &persistedQueries)
+
+	if err != nil {
+		return err
+	}
+
+	for hash, queryText := range persistedQueries {
+		c.Add(ctx, hash, queryText)
+	}
+
+	return nil
 }

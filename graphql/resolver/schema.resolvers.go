@@ -988,7 +988,15 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 }
 
 func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
-	panic(fmt.Errorf("not implemented"))
+	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
+
+	if err != nil {
+		return nil, err
+	}
+
+	message := "Persisted queries uploaded successfully"
+
+	return model.UploadPersistedQueriesPayload{Message: &message}, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
