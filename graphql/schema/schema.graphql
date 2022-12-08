@@ -756,6 +756,25 @@ enum Role {
     BETA_TESTER
 }
 
+enum MerchType {
+  TShirt
+  Hat
+  Card
+}
+
+type MerchToken {
+  tokenId: String!
+  objectType: MerchType!
+  discountCode: String
+  redeemed: Boolean!
+}
+
+type MerchTokensPayload {
+  tokens: [MerchToken!]
+}
+
+union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -773,6 +792,7 @@ type Query {
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
+    getMerchTokens(wallet: Address!): MerchTokensPayload
 
     # Retool Specific
     usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth
@@ -1413,27 +1433,6 @@ union RedeemMerchPayloadOrError =
     RedeemMerchPayload
     | ErrInvalidInput
 
-enum MerchType {
-    TShirt
-    Hat
-    Card
-}
-
-type MerchToken {
-    tokenId: String!
-    objectType: MerchType!
-    discountCode: String
-    redeemed: Boolean!
-}
-
-type MerchTokensPayload {
-    tokens: [MerchToken!]
-}
-
-union MerchTokensPayloadOrError =
-    MerchTokensPayload
-    | ErrInvalidInput
-
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1490,8 +1489,7 @@ type Mutation {
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
-    
-    getMerchTokens(wallet: Address!): MerchTokensPayload
+
     redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 }
 

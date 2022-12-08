@@ -987,18 +987,6 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 	return userToModel(ctx, *user), nil
 }
 
-func (r *mutationResolver) GetMerchTokens(ctx context.Context, wallet persist.Address) (*model.MerchTokensPayload, error) {
-	tokens, err := publicapi.For(ctx).Merch.GetMerchTokens(ctx, wallet)
-	if err != nil {
-		return nil, err
-	}
-
-	output := &model.MerchTokensPayload{
-		Tokens: tokens,
-	}
-	return output, nil
-}
-
 func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
 	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
 	for i, id := range input.TokenIds {
@@ -1139,6 +1127,18 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
+}
+
+func (r *queryResolver) GetMerchTokens(ctx context.Context, wallet persist.Address) (*model.MerchTokensPayload, error) {
+	tokens, err := publicapi.For(ctx).Merch.GetMerchTokens(ctx, wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.MerchTokensPayload{
+		Tokens: tokens,
+	}
+	return output, nil
 }
 
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
