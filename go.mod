@@ -34,6 +34,7 @@ require (
 	github.com/hamba/avro v1.6.6 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/imgix/imgix-go/v2 v2.0.3
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/go-ipfs-files v0.1.1 // indirect
 	github.com/jackc/pgconn v1.11.0
@@ -59,6 +60,7 @@ require (
 	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.8.2 // indirect
+	github.com/spf13/cobra v1.6.1 // indirect
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.8.1
 	github.com/ugorji/go v1.2.7 // indirect

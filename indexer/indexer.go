@@ -52,13 +52,11 @@ const (
 )
 
 var (
-	defaultStartingBlock  persist.BlockNumber = 5000000
-	defaultMaxBlock       persist.BlockNumber = 14000000
-	rpcEnabled            bool                = false // Enables external RPC calls
-	erc1155ABI, _                             = contracts.IERC1155MetaData.GetAbi()
-	animationKeywords                         = []string{"animation", "video"}
-	imageKeywords                             = []string{"image"}
-	defaultTransferEvents                     = []eventHash{
+	rpcEnabled            bool = false // Enables external RPC calls
+	erc1155ABI, _              = contracts.IERC1155MetaData.GetAbi()
+	animationKeywords          = []string{"animation", "video"}
+	imageKeywords              = []string{"image"}
+	defaultTransferEvents      = []eventHash{
 		transferBatchEventHash,
 		transferEventHash,
 		transferSingleEventHash,
@@ -181,48 +179,37 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		getLogsFunc: getLogsFunc,
 	}
 
-	if rpcEnabled {
-		mostRecentBlockUint64, err := ethClient.BlockNumber(context.Background())
+	if startingBlock != nil {
+		i.lastSyncedBlock = *startingBlock
+		i.lastSyncedBlock -= i.lastSyncedBlock % blocksPerLogsCall
+	} else {
+		recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
 		if err != nil {
 			panic(err)
 		}
-		i.mostRecentBlock = mostRecentBlockUint64
-	} else {
-		if startingBlock == nil {
-			i.mostRecentBlock = defaultMaxBlock.Uint64()
-		} else {
-			i.mostRecentBlock = *maxBlock
-		}
-	}
-	if maxBlock != nil {
-		if i.mostRecentBlock > *maxBlock {
-			i.mostRecentBlock = *maxBlock
-		}
+		i.lastSyncedBlock = recentDBBlock.Uint64()
+		i.lastSyncedBlock -= (i.lastSyncedBlock % blocksPerLogsCall) + (blocksPerLogsCall * defaultWorkerPoolSize)
 	}
 
-	lastSyncedBlock := defaultStartingBlock
-	if startingBlock != nil {
-		lastSyncedBlock = persist.BlockNumber(*startingBlock)
-		remainder := lastSyncedBlock % blocksPerLogsCall
-		lastSyncedBlock -= remainder
-	} else {
-		recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
-		if err == nil && recentDBBlock > defaultStartingBlock {
-			lastSyncedBlock = recentDBBlock
+	if maxBlock != nil {
+		i.mostRecentBlock = *maxBlock
+	} else if rpcEnabled {
+		mostRecentBlock, err := ethClient.BlockNumber(context.Background())
+		if err != nil {
+			panic(err)
 		}
-		remainder := lastSyncedBlock % blocksPerLogsCall
-		lastSyncedBlock -= (remainder + (blocksPerLogsCall * defaultWorkerPoolWaitSize))
-		if lastSyncedBlock < 0 {
-			lastSyncedBlock = 0
-		}
+		i.mostRecentBlock = mostRecentBlock
 	}
-	i.lastSyncedBlock = lastSyncedBlock.Uint64()
+
+	if i.lastSyncedBlock > i.mostRecentBlock {
+		panic(fmt.Sprintf("last handled block=%d is greater than the height=%d!", i.lastSyncedBlock, i.mostRecentBlock))
+	}
 
 	if i.getLogsFunc == nil {
 		i.getLogsFunc = i.defaultGetLogs
 	}
 
-	logger.For(nil).Infof("Starting indexer at block %d until block %d (max block %d) with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, i.maxBlock, rpcEnabled)
+	logger.For(nil).Infof("starting indexer at block=%d until block=%d with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, rpcEnabled)
 	return i
 }
 

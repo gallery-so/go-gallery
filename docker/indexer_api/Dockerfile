@@ -16,11 +16,11 @@ COPY _deploy/root-certs/sectigo.crt /usr/local/share/ca-certificates/sectigo.crt
 RUN update-ca-certificates
 
 COPY . /app
-RUN go build -o ./bin/indexer-api ./cmd/indexer/server/main.go
+RUN go build -o ./bin/indexer ./cmd/indexer/main.go
 
 ARG VERSION
 ENV VERSION=$VERSION
 
 EXPOSE 6000
 USER nobody
-ENTRYPOINT ["./bin/indexer-api"]
+ENTRYPOINT ["./bin/indexer", "server"]
