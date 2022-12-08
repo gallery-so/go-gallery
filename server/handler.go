@@ -64,7 +64,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler()
 	config.Directives.RetoolAuth = graphql.RetoolAuthDirectiveHandler()
-	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
+	config.Directives.FrontendBuildAuth = graphql.FrontendBuildAuthDirectiveHandler()
 
 	schema := generated.NewExecutableSchema(config)
 	h := handler.New(schema)

@@ -176,6 +176,41 @@ func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, nex
 	}
 }
 
+func FrontendBuildAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+		gc := util.GinContextFromContext(ctx)
+
+		authError := model.ErrNotAuthorized{
+			Message: "Not authorized",
+			Cause:   model.ErrInvalidToken{Message: "Frontend build auth: not authorized"},
+		}
+
+		parts := strings.SplitN(gc.GetHeader("Authorization"), "Basic ", 2)
+		if len(parts) != 2 {
+			return authError, nil
+		}
+
+		usernameAndPassword, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil {
+			return authError, nil
+		}
+
+		usernameAndPasswordParts := strings.SplitN(string(usernameAndPassword), ":", 2)
+		if len(usernameAndPasswordParts) != 2 {
+			return authError, nil
+		}
+
+		password := usernameAndPasswordParts[1]
+		passwordBytes := []byte(password)
+
+		if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("FRONTEND_APQ_UPLOAD_AUTH_TOKEN")), passwordBytes); cmp != 1 {
+			return authError, nil
+		}
+
+		return next(ctx)
+	}
+}
+
 func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
