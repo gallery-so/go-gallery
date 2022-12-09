@@ -337,9 +337,6 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 
 	logger.For(ctx).Infof("Getting logs from %d to %d", curBlock, nextBlock)
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
 	logsTo, err := i.getLogsFunc(ctx, curBlock, nextBlock, topics)
 	if err != nil {
 		panic(fmt.Sprintf("error getting logs: %s", err))
@@ -368,8 +365,12 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 			logsTo = []types.Log{}
 		}
 	}
+
+	rpcCtx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+
 	if len(logsTo) == 0 && rpcEnabled {
-		logsTo, err = rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
+		logsTo, err = rpc.RetryGetLogs(rpcCtx, i.ethClient, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
