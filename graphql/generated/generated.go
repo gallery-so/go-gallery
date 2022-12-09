@@ -546,7 +546,7 @@ type ComplexityRoot struct {
 		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
 		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
-		BanUserFromFeed                 func(childComplexity int, username string) int
+		BanUserFromFeed                 func(childComplexity int, username string, action string) int
 		ClearAllNotifications           func(childComplexity int) int
 		CommentOnFeedEvent              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
 		CreateCollection                func(childComplexity int, input model.CreateCollectionInput) int
@@ -1094,7 +1094,7 @@ type MutationResolver interface {
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
-	BanUserFromFeed(ctx context.Context, username string) (model.BanUserFromFeedPayloadOrError, error)
+	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
 	UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
@@ -2898,7 +2898,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.BanUserFromFeed(childComplexity, args["username"].(string)), true
+		return e.complexity.Mutation.BanUserFromFeed(childComplexity, args["username"].(string), args["action"].(string)), true
 
 	case "Mutation.clearAllNotifications":
 		if e.complexity.Mutation.ClearAllNotifications == nil {
@@ -6468,7 +6468,7 @@ type Mutation {
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
     syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError @retoolAuth
-    banUserFromFeed(username: String!): BanUserFromFeedPayloadOrError @retoolAuth
+    banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
 
     # Gallery Frontend Deploy Persisted Queries
     uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
@@ -6885,6 +6885,15 @@ func (ec *executionContext) field_Mutation_banUserFromFeed_args(ctx context.Cont
 		}
 	}
 	args["username"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["action"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("action"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["action"] = arg1
 	return args, nil
 }
 
@@ -17655,7 +17664,7 @@ func (ec *executionContext) _Mutation_banUserFromFeed(ctx context.Context, field
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().BanUserFromFeed(rctx, args["username"].(string))
+			return ec.resolvers.Mutation().BanUserFromFeed(rctx, args["username"].(string), args["action"].(string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {
