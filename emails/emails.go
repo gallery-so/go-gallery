@@ -3,6 +3,7 @@ package emails
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -104,7 +105,11 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("emails")
+		fi := "local"
+		if len(os.Args) > 0 {
+			fi = os.Args[0]
+		}
+		envFile := util.ResolveEnvFile("emails", fi)
 		util.LoadEnvFile(envFile)
 	}
 

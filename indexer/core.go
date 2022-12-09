@@ -147,12 +147,12 @@ func SetDefaults() {
 	viper.AutomaticEnv()
 }
 
-func LoadConfigFile(service string) {
+func LoadConfigFile(service string, manualEnv string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
-	util.LoadEnvFile(util.ResolveEnvFile(service))
+	util.LoadEnvFile(util.ResolveEnvFile(service, manualEnv))
 }
 
 func ValidateEnv() {
