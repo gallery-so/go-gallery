@@ -119,8 +119,8 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 	return submitAppEngineTask(ctx, client, queue, task, body)
 }
 
-func CreateTaskForMediaProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForMediaProcessing")
+func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
 	defer tracing.FinishSpan(span)
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{
