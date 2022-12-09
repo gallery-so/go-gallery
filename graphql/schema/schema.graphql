@@ -1445,6 +1445,18 @@ union RedeemMerchPayloadOrError =
     RedeemMerchPayload
     | ErrInvalidInput
 
+type SyncTokensForUsernamePayload {
+    message: String!
+}
+
+union SyncTokensForUsernamePayloadOrError = SyncTokensForUsernamePayload | ErrNotAuthorized | ErrSyncFailed
+
+type BanUserFromFeedPayload {
+   user: GalleryUser
+}
+
+union BanUserFromFeedPayloadOrError = BanUserFromFeedPayload | ErrNotAuthorized
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1503,6 +1515,8 @@ type Mutation {
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
+    syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError @retoolAuth
+    banUserFromFeed(username: String!): BanUserFromFeedPayloadOrError @retoolAuth
 
     # Gallery Frontend Deploy Persisted Queries
     uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
