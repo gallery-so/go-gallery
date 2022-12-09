@@ -281,7 +281,7 @@ func (i *indexer) waitForBlocks(ctx context.Context, topics [][]common.Hash) {
 }
 
 func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, topics [][]common.Hash) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "startPipeline", sentry.TransactionName("indexer-main:startPipeline"))
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "catchup", sentry.TransactionName("indexer-main:catchup"))
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"block": start})
 	defer tracing.FinishSpan(span)
 
@@ -292,7 +292,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	go func() {
 		ctx := sentryutil.NewSentryHubContext(ctx)
-		span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processLogs")
+		span, ctx := tracing.StartSpan(ctx, "indexer.logs", "processLogs")
 		defer tracing.FinishSpan(span)
 
 		logs := i.fetchLogs(ctx, start, topics)
@@ -304,7 +304,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 }
 
 func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.Hash) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "startNewBlocksPipeline", sentry.TransactionName("indexer-main:startNewBlocksPipeline"))
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "polling", sentry.TransactionName("indexer-main:polling"))
 	defer tracing.FinishSpan(span)
 
 	transfers := make(chan []transfersAtBlock)
@@ -386,7 +386,7 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 			logEntry.Error("failed to fetch logs")
 			return []types.Log{}, nil
 		}
-		saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
+		go saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
 	}
 	logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 	return logsTo, nil
@@ -511,7 +511,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 }
 
 func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, topics [][]common.Hash) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "pollNewLogs")
+	span, ctx := tracing.StartSpan(ctx, "indexer.logs", "pollLogs")
 	defer tracing.FinishSpan(span)
 	defer close(transfersChan)
 	defer recoverAndWait(ctx)
@@ -533,10 +533,10 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 				defer sentryutil.RecoverAndRaise(ctx)
 
 				nextBlock := curBlock + blocksPerLogsCall
-				ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+				rpcCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 				defer cancel()
 
-				logsTo, err := rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
+				logsTo, err := rpc.RetryGetLogs(rpcCtx, i.ethClient, ethereum.FilterQuery{
 					FromBlock: persist.BlockNumber(curBlock).BigInt(),
 					ToBlock:   persist.BlockNumber(nextBlock).BigInt(),
 					Topics:    topics,
@@ -563,7 +563,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 						}
 					}
 					i.polledLogs = append(i.polledLogs, logsTo[:indexToCut]...)
-					saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
+					go saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
 					i.lastSavedLog = blockLimit
 					i.polledLogs = logsTo[indexToCut:]
 				} else {
@@ -602,7 +602,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 // TRANSFERS FUNCS -------------------------------------------------------------
 
 func (i *indexer) processAllTransfers(ctx context.Context, incomingTransfers <-chan []transfersAtBlock, plugins []chan<- PluginMsg) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processTransfers")
+	span, ctx := tracing.StartSpan(ctx, "indexer.transfers", "processTransfers")
 	defer tracing.FinishSpan(span)
 	defer sentryutil.RecoverAndRaise(ctx)
 	for _, plugin := range plugins {

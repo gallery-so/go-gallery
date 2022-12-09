@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -41,8 +42,8 @@ type TransferPlugins struct {
 // PluginReceiver receives the results of a plugin.
 type PluginReceiver func()
 
-func startSpan(ctx context.Context, pluginName string) (*sentry.Span, context.Context) {
-	return tracing.StartSpan(ctx, "indexer.runPlugin", pluginName)
+func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Context) {
+	return tracing.StartSpan(ctx, "indexer.plugin", fmt.Sprintf("%s:%s", plugin, op))
 }
 
 // NewTransferPlugins returns a set of transfer plugins. Plugins have an `in` and an optional `out` channel that are handles to the service.
@@ -59,7 +60,7 @@ func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenR
 
 // RunPlugins returns when all plugins have received the message.
 func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, plugins []chan<- PluginMsg) {
-	span, _ := startSpan(ctx, "submitMessage")
+	span, ctx := tracing.StartSpan(ctx, "indexer.plugin", "submitMessage")
 	defer tracing.FinishSpan(span)
 
 	msg := PluginMsg{
@@ -73,7 +74,7 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 
 // ReceivePlugins blocks until all plugins have completed.
 func ReceivePlugins(ctx context.Context, wg *sync.WaitGroup, receivers []PluginReceiver) {
-	span, _ := startSpan(ctx, "receivePlugins")
+	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "receivePlugins")
 	defer tracing.FinishSpan(span)
 
 	for _, receiver := range receivers {
@@ -99,7 +100,7 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 	out := make(chan tokenURI)
 
 	go func() {
-		span, ctx := startSpan(ctx, "uriPlugin")
+		span, ctx := startSpan(ctx, "uriPlugin", "handleBatch")
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
@@ -108,7 +109,8 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
-				child := span.StartChild("handleMessage")
+				child := span.StartChild("plugin.uriPlugin")
+				child.Description = "handleMessage"
 
 				var uri persist.TokenURI
 
@@ -158,7 +160,7 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 	out := make(chan tokenBalances)
 
 	go func() {
-		span, ctx := startSpan(ctx, "balancePlugin")
+		span, ctx := startSpan(ctx, "balancePlugin", "handleBatch")
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
@@ -167,7 +169,8 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
-				child := span.StartChild("handleMessage")
+				child := span.StartChild("plugin.balancePlugin")
+				child.Description = "handleMessage"
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
 					if rpcEnabled {
@@ -217,7 +220,7 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 	out := make(chan ownersPluginResult)
 
 	go func() {
-		span, _ := startSpan(ctx, "ownerPlugin")
+		span, _ := startSpan(ctx, "ownerPlugin", "handleBatch")
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
@@ -226,7 +229,8 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
-				child := span.StartChild("handleMessage")
+				child := span.StartChild("plugin.ownerPlugin")
+				child.Description = "handleMessage"
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
 					out <- ownersPluginResult{
@@ -267,7 +271,7 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilt
 	out := make(chan error, 1)
 
 	go func() {
-		span, _ := startSpan(ctx, "refreshPlugin")
+		span, _ := startSpan(ctx, "refreshPlugin", "handleBatch")
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
@@ -280,7 +284,8 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilt
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
-				child := span.StartChild("handleMessage")
+				child := span.StartChild("plugin.refreshPlugin")
+				child.Description = "handleMessage"
 
 				fromBlock := msg.transfer.BlockNumber - (msg.transfer.BlockNumber % blocksPerLogsCall)
 				toBlock := fromBlock + blocksPerLogsCall
