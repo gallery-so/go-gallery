@@ -1516,7 +1516,7 @@ type Mutation {
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
     syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError @retoolAuth
-    banUserFromFeed(username: String!): BanUserFromFeedPayloadOrError @retoolAuth
+    banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
 
     # Gallery Frontend Deploy Persisted Queries
     uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
