@@ -29,8 +29,7 @@ func TestIndexLogs_Success(t *testing.T) {
 	stg := newStorageClient(ctx)
 
 	t.Run("it updates its state", func(t *testing.T) {
-		a.EqualValues(testBlockTo, i.lastSyncedBlock)
-		a.EqualValues(i.mostRecentBlock, i.lastSyncedBlock)
+		a.EqualValues(testBlockTo-blocksPerLogsCall, i.lastSyncedChunk)
 	})
 
 	t.Run("it saves ERC-721s to the db", func(t *testing.T) {

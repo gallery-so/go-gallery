@@ -19,7 +19,7 @@ func getStatus(i *indexer, tokenRepository persist.TokenRepository) gin.HandlerF
 		c.JSON(http.StatusOK, gin.H{
 			"most_recent_blockchain": i.mostRecentBlock,
 			"most_recent_db":         mostRecent,
-			"last_synced_block":      i.lastSyncedBlock,
+			"last_synced_chunk":      i.lastSyncedChunk,
 			"is_listening":           i.isListening,
 		})
 	}
