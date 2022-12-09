@@ -47,7 +47,6 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
-	viper.SetDefault("PORT", 4124)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("TASK_QUEUE_HOST", "localhost:8123")
