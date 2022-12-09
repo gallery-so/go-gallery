@@ -51,6 +51,7 @@ const (
 	defaultHTTPKeepAlive           = 600
 	defaultHTTPMaxIdleConns        = 100
 	defaultHTTPMaxIdleConnsPerHost = 100
+	GethSocketOpName               = "geth.wss"
 )
 
 var (
@@ -163,7 +164,7 @@ func (h metricsHandler) Log(r *log.Record) error {
 
 	// A useful context isn't passed to the log record, so we use the background context here.
 	ctx := context.Background()
-	span, _ := tracing.StartSpan(ctx, "geth.wss", "rpcCall", sentryutil.TransactionNameSafe("gethRPC"))
+	span, _ := tracing.StartSpan(ctx, GethSocketOpName, "rpcCall", sentryutil.TransactionNameSafe("gethRPC"))
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"reqID": reqID})
 	defer tracing.FinishSpan(span)
 
