@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -95,7 +96,11 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("tokenprocessing")
+		fi := "local"
+		if len(os.Args) > 0 {
+			fi = os.Args[0]
+		}
+		envFile := util.ResolveEnvFile("tokenprocessing", fi)
 		util.LoadEnvFile(envFile)
 	}
 

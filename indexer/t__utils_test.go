@@ -44,7 +44,7 @@ var allLogs = func() []types.Log {
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	SetDefaults()
-	LoadConfigFile("indexer-server")
+	LoadConfigFile("indexer-server", "local")
 	ValidateEnv()
 
 	pg, pgUnpatch := docker.InitPostgresIndexer()
