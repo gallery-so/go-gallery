@@ -139,7 +139,7 @@ type indexer struct {
 	lastSavedLog uint64
 
 	mostRecentBlock uint64  // Current height of the blockchain
-	lastSyncedBlock uint64  // Last block handled by the indexer
+	lastSyncedChunk uint64  // Start block of the last chunk handled by the indexer
 	maxBlock        *uint64 // If provided, the indexer will only index up to maxBlock
 
 	isListening bool // Indicates if the indexer is waiting for new blocks
@@ -180,15 +180,15 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	}
 
 	if startingBlock != nil {
-		i.lastSyncedBlock = *startingBlock
-		i.lastSyncedBlock -= i.lastSyncedBlock % blocksPerLogsCall
+		i.lastSyncedChunk = *startingBlock
+		i.lastSyncedChunk -= i.lastSyncedChunk % blocksPerLogsCall
 	} else {
 		recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
 		if err != nil {
 			panic(err)
 		}
-		i.lastSyncedBlock = recentDBBlock.Uint64()
-		i.lastSyncedBlock -= (i.lastSyncedBlock % blocksPerLogsCall) + (blocksPerLogsCall * defaultWorkerPoolSize)
+		i.lastSyncedChunk = recentDBBlock.Uint64()
+		i.lastSyncedChunk -= (i.lastSyncedChunk % blocksPerLogsCall) + (blocksPerLogsCall * defaultWorkerPoolSize)
 	}
 
 	if maxBlock != nil {
@@ -201,15 +201,15 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		i.mostRecentBlock = mostRecentBlock
 	}
 
-	if i.lastSyncedBlock > i.mostRecentBlock {
-		panic(fmt.Sprintf("last handled block=%d is greater than the height=%d!", i.lastSyncedBlock, i.mostRecentBlock))
+	if i.lastSyncedChunk > i.mostRecentBlock {
+		panic(fmt.Sprintf("last handled chunk=%d is greater than the height=%d!", i.lastSyncedChunk, i.mostRecentBlock))
 	}
 
 	if i.getLogsFunc == nil {
 		i.getLogsFunc = i.defaultGetLogs
 	}
 
-	logger.For(nil).Infof("starting indexer at block=%d until block=%d with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, rpcEnabled)
+	logger.For(nil).Infof("starting indexer at block=%d until block=%d with rpc enabled: %t", i.lastSyncedChunk, i.mostRecentBlock, rpcEnabled)
 	return i
 }
 
@@ -226,7 +226,7 @@ func (i *indexer) Start(ctx context.Context) {
 	logger.For(ctx).Info("Catching up to latest block")
 	i.isListening = false
 	i.catchUp(ctx, topics)
-	i.lastSavedLog = i.lastSyncedBlock
+	i.lastSavedLog = i.lastSyncedChunk
 
 	if !rpcEnabled {
 		logger.For(ctx).Info("Running in cached logs only mode, not listening for new logs")
@@ -243,7 +243,7 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 	wp := workerpool.New(defaultWorkerPoolSize)
 	defer wp.StopWait()
 
-	from := i.lastSyncedBlock
+	from := i.lastSyncedChunk
 	for ; from < atomic.LoadUint64(&i.mostRecentBlock); from += blocksPerLogsCall {
 		input := from
 		toQueue := func() {
@@ -252,7 +252,7 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 			defer sentryutil.RecoverAndRaise(workerCtx)
 			logger.For(workerCtx).Infof("Indexing block range starting at %d", input)
 			i.startPipeline(workerCtx, persist.BlockNumber(input), topics)
-			i.updateLastSynced(input + blocksPerLogsCall)
+			i.updateLastSynced(input)
 			logger.For(workerCtx).Infof("Finished indexing block range starting at %d", input)
 		}
 		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
@@ -265,8 +265,8 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 
 func (i *indexer) updateLastSynced(block uint64) {
 	i.stateMu.Lock()
-	if i.lastSyncedBlock < block {
-		i.lastSyncedBlock = block
+	if i.lastSyncedChunk < block {
+		i.lastSyncedChunk = block
 	}
 	i.stateMu.Unlock()
 }
@@ -523,10 +523,10 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 		panic(err)
 	}
 
-	logger.For(ctx).Infof("Subscribing to new logs from block %d starting with block %d", mostRecentBlock, i.lastSyncedBlock)
+	logger.For(ctx).Infof("Subscribing to new logs from block %d starting with block %d", mostRecentBlock, i.lastSyncedChunk)
 
 	wp := workerpool.New(10)
-	for j := i.lastSyncedBlock; j <= mostRecentBlock; j += blocksPerLogsCall {
+	for j := i.lastSyncedChunk; j <= mostRecentBlock; j += blocksPerLogsCall {
 		curBlock := j
 		wp.Submit(
 			func() {
@@ -595,9 +595,9 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 			})
 	}
 	wp.StopWait()
-	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedBlock, mostRecentBlock)
+	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedChunk, mostRecentBlock)
 
-	i.lastSyncedBlock = mostRecentBlock
+	i.lastSyncedChunk = mostRecentBlock
 }
 
 // TRANSFERS FUNCS -------------------------------------------------------------
