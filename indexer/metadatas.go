@@ -399,7 +399,7 @@ func ens(ctx context.Context, turi persist.TokenURI, addr persist.EthereumAddres
 	canvas.Square(0, 0, width, canvas.RGB(255, 255, 255))
 	result := domain.LabelName + ".eth"
 
-	canvas.Text(width/2, height/2, result, `font-size="16px"`, `text-anchor="middle"`, `alignment-baseline="middle"`)
+	canvas.Text(width/2, height/2, result, `font-size="16px"`, `text-anchor="middle"`, `alignment-baseline="middle"`, `font-family="Helvetica Neue"`)
 
 	canvas.End()
 
