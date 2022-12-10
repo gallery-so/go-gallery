@@ -61,6 +61,7 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 
 	queue := viper.GetString("GCLOUD_FEED_QUEUE")
 	task := &taskspb.Task{
+		ScheduleTime: timestamppb.New(scheduleOn),
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
