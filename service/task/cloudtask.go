@@ -61,17 +61,14 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 
 	queue := viper.GetString("GCLOUD_FEED_QUEUE")
 	task := &taskspb.Task{
-		Name:         fmt.Sprintf("%s/tasks/%s", queue, message.ID.String()),
-		ScheduleTime: timestamppb.New(scheduleOn),
-		MessageType: &taskspb.Task_AppEngineHttpRequest{
-			AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
-				HttpMethod:       taskspb.HttpMethod_POST,
-				AppEngineRouting: &taskspb.AppEngineRouting{Service: "feed"},
-				RelativeUri:      "/tasks/feed-event",
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/tasks/feed-event", viper.GetString("FEED_URL")),
 				Headers: map[string]string{
 					"Content-type":  "application/json",
-					"Authorization": "Basic " + viper.GetString("FEED_SECRET"),
 					"sentry-trace":  span.TraceID.String(),
+					"Authorization": "Basic " + viper.GetString("FEED_SECRET"),
 				},
 			},
 		},
@@ -82,7 +79,7 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 		return err
 	}
 
-	return submitAppEngineTask(ctx, client, queue, task, body)
+	return submitHttpTask(ctx, client, queue, task, body)
 }
 
 func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message FeedbotMessage, client *gcptasks.Client) error {
