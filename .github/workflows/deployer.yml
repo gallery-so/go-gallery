@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - benny/github-actions
+      - benny/prepare-region-migration
 env:
   CLOUDSDK_CORE_DISABLE_PROMPTS: 1
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -85,7 +86,7 @@ jobs:
       - name: "Install gcloud cli"
         uses: google-github-actions/setup-gcloud@v0
       - name: "Docker auth"
-        run: gcloud auth configure-docker us-west2-docker.pkg.dev
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
         run: |
           cd _deploy
@@ -167,7 +168,7 @@ jobs:
       - name: "Install gcloud cli"
         uses: google-github-actions/setup-gcloud@v0
       - name: "Docker auth"
-        run: gcloud auth configure-docker us-west2-docker.pkg.dev
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
         run: |
           cd _deploy
@@ -331,7 +332,7 @@ jobs:
       - name: "Install gcloud cli"
         uses: google-github-actions/setup-gcloud@v0
       - name: "Docker auth"
-        run: gcloud auth configure-docker us-west2-docker.pkg.dev
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
         run: |
           cd _deploy
@@ -413,7 +414,7 @@ jobs:
       - name: "Install gcloud cli"
         uses: google-github-actions/setup-gcloud@v0
       - name: "Docker auth"
-        run: gcloud auth configure-docker us-west2-docker.pkg.dev
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
         run: |
           cd _deploy
