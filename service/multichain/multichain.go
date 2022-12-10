@@ -329,7 +329,7 @@ func (p *Provider) processMedialessTokens(ctx context.Context, userID persist.DB
 		ImageKeywords:     imageKeywords,
 		AnimationKeywords: animationKeywords,
 	}
-	return task.CreateTaskForMediaProcessing(ctx, processMediaInput, p.TasksClient)
+	return task.CreateTaskForTokenProcessing(ctx, processMediaInput, p.TasksClient)
 }
 
 func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
