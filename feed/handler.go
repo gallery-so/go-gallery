@@ -14,13 +14,13 @@ import (
 // Returns a 200 status in order to remove bad messages from the task queue.
 func taskRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		taskName := c.Request.Header.Get("X-Appengine-Taskname")
+		taskName := c.Request.Header.Get("X-CloudTasks-Taskname")
 		if taskName == "" {
 			c.AbortWithError(http.StatusOK, errors.New("invalid task"))
 			return
 		}
 
-		queueName := c.Request.Header.Get("X-Appengine-Queuename")
+		queueName := c.Request.Header.Get("X-CloudTasks-Queuename")
 		if queueName == "" {
 			c.AbortWithError(http.StatusOK, errors.New("invalid queue"))
 			return
