@@ -139,7 +139,7 @@ type indexer struct {
 	lastSavedLog uint64
 
 	mostRecentBlock uint64  // Current height of the blockchain
-	lastSyncedBlock uint64  // Last block handled by the indexer
+	lastSyncedChunk uint64  // Start block of the last chunk handled by the indexer
 	maxBlock        *uint64 // If provided, the indexer will only index up to maxBlock
 
 	isListening bool // Indicates if the indexer is waiting for new blocks
@@ -180,15 +180,15 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 	}
 
 	if startingBlock != nil {
-		i.lastSyncedBlock = *startingBlock
-		i.lastSyncedBlock -= i.lastSyncedBlock % blocksPerLogsCall
+		i.lastSyncedChunk = *startingBlock
+		i.lastSyncedChunk -= i.lastSyncedChunk % blocksPerLogsCall
 	} else {
 		recentDBBlock, err := tokenRepo.MostRecentBlock(context.Background())
 		if err != nil {
 			panic(err)
 		}
-		i.lastSyncedBlock = recentDBBlock.Uint64()
-		i.lastSyncedBlock -= (i.lastSyncedBlock % blocksPerLogsCall) + (blocksPerLogsCall * defaultWorkerPoolSize)
+		i.lastSyncedChunk = recentDBBlock.Uint64()
+		i.lastSyncedChunk -= (i.lastSyncedChunk % blocksPerLogsCall) + (blocksPerLogsCall * defaultWorkerPoolSize)
 	}
 
 	if maxBlock != nil {
@@ -201,15 +201,15 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		i.mostRecentBlock = mostRecentBlock
 	}
 
-	if i.lastSyncedBlock > i.mostRecentBlock {
-		panic(fmt.Sprintf("last handled block=%d is greater than the height=%d!", i.lastSyncedBlock, i.mostRecentBlock))
+	if i.lastSyncedChunk > i.mostRecentBlock {
+		panic(fmt.Sprintf("last handled chunk=%d is greater than the height=%d!", i.lastSyncedChunk, i.mostRecentBlock))
 	}
 
 	if i.getLogsFunc == nil {
 		i.getLogsFunc = i.defaultGetLogs
 	}
 
-	logger.For(nil).Infof("starting indexer at block=%d until block=%d with rpc enabled: %t", i.lastSyncedBlock, i.mostRecentBlock, rpcEnabled)
+	logger.For(nil).Infof("starting indexer at block=%d until block=%d with rpc enabled: %t", i.lastSyncedChunk, i.mostRecentBlock, rpcEnabled)
 	return i
 }
 
@@ -226,7 +226,7 @@ func (i *indexer) Start(ctx context.Context) {
 	logger.For(ctx).Info("Catching up to latest block")
 	i.isListening = false
 	i.catchUp(ctx, topics)
-	i.lastSavedLog = i.lastSyncedBlock
+	i.lastSavedLog = i.lastSyncedChunk
 
 	if !rpcEnabled {
 		logger.For(ctx).Info("Running in cached logs only mode, not listening for new logs")
@@ -243,7 +243,7 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 	wp := workerpool.New(defaultWorkerPoolSize)
 	defer wp.StopWait()
 
-	from := i.lastSyncedBlock
+	from := i.lastSyncedChunk
 	for ; from < atomic.LoadUint64(&i.mostRecentBlock); from += blocksPerLogsCall {
 		input := from
 		toQueue := func() {
@@ -252,7 +252,7 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 			defer sentryutil.RecoverAndRaise(workerCtx)
 			logger.For(workerCtx).Infof("Indexing block range starting at %d", input)
 			i.startPipeline(workerCtx, persist.BlockNumber(input), topics)
-			i.updateLastSynced(input + blocksPerLogsCall)
+			i.updateLastSynced(input)
 			logger.For(workerCtx).Infof("Finished indexing block range starting at %d", input)
 		}
 		if wp.WaitingQueueSize() > defaultWorkerPoolWaitSize {
@@ -265,8 +265,8 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 
 func (i *indexer) updateLastSynced(block uint64) {
 	i.stateMu.Lock()
-	if i.lastSyncedBlock < block {
-		i.lastSyncedBlock = block
+	if i.lastSyncedChunk < block {
+		i.lastSyncedChunk = block
 	}
 	i.stateMu.Unlock()
 }
@@ -281,7 +281,7 @@ func (i *indexer) waitForBlocks(ctx context.Context, topics [][]common.Hash) {
 }
 
 func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, topics [][]common.Hash) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "startPipeline", sentry.TransactionName("indexer-main:startPipeline"))
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "catchup", sentry.TransactionName("indexer-main:catchup"))
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"block": start})
 	defer tracing.FinishSpan(span)
 
@@ -292,7 +292,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 	go func() {
 		ctx := sentryutil.NewSentryHubContext(ctx)
-		span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processLogs")
+		span, ctx := tracing.StartSpan(ctx, "indexer.logs", "processLogs")
 		defer tracing.FinishSpan(span)
 
 		logs := i.fetchLogs(ctx, start, topics)
@@ -304,7 +304,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 }
 
 func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.Hash) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "startNewBlocksPipeline", sentry.TransactionName("indexer-main:startNewBlocksPipeline"))
+	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "polling", sentry.TransactionName("indexer-main:polling"))
 	defer tracing.FinishSpan(span)
 
 	transfers := make(chan []transfersAtBlock)
@@ -337,9 +337,6 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 
 	logger.For(ctx).Infof("Getting logs from %d to %d", curBlock, nextBlock)
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
 	logsTo, err := i.getLogsFunc(ctx, curBlock, nextBlock, topics)
 	if err != nil {
 		panic(fmt.Sprintf("error getting logs: %s", err))
@@ -368,8 +365,12 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 			logsTo = []types.Log{}
 		}
 	}
+
+	rpcCtx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+
 	if len(logsTo) == 0 && rpcEnabled {
-		logsTo, err = rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
+		logsTo, err = rpc.RetryGetLogs(rpcCtx, i.ethClient, ethereum.FilterQuery{
 			FromBlock: curBlock,
 			ToBlock:   nextBlock,
 			Topics:    topics,
@@ -386,7 +387,7 @@ func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.I
 			logEntry.Error("failed to fetch logs")
 			return []types.Log{}, nil
 		}
-		saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
+		go saveLogsInBlockRange(ctx, curBlock.String(), nextBlock.String(), logsTo, i.storageClient)
 	}
 	logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
 	return logsTo, nil
@@ -511,7 +512,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 }
 
 func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, topics [][]common.Hash) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "pollNewLogs")
+	span, ctx := tracing.StartSpan(ctx, "indexer.logs", "pollLogs")
 	defer tracing.FinishSpan(span)
 	defer close(transfersChan)
 	defer recoverAndWait(ctx)
@@ -522,10 +523,10 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 		panic(err)
 	}
 
-	logger.For(ctx).Infof("Subscribing to new logs from block %d starting with block %d", mostRecentBlock, i.lastSyncedBlock)
+	logger.For(ctx).Infof("Subscribing to new logs from block %d starting with block %d", mostRecentBlock, i.lastSyncedChunk)
 
 	wp := workerpool.New(10)
-	for j := i.lastSyncedBlock; j <= mostRecentBlock; j += blocksPerLogsCall {
+	for j := i.lastSyncedChunk; j <= mostRecentBlock; j += blocksPerLogsCall {
 		curBlock := j
 		wp.Submit(
 			func() {
@@ -533,10 +534,10 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 				defer sentryutil.RecoverAndRaise(ctx)
 
 				nextBlock := curBlock + blocksPerLogsCall
-				ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+				rpcCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 				defer cancel()
 
-				logsTo, err := rpc.RetryGetLogs(ctx, i.ethClient, ethereum.FilterQuery{
+				logsTo, err := rpc.RetryGetLogs(rpcCtx, i.ethClient, ethereum.FilterQuery{
 					FromBlock: persist.BlockNumber(curBlock).BigInt(),
 					ToBlock:   persist.BlockNumber(nextBlock).BigInt(),
 					Topics:    topics,
@@ -563,7 +564,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 						}
 					}
 					i.polledLogs = append(i.polledLogs, logsTo[:indexToCut]...)
-					saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
+					go saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
 					i.lastSavedLog = blockLimit
 					i.polledLogs = logsTo[indexToCut:]
 				} else {
@@ -594,15 +595,15 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 			})
 	}
 	wp.StopWait()
-	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedBlock, mostRecentBlock)
+	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedChunk, mostRecentBlock)
 
-	i.lastSyncedBlock = mostRecentBlock
+	i.lastSyncedChunk = mostRecentBlock
 }
 
 // TRANSFERS FUNCS -------------------------------------------------------------
 
 func (i *indexer) processAllTransfers(ctx context.Context, incomingTransfers <-chan []transfersAtBlock, plugins []chan<- PluginMsg) {
-	span, ctx := tracing.StartSpan(ctx, "indexer.pipeline", "processTransfers")
+	span, ctx := tracing.StartSpan(ctx, "indexer.transfers", "processTransfers")
 	defer tracing.FinishSpan(span)
 	defer sentryutil.RecoverAndRaise(ctx)
 	for _, plugin := range plugins {

@@ -10,6 +10,7 @@ import (
 	"google.golang.org/appengine"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -19,7 +20,23 @@ var (
 	enableRPC      bool
 	quietLogs      bool
 	serviceKeyFile string
+	manualEnv      string
 )
+
+func init() {
+	cobra.OnInitialize(indexer.SetDefaults)
+
+	rootCmd.PersistentFlags().BoolVarP(&enableRPC, "enable-rpc", "r", false, "always enable RPC calls")
+	rootCmd.PersistentFlags().BoolVarP(&quietLogs, "quiet", "q", false, "hide debug logs")
+	rootCmd.Flags().Uint64VarP(&port, "port", "p", 4000, "port to serve on")
+	rootCmd.Flags().Uint64VarP(&fromBlock, "from-block", "f", 0, "first block to process")
+	rootCmd.Flags().Uint64VarP(&toBlock, "to-block", "t", 0, "last block to process")
+	rootCmd.MarkFlagsRequiredTogether("from-block", "to-block")
+	rootCmd.PersistentFlags().StringVarP(&manualEnv, "env", "e", "local", "env to run with")
+
+	rootCmd.AddCommand(serverCmd)
+	serverCmd.Flags().Uint64VarP(&port, "port", "p", 6000, "port to serve on")
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "indexer",
@@ -27,11 +44,20 @@ var rootCmd = &cobra.Command{
 	Long: `An NFT indexer lovingly built by your friends at Gallery.
                 Source code is available at https://github.com/gallery-so/go-gallery.`,
 	Args: func(cmd *cobra.Command, args []string) error {
+		switch manualEnv {
+		case "local", "dev":
+			serviceKeyFile = "./_deploy/service-key-dev.json"
+		case "prod":
+			serviceKeyFile = "./_deploy/service-key.json"
+		}
+		indexer.LoadConfigFile("indexer", manualEnv)
+		indexer.ValidateEnv()
+
 		if toBlock < fromBlock {
 			return fmt.Errorf("[from-block] must be less than [to-block]")
 		}
 
-		if !cmd.Flags().Lookup("to-block").Changed && !enableRPC {
+		if !cmd.Flags().Lookup("to-block").Changed && (!enableRPC && viper.GetString("ENV") != "production") {
 			return fmt.Errorf("`flags in group [from-block, to-block] must all be set when [enable-rpc] is not set")
 		}
 
@@ -62,6 +88,18 @@ var rootCmd = &cobra.Command{
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Run the indexer server",
+	Args: func(cmd *cobra.Command, args []string) error {
+		switch manualEnv {
+		case "local", "dev":
+			serviceKeyFile = "./_deploy/service-key-dev.json"
+		case "prod":
+			serviceKeyFile = "./_deploy/service-key.json"
+		}
+		indexer.LoadConfigFile("indexer-server", manualEnv)
+		indexer.ValidateEnv()
+
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		defer sentryutil.RecoverAndRaise(nil)
 
@@ -74,19 +112,6 @@ var serverCmd = &cobra.Command{
 			http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 		}
 	},
-}
-
-func init() {
-	rootCmd.PersistentFlags().BoolVarP(&enableRPC, "enable-rpc", "r", false, "always enable RPC calls")
-	rootCmd.PersistentFlags().BoolVarP(&quietLogs, "quiet", "q", false, "hide debug logs")
-	rootCmd.Flags().Uint64VarP(&port, "port", "p", 4000, "port to serve on")
-	rootCmd.Flags().Uint64VarP(&fromBlock, "from-block", "f", 0, "first block to process")
-	rootCmd.Flags().Uint64VarP(&toBlock, "to-block", "t", 0, "last block to process")
-	rootCmd.MarkFlagsRequiredTogether("from-block", "to-block")
-
-	rootCmd.AddCommand(serverCmd)
-	serverCmd.Flags().Uint64VarP(&port, "port", "p", 6000, "port to serve on")
-	serverCmd.Flags().StringVarP(&serviceKeyFile, "key-file", "f", "./_deploy/service-key-dev.json", "local service key file to use")
 }
 
 func Execute() {

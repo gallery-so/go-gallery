@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/everFinance/goar"
@@ -181,7 +182,11 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("backend")
+		fi := "local"
+		if len(os.Args) > 0 {
+			fi = os.Args[0]
+		}
+		envFile := util.ResolveEnvFile("backend", fi)
 		util.LoadEnvFile(envFile)
 	}
 

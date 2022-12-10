@@ -39,7 +39,6 @@ func InitServer(keyFile string, quietLogs, enableRPC bool) {
 }
 
 func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engine, *indexer) {
-	setDefaults("indexer")
 	initSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
@@ -81,7 +80,6 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 
 func coreInitServer(localKeyPath string, quietLogs, enableRPC bool) *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
-	setDefaults("indexer-server")
 	initSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
@@ -126,7 +124,7 @@ func coreInitServer(localKeyPath string, quietLogs, enableRPC bool) *gin.Engine 
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 
-func setDefaults(service string) {
+func SetDefaults() {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -146,16 +144,18 @@ func setDefaults(service string) {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
-
 	viper.AutomaticEnv()
+}
 
+func LoadConfigFile(service string, manualEnv string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
-	} else {
-		envFile := util.ResolveEnvFile(service)
-		util.LoadEnvFile(envFile)
+		return
 	}
+	util.LoadEnvFile(util.ResolveEnvFile(service, manualEnv))
+}
 
+func ValidateEnv() {
 	util.VarNotSetTo("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
@@ -180,9 +180,14 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              viper.GetString("SENTRY_DSN"),
-		Environment:      viper.GetString("ENV"),
-		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Dsn:         viper.GetString("SENTRY_DSN"),
+		Environment: viper.GetString("ENV"),
+		TracesSampler: sentry.TracesSamplerFunc(func(ctx sentry.SamplingContext) sentry.Sampled {
+			if ctx.Span.Op == rpc.GethSocketOpName {
+				return sentry.UniformTracesSampler(0.01).Sample(ctx)
+			}
+			return sentry.UniformTracesSampler(viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
+		}),
 		Release:          viper.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
