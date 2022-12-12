@@ -135,7 +135,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	}
 
 	// Sanitize
-	name = validate.SanitizationPolicy.Sanitize(name)
+	name = validate.SanitizationPolicy.Sanitize(strings.TrimSpace(name))
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
 	userID, err := getAuthenticatedUser(ctx)
