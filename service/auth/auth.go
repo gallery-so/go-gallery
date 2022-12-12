@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"math/rand"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 
@@ -359,32 +359,6 @@ func SetAuthStateForCtx(c *gin.Context, userID persist.DBID, err error) {
 	c.Set(userIDContextKey, userID)
 	c.Set(authErrorContextKey, err)
 	c.Set(userAuthedContextKey, userID != "" && err == nil)
-}
-
-// GetAllowlistContracts returns the list of addresses we allowlist against
-func GetAllowlistContracts() map[persist.EthereumAddress][]persist.TokenID {
-	addrs := viper.GetString("CONTRACT_ADDRESSES")
-	spl := strings.Split(addrs, "|")
-	logger.For(nil).Info("contract addresses:", spl)
-	res := make(map[persist.EthereumAddress][]persist.TokenID)
-	for _, addr := range spl {
-		nextSpl := strings.Split(addr, "=")
-		if len(nextSpl) != 2 {
-			panic("invalid contract address")
-		}
-		addr := nextSpl[0]
-		tokens := nextSpl[1]
-		tokens = strings.TrimLeft(tokens, "[")
-		tokens = strings.TrimRight(tokens, "]")
-		logger.For(nil).Info("token_ids:", tokens)
-		tokenIDs := strings.Split(tokens, ",")
-		logger.For(nil).Infof("tids %v and length %d", tokenIDs, len(tokenIDs))
-		res[persist.EthereumAddress(addr)] = make([]persist.TokenID, len(tokenIDs))
-		for i, tokenID := range tokenIDs {
-			res[persist.EthereumAddress(addr)][i] = persist.TokenID(tokenID)
-		}
-	}
-	return res
 }
 
 // SetJWTCookie sets the cookie for auth on the response

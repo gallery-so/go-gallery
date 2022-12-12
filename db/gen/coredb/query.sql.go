@@ -2097,10 +2097,30 @@ func (q *Queries) GetUserOwnsTokenByIdentifiers(ctx context.Context, arg GetUser
 
 const getUserRolesByUserId = `-- name: GetUserRolesByUserId :many
 select role from user_roles where user_id = $1 and deleted = false
+union
+select role from (
+  select
+    case when exists(select 1 from tokens where owner_user_id = $1 and token_id = any($2::varchar[]) and contract = (select id from contracts where address = $3 and contracts.chain = $4 and contracts.deleted = false) and deleted = false)
+      then $5 else null end as role
+) r where role is not null
 `
 
-func (q *Queries) GetUserRolesByUserId(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	rows, err := q.db.Query(ctx, getUserRolesByUserId, userID)
+type GetUserRolesByUserIdParams struct {
+	UserID                persist.DBID
+	MembershipTokenIds    []string
+	MembershipAddress     persist.Address
+	Chain                 persist.Chain
+	GrantedMembershipRole string
+}
+
+func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUserIdParams) ([]persist.Role, error) {
+	rows, err := q.db.Query(ctx, getUserRolesByUserId,
+		arg.UserID,
+		arg.MembershipTokenIds,
+		arg.MembershipAddress,
+		arg.Chain,
+		arg.GrantedMembershipRole,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -5658,6 +5658,7 @@ type UsersConnection {
 enum Role {
     ADMIN
     BETA_TESTER
+    EARLY_ACCESS
 }
 
 enum MerchType {

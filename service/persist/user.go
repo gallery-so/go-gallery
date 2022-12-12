@@ -43,10 +43,10 @@ type UserUpdateNotificationSettings struct {
 }
 
 /*
- 	someoneFollowedYou: Boolean
-    someoneAdmiredYourUpdate: Boolean
-    someoneCommentedOnYourUpdate: Boolean
-    someoneViewedYourGallery: Boolean
+someoneFollowedYou: Boolean
+someoneAdmiredYourUpdate: Boolean
+someoneCommentedOnYourUpdate: Boolean
+someoneViewedYourGallery: Boolean
 */
 type UserNotificationSettings struct {
 	SomeoneFollowedYou           *bool `json:"someone_followed_you,omitempty"`
@@ -199,8 +199,9 @@ func (e ErrWalletCreateFailed) Error() string {
 type Role string
 
 const (
-	RoleAdmin      Role = "ADMIN"
-	RoleBetaTester      = "BETA_TESTER"
+	RoleAdmin       Role = "ADMIN"
+	RoleBetaTester       = "BETA_TESTER"
+	RoleEarlyAccess      = "EARLY_ACCESS"
 )
 
 // Scan implements the database/sql Scanner interface for the DBID type
@@ -233,6 +234,8 @@ func (r *Role) UnmarshalGQL(v interface{}) error {
 		*r = RoleAdmin
 	case "beta_tester":
 		*r = RoleBetaTester
+	case "early_access":
+		*r = RoleEarlyAccess
 	}
 	return nil
 }
@@ -244,6 +247,8 @@ func (r Role) MarshalGQL(w io.Writer) {
 		w.Write([]byte(`"ADMIN"`))
 	case RoleBetaTester:
 		w.Write([]byte(`"BETA_TESTER"`))
+	case RoleEarlyAccess:
+		w.Write([]byte(`"EARLY_ACCESS"`))
 	}
 }
 
