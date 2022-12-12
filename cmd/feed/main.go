@@ -15,6 +15,6 @@ func main() {
 	if appengine.IsAppEngine() {
 		appengine.Main()
 	} else {
-		http.ListenAndServe(":4124", nil)
+		http.ListenAndServe(":4100", nil)
 	}
 }
