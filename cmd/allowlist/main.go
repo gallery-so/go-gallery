@@ -7,7 +7,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/spf13/viper"
@@ -43,14 +45,30 @@ func main() {
 
 	wallets := make([]persist.Address, 0, len(a))
 
+	wp := workerpool.New(100)
+	addrChan := make(chan persist.Address)
+
 	for _, userID := range a {
-		var walletAddress persist.Address
-		err = pg.QueryRow(ctx, "SELECT w.ADDRESS FROM users u, wallets w WHERE u.ID = $1 AND w.CHAIN = 0 AND w.ID = any(u.WALLETS) ORDER BY u.WALLETS LIMIT 1", userID).Scan(&walletAddress)
-		if err != nil && err != pgx.ErrNoRows {
-			panic(err)
-		}
-		if walletAddress != "" {
-			wallets = append(wallets, walletAddress)
+		user := userID
+		wp.Submit(func() {
+			var walletAddress persist.Address
+			err = pg.QueryRow(ctx, "SELECT w.ADDRESS FROM users u, wallets w WHERE u.ID = $1 AND w.CHAIN = 0 AND w.ID = any(u.WALLETS) ORDER BY array_position(u.WALLETS, w.ID) LIMIT 1", user).Scan(&walletAddress)
+			if err != nil && err != pgx.ErrNoRows {
+				panic(err)
+			}
+			addrChan <- walletAddress
+		})
+	}
+
+	go func() {
+		wp.StopWait()
+		close(addrChan)
+	}()
+
+	for address := range addrChan {
+		if address != "" {
+			wallets = append(wallets, address)
+			logger.For(ctx).Infof("Found wallet address %s", address)
 		}
 	}
 

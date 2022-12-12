@@ -160,6 +160,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		if err != nil {
 			return nil, fmt.Errorf("failed to get owner of token %v: %w", tokenID, err)
 		}
+		logger.For(ctx).Infof("owner of token %v is %v", tokenID, owner.String())
 
 		owns := strings.EqualFold(owner.String(), address.String())
 		if !owns {
@@ -235,6 +236,8 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		if err != nil {
 			return nil, fmt.Errorf("failed to get token URI for token %v: %w", tokenID, err)
 		}
+
+		logger.For(ctx).Debugf("token %v has URI %v", tokenID, uri)
 
 		objectType, ok := uriToMerchType[uri]
 		if ok {
