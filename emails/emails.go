@@ -107,7 +107,7 @@ func setDefaults() {
 	} else {
 		fi := "local"
 		if len(os.Args) > 0 {
-			fi = os.Args[0]
+			fi = os.Args[1]
 		}
 		envFile := util.ResolveEnvFile("emails", fi)
 		util.LoadEnvFile(envFile)

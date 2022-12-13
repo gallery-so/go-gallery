@@ -6391,7 +6391,7 @@ type MerchDiscountCode {
 }
 
 type RedeemMerchPayload {
-    tokens: [MerchToken!]
+    tokens: [MerchToken]
 }
 
 union RedeemMerchPayloadOrError =
@@ -19527,7 +19527,7 @@ func (ec *executionContext) _RedeemMerchPayload_tokens(ctx context.Context, fiel
 	}
 	res := resTmp.([]*model.MerchToken)
 	fc.Result = res
-	return ec.marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokenᚄ(ctx, field.Selections, res)
+	return ec.marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _RefreshCollectionPayload_collection(ctx context.Context, field graphql.CollectedField, obj *model.RefreshCollectionPayload) (ret graphql.Marshaler) {
@@ -39013,6 +39013,47 @@ func (ec *executionContext) marshalOMembershipTier2ᚖgithubᚗcomᚋmikeydubᚋ
 	return ec._MembershipTier(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx context.Context, sel ast.SelectionSet, v []*model.MerchToken) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOMerchToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
 func (ec *executionContext) marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokenᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MerchToken) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -39058,6 +39099,13 @@ func (ec *executionContext) marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋg
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalOMerchToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchToken(ctx context.Context, sel ast.SelectionSet, v *model.MerchToken) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MerchToken(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMerchTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokensPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.MerchTokensPayloadOrError) graphql.Marshaler {
