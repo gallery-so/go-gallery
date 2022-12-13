@@ -1047,7 +1047,7 @@ type RedeemMerchInput struct {
 }
 
 type RedeemMerchPayload struct {
-	DiscountCodes []*MerchDiscountCode `json:"discountCodes"`
+	Tokens []*MerchToken `json:"tokens"`
 }
 
 func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}

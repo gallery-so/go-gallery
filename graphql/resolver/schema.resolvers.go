@@ -972,14 +972,16 @@ func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMe
 	for i, id := range input.TokenIds {
 		tokenIDList[i] = persist.TokenID(id)
 	}
-	codes, err := publicapi.For(ctx).Merch.RedeemMerchItems(ctx, tokenIDList, persist.NewChainPubKey(persist.PubKey(input.Address.String()), input.Address.Chain()), input.Signature, input.WalletType)
-
+	if input.Address == nil {
+		return nil, fmt.Errorf("address is required")
+	}
+	tokens, err := publicapi.For(ctx).Merch.RedeemMerchItems(ctx, tokenIDList, *input.Address, input.Signature, input.WalletType)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.RedeemMerchPayload{
-		DiscountCodes: codes,
+		Tokens: tokens,
 	}
 	return output, nil
 }
