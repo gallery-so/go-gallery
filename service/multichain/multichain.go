@@ -1235,6 +1235,15 @@ func (f FallbackProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Contex
 	return token, contract, nil
 }
 
+func (f FallbackProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contractAddress persist.Address, limit int, offset int) ([]ChainAgnosticToken, ChainAgnosticContract, error) {
+	tokens, contract, err := f.Primary.GetTokensByContractAddressAndOwner(ctx, owner, contractAddress, limit, offset)
+	if err != nil {
+		return nil, ChainAgnosticContract{}, err
+	}
+	tokens = f.resolveTokens(ctx, tokens)
+	return tokens, contract, err
+}
+
 func (f FallbackProvider) resolveTokens(ctx context.Context, tokens []ChainAgnosticToken) []ChainAgnosticToken {
 	usableTokens := make([]ChainAgnosticToken, len(tokens))
 	var wg sync.WaitGroup

@@ -1008,6 +1008,53 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 
 func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
 	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
+  message := "Persisted queries uploaded successfully"
+
+	return model.UploadPersistedQueriesPayload{Message: &message}, nil
+}
+func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	user, err := api.User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if chains == nil || len(chains) == 0 {
+		chains = []persist.Chain{persist.ChainETH}
+	}
+
+	err = api.Token.SyncTokens(ctx, chains, &user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.SyncTokensForUsernamePayload{
+		Message: "Successfully synced tokens",
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = publicapi.For(ctx).Feed.BlockUser(ctx, user.ID, persist.Action(action))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return model.BanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
+}
+
+func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
+	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
 
 	if err != nil {
 		return nil, err
