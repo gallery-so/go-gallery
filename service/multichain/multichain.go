@@ -32,7 +32,7 @@ type Provider struct {
 	Repos   *postgres.Repositories
 	Queries *coredb.Queries
 	Cache   *redis.Cache
-	Chains  map[persist.Chain][]configurer
+	Chains  map[persist.Chain][]interface{}
 	// some chains use the addresses of other chains, this will map of chain we want tokens from => chain that's address will be used for lookup
 	ChainAddressOverrides ChainOverrideMap
 	TasksClient           *cloudtasks.Client
@@ -181,24 +181,95 @@ type deepRefresher interface {
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
 // NewProvider creates a new MultiChainDataRetriever
-func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, chains ...configurer) *Provider {
-	c := map[persist.Chain][]configurer{}
-	for _, chain := range chains {
-		info, err := chain.GetBlockchainInfo(ctx)
+func NewProvider(ctx context.Context, repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, taskClient *cloudtasks.Client, chainOverrides ChainOverrideMap, providers ...interface{}) *Provider {
+	return &Provider{
+		Repos:                 repos,
+		Cache:                 cache,
+		TasksClient:           taskClient,
+		Queries:               queries,
+		Chains:                validateProviders(ctx, providers),
+		ChainAddressOverrides: chainOverrides,
+	}
+}
+
+var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
+	persist.ChainETH: {
+		nameResolver:          true,
+		verifier:              true,
+		tokensFetcher:         true,
+		tokenRefresher:        true,
+		tokenFetcherRefresher: true,
+		contractRefresher:     true,
+	},
+	persist.ChainTezos: {
+		nameResolver:          false,
+		verifier:              false,
+		tokensFetcher:         true,
+		tokenRefresher:        true,
+		tokenFetcherRefresher: true,
+		contractRefresher:     false,
+	},
+	persist.ChainPOAP: {
+		nameResolver:          true,
+		verifier:              false,
+		tokensFetcher:         true,
+		tokenRefresher:        false,
+		tokenFetcherRefresher: false,
+		contractRefresher:     false,
+	},
+}
+
+type validation struct {
+	nameResolver          bool
+	verifier              bool
+	tokensFetcher         bool
+	tokenRefresher        bool
+	tokenFetcherRefresher bool
+	contractRefresher     bool
+}
+
+func validateProviders(ctx context.Context, providers []interface{}) map[persist.Chain][]interface{} {
+	chains := map[persist.Chain][]interface{}{}
+
+	for _, p := range providers {
+		cfg := p.(configurer)
+		info, err := cfg.GetBlockchainInfo(ctx)
 		if err != nil {
 			panic(err)
 		}
-		c[info.Chain] = append(c[info.Chain], chain)
+		chains[info.Chain] = append(chains[info.Chain], cfg)
 	}
-	return &Provider{
-		Repos:       repos,
-		Cache:       cache,
-		TasksClient: taskClient,
-		Queries:     queries,
 
-		Chains:                c,
-		ChainAddressOverrides: chainOverrides,
+	for chain, providers := range chains {
+		hasImplementor := validation{}
+		for _, p := range providers {
+			if _, ok := p.(nameResolver); ok {
+				hasImplementor.nameResolver = true
+			}
+			if _, ok := p.(verifier); ok {
+				hasImplementor.verifier = true
+			}
+			if _, ok := p.(tokensFetcher); ok {
+				hasImplementor.tokensFetcher = true
+			}
+			if _, ok := p.(tokenRefresher); ok {
+				hasImplementor.tokenRefresher = true
+			}
+			if _, ok := p.(tokenFetcherRefresher); ok {
+				hasImplementor.tokenFetcherRefresher = true
+			}
+			if _, ok := p.(contractRefresher); ok {
+				hasImplementor.contractRefresher = true
+			}
+		}
+		if requires, ok := chainValidation[chain]; !ok {
+			logger.For(ctx).Warnf("chain=%d has no provider validation", chain)
+		} else if hasImplementor != requires {
+			panic(fmt.Sprintf("chain=%d is got=%+v;want=%+v", chain, hasImplementor, requires))
+		}
 	}
+
+	return chains
 }
 
 // SyncTokens updates the media for all tokens for a user
@@ -661,7 +732,7 @@ outer:
 	return nil
 }
 
-func (d *Provider) getProvidersForChain(chain persist.Chain) ([]configurer, error) {
+func (d *Provider) getProvidersForChain(chain persist.Chain) ([]interface{}, error) {
 	providers, ok := d.Chains[chain]
 	if !ok {
 		return nil, ErrChainNotFound{Chain: chain}
