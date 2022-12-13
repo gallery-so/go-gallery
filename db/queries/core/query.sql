@@ -613,7 +613,13 @@ on conflict (user_id, role) do update set deleted = false, last_updated = now();
 update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any(@roles);
 
 -- name: GetUserRolesByUserId :many
-select role from user_roles where user_id = $1 and deleted = false;
+select role from user_roles where user_id = $1 and deleted = false
+union
+select role from (
+  select
+    case when exists(select 1 from tokens where owner_user_id = $1 and token_id = any(@membership_token_ids::varchar[]) and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false) and deleted = false)
+      then @granted_membership_role else null end as role
+) r where role is not null;
 
 -- name: RedeemMerch :one
 update merch set redeemed = true, token_id = @token_hex, last_updated = now() where id = (select m.id from merch m where m.object_type = @object_type and m.token_id is null and m.redeemed = false and m.deleted = false order by m.id limit 1) and token_id is null and redeemed = false returning discount_code;
