@@ -31,6 +31,21 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
+const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
+INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
+`
+
+type BlockUserFromFeedParams struct {
+	ID     persist.DBID
+	UserID persist.DBID
+	Action persist.Action
+}
+
+func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedParams) error {
+	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Action)
+	return err
+}
+
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
 UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
 `

@@ -400,6 +400,9 @@ select * from feed_events where deleted = false
 -- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
 
+-- name: BlockUserFromFeed :exec
+INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3);
+
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 

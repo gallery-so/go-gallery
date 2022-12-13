@@ -21,6 +21,26 @@ type FeedAPI struct {
 	ethClient *ethclient.Client
 }
 
+func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
+	// Validate
+	err := validateFields(api.validator, validationMap{
+		"userId": {userId, "required"},
+		"action": {action, "required"},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.BlockUserFromFeed(ctx, db.BlockUserFromFeedParams{
+		ID:     persist.GenerateID(),
+		UserID: userId,
+		Action: action,
+	})
+
+	return err
+}
+
 func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
