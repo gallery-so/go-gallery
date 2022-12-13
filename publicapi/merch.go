@@ -136,7 +136,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 	return merchTokens, nil
 }
 
-func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainPubKey, sig string, walletType persist.WalletType) ([]*model.MerchDiscountCode, error) {
+func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchDiscountCode, error) {
 
 	if err := validateFields(api.validator, validationMap{
 		"tokenIDs": {tokenIDs, "required,unique"},
@@ -162,7 +162,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		}
 		logger.For(ctx).Infof("owner of token %v is %v", tokenID, owner.String())
 
-		owns := strings.EqualFold(owner.String(), address.String())
+		owns := strings.EqualFold(owner.String(), address.Address().String())
 		if !owns {
 			return nil, fmt.Errorf("user does not own token %v", tokenID)
 		}
@@ -171,7 +171,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 	// verify signature
 
 	// user should have signed the tokenIDs in place of the usual nonce
-	valid, err := api.multichainProvider.VerifySignature(ctx, sig, fmt.Sprintf("%v", tokenIDs), address, walletType)
+	valid, err := api.multichainProvider.VerifySignature(ctx, sig, fmt.Sprintf("%v", tokenIDs), persist.NewChainPubKey(persist.PubKey(address.Address()), address.Chain()), walletType)
 	if err != nil {
 		return nil, err
 	}
