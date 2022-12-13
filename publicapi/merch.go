@@ -82,12 +82,12 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 		t := &model.MerchToken{
 			TokenID: token.TokenID.String(),
 		}
-		code, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
+		discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.TokenID, err)
 		}
-		if code.Valid && code.String != "" {
-			t.DiscountCode = &code.String
+		if discountCode.Valid && discountCode.String != "" {
+			t.DiscountCode = &discountCode.String
 			t.Redeemed = true
 		}
 
@@ -136,7 +136,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 	return merchTokens, nil
 }
 
-func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchDiscountCode, error) {
+func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchToken, error) {
 
 	if err := validateFields(api.validator, validationMap{
 		"tokenIDs": {tokenIDs, "required,unique"},
@@ -229,7 +229,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	// redeem and return codes in DB
 
-	result := make([]*model.MerchDiscountCode, 0, len(tokenIDs))
+	result := make([]*model.MerchToken, 0, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
 
 		uri, err := mer.TokenURI(&bind.CallOpts{Context: ctx}, tokenID.BigInt())
@@ -259,10 +259,31 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 				}
 			}
 
-			if discountCode.Valid {
-				tid := tokenID.String()
-				result = append(result, &model.MerchDiscountCode{Code: discountCode.String, TokenID: &tid})
+			var modelObjectType model.MerchType
+
+			switch objectType {
+			case merchTypeCard:
+				modelObjectType = model.MerchTypeCard
+			case merchTypeHat:
+				modelObjectType = model.MerchTypeHat
+			case merchTypeTShirt:
+				modelObjectType = model.MerchTypeTShirt
+			default:
+				return nil, fmt.Errorf("unknown merch type %v", objectType)
 			}
+
+			t := &model.MerchToken{
+				TokenID:    tokenID.String(),
+				ObjectType: modelObjectType,
+				Redeemed:   true,
+			}
+
+			if discountCode.Valid {
+				t.DiscountCode = &discountCode.String
+			} else {
+				return nil, fmt.Errorf("discount code for token %v is null", tokenID)
+			}
+			result = append(result, t)
 		} else {
 			logger.For(ctx).Errorf("unknown merch type for %v", uri)
 		}

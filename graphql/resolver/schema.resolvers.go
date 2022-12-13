@@ -967,16 +967,23 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEm
 	return verifyEmail(ctx, input.Token)
 }
 
-func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
-	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
-
+func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
+	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
+	for i, id := range input.TokenIds {
+		tokenIDList[i] = persist.TokenID(id)
+	}
+	if input.Address == nil {
+		return nil, fmt.Errorf("address is required")
+	}
+	tokens, err := publicapi.For(ctx).Merch.RedeemMerchItems(ctx, tokenIDList, *input.Address, input.Signature, input.WalletType)
 	if err != nil {
 		return nil, err
 	}
 
-	message := "Persisted queries uploaded successfully"
-
-	return model.UploadPersistedQueriesPayload{Message: &message}, nil
+	output := &model.RedeemMerchPayload{
+		Tokens: tokens,
+	}
+	return output, nil
 }
 
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
@@ -998,24 +1005,17 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 
 	return userToModel(ctx, *user), nil
 }
-func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
-	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
-	for i, id := range input.TokenIds {
-		tokenIDList[i] = persist.TokenID(id)
-	}
-	if input.Address == nil {
-		return nil, fmt.Errorf("address is required")
-	}
-	codes, err := publicapi.For(ctx).Merch.RedeemMerchItems(ctx, tokenIDList, *input.Address, input.Signature, input.WalletType)
+
+func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
+	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
 
 	if err != nil {
 		return nil, err
 	}
 
-	output := &model.RedeemMerchPayload{
-		DiscountCodes: codes,
-	}
-	return output, nil
+	message := "Persisted queries uploaded successfully"
+
+	return model.UploadPersistedQueriesPayload{Message: &message}, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
