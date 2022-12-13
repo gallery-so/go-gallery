@@ -78,7 +78,7 @@ func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, r
 }
 
 func (api *AdminAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	address, tokenIDs := parseAddressTokens(viper.GetString("CONTRACT_ADDRESSES"))
+	address, tokenIDs := parseAddressTokens(viper.GetString("PREMIUM_CONTRACT_ADDRESS"))
 	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
 		UserID:                userID,
 		MembershipAddress:     persist.Address(address),
