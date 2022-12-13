@@ -1006,12 +1006,6 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 	return userToModel(ctx, *user), nil
 }
 
-func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
-	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
-  message := "Persisted queries uploaded successfully"
-
-	return model.UploadPersistedQueriesPayload{Message: &message}, nil
-}
 func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error) {
 	api := publicapi.For(ctx)
 
