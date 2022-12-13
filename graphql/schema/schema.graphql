@@ -765,7 +765,8 @@ enum MerchType {
   Card
 }
 
-type MerchToken {
+type MerchToken @goGqlId(fields: ["tokenId"]) {
+  id: ID! 
   tokenId: String!
   objectType: MerchType!
   discountCode: String

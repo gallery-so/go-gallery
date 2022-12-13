@@ -957,6 +957,7 @@ type MerchDiscountCode struct {
 }
 
 type MerchToken struct {
+	ID           GqlID     `json:"id"`
 	TokenID      string    `json:"tokenId"`
 	ObjectType   MerchType `json:"objectType"`
 	DiscountCode *string   `json:"discountCode"`
