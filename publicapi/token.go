@@ -289,16 +289,27 @@ func isAdminUser(userID persist.DBID) bool {
 	}
 }
 
-func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain, asUserID *persist.DBID) error {
-	// No validation to do
-	authedUserID, err := getAuthenticatedUser(ctx)
-	if err != nil {
-		return err
+func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain, userID persist.DBID) error {
+	if err := api.throttler.Lock(ctx, userID.String()); err != nil {
+		return ErrTokenRefreshFailed{Message: err.Error()}
 	}
 
-	userID := authedUserID
-	if asUserID != nil && isAdminUser(authedUserID) {
-		userID = *asUserID
+	defer api.throttler.Unlock(ctx, userID.String())
+
+	if err := api.multichainProvider.SyncTokens(ctx, userID, chains); err != nil {
+		// Wrap all OpenSea sync failures in a generic type that can be returned to the frontend as an expected error type
+		return ErrTokenRefreshFailed{Message: err.Error()}
+	}
+
+	return nil
+}
+
+
+func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) error {
+	userID, err := getAuthenticatedUser(ctx)
+
+	if err != nil {
+		return err
 	}
 
 	if err := api.throttler.Lock(ctx, userID.String()); err != nil {

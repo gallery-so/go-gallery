@@ -615,23 +615,6 @@ func (r *mutationResolver) SetSpamPreference(ctx context.Context, input model.Se
 	return model.SetSpamPreferencePayload{Tokens: tokens}, nil
 }
 
-func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain, userID *persist.DBID) (model.SyncTokensPayloadOrError, error) {
-	api := publicapi.For(ctx)
-
-	if chains == nil || len(chains) == 0 {
-		chains = []persist.Chain{persist.ChainETH}
-	}
-	err := api.Token.SyncTokens(ctx, chains, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	output := &model.SyncTokensPayload{
-		Viewer: resolveViewer(ctx),
-	}
-
-	return output, nil
-}
 
 func (r *mutationResolver) RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error) {
 	api := publicapi.For(ctx)
@@ -1006,6 +989,24 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 	return userToModel(ctx, *user), nil
 }
 
+func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain, userID *persist.DBID) (model.SyncTokensPayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	if chains == nil || len(chains) == 0 {
+		chains = []persist.Chain{persist.ChainETH}
+	}
+	err := api.Token.SyncTokens(ctx, chains)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.SyncTokensPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error) {
 	api := publicapi.For(ctx)
 
@@ -1019,7 +1020,7 @@ func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username s
 		chains = []persist.Chain{persist.ChainETH}
 	}
 
-	err = api.Token.SyncTokens(ctx, chains, &user.ID)
+	err = api.Token.SyncTokensAdmin(ctx, chains, user.ID)
 	if err != nil {
 		return nil, err
 	}
