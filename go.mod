@@ -22,7 +22,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/ethereum/go-ethereum v1.10.16
 	github.com/everFinance/goar v1.4.0
-	github.com/gallery-so/dataloaden v0.0.0-20221004141822-8e925e89cb9f
+	github.com/gallery-so/dataloaden v0.0.0-20221214221404-9d30d4c39aa7
 	github.com/gammazero/deque v0.1.1 // indirect
 	github.com/gammazero/workerpool v1.1.2
 	github.com/getsentry/sentry-go v0.15.0
@@ -69,6 +69,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
 	golang.org/x/sync v0.1.0
+	golang.org/x/tools v0.4.0 // indirect
 	google.golang.org/api v0.103.0
 	google.golang.org/appengine v1.6.7
 	google.golang.org/genproto v0.0.0-20221202195650-67e5cbc046fd
