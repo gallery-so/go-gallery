@@ -367,6 +367,7 @@ type Gallery implements Node {
     dbid: DBID!
     name: String
 	description: String
+    position: String
 	hidden: Boolean
 	tokenPreviews: [String] @goField(forceResolver: true)
     owner: GalleryUser @goField(forceResolver: true)

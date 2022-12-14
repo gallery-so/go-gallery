@@ -36,4 +36,4 @@ select (t.media ->> 'thumbnail_url')::text from galleries g,
 update galleries set deleted = true where id = @gallery_id and owner_user_id = $1 returning *;
 
 -- name: GalleryRepoEnsureCollsOwnedByUser :exec
-update galleries set collections = collections || unused_colls from (select unnest(id) from collections c, galleries g where not c.id = any(g.collections)) as unused_colls where galleries.owner_user_id = @user_id and galleries.id = (select id from galleries g where g.owner_user_id = @user_id order by position limit 1); -- should this be their first gallery or their featured gallery
+update galleries set collections = collections || unused_colls.colls from (select array_agg(c.id)::varchar[] as colls from collections c, galleries g where not c.id = any(g.collections) and g.owner_user_id = @user_id and c.owner_user_id = @user_id and c.deleted = false and g.deleted = false) as unused_colls where galleries.owner_user_id = @user_id and galleries.id = (select g.id from galleries g where g.owner_user_id = @user_id order by g.position limit 1); -- should this be their first gallery or their featured gallery

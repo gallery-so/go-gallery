@@ -453,6 +453,7 @@ type ComplexityRoot struct {
 		ID            func(childComplexity int) int
 		Name          func(childComplexity int) int
 		Owner         func(childComplexity int) int
+		Position      func(childComplexity int) int
 		TokenPreviews func(childComplexity int) int
 	}
 
@@ -2530,6 +2531,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Gallery.Owner(childComplexity), true
+
+	case "Gallery.position":
+		if e.complexity.Gallery.Position == nil {
+			break
+		}
+
+		return e.complexity.Gallery.Position(childComplexity), true
 
 	case "Gallery.tokenPreviews":
 		if e.complexity.Gallery.TokenPreviews == nil {
@@ -5535,6 +5543,7 @@ type Gallery implements Node {
     dbid: DBID!
     name: String
 	description: String
+    position: String
 	hidden: Boolean
 	tokenPreviews: [String] @goField(forceResolver: true)
     owner: GalleryUser @goField(forceResolver: true)
@@ -14196,6 +14205,38 @@ func (ec *executionContext) _Gallery_description(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Gallery_position(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Gallery",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Position, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -33573,6 +33614,13 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 		case "description":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Gallery_description(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "position":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Gallery_position(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

@@ -136,7 +136,7 @@ func (q *Queries) GalleryRepoDelete(ctx context.Context, arg GalleryRepoDeletePa
 }
 
 const galleryRepoEnsureCollsOwnedByUser = `-- name: GalleryRepoEnsureCollsOwnedByUser :exec
-update galleries set collections = collections || unused_colls from (select unnest(id) from collections c, galleries g where not c.id = any(g.collections)) as unused_colls where galleries.owner_user_id = $1 and galleries.id = (select id from galleries g where g.owner_user_id = $1 order by position limit 1)
+update galleries set collections = collections || unused_colls.colls from (select array_agg(c.id)::varchar[] as colls from collections c, galleries g where not c.id = any(g.collections) and g.owner_user_id = $1 and c.owner_user_id = $1 and c.deleted = false and g.deleted = false) as unused_colls where galleries.owner_user_id = $1 and galleries.id = (select g.id from galleries g where g.owner_user_id = $1 order by g.position limit 1)
 `
 
 func (q *Queries) GalleryRepoEnsureCollsOwnedByUser(ctx context.Context, userID persist.DBID) error {

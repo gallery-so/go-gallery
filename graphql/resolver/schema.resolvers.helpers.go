@@ -1187,6 +1187,7 @@ func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
 		Dbid:        gallery.ID,
 		Name:        name,
 		Description: desc,
+		Position:    &gallery.Position,
 		Hidden:      &gallery.Hidden,
 		Owner:       nil, // handled by dedicated resolver
 		Collections: nil, // handled by dedicated resolver

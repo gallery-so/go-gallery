@@ -10,6 +10,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
@@ -138,6 +139,9 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 
 	previews, err := api.queries.GetGalleryTokenPreviewsByID(ctx, galleryID)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
 
