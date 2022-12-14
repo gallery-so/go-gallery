@@ -995,6 +995,7 @@ func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chai
 	if chains == nil || len(chains) == 0 {
 		chains = []persist.Chain{persist.ChainETH}
 	}
+
 	err := api.Token.SyncTokens(ctx, chains)
 	if err != nil {
 		return nil, err
