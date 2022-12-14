@@ -538,6 +538,11 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 
 		return util.NewFileHeaderReader(resp), nil
 	case persist.URITypeJSON, persist.URITypeSVG:
+		// query unescape asString first
+		asString, err := url.QueryUnescape(asString)
+		if err != nil {
+			return nil, err
+		}
 		idx := strings.IndexByte(asString, ',')
 		if idx == -1 {
 			buf := bytes.NewBuffer(util.RemoveBOM([]byte(asString)))
