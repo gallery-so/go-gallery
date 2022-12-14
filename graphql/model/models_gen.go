@@ -51,6 +51,10 @@ type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
 
+type CreateGalleryPayloadOrError interface {
+	IsCreateGalleryPayloadOrError()
+}
+
 type CreateUserPayloadOrError interface {
 	IsCreateUserPayloadOrError()
 }
@@ -61,6 +65,10 @@ type DeepRefreshPayloadOrError interface {
 
 type DeleteCollectionPayloadOrError interface {
 	IsDeleteCollectionPayloadOrError()
+}
+
+type DeleteGalleryPayloadOrError interface {
+	IsDeleteGalleryPayloadOrError()
 }
 
 type Error interface {
@@ -214,8 +222,24 @@ type UpdateEmailPayloadOrError interface {
 	IsUpdateEmailPayloadOrError()
 }
 
+type UpdateFeaturedGalleryPayloadOrError interface {
+	IsUpdateFeaturedGalleryPayloadOrError()
+}
+
 type UpdateGalleryCollectionsPayloadOrError interface {
 	IsUpdateGalleryCollectionsPayloadOrError()
+}
+
+type UpdateGalleryHiddenPayloadOrError interface {
+	IsUpdateGalleryHiddenPayloadOrError()
+}
+
+type UpdateGalleryInfoPayloadOrError interface {
+	IsUpdateGalleryInfoPayloadOrError()
+}
+
+type UpdateGalleryOrderPayloadOrError interface {
+	IsUpdateGalleryOrderPayloadOrError()
 }
 
 type UpdateTokenInfoPayloadOrError interface {
@@ -490,6 +514,27 @@ type CreateCollectionPayload struct {
 
 func (CreateCollectionPayload) IsCreateCollectionPayloadOrError() {}
 
+type CreateGalleryInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Position    string  `json:"position"`
+}
+
+type CreateGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (CreateGalleryPayload) IsCreateGalleryPayloadOrError() {}
+
+type CreateUserInput struct {
+	Username           string  `json:"username"`
+	Bio                *string `json:"bio"`
+	Email              *string `json:"email"`
+	GalleryName        *string `json:"galleryName"`
+	GalleryDescription *string `json:"galleryDescription"`
+	GalleryPosition    string  `json:"galleryPosition"`
+}
+
 type CreateUserPayload struct {
 	UserID    *persist.DBID `json:"userId"`
 	GalleryID *persist.DBID `json:"galleryId"`
@@ -520,6 +565,12 @@ type DeleteCollectionPayload struct {
 }
 
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
+
+type DeleteGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (DeleteGalleryPayload) IsDeleteGalleryPayloadOrError() {}
 
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
@@ -654,6 +705,12 @@ func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
 func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
+func (ErrInvalidInput) IsCreateGalleryPayloadOrError()                   {}
+func (ErrInvalidInput) IsUpdateGalleryInfoPayloadOrError()               {}
+func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()             {}
+func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
+func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
+func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -830,14 +887,24 @@ func (GIFMedia) IsMediaSubtype() {}
 func (GIFMedia) IsMedia()        {}
 
 type Gallery struct {
-	Dbid        persist.DBID  `json:"dbid"`
-	Owner       *GalleryUser  `json:"owner"`
-	Collections []*Collection `json:"collections"`
+	Dbid          persist.DBID  `json:"dbid"`
+	Name          *string       `json:"name"`
+	Description   *string       `json:"description"`
+	Hidden        *bool         `json:"hidden"`
+	TokenPreviews []*string     `json:"tokenPreviews"`
+	Owner         *GalleryUser  `json:"owner"`
+	Collections   []*Collection `json:"collections"`
 }
 
 func (Gallery) IsNode() {}
 
+type GalleryPositionInput struct {
+	GalleryID persist.DBID `json:"galleryId"`
+	Position  string       `json:"position"`
+}
+
 type GalleryUser struct {
+	HelperGalleryUserData
 	Dbid                persist.DBID    `json:"dbid"`
 	Username            *string         `json:"username"`
 	Bio                 *string         `json:"bio"`
@@ -847,6 +914,7 @@ type GalleryUser struct {
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
+	FeaturedGallery     *Gallery        `json:"featuredGallery"`
 	Galleries           []*Gallery      `json:"galleries"`
 	Badges              []*Badge        `json:"badges"`
 	IsAuthenticatedUser *bool           `json:"isAuthenticatedUser"`
@@ -957,12 +1025,13 @@ type MerchDiscountCode struct {
 }
 
 type MerchToken struct {
-	ID           GqlID     `json:"id"`
 	TokenID      string    `json:"tokenId"`
 	ObjectType   MerchType `json:"objectType"`
 	DiscountCode *string   `json:"discountCode"`
 	Redeemed     bool      `json:"redeemed"`
 }
+
+func (MerchToken) IsNode() {}
 
 type MerchTokensPayload struct {
 	Tokens []*MerchToken `json:"tokens"`
@@ -1369,6 +1438,12 @@ type UpdateEmailPayload struct {
 
 func (UpdateEmailPayload) IsUpdateEmailPayloadOrError() {}
 
+type UpdateFeaturedGalleryPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateFeaturedGalleryPayload) IsUpdateFeaturedGalleryPayloadOrError() {}
+
 type UpdateGalleryCollectionsInput struct {
 	GalleryID   persist.DBID   `json:"galleryId"`
 	Collections []persist.DBID `json:"collections"`
@@ -1379,6 +1454,39 @@ type UpdateGalleryCollectionsPayload struct {
 }
 
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
+
+type UpdateGalleryHiddenInput struct {
+	ID     persist.DBID `json:"id"`
+	Hidden bool         `json:"hidden"`
+}
+
+type UpdateGalleryHiddenPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (UpdateGalleryHiddenPayload) IsUpdateGalleryHiddenPayloadOrError() {}
+
+type UpdateGalleryInfoInput struct {
+	ID          persist.DBID `json:"id"`
+	Name        *string      `json:"name"`
+	Description *string      `json:"description"`
+}
+
+type UpdateGalleryInfoPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (UpdateGalleryInfoPayload) IsUpdateGalleryInfoPayloadOrError() {}
+
+type UpdateGalleryOrderInput struct {
+	Positions []*GalleryPositionInput `json:"positions"`
+}
+
+type UpdateGalleryOrderPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateGalleryOrderPayload) IsUpdateGalleryOrderPayloadOrError() {}
 
 type UpdateTokenInfoInput struct {
 	TokenID        persist.DBID  `json:"tokenId"`
@@ -1480,6 +1588,8 @@ type ViewGalleryPayload struct {
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
+	ID              GqlID            `json:"id"`
+	UserID          persist.DBID     `json:"userId"`
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 	Feed            *FeedConnection  `json:"feed"`

@@ -54,7 +54,7 @@ interface Error {
     message: String!
 }
 
-type GalleryUser implements Node {
+type GalleryUser implements Node @goEmbedHelper {
     id: ID!
     dbid: DBID!
     username: String
@@ -70,6 +70,7 @@ type GalleryUser implements Node {
     tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
     wallets: [Wallet] @goField(forceResolver: true)
+    featuredGallery: Gallery @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
     badges: [Badge] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
@@ -364,6 +365,10 @@ type Collection implements Node {
 type Gallery implements Node {
     id: ID!
     dbid: DBID!
+    name: String
+	description: String
+	hidden: Boolean
+	tokenPreviews: [String] @goField(forceResolver: true)
     owner: GalleryUser @goField(forceResolver: true)
     collections: [Collection] @goField(forceResolver: true)
 }
@@ -459,7 +464,9 @@ type NotificationsConnection @goEmbedHelper {
     pageInfo: PageInfo
 }
 
-type Viewer {
+type Viewer @goGqlId(fields: ["userId"]) {
+  id: ID!
+  userId: DBID!
   user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
@@ -765,7 +772,7 @@ enum MerchType {
   Card
 }
 
-type MerchToken @goGqlId(fields: ["tokenId"]) {
+type MerchToken implements Node @goGqlId(fields: ["tokenId"]) {
   id: ID! 
   tokenId: String!
   objectType: MerchType!
@@ -1150,6 +1157,14 @@ type LoginPayload {
 type LogoutPayload {
     viewer: Viewer
 }
+input CreateUserInput {
+	username: String!
+	bio: String
+	email: String
+	galleryName: String
+	galleryDescription: String
+    galleryPosition: String!
+}
 
 union CreateUserPayloadOrError =
     CreateUserPayload
@@ -1459,6 +1474,80 @@ type BanUserFromFeedPayload {
 
 union BanUserFromFeedPayloadOrError = BanUserFromFeedPayload | ErrNotAuthorized
 
+input GalleryPositionInput {
+    galleryId: DBID!
+    position: String!
+}
+
+input UpdateGalleryOrderInput {
+    positions: [GalleryPositionInput!]!
+}
+
+input UpdateGalleryHiddenInput {
+	id: DBID!
+	hidden: Boolean!
+}
+
+input UpdateGalleryInfoInput {
+    id: DBID!
+	name: String
+	description: String
+}
+
+input CreateGalleryInput {
+	name: String
+	description: String
+    position: String!
+}
+
+type CreateGalleryPayload {
+    gallery: Gallery
+}
+
+union CreateGalleryPayloadOrError =
+    CreateGalleryPayload
+    | ErrInvalidInput
+
+type UpdateGalleryInfoPayload {
+    gallery: Gallery
+}
+
+union UpdateGalleryInfoPayloadOrError =
+    UpdateGalleryInfoPayload
+    | ErrInvalidInput
+
+type UpdateGalleryHiddenPayload {
+    gallery: Gallery
+}
+
+union UpdateGalleryHiddenPayloadOrError =
+    UpdateGalleryHiddenPayload
+    | ErrInvalidInput
+
+type DeleteGalleryPayload {
+    gallery: Gallery
+}
+
+union DeleteGalleryPayloadOrError =
+    DeleteGalleryPayload
+    | ErrInvalidInput
+
+type UpdateGalleryOrderPayload {
+    viewer: Viewer
+}
+
+union UpdateGalleryOrderPayloadOrError =
+    UpdateGalleryOrderPayload
+    | ErrInvalidInput
+
+type UpdateFeaturedGalleryPayload {
+    viewer: Viewer
+}
+
+union UpdateFeaturedGalleryPayloadOrError =
+    UpdateFeaturedGalleryPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1487,7 +1576,7 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: Email): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
     updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
     updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
@@ -1503,6 +1592,13 @@ type Mutation {
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 
     viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+
+    createGallery(input: CreateGalleryInput!): CreateGalleryPayloadOrError @authRequired
+	updateGalleryHidden(input: UpdateGalleryHiddenInput!): UpdateGalleryHiddenPayloadOrError @authRequired
+	deleteGallery(galleryId: DBID!): DeleteGalleryPayloadOrError @authRequired
+    updateGalleryOrder(input: UpdateGalleryOrderInput!): UpdateGalleryOrderPayloadOrError @authRequired
+	updateGalleryInfo(input: UpdateGalleryInfoInput!): UpdateGalleryInfoPayloadOrError @authRequired
+	updateFeaturedGallery(galleryId: DBID!): UpdateFeaturedGalleryPayloadOrError @authRequired
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 

@@ -266,6 +266,10 @@ type ComplexityRoot struct {
 		FeedEvent  func(childComplexity int) int
 	}
 
+	CreateGalleryPayload struct {
+		Gallery func(childComplexity int) int
+	}
+
 	CreateUserPayload struct {
 		GalleryID func(childComplexity int) int
 		UserID    func(childComplexity int) int
@@ -278,6 +282,10 @@ type ComplexityRoot struct {
 	}
 
 	DeleteCollectionPayload struct {
+		Gallery func(childComplexity int) int
+	}
+
+	DeleteGalleryPayload struct {
 		Gallery func(childComplexity int) int
 	}
 
@@ -438,16 +446,21 @@ type ComplexityRoot struct {
 	}
 
 	Gallery struct {
-		Collections func(childComplexity int) int
-		Dbid        func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Owner       func(childComplexity int) int
+		Collections   func(childComplexity int) int
+		Dbid          func(childComplexity int) int
+		Description   func(childComplexity int) int
+		Hidden        func(childComplexity int) int
+		ID            func(childComplexity int) int
+		Name          func(childComplexity int) int
+		Owner         func(childComplexity int) int
+		TokenPreviews func(childComplexity int) int
 	}
 
 	GalleryUser struct {
 		Badges              func(childComplexity int) int
 		Bio                 func(childComplexity int) int
 		Dbid                func(childComplexity int) int
+		FeaturedGallery     func(childComplexity int) int
 		Feed                func(childComplexity int, before *string, after *string, first *int, last *int) int
 		Followers           func(childComplexity int) int
 		Following           func(childComplexity int) int
@@ -551,9 +564,11 @@ type ComplexityRoot struct {
 		ClearAllNotifications           func(childComplexity int) int
 		CommentOnFeedEvent              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
 		CreateCollection                func(childComplexity int, input model.CreateCollectionInput) int
-		CreateUser                      func(childComplexity int, authMechanism model.AuthMechanism, username string, bio *string, email *persist.Email) int
+		CreateGallery                   func(childComplexity int, input model.CreateGalleryInput) int
+		CreateUser                      func(childComplexity int, authMechanism model.AuthMechanism, input model.CreateUserInput) int
 		DeepRefresh                     func(childComplexity int, input model.DeepRefreshInput) int
 		DeleteCollection                func(childComplexity int, collectionID persist.DBID) int
+		DeleteGallery                   func(childComplexity int, galleryID persist.DBID) int
 		FollowUser                      func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
@@ -578,7 +593,11 @@ type ComplexityRoot struct {
 		UpdateCollectionTokens          func(childComplexity int, input model.UpdateCollectionTokensInput) int
 		UpdateEmail                     func(childComplexity int, input model.UpdateEmailInput) int
 		UpdateEmailNotificationSettings func(childComplexity int, input model.UpdateEmailNotificationSettingsInput) int
+		UpdateFeaturedGallery           func(childComplexity int, galleryID persist.DBID) int
 		UpdateGalleryCollections        func(childComplexity int, input model.UpdateGalleryCollectionsInput) int
+		UpdateGalleryHidden             func(childComplexity int, input model.UpdateGalleryHiddenInput) int
+		UpdateGalleryInfo               func(childComplexity int, input model.UpdateGalleryInfoInput) int
+		UpdateGalleryOrder              func(childComplexity int, input model.UpdateGalleryOrderInput) int
 		UpdateNotificationSettings      func(childComplexity int, settings *model.NotificationSettingsInput) int
 		UpdateTokenInfo                 func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
@@ -880,8 +899,24 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
+	UpdateFeaturedGalleryPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	UpdateGalleryCollectionsPayload struct {
 		Gallery func(childComplexity int) int
+	}
+
+	UpdateGalleryHiddenPayload struct {
+		Gallery func(childComplexity int) int
+	}
+
+	UpdateGalleryInfoPayload struct {
+		Gallery func(childComplexity int) int
+	}
+
+	UpdateGalleryOrderPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
 	UpdateTokenInfoPayload struct {
@@ -950,9 +985,11 @@ type ComplexityRoot struct {
 	Viewer struct {
 		Email                func(childComplexity int) int
 		Feed                 func(childComplexity int, before *string, after *string, first *int, last *int) int
+		ID                   func(childComplexity int) int
 		NotificationSettings func(childComplexity int) int
 		Notifications        func(childComplexity int, before *string, after *string, first *int, last *int) int
 		User                 func(childComplexity int) int
+		UserID               func(childComplexity int) int
 		ViewerGalleries      func(childComplexity int) int
 	}
 
@@ -1040,6 +1077,7 @@ type FollowUserPayloadResolver interface {
 	User(ctx context.Context, obj *model.FollowUserPayload) (*model.GalleryUser, error)
 }
 type GalleryResolver interface {
+	TokenPreviews(ctx context.Context, obj *model.Gallery) ([]*string, error)
 	Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error)
 	Collections(ctx context.Context, obj *model.Gallery) ([]*model.Collection, error)
 }
@@ -1048,6 +1086,7 @@ type GalleryUserResolver interface {
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
+	FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error)
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
 	Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error)
 
@@ -1073,7 +1112,7 @@ type MutationResolver interface {
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
 	DeepRefresh(ctx context.Context, input model.DeepRefreshInput) (model.DeepRefreshPayloadOrError, error)
 	GetAuthNonce(ctx context.Context, chainAddress persist.ChainAddress) (model.GetAuthNoncePayloadOrError, error)
-	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string, email *persist.Email) (model.CreateUserPayloadOrError, error)
+	CreateUser(ctx context.Context, authMechanism model.AuthMechanism, input model.CreateUserInput) (model.CreateUserPayloadOrError, error)
 	UpdateEmail(ctx context.Context, input model.UpdateEmailInput) (model.UpdateEmailPayloadOrError, error)
 	ResendVerificationEmail(ctx context.Context) (model.ResendVerificationEmailPayloadOrError, error)
 	UpdateEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (model.UpdateEmailNotificationSettingsPayloadOrError, error)
@@ -1087,6 +1126,12 @@ type MutationResolver interface {
 	CommentOnFeedEvent(ctx context.Context, feedEventID persist.DBID, replyToID *persist.DBID, comment string) (model.CommentOnFeedEventPayloadOrError, error)
 	RemoveComment(ctx context.Context, commentID persist.DBID) (model.RemoveCommentPayloadOrError, error)
 	ViewGallery(ctx context.Context, galleryID persist.DBID) (model.ViewGalleryPayloadOrError, error)
+	CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error)
+	UpdateGalleryHidden(ctx context.Context, input model.UpdateGalleryHiddenInput) (model.UpdateGalleryHiddenPayloadOrError, error)
+	DeleteGallery(ctx context.Context, galleryID persist.DBID) (model.DeleteGalleryPayloadOrError, error)
+	UpdateGalleryOrder(ctx context.Context, input model.UpdateGalleryOrderInput) (model.UpdateGalleryOrderPayloadOrError, error)
+	UpdateGalleryInfo(ctx context.Context, input model.UpdateGalleryInfoInput) (model.UpdateGalleryInfoPayloadOrError, error)
+	UpdateFeaturedGallery(ctx context.Context, galleryID persist.DBID) (model.UpdateFeaturedGalleryPayloadOrError, error)
 	ClearAllNotifications(ctx context.Context) (*model.ClearAllNotificationsPayload, error)
 	UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error)
 	PreverifyEmail(ctx context.Context, input model.PreverifyEmailInput) (model.PreverifyEmailPayloadOrError, error)
@@ -1946,6 +1991,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CreateCollectionPayload.FeedEvent(childComplexity), true
 
+	case "CreateGalleryPayload.gallery":
+		if e.complexity.CreateGalleryPayload.Gallery == nil {
+			break
+		}
+
+		return e.complexity.CreateGalleryPayload.Gallery(childComplexity), true
+
 	case "CreateUserPayload.galleryId":
 		if e.complexity.CreateUserPayload.GalleryID == nil {
 			break
@@ -1987,6 +2039,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.DeleteCollectionPayload.Gallery(childComplexity), true
+
+	case "DeleteGalleryPayload.gallery":
+		if e.complexity.DeleteGalleryPayload.Gallery == nil {
+			break
+		}
+
+		return e.complexity.DeleteGalleryPayload.Gallery(childComplexity), true
 
 	case "EmailNotificationSettings.unsubscribedFromAll":
 		if e.complexity.EmailNotificationSettings.UnsubscribedFromAll == nil {
@@ -2437,6 +2496,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Gallery.Dbid(childComplexity), true
 
+	case "Gallery.description":
+		if e.complexity.Gallery.Description == nil {
+			break
+		}
+
+		return e.complexity.Gallery.Description(childComplexity), true
+
+	case "Gallery.hidden":
+		if e.complexity.Gallery.Hidden == nil {
+			break
+		}
+
+		return e.complexity.Gallery.Hidden(childComplexity), true
+
 	case "Gallery.id":
 		if e.complexity.Gallery.ID == nil {
 			break
@@ -2444,12 +2517,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Gallery.ID(childComplexity), true
 
+	case "Gallery.name":
+		if e.complexity.Gallery.Name == nil {
+			break
+		}
+
+		return e.complexity.Gallery.Name(childComplexity), true
+
 	case "Gallery.owner":
 		if e.complexity.Gallery.Owner == nil {
 			break
 		}
 
 		return e.complexity.Gallery.Owner(childComplexity), true
+
+	case "Gallery.tokenPreviews":
+		if e.complexity.Gallery.TokenPreviews == nil {
+			break
+		}
+
+		return e.complexity.Gallery.TokenPreviews(childComplexity), true
 
 	case "GalleryUser.badges":
 		if e.complexity.GalleryUser.Badges == nil {
@@ -2471,6 +2558,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUser.Dbid(childComplexity), true
+
+	case "GalleryUser.featuredGallery":
+		if e.complexity.GalleryUser.FeaturedGallery == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.FeaturedGallery(childComplexity), true
 
 	case "GalleryUser.feed":
 		if e.complexity.GalleryUser.Feed == nil {
@@ -2939,6 +3033,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.CreateCollection(childComplexity, args["input"].(model.CreateCollectionInput)), true
 
+	case "Mutation.createGallery":
+		if e.complexity.Mutation.CreateGallery == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createGallery_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateGallery(childComplexity, args["input"].(model.CreateGalleryInput)), true
+
 	case "Mutation.createUser":
 		if e.complexity.Mutation.CreateUser == nil {
 			break
@@ -2949,7 +3055,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string), args["email"].(*persist.Email)), true
+		return e.complexity.Mutation.CreateUser(childComplexity, args["authMechanism"].(model.AuthMechanism), args["input"].(model.CreateUserInput)), true
 
 	case "Mutation.deepRefresh":
 		if e.complexity.Mutation.DeepRefresh == nil {
@@ -2974,6 +3080,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.DeleteCollection(childComplexity, args["collectionId"].(persist.DBID)), true
+
+	case "Mutation.deleteGallery":
+		if e.complexity.Mutation.DeleteGallery == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteGallery_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteGallery(childComplexity, args["galleryId"].(persist.DBID)), true
 
 	case "Mutation.followUser":
 		if e.complexity.Mutation.FollowUser == nil {
@@ -3253,6 +3371,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateEmailNotificationSettings(childComplexity, args["input"].(model.UpdateEmailNotificationSettingsInput)), true
 
+	case "Mutation.updateFeaturedGallery":
+		if e.complexity.Mutation.UpdateFeaturedGallery == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateFeaturedGallery_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateFeaturedGallery(childComplexity, args["galleryId"].(persist.DBID)), true
+
 	case "Mutation.updateGalleryCollections":
 		if e.complexity.Mutation.UpdateGalleryCollections == nil {
 			break
@@ -3264,6 +3394,42 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateGalleryCollections(childComplexity, args["input"].(model.UpdateGalleryCollectionsInput)), true
+
+	case "Mutation.updateGalleryHidden":
+		if e.complexity.Mutation.UpdateGalleryHidden == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateGalleryHidden_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateGalleryHidden(childComplexity, args["input"].(model.UpdateGalleryHiddenInput)), true
+
+	case "Mutation.updateGalleryInfo":
+		if e.complexity.Mutation.UpdateGalleryInfo == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateGalleryInfo_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateGalleryInfo(childComplexity, args["input"].(model.UpdateGalleryInfoInput)), true
+
+	case "Mutation.updateGalleryOrder":
+		if e.complexity.Mutation.UpdateGalleryOrder == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateGalleryOrder_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateGalleryOrder(childComplexity, args["input"].(model.UpdateGalleryOrderInput)), true
 
 	case "Mutation.updateNotificationSettings":
 		if e.complexity.Mutation.UpdateNotificationSettings == nil {
@@ -4580,12 +4746,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateEmailPayload.Viewer(childComplexity), true
 
+	case "UpdateFeaturedGalleryPayload.viewer":
+		if e.complexity.UpdateFeaturedGalleryPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UpdateFeaturedGalleryPayload.Viewer(childComplexity), true
+
 	case "UpdateGalleryCollectionsPayload.gallery":
 		if e.complexity.UpdateGalleryCollectionsPayload.Gallery == nil {
 			break
 		}
 
 		return e.complexity.UpdateGalleryCollectionsPayload.Gallery(childComplexity), true
+
+	case "UpdateGalleryHiddenPayload.gallery":
+		if e.complexity.UpdateGalleryHiddenPayload.Gallery == nil {
+			break
+		}
+
+		return e.complexity.UpdateGalleryHiddenPayload.Gallery(childComplexity), true
+
+	case "UpdateGalleryInfoPayload.gallery":
+		if e.complexity.UpdateGalleryInfoPayload.Gallery == nil {
+			break
+		}
+
+		return e.complexity.UpdateGalleryInfoPayload.Gallery(childComplexity), true
+
+	case "UpdateGalleryOrderPayload.viewer":
+		if e.complexity.UpdateGalleryOrderPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UpdateGalleryOrderPayload.Viewer(childComplexity), true
 
 	case "UpdateTokenInfoPayload.token":
 		if e.complexity.UpdateTokenInfoPayload.Token == nil {
@@ -4795,6 +4989,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Viewer.Feed(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Viewer.id":
+		if e.complexity.Viewer.ID == nil {
+			break
+		}
+
+		return e.complexity.Viewer.ID(childComplexity), true
+
 	case "Viewer.notificationSettings":
 		if e.complexity.Viewer.NotificationSettings == nil {
 			break
@@ -4820,6 +5021,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Viewer.User(childComplexity), true
+
+	case "Viewer.userId":
+		if e.complexity.Viewer.UserID == nil {
+			break
+		}
+
+		return e.complexity.Viewer.UserID(childComplexity), true
 
 	case "Viewer.viewerGalleries":
 		if e.complexity.Viewer.ViewerGalleries == nil {
@@ -5014,7 +5222,7 @@ interface Error {
     message: String!
 }
 
-type GalleryUser implements Node {
+type GalleryUser implements Node @goEmbedHelper {
     id: ID!
     dbid: DBID!
     username: String
@@ -5030,6 +5238,7 @@ type GalleryUser implements Node {
     tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
     wallets: [Wallet] @goField(forceResolver: true)
+    featuredGallery: Gallery @goField(forceResolver: true)
     galleries: [Gallery] @goField(forceResolver: true)
     badges: [Badge] @goField(forceResolver: true)
     isAuthenticatedUser: Boolean
@@ -5324,6 +5533,10 @@ type Collection implements Node {
 type Gallery implements Node {
     id: ID!
     dbid: DBID!
+    name: String
+	description: String
+	hidden: Boolean
+	tokenPreviews: [String] @goField(forceResolver: true)
     owner: GalleryUser @goField(forceResolver: true)
     collections: [Collection] @goField(forceResolver: true)
 }
@@ -5419,7 +5632,9 @@ type NotificationsConnection @goEmbedHelper {
     pageInfo: PageInfo
 }
 
-type Viewer {
+type Viewer @goGqlId(fields: ["userId"]) {
+  id: ID!
+  userId: DBID!
   user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
@@ -5725,7 +5940,7 @@ enum MerchType {
   Card
 }
 
-type MerchToken @goGqlId(fields: ["tokenId"]) {
+type MerchToken implements Node @goGqlId(fields: ["tokenId"]) {
   id: ID! 
   tokenId: String!
   objectType: MerchType!
@@ -6110,6 +6325,14 @@ type LoginPayload {
 type LogoutPayload {
     viewer: Viewer
 }
+input CreateUserInput {
+	username: String!
+	bio: String
+	email: String
+	galleryName: String
+	galleryDescription: String
+    galleryPosition: String!
+}
 
 union CreateUserPayloadOrError =
     CreateUserPayload
@@ -6419,6 +6642,80 @@ type BanUserFromFeedPayload {
 
 union BanUserFromFeedPayloadOrError = BanUserFromFeedPayload | ErrNotAuthorized
 
+input GalleryPositionInput {
+    galleryId: DBID!
+    position: String!
+}
+
+input UpdateGalleryOrderInput {
+    positions: [GalleryPositionInput!]!
+}
+
+input UpdateGalleryHiddenInput {
+	id: DBID!
+	hidden: Boolean!
+}
+
+input UpdateGalleryInfoInput {
+    id: DBID!
+	name: String
+	description: String
+}
+
+input CreateGalleryInput {
+	name: String
+	description: String
+    position: String!
+}
+
+type CreateGalleryPayload {
+    gallery: Gallery
+}
+
+union CreateGalleryPayloadOrError =
+    CreateGalleryPayload
+    | ErrInvalidInput
+
+type UpdateGalleryInfoPayload {
+    gallery: Gallery
+}
+
+union UpdateGalleryInfoPayloadOrError =
+    UpdateGalleryInfoPayload
+    | ErrInvalidInput
+
+type UpdateGalleryHiddenPayload {
+    gallery: Gallery
+}
+
+union UpdateGalleryHiddenPayloadOrError =
+    UpdateGalleryHiddenPayload
+    | ErrInvalidInput
+
+type DeleteGalleryPayload {
+    gallery: Gallery
+}
+
+union DeleteGalleryPayloadOrError =
+    DeleteGalleryPayload
+    | ErrInvalidInput
+
+type UpdateGalleryOrderPayload {
+    viewer: Viewer
+}
+
+union UpdateGalleryOrderPayloadOrError =
+    UpdateGalleryOrderPayload
+    | ErrInvalidInput
+
+type UpdateFeaturedGalleryPayload {
+    viewer: Viewer
+}
+
+union UpdateFeaturedGalleryPayloadOrError =
+    UpdateFeaturedGalleryPayload
+    | ErrInvalidInput
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -6447,7 +6744,7 @@ type Mutation {
 
     getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: Email): CreateUserPayloadOrError
+    createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
     updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
     resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
     updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
@@ -6463,6 +6760,13 @@ type Mutation {
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 
     viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+
+    createGallery(input: CreateGalleryInput!): CreateGalleryPayloadOrError @authRequired
+	updateGalleryHidden(input: UpdateGalleryHiddenInput!): UpdateGalleryHiddenPayloadOrError @authRequired
+	deleteGallery(galleryId: DBID!): DeleteGalleryPayloadOrError @authRequired
+    updateGalleryOrder(input: UpdateGalleryOrderInput!): UpdateGalleryOrderPayloadOrError @authRequired
+	updateGalleryInfo(input: UpdateGalleryInfoInput!): UpdateGalleryInfoPayloadOrError @authRequired
+	updateFeaturedGallery(galleryId: DBID!): UpdateFeaturedGalleryPayloadOrError @authRequired
 
     clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
@@ -6955,6 +7259,21 @@ func (ec *executionContext) field_Mutation_createCollection_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createGallery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.CreateGalleryInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNCreateGalleryInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateGalleryInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -6967,33 +7286,15 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 		}
 	}
 	args["authMechanism"] = arg0
-	var arg1 string
-	if tmp, ok := rawArgs["username"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+	var arg1 model.CreateUserInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg1, err = ec.unmarshalNCreateUserInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["username"] = arg1
-	var arg2 *string
-	if tmp, ok := rawArgs["bio"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bio"))
-		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["bio"] = arg2
-	var arg3 *persist.Email
-	if tmp, ok := rawArgs["email"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
-		arg3, err = ec.unmarshalOEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["email"] = arg3
+	args["input"] = arg1
 	return args, nil
 }
 
@@ -7024,6 +7325,21 @@ func (ec *executionContext) field_Mutation_deleteCollection_args(ctx context.Con
 		}
 	}
 	args["collectionId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteGallery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["galleryId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["galleryId"] = arg0
 	return args, nil
 }
 
@@ -7384,6 +7700,21 @@ func (ec *executionContext) field_Mutation_updateEmail_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_updateFeaturedGallery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["galleryId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryId"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["galleryId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateGalleryCollections_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -7391,6 +7722,51 @@ func (ec *executionContext) field_Mutation_updateGalleryCollections_args(ctx con
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalNUpdateGalleryCollectionsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateGalleryHidden_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateGalleryHiddenInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateGalleryHiddenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryHiddenInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateGalleryInfo_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateGalleryInfoInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateGalleryInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryInfoInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateGalleryOrder_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateGalleryOrderInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateGalleryOrderInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryOrderInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -11421,6 +11797,38 @@ func (ec *executionContext) _CreateCollectionPayload_feedEvent(ctx context.Conte
 	return ec.marshalOFeedEvent2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEvent(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _CreateGalleryPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.CreateGalleryPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "CreateGalleryPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _CreateUserPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model.CreateUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -11590,6 +11998,38 @@ func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "DeleteCollectionPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _DeleteGalleryPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.DeleteGalleryPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "DeleteGalleryPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -13714,6 +14154,134 @@ func (ec *executionContext) _Gallery_dbid(ctx context.Context, field graphql.Col
 	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Gallery_name(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Gallery",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Gallery_description(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Gallery",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Gallery_hidden(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Gallery",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Hidden, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Gallery_tokenPreviews(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Gallery",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Gallery().TokenPreviews(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*string)
+	fc.Result = res
+	return ec.marshalOString2ᚕᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Gallery_owner(ctx context.Context, field graphql.CollectedField, obj *model.Gallery) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -14109,6 +14677,38 @@ func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field grap
 	res := resTmp.([]*model.Wallet)
 	fc.Result = res
 	return ec.marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUser_featuredGallery(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().FeaturedGallery(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_galleries(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -15450,14 +16050,14 @@ func (ec *executionContext) _MerchToken_id(ctx context.Context, field graphql.Co
 		Object:     "MerchToken",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16591,7 +17191,7 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism), args["username"].(string), args["bio"].(*string), args["email"].(*persist.Email))
+		return ec.resolvers.Mutation().CreateUser(rctx, args["authMechanism"].(model.AuthMechanism), args["input"].(model.CreateUserInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -17276,6 +17876,360 @@ func (ec *executionContext) _Mutation_viewGallery(ctx context.Context, field gra
 	res := resTmp.(model.ViewGalleryPayloadOrError)
 	fc.Result = res
 	return ec.marshalOViewGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewGalleryPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_createGallery(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_createGallery_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().CreateGallery(rctx, args["input"].(model.CreateGalleryInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.CreateGalleryPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.CreateGalleryPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.CreateGalleryPayloadOrError)
+	fc.Result = res
+	return ec.marshalOCreateGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateGalleryPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateGalleryHidden(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateGalleryHidden_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateGalleryHidden(rctx, args["input"].(model.UpdateGalleryHiddenInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateGalleryHiddenPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateGalleryHiddenPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateGalleryHiddenPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateGalleryHiddenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryHiddenPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_deleteGallery(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_deleteGallery_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeleteGallery(rctx, args["galleryId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.DeleteGalleryPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.DeleteGalleryPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.DeleteGalleryPayloadOrError)
+	fc.Result = res
+	return ec.marshalODeleteGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteGalleryPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateGalleryOrder(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateGalleryOrder_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateGalleryOrder(rctx, args["input"].(model.UpdateGalleryOrderInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateGalleryOrderPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateGalleryOrderPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateGalleryOrderPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateGalleryOrderPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryOrderPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateGalleryInfo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateGalleryInfo_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateGalleryInfo(rctx, args["input"].(model.UpdateGalleryInfoInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateGalleryInfoPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateGalleryInfoPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateGalleryInfoPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateGalleryInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryInfoPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateFeaturedGallery(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateFeaturedGallery_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateFeaturedGallery(rctx, args["galleryId"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateFeaturedGalleryPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateFeaturedGalleryPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateFeaturedGalleryPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateFeaturedGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateFeaturedGalleryPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_clearAllNotifications(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -23379,6 +24333,38 @@ func (ec *executionContext) _UpdateEmailPayload_viewer(ctx context.Context, fiel
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UpdateFeaturedGalleryPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateFeaturedGalleryPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateFeaturedGalleryPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UpdateGalleryCollectionsPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.UpdateGalleryCollectionsPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -23409,6 +24395,102 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayload_gallery(ctx context
 	res := resTmp.(*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UpdateGalleryHiddenPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.UpdateGalleryHiddenPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateGalleryHiddenPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UpdateGalleryInfoPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.UpdateGalleryInfoPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateGalleryInfoPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UpdateGalleryOrderPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateGalleryOrderPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateGalleryOrderPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UpdateTokenInfoPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.UpdateTokenInfoPayload) (ret graphql.Marshaler) {
@@ -24279,6 +25361,76 @@ func (ec *executionContext) _ViewGalleryPayload_gallery(ctx context.Context, fie
 	res := resTmp.(*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Viewer_id(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Viewer_userId(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
@@ -26202,6 +27354,108 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreateGalleryInput(ctx context.Context, obj interface{}) (model.CreateGalleryInput, error) {
+	var it model.CreateGalleryInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "name":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			it.Name, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "description":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			it.Description, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "position":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("position"))
+			it.Position, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, obj interface{}) (model.CreateUserInput, error) {
+	var it model.CreateUserInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "username":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+			it.Username, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "bio":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bio"))
+			it.Bio, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "email":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			it.Email, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "galleryName":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryName"))
+			it.GalleryName, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "galleryDescription":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryDescription"))
+			it.GalleryDescription, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "galleryPosition":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryPosition"))
+			it.GalleryPosition, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj interface{}) (model.DebugAuth, error) {
 	var it model.DebugAuth
 	asMap := map[string]interface{}{}
@@ -26358,6 +27612,37 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
 			it.Signature, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputGalleryPositionInput(ctx context.Context, obj interface{}) (model.GalleryPositionInput, error) {
+	var it model.GalleryPositionInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "galleryId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("galleryId"))
+			it.GalleryID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "position":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("position"))
+			it.Position, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -26778,6 +28063,99 @@ func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx cont
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collections"))
 			it.Collections, err = ec.unmarshalNDBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateGalleryHiddenInput(ctx context.Context, obj interface{}) (model.UpdateGalleryHiddenInput, error) {
+	var it model.UpdateGalleryHiddenInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "id":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			it.ID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "hidden":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hidden"))
+			it.Hidden, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateGalleryInfoInput(ctx context.Context, obj interface{}) (model.UpdateGalleryInfoInput, error) {
+	var it model.UpdateGalleryInfoInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "id":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			it.ID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "name":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			it.Name, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "description":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			it.Description, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateGalleryOrderInput(ctx context.Context, obj interface{}) (model.UpdateGalleryOrderInput, error) {
+	var it model.UpdateGalleryOrderInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "positions":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("positions"))
+			it.Positions, err = ec.unmarshalNGalleryPositionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryPositionInputᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -27228,6 +28606,29 @@ func (ec *executionContext) _CreateCollectionPayloadOrError(ctx context.Context,
 	}
 }
 
+func (ec *executionContext) _CreateGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.CreateGalleryPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.CreateGalleryPayload:
+		return ec._CreateGalleryPayload(ctx, sel, &obj)
+	case *model.CreateGalleryPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CreateGalleryPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _CreateUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.CreateUserPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -27334,6 +28735,29 @@ func (ec *executionContext) _DeleteCollectionPayloadOrError(ctx context.Context,
 			return graphql.Null
 		}
 		return ec._ErrCollectionNotFound(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _DeleteGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.DeleteGalleryPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.DeleteGalleryPayload:
+		return ec._DeleteGalleryPayload(ctx, sel, &obj)
+	case *model.DeleteGalleryPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._DeleteGalleryPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -28097,6 +29521,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._FeedEvent(ctx, sel, obj)
+	case model.MerchToken:
+		return ec._MerchToken(ctx, sel, &obj)
+	case *model.MerchToken:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._MerchToken(ctx, sel, obj)
 	case model.Notification:
 		if obj == nil {
 			return graphql.Null
@@ -28798,6 +30229,29 @@ func (ec *executionContext) _UpdateEmailPayloadOrError(ctx context.Context, sel 
 	}
 }
 
+func (ec *executionContext) _UpdateFeaturedGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateFeaturedGalleryPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateFeaturedGalleryPayload:
+		return ec._UpdateFeaturedGalleryPayload(ctx, sel, &obj)
+	case *model.UpdateFeaturedGalleryPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateFeaturedGalleryPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UpdateGalleryCollectionsPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateGalleryCollectionsPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -28816,6 +30270,75 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayloadOrError(ctx context.
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UpdateGalleryHiddenPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateGalleryHiddenPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateGalleryHiddenPayload:
+		return ec._UpdateGalleryHiddenPayload(ctx, sel, &obj)
+	case *model.UpdateGalleryHiddenPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateGalleryHiddenPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UpdateGalleryInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateGalleryInfoPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateGalleryInfoPayload:
+		return ec._UpdateGalleryInfoPayload(ctx, sel, &obj)
+	case *model.UpdateGalleryInfoPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateGalleryInfoPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UpdateGalleryOrderPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateGalleryOrderPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateGalleryOrderPayload:
+		return ec._UpdateGalleryOrderPayload(ctx, sel, &obj)
+	case *model.UpdateGalleryOrderPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateGalleryOrderPayload(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -30596,6 +32119,34 @@ func (ec *executionContext) _CreateCollectionPayload(ctx context.Context, sel as
 	return out
 }
 
+var createGalleryPayloadImplementors = []string{"CreateGalleryPayload", "CreateGalleryPayloadOrError"}
+
+func (ec *executionContext) _CreateGalleryPayload(ctx context.Context, sel ast.SelectionSet, obj *model.CreateGalleryPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, createGalleryPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CreateGalleryPayload")
+		case "gallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._CreateGalleryPayload_gallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var createUserPayloadImplementors = []string{"CreateUserPayload", "CreateUserPayloadOrError"}
 
 func (ec *executionContext) _CreateUserPayload(ctx context.Context, sel ast.SelectionSet, obj *model.CreateUserPayload) graphql.Marshaler {
@@ -30686,6 +32237,34 @@ func (ec *executionContext) _DeleteCollectionPayload(ctx context.Context, sel as
 		case "gallery":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._DeleteCollectionPayload_gallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var deleteGalleryPayloadImplementors = []string{"DeleteGalleryPayload", "DeleteGalleryPayloadOrError"}
+
+func (ec *executionContext) _DeleteGalleryPayload(ctx context.Context, sel ast.SelectionSet, obj *model.DeleteGalleryPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deleteGalleryPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeleteGalleryPayload")
+		case "gallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._DeleteGalleryPayload_gallery(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -31021,7 +32600,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -31993,6 +33572,44 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "name":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Gallery_name(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "description":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Gallery_description(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "hidden":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Gallery_hidden(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "tokenPreviews":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Gallery_tokenPreviews(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "owner":
 			field := field
 
@@ -32157,6 +33774,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._GalleryUser_wallets(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "featuredGallery":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_featuredGallery(ctx, field, obj)
 				return res
 			}
 
@@ -32752,7 +34386,7 @@ func (ec *executionContext) _MerchDiscountCode(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var merchTokenImplementors = []string{"MerchToken"}
+var merchTokenImplementors = []string{"MerchToken", "Node"}
 
 func (ec *executionContext) _MerchToken(ctx context.Context, sel ast.SelectionSet, obj *model.MerchToken) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, merchTokenImplementors)
@@ -33080,6 +34714,48 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "viewGallery":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_viewGallery(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "createGallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createGallery(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateGalleryHidden":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateGalleryHidden(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "deleteGallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteGallery(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateGalleryOrder":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateGalleryOrder(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateGalleryInfo":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateGalleryInfo(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateFeaturedGallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateFeaturedGallery(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -35746,6 +37422,34 @@ func (ec *executionContext) _UpdateEmailPayload(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var updateFeaturedGalleryPayloadImplementors = []string{"UpdateFeaturedGalleryPayload", "UpdateFeaturedGalleryPayloadOrError"}
+
+func (ec *executionContext) _UpdateFeaturedGalleryPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateFeaturedGalleryPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateFeaturedGalleryPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateFeaturedGalleryPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateFeaturedGalleryPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var updateGalleryCollectionsPayloadImplementors = []string{"UpdateGalleryCollectionsPayload", "UpdateGalleryCollectionsPayloadOrError"}
 
 func (ec *executionContext) _UpdateGalleryCollectionsPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateGalleryCollectionsPayload) graphql.Marshaler {
@@ -35759,6 +37463,90 @@ func (ec *executionContext) _UpdateGalleryCollectionsPayload(ctx context.Context
 		case "gallery":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UpdateGalleryCollectionsPayload_gallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updateGalleryHiddenPayloadImplementors = []string{"UpdateGalleryHiddenPayload", "UpdateGalleryHiddenPayloadOrError"}
+
+func (ec *executionContext) _UpdateGalleryHiddenPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateGalleryHiddenPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateGalleryHiddenPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateGalleryHiddenPayload")
+		case "gallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateGalleryHiddenPayload_gallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updateGalleryInfoPayloadImplementors = []string{"UpdateGalleryInfoPayload", "UpdateGalleryInfoPayloadOrError"}
+
+func (ec *executionContext) _UpdateGalleryInfoPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateGalleryInfoPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateGalleryInfoPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateGalleryInfoPayload")
+		case "gallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateGalleryInfoPayload_gallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updateGalleryOrderPayloadImplementors = []string{"UpdateGalleryOrderPayload", "UpdateGalleryOrderPayloadOrError"}
+
+func (ec *executionContext) _UpdateGalleryOrderPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateGalleryOrderPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateGalleryOrderPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateGalleryOrderPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateGalleryOrderPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -36251,6 +38039,26 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Viewer")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Viewer_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "userId":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Viewer_userId(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "user":
 			field := field
 
@@ -37090,6 +38898,16 @@ func (ec *executionContext) unmarshalNCreateCollectionInput2githubᚗcomᚋmikey
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateGalleryInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateGalleryInput(ctx context.Context, v interface{}) (model.CreateGalleryInput, error) {
+	res, err := ec.unmarshalInputCreateGalleryInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNCreateUserInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserInput(ctx context.Context, v interface{}) (model.CreateUserInput, error) {
+	res, err := ec.unmarshalInputCreateUserInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx context.Context, v interface{}) (persist.DBID, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := persist.DBID(tmp)
@@ -37167,6 +38985,28 @@ func (ec *executionContext) unmarshalNEmailUnsubscriptionType2githubᚗcomᚋmik
 
 func (ec *executionContext) marshalNEmailUnsubscriptionType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐEmailUnsubscriptionType(ctx context.Context, sel ast.SelectionSet, v model.EmailUnsubscriptionType) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) unmarshalNGalleryPositionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryPositionInputᚄ(ctx context.Context, v interface{}) ([]*model.GalleryPositionInput, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*model.GalleryPositionInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNGalleryPositionInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryPositionInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNGalleryPositionInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryPositionInput(ctx context.Context, v interface{}) (*model.GalleryPositionInput, error) {
+	res, err := ec.unmarshalInputGalleryPositionInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v *model.GalleryUser) graphql.Marshaler {
@@ -37412,6 +39252,21 @@ func (ec *executionContext) unmarshalNUpdateEmailNotificationSettingsInput2githu
 
 func (ec *executionContext) unmarshalNUpdateGalleryCollectionsInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsInput(ctx context.Context, v interface{}) (model.UpdateGalleryCollectionsInput, error) {
 	res, err := ec.unmarshalInputUpdateGalleryCollectionsInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateGalleryHiddenInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryHiddenInput(ctx context.Context, v interface{}) (model.UpdateGalleryHiddenInput, error) {
+	res, err := ec.unmarshalInputUpdateGalleryHiddenInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateGalleryInfoInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryInfoInput(ctx context.Context, v interface{}) (model.UpdateGalleryInfoInput, error) {
+	res, err := ec.unmarshalInputUpdateGalleryInfoInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateGalleryOrderInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryOrderInput(ctx context.Context, v interface{}) (model.UpdateGalleryOrderInput, error) {
+	res, err := ec.unmarshalInputUpdateGalleryOrderInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -38259,6 +40114,13 @@ func (ec *executionContext) marshalOCreateCollectionPayloadOrError2githubᚗcom�
 	return ec._CreateCollectionPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOCreateGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CreateGalleryPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CreateGalleryPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOCreateUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.CreateUserPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -38303,6 +40165,13 @@ func (ec *executionContext) marshalODeleteCollectionPayloadOrError2githubᚗcom�
 		return graphql.Null
 	}
 	return ec._DeleteCollectionPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalODeleteGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeleteGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DeleteGalleryPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DeleteGalleryPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx context.Context, v interface{}) (*persist.Email, error) {
@@ -39877,11 +41746,39 @@ func (ec *executionContext) marshalOUpdateEmailPayloadOrError2githubᚗcomᚋmik
 	return ec._UpdateEmailPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOUpdateFeaturedGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateFeaturedGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateFeaturedGalleryPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateFeaturedGalleryPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOUpdateGalleryCollectionsPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryCollectionsPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateGalleryCollectionsPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._UpdateGalleryCollectionsPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdateGalleryHiddenPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryHiddenPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateGalleryHiddenPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateGalleryHiddenPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdateGalleryInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateGalleryInfoPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateGalleryInfoPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdateGalleryOrderPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryOrderPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateGalleryOrderPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateGalleryOrderPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateTokenInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {

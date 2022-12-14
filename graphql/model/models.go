@@ -50,6 +50,11 @@ type HelperGroupNotificationUsersConnectionData struct {
 	UserIDs persist.DBIDList
 }
 
+type HelperGalleryUserData struct {
+	UserID            persist.DBID
+	FeaturedGalleryID *persist.DBID
+}
+
 type HelperNotificationSettingsData struct {
 	UserId persist.DBID
 }

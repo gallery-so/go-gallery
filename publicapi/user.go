@@ -294,7 +294,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	return nil
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string) (userID persist.DBID, galleryID persist.DBID, err error) {
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string, galleryName, galleryDesc *string, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required,username"},
@@ -303,7 +303,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, api.repos.UserRepository, api.repos.GalleryRepository)
+	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository)
 	if err != nil {
 		return "", "", err
 	}
@@ -350,6 +350,28 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	}
 
 	err = user.UpdateUserInfo(ctx, userID, username, bio, api.repos.UserRepository, api.ethClient)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.DBID) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	// query will validate that the gallery belongs to the user
+	err = api.queries.UpdateUserFeaturedGallery(ctx, db.UpdateUserFeaturedGalleryParams{GalleryID: galleryID, UserID: userID})
 	if err != nil {
 		return err
 	}

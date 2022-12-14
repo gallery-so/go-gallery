@@ -271,6 +271,10 @@ func (r *followUserPayloadResolver) User(ctx context.Context, obj *model.FollowU
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
 }
 
+func (r *galleryResolver) TokenPreviews(ctx context.Context, obj *model.Gallery) ([]*string, error) {
+	return resolveTokenPreviewsByGalleryID(ctx, obj.Dbid)
+}
+
 func (r *galleryResolver) Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error) {
 	gallery, err := publicapi.For(ctx).Gallery.GetGalleryById(ctx, obj.Dbid)
 
@@ -318,6 +322,14 @@ func (r *galleryUserResolver) TokensByChain(ctx context.Context, obj *model.Gall
 
 func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
 	return resolveWalletsByUserID(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error) {
+	if obj.HelperGalleryUserData.FeaturedGalleryID == nil {
+		return nil, nil
+	}
+
+	return resolveGalleryByGalleryID(ctx, *obj.HelperGalleryUserData.FeaturedGalleryID)
 }
 
 func (r *galleryUserResolver) Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error) {
@@ -721,18 +733,24 @@ func (r *mutationResolver) GetAuthNonce(ctx context.Context, chainAddress persis
 	return output, nil
 }
 
-func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism, username string, bio *string, email *persist.Email) (model.CreateUserPayloadOrError, error) {
+func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.AuthMechanism, input model.CreateUserInput) (model.CreateUserPayloadOrError, error) {
 	authenticator, err := r.authMechanismToAuthenticator(ctx, authMechanism)
 	if err != nil {
 		return nil, err
 	}
 
 	bioStr := ""
-	if bio != nil {
-		bioStr = *bio
+	if input.Bio != nil {
+		bioStr = *input.Bio
 	}
 
-	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, username, email, bioStr)
+	var email *persist.Email
+	if input.Email != nil {
+		it := persist.Email(*input.Email)
+		email = &it
+	}
+
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, input.Username, email, bioStr, input.GalleryName, input.GalleryDescription, input.GalleryPosition)
 	if err != nil {
 		return nil, err
 	}
@@ -898,6 +916,94 @@ func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DB
 
 	output := &model.ViewGalleryPayload{
 		Gallery: galleryToModel(ctx, gallery),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error) {
+	gallery, err := publicapi.For(ctx).Gallery.CreateGallery(ctx, input.Name, input.Description, input.Position)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.CreateGalleryPayload{
+		Gallery: galleryToModel(ctx, gallery),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateGalleryHidden(ctx context.Context, input model.UpdateGalleryHiddenInput) (model.UpdateGalleryHiddenPayloadOrError, error) {
+	err := publicapi.For(ctx).Gallery.UpdateGalleryHidden(ctx, input.ID, input.Hidden)
+	if err != nil {
+		return nil, err
+	}
+
+	gallery, err := resolveGalleryByGalleryID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateGalleryHiddenPayload{
+		Gallery: gallery,
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) DeleteGallery(ctx context.Context, galleryID persist.DBID) (model.DeleteGalleryPayloadOrError, error) {
+	gallery, err := publicapi.For(ctx).Gallery.DeleteGallery(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.DeleteGalleryPayload{
+		Gallery: galleryToModel(ctx, gallery),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateGalleryOrder(ctx context.Context, input model.UpdateGalleryOrderInput) (model.UpdateGalleryOrderPayloadOrError, error) {
+	err := publicapi.For(ctx).Gallery.UpdateGalleryPositions(ctx, input.Positions)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateGalleryOrderPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateGalleryInfo(ctx context.Context, input model.UpdateGalleryInfoInput) (model.UpdateGalleryInfoPayloadOrError, error) {
+	err := publicapi.For(ctx).Gallery.UpdateGalleryInfo(ctx, input.ID, input.Name, input.Description)
+	if err != nil {
+		return nil, err
+	}
+
+	gallery, err := resolveGalleryByGalleryID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateGalleryInfoPayload{
+		Gallery: gallery,
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateFeaturedGallery(ctx context.Context, galleryID persist.DBID) (model.UpdateFeaturedGalleryPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateFeaturedGallery(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateFeaturedGalleryPayload{
+		Viewer: resolveViewer(ctx),
 	}
 
 	return output, nil

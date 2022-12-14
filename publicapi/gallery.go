@@ -3,6 +3,7 @@ package publicapi
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding"
 	"encoding/base64"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -29,6 +31,53 @@ type GalleryAPI struct {
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
+}
+
+func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *string, position string) (db.Gallery, error) {
+
+	var nullName, nullDesc sql.NullString
+	if name != nil {
+		nullName = sql.NullString{String: *name, Valid: true}
+	}
+	if description != nil {
+		nullDesc = sql.NullString{String: *description, Valid: true}
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	gallery, err := api.repos.GalleryRepository.Create(ctx, db.GalleryRepoCreateParams{
+		ID:          persist.GenerateID(),
+		Name:        nullName,
+		Description: nullDesc,
+		Position:    position,
+		OwnerUserID: userID,
+	})
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	return gallery, nil
+}
+
+func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	gallery, err := api.repos.GalleryRepository.Delete(ctx, db.GalleryRepoDeleteParams{
+		GalleryID:   galleryID,
+		OwnerUserID: userID,
+	})
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	return gallery, nil
 }
 
 func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
@@ -79,6 +128,22 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 	return galleries, nil
 }
 
+func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]string, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	previews, err := api.queries.GetGalleryTokenPreviewsByID(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return previews, nil
+}
+
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
@@ -100,6 +165,83 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
+	return nil
+}
+
+func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.DBID, name, description *string) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	var nullName, nullDesc sql.NullString
+	if name != nil {
+		nullName = sql.NullString{String: *name, Valid: true}
+	}
+	if description != nil {
+		nullDesc = sql.NullString{String: *description, Valid: true}
+	}
+
+	err = api.queries.UpdateGalleryInfo(ctx, db.UpdateGalleryInfoParams{
+		ID:          galleryID,
+		OwnerUserID: userID,
+		Name:        nullName,
+		Description: nullDesc,
+	})
+	return nil
+}
+
+func (api GalleryAPI) UpdateGalleryHidden(ctx context.Context, galleryID persist.DBID, hidden bool) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.UpdateGalleryHidden(ctx, db.UpdateGalleryHiddenParams{
+		ID:          galleryID,
+		OwnerUserID: userID,
+		Hidden:      hidden,
+	})
+	return nil
+}
+
+func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*model.GalleryPositionInput) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"positions": {positions, "required,min=1"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, position := range positions {
+		err = api.queries.UpdateGalleryPosition(ctx, db.UpdateGalleryPositionParams{
+			ID:          position.GalleryID,
+			OwnerUserID: userID,
+			Position:    position.Position,
+		})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

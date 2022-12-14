@@ -2,10 +2,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"time"
+
+	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -24,31 +24,34 @@ func NewGalleryRepository(queries *db.Queries) *GalleryRepository {
 }
 
 // Create creates a new gallery
-func (g *GalleryRepository) Create(pCtx context.Context, pGallery persist.GalleryDB) (persist.DBID, error) {
+func (g *GalleryRepository) Create(pCtx context.Context, pGallery db.GalleryRepoCreateParams) (db.Gallery, error) {
 
-	err := ensureCollsOwnedByUserToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	gal, err := g.queries.GalleryRepoCreate(pCtx, pGallery)
 	if err != nil {
-		return "", err
+		return db.Gallery{}, err
 	}
 
-	colls, err := ensureAllCollsAccountedForToken(pCtx, g, pGallery.Collections, pGallery.OwnerUserID)
+	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.OwnerUserID)
 	if err != nil {
-		return "", err
+		return db.Gallery{}, err
 	}
-	pGallery.Collections = colls
+	return gal, nil
+}
 
-	id, err := g.queries.GalleryRepoCreate(pCtx, db.GalleryRepoCreateParams{
-		ID:          persist.GenerateID(),
-		Version:     sql.NullInt32{Int32: pGallery.Version.Int32(), Valid: true},
-		Collections: pGallery.Collections,
-		OwnerUserID: pGallery.OwnerUserID,
-	})
+// Delete deletes a gallery and ensures that the collections of that gallery are passed on to another gallery
+func (g *GalleryRepository) Delete(pCtx context.Context, pGallery db.GalleryRepoDeleteParams) (db.Gallery, error) {
 
+	gal, err := g.queries.GalleryRepoDelete(pCtx, pGallery)
 	if err != nil {
-		return "", err
+		return db.Gallery{}, err
 	}
 
-	return id, nil
+	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.OwnerUserID)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	return gal, nil
 }
 
 // Update updates the gallery with the given ID and ensures that gallery is owned by the given userID
@@ -57,11 +60,6 @@ func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUser
 	if err != nil {
 		return err
 	}
-	colls, err := ensureAllCollsAccountedForToken(pCtx, g, pUpdate.Collections, pUserID)
-	if err != nil {
-		return err
-	}
-	pUpdate.Collections = colls
 
 	rowsAffected, err := g.queries.GalleryRepoUpdate(pCtx, db.GalleryRepoUpdateParams{
 		LastUpdated: time.Time(pUpdate.LastUpdated),
@@ -78,7 +76,7 @@ func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUser
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
 
-	return nil
+	return ensureAllCollsAccountedForToken(pCtx, g, pUserID)
 }
 
 // AddCollections adds the given collections to the gallery with the given ID
@@ -87,46 +85,6 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	err := ensureCollsOwnedByUserToken(pCtx, g, pCollections, pUserID)
 	if err != nil {
 		return err
-	}
-
-	ct, err := g.queries.GalleryRepoCountColls(pCtx, pID)
-	if err != nil {
-		return err
-	}
-
-	allCollsCt, err := g.queries.GalleryRepoCountAllCollections(pCtx, pUserID)
-	if err != nil {
-		return err
-	}
-
-	if ct+int64(len(pCollections)) != allCollsCt {
-		galleryCollIDs, err := g.queries.GalleryRepoGetGalleryCollections(pCtx, pID)
-		if err != nil {
-			return err
-		}
-		galleryCollIDs = append(pCollections, galleryCollIDs...)
-
-		allColls, err := addUnaccountedForCollectionsToken(pCtx, g, pUserID, galleryCollIDs)
-		if err != nil {
-			return err
-		}
-
-		rowsAffected, err := g.queries.GalleryRepoUpdate(pCtx, db.GalleryRepoUpdateParams{
-			LastUpdated: time.Now(),
-			Collections: allColls,
-			GalleryID:   pID,
-			OwnerUserID: pUserID,
-		})
-
-		if err != nil {
-			return err
-		}
-
-		if rowsAffected == 0 {
-			return persist.ErrGalleryNotFoundByID{ID: pID}
-		}
-
-		return nil
 	}
 
 	rowsAffected, err := g.queries.GalleryRepoAddCollections(pCtx, db.GalleryRepoAddCollectionsParams{
@@ -143,7 +101,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
 
-	return nil
+	return ensureAllCollsAccountedForToken(pCtx, g, pUserID)
 }
 
 func (g *GalleryRepository) GetPreviewsURLsByUserID(pCtx context.Context, pUserID persist.DBID, limit int) ([]string, error) {
@@ -170,33 +128,10 @@ func ensureCollsOwnedByUserToken(pCtx context.Context, g *GalleryRepository, pCo
 	return nil
 }
 
-func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryRepository, pColls []persist.DBID, pUserID persist.DBID) ([]persist.DBID, error) {
-	ct, err := g.queries.GalleryRepoCountAllCollections(pCtx, pUserID)
+func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryRepository, pUserID persist.DBID) error {
+	err := g.queries.GalleryRepoEnsureCollsOwnedByUser(pCtx, pUserID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if ct != int64(len(pColls)) {
-		if int64(len(pColls)) < ct {
-			return addUnaccountedForCollectionsToken(pCtx, g, pUserID, pColls)
-		}
-		return nil, errCollsNotOwnedByUser
-	}
-	return pColls, nil
-}
-
-func appendDifference(pDest []persist.DBID, pSrc []persist.DBID) []persist.DBID {
-	for _, v := range pSrc {
-		if !persist.ContainsDBID(pDest, v) {
-			pDest = append(pDest, v)
-		}
-	}
-	return pDest
-}
-
-func addUnaccountedForCollectionsToken(pCtx context.Context, g *GalleryRepository, pUserID persist.DBID, pColls []persist.DBID) ([]persist.DBID, error) {
-	colls, err := g.queries.GalleryRepoGetCollections(pCtx, pUserID)
-	if err != nil {
-		return nil, err
-	}
-	return appendDifference(pColls, colls), nil
+	return nil
 }

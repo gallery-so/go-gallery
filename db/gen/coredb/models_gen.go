@@ -177,6 +177,10 @@ type Gallery struct {
 	Version     sql.NullInt32
 	OwnerUserID persist.DBID
 	Collections persist.DBIDList
+	Name        sql.NullString
+	Description sql.NullString
+	Hidden      bool
+	Position    string
 }
 
 type LoginAttempt struct {
@@ -307,6 +311,7 @@ type User struct {
 	NotificationSettings persist.UserNotificationSettings
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
+	FeaturedGallery      *persist.DBID
 }
 
 type UserEvent struct {

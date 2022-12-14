@@ -2,10 +2,12 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
@@ -82,7 +84,7 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string, userRepo *postgres.UserRepository,
+func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string, galleryName, galleryDesc *string, galleryPos string, userRepo *postgres.UserRepository,
 	galleryRepo *postgres.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
@@ -120,12 +122,25 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		return "", "", err
 	}
 
-	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{}}
-
-	galleryID, err = galleryRepo.Create(pCtx, galleryInsert)
+	var nullName, nullDesc sql.NullString
+	if galleryName != nil {
+		nullName = sql.NullString{String: *galleryName, Valid: true}
+	}
+	if galleryDesc != nil {
+		nullDesc = sql.NullString{String: *galleryDesc, Valid: true}
+	}
+	gallery, err := galleryRepo.Create(pCtx, coredb.GalleryRepoCreateParams{
+		ID:          persist.GenerateID(),
+		OwnerUserID: userID,
+		Name:        nullName,
+		Description: nullDesc,
+		Position:    galleryPos,
+	})
 	if err != nil {
 		return "", "", err
 	}
+
+	galleryID = gallery.ID
 
 	auth.SetAuthStateForCtx(gc, userID, nil)
 	auth.SetJWTCookie(gc, jwtTokenStr)

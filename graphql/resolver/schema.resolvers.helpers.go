@@ -333,6 +333,20 @@ func resolveCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) 
 	return output, nil
 }
 
+func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*string, error) {
+	tokens, err := publicapi.For(ctx).Gallery.GetTokenPreviewsByGalleryID(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	var output = make([]*string, len(tokens))
+	for i, token := range tokens {
+		output[i] = &token
+	}
+
+	return output, nil
+}
+
 func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (*model.CollectionToken, error) {
 	token, err := resolveTokenByTokenID(ctx, tokenID)
 	if err != nil {
@@ -491,11 +505,15 @@ func resolveWalletByAddress(ctx context.Context, address persist.DBID) (*model.W
 }
 
 func resolveViewer(ctx context.Context) *model.Viewer {
+	var userID persist.DBID
 	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
 		return nil
+
 	}
+	userID = publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 
 	viewer := &model.Viewer{
+		UserID:          userID,
 		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver
 	}
@@ -1197,6 +1215,10 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
+		HelperGalleryUserData: model.HelperGalleryUserData{
+			UserID:            user.ID,
+			FeaturedGalleryID: user.FeaturedGallery,
+		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
 		Bio:       &user.Bio.String,
