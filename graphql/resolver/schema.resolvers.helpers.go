@@ -42,6 +42,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnFeedEvent:      resolveFeedEventByEventID,
 	OnAdmire:         resolveAdmireByAdmireID,
 	OnComment:        resolveCommentByCommentID,
+	OnMerchToken:     resolveMerchTokenByTokenID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -946,6 +947,16 @@ func resolveCommentByCommentID(ctx context.Context, commentID persist.DBID) (*mo
 	}
 
 	return commentToModel(ctx, *comment), nil
+}
+
+func resolveMerchTokenByTokenID(ctx context.Context, tokenID string) (*model.MerchToken, error) {
+	token, err := publicapi.For(ctx).Merch.GetMerchTokenByTokenID(ctx, persist.TokenID(tokenID))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
 }
 
 func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {

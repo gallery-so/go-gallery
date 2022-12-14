@@ -46,6 +46,7 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 			util.ErrResponse(c, http.StatusOK, err)
 			return
 		}
+		defer throttler.Unlock(ctx, input.UserID.String())
 
 		allTokens, err := tokenRepo.GetByUserID(ctx, input.UserID, -1, -1)
 		if err != nil {
