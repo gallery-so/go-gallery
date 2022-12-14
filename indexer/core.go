@@ -3,8 +3,6 @@ package indexer
 import (
 	"context"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -14,9 +12,9 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -26,27 +24,29 @@ import (
 )
 
 // Init initializes the indexer
-func Init() {
-	router, i := coreInit()
+func Init(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) {
+	router, i := coreInit(fromBlock, toBlock, quietLogs, enableRPC)
 	logger.For(nil).Info("Starting indexer...")
 	go i.Start(sentry.SetHubOnContext(context.Background(), sentry.CurrentHub()))
 	http.Handle("/", router)
 }
 
 // InitServer initializes the indexer server
-func InitServer() {
-	router := coreInitServer()
+func InitServer(keyFile string, quietLogs, enableRPC bool) {
+	router := coreInitServer(keyFile, quietLogs, enableRPC)
 	logger.For(nil).Info("Starting indexer server...")
 	http.Handle("/", router)
 }
 
-func coreInit() (*gin.Engine, *indexer) {
-
-	setDefaults("indexer")
+func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engine, *indexer) {
 	initSentry()
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.AddHook(sentryutil.SentryLoggerHook)
+		logger.SetLevel(logrus.InfoLevel)
+		if viper.GetString("ENV") != "production" && !quietLogs {
+			logger.SetLevel(logrus.DebugLevel)
+		}
 	})
 
 	var s *storage.Client
@@ -60,14 +60,11 @@ func coreInit() (*gin.Engine, *indexer) {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	// overrides for where the indexer starts and stops
-	startingBlock, maxBlock := getBlockRangeFromArgs()
-
-	if viper.GetString("ENV") == "production" {
+	if viper.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, startingBlock, maxBlock)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -75,44 +72,22 @@ func coreInit() (*gin.Engine, *indexer) {
 
 	if viper.GetString("ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
-		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	logger.For(nil).Info("Registering handlers...")
 	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
 }
 
-func getBlockRangeFromArgs() (*uint64, *uint64) {
-	var startingBlock, maxBlock *uint64
-	if len(os.Args) > 1 {
-		start, err := strconv.ParseUint(os.Args[1], 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		startingBlock = &start
-	}
-	if len(os.Args) > 2 {
-		max, err := strconv.ParseUint(os.Args[2], 10, 64)
-		if err != nil {
-			panic(err)
-		}
-		maxBlock = &max
-	}
-	return startingBlock, maxBlock
-}
-
-func coreInitServer() *gin.Engine {
+func coreInitServer(localKeyPath string, quietLogs, enableRPC bool) *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
-
-	localKeyPath := "./_deploy/service-key-dev.json"
-	if len(os.Args) > 1 {
-		if os.Args[1] == "prod" {
-			localKeyPath = "./_deploy/service-key.json"
-		}
-	}
-	setDefaults("indexer-server")
 	initSentry()
 	logger.InitWithGCPDefaults()
+	logger.SetLoggerOptions(func(logger *logrus.Logger) {
+		logger.SetLevel(logrus.InfoLevel)
+		if viper.GetString("ENV") != "production" && !quietLogs {
+			logger.SetLevel(logrus.DebugLevel)
+		}
+	})
 
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
@@ -125,7 +100,7 @@ func coreInitServer() *gin.Engine {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	if viper.GetString("ENV") == "production" {
+	if viper.GetString("ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
@@ -149,7 +124,7 @@ func coreInitServer() *gin.Engine {
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 
-func setDefaults(service string) {
+func SetDefaults() {
 	viper.SetDefault("RPC_URL", "")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
 	viper.SetDefault("IPFS_API_URL", "https://ipfs.infura.io:5001")
@@ -169,16 +144,18 @@ func setDefaults(service string) {
 	viper.SetDefault("SENTRY_DSN", "")
 	viper.SetDefault("IMGIX_API_KEY", "")
 	viper.SetDefault("VERSION", "")
-
 	viper.AutomaticEnv()
+}
 
+func LoadConfigFile(service string, manualEnv string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
-	} else {
-		envFile := util.ResolveEnvFile(service)
-		util.LoadEnvFile(envFile)
+		return
 	}
+	util.LoadEnvFile(util.ResolveEnvFile(service, manualEnv))
+}
 
+func ValidateEnv() {
 	util.VarNotSetTo("RPC_URL", "")
 	if viper.GetString("ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
@@ -203,9 +180,14 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              viper.GetString("SENTRY_DSN"),
-		Environment:      viper.GetString("ENV"),
-		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		Dsn:         viper.GetString("SENTRY_DSN"),
+		Environment: viper.GetString("ENV"),
+		TracesSampler: sentry.TracesSamplerFunc(func(ctx sentry.SamplingContext) sentry.Sampled {
+			if ctx.Span.Op == rpc.GethSocketOpName {
+				return sentry.UniformTracesSampler(0.01).Sample(ctx)
+			}
+			return sentry.UniformTracesSampler(viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
+		}),
 		Release:          viper.GetString("VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {

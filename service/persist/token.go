@@ -50,6 +50,8 @@ const (
 	MediaTypeJSON MediaType = "json"
 	// MediaTypeAnimation represents an animation (.glb)
 	MediaTypeAnimation MediaType = "animation"
+	// MediaTypePDF represents a pdf
+	MediaTypePDF MediaType = "pdf"
 	// MediaTypeInvalid represents an invalid media type such as when a token's external metadata's API is broken or no longer exists
 	MediaTypeInvalid MediaType = "invalid"
 	// MediaTypeUnknown represents an unknown media type
@@ -167,6 +169,16 @@ type Chain int
 
 // TokenID represents the ID of a token
 type TokenID string
+
+type TokenIDList []TokenID
+
+func (l TokenIDList) Value() (driver.Value, error) {
+	return pq.Array(l).Value()
+}
+
+func (l *TokenIDList) Scan(value interface{}) error {
+	return pq.Array(l).Scan(value)
+}
 
 // TokenURI represents the URI for an Ethereum token
 type TokenURI string
@@ -413,6 +425,8 @@ func MediaFromContentType(contentType string) MediaType {
 		default:
 			return MediaTypeText
 		}
+	case "pdf":
+		return MediaTypePDF
 	default:
 		return MediaTypeUnknown
 	}

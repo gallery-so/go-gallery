@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -16,8 +17,8 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -95,7 +96,11 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("tokenprocessing")
+		fi := "local"
+		if len(os.Args) > 1 {
+			fi = os.Args[1]
+		}
+		envFile := util.ResolveEnvFile("tokenprocessing", fi)
 		util.LoadEnvFile(envFile)
 	}
 

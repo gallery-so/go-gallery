@@ -6,12 +6,16 @@ import (
 	"time"
 
 	"github.com/bsm/redislock"
-	"github.com/mikeydub/go-gallery/service/memstore"
+
 	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/viper"
 )
+
+type ErrKeyNotFound struct {
+	Key string
+}
 
 const (
 	GalleriesDB               = 0
@@ -25,6 +29,7 @@ const (
 	EmailThrottleDB           = 9
 	NotificationLockDB        = 10
 	EmailRateLimiterDB        = 11
+	GraphQLAPQ                = 12
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.
@@ -78,7 +83,7 @@ func ClearCache(db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	client := NewClient(db)
-	return client.FlushAll(ctx).Err()
+	return client.FlushDB(ctx).Err()
 }
 
 // Set sets a value in the redis cache
@@ -91,7 +96,7 @@ func (c *Cache) Get(pCtx context.Context, key string) ([]byte, error) {
 	bs, err := c.client.Get(pCtx, key).Bytes()
 	if err != nil {
 		if err == redis.Nil {
-			return nil, memstore.ErrKeyNotFound{Key: key}
+			return nil, ErrKeyNotFound{Key: key}
 		}
 		return nil, err
 	}
@@ -141,4 +146,8 @@ func (l *GlobalLock) Lock(ctx context.Context) error {
 
 func (l *GlobalLock) Unlock(ctx context.Context) error {
 	return l.lock.Release(ctx)
+}
+
+func (e ErrKeyNotFound) Error() string {
+	return fmt.Sprintf("key %s not found", e.Key)
 }

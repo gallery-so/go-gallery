@@ -1495,6 +1495,8 @@ func getMediaForToken(ctx context.Context, token db.Token) model.MediaSubtype {
 		return getJsonMedia(ctx, med)
 	case persist.MediaTypeText, persist.MediaTypeBase64Text:
 		return getTextMedia(ctx, med)
+	case persist.MediaTypePDF:
+		return getPdfMedia(ctx, med)
 	case persist.MediaTypeUnknown:
 		return getUnknownMedia(ctx, med)
 	case persist.MediaTypeSyncing:
@@ -1583,6 +1585,15 @@ func getAudioMedia(ctx context.Context, media persist.Media) model.AudioMedia {
 
 func getTextMedia(ctx context.Context, media persist.Media) model.TextMedia {
 	return model.TextMedia{
+		PreviewURLs:      getPreviewUrls(ctx, media),
+		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaType:        (*string)(&media.MediaType),
+		ContentRenderURL: (*string)(&media.MediaURL),
+	}
+}
+
+func getPdfMedia(ctx context.Context, media persist.Media) model.PDFMedia {
+	return model.PDFMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
 		MediaURL:         util.StringToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),

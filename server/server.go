@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/everFinance/goar"
@@ -16,6 +18,7 @@ import (
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
@@ -27,8 +30,6 @@ import (
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
-	"github.com/mikeydub/go-gallery/service/memstore"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/multichain/eth"
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
@@ -36,6 +37,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -101,23 +103,26 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		}
 	}
 	taskClient := task.NewClient(context.Background())
+	secretClient := newSecretsClient()
 	lock := redis.NewLockClient(redis.NotificationLockDB)
+
+	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 
 	queries := db.New(pgx)
 
-	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub, lock)
+	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub, lock, secretClient, graphqlAPQCache)
 }
 
-func newTasksClient() *cloudtasks.Client {
-	var c *cloudtasks.Client
+func newSecretsClient() *secretmanager.Client {
+	var c *secretmanager.Client
 	var err error
 	if viper.GetString("ENV") != "local" {
-		c, err = cloudtasks.NewClient(context.Background())
+		c, err = secretmanager.NewClient(context.Background())
 	} else {
-		c, err = cloudtasks.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		c, err = secretmanager.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
 	}
 	if err != nil {
-		logger.For(nil).Errorf("error creating tasks client: %v", err)
+		panic(fmt.Sprintf("error creating secrets client: %v", err))
 	}
 	return c
 }
@@ -140,8 +145,8 @@ func setDefaults() {
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
-	viper.SetDefault("CONTRACT_ADDRESSES", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
-	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-rinkeby.alchemyapi.io/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("PREMIUM_CONTRACT_ADDRESS", "0x93eC9b03a9C14a530F582aef24a21d7FC88aaC46=[0,1,2,3,4,5,6,7,8]")
+	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
@@ -170,13 +175,18 @@ func setDefaults() {
 	viper.SetDefault("EMAILS_HOST", "http://localhost:5500")
 	viper.SetDefault("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
+	viper.SetDefault("MERCH_CONTRACT_ADDRESS", "0x01f55be815fbd10b1770b008b8960931a30e7f65")
 
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("backend")
+		fi := "local"
+		if len(os.Args) > 1 {
+			fi = os.Args[1]
+		}
+		envFile := util.ResolveEnvFile("backend", fi)
 		util.LoadEnvFile(envFile)
 	}
 
@@ -242,7 +252,7 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries, cache memstore.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
+func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)
@@ -250,7 +260,9 @@ func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries
 	tezosProvider := multichain.FallbackProvider{
 		Primary:  tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket),
 		Fallback: tezos.NewObjktProvider(viper.GetString("IPFS_URL")),
-		Eval:     multichain.ContainsTezosKeywords,
+		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
+			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
+		},
 	}
 	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
 	return multichain.NewProvider(context.Background(), repos, queries, cache, taskClient,

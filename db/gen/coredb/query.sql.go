@@ -31,6 +31,21 @@ func (q *Queries) AddUserRoles(ctx context.Context, arg AddUserRolesParams) erro
 	return err
 }
 
+const blockUserFromFeed = `-- name: BlockUserFromFeed :exec
+INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3)
+`
+
+type BlockUserFromFeedParams struct {
+	ID     persist.DBID
+	UserID persist.DBID
+	Action persist.Action
+}
+
+func (q *Queries) BlockUserFromFeed(ctx context.Context, arg BlockUserFromFeedParams) error {
+	_, err := q.db.Exec(ctx, blockUserFromFeed, arg.ID, arg.UserID, arg.Action)
+	return err
+}
+
 const clearNotificationsForUser = `-- name: ClearNotificationsForUser :many
 UPDATE notifications SET seen = true WHERE owner_id = $1 AND seen = false RETURNING id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount
 `
@@ -1342,6 +1357,17 @@ func (q *Queries) GetMembershipByMembershipId(ctx context.Context, id persist.DB
 	return i, err
 }
 
+const getMerchDiscountCodeByTokenID = `-- name: GetMerchDiscountCodeByTokenID :one
+select discount_code from merch where token_id = $1 and redeemed = true and deleted = false
+`
+
+func (q *Queries) GetMerchDiscountCodeByTokenID(ctx context.Context, tokenHex persist.TokenID) (sql.NullString, error) {
+	row := q.db.QueryRow(ctx, getMerchDiscountCodeByTokenID, tokenHex)
+	var discount_code sql.NullString
+	err := row.Scan(&discount_code)
+	return discount_code, err
+}
+
 const getMostRecentNotificationByOwnerIDForAction = `-- name: GetMostRecentNotificationByOwnerIDForAction :one
 select id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount from notifications
     where owner_id = $1
@@ -2061,12 +2087,55 @@ func (q *Queries) GetUserNotifications(ctx context.Context, arg GetUserNotificat
 	return items, nil
 }
 
-const getUserRolesByUserId = `-- name: GetUserRolesByUserId :many
-select role from user_roles where user_id = $1 and deleted = false
+const getUserOwnsTokenByIdentifiers = `-- name: GetUserOwnsTokenByIdentifiers :one
+select exists(select 1 from tokens where owner_user_id = $1 and token_id = $2 and contract = $3 and chain = $4 and deleted = false) as owns_token
 `
 
-func (q *Queries) GetUserRolesByUserId(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	rows, err := q.db.Query(ctx, getUserRolesByUserId, userID)
+type GetUserOwnsTokenByIdentifiersParams struct {
+	UserID   persist.DBID
+	TokenHex persist.TokenID
+	Contract persist.DBID
+	Chain    persist.Chain
+}
+
+func (q *Queries) GetUserOwnsTokenByIdentifiers(ctx context.Context, arg GetUserOwnsTokenByIdentifiersParams) (bool, error) {
+	row := q.db.QueryRow(ctx, getUserOwnsTokenByIdentifiers,
+		arg.UserID,
+		arg.TokenHex,
+		arg.Contract,
+		arg.Chain,
+	)
+	var owns_token bool
+	err := row.Scan(&owns_token)
+	return owns_token, err
+}
+
+const getUserRolesByUserId = `-- name: GetUserRolesByUserId :many
+select role from user_roles where user_id = $1 and deleted = false
+union
+select role from (
+  select
+    case when exists(select 1 from tokens where owner_user_id = $1 and token_id = any($2::varchar[]) and contract = (select id from contracts where address = $3 and contracts.chain = $4 and contracts.deleted = false) and deleted = false)
+      then $5 else null end as role
+) r where role is not null
+`
+
+type GetUserRolesByUserIdParams struct {
+	UserID                persist.DBID
+	MembershipTokenIds    []string
+	MembershipAddress     persist.Address
+	Chain                 persist.Chain
+	GrantedMembershipRole string
+}
+
+func (q *Queries) GetUserRolesByUserId(ctx context.Context, arg GetUserRolesByUserIdParams) ([]persist.Role, error) {
+	rows, err := q.db.Query(ctx, getUserRolesByUserId,
+		arg.UserID,
+		arg.MembershipTokenIds,
+		arg.MembershipAddress,
+		arg.Chain,
+		arg.GrantedMembershipRole,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2715,6 +2784,22 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const redeemMerch = `-- name: RedeemMerch :one
+update merch set redeemed = true, token_id = $1, last_updated = now() where id = (select m.id from merch m where m.object_type = $2 and m.token_id is null and m.redeemed = false and m.deleted = false order by m.id limit 1) and token_id is null and redeemed = false returning discount_code
+`
+
+type RedeemMerchParams struct {
+	TokenHex   persist.TokenID
+	ObjectType int32
+}
+
+func (q *Queries) RedeemMerch(ctx context.Context, arg RedeemMerchParams) (sql.NullString, error) {
+	row := q.db.QueryRow(ctx, redeemMerch, arg.TokenHex, arg.ObjectType)
+	var discount_code sql.NullString
+	err := row.Scan(&discount_code)
+	return discount_code, err
 }
 
 const updateNotification = `-- name: UpdateNotification :exec

@@ -260,7 +260,7 @@ func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID per
 }
 
 // BulkUpsertByOwnerUserID upserts multiple tokens for a user and removes any tokens that are not in the list
-func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery) error {
+func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery, skipDelete bool) error {
 	now, err := t.bulkUpsert(pCtx, pTokens)
 	if err != nil {
 		return err
@@ -268,32 +268,36 @@ func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, o
 
 	// delete tokens of owner before timestamp
 
-	res, err := t.deleteTokensOfOwnerBeforeTimeStampStmt.ExecContext(pCtx, ownerUserID, chains, now)
-	if err != nil {
-		return fmt.Errorf("failed to delete tokens: %w", err)
-	}
+	if !skipDelete {
+		res, err := t.deleteTokensOfOwnerBeforeTimeStampStmt.ExecContext(pCtx, ownerUserID, chains, now)
+		if err != nil {
+			return fmt.Errorf("failed to delete tokens: %w", err)
+		}
 
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected: %w", err)
+		}
 
-	logger.For(pCtx).Infof("deleted %d tokens", rowsAffected)
+		logger.For(pCtx).Infof("deleted %d tokens", rowsAffected)
+	}
 
 	return nil
 }
 
 // BulkUpsertTokensOfContract upserts all tokens of a contract and deletes the old tokens
-func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery) error {
+func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery, skipDelete bool) error {
 	now, err := t.bulkUpsert(pCtx, pTokens)
 	if err != nil {
 		return err
 	}
 	// delete tokens of contract before timestamp
 
-	_, err = t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(pCtx, contractID, now)
-	if err != nil {
-		return fmt.Errorf("failed to delete tokens: %w", err)
+	if !skipDelete {
+		_, err = t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(pCtx, contractID, now)
+		if err != nil {
+			return fmt.Errorf("failed to delete tokens: %w", err)
+		}
 	}
 
 	return nil

@@ -345,21 +345,21 @@ func InDocker() bool {
 }
 
 // ResolveEnvFile finds the appropriate env file to use for the service.
-func ResolveEnvFile(service string) string {
+func ResolveEnvFile(service string, env string) string {
 	format := "app-%s-%s.yaml"
 	if InDocker() {
 		return fmt.Sprintf(format, "docker", service)
 	}
-	if len(os.Args) > 1 {
-		switch env := os.Args[1]; env {
-		case "local":
-			return fmt.Sprintf(format, "local", service)
-		case "dev":
-			return fmt.Sprintf(format, "dev", service)
-		case "prod":
-			return fmt.Sprintf(format, "prod", service)
-		}
+
+	switch env {
+	case "local":
+		return fmt.Sprintf(format, "local", service)
+	case "dev":
+		return fmt.Sprintf(format, "dev", service)
+	case "prod":
+		return fmt.Sprintf(format, "prod", service)
 	}
+
 	return fmt.Sprintf("app-local-%s.yaml", service)
 }
 

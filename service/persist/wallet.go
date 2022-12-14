@@ -255,18 +255,29 @@ func (w Wallet) Value() (driver.Value, error) {
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (wa *WalletType) UnmarshalGQL(v interface{}) error {
-	n, ok := v.(int)
+	n, ok := v.(string)
 	if !ok {
-		return fmt.Errorf("Chain must be an int")
+		return fmt.Errorf("wrong type for WalletType: %T", v)
 	}
-
-	*wa = WalletType(n)
+	switch n {
+	case "EOA":
+		*wa = WalletTypeEOA
+	case "Gnosis":
+		*wa = WalletTypeGnosis
+	default:
+		return fmt.Errorf("unknown WalletType: %s", n)
+	}
 	return nil
 }
 
 // MarshalGQL implements the graphql.Marshaler interface
 func (wa WalletType) MarshalGQL(w io.Writer) {
-	w.Write([]byte{uint8(wa)})
+	switch wa {
+	case WalletTypeEOA:
+		w.Write([]byte(`"EOA"`))
+	case WalletTypeGnosis:
+		w.Write([]byte(`"Gnosis"`))
+	}
 }
 
 func (n Address) String() string {

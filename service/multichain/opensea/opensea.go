@@ -183,6 +183,24 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	return tokens, contract, nil
 }
 
+// GetTokensByContractAddressAndOwner returns a list of tokens for a contract address and owner
+func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	assetsChan := make(chan assetsReceieved)
+	go func() {
+		defer close(assetsChan)
+		FetchAssets(ctx, assetsChan, persist.EthereumAddress(owner), persist.EthereumAddress(address), "", "", 0, nil)
+	}()
+	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	var contract multichain.ChainAgnosticContract
+	if len(contracts) > 0 {
+		contract = contracts[0]
+	}
+	return tokens, contract, nil
+}
+
 // GetTokensByTokenIdentifiers returns a list of tokens for a list of token identifiers
 func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	assetsChan := make(chan assetsReceieved)

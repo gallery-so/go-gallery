@@ -615,13 +615,14 @@ func (r *mutationResolver) SetSpamPreference(ctx context.Context, input model.Se
 	return model.SetSpamPreferencePayload{Tokens: tokens}, nil
 }
 
-func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain, userID *persist.DBID) (model.SyncTokensPayloadOrError, error) {
+func (r *mutationResolver) SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
 	if chains == nil || len(chains) == 0 {
 		chains = []persist.Chain{persist.ChainETH}
 	}
-	err := api.Token.SyncTokens(ctx, chains, userID)
+
+	err := api.Token.SyncTokens(ctx, chains)
 	if err != nil {
 		return nil, err
 	}
@@ -967,6 +968,25 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, input model.VerifyEm
 	return verifyEmail(ctx, input.Token)
 }
 
+func (r *mutationResolver) RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error) {
+	tokenIDList := make([]persist.TokenID, len(input.TokenIds))
+	for i, id := range input.TokenIds {
+		tokenIDList[i] = persist.TokenID(id)
+	}
+	if input.Address == nil {
+		return nil, fmt.Errorf("address is required")
+	}
+	tokens, err := publicapi.For(ctx).Merch.RedeemMerchItems(ctx, tokenIDList, *input.Address, input.Signature, input.WalletType)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.RedeemMerchPayload{
+		Tokens: tokens,
+	}
+	return output, nil
+}
+
 func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.AddRolesToUser(ctx, username, roles)
 
@@ -985,6 +1005,59 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 	}
 
 	return userToModel(ctx, *user), nil
+}
+
+func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error) {
+	api := publicapi.For(ctx)
+
+	user, err := api.User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if chains == nil || len(chains) == 0 {
+		chains = []persist.Chain{persist.ChainETH}
+	}
+
+	err = api.Token.SyncTokensAdmin(ctx, chains, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.SyncTokensForUsernamePayload{
+		Message: "Successfully synced tokens",
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = publicapi.For(ctx).Feed.BlockUser(ctx, user.ID, persist.Action(action))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return model.BanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
+}
+
+func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
+	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
+
+	if err != nil {
+		return nil, err
+	}
+
+	message := "Persisted queries uploaded successfully"
+
+	return model.UploadPersistedQueriesPayload{Message: &message}, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
@@ -1111,6 +1184,18 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
+}
+
+func (r *queryResolver) GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error) {
+	tokens, err := publicapi.For(ctx).Merch.GetMerchTokens(ctx, wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.MerchTokensPayload{
+		Tokens: tokens,
+	}
+	return output, nil
 }
 
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {

@@ -247,6 +247,59 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	return tokens, contract, nil
 }
 
+// GetTokensByContractAddressAndOwner retrieves tokens for a contract address and owner on the Tezos Blockchain
+func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+
+	offset := startOffset
+	limit := int(math.Min(float64(maxLimit), float64(pageSize)))
+	if limit < 1 {
+		limit = pageSize
+	}
+	resultTokens := []tzktBalanceToken{}
+
+	for {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/tokens/balances?account=%s&token.standard=fa2&token.contract=%s&limit=%d&offset=%d", d.apiURL, owner, contractAddress.String(), limit, offset), nil)
+		if err != nil {
+			return nil, multichain.ChainAgnosticContract{}, err
+		}
+		resp, err := d.httpClient.Do(req)
+		if err != nil {
+			return nil, multichain.ChainAgnosticContract{}, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, multichain.ChainAgnosticContract{}, util.GetErrFromResp(resp)
+		}
+		var tzktBalances []tzktBalanceToken
+		if err := json.NewDecoder(resp.Body).Decode(&tzktBalances); err != nil {
+			return nil, multichain.ChainAgnosticContract{}, err
+		}
+		resultTokens = append(resultTokens, tzktBalances...)
+
+		if len(tzktBalances) < limit || (maxLimit > 0 && len(resultTokens) >= maxLimit) {
+			break
+		}
+
+		if maxLimit > 0 && len(resultTokens)+limit >= maxLimit {
+			// this will ensure that we don't go over the max limit
+			limit = maxLimit - len(resultTokens)
+		}
+
+		offset += limit
+	}
+
+	tokens, contracts, err := d.tzBalanceTokensToTokens(ctx, resultTokens, contractAddress.String())
+	if err != nil {
+		return nil, multichain.ChainAgnosticContract{}, err
+	}
+	if len(contractAddress) == 0 {
+		return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("no contract found for address: %s", contractAddress)
+	}
+	contract := contracts[0]
+
+	return tokens, contract, nil
+}
+
 // GetTokensByTokenIdentifiers retrieves tokens for a token identifiers on the Tezos Blockchain
 func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentifiers multichain.ChainAgnosticIdentifiers, maxLimit, startOffset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	offset := startOffset
@@ -790,4 +843,35 @@ func (b balance) ToBigInt() *big.Int {
 		panic(fmt.Sprintf("failed to convert tokenID to int: %s", b))
 	}
 	return asInt
+}
+
+// IsSigned returns false if the token is an unsigned FxHash token (metadata hasn't yet been uploaded to the FxHash contract).
+// It's possible for tzkt to index a token before FxHash signs a token which results in the API returning placeholder metadata.
+// This seems to happen infrequently, but there are a few cases where the token is never updated with the signed metadata
+// (either because of tzkt failing to update the metadata, or FxHash never signing the token). If it's the former, we want to
+// fallback to an alternative provider in case there might be usable metadata elsewhere.
+func IsSigned(ctx context.Context, token multichain.ChainAgnosticToken) bool {
+	return !media.IsFxHash(token.ContractAddress) || token.Name != "[WAITING TO BE SIGNED]"
+}
+
+// ContainsTezosKeywords returns true if the token's metadata has at least one non-empty Tezos keyword.
+// The tzkt API sometimes returns completely empty metadata, in which case we want to fallback
+// to an alternative provider.
+func ContainsTezosKeywords(ctx context.Context, token multichain.ChainAgnosticToken) bool {
+	imageKeywords, animationKeywords := persist.ChainTezos.BaseKeywords()
+	for field, val := range token.TokenMetadata {
+
+		for _, keyword := range imageKeywords {
+			if field == keyword && (val != nil && val != "") {
+				return true
+			}
+		}
+
+		for _, keyword := range animationKeywords {
+			if field == keyword && (val != nil && val != "") {
+				return true
+			}
+		}
+	}
+	return false
 }

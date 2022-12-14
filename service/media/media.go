@@ -74,6 +74,7 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 	"glb":  {persist.MediaTypeAnimation, "model/gltf-binary"},
 	"gltf": {persist.MediaTypeAnimation, "model/gltf+json"},
 	"svg":  {persist.MediaTypeImage, "image/svg+xml"},
+	"pdf":  {persist.MediaTypePDF, "application/pdf"},
 }
 
 func NewLocalStorageClient(ctx context.Context, keyPath string) *storage.Client {
@@ -169,7 +170,7 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 	switch mediaType {
 	case persist.MediaTypeImage:
 		res = getImageMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
-	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypeAnimation:
+	case persist.MediaTypeVideo, persist.MediaTypeAudio, persist.MediaTypeText, persist.MediaTypePDF, persist.MediaTypeAnimation:
 		res = getAuxilaryMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL, mediaType)
 	case persist.MediaTypeHTML:
 		res = getHTMLMedia(pCtx, name, tokenBucket, storageClient, vURL, imgURL)
@@ -781,18 +782,23 @@ func (d DefaultKeywords) ForToken(tokenID persist.TokenID, contract persist.Addr
 
 const (
 	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
-	fxHash    = "KT1BJC12dG17CVvPKJ1VYaNnaT5mzfnUTwXv"
-	fxHash2   = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
+	fxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
+	fxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
 )
 
+func IsHicEtNunc(contract persist.Address) bool {
+	return contract == hicEtNunc
+}
+
+func IsFxHash(contract persist.Address) bool {
+	return contract == fxHash || contract == fxHash2
+}
+
 func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
-
-	switch contract {
-
-	case hicEtNunc:
-		return []string{"displayUri", "image", "artifactUri"}
-		// fxhash
-	case fxHash, fxHash2:
+	switch {
+	case IsHicEtNunc(contract):
+		return []string{"artifactUri", "displayUri", "image"}
+	case IsFxHash(contract):
 		return []string{"displayUri", "artifactUri", "image", "uri"}
 	default:
 		return i
@@ -800,8 +806,8 @@ func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Add
 }
 
 func (a TezAnimationKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
-	switch contract {
-	case fxHash, fxHash2:
+	switch {
+	case IsFxHash(contract):
 		return []string{"artifactUri", "displayUri"}
 	default:
 		return a

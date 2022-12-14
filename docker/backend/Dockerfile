@@ -17,6 +17,6 @@ RUN go build -o ./bin/backend ./cmd/server/main.go
 ARG VERSION
 ENV GAE_VERSION=$VERSION
 
-EXPOSE 6000
+EXPOSE 4000
 USER nobody
 ENTRYPOINT ["./bin/backend"]

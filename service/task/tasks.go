@@ -1,4 +1,4 @@
-package memstore
+package task
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/gammazero/workerpool"
 )
@@ -25,7 +26,7 @@ type UpdateQueue struct {
 	poolMu         *sync.Mutex
 	lastFinishedMu *sync.Mutex
 
-	cache Cache
+	cache *redis.Cache
 
 	updates           chan update
 	pools             map[string]*workerpool.WorkerPool
@@ -35,7 +36,7 @@ type UpdateQueue struct {
 }
 
 // NewUpdateQueue creates a new UpdateQueue
-func NewUpdateQueue(cache Cache) *UpdateQueue {
+func NewUpdateQueue(cache *redis.Cache) *UpdateQueue {
 	queue := &UpdateQueue{
 		wg:                &sync.WaitGroup{},
 		poolMu:            &sync.Mutex{},

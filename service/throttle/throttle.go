@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/memstore"
+	"github.com/mikeydub/go-gallery/service/redis"
 )
 
 // ErrThrottleLocked is returned when the throttle is already locked for a given key. We do not block
@@ -17,12 +17,12 @@ type ErrThrottleLocked struct {
 // across the application. It useses a memstore to store empty data with a given key.
 // The key will also be stored with the given expiry to ensure no state is locked indefinitely (unless the expiry is set to allow that).
 type Locker struct {
-	memstore memstore.Cache
+	memstore *redis.Cache
 	expiry   time.Duration
 }
 
 // NewThrottleLocker creates a new throttle locker
-func NewThrottleLocker(memstore memstore.Cache, expiry time.Duration) *Locker {
+func NewThrottleLocker(memstore *redis.Cache, expiry time.Duration) *Locker {
 	return &Locker{
 		memstore: memstore,
 		expiry:   expiry,
@@ -62,7 +62,7 @@ func (t *Locker) IsLocked(ctx context.Context, key string) (bool, error) {
 
 	_, err := t.memstore.Get(ctx, key)
 	if err != nil {
-		if _, ok := err.(memstore.ErrKeyNotFound); ok {
+		if _, ok := err.(redis.ErrKeyNotFound); ok {
 			return false, nil
 		}
 		return false, err

@@ -183,6 +183,11 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
 }
 
+// GetTokensByContractAddressAndOwner retrieves tokens for a contract address with owner on the Poap Blockchain
+func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	return nil, multichain.ChainAgnosticContract{}, fmt.Errorf("poap has no way to retrieve tokens by contract address")
+}
+
 func (d *Provider) GetCommunityOwners(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticCommunityOwner, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/events/%s", d.apiURL, contractAddress), nil)
 	if err != nil {

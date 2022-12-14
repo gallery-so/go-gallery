@@ -14,6 +14,8 @@ directive @authRequired on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @retoolAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
+directive @frontendBuildAuth on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
 # Use @scrub on any input field that should be omitted from request logging (e.g. passwords or
 # other sensitive data)
 directive @scrub on INPUT_FIELD_DEFINITION
@@ -127,6 +129,7 @@ union MediaSubtype =
   | VideoMedia
   | AudioMedia
   | TextMedia
+  | PdfMedia
   | HtmlMedia
   | JsonMedia
   | GltfMedia
@@ -203,6 +206,14 @@ type TextMedia implements Media {
     mediaType: String
 
     contentRenderURL: String
+}
+
+type PdfMedia implements Media {
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
+
+  contentRenderURL: String
 }
 
 type HtmlMedia implements Media {
@@ -745,7 +756,28 @@ type UsersConnection {
 enum Role {
     ADMIN
     BETA_TESTER
+    EARLY_ACCESS
 }
+
+enum MerchType {
+  TShirt
+  Hat
+  Card
+}
+
+type MerchToken @goGqlId(fields: ["tokenId"]) {
+  id: ID!
+  tokenId: String!
+  objectType: MerchType!
+  discountCode: String
+  redeemed: Boolean!
+}
+
+type MerchTokensPayload {
+  tokens: [MerchToken!]
+}
+
+union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
 
 type Query {
     node(id: ID!): Node
@@ -764,6 +796,7 @@ type Query {
     galleryOfTheWeekWinners: [GalleryUser!]
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
+    getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
 
     # Retool Specific
     usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth
@@ -1384,6 +1417,48 @@ union UnsubscribeFromEmailTypePayloadOrError =
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
 
+input UploadPersistedQueriesInput {
+    persistedQueries: String
+}
+
+union UploadPersistedQueriesPayloadOrError = UploadPersistedQueriesPayload | ErrNotAuthorized
+
+type UploadPersistedQueriesPayload {
+    message: String
+}
+
+input RedeemMerchInput {
+    tokenIds: [String!]!
+    address: ChainAddressInput!
+    walletType: WalletType!
+    signature: String!
+}
+
+type MerchDiscountCode {
+    code: String!
+    tokenId: String
+}
+
+type RedeemMerchPayload {
+    tokens: [MerchToken]
+}
+
+union RedeemMerchPayloadOrError =
+    RedeemMerchPayload
+    | ErrInvalidInput
+
+type SyncTokensForUsernamePayload {
+    message: String!
+}
+
+union SyncTokensForUsernamePayloadOrError = SyncTokensForUsernamePayload | ErrNotAuthorized | ErrSyncFailed
+
+type BanUserFromFeedPayload {
+   user: GalleryUser
+}
+
+union BanUserFromFeedPayloadOrError = BanUserFromFeedPayload | ErrNotAuthorized
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1404,7 +1479,7 @@ type Mutation {
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
     setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-    syncTokens(chains: [Chain!], userID: DBID): SyncTokensPayloadOrError @authRequired
+    syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -1437,9 +1512,16 @@ type Mutation {
     preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
     verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
 
+    redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
+
     # Retool Specific Mutations
     addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
     revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
+    syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError @retoolAuth
+    banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
+
+    # Gallery Frontend Deploy Persisted Queries
+    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
 }
 
 type Subscription {

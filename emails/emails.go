@@ -3,6 +3,7 @@ package emails
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -12,8 +13,8 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -104,7 +105,11 @@ func setDefaults() {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
-		envFile := util.ResolveEnvFile("emails")
+		fi := "local"
+		if len(os.Args) > 0 {
+			fi = os.Args[1]
+		}
+		envFile := util.ResolveEnvFile("emails", fi)
 		util.LoadEnvFile(envFile)
 	}
 

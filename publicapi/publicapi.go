@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mikeydub/go-gallery/graphql/apq"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/event"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/everFinance/goar"
@@ -33,10 +35,12 @@ var errBadCursorFormat = errors.New("bad cursor format")
 const apiContextKey = "publicapi.api"
 
 type PublicAPI struct {
-	repos         *postgres.Repositories
-	queries       *db.Queries
-	loaders       *dataloader.Loaders
-	validator     *validator.Validate
+	repos     *postgres.Repositories
+	queries   *db.Queries
+	loaders   *dataloader.Loaders
+	validator *validator.Validate
+	APQ       *apq.APQCache
+
 	Auth          *AuthAPI
 	Collection    *CollectionAPI
 	Gallery       *GalleryAPI
@@ -49,19 +53,22 @@ type PublicAPI struct {
 	Notifications *NotificationsAPI
 	Interaction   *InteractionAPI
 	Admin         *AdminAPI
+	Merch         *MerchAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker) *PublicAPI {
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := newValidator()
 
 	return &PublicAPI{
-		repos:         repos,
-		queries:       queries,
-		loaders:       loaders,
-		validator:     validator,
+		repos:     repos,
+		queries:   queries,
+		loaders:   loaders,
+		validator: validator,
+		APQ:       apq,
+
 		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
@@ -74,6 +81,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 		Admin:         &AdminAPI{queries: queries, loaders: loaders, validator: validator},
+		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }
 

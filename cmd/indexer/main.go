@@ -1,21 +1,11 @@
 package main
 
 import (
-	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/mikeydub/go-gallery/indexer"
-	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"google.golang.org/appengine"
+	"github.com/mikeydub/go-gallery/indexer/cmd"
 )
 
 func main() {
-	defer sentryutil.RecoverAndRaise(nil)
-
-	indexer.Init()
-	if appengine.IsAppEngine() {
-		appengine.Main()
-	} else {
-		http.ListenAndServe(":4000", nil)
-	}
+	cmd.Execute()
 }

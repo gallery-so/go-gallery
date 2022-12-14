@@ -27,6 +27,10 @@ type AuthorizationError interface {
 	IsAuthorizationError()
 }
 
+type BanUserFromFeedPayloadOrError interface {
+	IsBanUserFromFeedPayloadOrError()
+}
+
 type CollectionByIDOrError interface {
 	IsCollectionByIDOrError()
 }
@@ -113,6 +117,10 @@ type MediaSubtype interface {
 	IsMediaSubtype()
 }
 
+type MerchTokensPayloadOrError interface {
+	IsMerchTokensPayloadOrError()
+}
+
 type Node interface {
 	IsNode()
 }
@@ -124,6 +132,10 @@ type Notification interface {
 
 type PreverifyEmailPayloadOrError interface {
 	IsPreverifyEmailPayloadOrError()
+}
+
+type RedeemMerchPayloadOrError interface {
+	IsRedeemMerchPayloadOrError()
 }
 
 type RefreshCollectionPayloadOrError interface {
@@ -160,6 +172,10 @@ type RevokeRolesFromUserPayloadOrError interface {
 
 type SetSpamPreferencePayloadOrError interface {
 	IsSetSpamPreferencePayloadOrError()
+}
+
+type SyncTokensForUsernamePayloadOrError interface {
+	IsSyncTokensForUsernamePayloadOrError()
 }
 
 type SyncTokensPayloadOrError interface {
@@ -208,6 +224,10 @@ type UpdateTokenInfoPayloadOrError interface {
 
 type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
+}
+
+type UploadPersistedQueriesPayloadOrError interface {
+	IsUploadPersistedQueriesPayloadOrError()
 }
 
 type UserByAddressOrError interface {
@@ -286,6 +306,12 @@ type Badge struct {
 	ImageURL string    `json:"imageURL"`
 	Contract *Contract `json:"contract"`
 }
+
+type BanUserFromFeedPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (BanUserFromFeedPayload) IsBanUserFromFeedPayloadOrError() {}
 
 type ChainTokens struct {
 	Chain  *persist.Chain `json:"chain"`
@@ -599,6 +625,7 @@ func (ErrInvalidInput) IsUserByIDOrError()                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                          {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
+func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -626,6 +653,7 @@ func (ErrInvalidInput) IsUpdateEmailPayloadOrError()                     {}
 func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
+func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -663,16 +691,20 @@ func (ErrNotAuthorized) IsError()                                  {}
 func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
 func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()           {}
 func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()      {}
+func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()   {}
+func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()    {}
+func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()          {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
 }
 
-func (ErrSyncFailed) IsSyncTokensPayloadOrError()        {}
-func (ErrSyncFailed) IsRefreshTokenPayloadOrError()      {}
-func (ErrSyncFailed) IsRefreshCollectionPayloadOrError() {}
-func (ErrSyncFailed) IsRefreshContractPayloadOrError()   {}
-func (ErrSyncFailed) IsError()                           {}
+func (ErrSyncFailed) IsSyncTokensPayloadOrError()            {}
+func (ErrSyncFailed) IsRefreshTokenPayloadOrError()          {}
+func (ErrSyncFailed) IsRefreshCollectionPayloadOrError()     {}
+func (ErrSyncFailed) IsRefreshContractPayloadOrError()       {}
+func (ErrSyncFailed) IsError()                               {}
+func (ErrSyncFailed) IsSyncTokensForUsernamePayloadOrError() {}
 
 type ErrTokenNotFound struct {
 	Message string `json:"message"`
@@ -919,6 +951,25 @@ type MembershipTier struct {
 
 func (MembershipTier) IsNode() {}
 
+type MerchDiscountCode struct {
+	Code    string  `json:"code"`
+	TokenID *string `json:"tokenId"`
+}
+
+type MerchToken struct {
+	ID           GqlID     `json:"id"`
+	TokenID      string    `json:"tokenId"`
+	ObjectType   MerchType `json:"objectType"`
+	DiscountCode *string   `json:"discountCode"`
+	Redeemed     bool      `json:"redeemed"`
+}
+
+type MerchTokensPayload struct {
+	Tokens []*MerchToken `json:"tokens"`
+}
+
+func (MerchTokensPayload) IsMerchTokensPayloadOrError() {}
+
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
 	Cursor *string      `json:"cursor"`
@@ -959,6 +1010,16 @@ type PageInfo struct {
 	EndCursor       string `json:"endCursor"`
 }
 
+type PDFMedia struct {
+	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
+	MediaURL         *string        `json:"mediaURL"`
+	MediaType        *string        `json:"mediaType"`
+	ContentRenderURL *string        `json:"contentRenderURL"`
+}
+
+func (PDFMedia) IsMediaSubtype() {}
+func (PDFMedia) IsMedia()        {}
+
 type PreverifyEmailInput struct {
 	Email persist.Email `json:"email"`
 }
@@ -978,6 +1039,19 @@ type PreviewURLSet struct {
 	Large     *string `json:"large"`
 	SrcSet    *string `json:"srcSet"`
 }
+
+type RedeemMerchInput struct {
+	TokenIds   []string              `json:"tokenIds"`
+	Address    *persist.ChainAddress `json:"address"`
+	WalletType persist.WalletType    `json:"walletType"`
+	Signature  string                `json:"signature"`
+}
+
+type RedeemMerchPayload struct {
+	Tokens []*MerchToken `json:"tokens"`
+}
+
+func (RedeemMerchPayload) IsRedeemMerchPayloadOrError() {}
 
 type RefreshCollectionPayload struct {
 	Collection *Collection `json:"collection"`
@@ -1106,6 +1180,12 @@ type SomeoneViewedYourGalleryNotification struct {
 func (SomeoneViewedYourGalleryNotification) IsNotification()        {}
 func (SomeoneViewedYourGalleryNotification) IsNode()                {}
 func (SomeoneViewedYourGalleryNotification) IsGroupedNotification() {}
+
+type SyncTokensForUsernamePayload struct {
+	Message string `json:"message"`
+}
+
+func (SyncTokensForUsernamePayload) IsSyncTokensForUsernamePayloadOrError() {}
 
 type SyncTokensPayload struct {
 	Viewer *Viewer `json:"viewer"`
@@ -1323,6 +1403,16 @@ type UpdateUserInfoPayload struct {
 
 func (UpdateUserInfoPayload) IsUpdateUserInfoPayloadOrError() {}
 
+type UploadPersistedQueriesInput struct {
+	PersistedQueries *string `json:"persistedQueries"`
+}
+
+type UploadPersistedQueriesPayload struct {
+	Message *string `json:"message"`
+}
+
+func (UploadPersistedQueriesPayload) IsUploadPersistedQueriesPayloadOrError() {}
+
 type UserCreatedFeedEventData struct {
 	EventTime *time.Time      `json:"eventTime"`
 	Owner     *GalleryUser    `json:"owner"`
@@ -1455,6 +1545,49 @@ func (e *EmailUnsubscriptionType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e EmailUnsubscriptionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type MerchType string
+
+const (
+	MerchTypeTShirt MerchType = "TShirt"
+	MerchTypeHat    MerchType = "Hat"
+	MerchTypeCard   MerchType = "Card"
+)
+
+var AllMerchType = []MerchType{
+	MerchTypeTShirt,
+	MerchTypeHat,
+	MerchTypeCard,
+}
+
+func (e MerchType) IsValid() bool {
+	switch e {
+	case MerchTypeTShirt, MerchTypeHat, MerchTypeCard:
+		return true
+	}
+	return false
+}
+
+func (e MerchType) String() string {
+	return string(e)
+}
+
+func (e *MerchType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MerchType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MerchType", str)
+	}
+	return nil
+}
+
+func (e MerchType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

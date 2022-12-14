@@ -165,7 +165,7 @@ func HandleCORS() gin.HandlerFunc {
 		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, Set-Cookie, sentry-trace")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, Set-Cookie, sentry-trace, baggage")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type, Set-Cookie")
 
@@ -244,6 +244,13 @@ func Tracing() gin.HandlerFunc {
 			sentry.TransactionName(description),
 			sentry.ContinueFromRequest(c.Request),
 		)
+
+		if c.Request.Method == "OPTIONS" {
+			// Don't sample OPTIONS requests; there's nothing to trace and they eat up our Sentry quota.
+			// Using a sampling decision here (instead of simply omitting the span) ensures that any
+			// child spans will also be filtered out.
+			span.Sampled = sentry.SampledFalse
+		}
 
 		defer tracing.FinishSpan(span)
 

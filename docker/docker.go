@@ -12,7 +12,7 @@ import (
 
 	"github.com/asottile/dockerfile"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/memstore/redis"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
