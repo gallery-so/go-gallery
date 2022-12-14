@@ -568,7 +568,7 @@ func SpanFilterEventProcessor(ctx context.Context, minSpanDuration time.Duration
 			event.Spans = append(event.Spans, span.RawSpan)
 		}
 
-		logger.For(nil).Infof("filtered %d spans down to %d spans in %v\n", numUnfilteredSpans, len(event.Spans), time.Since(spanFilterStartTime))
+		logger.For(ctx).Infof("filtered %d spans down to %d spans in %v\n", numUnfilteredSpans, len(event.Spans), time.Since(spanFilterStartTime))
 
 		const maxSpans = 1000
 		// If we still have too many spans after filtering, we need to drop some
