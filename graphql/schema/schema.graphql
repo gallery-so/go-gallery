@@ -1479,7 +1479,7 @@ type Mutation {
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
     setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-    syncTokens(chains: [Chain!], userID: DBID): SyncTokensPayloadOrError @authRequired
+    syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError

@@ -569,7 +569,7 @@ type ComplexityRoot struct {
 		ResendVerificationEmail         func(childComplexity int) int
 		RevokeRolesFromUser             func(childComplexity int, username string, roles []*persist.Role) int
 		SetSpamPreference               func(childComplexity int, input model.SetSpamPreferenceInput) int
-		SyncTokens                      func(childComplexity int, chains []persist.Chain, userID *persist.DBID) int
+		SyncTokens                      func(childComplexity int, chains []persist.Chain) int
 		SyncTokensForUsername           func(childComplexity int, username string, chains []persist.Chain) int
 		UnfollowUser                    func(childComplexity int, userID persist.DBID) int
 		UnsubscribeFromEmailType        func(childComplexity int, input model.UnsubscribeFromEmailTypeInput) int
@@ -1067,7 +1067,7 @@ type MutationResolver interface {
 	UpdateCollectionHidden(ctx context.Context, input model.UpdateCollectionHiddenInput) (model.UpdateCollectionHiddenPayloadOrError, error)
 	UpdateTokenInfo(ctx context.Context, input model.UpdateTokenInfoInput) (model.UpdateTokenInfoPayloadOrError, error)
 	SetSpamPreference(ctx context.Context, input model.SetSpamPreferenceInput) (model.SetSpamPreferencePayloadOrError, error)
-	SyncTokens(ctx context.Context, chains []persist.Chain, userID *persist.DBID) (model.SyncTokensPayloadOrError, error)
+	SyncTokens(ctx context.Context, chains []persist.Chain) (model.SyncTokensPayloadOrError, error)
 	RefreshToken(ctx context.Context, tokenID persist.DBID) (model.RefreshTokenPayloadOrError, error)
 	RefreshCollection(ctx context.Context, collectionID persist.DBID) (model.RefreshCollectionPayloadOrError, error)
 	RefreshContract(ctx context.Context, contractID persist.DBID) (model.RefreshContractPayloadOrError, error)
@@ -3155,7 +3155,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]persist.Chain), args["userID"].(*persist.DBID)), true
+		return e.complexity.Mutation.SyncTokens(childComplexity, args["chains"].([]persist.Chain)), true
 
 	case "Mutation.syncTokensForUsername":
 		if e.complexity.Mutation.SyncTokensForUsername == nil {
@@ -6439,7 +6439,7 @@ type Mutation {
     updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
     setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
-    syncTokens(chains: [Chain!], userID: DBID): SyncTokensPayloadOrError @authRequired
+    syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
     refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
     refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
     refreshContract(contractId: DBID!): RefreshContractPayloadOrError
@@ -7267,15 +7267,6 @@ func (ec *executionContext) field_Mutation_syncTokens_args(ctx context.Context, 
 		}
 	}
 	args["chains"] = arg0
-	var arg1 *persist.DBID
-	if tmp, ok := rawArgs["userID"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userID"))
-		arg1, err = ec.unmarshalODBID2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["userID"] = arg1
 	return args, nil
 }
 
@@ -16318,7 +16309,7 @@ func (ec *executionContext) _Mutation_syncTokens(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().SyncTokens(rctx, args["chains"].([]persist.Chain), args["userID"].(*persist.DBID))
+			return ec.resolvers.Mutation().SyncTokens(rctx, args["chains"].([]persist.Chain))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {
