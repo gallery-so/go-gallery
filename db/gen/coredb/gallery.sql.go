@@ -75,7 +75,7 @@ insert into galleries (id, owner_user_id, name, description, position) values ($
 `
 
 type GalleryRepoCreateParams struct {
-	ID          persist.DBID
+	GalleryID   persist.DBID
 	OwnerUserID persist.DBID
 	Name        sql.NullString
 	Description sql.NullString
@@ -84,7 +84,7 @@ type GalleryRepoCreateParams struct {
 
 func (q *Queries) GalleryRepoCreate(ctx context.Context, arg GalleryRepoCreateParams) (Gallery, error) {
 	row := q.db.QueryRow(ctx, galleryRepoCreate,
-		arg.ID,
+		arg.GalleryID,
 		arg.OwnerUserID,
 		arg.Name,
 		arg.Description,

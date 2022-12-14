@@ -49,7 +49,7 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 	}
 
 	gallery, err := api.repos.GalleryRepository.Create(ctx, db.GalleryRepoCreateParams{
-		ID:          persist.GenerateID(),
+		GalleryID:   persist.GenerateID(),
 		Name:        nullName,
 		Description: nullDesc,
 		Position:    position,

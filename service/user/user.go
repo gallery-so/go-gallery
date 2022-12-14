@@ -130,7 +130,7 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		nullDesc = sql.NullString{String: *galleryDesc, Valid: true}
 	}
 	gallery, err := galleryRepo.Create(pCtx, coredb.GalleryRepoCreateParams{
-		ID:          persist.GenerateID(),
+		GalleryID:   persist.GenerateID(),
 		OwnerUserID: userID,
 		Name:        nullName,
 		Description: nullDesc,

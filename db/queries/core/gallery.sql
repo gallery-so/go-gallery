@@ -1,5 +1,5 @@
 -- name: GalleryRepoCreate :one
-insert into galleries (id, owner_user_id, name, description, position) values (@id, @owner_user_id, @name, @description, @position) returning *;
+insert into galleries (id, owner_user_id, name, description, position) values (@gallery_id, @owner_user_id, @name, @description, @position) returning *;
 
 -- name: GalleryRepoUpdate :execrows
 update galleries set last_updated = $1, collections = $2 where id = @gallery_id and owner_user_id = $3;

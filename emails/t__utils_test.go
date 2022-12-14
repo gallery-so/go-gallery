@@ -114,14 +114,14 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 		t.Fatalf("failed to create collection: %s", err)
 	}
 
-	galleryInsert := coredb.GalleryRepoCreateParams{OwnerUserID: userID, ID: persist.GenerateID(), Position: "0.1"}
+	galleryInsert := coredb.GalleryRepoCreateParams{OwnerUserID: userID, GalleryID: persist.GenerateID(), Position: "0.1"}
 
 	gallery, err := repos.GalleryRepository.Create(ctx, galleryInsert)
 	if err != nil {
 		t.Fatalf("failed to create gallery: %s", err)
 	}
 
-	galleryInsert2 := coredb.GalleryRepoCreateParams{OwnerUserID: userID2, ID: persist.GenerateID(), Position: "0.2"}
+	galleryInsert2 := coredb.GalleryRepoCreateParams{OwnerUserID: userID2, GalleryID: persist.GenerateID(), Position: "0.2"}
 
 	_, err = repos.GalleryRepository.Create(ctx, galleryInsert2)
 	if err != nil {
