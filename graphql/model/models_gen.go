@@ -957,12 +957,13 @@ type MerchDiscountCode struct {
 }
 
 type MerchToken struct {
-	ID           GqlID     `json:"id"`
 	TokenID      string    `json:"tokenId"`
 	ObjectType   MerchType `json:"objectType"`
 	DiscountCode *string   `json:"discountCode"`
 	Redeemed     bool      `json:"redeemed"`
 }
+
+func (MerchToken) IsNode() {}
 
 type MerchTokensPayload struct {
 	Tokens []*MerchToken `json:"tokens"`

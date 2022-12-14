@@ -136,6 +136,79 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 	return merchTokens, nil
 }
 
+func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.TokenID) (*model.MerchToken, error) {
+
+	if err := validateFields(api.validator, validationMap{
+		"tokenID": {tokenID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	merchAddress := viper.GetString("MERCH_CONTRACT_ADDRESS")
+
+	token, err := api.queries.GetTokenByTokenIdentifiers(ctx, db.GetTokenByTokenIdentifiersParams{
+		TokenHex:        tokenID,
+		ContractAddress: persist.Address(merchAddress),
+		Chain:           persist.ChainETH,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	t := &model.MerchToken{
+		TokenID: tokenID.String(),
+	}
+	discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.TokenID, err)
+	}
+	if discountCode.Valid && discountCode.String != "" {
+		t.DiscountCode = &discountCode.String
+		t.Redeemed = true
+	}
+
+	if token.TokenUri.String != "" {
+		otype := uriToMerchType[token.TokenUri.String]
+		switch otype {
+		case merchTypeTShirt:
+			t.ObjectType = model.MerchTypeTShirt
+		case merchTypeHat:
+			t.ObjectType = model.MerchTypeHat
+		case merchTypeCard:
+			t.ObjectType = model.MerchTypeCard
+		default:
+			return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
+		}
+	} else if token.TokenMetadata != nil && len(token.TokenMetadata) > 0 {
+		// TokenURI should exist but since we have been talking about removing this field, I added this extra backup logic
+		asBytes, err := json.Marshal(token.TokenMetadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal token metadata: %w", err)
+		}
+		var metadata merchMetadata
+		if err := json.Unmarshal(asBytes, &metadata); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal token metadata: %w", err)
+		}
+		for _, attr := range metadata.Attributes {
+			if attr.TraitType == "Object" {
+				switch attr.Value {
+				case "001":
+					t.ObjectType = model.MerchTypeTShirt
+				case "002":
+					t.ObjectType = model.MerchTypeHat
+				case "003":
+					t.ObjectType = model.MerchTypeCard
+				default:
+					return nil, fmt.Errorf("unknown merch type for token %v", token.TokenID)
+				}
+				break
+			}
+		}
+	}
+
+	return t, nil
+}
+
 func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchToken, error) {
 
 	if err := validateFields(api.validator, validationMap{

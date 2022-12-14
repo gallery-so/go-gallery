@@ -1594,6 +1594,48 @@ func (q *Queries) GetTokenById(ctx context.Context, id persist.DBID) (Token, err
 	return i, err
 }
 
+const getTokenByTokenIdentifiers = `-- name: GetTokenByTokenIdentifiers :one
+select id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced from tokens where tokens.token_id = $1 and contract = (select contracts.id from contracts where contracts.address = $2) and tokens.chain = $3 and tokens.deleted = false
+`
+
+type GetTokenByTokenIdentifiersParams struct {
+	TokenHex        persist.TokenID
+	ContractAddress persist.Address
+	Chain           persist.Chain
+}
+
+func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenByTokenIdentifiersParams) (Token, error) {
+	row := q.db.QueryRow(ctx, getTokenByTokenIdentifiers, arg.TokenHex, arg.ContractAddress, arg.Chain)
+	var i Token
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.Name,
+		&i.Description,
+		&i.CollectorsNote,
+		&i.Media,
+		&i.TokenUri,
+		&i.TokenType,
+		&i.TokenID,
+		&i.Quantity,
+		&i.OwnershipHistory,
+		&i.TokenMetadata,
+		&i.ExternalUrl,
+		&i.BlockNumber,
+		&i.OwnerUserID,
+		&i.OwnedByWallets,
+		&i.Chain,
+		&i.Contract,
+		&i.IsUserMarkedSpam,
+		&i.IsProviderMarkedSpam,
+		&i.LastSynced,
+	)
+	return i, err
+}
+
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
 SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions FROM tokens t
     JOIN users u ON u.id = t.owner_user_id

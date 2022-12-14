@@ -632,3 +632,6 @@ select discount_code from merch where token_id = @token_hex and redeemed = true 
 
 -- name: GetUserOwnsTokenByIdentifiers :one
 select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain and deleted = false) as owns_token;
+
+-- name: GetTokenByTokenIdentifiers :one
+select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
