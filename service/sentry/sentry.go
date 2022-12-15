@@ -375,6 +375,7 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 
 		for _, span := range spans {
 			span.Parent = spanDataBySpanID[span.RawSpan.ParentSpanID]
+			span.Duration = getSpanDuration(span.RawSpan)
 		}
 
 		// Propagate span times from child to parent.
