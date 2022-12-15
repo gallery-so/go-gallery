@@ -172,7 +172,7 @@ jobs:
         run: |
           cd _deploy
           make deploy-prod-tokenprocessing
-  deploy-dev-indexer:
+  deploy-dev-indexer-api:
     runs-on: ubuntu-latest
     steps:
       - name: Dump GitHub context
@@ -213,7 +213,7 @@ jobs:
         run: |
           cd _deploy
           make deploy-dev-indexer-server
-  deploy-prod-indexer:
+  deploy-prod-indexer-api:
     runs-on: ubuntu-latest
     steps:
       - name: Dump GitHub context
