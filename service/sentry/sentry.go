@@ -579,7 +579,9 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 		filteredTo := len(event.Spans)
 		numDropped := 0
 
-		logger.For(ctx).Infof("filtered %d spans down to %d spans in %v\n", filteredFrom, filteredTo, timeTaken)
+		if filteredFrom != filteredTo {
+			logger.For(ctx).Infof("filtered %d spans down to %d spans in %v\n", filteredFrom, filteredTo, timeTaken)
+		}
 
 		// If we still have too many spans after filtering, we need to drop some
 		if len(event.Spans) > maxSpans {
