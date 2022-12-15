@@ -571,12 +571,35 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 			event.Spans = append(event.Spans, span.RawSpan)
 		}
 
-		logger.For(ctx).Infof("filtered %d spans down to %d spans in %v\n", numUnfilteredSpans, len(event.Spans), time.Since(spanFilterStartTime))
+		timeTaken := time.Since(spanFilterStartTime)
+		filteredFrom := numUnfilteredSpans
+		filteredTo := len(event.Spans)
+		numDropped := 0
+
+		logger.For(ctx).Infof("filtered %d spans down to %d spans in %v\n", filteredFrom, filteredTo, timeTaken)
 
 		// If we still have too many spans after filtering, we need to drop some
 		if len(event.Spans) > maxSpans {
-			logger.For(ctx).Warnf("dropping %d spans to reduce total from %d to %d\n", len(event.Spans)-maxSpans, len(event.Spans), maxSpans)
+			numDropped = len(event.Spans) - maxSpans
+			logger.For(ctx).Warnf("dropping %d spans to reduce total from %d to %d\n", numDropped, len(event.Spans), maxSpans)
 			event.Spans = event.Spans[:maxSpans]
+		}
+
+		// Add filtering metadata to the top-level span
+		if len(event.Spans) > 0 {
+			transaction := sentry.TransactionFromContext(event.Spans[0].Context())
+			if transaction != nil {
+				if transaction.Data == nil {
+					transaction.Data = make(map[string]interface{})
+				}
+
+				transaction.Data["Span Filtering"] = map[string]interface{}{
+					"Time Taken":    fmt.Sprintf("%.3fms", durationToMsFloat(timeTaken)),
+					"Filtered From": filteredFrom,
+					"Filtered To":   filteredTo,
+					"Dropped":       numDropped,
+				}
+			}
 		}
 
 		return event
