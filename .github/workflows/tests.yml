@@ -16,7 +16,7 @@ jobs:
       - name: "Install Dependencies"
         run: |
           go mod download
-          go get gotest.tools/gotestsum@v1.7.0
+          go install gotest.tools/gotestsum@v1.8.2
       - name: "Update apt"
         run: sudo apt-get update
       - name: "Download Keybase"
@@ -63,7 +63,7 @@ jobs:
       - name: "Install Dependencies"
         run: |
           go mod download
-          go get gotest.tools/gotestsum@v1.7.0
+          go install gotest.tools/gotestsum@v1.8.2
       - name: "Update apt"
         run: sudo apt-get update
       - name: "Download Keybase"

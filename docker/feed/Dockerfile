@@ -2,10 +2,6 @@
 
 FROM golang:1.19-bullseye
 
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
 # Install deps
 WORKDIR /app
 COPY go.mod go.sum /app/
