@@ -415,11 +415,11 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 
 		var filteredSpans []*spanData
 
-		filterPass := 1
-		minDurationForPass := minSpanDuration
+		reportedFilterPasses := 0
+		reportedMinSpanDuration := time.Duration(0)
 
 		// Keep filtering and doubling the minSpanDuration until we've filtered out enough spans
-		for ; filterPass <= maxFilterPasses; filterPass++ {
+		for filterPass, minDurationForPass := 1, minSpanDuration; filterPass <= maxFilterPasses; filterPass++ {
 			if len(spans) <= maxSpans {
 				break
 			}
@@ -436,6 +436,9 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 					span.IsFiltered = true
 				}
 			}
+
+			reportedFilterPasses = filterPass
+			reportedMinSpanDuration = minDurationForPass
 
 			spans = allowedSpans
 			minDurationForPass *= 2
@@ -591,23 +594,14 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 			event.Spans = event.Spans[:maxSpans]
 		}
 
-		// Add filtering metadata to the top-level span
-		if len(event.Spans) > 0 {
-			transaction := sentry.TransactionFromContext(event.Spans[0].Context())
-			if transaction != nil {
-				if transaction.Data == nil {
-					transaction.Data = make(map[string]interface{})
-				}
-
-				transaction.Data["Span Filtering"] = map[string]interface{}{
-					"Time Taken":        fmt.Sprintf("%.3fms", durationToMsFloat(timeTaken)),
-					"Filtered From":     filteredFrom,
-					"Filtered To":       filteredTo,
-					"Dropped":           numDropped,
-					"Min Span Duration": fmt.Sprintf("%.3fms", durationToMsFloat(minDurationForPass)),
-					"Filter Passes":     filterPass,
-				}
-			}
+		// Add filtering metadata to the event
+		event.Contexts["Span Filtering"] = map[string]interface{}{
+			"Filtering Took":    fmt.Sprintf("%.3fms", durationToMsFloat(timeTaken)),
+			"Filtered From":     fmt.Sprintf("%d spans", filteredFrom),
+			"Filtered To":       fmt.Sprintf("%d spans", filteredTo),
+			"Dropped":           fmt.Sprintf("%d spans", numDropped),
+			"Min Span Duration": fmt.Sprintf("%.3fms", durationToMsFloat(reportedMinSpanDuration)),
+			"Filter Passes":     reportedFilterPasses,
 		}
 
 		return event
