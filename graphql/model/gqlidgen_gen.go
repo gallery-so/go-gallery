@@ -70,6 +70,10 @@ func (r *MembershipTier) ID() GqlID {
 	return GqlID(fmt.Sprintf("MembershipTier:%s", r.Dbid))
 }
 
+func (r *MerchToken) ID() GqlID {
+	return GqlID(fmt.Sprintf("MerchToken:%s", r.TokenID))
+}
+
 func (r *SomeoneAdmiredYourFeedEventNotification) ID() GqlID {
 	return GqlID(fmt.Sprintf("SomeoneAdmiredYourFeedEventNotification:%s", r.Dbid))
 }
@@ -109,6 +113,7 @@ type NodeFetcher struct {
 	OnGallery                                     func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser                                 func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
 	OnMembershipTier                              func(ctx context.Context, dbid persist.DBID) (*MembershipTier, error)
+	OnMerchToken                                  func(ctx context.Context, tokenId string) (*MerchToken, error)
 	OnSomeoneAdmiredYourFeedEventNotification     func(ctx context.Context, dbid persist.DBID) (*SomeoneAdmiredYourFeedEventNotification, error)
 	OnSomeoneCommentedOnYourFeedEventNotification func(ctx context.Context, dbid persist.DBID) (*SomeoneCommentedOnYourFeedEventNotification, error)
 	OnSomeoneFollowedYouBackNotification          func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouBackNotification, error)
@@ -178,6 +183,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MembershipTier' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnMembershipTier(ctx, persist.DBID(ids[0]))
+	case "MerchToken":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'MerchToken' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnMerchToken(ctx, string(ids[0]))
 	case "SomeoneAdmiredYourFeedEventNotification":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'SomeoneAdmiredYourFeedEventNotification' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -240,6 +250,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnGalleryUser")
 	case n.OnMembershipTier == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMembershipTier")
+	case n.OnMerchToken == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnMerchToken")
 	case n.OnSomeoneAdmiredYourFeedEventNotification == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneAdmiredYourFeedEventNotification")
 	case n.OnSomeoneCommentedOnYourFeedEventNotification == nil:

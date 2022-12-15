@@ -69,7 +69,6 @@ require (
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
 	golang.org/x/sync v0.1.0
-	golang.org/x/tools v0.4.0 // indirect
 	google.golang.org/api v0.103.0
 	google.golang.org/appengine v1.6.7
 	google.golang.org/genproto v0.0.0-20221202195650-67e5cbc046fd

@@ -5725,7 +5725,7 @@ enum MerchType {
   Card
 }
 
-type MerchToken @goGqlId(fields: ["tokenId"]) {
+type MerchToken implements Node @goGqlId(fields: ["tokenId"]) {
   id: ID!
   tokenId: String!
   objectType: MerchType!
@@ -15441,14 +15441,14 @@ func (ec *executionContext) _MerchToken_id(ctx context.Context, field graphql.Co
 		Object:     "MerchToken",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -28088,6 +28088,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._FeedEvent(ctx, sel, obj)
+	case model.MerchToken:
+		return ec._MerchToken(ctx, sel, &obj)
+	case *model.MerchToken:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._MerchToken(ctx, sel, obj)
 	case model.Notification:
 		if obj == nil {
 			return graphql.Null
@@ -32743,7 +32750,7 @@ func (ec *executionContext) _MerchDiscountCode(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var merchTokenImplementors = []string{"MerchToken"}
+var merchTokenImplementors = []string{"MerchToken", "Node"}
 
 func (ec *executionContext) _MerchToken(ctx context.Context, sel ast.SelectionSet, obj *model.MerchToken) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, merchTokenImplementors)
