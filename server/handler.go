@@ -143,7 +143,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 				return event
 			})
 
-			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 5*time.Millisecond))
+			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8))
 		}
 
 		disableDataloaderCaching := false

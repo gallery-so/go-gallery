@@ -331,33 +331,15 @@ func getSpanDuration(s *sentry.Span) time.Duration {
 	return s.EndTime.Sub(s.StartTime)
 }
 
-// expandForChildSpan updates a parent span's start/end times (if necessary) to fully encompass a child span
-func expandForChildSpan(ctx context.Context, parent *sentry.Span, child *sentry.Span) bool {
-	updatedParent := false
-
-	if child.EndTime.After(parent.EndTime) {
-		parent.EndTime = child.EndTime
-		updatedParent = true
-	}
-
-	// This generally shouldn't happen, but if it does, we still want the parent span to fully encapsulate its children
-	if child.StartTime.Before(parent.StartTime) {
-		logger.For(ctx).Warnf("child span '%s - %s' started at %v, before parent span '%s - %s' started at %v\n",
-			child.Op, child.Description, child.StartTime, parent.Op, parent.Description, parent.StartTime)
-
-		parent.StartTime = child.StartTime
-		updatedParent = true
-	}
-
-	return updatedParent
-}
-
 // Sentry uses milliseconds for its trace fields, and it keeps things consistent if we do it too
 func durationToMsFloat(duration time.Duration) float64 {
 	return float64(duration.Microseconds()) / 1000.0
 }
 
-func SpanFilterEventProcessor(ctx context.Context, minSpanDuration time.Duration) sentry.EventProcessor {
+// SpanFilterEventProcessor applies a progressive filter to spans, removing the shortest spans until the total span count
+// is less than the specified maxSpans value. Initially, spans shorter than minSpanDuration will be dropped, but each filter
+// pass (up to maxFilterPasses) will double the minSpanDuration until enough spans have been filtered out.
+func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration time.Duration, maxFilterPasses int) sentry.EventProcessor {
 	return func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 		if event == nil || event.Type != "transaction" || len(event.Spans) == 0 {
 			return event
@@ -370,11 +352,11 @@ func SpanFilterEventProcessor(ctx context.Context, minSpanDuration time.Duration
 		}
 
 		type spanData struct {
-			Parent                *spanData
-			RawSpan               *sentry.Span
-			IsAllowed             bool
-			CheckedLatestDuration bool
-			RollupsByName         map[string]*rollup
+			Parent        *spanData
+			RawSpan       *sentry.Span
+			IsFiltered    bool
+			RollupsByName map[string]*rollup
+			Duration      time.Duration
 		}
 
 		// Record how long the filtering process takes
@@ -395,56 +377,77 @@ func SpanFilterEventProcessor(ctx context.Context, minSpanDuration time.Duration
 			span.Parent = spanDataBySpanID[span.RawSpan.ParentSpanID]
 		}
 
-		// Propagate span times from child to parent, keeping any span with a duration greater than minSpanDuration.
+		// Propagate span times from child to parent.
 		// Use depth counter to avoid infinite looping if a cycle is encountered.
 		for _, span := range spans {
 			for depth := 0; depth < 1000; depth++ {
-				// Keep all top-level spans, regardless of their duration
 				if span.Parent == nil {
-					span.IsAllowed = true
 					break
 				}
 
-				// If a span isn't allowed yet, but its most recent duration hasn't been checked, see if it's allowed now
-				if !span.IsAllowed && !span.CheckedLatestDuration {
-					span.CheckedLatestDuration = true
-					if getSpanDuration(span.RawSpan) >= minSpanDuration {
-						span.IsAllowed = true
-					}
+				child := span.RawSpan
+				parent := span.Parent.RawSpan
+				updatedParent := false
+
+				if child.EndTime.After(parent.EndTime) {
+					parent.EndTime = child.EndTime
+					updatedParent = true
 				}
 
-				if expandForChildSpan(ctx, span.Parent.RawSpan, span.RawSpan) {
+				// This generally shouldn't happen, but if it does, we still want the parent span to fully encapsulate its children
+				if child.StartTime.Before(parent.StartTime) {
+					logger.For(ctx).Warnf("child span '%s - %s' started at %v, before parent span '%s - %s' started at %v\n",
+						child.Op, child.Description, child.StartTime, parent.Op, parent.Description, parent.StartTime)
+
+					parent.StartTime = child.StartTime
+					updatedParent = true
+				}
+
+				if updatedParent {
 					// If the parent span has been updated, we should recalculate its duration to see if we should keep it
-					span.Parent.CheckedLatestDuration = false
-				}
-
-				// No need to calculate a parent's duration if its child span is allowed. An allowed
-				// child implies an allowed parent.
-				if span.IsAllowed {
-					span.Parent.IsAllowed = true
+					span.Parent.Duration = getSpanDuration(span.Parent.RawSpan)
 				}
 
 				span = span.Parent
 			}
 		}
 
-		// Filter disallowed spans and roll them up to their nearest allowed ancestor
-		allowedSpans := spans[:0]
 		var filteredSpans []*spanData
 
-		for _, span := range spans {
-			if span.IsAllowed {
-				allowedSpans = append(allowedSpans, span)
-				continue
+		// Keep filtering and doubling the minSpanDuration until we've filtered out enough spans
+		for filterPass, minDurationForPass := 1, minSpanDuration; filterPass <= maxFilterPasses; filterPass++ {
+			if len(spans) <= maxSpans {
+				break
 			}
 
-			filteredSpans = append(filteredSpans[:0], span)
-			span = span.Parent // will be non-nil, since disallowed spans must have parents
+			logger.For(ctx).Infof("span filter pass %d, %d spans, minDurationForPass: %v\n", filterPass, len(spans), minDurationForPass)
+
+			allowedSpans := spans[:0]
+			for _, span := range spans {
+				// Spans without parents are always allowed
+				if span.Parent == nil || span.Duration > minDurationForPass {
+					allowedSpans = append(allowedSpans, span)
+				} else {
+					filteredSpans = append(filteredSpans, span)
+					span.IsFiltered = true
+				}
+			}
+
+			spans = allowedSpans
+			minDurationForPass *= 2
+		}
+
+		var filterPath []*spanData
+
+		// Roll filtered spans up to their nearest unfiltered ancestor
+		for _, span := range filteredSpans {
+			filterPath = append(filterPath[:0], span)
+			span = span.Parent // will be non-nil, since filtered spans must have parents
 
 			// As above, use a depth counter to break cycles instead of infinite looping
 			for depth := 0; depth < 1000; depth++ {
-				if !span.IsAllowed {
-					filteredSpans = append(filteredSpans, span)
+				if span.IsFiltered {
+					filterPath = append(filterPath, span)
 					span = span.Parent
 					continue
 				}
@@ -457,8 +460,8 @@ func SpanFilterEventProcessor(ctx context.Context, minSpanDuration time.Duration
 				rollupsByName := span.RollupsByName
 
 				// Iterate backward so we're going from parent -> child
-				for i := len(filteredSpans) - 1; i >= 0; i-- {
-					filteredSpan := filteredSpans[i]
+				for i := len(filterPath) - 1; i >= 0; i-- {
+					filteredSpan := filterPath[i]
 					rawSpan := filteredSpan.RawSpan
 
 					var currentRollup *rollup
@@ -551,7 +554,7 @@ func SpanFilterEventProcessor(ctx context.Context, minSpanDuration time.Duration
 		numUnfilteredSpans := len(event.Spans)
 		event.Spans = event.Spans[:0]
 
-		for _, span := range allowedSpans {
+		for _, span := range spans {
 			if span.RollupsByName != nil {
 				filteredSpanStats := make(map[string]interface{})
 				rollupStart, rollupEnd := getRollupStats(span, span.RollupsByName, filteredSpanStats)
@@ -570,7 +573,6 @@ func SpanFilterEventProcessor(ctx context.Context, minSpanDuration time.Duration
 
 		logger.For(ctx).Infof("filtered %d spans down to %d spans in %v\n", numUnfilteredSpans, len(event.Spans), time.Since(spanFilterStartTime))
 
-		const maxSpans = 1000
 		// If we still have too many spans after filtering, we need to drop some
 		if len(event.Spans) > maxSpans {
 			logger.For(ctx).Warnf("dropping %d spans to reduce total from %d to %d\n", len(event.Spans)-maxSpans, len(event.Spans), maxSpans)
