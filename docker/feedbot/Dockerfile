@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.16-bullseye
+FROM golang:1.19-bullseye
 
 RUN apt-get update
 RUN apt-get install -y && rm -rf /var/lib/apt/lists/*
