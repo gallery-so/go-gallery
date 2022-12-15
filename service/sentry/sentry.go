@@ -414,8 +414,11 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 
 		var filteredSpans []*spanData
 
+		filterPass := 1
+		minDurationForPass := minSpanDuration
+
 		// Keep filtering and doubling the minSpanDuration until we've filtered out enough spans
-		for filterPass, minDurationForPass := 1, minSpanDuration; filterPass <= maxFilterPasses; filterPass++ {
+		for ; filterPass <= maxFilterPasses; filterPass++ {
 			if len(spans) <= maxSpans {
 				break
 			}
@@ -594,10 +597,12 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 				}
 
 				transaction.Data["Span Filtering"] = map[string]interface{}{
-					"Time Taken":    fmt.Sprintf("%.3fms", durationToMsFloat(timeTaken)),
-					"Filtered From": filteredFrom,
-					"Filtered To":   filteredTo,
-					"Dropped":       numDropped,
+					"Time Taken":        fmt.Sprintf("%.3fms", durationToMsFloat(timeTaken)),
+					"Filtered From":     filteredFrom,
+					"Filtered To":       filteredTo,
+					"Dropped":           numDropped,
+					"Min Span Duration": fmt.Sprintf("%.3fms", durationToMsFloat(minDurationForPass)),
+					"Filter Passes":     filterPass,
 				}
 			}
 		}
