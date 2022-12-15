@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.20-rc-bullseye
+FROM golang:1.19-bullseye
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
