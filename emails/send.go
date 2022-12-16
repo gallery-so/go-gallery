@@ -29,8 +29,8 @@ type VerificationEmailInput struct {
 }
 
 type sendNotificationEmailHttpInput struct {
-	UserID         persist.DBID  `json:"user_id"`
-	ToEmail        persist.Email `json:"to_email"`
+	UserID         persist.DBID  `json:"user_id,required"`
+	ToEmail        persist.Email `json:"to_email,required"`
 	SendRealEmails bool          `json:"send_real_emails"`
 }
 
@@ -114,7 +114,7 @@ type notificationsEmailDynamicTemplateData struct {
 	UnsubscribeToken string                                 `json:"unsubscribeToken"`
 }
 
-func sendNotificationEmailsHandler(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
+func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -124,23 +124,15 @@ func sendNotificationEmailsHandler(queries *coredb.Queries, s *sendgrid.Client) 
 			return
 		}
 
-		if input.UserID == "" && input.ToEmail == "" {
-			err := sendNotificationEmailsToAllUsers(c, queries, s, input.SendRealEmails)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-		} else {
-			userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
-			if err != nil {
-				util.ErrResponse(c, http.StatusBadRequest, err)
-				return
-			}
+		userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
+		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
 
-			if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, queries, s, 10, 5, input.SendRealEmails); err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
+		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, queries, s, 10, 5, input.SendRealEmails); err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
 		}
 
 		c.Status(http.StatusOK)

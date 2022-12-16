@@ -95,11 +95,10 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 	task := &taskspb.Task{
 		Name:         fmt.Sprintf("%s/tasks/%s", queue, message.FeedEventID.String()),
 		ScheduleTime: timestamppb.New(scheduleOn),
-		MessageType: &taskspb.Task_AppEngineHttpRequest{
-			AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
-				HttpMethod:       taskspb.HttpMethod_POST,
-				AppEngineRouting: &taskspb.AppEngineRouting{Service: "feedbot"},
-				RelativeUri:      "/tasks/feed-event",
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/tasks/feed-event", viper.GetString("FEEDBOT_URL")),
 				Headers: map[string]string{
 					"Content-type":  "application/json",
 					"Authorization": "Basic " + viper.GetString("FEEDBOT_SECRET"),
@@ -114,7 +113,7 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 		return err
 	}
 
-	return submitAppEngineTask(ctx, client, queue, task, body)
+	return submitHttpTask(ctx, client, queue, task, body)
 }
 
 func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
@@ -237,13 +236,6 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 	}
 
 	return client
-}
-
-func submitAppEngineTask(ctx context.Context, client *gcptasks.Client, queue string, task *taskspb.Task, messageBody []byte) error {
-	req := &taskspb.CreateTaskRequest{Parent: queue, Task: task}
-	req.Task.GetAppEngineHttpRequest().Body = messageBody
-	_, err := client.CreateTask(ctx, req)
-	return err
 }
 
 func submitHttpTask(ctx context.Context, client *gcptasks.Client, queue string, task *taskspb.Task, messageBody []byte) error {
