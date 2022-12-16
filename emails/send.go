@@ -29,9 +29,9 @@ type VerificationEmailInput struct {
 }
 
 type sendNotificationEmailHttpInput struct {
-	UserID         persist.DBID `json:"user_id"`
-	ToEmail        string       `json:"to_email"`
-	SendRealEmails bool         `json:"send_real_emails"`
+	UserID         persist.DBID  `json:"user_id"`
+	ToEmail        persist.Email `json:"to_email"`
+	SendRealEmails bool          `json:"send_real_emails"`
 }
 
 type verificationEmailTemplateData struct {
@@ -137,7 +137,7 @@ func sendNotificationEmailsHandler(queries *coredb.Queries, s *sendgrid.Client) 
 				return
 			}
 
-			if _, err := sendNotificationEmailToUser(c, userWithPII, queries, s, 10, 5, input.SendRealEmails); err != nil {
+			if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, queries, s, 10, 5, input.SendRealEmails); err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)
 				return
 			}
@@ -172,7 +172,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.UsersWithPii) error {
 
-		response, err := sendNotificationEmailToUser(c, u, queries, s, searchLimit, resultLimit, sendRealEmails)
+		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, queries, s, searchLimit, resultLimit, sendRealEmails)
 		if err != nil {
 			return err
 		}
@@ -188,7 +188,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	})
 }
 
-func sendNotificationEmailToUser(c context.Context, u coredb.UsersWithPii, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
+func sendNotificationEmailToUser(c context.Context, u coredb.UsersWithPii, emailRecipient persist.Email, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
 
 	// generate notification data for user
 	notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
@@ -256,7 +256,7 @@ outer:
 	if sendRealEmail {
 		// send email
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(u.Username.String, u.PiiEmailAddress.String())
+		to := mail.NewEmail(u.Username.String, emailRecipient.String())
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
