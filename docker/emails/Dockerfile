@@ -1,10 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.16-bullseye
-
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+FROM golang:1.19-bullseye
 
 # Install deps
 WORKDIR /app
