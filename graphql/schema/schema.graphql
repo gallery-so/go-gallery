@@ -779,6 +779,13 @@ type MerchTokensPayload {
 
 union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
 
+type ErrGalleryNotFound  {
+    message: String!
+}
+
+union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
+union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -797,6 +804,9 @@ type Query {
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
     getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
+    galleryById(id: DBID!): GalleryByIdPayloadOrError
+    viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
+
 
     # Retool Specific
     usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth

@@ -93,6 +93,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GalleryByIdPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GalleryByIDPayloadOrError)
+		return obj, ok
+	},
+
 	"GalleryUserOrAddress": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(GalleryUserOrAddress)
 		return obj, ok
@@ -295,6 +300,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"ViewGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(ViewGalleryPayloadOrError)
+		return obj, ok
+	},
+
+	"ViewerGalleryByIdPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ViewerGalleryByIDPayloadOrError)
 		return obj, ok
 	},
 

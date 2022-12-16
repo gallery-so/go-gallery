@@ -322,6 +322,10 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrGalleryNotFound struct {
+		Message func(childComplexity int) int
+	}
+
 	ErrInvalidInput struct {
 		Message    func(childComplexity int) int
 		Parameters func(childComplexity int) int
@@ -646,6 +650,7 @@ type ComplexityRoot struct {
 		CollectionsByIds        func(childComplexity int, ids []persist.DBID) int
 		CommunityByAddress      func(childComplexity int, communityAddress persist.ChainAddress, forceRefresh *bool) int
 		FeedEventByID           func(childComplexity int, id persist.DBID) int
+		GalleryByID             func(childComplexity int, id persist.DBID) int
 		GalleryOfTheWeekWinners func(childComplexity int) int
 		GeneralAllowlist        func(childComplexity int) int
 		GetMerchTokens          func(childComplexity int, wallet persist.Address) int
@@ -659,6 +664,7 @@ type ComplexityRoot struct {
 		UsersByRole             func(childComplexity int, role persist.Role, before *string, after *string, first *int, last *int) int
 		UsersWithTrait          func(childComplexity int, trait string) int
 		Viewer                  func(childComplexity int) int
+		ViewerGalleryByID       func(childComplexity int, id persist.DBID) int
 	}
 
 	RedeemMerchPayload struct {
@@ -1119,6 +1125,8 @@ type QueryResolver interface {
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 	GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error)
+	GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error)
+	ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
@@ -2064,6 +2072,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrFeedEventNotFound.Message(childComplexity), true
+
+	case "ErrGalleryNotFound.message":
+		if e.complexity.ErrGalleryNotFound.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrGalleryNotFound.Message(childComplexity), true
 
 	case "ErrInvalidInput.message":
 		if e.complexity.ErrInvalidInput.Message == nil {
@@ -3600,6 +3615,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.FeedEventByID(childComplexity, args["id"].(persist.DBID)), true
 
+	case "Query.galleryById":
+		if e.complexity.Query.GalleryByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_galleryById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.GalleryByID(childComplexity, args["id"].(persist.DBID)), true
+
 	case "Query.galleryOfTheWeekWinners":
 		if e.complexity.Query.GalleryOfTheWeekWinners == nil {
 			break
@@ -3740,6 +3767,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Viewer(childComplexity), true
+
+	case "Query.viewerGalleryById":
+		if e.complexity.Query.ViewerGalleryByID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_viewerGalleryById_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ViewerGalleryByID(childComplexity, args["id"].(persist.DBID)), true
 
 	case "RedeemMerchPayload.tokens":
 		if e.complexity.RedeemMerchPayload.Tokens == nil {
@@ -5739,6 +5778,13 @@ type MerchTokensPayload {
 
 union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
 
+type ErrGalleryNotFound  {
+    message: String!
+}
+
+union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
+union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
+
 type Query {
     node(id: ID!): Node
     viewer: ViewerOrError @authRequired
@@ -5757,6 +5803,9 @@ type Query {
     globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
     feedEventById(id: DBID!): FeedEventByIdOrError
     getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
+    galleryById(id: DBID!): GalleryByIdPayloadOrError
+    viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
+
 
     # Retool Specific
     usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth
@@ -7588,6 +7637,21 @@ func (ec *executionContext) field_Query_feedEventById_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_galleryById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_getMerchTokens_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -7798,6 +7862,21 @@ func (ec *executionContext) field_Query_usersWithTrait_args(ctx context.Context,
 		}
 	}
 	args["trait"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_viewerGalleryById_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -11963,6 +12042,41 @@ func (ec *executionContext) _ErrFeedEventNotFound_message(ctx context.Context, f
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "ErrFeedEventNotFound",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ErrGalleryNotFound_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrGalleryNotFound) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ErrGalleryNotFound",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -19401,6 +19515,84 @@ func (ec *executionContext) _Query_getMerchTokens(ctx context.Context, field gra
 	res := resTmp.(model.MerchTokensPayloadOrError)
 	fc.Result = res
 	return ec.marshalOMerchTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokensPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_galleryById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_galleryById_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().GalleryByID(rctx, args["id"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.GalleryByIDPayloadOrError)
+	fc.Result = res
+	return ec.marshalOGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryByIDPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_viewerGalleryById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_viewerGalleryById_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ViewerGalleryByID(rctx, args["id"].(persist.DBID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.ViewerGalleryByIDPayloadOrError)
+	fc.Result = res
+	return ec.marshalOViewerGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGalleryByIDPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -27627,6 +27819,29 @@ func (ec *executionContext) _FollowUserPayloadOrError(ctx context.Context, sel a
 	}
 }
 
+func (ec *executionContext) _GalleryByIdPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.GalleryByIDPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.Gallery:
+		return ec._Gallery(ctx, sel, &obj)
+	case *model.Gallery:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Gallery(ctx, sel, obj)
+	case model.ErrGalleryNotFound:
+		return ec._ErrGalleryNotFound(ctx, sel, &obj)
+	case *model.ErrGalleryNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrGalleryNotFound(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _GalleryUserOrAddress(ctx context.Context, sel ast.SelectionSet, obj model.GalleryUserOrAddress) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -29047,6 +29262,29 @@ func (ec *executionContext) _ViewGalleryPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrAuthenticationFailed(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _ViewerGalleryByIdPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ViewerGalleryByIDPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ViewerGallery:
+		return ec._ViewerGallery(ctx, sel, &obj)
+	case *model.ViewerGallery:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ViewerGallery(ctx, sel, obj)
+	case model.ErrGalleryNotFound:
+		return ec._ErrGalleryNotFound(ctx, sel, &obj)
+	case *model.ErrGalleryNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrGalleryNotFound(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -31019,6 +31257,37 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
+var errGalleryNotFoundImplementors = []string{"ErrGalleryNotFound", "GalleryByIdPayloadOrError", "ViewerGalleryByIdPayloadOrError"}
+
+func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrGalleryNotFound) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errGalleryNotFoundImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrGalleryNotFound")
+		case "message":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ErrGalleryNotFound_message(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
@@ -31961,7 +32230,7 @@ func (ec *executionContext) _GIFMedia(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
-var galleryImplementors = []string{"Gallery", "Node"}
+var galleryImplementors = []string{"Gallery", "Node", "GalleryByIdPayloadOrError"}
 
 func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, obj *model.Gallery) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, galleryImplementors)
@@ -33914,6 +34183,46 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_getMerchTokens(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "galleryById":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_galleryById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "viewerGalleryById":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_viewerGalleryById(ctx, field)
 				return res
 			}
 
@@ -36362,7 +36671,7 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 	return out
 }
 
-var viewerGalleryImplementors = []string{"ViewerGallery"}
+var viewerGalleryImplementors = []string{"ViewerGallery", "ViewerGalleryByIdPayloadOrError"}
 
 func (ec *executionContext) _ViewerGallery(ctx context.Context, sel ast.SelectionSet, obj *model.ViewerGallery) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, viewerGalleryImplementors)
@@ -38702,6 +39011,13 @@ func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑga
 	return ec._Gallery(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryByIDPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GalleryByIDPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._GalleryByIdPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryUser) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -40068,6 +40384,13 @@ func (ec *executionContext) marshalOViewerGallery2ᚖgithubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._ViewerGallery(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOViewerGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGalleryByIDPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ViewerGalleryByIDPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ViewerGalleryByIdPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOViewerOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerOrError(ctx context.Context, sel ast.SelectionSet, v model.ViewerOrError) graphql.Marshaler {
