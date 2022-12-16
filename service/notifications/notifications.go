@@ -176,78 +176,85 @@ type viewedNotificationHandler struct {
 	pubSub  *pubsub.Client
 }
 
-func beginningOfDay(t time.Time) time.Time {
-	year, month, day := t.Date()
+// will return the beginning of the week (sunday) in PST
+func beginningOfWeek(t time.Time) time.Time {
+
 	pst, err := time.LoadLocation("America/Los_Angeles")
 	if err != nil {
 		panic(err)
 	}
-	return time.Date(year, month, day, 0, 0, 0, 0, pst)
+
+	y, m, d := t.In(pst).Date()
+
+	newD := d - int(t.Weekday())
+
+	return time.Date(y, m, newD, 0, 0, 0, 0, pst)
 }
 
 // this handler will still group notifications in the usual window, but it will also ensure that each viewer does
 // does not show up mutliple times in a week
 func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notification) error {
+	// all of this user's view notifications in the current week
 	notifs, _ := h.queries.GetNotificationsByOwnerIDForActionAfter(ctx, db.GetNotificationsByOwnerIDForActionAfterParams{
 		OwnerID:      notif.OwnerID,
 		Action:       notif.Action,
-		CreatedAfter: beginningOfDay(time.Now()),
+		CreatedAfter: beginningOfWeek(time.Now()),
 	})
 	if notifs == nil || len(notifs) == 0 {
+		// if there are no notifications this week, then we definitely are going to insert this one
+		logger.For(ctx).Debugf("no notifications this week, inserting: %s-%s", notif.Action, notif.OwnerID)
 		return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 	}
 
 	mostRecentNotif := notifs[0]
 
 	if notif.Data.UnauthedViewerIDs != nil && len(notif.Data.UnauthedViewerIDs) > 0 {
-		externalsToAdd := map[string]bool{}
+
+		resultIDs := []string{}
+		// add each of the unauthed viewer ids in the passed in notif to the map unless it is already in one of the notifications this week
 		for _, id := range notif.Data.UnauthedViewerIDs {
-			externalsToAdd[id] = true
-		}
-		for _, id := range notif.Data.UnauthedViewerIDs {
+			add := true
 		firstInner:
 			for _, n := range notifs {
 				if util.ContainsString(n.Data.UnauthedViewerIDs, id) {
-					externalsToAdd[id] = false
+					add = false
 					break firstInner
 				}
 			}
-		}
-		resultIDs := []string{}
-		for id, add := range externalsToAdd {
 			if add {
 				resultIDs = append(resultIDs, id)
 			}
 		}
+
 		notif.Data.UnauthedViewerIDs = resultIDs
 	}
 
 	if notif.Data.AuthedViewerIDs != nil && len(notif.Data.AuthedViewerIDs) > 0 {
-		idsToAdd := map[persist.DBID]bool{}
+		// go through each of the authed viewer ids in the passed in notif and add them to the map unless they are already in one of the notifications this week
+		resultIDs := []persist.DBID{}
 		for _, id := range notif.Data.AuthedViewerIDs {
-			idsToAdd[id] = true
-		}
-		for _, id := range notif.Data.AuthedViewerIDs {
+			add := true
 		secondInner:
 			for _, n := range notifs {
 				if persist.ContainsDBID(n.Data.AuthedViewerIDs, id) {
-					idsToAdd[id] = false
+					add = false
 					break secondInner
 				}
 			}
-		}
-		resultIDs := []persist.DBID{}
-		for id, add := range idsToAdd {
 			if add {
 				resultIDs = append(resultIDs, id)
 			}
 		}
+
 		notif.Data.AuthedViewerIDs = resultIDs
 	}
 
+	// if the most recent notification in the last week is within the grouping window then we will update it, if not, insert it
 	if time.Since(mostRecentNotif.CreatedAt) < viewWindow {
+		logger.For(ctx).Debugf("grouping notification %s: %s-%s", mostRecentNotif.ID, notif.Action, notif.OwnerID)
 		return updateAndPublishNotif(ctx, notif, mostRecentNotif, h.queries, h.pubSub)
 	}
+	logger.For(ctx).Debugf("not grouping notification: %s-%s", notif.Action, notif.OwnerID)
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 }
 

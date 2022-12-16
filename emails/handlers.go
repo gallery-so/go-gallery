@@ -12,7 +12,7 @@ func handlersInitServer(router *gin.Engine, loaders *dataloader.Loaders, queries
 
 	sendGroup := router.Group("/send")
 	if isDevEnv() {
-		sendGroup.POST("/notifications", middleware.RateLimited(lim), sendNotificationEmails(queries, s))
+		sendGroup.POST("/notifications", middleware.RateLimited(lim), sendNotificationEmailsHandler(queries, s))
 	}
 	sendGroup.POST("/verification", middleware.RateLimited(lim), sendVerificationEmail(loaders, queries, s))
 
