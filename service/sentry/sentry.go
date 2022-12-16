@@ -339,7 +339,9 @@ func durationToMsFloat(duration time.Duration) float64 {
 // SpanFilterEventProcessor applies a progressive filter to spans, removing the shortest spans until the total span count
 // is less than the specified maxSpans value. Initially, spans shorter than minSpanDuration will be dropped, but each filter
 // pass (up to maxFilterPasses) will double the minSpanDuration until enough spans have been filtered out.
-func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration time.Duration, maxFilterPasses int) sentry.EventProcessor {
+// If alwaysFilter is specified, spans shorter than minSpanDuration will be removed, even if the total span count is low
+// enough not to require any filtering.
+func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration time.Duration, maxFilterPasses int, alwaysFilter bool) sentry.EventProcessor {
 	return func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 		if event == nil || event.Type != "transaction" || len(event.Spans) == 0 {
 			return event
@@ -419,17 +421,17 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 		reportedMinSpanDuration := time.Duration(0)
 
 		// Keep filtering and doubling the minSpanDuration until we've filtered out enough spans
-		for filterPass, minDurationForPass := 1, minSpanDuration; filterPass <= maxFilterPasses; filterPass++ {
-			if len(spans) <= maxSpans {
+		for filterPass := 1; filterPass <= maxFilterPasses; filterPass++ {
+			if (!alwaysFilter || filterPass > 1) && len(spans) <= maxSpans {
 				break
 			}
 
-			logger.For(ctx).Infof("span filter pass %d, %d spans, minDurationForPass: %v\n", filterPass, len(spans), minDurationForPass)
+			logger.For(ctx).Infof("span filter pass %d, %d spans, minDurationForPass: %v\n", filterPass, len(spans), minSpanDuration)
 
 			allowedSpans := spans[:0]
 			for _, span := range spans {
 				// Spans without parents are always allowed
-				if span.Parent == nil || span.Duration > minDurationForPass {
+				if span.Parent == nil || span.Duration > minSpanDuration {
 					allowedSpans = append(allowedSpans, span)
 				} else {
 					filteredSpans = append(filteredSpans, span)
@@ -438,10 +440,10 @@ func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration
 			}
 
 			reportedFilterPasses = filterPass
-			reportedMinSpanDuration = minDurationForPass
+			reportedMinSpanDuration = minSpanDuration
 
 			spans = allowedSpans
-			minDurationForPass *= 2
+			minSpanDuration *= 2
 		}
 
 		var filterPath []*spanData
