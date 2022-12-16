@@ -39,23 +39,6 @@ var logToSentryLevel = map[logrus.Level]sentry.Level{
 }
 var sentryTrailLimit = 8
 
-type authContext struct {
-	UserID        string
-	Authenticated bool
-	AuthError     error
-}
-
-type errorContext struct {
-	Mapped   bool
-	MappedTo string
-}
-
-type eventContext struct {
-	ActorID   persist.DBID
-	SubjectID persist.DBID
-	Action    persist.Action
-}
-
 func ReportRemappedError(ctx context.Context, originalErr error, remappedErr interface{}) {
 	hub := sentry.GetHubFromContext(ctx)
 	if hub == nil {
@@ -154,15 +137,20 @@ func UpdateLogErrorEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Ev
 }
 
 func SetAuthContext(scope *sentry.Scope, gc *gin.Context) {
-	var authCtx authContext
+	var authCtx sentry.Context
 	var userCtx sentry.User
 
 	if auth.GetUserAuthedFromCtx(gc) {
 		userID := string(auth.GetUserIDFromCtx(gc))
-		authCtx = authContext{Authenticated: true, UserID: userID}
+		authCtx = sentry.Context{
+			"Authenticated": true,
+			"UserID":        userID,
+		}
 		userCtx = sentry.User{ID: userID}
 	} else {
-		authCtx = authContext{AuthError: auth.GetAuthErrorFromCtx(gc)}
+		authCtx = sentry.Context{
+			"AuthError": auth.GetAuthErrorFromCtx(gc),
+		}
 		userCtx = sentry.User{}
 	}
 
@@ -171,19 +159,19 @@ func SetAuthContext(scope *sentry.Scope, gc *gin.Context) {
 }
 
 func SetErrorContext(scope *sentry.Scope, mapped bool, mappedTo string) {
-	errCtx := errorContext{
-		Mapped:   mapped,
-		MappedTo: mappedTo,
+	errCtx := sentry.Context{
+		"Mapped":   mapped,
+		"MappedTo": mappedTo,
 	}
 
 	scope.SetContext(errorContextName, errCtx)
 }
 
 func SetEventContext(scope *sentry.Scope, actorID, subjectID persist.DBID, action persist.Action) {
-	eventCtx := eventContext{
-		ActorID:   actorID,
-		SubjectID: subjectID,
-		Action:    action,
+	eventCtx := sentry.Context{
+		"ActorID":   actorID,
+		"SubjectID": subjectID,
+		"Action":    action,
 	}
 
 	scope.SetContext(eventContextName, eventCtx)
@@ -336,6 +324,289 @@ func TransactionNameSafe(name string) sentry.SpanOption {
 		}
 
 		sentry.TransactionName(name)(s)
+	}
+}
+
+func getSpanDuration(s *sentry.Span) time.Duration {
+	return s.EndTime.Sub(s.StartTime)
+}
+
+// Sentry uses milliseconds for its trace fields, and it keeps things consistent if we do it too
+func durationToMsFloat(duration time.Duration) float64 {
+	return float64(duration.Microseconds()) / 1000.0
+}
+
+// SpanFilterEventProcessor applies a progressive filter to spans, removing the shortest spans until the total span count
+// is less than the specified maxSpans value. Initially, spans shorter than minSpanDuration will be dropped, but each filter
+// pass (up to maxFilterPasses) will double the minSpanDuration until enough spans have been filtered out.
+// If alwaysFilter is specified, spans shorter than minSpanDuration will be removed, even if the total span count is low
+// enough not to require any filtering.
+func SpanFilterEventProcessor(ctx context.Context, maxSpans int, minSpanDuration time.Duration, maxFilterPasses int, alwaysFilter bool) sentry.EventProcessor {
+	return func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+		if event == nil || event.Type != "transaction" || len(event.Spans) == 0 {
+			return event
+		}
+
+		type rollup struct {
+			Name     string
+			RawSpans []*sentry.Span
+			Children map[string]*rollup
+		}
+
+		type spanData struct {
+			Parent        *spanData
+			RawSpan       *sentry.Span
+			IsFiltered    bool
+			RollupsByName map[string]*rollup
+			Duration      time.Duration
+		}
+
+		// Record how long the filtering process takes
+		spanFilterStartTime := time.Now()
+
+		spanDataBySpanID := make(map[sentry.SpanID]*spanData)
+		spans := make([]*spanData, 0, len(event.Spans))
+
+		for _, span := range event.Spans {
+			if span != nil {
+				sd := &spanData{RawSpan: span}
+				spanDataBySpanID[span.SpanID] = sd
+				spans = append(spans, sd)
+			}
+		}
+
+		for _, span := range spans {
+			span.Parent = spanDataBySpanID[span.RawSpan.ParentSpanID]
+			span.Duration = getSpanDuration(span.RawSpan)
+		}
+
+		// Propagate span times from child to parent.
+		// Use depth counter to avoid infinite looping if a cycle is encountered.
+		for _, span := range spans {
+			for depth := 0; depth < 1000; depth++ {
+				if span.Parent == nil {
+					break
+				}
+
+				child := span.RawSpan
+				parent := span.Parent.RawSpan
+				updatedParent := false
+
+				if child.EndTime.After(parent.EndTime) {
+					parent.EndTime = child.EndTime
+					updatedParent = true
+				}
+
+				// This generally shouldn't happen, but if it does, we still want the parent span to fully encapsulate its children
+				if child.StartTime.Before(parent.StartTime) {
+					logger.For(ctx).Warnf("child span '%s - %s' started at %v, before parent span '%s - %s' started at %v\n",
+						child.Op, child.Description, child.StartTime, parent.Op, parent.Description, parent.StartTime)
+
+					parent.StartTime = child.StartTime
+					updatedParent = true
+				}
+
+				if updatedParent {
+					// If the parent span has been updated, we should recalculate its duration to see if we should keep it
+					span.Parent.Duration = getSpanDuration(span.Parent.RawSpan)
+				}
+
+				span = span.Parent
+			}
+		}
+
+		var filteredSpans []*spanData
+
+		reportedFilterPasses := 0
+		reportedMinSpanDuration := time.Duration(0)
+
+		// Keep filtering and doubling the minSpanDuration until we've filtered out enough spans
+		for filterPass := 1; filterPass <= maxFilterPasses; filterPass++ {
+			if (!alwaysFilter || filterPass > 1) && len(spans) <= maxSpans {
+				break
+			}
+
+			logger.For(ctx).Infof("span filter pass %d, %d spans, minDurationForPass: %v\n", filterPass, len(spans), minSpanDuration)
+
+			allowedSpans := spans[:0]
+			for _, span := range spans {
+				// Spans without parents are always allowed
+				if span.Parent == nil || span.Duration > minSpanDuration {
+					allowedSpans = append(allowedSpans, span)
+				} else {
+					filteredSpans = append(filteredSpans, span)
+					span.IsFiltered = true
+				}
+			}
+
+			reportedFilterPasses = filterPass
+			reportedMinSpanDuration = minSpanDuration
+
+			spans = allowedSpans
+			minSpanDuration *= 2
+		}
+
+		var filterPath []*spanData
+
+		// Roll filtered spans up to their nearest unfiltered ancestor
+		for _, span := range filteredSpans {
+			filterPath = append(filterPath[:0], span)
+			span = span.Parent // will be non-nil, since filtered spans must have parents
+
+			// As above, use a depth counter to break cycles instead of infinite looping
+			for depth := 0; depth < 1000; depth++ {
+				if span.IsFiltered {
+					filterPath = append(filterPath, span)
+					span = span.Parent
+					continue
+				}
+
+				// We've reached the nearest allowed ancestor! Lazy initialize it.
+				if span.RollupsByName == nil {
+					span.RollupsByName = make(map[string]*rollup)
+				}
+
+				rollupsByName := span.RollupsByName
+
+				// Iterate backward so we're going from parent -> child
+				for i := len(filterPath) - 1; i >= 0; i-- {
+					filteredSpan := filterPath[i]
+					rawSpan := filteredSpan.RawSpan
+
+					var currentRollup *rollup
+					var ok bool
+
+					if currentRollup, ok = rollupsByName[rawSpan.Description]; !ok {
+						currentRollup = &rollup{Name: rawSpan.Description}
+						rollupsByName[rawSpan.Description] = currentRollup
+					}
+
+					// Only add the child span that's actively being rolled up; its parent spans (if any) will be
+					// added during their own roll-up step
+					if i == 0 {
+						currentRollup.RawSpans = append(currentRollup.RawSpans, rawSpan)
+					}
+
+					// If we haven't reached the final child span yet, make sure there's a map for the next
+					// level of rollup depth
+					if currentRollup.Children == nil && i > 0 {
+						currentRollup.Children = make(map[string]*rollup)
+					}
+
+					rollupsByName = currentRollup.Children
+				}
+
+				break
+			}
+		}
+
+		var getRollupStats func(*spanData, map[string]*rollup, map[string]interface{}) (time.Time, time.Time)
+
+		getRollupStats = func(rollupTo *spanData, rollupsByName map[string]*rollup, stats map[string]interface{}) (time.Time, time.Time) {
+			var rollupStart time.Time
+			var rollupEnd time.Time
+
+			// Get any child span to initialize the start and end times for the whole rollup
+			for _, r := range rollupsByName {
+				rollupStart = r.RawSpans[0].StartTime
+				rollupEnd = r.RawSpans[0].EndTime
+				break
+			}
+
+			// For every group of rolled up spans, figure out their containing interval (earliest start time to
+			// latest end time) and the average time per span.
+			for name, r := range rollupsByName {
+				intervalStart := r.RawSpans[0].StartTime
+				intervalEnd := r.RawSpans[0].EndTime
+				cumulativeDuration := time.Duration(0)
+
+				for _, s := range r.RawSpans {
+					if s.StartTime.Before(intervalStart) {
+						intervalStart = s.StartTime
+					}
+
+					if s.EndTime.After(intervalEnd) {
+						intervalEnd = s.EndTime
+					}
+
+					cumulativeDuration += getSpanDuration(s)
+				}
+
+				avgDuration := time.Duration(int64(cumulativeDuration) / int64(len(r.RawSpans)))
+
+				// Record interval start/end times relative to the parent span these are being rolled up to
+				relativeStart := intervalStart.Sub(rollupTo.RawSpan.StartTime)
+				relativeEnd := intervalEnd.Sub(rollupTo.RawSpan.StartTime)
+
+				statsForName := fmt.Sprintf("%s (%d) | %.3fms avg | [%.3fms - %.3fms] range", name, len(r.RawSpans),
+					durationToMsFloat(avgDuration), durationToMsFloat(relativeStart), durationToMsFloat(relativeEnd))
+
+				childStats := make(map[string]interface{})
+				stats[statsForName] = childStats
+
+				if r.Children != nil {
+					getRollupStats(rollupTo, r.Children, childStats)
+				}
+
+				if intervalStart.Before(rollupStart) {
+					rollupStart = intervalStart
+				}
+
+				if intervalEnd.After(rollupEnd) {
+					rollupEnd = intervalEnd
+				}
+			}
+
+			return rollupStart, rollupEnd
+		}
+
+		numUnfilteredSpans := len(event.Spans)
+		event.Spans = event.Spans[:0]
+
+		for _, span := range spans {
+			if span.RollupsByName != nil {
+				filteredSpanStats := make(map[string]interface{})
+				rollupStart, rollupEnd := getRollupStats(span, span.RollupsByName, filteredSpanStats)
+
+				if span.RawSpan.Data == nil {
+					span.RawSpan.Data = make(map[string]interface{})
+				}
+
+				data := span.RawSpan.Data
+				data["Filtered Spans"] = filteredSpanStats
+				data["Filtered Span Range"] = fmt.Sprintf("[%.3fms - %.3fms]", durationToMsFloat(rollupStart.Sub(span.RawSpan.StartTime)), durationToMsFloat(rollupEnd.Sub(span.RawSpan.StartTime)))
+			}
+
+			event.Spans = append(event.Spans, span.RawSpan)
+		}
+
+		timeTaken := time.Since(spanFilterStartTime)
+		filteredFrom := numUnfilteredSpans
+		filteredTo := len(event.Spans)
+		numDropped := 0
+
+		if filteredFrom != filteredTo {
+			logger.For(ctx).Infof("filtered %d spans down to %d spans in %v\n", filteredFrom, filteredTo, timeTaken)
+		}
+
+		// If we still have too many spans after filtering, we need to drop some
+		if len(event.Spans) > maxSpans {
+			numDropped = len(event.Spans) - maxSpans
+			logger.For(ctx).Warnf("dropping %d spans to reduce total from %d to %d\n", numDropped, len(event.Spans), maxSpans)
+			event.Spans = event.Spans[:maxSpans]
+		}
+
+		// Add filtering metadata to the event
+		event.Contexts["Span Filtering"] = map[string]interface{}{
+			"Filtering Took":    fmt.Sprintf("%.3fms", durationToMsFloat(timeTaken)),
+			"Filtered From":     fmt.Sprintf("%d spans", filteredFrom),
+			"Filtered To":       fmt.Sprintf("%d spans", filteredTo),
+			"Dropped":           fmt.Sprintf("%d spans", numDropped),
+			"Min Span Duration": fmt.Sprintf("%.3fms", durationToMsFloat(reportedMinSpanDuration)),
+			"Filter Passes":     reportedFilterPasses,
+		}
+
+		return event
 	}
 }
 

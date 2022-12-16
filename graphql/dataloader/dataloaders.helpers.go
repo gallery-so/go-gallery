@@ -11,6 +11,8 @@ type settings struct {
 	waitTime             time.Duration
 	disableCaching       bool
 	publishResults       bool
+	preFetchHook         func(context.Context, string) context.Context
+	postFetchHook        func(context.Context, string)
 	maxBatchOne          int
 	maxBatchMany         int
 	subscriptionRegistry *[]interface{}
@@ -31,6 +33,14 @@ func (s settings) getDisableCaching() bool {
 
 func (s settings) getPublishResults() bool {
 	return s.publishResults
+}
+
+func (s settings) getPreFetchHook() func(context.Context, string) context.Context {
+	return s.preFetchHook
+}
+
+func (s settings) getPostFetchHook() func(context.Context, string) {
+	return s.postFetchHook
 }
 
 func (s settings) getSubscriptionRegistry() *[]interface{} {
