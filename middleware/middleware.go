@@ -64,6 +64,17 @@ func AuthRequired(userRepository postgres.UserRepository, ethClient *ethclient.C
 	}
 }
 
+// AdminRequired is a middleware that checks if the user is authenticated as an admin
+func AdminRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetHeader("Authorization") != viper.GetString("ADMIN_PASS") {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "Unauthorized"})
+			return
+		}
+		c.Next()
+	}
+}
+
 // AuthOptional is a middleware that checks if the user is authenticated and if so stores
 // auth data in the context
 func AuthOptional() gin.HandlerFunc {

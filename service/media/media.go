@@ -363,8 +363,8 @@ func remapPaths(mediaURL string) string {
 }
 
 func remapMedia(media persist.Media) persist.Media {
-	media.MediaURL = persist.NullString(remapPaths(media.MediaURL.String()))
-	media.ThumbnailURL = persist.NullString(remapPaths(media.ThumbnailURL.String()))
+	media.MediaURL = persist.NullString(remapPaths(strings.TrimSpace(media.MediaURL.String())))
+	media.ThumbnailURL = persist.NullString(remapPaths(strings.TrimSpace(media.ThumbnailURL.String())))
 	return media
 }
 
