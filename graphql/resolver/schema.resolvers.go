@@ -1198,6 +1198,30 @@ func (r *queryResolver) GetMerchTokens(ctx context.Context, wallet persist.Addre
 	return output, nil
 }
 
+func (r *queryResolver) GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error) {
+	gallery, err := resolveGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return gallery, nil
+}
+
+func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error) {
+	gallery, err := resolveViewerGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if gallery == nil {
+		return model.ErrGalleryNotFound{Message: "Could not find gallery with that id"}, nil
+	}
+
+	return gallery, nil
+}
+
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
 	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
 	if err != nil {

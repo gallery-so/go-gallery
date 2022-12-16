@@ -368,6 +368,22 @@ func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*mo
 	return gallery, nil
 }
 
+func resolveViewerGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.ViewerGallery, error) {
+	gallery, err := publicapi.For(ctx).Gallery.GetViewerGalleryById(ctx, galleryID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if gallery == nil {
+		return nil, nil
+	}
+
+	return &model.ViewerGallery{
+		Gallery: galleryToModel(ctx, *gallery),
+	}, nil
+}
+
 func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 

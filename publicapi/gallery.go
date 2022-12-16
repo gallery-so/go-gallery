@@ -47,6 +47,34 @@ func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID
 	return &gallery, nil
 }
 
+func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+
+	if err != nil {
+		// return the error thing here
+		return nil, persist.ErrGalleryNotFound{}
+	}
+
+	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	if userID != gallery.OwnerUserID {
+		// put error here
+		return nil, nil
+	}
+
+	return &gallery, nil
+}
+
 func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID persist.DBID) (*db.Gallery, error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
