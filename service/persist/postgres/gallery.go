@@ -75,7 +75,7 @@ func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUser
 	}
 
 	if rowsAffected == 0 {
-		return persist.ErrGalleryNotFoundByID{ID: pID}
+		return persist.ErrGalleryNotFound{ID: pID}
 	}
 
 	return nil
@@ -123,7 +123,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		}
 
 		if rowsAffected == 0 {
-			return persist.ErrGalleryNotFoundByID{ID: pID}
+			return persist.ErrGalleryNotFound{ID: pID}
 		}
 
 		return nil
@@ -140,7 +140,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	}
 
 	if rowsAffected == 0 {
-		return persist.ErrGalleryNotFoundByID{ID: pID}
+		return persist.ErrGalleryNotFound{ID: pID}
 	}
 
 	return nil
