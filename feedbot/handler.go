@@ -22,13 +22,13 @@ func (e errBadTaskRequest) Error() string {
 // Returns a 200 status to remove the message from the queue if it is a bad request.
 func TaskRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		taskName := c.Request.Header.Get("X-Appengine-Taskname")
+		taskName := c.Request.Header.Get("X-CloudTasks-TaskName")
 		if taskName == "" {
 			c.AbortWithError(http.StatusOK, errBadTaskRequest{"invalid task"})
 			return
 		}
 
-		queueName := c.Request.Header.Get("X-Appengine-Queuename")
+		queueName := c.Request.Header.Get("X-CloudTasks-QueueName")
 		if queueName == "" {
 			c.AbortWithError(http.StatusOK, errBadTaskRequest{"invalid queue"})
 			return
