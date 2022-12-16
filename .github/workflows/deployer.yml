@@ -1,4 +1,4 @@
-name: dev-deployer
+name: deployer
 on:
   push:
     branches:
