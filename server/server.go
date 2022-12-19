@@ -198,6 +198,7 @@ func setDefaults() {
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")
+		util.VarNotSetTo("ETH_PRIVATE_KEY", "")
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 	}

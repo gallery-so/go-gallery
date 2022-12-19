@@ -283,9 +283,6 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	if chainID.Cmp(big.NewInt(1)) == 0 && viper.GetString("ENV") == "production" {
 		privateKey := viper.GetString("ETH_PRIVATE_KEY")
-		if err != nil {
-			return nil, err
-		}
 
 		key, err := crypto.HexToECDSA(privateKey)
 		if err != nil {
