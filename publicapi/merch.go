@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -20,6 +19,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -287,7 +287,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 			return nil, err
 		}
 
-		key, err := x509.ParseECPrivateKey([]byte(privateKey))
+		key, err := crypto.HexToECDSA(privateKey)
 		if err != nil {
 			return nil, err
 		}
