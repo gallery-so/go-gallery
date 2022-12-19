@@ -76,19 +76,30 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 		return nil, err
 	}
 
+	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate a Merch contract: %w", err)
+	}
+
 	merchTokens := make([]*model.MerchToken, len(tokens))
 
 	for i, token := range tokens {
 		t := &model.MerchToken{
 			TokenID: token.TokenID.String(),
 		}
+
+		isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.TokenID.BigInt())
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.TokenID, err)
+		}
+		t.Redeemed = isRedeemed
+
 		discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.TokenID, err)
 		}
 		if discountCode.Valid && discountCode.String != "" {
 			t.DiscountCode = &discountCode.String
-			t.Redeemed = true
 		}
 
 		if token.TokenURI != "" {
@@ -155,16 +166,27 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 		return nil, err
 	}
 
+	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate a Merch contract: %w", err)
+	}
+
 	t := &model.MerchToken{
 		TokenID: tokenID.String(),
 	}
+
+	isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.TokenID.BigInt())
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.TokenID, err)
+	}
+	t.Redeemed = isRedeemed
+
 	discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
 	if err != nil && err != pgx.ErrNoRows {
 		return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.TokenID, err)
 	}
 	if discountCode.Valid && discountCode.String != "" {
 		t.DiscountCode = &discountCode.String
-		t.Redeemed = true
 	}
 
 	if token.TokenUri.String != "" {
