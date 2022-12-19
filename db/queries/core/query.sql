@@ -471,7 +471,7 @@ SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = f
     LIMIT $2;
 
 -- name: GetRecentUnseenNotifications :many
-SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false ORDER BY CREATED_AT DESC LIMIT $2;
+SELECT * FROM notifications WHERE owner_id = @owner_id AND deleted = false AND seen = false and created_at > @created_after order by created_at desc limit @lim;
 
 -- name: GetUserNotificationsBatch :batchmany
 SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false

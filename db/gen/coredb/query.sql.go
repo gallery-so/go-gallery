@@ -1515,16 +1515,17 @@ func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg G
 }
 
 const getRecentUnseenNotifications = `-- name: GetRecentUnseenNotifications :many
-SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false ORDER BY CREATED_AT DESC LIMIT $2
+SELECT id, deleted, owner_id, version, last_updated, created_at, action, data, event_ids, feed_event_id, comment_id, gallery_id, seen, amount FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false and created_at > $2 order by created_at desc limit $3
 `
 
 type GetRecentUnseenNotificationsParams struct {
-	OwnerID persist.DBID
-	Limit   int32
+	OwnerID      persist.DBID
+	CreatedAfter time.Time
+	Lim          int32
 }
 
 func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecentUnseenNotificationsParams) ([]Notification, error) {
-	rows, err := q.db.Query(ctx, getRecentUnseenNotifications, arg.OwnerID, arg.Limit)
+	rows, err := q.db.Query(ctx, getRecentUnseenNotifications, arg.OwnerID, arg.CreatedAfter, arg.Lim)
 	if err != nil {
 		return nil, err
 	}
