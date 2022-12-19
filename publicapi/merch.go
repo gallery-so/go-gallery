@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/viper"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
-	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -283,14 +282,12 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 	}
 
 	if chainID.Cmp(big.NewInt(1)) == 0 && viper.GetString("ENV") == "production" {
-		privateKey, err := api.secrets.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
-			Name: "backend-eth-private-key",
-		})
+		privateKey := viper.GetString("ETH_PRIVATE_KEY")
 		if err != nil {
 			return nil, err
 		}
 
-		key, err := x509.ParseECPrivateKey(privateKey.Payload.Data)
+		key, err := x509.ParseECPrivateKey([]byte(privateKey))
 		if err != nil {
 			return nil, err
 		}
