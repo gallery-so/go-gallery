@@ -1215,10 +1215,6 @@ func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) 
 		return nil, err
 	}
 
-	if gallery == nil {
-		return model.ErrGalleryNotFound{Message: "Could not find gallery with that id"}, nil
-	}
-
 	return gallery, nil
 }
 

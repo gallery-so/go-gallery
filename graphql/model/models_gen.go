@@ -626,6 +626,7 @@ type ErrGalleryNotFound struct {
 	Message string `json:"message"`
 }
 
+func (ErrGalleryNotFound) IsError()                           {}
 func (ErrGalleryNotFound) IsGalleryByIDPayloadOrError()       {}
 func (ErrGalleryNotFound) IsViewerGalleryByIDPayloadOrError() {}
 

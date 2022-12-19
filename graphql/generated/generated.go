@@ -5778,7 +5778,7 @@ type MerchTokensPayload {
 
 union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
 
-type ErrGalleryNotFound  {
+type ErrGalleryNotFound implements Error {
     message: String!
 }
 
@@ -27554,6 +27554,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrFeedEventNotFound(ctx, sel, obj)
+	case model.ErrGalleryNotFound:
+		return ec._ErrGalleryNotFound(ctx, sel, &obj)
+	case *model.ErrGalleryNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrGalleryNotFound(ctx, sel, obj)
 	case model.ErrAuthenticationFailed:
 		return ec._ErrAuthenticationFailed(ctx, sel, &obj)
 	case *model.ErrAuthenticationFailed:
@@ -31257,7 +31264,7 @@ func (ec *executionContext) _ErrFeedEventNotFound(ctx context.Context, sel ast.S
 	return out
 }
 
-var errGalleryNotFoundImplementors = []string{"ErrGalleryNotFound", "GalleryByIdPayloadOrError", "ViewerGalleryByIdPayloadOrError"}
+var errGalleryNotFoundImplementors = []string{"ErrGalleryNotFound", "Error", "GalleryByIdPayloadOrError", "ViewerGalleryByIdPayloadOrError"}
 
 func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrGalleryNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errGalleryNotFoundImplementors)

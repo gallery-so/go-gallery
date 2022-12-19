@@ -58,8 +58,7 @@ func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persis
 	userID, err := getAuthenticatedUser(ctx)
 
 	if err != nil {
-		// return the error thing here
-		return nil, persist.ErrGalleryNotFound{}
+		return nil, persist.ErrGalleryNotFound{ID: galleryID}
 	}
 
 	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
@@ -68,8 +67,7 @@ func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persis
 	}
 
 	if userID != gallery.OwnerUserID {
-		// put error here
-		return nil, nil
+		return nil, persist.ErrGalleryNotFound{ID: galleryID}
 	}
 
 	return &gallery, nil

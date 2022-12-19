@@ -155,6 +155,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
 	case persist.ErrUnknownAction:
 		mappedErr = model.ErrUnknownAction{Message: message}
+	case persist.ErrGalleryNotFound:
+		mappedErr = model.ErrGalleryNotFound{Message: message}
 	}
 
 	if mappedErr != nil {
@@ -373,10 +375,6 @@ func resolveViewerGalleryByGalleryID(ctx context.Context, galleryID persist.DBID
 
 	if err != nil {
 		return nil, err
-	}
-
-	if gallery == nil {
-		return nil, nil
 	}
 
 	return &model.ViewerGallery{
