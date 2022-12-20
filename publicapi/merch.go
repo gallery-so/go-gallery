@@ -2,7 +2,6 @@ package publicapi
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -17,10 +16,10 @@ import (
 	"github.com/spf13/viper"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
-	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -76,19 +75,30 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 		return nil, err
 	}
 
+	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate a Merch contract: %w", err)
+	}
+
 	merchTokens := make([]*model.MerchToken, len(tokens))
 
 	for i, token := range tokens {
 		t := &model.MerchToken{
 			TokenID: token.TokenID.String(),
 		}
+
+		isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.TokenID.BigInt())
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.TokenID, err)
+		}
+		t.Redeemed = isRedeemed
+
 		discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.TokenID, err)
 		}
 		if discountCode.Valid && discountCode.String != "" {
 			t.DiscountCode = &discountCode.String
-			t.Redeemed = true
 		}
 
 		if token.TokenURI != "" {
@@ -155,16 +165,27 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 		return nil, err
 	}
 
+	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate a Merch contract: %w", err)
+	}
+
 	t := &model.MerchToken{
 		TokenID: tokenID.String(),
 	}
+
+	isRedeemed, err := mer.IsRedeemed(&bind.CallOpts{Context: ctx}, token.TokenID.BigInt())
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if token %v is redeemed: %w", token.TokenID, err)
+	}
+	t.Redeemed = isRedeemed
+
 	discountCode, err := api.queries.GetMerchDiscountCodeByTokenID(ctx, token.TokenID)
 	if err != nil && err != pgx.ErrNoRows {
 		return nil, fmt.Errorf("failed to get discount code for token %v: %w", token.TokenID, err)
 	}
 	if discountCode.Valid && discountCode.String != "" {
 		t.DiscountCode = &discountCode.String
-		t.Redeemed = true
 	}
 
 	if token.TokenUri.String != "" {
@@ -261,14 +282,9 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 	}
 
 	if chainID.Cmp(big.NewInt(1)) == 0 && viper.GetString("ENV") == "production" {
-		privateKey, err := api.secrets.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
-			Name: "backend-eth-private-key",
-		})
-		if err != nil {
-			return nil, err
-		}
+		privateKey := viper.GetString("ETH_PRIVATE_KEY")
 
-		key, err := x509.ParseECPrivateKey(privateKey.Payload.Data)
+		key, err := crypto.HexToECDSA(privateKey)
 		if err != nil {
 			return nil, err
 		}

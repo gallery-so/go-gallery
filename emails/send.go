@@ -155,8 +155,6 @@ func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psu
 }
 
 func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {
-	searchLimit := int32(10)
-	resultLimit := 5
 
 	emailsSent := new(atomic.Uint64)
 	defer func() {
@@ -164,7 +162,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.UsersWithPii) error {
 
-		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, queries, s, searchLimit, resultLimit, sendRealEmails)
+		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, queries, s, 10, 5, sendRealEmails)
 		if err != nil {
 			return err
 		}
@@ -184,8 +182,9 @@ func sendNotificationEmailToUser(c context.Context, u coredb.UsersWithPii, email
 
 	// generate notification data for user
 	notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
-		OwnerID: u.ID,
-		Limit:   searchLimit,
+		OwnerID:      u.ID,
+		Lim:          searchLimit,
+		CreatedAfter: time.Now().Add(-7 * 24 * time.Hour),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)

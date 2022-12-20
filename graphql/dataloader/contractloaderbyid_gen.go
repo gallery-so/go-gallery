@@ -18,6 +18,8 @@ type ContractLoaderByIDSettings interface {
 	getMaxBatchMany() int
 	getDisableCaching() bool
 	getPublishResults() bool
+	getPreFetchHook() func(context.Context, string) context.Context
+	getPostFetchHook() func(context.Context, string)
 	getSubscriptionRegistry() *[]interface{}
 	getMutexRegistry() *[]*sync.Mutex
 }
@@ -67,6 +69,14 @@ func (l *ContractLoaderByID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
+func (l *ContractLoaderByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+	l.preFetchHook = preFetchHook
+}
+
+func (l *ContractLoaderByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
+	l.postFetchHook = postFetchHook
+}
+
 // NewContractLoaderByID creates a new ContractLoaderByID with the given settings, functions, and options
 func NewContractLoaderByID(
 	settings ContractLoaderByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([]coredb.Contract, []error),
@@ -77,6 +87,8 @@ func NewContractLoaderByID(
 		setMaxBatch(int)
 		setDisableCaching(bool)
 		setPublishResults(bool)
+		setPreFetchHook(func(context.Context, string) context.Context)
+		setPostFetchHook(func(context.Context, string))
 	}),
 ) *ContractLoaderByID {
 	loader := &ContractLoaderByID{
@@ -84,6 +96,8 @@ func NewContractLoaderByID(
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
 		publishResults:       settings.getPublishResults(),
+		preFetchHook:         settings.getPreFetchHook(),
+		postFetchHook:        settings.getPostFetchHook(),
 		subscriptionRegistry: settings.getSubscriptionRegistry(),
 		mutexRegistry:        settings.getMutexRegistry(),
 		maxBatch:             settings.getMaxBatchOne(),
@@ -94,7 +108,22 @@ func NewContractLoaderByID(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []persist.DBID) ([]coredb.Contract, []error) { return fetch(loader.ctx, keys) }
+	loader.fetch = func(keys []persist.DBID) ([]coredb.Contract, []error) {
+		ctx := loader.ctx
+
+		// Allow the preFetchHook to modify and return a new context
+		if loader.preFetchHook != nil {
+			ctx = loader.preFetchHook(ctx, "ContractLoaderByID")
+		}
+
+		results, errors := fetch(ctx, keys)
+
+		if loader.postFetchHook != nil {
+			loader.postFetchHook(ctx, "ContractLoaderByID")
+		}
+
+		return results, errors
+	}
 
 	if loader.subscriptionRegistry == nil {
 		panic("subscriptionRegistry may not be nil")
@@ -147,6 +176,13 @@ type ContractLoaderByID struct {
 
 	// whether this dataloader will publish its results for others to cache
 	publishResults bool
+
+	// a hook invoked before the fetch operation, useful for things like tracing.
+	// the returned context will be passed to the fetch operation.
+	preFetchHook func(ctx context.Context, loaderName string) context.Context
+
+	// a hook invoked after the fetch operation, useful for things like tracing
+	postFetchHook func(ctx context.Context, loaderName string)
 
 	// a shared slice where dataloaders will register and invoke caching functions.
 	// the same slice should be passed to every dataloader.

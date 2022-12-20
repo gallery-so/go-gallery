@@ -17,6 +17,8 @@ type FeedEventCommentsLoaderSettings interface {
 	getMaxBatchMany() int
 	getDisableCaching() bool
 	getPublishResults() bool
+	getPreFetchHook() func(context.Context, string) context.Context
+	getPostFetchHook() func(context.Context, string)
 	getSubscriptionRegistry() *[]interface{}
 	getMutexRegistry() *[]*sync.Mutex
 }
@@ -41,6 +43,14 @@ func (l *FeedEventCommentsLoader) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
+func (l *FeedEventCommentsLoader) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+	l.preFetchHook = preFetchHook
+}
+
+func (l *FeedEventCommentsLoader) setPostFetchHook(postFetchHook func(context.Context, string)) {
+	l.postFetchHook = postFetchHook
+}
+
 // NewFeedEventCommentsLoader creates a new FeedEventCommentsLoader with the given settings, functions, and options
 func NewFeedEventCommentsLoader(
 	settings FeedEventCommentsLoaderSettings, fetch func(ctx context.Context, keys []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error),
@@ -50,6 +60,8 @@ func NewFeedEventCommentsLoader(
 		setMaxBatch(int)
 		setDisableCaching(bool)
 		setPublishResults(bool)
+		setPreFetchHook(func(context.Context, string) context.Context)
+		setPostFetchHook(func(context.Context, string))
 	}),
 ) *FeedEventCommentsLoader {
 	loader := &FeedEventCommentsLoader{
@@ -57,6 +69,8 @@ func NewFeedEventCommentsLoader(
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
 		publishResults:       settings.getPublishResults(),
+		preFetchHook:         settings.getPreFetchHook(),
+		postFetchHook:        settings.getPostFetchHook(),
 		subscriptionRegistry: settings.getSubscriptionRegistry(),
 		mutexRegistry:        settings.getMutexRegistry(),
 		maxBatch:             settings.getMaxBatchMany(),
@@ -68,7 +82,20 @@ func NewFeedEventCommentsLoader(
 
 	// Set this after applying options, in case a different context was set via options
 	loader.fetch = func(keys []coredb.PaginateCommentsByFeedEventIDBatchParams) ([][]coredb.Comment, []error) {
-		return fetch(loader.ctx, keys)
+		ctx := loader.ctx
+
+		// Allow the preFetchHook to modify and return a new context
+		if loader.preFetchHook != nil {
+			ctx = loader.preFetchHook(ctx, "FeedEventCommentsLoader")
+		}
+
+		results, errors := fetch(ctx, keys)
+
+		if loader.postFetchHook != nil {
+			loader.postFetchHook(ctx, "FeedEventCommentsLoader")
+		}
+
+		return results, errors
 	}
 
 	if loader.subscriptionRegistry == nil {
@@ -104,6 +131,13 @@ type FeedEventCommentsLoader struct {
 
 	// whether this dataloader will publish its results for others to cache
 	publishResults bool
+
+	// a hook invoked before the fetch operation, useful for things like tracing.
+	// the returned context will be passed to the fetch operation.
+	preFetchHook func(ctx context.Context, loaderName string) context.Context
+
+	// a hook invoked after the fetch operation, useful for things like tracing
+	postFetchHook func(ctx context.Context, loaderName string)
 
 	// a shared slice where dataloaders will register and invoke caching functions.
 	// the same slice should be passed to every dataloader.

@@ -114,6 +114,10 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 		return
 	}
 
+	// Get the current time before we do anything else, since this is our best approximation
+	// of when the operation "finished"
+	endTime := time.Now()
+
 	if l.continueOnly {
 		transaction := sentry.TransactionFromContext(ctx)
 		if transaction == nil {
@@ -176,7 +180,8 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 
 	// pgx calls the logger AFTER the operation happens, but it tells us how long the operation took.
 	// We can use that to update our span so it reflects the correct start time.
-	span.StartTime = time.Now().Add(-duration)
+	span.EndTime = endTime
+	span.StartTime = endTime.Add(-duration)
 }
 
 func generateValuesPlaceholders(l, offset int, nows []int) string {

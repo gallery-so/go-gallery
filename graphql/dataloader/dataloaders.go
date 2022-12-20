@@ -43,6 +43,7 @@ package dataloader
 import (
 	"context"
 	"database/sql"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"sync"
 	"time"
 
@@ -124,6 +125,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 		waitTime:             2 * time.Millisecond,
 		disableCaching:       disableCaching,
 		publishResults:       true,
+		preFetchHook:         tracing.DataloaderPreFetchHook,
+		postFetchHook:        tracing.DataloaderPostFetchHook,
 		subscriptionRegistry: &subscriptionRegistry,
 		mutexRegistry:        &mutexRegistry,
 	}
