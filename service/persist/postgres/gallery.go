@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
@@ -31,27 +30,18 @@ func (g *GalleryRepository) Create(pCtx context.Context, pGallery db.GalleryRepo
 		return db.Gallery{}, err
 	}
 
-	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.OwnerUserID)
-	if err != nil {
-		return db.Gallery{}, err
-	}
 	return gal, nil
 }
 
 // Delete deletes a gallery and ensures that the collections of that gallery are passed on to another gallery
-func (g *GalleryRepository) Delete(pCtx context.Context, pGallery db.GalleryRepoDeleteParams) (db.Gallery, error) {
+func (g *GalleryRepository) Delete(pCtx context.Context, pGallery db.GalleryRepoDeleteParams) error {
 
-	gal, err := g.queries.GalleryRepoDelete(pCtx, pGallery)
+	err := g.queries.GalleryRepoDelete(pCtx, pGallery)
 	if err != nil {
-		return db.Gallery{}, err
+		return err
 	}
 
-	err = ensureAllCollsAccountedForToken(pCtx, g, pGallery.OwnerUserID)
-	if err != nil {
-		return db.Gallery{}, err
-	}
-
-	return gal, nil
+	return nil
 }
 
 // Update updates the gallery with the given ID and ensures that gallery is owned by the given userID
@@ -62,10 +52,8 @@ func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUser
 	}
 
 	rowsAffected, err := g.queries.GalleryRepoUpdate(pCtx, db.GalleryRepoUpdateParams{
-		LastUpdated: time.Time(pUpdate.LastUpdated),
-		Collections: pUpdate.Collections,
-		GalleryID:   pID,
-		OwnerUserID: pUserID,
+		CollectionIds: pUpdate.Collections,
+		GalleryID:     pID,
 	})
 
 	if err != nil {
@@ -76,7 +64,7 @@ func (g *GalleryRepository) Update(pCtx context.Context, pID persist.DBID, pUser
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
 
-	return ensureAllCollsAccountedForToken(pCtx, g, pUserID)
+	return nil
 }
 
 // AddCollections adds the given collections to the gallery with the given ID
@@ -88,7 +76,6 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	}
 
 	rowsAffected, err := g.queries.GalleryRepoAddCollections(pCtx, db.GalleryRepoAddCollectionsParams{
-		OwnerUserID:   pUserID,
 		CollectionIds: dbidsToStrings(pCollections),
 		GalleryID:     pID,
 	})
@@ -101,7 +88,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 		return persist.ErrGalleryNotFoundByID{ID: pID}
 	}
 
-	return ensureAllCollsAccountedForToken(pCtx, g, pUserID)
+	return nil
 }
 
 func (g *GalleryRepository) GetPreviewsURLsByUserID(pCtx context.Context, pUserID persist.DBID, limit int) ([]string, error) {
@@ -125,13 +112,5 @@ func ensureCollsOwnedByUserToken(pCtx context.Context, g *GalleryRepository, pCo
 		return errCollsNotOwnedByUser
 	}
 
-	return nil
-}
-
-func ensureAllCollsAccountedForToken(pCtx context.Context, g *GalleryRepository, pUserID persist.DBID) error {
-	err := g.queries.GalleryRepoEnsureCollsOwnedByUser(pCtx, pUserID)
-	if err != nil {
-		return err
-	}
 	return nil
 }

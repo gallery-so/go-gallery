@@ -286,7 +286,12 @@ type ComplexityRoot struct {
 	}
 
 	DeleteGalleryPayload struct {
-		Gallery func(childComplexity int) int
+		DeletedID func(childComplexity int) int
+	}
+
+	DeletedNode struct {
+		Dbid func(childComplexity int) int
+		ID   func(childComplexity int) int
 	}
 
 	EmailNotificationSettings struct {
@@ -2041,12 +2046,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DeleteCollectionPayload.Gallery(childComplexity), true
 
-	case "DeleteGalleryPayload.gallery":
-		if e.complexity.DeleteGalleryPayload.Gallery == nil {
+	case "DeleteGalleryPayload.deletedId":
+		if e.complexity.DeleteGalleryPayload.DeletedID == nil {
 			break
 		}
 
-		return e.complexity.DeleteGalleryPayload.Gallery(childComplexity), true
+		return e.complexity.DeleteGalleryPayload.DeletedID(childComplexity), true
+
+	case "DeletedNode.dbid":
+		if e.complexity.DeletedNode.Dbid == nil {
+			break
+		}
+
+		return e.complexity.DeletedNode.Dbid(childComplexity), true
+
+	case "DeletedNode.id":
+		if e.complexity.DeletedNode.ID == nil {
+			break
+		}
+
+		return e.complexity.DeletedNode.ID(childComplexity), true
 
 	case "EmailNotificationSettings.unsubscribedFromAll":
 		if e.complexity.EmailNotificationSettings.UnsubscribedFromAll == nil {
@@ -5226,6 +5245,11 @@ interface Node {
     id: ID!
 }
 
+type DeletedNode implements Node {
+    id: ID!
+    dbid: DBID!
+}
+
 interface Error {
     message: String!
 }
@@ -5641,7 +5665,7 @@ type NotificationsConnection @goEmbedHelper {
     pageInfo: PageInfo
 }
 
-type Viewer @goGqlId(fields: ["userId"]) {
+type Viewer implements Node @goGqlId(fields: ["userId"]) {
   id: ID!
   userId: DBID!
   user: GalleryUser @goField(forceResolver: true)
@@ -6337,7 +6361,7 @@ type LogoutPayload {
 input CreateUserInput {
 	username: String!
 	bio: String
-	email: String
+	email: Email
 	galleryName: String
 	galleryDescription: String
     galleryPosition: String!
@@ -6684,6 +6708,7 @@ type CreateGalleryPayload {
 union CreateGalleryPayloadOrError =
     CreateGalleryPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateGalleryInfoPayload {
     gallery: Gallery
@@ -6692,6 +6717,7 @@ type UpdateGalleryInfoPayload {
 union UpdateGalleryInfoPayloadOrError =
     UpdateGalleryInfoPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateGalleryHiddenPayload {
     gallery: Gallery
@@ -6700,14 +6726,16 @@ type UpdateGalleryHiddenPayload {
 union UpdateGalleryHiddenPayloadOrError =
     UpdateGalleryHiddenPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type DeleteGalleryPayload {
-    gallery: Gallery
+    deletedId: DeletedNode
 }
 
 union DeleteGalleryPayloadOrError =
     DeleteGalleryPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateGalleryOrderPayload {
     viewer: Viewer
@@ -6716,6 +6744,7 @@ type UpdateGalleryOrderPayload {
 union UpdateGalleryOrderPayloadOrError =
     UpdateGalleryOrderPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateFeaturedGalleryPayload {
     viewer: Viewer
@@ -6724,6 +6753,7 @@ type UpdateFeaturedGalleryPayload {
 union UpdateFeaturedGalleryPayloadOrError =
     UpdateFeaturedGalleryPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type Mutation {
     # User Mutations
@@ -12021,7 +12051,7 @@ func (ec *executionContext) _DeleteCollectionPayload_gallery(ctx context.Context
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _DeleteGalleryPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.DeleteGalleryPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _DeleteGalleryPayload_deletedId(ctx context.Context, field graphql.CollectedField, obj *model.DeleteGalleryPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -12039,7 +12069,7 @@ func (ec *executionContext) _DeleteGalleryPayload_gallery(ctx context.Context, f
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Gallery, nil
+		return obj.DeletedID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12048,9 +12078,79 @@ func (ec *executionContext) _DeleteGalleryPayload_gallery(ctx context.Context, f
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Gallery)
+	res := resTmp.(*model.DeletedNode)
 	fc.Result = res
-	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+	return ec.marshalODeletedNode2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeletedNode(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _DeletedNode_id(ctx context.Context, field graphql.CollectedField, obj *model.DeletedNode) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "DeletedNode",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID(), nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.GqlID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _DeletedNode_dbid(ctx context.Context, field graphql.CollectedField, obj *model.DeletedNode) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "DeletedNode",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dbid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.DBID)
+	fc.Result = res
+	return ec.marshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _EmailNotificationSettings_unsubscribedFromAll(ctx context.Context, field graphql.CollectedField, obj *model.EmailNotificationSettings) (ret graphql.Marshaler) {
@@ -25406,14 +25506,14 @@ func (ec *executionContext) _Viewer_id(ctx context.Context, field graphql.Collec
 		Object:     "Viewer",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.ID(), nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -27454,7 +27554,7 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
-			it.Email, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			it.Email, err = ec.unmarshalOEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -28656,6 +28756,13 @@ func (ec *executionContext) _CreateGalleryPayloadOrError(ctx context.Context, se
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -28790,6 +28897,13 @@ func (ec *executionContext) _DeleteGalleryPayloadOrError(ctx context.Context, se
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -29469,6 +29583,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
+	case model.DeletedNode:
+		return ec._DeletedNode(ctx, sel, &obj)
+	case *model.DeletedNode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._DeletedNode(ctx, sel, obj)
 	case model.GalleryUser:
 		return ec._GalleryUser(ctx, sel, &obj)
 	case *model.GalleryUser:
@@ -29532,6 +29653,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Contract(ctx, sel, obj)
+	case model.Viewer:
+		return ec._Viewer(ctx, sel, &obj)
+	case *model.Viewer:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Viewer(ctx, sel, obj)
 	case model.Admire:
 		return ec._Admire(ctx, sel, &obj)
 	case *model.Admire:
@@ -30279,6 +30407,13 @@ func (ec *executionContext) _UpdateFeaturedGalleryPayloadOrError(ctx context.Con
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -30332,6 +30467,13 @@ func (ec *executionContext) _UpdateGalleryHiddenPayloadOrError(ctx context.Conte
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -30355,6 +30497,13 @@ func (ec *executionContext) _UpdateGalleryInfoPayloadOrError(ctx context.Context
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -30378,6 +30527,13 @@ func (ec *executionContext) _UpdateGalleryOrderPayloadOrError(ctx context.Contex
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -32294,13 +32450,54 @@ func (ec *executionContext) _DeleteGalleryPayload(ctx context.Context, sel ast.S
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("DeleteGalleryPayload")
-		case "gallery":
+		case "deletedId":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._DeleteGalleryPayload_gallery(ctx, field, obj)
+				return ec._DeleteGalleryPayload_deletedId(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var deletedNodeImplementors = []string{"DeletedNode", "Node"}
+
+func (ec *executionContext) _DeletedNode(ctx context.Context, sel ast.SelectionSet, obj *model.DeletedNode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deletedNodeImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeletedNode")
+		case "id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._DeletedNode_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dbid":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._DeletedNode_dbid(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -32745,7 +32942,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -38068,7 +38265,7 @@ func (ec *executionContext) _ViewGalleryPayload(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var viewerImplementors = []string{"Viewer", "ViewerOrError"}
+var viewerImplementors = []string{"Viewer", "Node", "ViewerOrError"}
 
 func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, obj *model.Viewer) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, viewerImplementors)
@@ -40211,6 +40408,13 @@ func (ec *executionContext) marshalODeleteGalleryPayloadOrError2githubᚗcomᚋm
 		return graphql.Null
 	}
 	return ec._DeleteGalleryPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalODeletedNode2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDeletedNode(ctx context.Context, sel ast.SelectionSet, v *model.DeletedNode) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DeletedNode(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx context.Context, v interface{}) (*persist.Email, error) {

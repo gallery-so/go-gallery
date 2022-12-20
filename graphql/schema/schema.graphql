@@ -50,6 +50,11 @@ interface Node {
     id: ID!
 }
 
+type DeletedNode implements Node {
+    id: ID!
+    dbid: DBID!
+}
+
 interface Error {
     message: String!
 }
@@ -465,7 +470,7 @@ type NotificationsConnection @goEmbedHelper {
     pageInfo: PageInfo
 }
 
-type Viewer @goGqlId(fields: ["userId"]) {
+type Viewer implements Node @goGqlId(fields: ["userId"]) {
   id: ID!
   userId: DBID!
   user: GalleryUser @goField(forceResolver: true)
@@ -1161,7 +1166,7 @@ type LogoutPayload {
 input CreateUserInput {
 	username: String!
 	bio: String
-	email: String
+	email: Email
 	galleryName: String
 	galleryDescription: String
     galleryPosition: String!
@@ -1508,6 +1513,7 @@ type CreateGalleryPayload {
 union CreateGalleryPayloadOrError =
     CreateGalleryPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateGalleryInfoPayload {
     gallery: Gallery
@@ -1516,6 +1522,7 @@ type UpdateGalleryInfoPayload {
 union UpdateGalleryInfoPayloadOrError =
     UpdateGalleryInfoPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateGalleryHiddenPayload {
     gallery: Gallery
@@ -1524,14 +1531,16 @@ type UpdateGalleryHiddenPayload {
 union UpdateGalleryHiddenPayloadOrError =
     UpdateGalleryHiddenPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type DeleteGalleryPayload {
-    gallery: Gallery
+    deletedId: DeletedNode
 }
 
 union DeleteGalleryPayloadOrError =
     DeleteGalleryPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateGalleryOrderPayload {
     viewer: Viewer
@@ -1540,6 +1549,7 @@ type UpdateGalleryOrderPayload {
 union UpdateGalleryOrderPayloadOrError =
     UpdateGalleryOrderPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type UpdateFeaturedGalleryPayload {
     viewer: Viewer
@@ -1548,6 +1558,7 @@ type UpdateFeaturedGalleryPayload {
 union UpdateFeaturedGalleryPayloadOrError =
     UpdateFeaturedGalleryPayload
     | ErrInvalidInput
+    | ErrNotAuthorized
 
 type Mutation {
     # User Mutations

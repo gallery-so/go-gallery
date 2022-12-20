@@ -527,12 +527,12 @@ type CreateGalleryPayload struct {
 func (CreateGalleryPayload) IsCreateGalleryPayloadOrError() {}
 
 type CreateUserInput struct {
-	Username           string  `json:"username"`
-	Bio                *string `json:"bio"`
-	Email              *string `json:"email"`
-	GalleryName        *string `json:"galleryName"`
-	GalleryDescription *string `json:"galleryDescription"`
-	GalleryPosition    string  `json:"galleryPosition"`
+	Username           string         `json:"username"`
+	Bio                *string        `json:"bio"`
+	Email              *persist.Email `json:"email"`
+	GalleryName        *string        `json:"galleryName"`
+	GalleryDescription *string        `json:"galleryDescription"`
+	GalleryPosition    string         `json:"galleryPosition"`
 }
 
 type CreateUserPayload struct {
@@ -567,10 +567,16 @@ type DeleteCollectionPayload struct {
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
 
 type DeleteGalleryPayload struct {
-	Gallery *Gallery `json:"gallery"`
+	DeletedID *DeletedNode `json:"deletedId"`
 }
 
 func (DeleteGalleryPayload) IsDeleteGalleryPayloadOrError() {}
+
+type DeletedNode struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+func (DeletedNode) IsNode() {}
 
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
@@ -751,6 +757,12 @@ func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()      {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()   {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()    {}
 func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()          {}
+func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()            {}
+func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()        {}
+func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()      {}
+func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
+func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
+func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1589,7 +1601,6 @@ type ViewGalleryPayload struct {
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
-	ID              GqlID            `json:"id"`
 	UserID          persist.DBID     `json:"userId"`
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
@@ -1601,6 +1612,7 @@ type Viewer struct {
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
 }
 
+func (Viewer) IsNode()          {}
 func (Viewer) IsViewerOrError() {}
 
 type ViewerGallery struct {

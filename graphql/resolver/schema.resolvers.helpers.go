@@ -1175,18 +1175,11 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 }
 
 func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
-	var name, desc *string
-	if gallery.Name.Valid {
-		name = util.StringToPointer(gallery.Name.String)
-	}
-	if gallery.Description.Valid {
-		desc = util.StringToPointer(gallery.Description.String)
-	}
 
 	return &model.Gallery{
 		Dbid:        gallery.ID,
-		Name:        name,
-		Description: desc,
+		Name:        &gallery.Name,
+		Description: &gallery.Description,
 		Position:    &gallery.Position,
 		Hidden:      &gallery.Hidden,
 		Owner:       nil, // handled by dedicated resolver

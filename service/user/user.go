@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -122,12 +121,12 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		return "", "", err
 	}
 
-	var nullName, nullDesc sql.NullString
+	var nullName, nullDesc string
 	if galleryName != nil {
-		nullName = sql.NullString{String: *galleryName, Valid: true}
+		nullName = *galleryName
 	}
 	if galleryDesc != nil {
-		nullDesc = sql.NullString{String: *galleryDesc, Valid: true}
+		nullDesc = *galleryDesc
 	}
 	gallery, err := galleryRepo.Create(pCtx, coredb.GalleryRepoCreateParams{
 		GalleryID:   persist.GenerateID(),

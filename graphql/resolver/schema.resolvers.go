@@ -936,31 +936,28 @@ func (r *mutationResolver) CreateGallery(ctx context.Context, input model.Create
 }
 
 func (r *mutationResolver) UpdateGalleryHidden(ctx context.Context, input model.UpdateGalleryHiddenInput) (model.UpdateGalleryHiddenPayloadOrError, error) {
-	err := publicapi.For(ctx).Gallery.UpdateGalleryHidden(ctx, input.ID, input.Hidden)
-	if err != nil {
-		return nil, err
-	}
-
-	gallery, err := resolveGalleryByGalleryID(ctx, input.ID)
+	gallery, err := publicapi.For(ctx).Gallery.UpdateGalleryHidden(ctx, input.ID, input.Hidden)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.UpdateGalleryHiddenPayload{
-		Gallery: gallery,
+		Gallery: galleryToModel(ctx, gallery),
 	}
 
 	return output, nil
 }
 
 func (r *mutationResolver) DeleteGallery(ctx context.Context, galleryID persist.DBID) (model.DeleteGalleryPayloadOrError, error) {
-	gallery, err := publicapi.For(ctx).Gallery.DeleteGallery(ctx, galleryID)
+	err := publicapi.For(ctx).Gallery.DeleteGallery(ctx, galleryID)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &model.DeleteGalleryPayload{
-		Gallery: galleryToModel(ctx, gallery),
+		DeletedID: &model.DeletedNode{
+			Dbid: galleryID,
+		},
 	}
 
 	return output, nil

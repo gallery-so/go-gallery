@@ -633,20 +633,23 @@ select discount_code from merch where token_id = @token_hex and redeemed = true 
 -- name: GetUserOwnsTokenByIdentifiers :one
 select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain and deleted = false) as owns_token;
 
--- name: UpdateGalleryHidden :exec
-update galleries set hidden = @hidden, last_updated = now() where id = @id and owner_user_id = @owner_user_id and deleted = false;
+-- name: UpdateGalleryHidden :one
+update galleries set hidden = @hidden, last_updated = now() where id = @id and deleted = false returning *;
 
--- name: UpdateGalleryPosition :exec
-update galleries set position = @position, last_updated = now() where id = @id and owner_user_id = @owner_user_id and deleted = false;
+-- name: UpdateGalleryPositions :exec
+with updates as (
+    select unnest(@gallery_ids::text[]) as id, unnest(@positions::text[]) as position
+)
+update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false;
 
 -- name: UpdateGalleryInfo :exec
-update galleries set name = @name, description = @description, last_updated = now() where id = @id and owner_user_id = @owner_user_id and deleted = false;
+update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
 
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
--- name: GetGalleryTokenPreviewsByID :one
-select array(select t.media->>'thumbnail_url'::varchar from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 group by g.collections,c.id,c.nfts,t.id order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3)::varchar[] as previews;
+-- name: GetGalleryTokenPreviewsByID :many
+select t.media->>'thumbnail_url'::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;

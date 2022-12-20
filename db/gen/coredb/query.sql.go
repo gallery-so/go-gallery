@@ -739,7 +739,7 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 }
 
 const getCollectionById = `-- name: GetCollectionById :one
-SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings FROM collections WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings, gallery_id FROM collections WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetCollectionById(ctx context.Context, id persist.DBID) (Collection, error) {
@@ -758,12 +758,13 @@ func (q *Queries) GetCollectionById(ctx context.Context, id persist.DBID) (Colle
 		&i.Name,
 		&i.Layout,
 		&i.TokenSettings,
+		&i.GalleryID,
 	)
 	return i, err
 }
 
 const getCollectionsByGalleryId = `-- name: GetCollectionsByGalleryId :many
-SELECT c.id, c.deleted, c.owner_user_id, c.nfts, c.version, c.last_updated, c.created_at, c.hidden, c.collectors_note, c.name, c.layout, c.token_settings FROM galleries g, unnest(g.collections)
+SELECT c.id, c.deleted, c.owner_user_id, c.nfts, c.version, c.last_updated, c.created_at, c.hidden, c.collectors_note, c.name, c.layout, c.token_settings, c.gallery_id FROM galleries g, unnest(g.collections)
     WITH ORDINALITY AS x(coll_id, coll_ord)
     INNER JOIN collections c ON c.id = x.coll_id
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord
@@ -791,6 +792,7 @@ func (q *Queries) GetCollectionsByGalleryId(ctx context.Context, id persist.DBID
 			&i.Name,
 			&i.Layout,
 			&i.TokenSettings,
+			&i.GalleryID,
 		); err != nil {
 			return nil, err
 		}
@@ -1232,15 +1234,28 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 	return i, err
 }
 
-const getGalleryTokenPreviewsByID = `-- name: GetGalleryTokenPreviewsByID :one
-select array(select t.media->>'thumbnail_url'::varchar from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 group by g.collections,c.id,c.nfts,t.id order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3)::varchar[] as previews
+const getGalleryTokenPreviewsByID = `-- name: GetGalleryTokenPreviewsByID :many
+select t.media->>'thumbnail_url'::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3
 `
 
-func (q *Queries) GetGalleryTokenPreviewsByID(ctx context.Context, id persist.DBID) ([]string, error) {
-	row := q.db.QueryRow(ctx, getGalleryTokenPreviewsByID, id)
-	var previews []string
-	err := row.Scan(&previews)
-	return previews, err
+func (q *Queries) GetGalleryTokenPreviewsByID(ctx context.Context, id persist.DBID) ([]interface{}, error) {
+	rows, err := q.db.Query(ctx, getGalleryTokenPreviewsByID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []interface{}
+	for rows.Next() {
+		var previews interface{}
+		if err := rows.Scan(&previews); err != nil {
+			return nil, err
+		}
+		items = append(items, previews)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
@@ -2875,54 +2890,63 @@ func (q *Queries) RedeemMerch(ctx context.Context, arg RedeemMerchParams) (sql.N
 	return discount_code, err
 }
 
-const updateGalleryHidden = `-- name: UpdateGalleryHidden :exec
-update galleries set hidden = $1, last_updated = now() where id = $2 and owner_user_id = $3 and deleted = false
+const updateGalleryHidden = `-- name: UpdateGalleryHidden :one
+update galleries set hidden = $1, last_updated = now() where id = $2 and deleted = false returning id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position
 `
 
 type UpdateGalleryHiddenParams struct {
-	Hidden      bool
-	ID          persist.DBID
-	OwnerUserID persist.DBID
+	Hidden bool
+	ID     persist.DBID
 }
 
-func (q *Queries) UpdateGalleryHidden(ctx context.Context, arg UpdateGalleryHiddenParams) error {
-	_, err := q.db.Exec(ctx, updateGalleryHidden, arg.Hidden, arg.ID, arg.OwnerUserID)
-	return err
+func (q *Queries) UpdateGalleryHidden(ctx context.Context, arg UpdateGalleryHiddenParams) (Gallery, error) {
+	row := q.db.QueryRow(ctx, updateGalleryHidden, arg.Hidden, arg.ID)
+	var i Gallery
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Version,
+		&i.OwnerUserID,
+		&i.Collections,
+		&i.Name,
+		&i.Description,
+		&i.Hidden,
+		&i.Position,
+	)
+	return i, err
 }
 
 const updateGalleryInfo = `-- name: UpdateGalleryInfo :exec
-update galleries set name = $1, description = $2, last_updated = now() where id = $3 and owner_user_id = $4 and deleted = false
+update galleries set name = $1, description = $2, last_updated = now() where id = $3 and deleted = false
 `
 
 type UpdateGalleryInfoParams struct {
-	Name        sql.NullString
-	Description sql.NullString
+	Name        string
+	Description string
 	ID          persist.DBID
-	OwnerUserID persist.DBID
 }
 
 func (q *Queries) UpdateGalleryInfo(ctx context.Context, arg UpdateGalleryInfoParams) error {
-	_, err := q.db.Exec(ctx, updateGalleryInfo,
-		arg.Name,
-		arg.Description,
-		arg.ID,
-		arg.OwnerUserID,
-	)
+	_, err := q.db.Exec(ctx, updateGalleryInfo, arg.Name, arg.Description, arg.ID)
 	return err
 }
 
-const updateGalleryPosition = `-- name: UpdateGalleryPosition :exec
-update galleries set position = $1, last_updated = now() where id = $2 and owner_user_id = $3 and deleted = false
+const updateGalleryPositions = `-- name: UpdateGalleryPositions :exec
+with updates as (
+    select unnest($1::text[]) as id, unnest($2::text[]) as position
+)
+update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false
 `
 
-type UpdateGalleryPositionParams struct {
-	Position    string
-	ID          persist.DBID
-	OwnerUserID persist.DBID
+type UpdateGalleryPositionsParams struct {
+	GalleryIds []string
+	Positions  []string
 }
 
-func (q *Queries) UpdateGalleryPosition(ctx context.Context, arg UpdateGalleryPositionParams) error {
-	_, err := q.db.Exec(ctx, updateGalleryPosition, arg.Position, arg.ID, arg.OwnerUserID)
+func (q *Queries) UpdateGalleryPositions(ctx context.Context, arg UpdateGalleryPositionsParams) error {
+	_, err := q.db.Exec(ctx, updateGalleryPositions, arg.GalleryIds, arg.Positions)
 	return err
 }
 

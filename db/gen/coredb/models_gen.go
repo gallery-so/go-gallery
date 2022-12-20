@@ -47,6 +47,7 @@ type Collection struct {
 	Name           sql.NullString
 	Layout         persist.TokenLayout
 	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings
+	GalleryID      persist.DBID
 }
 
 type CollectionEvent struct {
@@ -177,8 +178,8 @@ type Gallery struct {
 	Version     sql.NullInt32
 	OwnerUserID persist.DBID
 	Collections persist.DBIDList
-	Name        sql.NullString
-	Description sql.NullString
+	Name        string
+	Description string
 	Hidden      bool
 	Position    string
 }

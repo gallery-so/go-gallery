@@ -357,7 +357,7 @@ func (b *GetAdmiresByActorIDBatchBatchResults) Close() error {
 }
 
 const getCollectionByIdBatch = `-- name: GetCollectionByIdBatch :batchone
-SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings FROM collections WHERE id = $1 AND deleted = false
+SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings, gallery_id FROM collections WHERE id = $1 AND deleted = false
 `
 
 type GetCollectionByIdBatchBatchResults struct {
@@ -402,6 +402,7 @@ func (b *GetCollectionByIdBatchBatchResults) QueryRow(f func(int, Collection, er
 			&i.Name,
 			&i.Layout,
 			&i.TokenSettings,
+			&i.GalleryID,
 		)
 		if f != nil {
 			f(t, i, err)
@@ -415,7 +416,7 @@ func (b *GetCollectionByIdBatchBatchResults) Close() error {
 }
 
 const getCollectionsByGalleryIdBatch = `-- name: GetCollectionsByGalleryIdBatch :batchmany
-SELECT c.id, c.deleted, c.owner_user_id, c.nfts, c.version, c.last_updated, c.created_at, c.hidden, c.collectors_note, c.name, c.layout, c.token_settings FROM galleries g, unnest(g.collections)
+SELECT c.id, c.deleted, c.owner_user_id, c.nfts, c.version, c.last_updated, c.created_at, c.hidden, c.collectors_note, c.name, c.layout, c.token_settings, c.gallery_id FROM galleries g, unnest(g.collections)
     WITH ORDINALITY AS x(coll_id, coll_ord)
     INNER JOIN collections c ON c.id = x.coll_id
     WHERE g.id = $1 AND g.deleted = false AND c.deleted = false ORDER BY x.coll_ord
@@ -470,6 +471,7 @@ func (b *GetCollectionsByGalleryIdBatchBatchResults) Query(f func(int, []Collect
 					&i.Name,
 					&i.Layout,
 					&i.TokenSettings,
+					&i.GalleryID,
 				); err != nil {
 					return err
 				}
