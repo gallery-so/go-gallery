@@ -204,10 +204,15 @@ func Map[T, U any](xs []T, f func(T) (U, error)) ([]U, error) {
 }
 
 // Dedupe removes duplicate elements from a slice, preserving the order of the remaining elements.
-func Dedupe[T comparable](xs []T) []T {
+func Dedupe[T comparable](src []T, filterInPlace bool) []T {
+	var result []T
+	if filterInPlace {
+		result = src[:0]
+	} else {
+		result = make([]T, 0, len(src))
+	}
 	seen := make(map[T]bool)
-	result := make([]T, 0, len(xs))
-	for _, x := range xs {
+	for _, x := range src {
 		if !seen[x] {
 			result = append(result, x)
 			seen[x] = true
