@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/mikeydub/go-gallery/graphql/apq"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -60,7 +61,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
-	validator := newValidator()
+	validator := validate.ValidateWithCustomValidators()
 
 	return &PublicAPI{
 		repos:     repos,
@@ -72,7 +73,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
+		User:          NewUserAPI(repos, queries, loaders, validator, ethClient, ipfsClient, arweaveClient, storageClient),
 		Contract:      &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, taskClient: taskClient},
 		Token:         &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
 		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
@@ -104,12 +105,6 @@ func For(ctx context.Context) *PublicAPI {
 	// If not, fall back to the one added to the gin context
 	gc := util.GinContextFromContext(ctx)
 	return gc.Value(apiContextKey).(*PublicAPI)
-}
-
-func newValidator() *validator.Validate {
-	v := validator.New()
-	validate.RegisterCustomValidators(v)
-	return v
 }
 
 func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {

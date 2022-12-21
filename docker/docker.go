@@ -11,22 +11,84 @@ import (
 	"time"
 
 	"github.com/asottile/dockerfile"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
 
-// N.B. This isn't the entire Docker Compose spec...
-type ComposeFile struct {
-	Version  string             `yaml:"version"`
-	Services map[string]Service `yaml:"services"`
+func StartPostgres() (resource *dockertest.Resource, err error) {
+	pool, err := newPool(time.Minute * 3)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := startService(pool, "postgres")
+	if err != nil {
+		return nil, err
+	}
+
+	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
+	host := hostAndPort[0]
+	port := hostAndPort[1]
+
+	if err = pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
+		log.Fatalf("could not connect to postgres: %s", err)
+	}
+
+	return r, nil
 }
 
-type Service struct {
+func StartPostgresIndexer() (resource *dockertest.Resource, err error) {
+	pool, err := newPool(time.Minute * 3)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := startService(pool, "postgres_indexer")
+	if err != nil {
+		return nil, err
+	}
+
+	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
+	host := hostAndPort[0]
+	port := hostAndPort[1]
+
+	if err = pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
+		log.Fatalf("could not connect to postgres: %s", err)
+	}
+
+	return r, nil
+}
+
+func StartRedis() (*dockertest.Resource, error) {
+	pool, err := newPool(time.Minute * 3)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := startService(pool, "redis")
+	if err != nil {
+		return nil, err
+	}
+
+	hostAndPort := r.GetHostPort("6379/tcp")
+
+	if err = pool.Retry(waitOnCache(hostAndPort)); err != nil {
+		log.Fatalf("could not connect to redis: %s", err)
+	}
+
+	return r, nil
+}
+
+// N.B. This isn't the entire Docker Compose spec...
+type compose struct {
+	Version  string             `yaml:"version"`
+	Services map[string]service `yaml:"services"`
+}
+
+type service struct {
 	Image       string                 `yaml:"image"`
 	Ports       []string               `yaml:"ports"`
 	Build       map[string]interface{} `yaml:"build"`
@@ -34,254 +96,98 @@ type Service struct {
 	Command     string                 `yaml:"command"`
 }
 
-func configureContainerCleanup(config *docker.HostConfig) {
-	config.AutoRemove = true
-	config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-}
+func startService(pool *dockertest.Pool, service string) (*dockertest.Resource, error) {
+	apps, err := loadComposeFile()
+	if err != nil {
+		return nil, err
+	}
 
-func waitOnDB() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("db is not available")
-		}
-	}()
+	serviceConf, ok := apps.Services[service]
+	if !ok {
+		return nil, fmt.Errorf("service=%s not configured in docker-compose.yml", service)
+	}
 
-	db, err := sql.Open(
-		"pgx",
-		fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s",
-			viper.GetString("POSTGRES_HOST"),
-			viper.GetInt("POSTGRES_PORT"),
-			viper.GetString("POSTGRES_USER"),
-			viper.GetString("POSTGRES_PASSWORD"),
-			viper.GetString("POSTGRES_DB"),
-		),
+	img, tag, err := baseImage(serviceConf)
+	if err != nil {
+		return nil, err
+	}
+
+	return pool.RunWithOptions(
+		&dockertest.RunOptions{
+			Repository: img,
+			Tag:        tag,
+			Env:        serviceConf.Environment,
+		},
+		func(c *docker.HostConfig) {
+			c.AutoRemove = true
+			c.RestartPolicy = docker.RestartPolicy{Name: "no"}
+		},
 	)
-	if err != nil {
-		panic(err)
-	}
-
-	if err := db.Ping(); err != nil {
-		panic(err)
-	}
-
-	db.Close()
-	return
 }
 
-func waitOnCache() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("cache is not available")
+func newPool(waitTime time.Duration) (*dockertest.Pool, error) {
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		return nil, err
+	}
+	pool.MaxWait = waitTime
+	return pool, nil
+}
+
+func waitOnDB(host, port, user, password, db string) func() error {
+	return func() error {
+		db, err := sql.Open("pgx", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s", host, port, user, password, db))
+		if err != nil {
+			return err
 		}
-	}()
-	redis.NewCache(0).Close(false)
-	return
+		defer db.Close()
+		return db.Ping()
+	}
 }
 
-func loadComposeFile() (f ComposeFile) {
-	path, err := util.FindFile("./docker-compose.yml", 3)
-	if err != nil {
-		log.Fatal(err)
+func waitOnCache(url string) func() error {
+	return func() error {
+		return redis.NewCache(0).Close(false)
 	}
+}
+
+func loadComposeFile() (compose, error) {
+	path := util.MustFindFile("./docker-compose.yml")
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatal(err)
+		return compose{}, err
 	}
 
-	err = yaml.Unmarshal(data, &f)
-	if err != nil {
-		log.Fatal(err)
-	}
+	var c compose
+	err = yaml.Unmarshal(data, &c)
 
-	return
+	return c, err
 }
 
-func getImageAndVersion(s string) ([]string, error) {
-	imgAndVer := strings.Split(s, ":")
-	if len(imgAndVer) != 2 {
-		return nil, errors.New("no version specified for image")
+func imageAndTag(s string) (string, string, error) {
+	uri := strings.Split(s, ":")
+	if len(uri) != 2 {
+		return uri[0], "latest", nil
 	}
-	return imgAndVer, nil
+	return uri[0], uri[1], nil
 }
 
-func getBuildImage(s Service) ([]string, error) {
-	path, err := util.FindFile("./docker-compose.yml", 3)
-	if err != nil {
-		log.Fatal(err)
-	}
+func baseImage(s service) (string, string, error) {
+	path := util.MustFindFile("./docker-compose.yml")
 
 	dockerPath := filepath.Join(filepath.Dir(path), s.Build["dockerfile"].(string))
 	absPath, _ := filepath.Abs(dockerPath)
 	res, err := dockerfile.ParseFile(absPath)
 	if err != nil {
-		log.Fatal(err)
+		return "", "", err
 	}
 
 	for _, cmd := range res {
 		if cmd.Cmd == "FROM" {
-			return getImageAndVersion(cmd.Value[0])
+			return imageAndTag(cmd.Value[0])
 		}
 	}
 
-	return nil, errors.New("no `FROM` directive found in dockerfile")
-}
-
-func InitPostgres() (resource *dockertest.Resource, callback func()) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("could not connect to docker: %s", err)
-	}
-	pool.MaxWait = 3 * time.Minute
-
-	logger.For(nil).Info("starting postgres")
-
-	apps := loadComposeFile()
-	imgAndVer, err := getBuildImage(apps.Services["postgres"])
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	logger.For(nil).Info("building postgres image")
-
-	pg, err := pool.RunWithOptions(
-		&dockertest.RunOptions{
-			Repository: imgAndVer[0],
-			Tag:        imgAndVer[1],
-			Env:        apps.Services["postgres"].Environment,
-		}, configureContainerCleanup,
-	)
-	if err != nil {
-		log.Fatalf("could not start postgres: %s", err)
-	}
-	logger.For(nil).Info("postgres started")
-
-	// Patch environment to use container
-	pgHost := viper.GetString("POSTGRES_HOST")
-	pgPort := viper.GetString("POSTGRES_PORT")
-	pgUser := viper.GetString("POSTGRES_USER")
-	pgPass := viper.GetString("POSTGRES_PASSWORD")
-	pgDb := viper.GetString("POSTGRES_DB")
-	env := viper.GetString("ENV")
-
-	hostAndPort := strings.Split(pg.GetHostPort("5432/tcp"), ":")
-	viper.Set("POSTGRES_HOST", hostAndPort[0])
-	viper.Set("POSTGRES_PORT", hostAndPort[1])
-	viper.Set("POSTGRES_USER", "postgres")
-	viper.Set("POSTGRES_PASSWORD", "")
-	viper.Set("POSTGRES_DB", "postgres")
-	viper.Set("ENV", "local")
-
-	// Called to restore original environment
-	callback = func() {
-		viper.Set("POSTGRES_HOST", pgHost)
-		viper.Set("POSTGRES_PORT", pgPort)
-		viper.Set("POSTGRES_USER", pgUser)
-		viper.Set("POSTGRES_PASSWORD", pgPass)
-		viper.Set("POSTGRES_DB", pgDb)
-		viper.Set("ENV", env)
-	}
-
-	if err = pool.Retry(waitOnDB); err != nil {
-		log.Fatalf("could not connect to postgres: %s", err)
-	}
-
-	return pg, callback
-}
-
-func InitPostgresIndexer() (resource *dockertest.Resource, callback func()) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("could not connect to docker: %s", err)
-	}
-	pool.MaxWait = 3 * time.Minute
-
-	apps := loadComposeFile()
-	imgAndVer, err := getBuildImage(apps.Services["postgres_indexer"])
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pg, err := pool.RunWithOptions(
-		&dockertest.RunOptions{
-			Repository: imgAndVer[0],
-			Tag:        imgAndVer[1],
-			Env:        apps.Services["postgres_indexer"].Environment,
-		}, configureContainerCleanup,
-	)
-	if err != nil {
-		log.Fatalf("could not start postgres: %s", err)
-	}
-
-	// Patch environment to use container
-	pgHost := viper.GetString("POSTGRES_HOST")
-	pgPort := viper.GetString("POSTGRES_PORT")
-	pgUser := viper.GetString("POSTGRES_USER")
-	pgPass := viper.GetString("POSTGRES_PASSWORD")
-	pgDb := viper.GetString("POSTGRES_DB")
-	env := viper.GetString("ENV")
-
-	hostAndPort := strings.Split(pg.GetHostPort("5432/tcp"), ":")
-	fmt.Println(hostAndPort)
-	viper.Set("POSTGRES_HOST", hostAndPort[0])
-	viper.Set("POSTGRES_PORT", hostAndPort[1])
-	viper.Set("POSTGRES_USER", "postgres")
-	viper.Set("POSTGRES_PASSWORD", "")
-	viper.Set("POSTGRES_DB", "postgres")
-	viper.Set("ENV", "local")
-
-	// Called to restore original environment
-	callback = func() {
-		viper.Set("POSTGRES_HOST", pgHost)
-		viper.Set("POSTGRES_PORT", pgPort)
-		viper.Set("POSTGRES_USER", pgUser)
-		viper.Set("POSTGRES_PASSWORD", pgPass)
-		viper.Set("POSTGRES_DB", pgDb)
-		viper.Set("ENV", env)
-	}
-
-	if err = pool.Retry(waitOnDB); err != nil {
-		log.Fatalf("could not connect to postgres: %s", err)
-	}
-
-	return pg, callback
-}
-
-func InitRedis() (resource *dockertest.Resource, callback func()) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("could not connect to docker: %s", err)
-	}
-	pool.MaxWait = 3 * time.Minute
-
-	apps := loadComposeFile()
-	imgAndVer, err := getImageAndVersion(apps.Services["redis"].Image)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	rd, err := pool.RunWithOptions(
-		&dockertest.RunOptions{
-			Repository: imgAndVer[0],
-			Tag:        imgAndVer[1],
-		}, configureContainerCleanup,
-	)
-	if err != nil {
-		log.Fatalf("could not start redis: %s", err)
-	}
-
-	// Patch environment to use container
-	url := viper.Get("REDIS_URL")
-	viper.Set("REDIS_URL", rd.GetHostPort("6379/tcp"))
-
-	// Called to restore original environment
-	callback = func() {
-		viper.Set("REDIS_URL", url)
-	}
-
-	if err = pool.Retry(waitOnCache); err != nil {
-		log.Fatalf("could not connect to redis: %s", err)
-	}
-
-	return rd, callback
+	return "", "", errors.New("no `FROM` directive found in dockerfile")
 }

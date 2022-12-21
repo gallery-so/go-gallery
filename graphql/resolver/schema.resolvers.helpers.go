@@ -190,7 +190,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 }
 
 func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*model.GalleryUser, error) {
-	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	user, err := publicapi.For(ctx).User.UserByID(ctx, userID)
 
 	if err != nil {
 		return nil, err
@@ -200,7 +200,7 @@ func resolveGalleryUserByUserID(ctx context.Context, userID persist.DBID) (*mode
 }
 
 func resolveGalleryUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*model.GalleryUser, error) {
-	user, err := publicapi.For(ctx).User.GetUserByAddress(ctx, chainAddress)
+	user, err := publicapi.For(ctx).User.UserByAddress(ctx, chainAddress)
 
 	if err != nil {
 		return nil, err
@@ -210,7 +210,7 @@ func resolveGalleryUserByAddress(ctx context.Context, chainAddress persist.Chain
 }
 
 func resolveGalleryUsersWithTrait(ctx context.Context, trait string) ([]*model.GalleryUser, error) {
-	users, err := publicapi.For(ctx).User.GetUsersWithTrait(ctx, trait)
+	users, err := publicapi.For(ctx).User.UsersWithTrait(ctx, trait)
 
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func resolveBadgesByUserID(ctx context.Context, userID persist.DBID) ([]*model.B
 }
 
 func resolveFollowersByUserID(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
-	followers, err := publicapi.For(ctx).User.GetFollowersByUserId(ctx, userID)
+	followers, err := publicapi.For(ctx).User.FollowersByUserID(ctx, userID)
 
 	if err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func resolveFollowersByUserID(ctx context.Context, userID persist.DBID) ([]*mode
 }
 
 func resolveFollowingByUserID(ctx context.Context, userID persist.DBID) ([]*model.GalleryUser, error) {
-	following, err := publicapi.For(ctx).User.GetFollowingByUserId(ctx, userID)
+	following, err := publicapi.For(ctx).User.FollowingByUserID(ctx, userID)
 
 	if err != nil {
 		return nil, err
@@ -270,7 +270,7 @@ func resolveFollowingByUserID(ctx context.Context, userID persist.DBID) ([]*mode
 }
 
 func resolveGalleryUserByUsername(ctx context.Context, username string) (*model.GalleryUser, error) {
-	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+	user, err := publicapi.For(ctx).User.UserByUsername(ctx, username)
 
 	if err != nil {
 		return nil, err
@@ -505,7 +505,7 @@ func resolveViewer(ctx context.Context) *model.Viewer {
 }
 
 func resolveViewerEmail(ctx context.Context) *model.UserEmail {
-	userWithPII, err := publicapi.For(ctx).User.GetUserWithPII(ctx)
+	userWithPII, err := publicapi.For(ctx).User.LoggedInUserWithPII(ctx)
 	if err != nil {
 		return nil
 	}
@@ -527,7 +527,7 @@ func userWithPIIToEmailModel(user *db.UsersWithPii) *model.UserEmail {
 }
 
 func resolveMembershipTierByMembershipId(ctx context.Context, id persist.DBID) (*model.MembershipTier, error) {
-	tier, err := publicapi.For(ctx).User.GetMembershipByMembershipId(ctx, id)
+	tier, err := publicapi.For(ctx).User.MembershipByID(ctx, id)
 
 	if err != nil {
 		return nil, err
@@ -735,9 +735,9 @@ func notificationToModel(notif db.Notification) (model.Notification, error) {
 
 func resolveViewerNotificationSettings(ctx context.Context) (*model.NotificationSettings, error) {
 
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	userID := publicapi.For(ctx).User.LoggedInUserID(ctx)
 
-	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	user, err := publicapi.For(ctx).User.UserByID(ctx, userID)
 
 	if err != nil {
 		return nil, err
@@ -758,7 +758,7 @@ func notificationSettingsToModel(ctx context.Context, user *db.User) *model.Noti
 }
 
 func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notification {
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	userID := publicapi.For(ctx).User.LoggedInUserID(ctx)
 	notifDispatcher := notifications.For(ctx)
 	notifs := notifDispatcher.GetNewNotificationsForUser(userID)
 	logger.For(ctx).Info("new notification subscription for ", userID)
@@ -787,7 +787,7 @@ func resolveNewNotificationSubscription(ctx context.Context) <-chan model.Notifi
 }
 
 func resolveUpdatedNotificationSubscription(ctx context.Context) <-chan model.Notification {
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	userID := publicapi.For(ctx).User.LoggedInUserID(ctx)
 	notifDispatcher := notifications.For(ctx)
 	notifs := notifDispatcher.GetUpdatedNotificationsForUser(userID)
 
@@ -826,7 +826,7 @@ func resolveGroupNotificationUsersConnectionByUserIDs(ctx context.Context, userI
 			PageInfo: &model.PageInfo{},
 		}, nil
 	}
-	users, pageInfo, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, userIDs, before, after, first, last)
+	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithIDs(ctx, userIDs, before, after, first, last)
 	if err != nil {
 		return nil, err
 	}
@@ -954,7 +954,7 @@ func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, 
 }
 
 func updateUserEmail(ctx context.Context, email persist.Email) (*model.UpdateEmailPayload, error) {
-	err := publicapi.For(ctx).User.UpdateUserEmail(ctx, email)
+	err := publicapi.For(ctx).User.UpdateEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
@@ -978,7 +978,7 @@ func resendEmailVerification(ctx context.Context) (*model.ResendVerificationEmai
 }
 
 func updateUserEmailNotificationSettings(ctx context.Context, input model.UpdateEmailNotificationSettingsInput) (*model.UpdateEmailNotificationSettingsPayload, error) {
-	err := publicapi.For(ctx).User.UpdateUserEmailNotificationSettings(ctx, persist.EmailUnsubscriptions{
+	err := publicapi.For(ctx).User.UpdateEmailNotificationSettings(ctx, persist.EmailUnsubscriptions{
 		All:           persist.NullBool(input.UnsubscribedFromAll),
 		Notifications: persist.NullBool(input.UnsubscribedFromNotifications),
 	})
@@ -1200,7 +1200,7 @@ func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int)
 // userToModel converts a db.User to a model.User
 func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 	userApi := publicapi.For(ctx).User
-	isAuthenticatedUser := userApi.IsUserLoggedIn(ctx) && userApi.GetLoggedInUserId(ctx) == user.ID
+	isAuthenticatedUser := userApi.IsUserLoggedIn(ctx) && userApi.LoggedInUserID(ctx) == user.ID
 
 	wallets := make([]*model.Wallet, len(user.Wallets))
 	for i, wallet := range user.Wallets {

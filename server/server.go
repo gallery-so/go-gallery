@@ -48,7 +48,7 @@ import (
 // Init initializes the server
 func Init() {
 
-	setDefaults()
+	SetDefaults()
 
 	logger.InitWithGCPDefaults()
 	initSentry()
@@ -90,8 +90,9 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	var storage *storage.Client
 	var pub *pubsub.Client
 	if viper.GetString("ENV") == "local" {
-		storage = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
-		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
+		storage = media.NewLocalStorageClient(context.Background(), keyPath)
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile(keyPath))
 		if err != nil {
 			panic(err)
 		}
@@ -119,7 +120,8 @@ func newSecretsClient() *secretmanager.Client {
 	if viper.GetString("ENV") != "local" {
 		c, err = secretmanager.NewClient(context.Background())
 	} else {
-		c, err = secretmanager.NewClient(context.Background(), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
+		c, err = secretmanager.NewClient(context.Background(), option.WithCredentialsFile(keyPath))
 	}
 	if err != nil {
 		panic(fmt.Sprintf("error creating secrets client: %v", err))
@@ -127,7 +129,7 @@ func newSecretsClient() *secretmanager.Client {
 	return c
 }
 
-func setDefaults() {
+func SetDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("JWT_SECRET", "Test-Secret")

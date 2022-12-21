@@ -245,7 +245,7 @@ func (r *feedEventResolver) ViewerAdmire(ctx context.Context, obj *model.FeedEve
 		return nil, nil
 	}
 
-	userID := api.User.GetLoggedInUserId(ctx)
+	userID := api.User.LoggedInUserID(ctx)
 
 	admire, err := api.Interaction.GetAdmireByActorIDAndFeedEventID(ctx, userID, obj.Dbid)
 	if err != nil {
@@ -361,7 +361,7 @@ func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persi
 		return nil, err
 	}
 
-	err = api.User.AddWalletToUser(ctx, chainAddress, authenticator)
+	err = api.User.AddWallet(ctx, chainAddress, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +376,7 @@ func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persi
 func (r *mutationResolver) RemoveUserWallets(ctx context.Context, walletIds []persist.DBID) (model.RemoveUserWalletsPayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	err := api.User.RemoveWalletsFromUser(ctx, walletIds)
+	err := api.User.RemoveWallets(ctx, walletIds)
 	if err != nil {
 		return nil, err
 	}
@@ -926,7 +926,7 @@ func (r *mutationResolver) ClearAllNotifications(ctx context.Context) (*model.Cl
 }
 
 func (r *mutationResolver) UpdateNotificationSettings(ctx context.Context, settings *model.NotificationSettingsInput) (*model.NotificationSettings, error) {
-	err := publicapi.For(ctx).User.UpdateUserNotificationSettings(ctx, persist.UserNotificationSettings{
+	err := publicapi.For(ctx).User.UpdateNotificationSettings(ctx, persist.UserNotificationSettings{
 		SomeoneFollowedYou:           settings.SomeoneFollowedYou,
 		SomeoneAdmiredYourUpdate:     settings.SomeoneAdmiredYourUpdate,
 		SomeoneCommentedOnYourUpdate: settings.SomeoneCommentedOnYourUpdate,
@@ -1010,7 +1010,7 @@ func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username str
 func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error) {
 	api := publicapi.For(ctx)
 
-	user, err := api.User.GetUserByUsername(ctx, username)
+	user, err := api.User.UserByUsername(ctx, username)
 
 	if err != nil {
 		return nil, err
@@ -1033,7 +1033,7 @@ func (r *mutationResolver) SyncTokensForUsername(ctx context.Context, username s
 }
 
 func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error) {
-	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+	user, err := publicapi.For(ctx).User.UserByUsername(ctx, username)
 
 	if err != nil {
 		return nil, err
@@ -1096,7 +1096,7 @@ func (r *queryResolver) MembershipTiers(ctx context.Context, forceRefresh *bool)
 		refresh = *forceRefresh
 	}
 
-	tiers, err := api.User.GetMembershipTiers(ctx, refresh)
+	tiers, err := api.User.MembershipTiers(ctx, refresh)
 	if err != nil {
 		return nil, err
 	}
@@ -1356,12 +1356,12 @@ func (r *userFollowedUsersFeedEventDataResolver) Owner(ctx context.Context, obj 
 }
 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	userID := publicapi.For(ctx).User.LoggedInUserID(ctx)
 	return resolveGalleryUserByUserID(ctx, userID)
 }
 
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
-	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	userID := publicapi.For(ctx).User.LoggedInUserID(ctx)
 	galleries, err := resolveGalleriesByUserID(ctx, userID)
 
 	if err != nil {

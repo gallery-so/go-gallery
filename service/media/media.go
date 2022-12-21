@@ -78,6 +78,7 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 }
 
 func NewLocalStorageClient(ctx context.Context, keyPath string) *storage.Client {
+	keyPath = util.MustFindFile(keyPath)
 	scopes := []string{storage.ScopeFullControl}
 	transport, err := htransport.NewTransport(ctx, http.DefaultTransport, option.WithCredentialsFile(keyPath), option.WithScopes(scopes...))
 	if err != nil {

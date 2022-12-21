@@ -1,0 +1,84 @@
+query userByUsernameQuery($user: String!) {
+	userByUsername(username: $user) {
+		...on Error {
+			__typename
+			message
+		}
+		...on GalleryUser {
+			username
+      dbid
+		}
+	}
+}
+
+query userByIdQuery($id: DBID!) {
+	userById(id: $id) {
+		...on Error {
+			__typename
+			message
+		}
+		...on GalleryUser {
+			username
+      dbid
+		}
+	}
+}
+
+query userByAddressQuery($input: ChainAddressInput!) {
+	userByAddress(chainAddress: $input) {
+		...on Error {
+			__typename
+			message
+		}
+		...on GalleryUser {
+			username
+      dbid
+		}
+	}
+}
+
+query viewerQuery {
+	viewer {
+		...on Error {
+			__typename
+			message
+		}
+		...on Viewer {
+      user {
+        username
+        dbid
+      }
+		}
+	}
+}
+
+mutation createUserMutation($authMethod: AuthMechanism!, $username: String!, $bio: String, $email: Email) {
+	createUser(authMechanism: $authMethod, username: $username, bio: $bio, email: $email) {
+		...on Error {
+			__typename
+			message
+		}
+		...on CreateUserPayload {
+			viewer {
+				user {
+					username
+					dbid
+          bio
+				}
+			}
+		}
+	}
+}
+
+mutation getAuthNonceMutation($input: ChainAddressInput!) {
+  getAuthNonce(chainAddress: $input) {
+    ...on Error {
+      __typename
+      message
+    }
+    ...on AuthNonce {
+      nonce
+      userExists
+    }
+  }
+}
