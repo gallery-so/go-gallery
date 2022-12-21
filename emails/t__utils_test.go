@@ -105,15 +105,6 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 
 	testUser2.ID = userID2
 
-	collID, err := repos.CollectionRepository.Create(ctx, persist.CollectionDB{
-		Name:        "test coll",
-		OwnerUserID: userID,
-	})
-
-	if err != nil {
-		t.Fatalf("failed to create collection: %s", err)
-	}
-
 	galleryInsert := coredb.GalleryRepoCreateParams{OwnerUserID: userID, GalleryID: persist.GenerateID(), Position: "0.1"}
 
 	gallery, err := repos.GalleryRepository.Create(ctx, galleryInsert)
@@ -126,6 +117,16 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 	_, err = repos.GalleryRepository.Create(ctx, galleryInsert2)
 	if err != nil {
 		t.Fatalf("failed to create gallery: %s", err)
+	}
+
+	collID, err := repos.CollectionRepository.Create(ctx, persist.CollectionDB{
+		Name:        "test coll",
+		OwnerUserID: userID,
+		GalleryID:   gallery.ID,
+	})
+
+	if err != nil {
+		t.Fatalf("failed to create collection: %s", err)
 	}
 
 	err = repos.GalleryRepository.Update(ctx, gallery.ID, userID, persist.GalleryTokenUpdateInput{

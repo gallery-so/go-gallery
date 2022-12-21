@@ -471,7 +471,7 @@ SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = f
     LIMIT $2;
 
 -- name: GetRecentUnseenNotifications :many
-SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false ORDER BY CREATED_AT DESC LIMIT $2;
+SELECT * FROM notifications WHERE owner_id = @owner_id AND deleted = false AND seen = false and created_at > @created_after order by created_at desc limit @lim;
 
 -- name: GetUserNotificationsBatch :batchmany
 SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
@@ -520,7 +520,7 @@ INSERT INTO notifications (id, owner_id, action, data, event_ids) VALUES ($1, $2
 INSERT INTO notifications (id, owner_id, action, data, event_ids, gallery_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 
 -- name: UpdateNotification :exec
-UPDATE notifications SET data = $2, event_ids = event_ids || $3, amount = $4, last_updated = now(), seen = false WHERE id = $1;
+UPDATE notifications SET data = $2, event_ids = event_ids || $3, amount = $4, last_updated = now(), seen = false WHERE id = $1 AND deleted = false AND NOT amount = $4;
 
 -- name: UpdateNotificationSettingsByID :exec
 UPDATE users SET notification_settings = $2 WHERE id = $1;

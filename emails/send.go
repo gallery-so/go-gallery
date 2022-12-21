@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -14,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sendgrid/rest"
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"github.com/spf13/viper"
@@ -24,6 +26,12 @@ const emailsAtATime = 10_000
 
 type VerificationEmailInput struct {
 	UserID persist.DBID `json:"user_id" binding:"required"`
+}
+
+type sendNotificationEmailHttpInput struct {
+	UserID         persist.DBID  `json:"user_id,required"`
+	ToEmail        persist.Email `json:"to_email,required"`
+	SendRealEmails bool          `json:"send_real_emails"`
 }
 
 type verificationEmailTemplateData struct {
@@ -106,11 +114,23 @@ type notificationsEmailDynamicTemplateData struct {
 	UnsubscribeToken string                                 `json:"unsubscribeToken"`
 }
 
-func sendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
+func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		err := sendNotificationEmailsToAllUsers(c, queries, s)
+
+		var input sendNotificationEmailHttpInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		userWithPII, err := queries.GetUserWithPIIByID(c, input.UserID)
 		if err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+
+		if _, err := sendNotificationEmailToUser(c, userWithPII, input.ToEmail, queries, s, 10, 5, input.SendRealEmails); err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
@@ -124,7 +144,7 @@ func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psu
 
 	ctx := context.Background()
 	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		err := sendNotificationEmailsToAllUsers(ctx, queries, s)
+		err := sendNotificationEmailsToAllUsers(ctx, queries, s, viper.GetString("ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			msg.Nack()
@@ -134,92 +154,118 @@ func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psu
 	})
 }
 
-func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client) error {
-	searchLimit := int32(10)
-	resultLimit := 5
+func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries, s *sendgrid.Client, sendRealEmails bool) error {
+
+	emailsSent := new(atomic.Uint64)
+	defer func() {
+		logger.For(c).Infof("sent %d emails", emailsSent.Load())
+	}()
 	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.UsersWithPii) error {
 
+		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, queries, s, 10, 5, sendRealEmails)
+		if err != nil {
+			return err
+		}
+		if response != nil {
+			if response.StatusCode >= 299 || response.StatusCode < 200 {
+				logger.For(c).Errorf("error sending email to %s: %s", u.Username.String, response.Body)
+			} else {
+				emailsSent.Add(1)
+			}
+		}
+
+		return nil
+	})
+}
+
+func sendNotificationEmailToUser(c context.Context, u coredb.UsersWithPii, emailRecipient persist.Email, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
+
+	// generate notification data for user
+	notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
+		OwnerID:      u.ID,
+		Lim:          searchLimit,
+		CreatedAfter: time.Now().Add(-7 * 24 * time.Hour),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
+	}
+
+	j, err := jwtGenerate(u.ID, u.PiiEmailAddress.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
+	}
+
+	data := notificationsEmailDynamicTemplateData{
+		Notifications:    make([]notificationEmailDynamicTemplateData, 0, resultLimit),
+		Username:         u.Username.String,
+		UnsubscribeToken: j,
+	}
+	notifTemplates := make(chan notificationEmailDynamicTemplateData)
+	errChan := make(chan error)
+
+	for _, n := range notifs {
+		notif := n
+		go func() {
+			notifTemplate, err := notifToTemplateData(c, queries, notif)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			notifTemplates <- notifTemplate
+		}()
+	}
+
+outer:
+	for i := 0; i < len(notifs); i++ {
+		select {
+		case err := <-errChan:
+			logger.For(c).Errorf("failed to get notification template data: %v", err)
+		case notifTemplate := <-notifTemplates:
+			data.Notifications = append(data.Notifications, notifTemplate)
+			if len(data.Notifications) >= resultLimit {
+				break outer
+			}
+		}
+	}
+
+	if len(data.Notifications) == 0 {
+		return nil, nil
+	}
+
+	asJSON, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	asMap := make(map[string]interface{})
+
+	err = json.Unmarshal(asJSON, &asMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if sendRealEmail {
+		// send email
 		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
-		to := mail.NewEmail(u.Username.String, u.PiiEmailAddress.String())
+		to := mail.NewEmail(u.Username.String, emailRecipient.String())
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
 		m.SetTemplateID(viper.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
-		notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
-			OwnerID: u.ID,
-			Limit:   searchLimit,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to get notifications for user %s: %w", u.ID, err)
-		}
-
-		j, err := jwtGenerate(u.ID, u.PiiEmailAddress.String())
-		if err != nil {
-			return fmt.Errorf("failed to generate jwt for user %s: %w", u.ID, err)
-		}
-
-		data := notificationsEmailDynamicTemplateData{
-			Notifications:    make([]notificationEmailDynamicTemplateData, 0, resultLimit),
-			Username:         u.Username.String,
-			UnsubscribeToken: j,
-		}
-		notifTemplates := make(chan notificationEmailDynamicTemplateData)
-		errChan := make(chan error)
-
-		for _, n := range notifs {
-			notif := n
-			go func() {
-				notifTemplate, err := notifToTemplateData(c, queries, notif)
-				if err != nil {
-					errChan <- err
-					return
-				}
-				notifTemplates <- notifTemplate
-			}()
-		}
-
-	outer:
-		for i := 0; i < len(notifs); i++ {
-			select {
-			case err := <-errChan:
-				logger.For(c).Errorf("failed to get notification template data: %v", err)
-			case notifTemplate := <-notifTemplates:
-				data.Notifications = append(data.Notifications, notifTemplate)
-				if len(data.Notifications) >= resultLimit {
-					break outer
-				}
-			}
-		}
-
-		if len(data.Notifications) == 0 {
-			//logger.For(c).Debugf("no notifications to send to %s (username: %s, email: %s)... skipping", u.ID, u.Username.String, u.PiiEmailAddress.String())
-			return nil
-		}
-
-		asJSON, err := json.Marshal(data)
-		if err != nil {
-			return err
-		}
-		asMap := make(map[string]interface{})
-		err = json.Unmarshal(asJSON, &asMap)
-		if err != nil {
-			return err
-		}
-
-		//logger.For(c).Debugf("sending notifications email to %s with data %+v", u.PiiEmailAddress.String(), asMap)
-
 		p.DynamicTemplateData = asMap
-
 		m.AddPersonalizations(p)
 		p.AddTos(to)
 
 		response, err := s.Send(m)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		logger.For(c).Debugf("email sent: %d", *&response.StatusCode)
-		return nil
-	})
+		return response, nil
+	}
+
+	logger.For(c).Infof("would have sent email to %s (username: %s): %s", u.ID, u.Username.String, string(asJSON))
+
+	return &rest.Response{StatusCode: 200, Body: "not sending real emails", Headers: map[string][]string{}}, nil
 }
 
 func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.Notification) (notificationEmailDynamicTemplateData, error) {
@@ -329,8 +375,7 @@ func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.
 	}
 }
 
-func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries,
-	fn func(u coredb.UsersWithPii) error) error {
+func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.UsersWithPii) error) error {
 	errGroup := new(errgroup.Group)
 	var lastID persist.DBID
 	var lastCreatedAt time.Time
@@ -339,6 +384,7 @@ func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType p
 	if isDevEnv() {
 		requiredStatus = persist.EmailVerificationStatusAdmin
 	}
+
 	for {
 		users, err := queries.GetUsersWithEmailNotificationsOnForEmailType(ctx, coredb.GetUsersWithEmailNotificationsOnForEmailTypeParams{
 			Limit:               emailsAtATime,

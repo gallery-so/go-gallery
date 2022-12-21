@@ -104,6 +104,7 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 	}
 	taskClient := task.NewClient(context.Background())
 	secretClient := newSecretsClient()
+
 	lock := redis.NewLockClient(redis.NotificationLockDB)
 
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
@@ -124,6 +125,7 @@ func newSecretsClient() *secretmanager.Client {
 	if err != nil {
 		panic(fmt.Sprintf("error creating secrets client: %v", err))
 	}
+
 	return c
 }
 
@@ -176,6 +178,7 @@ func setDefaults() {
 	viper.SetDefault("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
 	viper.SetDefault("MERCH_CONTRACT_ADDRESS", "0x01f55be815fbd10b1770b008b8960931a30e7f65")
+	viper.SetDefault("ETH_PRIVATE_KEY", "")
 
 	viper.AutomaticEnv()
 
@@ -195,6 +198,7 @@ func setDefaults() {
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")
+		util.VarNotSetTo("ETH_PRIVATE_KEY", "")
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 	}
@@ -217,6 +221,7 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
+		MaxSpans:         100000,
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),

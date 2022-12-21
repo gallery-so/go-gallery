@@ -99,6 +99,7 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
 	viper.SetDefault("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "notifications-email-sub")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "")
+	viper.SetDefault("ADMIN_PASS", "admin")
 
 	viper.AutomaticEnv()
 

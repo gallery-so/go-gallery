@@ -2,17 +2,20 @@
 
 FROM golang:1.19-bullseye
 
+RUN apt-get update
+RUN apt-get install -y && rm -rf /var/lib/apt/lists/*
+
 # Install deps
 WORKDIR /app
 COPY go.mod go.sum /app/
 RUN go mod download
 
 COPY . /app
-RUN go build -o ./bin/feed ./cmd/feed/main.go
+RUN go build -o ./bin/feedbot ./cmd/feedbot/main.go
 
 ARG VERSION
 ENV GAE_VERSION=$VERSION
 
 EXPOSE 4124
 USER nobody
-ENTRYPOINT ["./bin/feed"]
+ENTRYPOINT ["./bin/feedbot"]

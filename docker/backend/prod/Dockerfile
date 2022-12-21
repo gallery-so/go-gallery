@@ -10,16 +10,12 @@ WORKDIR /app
 COPY go.mod go.sum /app/
 RUN go mod download
 
-# Install certs
-COPY _deploy/root-certs/sectigo.crt /usr/local/share/ca-certificates/sectigo.crt
-RUN update-ca-certificates
-
 COPY . /app
-RUN go build -o ./bin/indexer ./cmd/indexer/main.go
+RUN go build -o ./bin/backend ./cmd/server/main.go
 
 ARG VERSION
-ENV VERSION=$VERSION
+ENV GAE_VERSION=$VERSION
 
-EXPOSE 6000
+EXPOSE 4000
 USER nobody
-ENTRYPOINT ["./bin/indexer", "server", "--enable-rpc"]
+ENTRYPOINT ["./bin/backend"]

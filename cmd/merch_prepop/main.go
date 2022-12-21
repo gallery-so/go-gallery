@@ -30,7 +30,7 @@ func main() {
 
 	pg := postgres.NewPgxClient()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	discountCodeFile, err := os.Open("./discount_codes.json")
@@ -44,13 +44,12 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("codes: %+v", discountCodes)
-
 	for _, code := range discountCodes.TShirts {
 		_, err = pg.Exec(ctx, "INSERT INTO merch (id, discount_code, object_type) VALUES ($1, $2, $3)", persist.GenerateID(), code, 0)
 		if err != nil {
 			panic(err)
 		}
+		fmt.Printf("Inserted %s for t-shirts\n", code)
 	}
 
 	for _, code := range discountCodes.Hats {
@@ -58,6 +57,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		fmt.Printf("Inserted %s for hats\n", code)
 	}
 
 	for _, code := range discountCodes.Cards {
@@ -65,6 +65,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		fmt.Printf("Inserted %s for cards\n", code)
 	}
 
 }
@@ -75,6 +76,10 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_USER", "postgres")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
+
+	viper.SetDefault("POSTGRES_SERVER_CA", "")
+	viper.SetDefault("POSTGRES_CLIENT_CERT", "")
+	viper.SetDefault("POSTGRES_CLIENT_KEY", "")
 
 	viper.AutomaticEnv()
 }

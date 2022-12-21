@@ -31,7 +31,7 @@ type redisHook struct {
 
 var _ redis.Hook = redisHook{}
 
-type spanContextKey struct{}
+type redisSpanContextKey struct{}
 
 func (r redisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
 	if r.continueOnly {
@@ -51,13 +51,13 @@ func (r redisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.
 		"Redis DB":  r.db,
 	})
 
-	ctx = context.WithValue(span.Context(), spanContextKey{}, span)
+	ctx = context.WithValue(span.Context(), redisSpanContextKey{}, span)
 
 	return ctx, nil
 }
 
 func (redisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
-	if span, ok := ctx.Value(spanContextKey{}).(*sentry.Span); ok {
+	if span, ok := ctx.Value(redisSpanContextKey{}).(*sentry.Span); ok {
 		if err := cmd.Err(); err != nil {
 			AddEventDataToSpan(span, map[string]interface{}{
 				"Redis Error": err,
@@ -85,13 +85,13 @@ func (r redisHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder
 		"Redis DB":                r.db,
 	})
 
-	ctx = context.WithValue(span.Context(), spanContextKey{}, span)
+	ctx = context.WithValue(span.Context(), redisSpanContextKey{}, span)
 
 	return ctx, nil
 }
 
 func (redisHook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
-	if span, ok := ctx.Value(spanContextKey{}).(*sentry.Span); ok {
+	if span, ok := ctx.Value(redisSpanContextKey{}).(*sentry.Span); ok {
 		FinishSpan(span)
 	}
 
