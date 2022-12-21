@@ -2975,8 +2975,8 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 	return err
 }
 
-const updateGallery = `-- name: UpdateGallery :one
-update galleries set name = $1, description = $2, collections = $3, last_updated = now() where galleries.id = $4 and galleries.deleted = false and (select count(*) from collections c where c.id = any($3) and c.gallery_id = $5 and c.deleted = false) = array_length($3, 1) returning id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position
+const updateGallery = `-- name: UpdateGallery :exec
+update galleries set name = $1, description = $2, collections = $3, last_updated = now() where galleries.id = $4 and galleries.deleted = false and (select count(*) from collections c where c.id = any($3) and c.gallery_id = $5 and c.deleted = false) = array_length($3, 1)
 `
 
 type UpdateGalleryParams struct {
@@ -2987,29 +2987,15 @@ type UpdateGalleryParams struct {
 	GalleryID   persist.DBID
 }
 
-func (q *Queries) UpdateGallery(ctx context.Context, arg UpdateGalleryParams) (Gallery, error) {
-	row := q.db.QueryRow(ctx, updateGallery,
+func (q *Queries) UpdateGallery(ctx context.Context, arg UpdateGalleryParams) error {
+	_, err := q.db.Exec(ctx, updateGallery,
 		arg.Name,
 		arg.Description,
 		arg.Collections,
 		arg.ID,
 		arg.GalleryID,
 	)
-	var i Gallery
-	err := row.Scan(
-		&i.ID,
-		&i.Deleted,
-		&i.LastUpdated,
-		&i.CreatedAt,
-		&i.Version,
-		&i.OwnerUserID,
-		&i.Collections,
-		&i.Name,
-		&i.Description,
-		&i.Hidden,
-		&i.Position,
-	)
-	return i, err
+	return err
 }
 
 const updateGalleryHidden = `-- name: UpdateGalleryHidden :one

@@ -138,12 +138,22 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	newGall, err := q.UpdateGallery(ctx, db.UpdateGalleryParams{
+	err = q.UpdateGallery(ctx, db.UpdateGalleryParams{
 		ID:          update.GalleryID,
 		Name:        util.FromStringPointer(update.Name),
 		Description: util.FromStringPointer(update.Description),
 		Collections: orderClone,
 	})
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	newGall, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
 	if err != nil {
 		return db.Gallery{}, err
 	}

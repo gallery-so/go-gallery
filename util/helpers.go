@@ -192,15 +192,28 @@ func CopyMax(writer io.Writer, it io.Reader, max int64) error {
 
 // Map applies a function to each element of a slice, returning a new slice of the same length.
 func Map[T, U any](xs []T, f func(T) (U, error)) ([]U, error) {
-	ys := make([]U, len(xs))
+	result := make([]U, len(xs))
 	for i, x := range xs {
 		it, err := f(x)
 		if err != nil {
 			return nil, err
 		}
-		ys[i] = it
+		result[i] = it
 	}
-	return ys, nil
+	return result, nil
+}
+
+// Dedupe removes duplicate elements from a slice, preserving the order of the remaining elements.
+func Dedupe[T comparable](xs []T) []T {
+	seen := make(map[T]bool)
+	result := make([]T, 0, len(xs))
+	for _, x := range xs {
+		if !seen[x] {
+			result = append(result, x)
+			seen[x] = true
+		}
+	}
+	return result
 }
 
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
