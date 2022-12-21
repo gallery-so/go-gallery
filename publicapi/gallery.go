@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -79,7 +80,13 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		"name":                {update.Name, "max=200"},
 		"description":         {update.Description, "max=600"},
 		"deleted_collections": {update.DeletedCollections, "unique"},
+		"created_collections": {update.CreatedCollections, "created_collections"},
 	}); err != nil {
+		return db.Gallery{}, err
+	}
+
+	curGal, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
+	if err != nil {
 		return db.Gallery{}, err
 	}
 
@@ -89,16 +96,6 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	}
 
 	q := api.queries.WithTx(tx)
-
-	// first gallery info
-	err = q.UpdateGalleryInfo(ctx, db.UpdateGalleryInfoParams{
-		ID:          update.GalleryID,
-		Name:        util.FromStringPointer(update.Name),
-		Description: util.FromStringPointer(update.Description),
-	})
-	if err != nil {
-		return db.Gallery{}, err
-	}
 
 	// then delete collections
 	err = q.DeleteCollections(ctx, util.StringersToStrings(update.DeletedCollections))
@@ -113,46 +110,64 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
-	// update collection positions
-	// TODO the schema does not currently include the array of collections in the gallery. If this mutation contains new collections to be created, how can we even create the array of collection DBIDs ahead of time?
+	// create collections
+	mappedIDs := make(map[persist.DBID]persist.DBID)
+	for _, c := range update.CreatedCollections {
+		collectionID, err := q.CreateCollection(ctx, db.CreateCollectionParams{
+			ID:             persist.GenerateID(),
+			Name:           persist.StrToNullStr(&c.Name),
+			CollectorsNote: persist.StrToNullStr(&c.CollectorsNote),
+			OwnerUserID:    curGal.OwnerUserID,
+			GalleryID:      update.GalleryID,
+			Layout:         modelToTokenLayout(c.Layout),
+			Hidden:         c.Hidden,
+			Nfts:           c.Tokens,
+			TokenSettings:  modelToTokenSettings(c.TokenSettings),
+		})
+		if err != nil {
+			return db.Gallery{}, err
+		}
+		mappedIDs[c.GivenID] = collectionID
+	}
 
-	// return gallery
-	gallery, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
+	orderClone := slices.Clone(update.Order)
+	// order collections
+	for i, c := range orderClone {
+		if newID, ok := mappedIDs[c]; ok {
+			orderClone[i] = newID
+		}
+	}
+
+	newGall, err := q.UpdateGallery(ctx, db.UpdateGalleryParams{
+		ID:          update.GalleryID,
+		Name:        util.FromStringPointer(update.Name),
+		Description: util.FromStringPointer(update.Description),
+		Collections: orderClone,
+	})
 	if err != nil {
 		return db.Gallery{}, err
 	}
 
-	return gallery, nil
+	return newGall, nil
 }
 
 func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update model.UpdateGalleryInput) error {
-	dbids, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+	dbids, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Dbid.String(), nil
 	})
 	if err != nil {
 		return err
 	}
 
-	collectorNotes, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+	collectorNotes, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.CollectorsNote, nil
 	})
 	if err != nil {
 		return err
 	}
 
-	layouts, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
-		sectionLayout := make([]persist.CollectionSectionLayout, len(u.Layout.SectionLayout))
-		for i, layout := range u.Layout.SectionLayout {
-			sectionLayout[i] = persist.CollectionSectionLayout{
-				Columns:    persist.NullInt32(layout.Columns),
-				Whitespace: layout.Whitespace,
-			}
-		}
-		layout := persist.TokenLayout{
-			Sections:      persist.StandardizeCollectionSections(u.Layout.Sections),
-			SectionLayout: sectionLayout,
-		}
-		b, err := json.Marshal(layout)
+	layouts, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+		b, err := json.Marshal(modelToTokenLayout(u.Layout))
 		if err != nil {
 			return "", err
 		}
@@ -162,11 +177,8 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	tokenSettings, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
-		settings := make(map[persist.DBID]persist.CollectionTokenSettings)
-		for _, tokenSetting := range u.TokenSettings {
-			settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
-		}
+	tokenSettings, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+		settings := modelToTokenSettings(u.TokenSettings)
 		b, err := json.Marshal(settings)
 		if err != nil {
 			return "", err
@@ -177,14 +189,14 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	hiddens, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (bool, error) {
+	hiddens, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (bool, error) {
 		return u.Hidden, nil
 	})
 	if err != nil {
 		return err
 	}
 
-	names, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+	names, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Name, nil
 	})
 	if err != nil {
@@ -203,8 +215,9 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	for _, collection := range update.Collections {
+	for _, collection := range update.UpdateCollections {
 		err = q.UpdateCollectionTokens(ctx, db.UpdateCollectionTokensParams{
+			ID:   collection.Dbid,
 			Nfts: collection.Tokens,
 		})
 		if err != nil {
@@ -509,4 +522,26 @@ func IsPrivate(ip net.IP) bool {
 	//   The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
 	IPv6Len := 16
 	return len(ip) == IPv6Len && ip[0]&0xfe == 0xfc
+}
+
+func modelToTokenLayout(u *model.CollectionLayoutInput) persist.TokenLayout {
+	sectionLayout := make([]persist.CollectionSectionLayout, len(u.SectionLayout))
+	for i, layout := range u.SectionLayout {
+		sectionLayout[i] = persist.CollectionSectionLayout{
+			Columns:    persist.NullInt32(layout.Columns),
+			Whitespace: layout.Whitespace,
+		}
+	}
+	return persist.TokenLayout{
+		Sections:      persist.StandardizeCollectionSections(u.Sections),
+		SectionLayout: sectionLayout,
+	}
+}
+
+func modelToTokenSettings(u []*model.CollectionTokenSettingsInput) map[persist.DBID]persist.CollectionTokenSettings {
+	settings := make(map[persist.DBID]persist.CollectionTokenSettings)
+	for _, tokenSetting := range u {
+		settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
+	}
+	return settings
 }

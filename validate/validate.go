@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"golang.org/x/exp/slices"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/microcosm-cc/bluemonday"
@@ -75,6 +77,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("sorted_asc", SortedAscValidator)
 	v.RegisterValidation("chain", ChainValidator)
 	v.RegisterValidation("role", IsValidRole)
+	v.RegisterValidation("created_collections", CreatedCollectionsValidator)
 	v.RegisterAlias("collection_name", "max=200")
 	v.RegisterAlias("collection_note", "max=600")
 	v.RegisterAlias("token_note", "max=1200")
@@ -211,6 +214,16 @@ var SortedAscValidator validator.Func = func(fl validator.FieldLevel) bool {
 		return sort.IntsAreSorted(s)
 	}
 	return false
+}
+
+// CreatedCollectionsValidator validates that the create collection input has valid given IDs
+var CreatedCollectionsValidator validator.Func = func(fl validator.FieldLevel) bool {
+	if s, ok := fl.Field().Interface().([]*model.CreateCollectionInGalleryInput); ok {
+		return !slices.ContainsFunc(s, func(l *model.CreateCollectionInGalleryInput) bool {
+			return l.GivenID == ""
+		})
+	}
+	return true
 }
 
 // ChainValidator ensures the specified Chain is one we support

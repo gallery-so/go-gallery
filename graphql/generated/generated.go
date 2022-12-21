@@ -6855,6 +6855,7 @@ input CreateCollectionInGalleryInput {
   layout: CollectionLayoutInput!
   tokenSettings: [CollectionTokenSettingsInput!]!
   hidden: Boolean!
+  givenID: DBID!
 }
 
 input UpdateGalleryInput {
@@ -6867,8 +6868,10 @@ input UpdateGalleryInput {
 
   deletedCollections: [DBID!]
 
-  collections: [UpdateCollectionInput]
+  updateCollections: [UpdateCollectionInput]
   createdCollections: [CreateCollectionInGalleryInput]
+
+  order: [DBID!]
 }
 
 type UpdateGalleryPayload {
@@ -27760,6 +27763,14 @@ func (ec *executionContext) unmarshalInputCreateCollectionInGalleryInput(ctx con
 			if err != nil {
 				return it, err
 			}
+		case "givenID":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("givenID"))
+			it.GivenID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
 		}
 	}
 
@@ -28745,11 +28756,11 @@ func (ec *executionContext) unmarshalInputUpdateGalleryInput(ctx context.Context
 			if err != nil {
 				return it, err
 			}
-		case "collections":
+		case "updateCollections":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collections"))
-			it.Collections, err = ec.unmarshalOUpdateCollectionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInput(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("updateCollections"))
+			it.UpdateCollections, err = ec.unmarshalOUpdateCollectionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInput(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -28758,6 +28769,14 @@ func (ec *executionContext) unmarshalInputUpdateGalleryInput(ctx context.Context
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createdCollections"))
 			it.CreatedCollections, err = ec.unmarshalOCreateCollectionInGalleryInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInGalleryInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "order":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("order"))
+			it.Order, err = ec.unmarshalODBID2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBIDᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}

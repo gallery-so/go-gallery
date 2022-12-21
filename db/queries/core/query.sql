@@ -645,6 +645,9 @@ update galleries g set position = updates.position, last_updated = now() from up
 -- name: UpdateGalleryInfo :exec
 update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
 
+-- name: UpdateGallery :one
+update galleries set name = @name, description = @description, collections = @collections, last_updated = now() where galleries.id = @id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = array_length(@collections, 1) returning *;
+
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
@@ -665,3 +668,6 @@ update collections c set collectors_note = updates.collectors_note, layout = upd
 
 -- name: UpdateCollectionTokens :exec
 update collections set nfts = @nfts, last_updated = now() where id = @id and deleted = false;
+
+-- name: CreateCollection :one
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) on conflict (id) do update set version = excluded.version, name = excluded.name, collectors_note = excluded.collectors_note, owner_user_id = excluded.owner_user_id, gallery_id = excluded.gallery_id, layout = excluded.layout, nfts = excluded.nfts, hidden = excluded.hidden, token_settings = excluded.token_settings, last_updated = excluded.last_updated returning id;

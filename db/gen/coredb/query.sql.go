@@ -233,6 +233,39 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 	return i, err
 }
 
+const createCollection = `-- name: CreateCollection :one
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) on conflict (id) do update set version = excluded.version, name = excluded.name, collectors_note = excluded.collectors_note, owner_user_id = excluded.owner_user_id, gallery_id = excluded.gallery_id, layout = excluded.layout, nfts = excluded.nfts, hidden = excluded.hidden, token_settings = excluded.token_settings, last_updated = excluded.last_updated returning id
+`
+
+type CreateCollectionParams struct {
+	ID             persist.DBID
+	Name           sql.NullString
+	CollectorsNote sql.NullString
+	OwnerUserID    persist.DBID
+	GalleryID      persist.DBID
+	Layout         persist.TokenLayout
+	Nfts           persist.DBIDList
+	Hidden         bool
+	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings
+}
+
+func (q *Queries) CreateCollection(ctx context.Context, arg CreateCollectionParams) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, createCollection,
+		arg.ID,
+		arg.Name,
+		arg.CollectorsNote,
+		arg.OwnerUserID,
+		arg.GalleryID,
+		arg.Layout,
+		arg.Nfts,
+		arg.Hidden,
+		arg.TokenSettings,
+	)
+	var id persist.DBID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createCollectionEvent = `-- name: CreateCollectionEvent :one
 INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption
 `
@@ -2940,6 +2973,43 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 		arg.Hidden,
 	)
 	return err
+}
+
+const updateGallery = `-- name: UpdateGallery :one
+update galleries set name = $1, description = $2, collections = $3, last_updated = now() where galleries.id = $4 and galleries.deleted = false and (select count(*) from collections c where c.id = any($3) and c.gallery_id = $5 and c.deleted = false) = array_length($3, 1) returning id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position
+`
+
+type UpdateGalleryParams struct {
+	Name        string
+	Description string
+	Collections persist.DBIDList
+	ID          persist.DBID
+	GalleryID   persist.DBID
+}
+
+func (q *Queries) UpdateGallery(ctx context.Context, arg UpdateGalleryParams) (Gallery, error) {
+	row := q.db.QueryRow(ctx, updateGallery,
+		arg.Name,
+		arg.Description,
+		arg.Collections,
+		arg.ID,
+		arg.GalleryID,
+	)
+	var i Gallery
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Version,
+		&i.OwnerUserID,
+		&i.Collections,
+		&i.Name,
+		&i.Description,
+		&i.Hidden,
+		&i.Position,
+	)
+	return i, err
 }
 
 const updateGalleryHidden = `-- name: UpdateGalleryHidden :one

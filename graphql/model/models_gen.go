@@ -508,6 +508,7 @@ type CreateCollectionInGalleryInput struct {
 	Layout         *CollectionLayoutInput          `json:"layout"`
 	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
 	Hidden         bool                            `json:"hidden"`
+	GivenID        persist.DBID                    `json:"givenID"`
 }
 
 type CreateCollectionInput struct {
@@ -1522,8 +1523,9 @@ type UpdateGalleryInput struct {
 	Description        *string                           `json:"description"`
 	Caption            *string                           `json:"caption"`
 	DeletedCollections []persist.DBID                    `json:"deletedCollections"`
-	Collections        []*UpdateCollectionInput          `json:"collections"`
+	UpdateCollections  []*UpdateCollectionInput          `json:"updateCollections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
+	Order              []persist.DBID                    `json:"order"`
 }
 
 type UpdateGalleryOrderInput struct {

@@ -1635,6 +1635,7 @@ input CreateCollectionInGalleryInput {
   layout: CollectionLayoutInput!
   tokenSettings: [CollectionTokenSettingsInput!]!
   hidden: Boolean!
+  givenID: DBID!
 }
 
 input UpdateGalleryInput {
@@ -1647,8 +1648,10 @@ input UpdateGalleryInput {
 
   deletedCollections: [DBID!]
 
-  collections: [UpdateCollectionInput]
+  updateCollections: [UpdateCollectionInput]
   createdCollections: [CreateCollectionInGalleryInput]
+
+  order: [DBID!]
 }
 
 type UpdateGalleryPayload {
