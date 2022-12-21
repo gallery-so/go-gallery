@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/persist"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v4"
@@ -210,14 +209,6 @@ func checkNoErr(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func dbidsToStrings(dbids []persist.DBID) []string {
-	strings := make([]string, len(dbids))
-	for i, dbid := range dbids {
-		strings[i] = string(dbid)
-	}
-	return strings
 }
 
 // Repositories is the set of all available persistence repositories

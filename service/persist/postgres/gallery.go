@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/util"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -76,7 +77,7 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	}
 
 	rowsAffected, err := g.queries.GalleryRepoAddCollections(pCtx, db.GalleryRepoAddCollectionsParams{
-		CollectionIds: dbidsToStrings(pCollections),
+		CollectionIds: util.StringersToStrings(pCollections),
 		GalleryID:     pID,
 	})
 

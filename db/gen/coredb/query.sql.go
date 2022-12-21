@@ -641,6 +641,15 @@ func (q *Queries) CreateViewGalleryNotification(ctx context.Context, arg CreateV
 	return i, err
 }
 
+const deleteCollections = `-- name: DeleteCollections :exec
+update collections set deleted = true, last_updated = now() where id = any($1::varchar[])
+`
+
+func (q *Queries) DeleteCollections(ctx context.Context, ids []string) error {
+	_, err := q.db.Exec(ctx, deleteCollections, ids)
+	return err
+}
+
 const deleteUserRoles = `-- name: DeleteUserRoles :exec
 update user_roles set deleted = true, last_updated = now() where user_id = $1 and role = any($2)
 `
@@ -2889,6 +2898,48 @@ func (q *Queries) RedeemMerch(ctx context.Context, arg RedeemMerchParams) (sql.N
 	var discount_code sql.NullString
 	err := row.Scan(&discount_code)
 	return discount_code, err
+}
+
+const updateCollectionTokens = `-- name: UpdateCollectionTokens :exec
+update collections set nfts = $1, last_updated = now() where id = $2 and deleted = false
+`
+
+type UpdateCollectionTokensParams struct {
+	Nfts persist.DBIDList
+	ID   persist.DBID
+}
+
+func (q *Queries) UpdateCollectionTokens(ctx context.Context, arg UpdateCollectionTokensParams) error {
+	_, err := q.db.Exec(ctx, updateCollectionTokens, arg.Nfts, arg.ID)
+	return err
+}
+
+const updateCollectionsInfo = `-- name: UpdateCollectionsInfo :exec
+with updates as (
+    select unnest($1::varchar[]) as id, unnest($2::varchar[]) as name, unnest($3::varchar[]) as collectors_note, unnest($4::varchar[]) as layout, unnest($5::varchar[]) as token_settings, unnest($6::bool[]) as hidden
+)
+update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now() from updates where c.id = updates.id and c.deleted = false
+`
+
+type UpdateCollectionsInfoParams struct {
+	Ids             []string
+	Names           []string
+	CollectorsNotes []string
+	Layouts         []string
+	TokenSettings   []string
+	Hidden          []bool
+}
+
+func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectionsInfoParams) error {
+	_, err := q.db.Exec(ctx, updateCollectionsInfo,
+		arg.Ids,
+		arg.Names,
+		arg.CollectorsNotes,
+		arg.Layouts,
+		arg.TokenSettings,
+		arg.Hidden,
+	)
+	return err
 }
 
 const updateGalleryHidden = `-- name: UpdateGalleryHidden :one

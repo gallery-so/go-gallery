@@ -507,6 +507,7 @@ type CreateCollectionInGalleryInput struct {
 	Tokens         []persist.DBID                  `json:"tokens"`
 	Layout         *CollectionLayoutInput          `json:"layout"`
 	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+	Hidden         bool                            `json:"hidden"`
 }
 
 type CreateCollectionInput struct {
@@ -1430,12 +1431,13 @@ type UpdateCollectionInfoPayload struct {
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
 type UpdateCollectionInput struct {
-	Dbid           *persist.DBID                   `json:"dbid"`
+	Dbid           persist.DBID                    `json:"dbid"`
 	Name           string                          `json:"name"`
 	CollectorsNote string                          `json:"collectorsNote"`
 	Tokens         []persist.DBID                  `json:"tokens"`
 	Layout         *CollectionLayoutInput          `json:"layout"`
 	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+	Hidden         bool                            `json:"hidden"`
 }
 
 type UpdateCollectionTokensInput struct {
@@ -1519,7 +1521,6 @@ type UpdateGalleryInput struct {
 	Name               *string                           `json:"name"`
 	Description        *string                           `json:"description"`
 	Caption            *string                           `json:"caption"`
-	HiddenCollections  []persist.DBID                    `json:"hiddenCollections"`
 	DeletedCollections []persist.DBID                    `json:"deletedCollections"`
 	Collections        []*UpdateCollectionInput          `json:"collections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`

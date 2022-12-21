@@ -190,18 +190,38 @@ func CopyMax(writer io.Writer, it io.Reader, max int64) error {
 	return nil
 }
 
-// func ToPointers[T any](s []T) []*T {
-// 	p := make([]*T, len(s))
-// 	for i := range s {
-// 		p[i] = &s[i]
-// 	}
-// 	return p
-// }
+// Map applies a function to each element of a slice, returning a new slice of the same length.
+func Map[T, U any](xs []T, f func(T) (U, error)) ([]U, error) {
+	ys := make([]U, len(xs))
+	for i, x := range xs {
+		it, err := f(x)
+		if err != nil {
+			return nil, err
+		}
+		ys[i] = it
+	}
+	return ys, nil
+}
 
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
 // a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
 func StringToPointer(str string) *string {
 	return &str
+}
+
+func FromStringPointer(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func StringersToStrings[T fmt.Stringer](stringers []T) []string {
+	strings := make([]string, len(stringers))
+	for i, stringer := range stringers {
+		strings[i] = stringer.String()
+	}
+	return strings
 }
 
 // BoolToPointer returns a pointer to the parameter boolean. Useful for a boolean that would need to be assigned to a variable

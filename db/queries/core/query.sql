@@ -653,3 +653,15 @@ select t.media->>'thumbnail_url'::varchar as previews from tokens t, collections
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
+
+-- name: DeleteCollections :exec
+update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
+
+-- name: UpdateCollectionsInfo :exec
+with updates as (
+    select unnest(@ids::varchar[]) as id, unnest(@names::varchar[]) as name, unnest(@collectors_notes::varchar[]) as collectors_note, unnest(@layouts::varchar[]) as layout, unnest(@token_settings::varchar[]) as token_settings, unnest(@hidden::bool[]) as hidden
+)
+update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now() from updates where c.id = updates.id and c.deleted = false;
+
+-- name: UpdateCollectionTokens :exec
+update collections set nfts = @nfts, last_updated = now() where id = @id and deleted = false;

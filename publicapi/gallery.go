@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -77,20 +78,140 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		"galleryID":           {update.GalleryID, "required"},
 		"name":                {update.Name, "max=200"},
 		"description":         {update.Description, "max=600"},
-		"hidden_collections":  {update.HiddenCollections, "unique"},
 		"deleted_collections": {update.DeletedCollections, "unique"},
 	}); err != nil {
 		return db.Gallery{}, err
 	}
 
-	// tx, err := api.repos.BeginTx(ctx)
-	// if err != nil {
-	// 	return db.Gallery{}, err
-	// }
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
 
-	// q := api.queries.WithTx(tx)
+	q := api.queries.WithTx(tx)
 
-	return db.Gallery{}, nil
+	// first gallery info
+	err = q.UpdateGalleryInfo(ctx, db.UpdateGalleryInfoParams{
+		ID:          update.GalleryID,
+		Name:        util.FromStringPointer(update.Name),
+		Description: util.FromStringPointer(update.Description),
+	})
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	// then delete collections
+	err = q.DeleteCollections(ctx, util.StringersToStrings(update.DeletedCollections))
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	// update collections
+
+	err = updateCollectionsInfoAndTokens(ctx, q, update)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	// update collection positions
+	// TODO the schema does not currently include the array of collections in the gallery. If this mutation contains new collections to be created, how can we even create the array of collection DBIDs ahead of time?
+
+	// return gallery
+	gallery, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	return gallery, nil
+}
+
+func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update model.UpdateGalleryInput) error {
+	dbids, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+		return u.Dbid.String(), nil
+	})
+	if err != nil {
+		return err
+	}
+
+	collectorNotes, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+		return u.CollectorsNote, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	layouts, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+		sectionLayout := make([]persist.CollectionSectionLayout, len(u.Layout.SectionLayout))
+		for i, layout := range u.Layout.SectionLayout {
+			sectionLayout[i] = persist.CollectionSectionLayout{
+				Columns:    persist.NullInt32(layout.Columns),
+				Whitespace: layout.Whitespace,
+			}
+		}
+		layout := persist.TokenLayout{
+			Sections:      persist.StandardizeCollectionSections(u.Layout.Sections),
+			SectionLayout: sectionLayout,
+		}
+		b, err := json.Marshal(layout)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	})
+	if err != nil {
+		return err
+	}
+
+	tokenSettings, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+		settings := make(map[persist.DBID]persist.CollectionTokenSettings)
+		for _, tokenSetting := range u.TokenSettings {
+			settings[tokenSetting.TokenID] = persist.CollectionTokenSettings{RenderLive: tokenSetting.RenderLive}
+		}
+		b, err := json.Marshal(settings)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	})
+	if err != nil {
+		return err
+	}
+
+	hiddens, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (bool, error) {
+		return u.Hidden, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	names, err := util.Map(update.Collections, func(u *model.UpdateCollectionInput) (string, error) {
+		return u.Name, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	err = q.UpdateCollectionsInfo(ctx, db.UpdateCollectionsInfoParams{
+		Ids:             dbids,
+		Names:           names,
+		CollectorsNotes: collectorNotes,
+		Layouts:         layouts,
+		TokenSettings:   tokenSettings,
+		Hidden:          hiddens,
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, collection := range update.Collections {
+		err = q.UpdateCollectionTokens(ctx, db.UpdateCollectionTokensParams{
+			Nfts: collection.Tokens,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) error {
