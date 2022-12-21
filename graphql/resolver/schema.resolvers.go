@@ -741,8 +741,20 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 	}
 
 	bioStr := ""
+	nameStr := ""
+	descStr := ""
+	positionStr := ""
 	if input.Bio != nil {
 		bioStr = *input.Bio
+	}
+	if input.GalleryName != nil {
+		nameStr = *input.GalleryName
+	}
+	if input.GalleryDescription != nil {
+		descStr = *input.GalleryDescription
+	}
+	if input.GalleryPosition != nil {
+		positionStr = *input.GalleryPosition
 	}
 
 	var email *persist.Email
@@ -751,7 +763,7 @@ func (r *mutationResolver) CreateUser(ctx context.Context, authMechanism model.A
 		email = &it
 	}
 
-	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, input.Username, email, bioStr, input.GalleryName, input.GalleryDescription, input.GalleryPosition)
+	userID, galleryID, err := publicapi.For(ctx).User.CreateUser(ctx, authenticator, input.Username, email, bioStr, nameStr, descStr, positionStr)
 	if err != nil {
 		return nil, err
 	}
@@ -920,6 +932,10 @@ func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DB
 	}
 
 	return output, nil
+}
+
+func (r *mutationResolver) UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *mutationResolver) CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error) {

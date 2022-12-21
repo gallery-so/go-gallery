@@ -71,6 +71,28 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 	return gallery, nil
 }
 
+func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGalleryInput) (db.Gallery, error) {
+
+	if err := validateFields(api.validator, validationMap{
+		"galleryID":           {update.GalleryID, "required"},
+		"name":                {update.Name, "max=200"},
+		"description":         {update.Description, "max=600"},
+		"hidden_collections":  {update.HiddenCollections, "unique"},
+		"deleted_collections": {update.DeletedCollections, "unique"},
+	}); err != nil {
+		return db.Gallery{}, err
+	}
+
+	// tx, err := api.repos.BeginTx(ctx)
+	// if err != nil {
+	// 	return db.Gallery{}, err
+	// }
+
+	// q := api.queries.WithTx(tx)
+
+	return db.Gallery{}, nil
+}
+
 func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) error {
 
 	if err := validateFields(api.validator, validationMap{

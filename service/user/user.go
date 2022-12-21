@@ -83,7 +83,7 @@ type MergeUsersInput struct {
 }
 
 // CreateUser creates a new user
-func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string, galleryName, galleryDesc *string, galleryPos string, userRepo *postgres.UserRepository,
+func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
 	galleryRepo *postgres.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
@@ -121,18 +121,11 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 		return "", "", err
 	}
 
-	var nullName, nullDesc string
-	if galleryName != nil {
-		nullName = *galleryName
-	}
-	if galleryDesc != nil {
-		nullDesc = *galleryDesc
-	}
 	gallery, err := galleryRepo.Create(pCtx, coredb.GalleryRepoCreateParams{
 		GalleryID:   persist.GenerateID(),
 		OwnerUserID: userID,
-		Name:        nullName,
-		Description: nullDesc,
+		Name:        galleryName,
+		Description: galleryDesc,
 		Position:    galleryPos,
 	})
 	if err != nil {

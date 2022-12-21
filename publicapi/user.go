@@ -22,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
+	"roci.dev/fracdex"
 )
 
 type UserAPI struct {
@@ -294,13 +295,21 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	return nil
 }
 
-func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio string, galleryName, galleryDesc *string, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
+func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
 		"username": {username, "required,username"},
 		"bio":      {bio, "bio"},
 	}); err != nil {
 		return "", "", err
+	}
+
+	if galleryPos == "" {
+		first, err := fracdex.KeyBetween("", "")
+		if err != nil {
+			return "", "", err
+		}
+		galleryPos = first
 	}
 
 	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository)

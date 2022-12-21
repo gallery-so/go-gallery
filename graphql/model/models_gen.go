@@ -242,6 +242,10 @@ type UpdateGalleryOrderPayloadOrError interface {
 	IsUpdateGalleryOrderPayloadOrError()
 }
 
+type UpdateGalleryPayloadOrError interface {
+	IsUpdateGalleryPayloadOrError()
+}
+
 type UpdateTokenInfoPayloadOrError interface {
 	IsUpdateTokenInfoPayloadOrError()
 }
@@ -497,6 +501,14 @@ type Contract struct {
 
 func (Contract) IsNode() {}
 
+type CreateCollectionInGalleryInput struct {
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	Tokens         []persist.DBID                  `json:"tokens"`
+	Layout         *CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+}
+
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID                    `json:"galleryId"`
 	Name           string                          `json:"name"`
@@ -532,7 +544,7 @@ type CreateUserInput struct {
 	Email              *persist.Email `json:"email"`
 	GalleryName        *string        `json:"galleryName"`
 	GalleryDescription *string        `json:"galleryDescription"`
-	GalleryPosition    string         `json:"galleryPosition"`
+	GalleryPosition    *string        `json:"galleryPosition"`
 }
 
 type CreateUserPayload struct {
@@ -717,6 +729,7 @@ func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()             {}
 func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
 func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
+func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -763,6 +776,7 @@ func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()      {}
 func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
 func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
+func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1415,6 +1429,15 @@ type UpdateCollectionInfoPayload struct {
 
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
+type UpdateCollectionInput struct {
+	Dbid           *persist.DBID                   `json:"dbid"`
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	Tokens         []persist.DBID                  `json:"tokens"`
+	Layout         *CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+}
+
 type UpdateCollectionTokensInput struct {
 	CollectionID  persist.DBID                    `json:"collectionId"`
 	Tokens        []persist.DBID                  `json:"tokens"`
@@ -1491,6 +1514,17 @@ type UpdateGalleryInfoPayload struct {
 
 func (UpdateGalleryInfoPayload) IsUpdateGalleryInfoPayloadOrError() {}
 
+type UpdateGalleryInput struct {
+	GalleryID          persist.DBID                      `json:"galleryId"`
+	Name               *string                           `json:"name"`
+	Description        *string                           `json:"description"`
+	Caption            *string                           `json:"caption"`
+	HiddenCollections  []persist.DBID                    `json:"hiddenCollections"`
+	DeletedCollections []persist.DBID                    `json:"deletedCollections"`
+	Collections        []*UpdateCollectionInput          `json:"collections"`
+	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
+}
+
 type UpdateGalleryOrderInput struct {
 	Positions []*GalleryPositionInput `json:"positions"`
 }
@@ -1500,6 +1534,12 @@ type UpdateGalleryOrderPayload struct {
 }
 
 func (UpdateGalleryOrderPayload) IsUpdateGalleryOrderPayloadOrError() {}
+
+type UpdateGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (UpdateGalleryPayload) IsUpdateGalleryPayloadOrError() {}
 
 type UpdateTokenInfoInput struct {
 	TokenID        persist.DBID  `json:"tokenId"`

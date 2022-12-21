@@ -190,6 +190,14 @@ func CopyMax(writer io.Writer, it io.Reader, max int64) error {
 	return nil
 }
 
+// func ToPointers[T any](s []T) []*T {
+// 	p := make([]*T, len(s))
+// 	for i := range s {
+// 		p[i] = &s[i]
+// 	}
+// 	return p
+// }
+
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
 // a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
 func StringToPointer(str string) *string {

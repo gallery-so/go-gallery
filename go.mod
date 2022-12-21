@@ -76,4 +76,5 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0
+	roci.dev/fracdex v0.0.0-20220111221836-dbd126571100
 )

@@ -2,12 +2,9 @@ package tokenprocessing
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"os"
 	"time"
-
-	"github.com/jackc/pgx/v4/pgxpool"
 
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
@@ -41,7 +38,7 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	logger.InitWithGCPDefaults()
 
-	repos := newRepos(postgres.NewClient(), postgres.NewPgxClient())
+	repos := postgres.NewRepositories(postgres.NewClient(), postgres.NewPgxClient())
 	var s *storage.Client
 	if viper.GetString("ENV") == "local" {
 		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
@@ -138,23 +135,5 @@ func initSentry() {
 
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
-	}
-}
-
-func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
-	queries := coredb.New(pgx)
-
-	return &postgres.Repositories{
-		UserRepository:        postgres.NewUserRepository(pq, queries),
-		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
-		GalleryRepository:     postgres.NewGalleryRepository(queries),
-		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
-		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
-		WalletRepository:      postgres.NewWalletRepository(pq, queries),
-		AdmireRepository:      postgres.NewAdmireRepository(queries),
-		CommentRepository:     postgres.NewCommentRepository(pq, queries),
 	}
 }

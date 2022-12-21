@@ -1169,7 +1169,7 @@ input CreateUserInput {
 	email: Email
 	galleryName: String
 	galleryDescription: String
-    galleryPosition: String!
+    galleryPosition: String
 }
 
 union CreateUserPayloadOrError =
@@ -1560,6 +1560,47 @@ union UpdateFeaturedGalleryPayloadOrError =
     | ErrInvalidInput
     | ErrNotAuthorized
 
+input UpdateCollectionInput {
+  dbid: DBID
+  name: String!
+  collectorsNote: String!
+  tokens: [DBID!]!
+  layout: CollectionLayoutInput!
+  tokenSettings: [CollectionTokenSettingsInput!]!
+}
+
+input CreateCollectionInGalleryInput {
+  name: String!
+  collectorsNote: String!
+  tokens: [DBID!]!
+  layout: CollectionLayoutInput!
+  tokenSettings: [CollectionTokenSettingsInput!]!
+}
+
+input UpdateGalleryInput {
+  galleryId: DBID!
+
+  name: String
+  description: String
+
+  caption: String
+
+  hiddenCollections: [DBID!]
+  deletedCollections: [DBID!]
+
+  collections: [UpdateCollectionInput]
+  createdCollections: [CreateCollectionInGalleryInput]
+}
+
+type UpdateGalleryPayload {
+  gallery: Gallery
+}
+
+union UpdateGalleryPayloadOrError =
+  UpdateGalleryPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type Mutation {
     # User Mutations
     addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
@@ -1604,6 +1645,8 @@ type Mutation {
     removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 
     viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+
+    updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
 
     createGallery(input: CreateGalleryInput!): CreateGalleryPayloadOrError @authRequired
 	updateGalleryHidden(input: UpdateGalleryHiddenInput!): UpdateGalleryHiddenPayloadOrError @authRequired
