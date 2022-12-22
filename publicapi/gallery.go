@@ -94,6 +94,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	if err != nil {
 		return db.Gallery{}, err
 	}
+	defer tx.Rollback(ctx)
 
 	q := api.queries.WithTx(tx)
 
