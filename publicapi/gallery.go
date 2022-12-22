@@ -336,12 +336,7 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	asString := make([]string, len(previews))
-	for i, preview := range previews {
-		asString[i] = preview.(string)
-	}
-
-	return asString, nil
+	return previews, nil
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
