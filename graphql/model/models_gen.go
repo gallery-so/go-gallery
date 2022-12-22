@@ -1644,7 +1644,7 @@ type ViewGalleryPayload struct {
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
-	UserID          persist.DBID     `json:"userId"`
+	HelperViewerData
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 	Feed            *FeedConnection  `json:"feed"`

@@ -24,6 +24,10 @@ func (r *Community) GetGqlIDField_ContractAddress() string {
 	return r.ContractAddress.Address().String()
 }
 
+func (v *Viewer) GetGqlIDField_UserID() string {
+	return string(v.UserId)
+}
+
 type HelperCollectionTokenData struct {
 	TokenId      persist.DBID
 	CollectionId persist.DBID
@@ -32,6 +36,10 @@ type HelperCollectionTokenData struct {
 type HelperTokenHolderData struct {
 	UserId    persist.DBID
 	WalletIds []persist.DBID
+}
+
+type HelperViewerData struct {
+	UserId persist.DBID
 }
 
 type HelperCommunityData struct {

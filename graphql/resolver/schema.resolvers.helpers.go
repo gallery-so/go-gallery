@@ -43,6 +43,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnAdmire:         resolveAdmireByAdmireID,
 	OnComment:        resolveCommentByCommentID,
 	OnMerchToken:     resolveMerchTokenByTokenID,
+	OnViewer:         resolveViewerByID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -506,15 +507,17 @@ func resolveWalletByAddress(ctx context.Context, address persist.DBID) (*model.W
 }
 
 func resolveViewer(ctx context.Context) *model.Viewer {
-	var userID persist.DBID
+
 	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
 		return nil
-
 	}
-	userID = publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 
 	viewer := &model.Viewer{
-		UserID:          userID,
+		HelperViewerData: model.HelperViewerData{
+			UserId: userID,
+		},
 		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver
 	}
@@ -957,6 +960,26 @@ func resolveMerchTokenByTokenID(ctx context.Context, tokenID string) (*model.Mer
 	}
 
 	return token, nil
+}
+
+func resolveViewerByID(ctx context.Context, id string) (*model.Viewer, error) {
+	var userID persist.DBID
+	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+	userID = publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	if userID.String() != id {
+		return nil, nil
+	}
+
+	return &model.Viewer{
+		HelperViewerData: model.HelperViewerData{
+			UserId: userID,
+		},
+		User:            nil, // handled by dedicated resolver
+		ViewerGalleries: nil, // handled by dedicated resolver
+	}, nil
 }
 
 func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {

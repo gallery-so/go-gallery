@@ -15,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -130,11 +129,10 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		mappedIDs[c.GivenID] = collectionID
 	}
 
-	orderClone := slices.Clone(update.Order)
 	// order collections
-	for i, c := range orderClone {
+	for i, c := range update.Order {
 		if newID, ok := mappedIDs[c]; ok {
-			orderClone[i] = newID
+			update.Order[i] = newID
 		}
 	}
 
@@ -142,7 +140,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		ID:          update.GalleryID,
 		Name:        util.FromStringPointer(update.Name),
 		Description: util.FromStringPointer(update.Description),
-		Collections: orderClone,
+		Collections: update.Order,
 	})
 	if err != nil {
 		return db.Gallery{}, err

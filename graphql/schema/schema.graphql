@@ -484,9 +484,8 @@ type NotificationsConnection @goEmbedHelper {
   pageInfo: PageInfo
 }
 
-type Viewer implements Node @goGqlId(fields: ["userId"]) {
+type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   id: ID!
-  userId: DBID!
   user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection

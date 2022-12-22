@@ -103,7 +103,16 @@ func (r *Token) ID() GqlID {
 }
 
 func (r *Viewer) ID() GqlID {
-	return GqlID(fmt.Sprintf("Viewer:%s", r.UserID))
+	//-----------------------------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------------------------
+	// Some fields specified by @goGqlId require manual binding because one of the following is true:
+	// (a) the field does not exist on the Viewer type, or
+	// (b) the field exists but is not a string type
+	//-----------------------------------------------------------------------------------------------
+	// Please create binding methods on the Viewer type with the following signatures:
+	// func (r *Viewer) GetGqlIDField_UserID() string
+	//-----------------------------------------------------------------------------------------------
+	return GqlID(fmt.Sprintf("Viewer:%s", r.GetGqlIDField_UserID()))
 }
 
 func (r *Wallet) ID() GqlID {
@@ -129,7 +138,7 @@ type NodeFetcher struct {
 	OnSomeoneFollowedYouNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
 	OnSomeoneViewedYourGalleryNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
 	OnToken                                       func(ctx context.Context, dbid persist.DBID) (*Token, error)
-	OnViewer                                      func(ctx context.Context, userId persist.DBID) (*Viewer, error)
+	OnViewer                                      func(ctx context.Context, userId string) (*Viewer, error)
 	OnWallet                                      func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
 }
 
@@ -237,7 +246,7 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Viewer' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
-		return n.OnViewer(ctx, persist.DBID(ids[0]))
+		return n.OnViewer(ctx, string(ids[0]))
 	case "Wallet":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
