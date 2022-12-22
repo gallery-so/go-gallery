@@ -53,13 +53,13 @@ query viewerQuery {
 }
 
 mutation createUserMutation(
-	$authMethod: AuthMechanism!
+	$authMechanism: AuthMechanism!
 	$username: String!
 	$bio: String
 	$email: Email
 ) {
 	createUser(
-		authMechanism: $authMethod
+		authMechanism: $authMechanism
 		username: $username
 		bio: $bio
 		email: $email
@@ -91,4 +91,56 @@ mutation getAuthNonceMutation($input: ChainAddressInput!) {
 			userExists
 		}
 	}
+}
+
+mutation loginMutation($authMechanism: AuthMechanism!) {
+  login(authMechanism: $authMechanism) {
+		... on Error {
+			__typename
+			message
+		}
+    ... on LoginPayload {
+      viewer {
+        user {
+          username
+          dbid
+        }
+      }
+    }
+  }
+}
+
+mutation logoutMutation {
+  logout {
+    viewer {
+      user {
+        username
+        dbid
+      }
+    }
+  }
+}
+
+mutation addUserWalletMutation(
+  $chainAddress: ChainAddressInput!,
+  $authMechanism: AuthMechanism!,
+) {
+  addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
+    ... on Error {
+      __typename
+      message
+    }
+    ...on AddUserWalletPayload {
+      viewer {
+        user {
+          wallets {
+            chainAddress {
+              address
+              chain
+            }
+          }
+        }
+      }
+    }
+  }
 }

@@ -1,19 +1,21 @@
 package graphql_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/99designs/gqlgen/client"
 	"github.com/ethereum/go-ethereum/crypto"
-	migrate "github.com/mikeydub/go-gallery/db"
-	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/server"
@@ -32,6 +34,16 @@ var (
 	operations = loadOperations()
 )
 
+func loadOperations() map[string]string {
+	schema := loadGeneratedSchema()
+	filePath := util.MustFindFile("./testdata/operations.gql")
+	ops, err := readOperationsFromFile(schema, filePath)
+	if err != nil {
+		panic(err)
+	}
+	return ops
+}
+
 type testCase struct {
 	title    string
 	run      func(t *testing.T)
@@ -42,112 +54,257 @@ func TestGraphQL(t *testing.T) {
 	tests := []testCase{
 		{
 			title:    "test user API",
-			run:      testAPI_User,
+			run:      testGraphQL_User,
 			fixtures: []fixture{useDefaultEnv, usePostgres},
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.title, withFixtures(test.run, test.fixtures...))
+		t.Run(test.title, withSetup(test.run, test.fixtures...))
 	}
 }
 
-func testAPI_User(t *testing.T) {
+func testGraphQL_User(t *testing.T) {
 	tests := []testCase{
-		{title: "should get user by ID", run: testUserByID},
-		{title: "should get user by username", run: testUserByUsername},
-		{title: "should get user by address", run: testUserByAddress},
-		{title: "should get viewer", run: testViewer},
+		{title: "should create a user", run: testCreateUser(newNonceFixture{})},
+		{title: "should be able to login", run: testLogin(newUserFixture{})},
+		{title: "should be able to logout", run: testLogout(newUserFixture{})},
+		{title: "should get user by ID", run: testUserByID(newUserFixture{})},
+		{title: "should get user by username", run: testUserByUsername(newUserFixture{})},
+		{title: "should get user by address", run: testUserByAddress(newUserFixture{})},
+		{title: "should get viewer", run: testViewer(newUserFixture{})},
+		{title: "can add a wallet", run: testAddWallet(newUserFixture{})},
 	}
 	for _, test := range tests {
-		t.Run(test.title, test.run)
+		t.Run(test.title, withSetup(test.run, test.fixtures...))
 	}
 }
 
-func testUserByUsername(t *testing.T) {
-	c := newClient()
-	wallet := newWallet(t)
-	id, username := newUser(t, c, wallet)
+func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		nonceF.setup(t)
+		c := defaultClient()
+		username := "user" + persist.GenerateID().String()
 
-	var response = struct {
-		UserByUsername struct {
-			model.GalleryUser
-			errMessage
-		}
-	}{}
+		var response = struct {
+			CreateUser struct {
+				Viewer model.Viewer
+				errMessage
+			}
+		}{}
 
-	post(t, c, mustGet(operations, "userByUsernameQuery"), &response, client.Var("user", username))
+		post(t, c, mustGet(operations, "createUserMutation"), &response,
+			client.Var("username", username),
+			client.Var("authMechanism", map[string]any{
+				"eoa": map[string]any{
+					"nonce":       nonceF.nonce,
+					"signature":   nonceF.wallet.Sign(nonceF.nonce),
+					"chainPubKey": map[string]string{"pubKey": nonceF.wallet.address, "chain": "Ethereum"},
+				},
+			}),
+		)
 
-	require.Empty(t, response.UserByUsername.Message)
-	assert.Equal(t, username, *response.UserByUsername.Username)
-	assert.Equal(t, id, response.UserByUsername.Dbid)
+		require.Empty(t, response.CreateUser.Message)
+		assert.Equal(t, username, *response.CreateUser.Viewer.User.Username)
+	}
 }
 
-func testUserByAddress(t *testing.T) {
-	c := newClient()
-	wallet := newWallet(t)
-	id, username := newUser(t, c, wallet)
+func testUserByUsername(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		c := defaultClient()
 
-	var response = struct {
-		UserByAddress struct {
-			model.GalleryUser
-			errMessage
-		}
-	}{}
+		var response = struct {
+			UserByUsername struct {
+				model.GalleryUser
+				errMessage
+			}
+		}{}
 
-	post(t, c, mustGet(operations, "userByAddressQuery"), &response,
-		client.Var("input", map[string]string{
-			"address": wallet.address,
-			"chain":   "Ethereum",
-		}),
-	)
+		post(t, c, mustGet(operations, "userByUsernameQuery"), &response, client.Var("user", userF.username))
 
-	require.Empty(t, response.UserByAddress.Message)
-	assert.Equal(t, username, *response.UserByAddress.Username)
-	assert.Equal(t, id, response.UserByAddress.Dbid)
+		require.Empty(t, response.UserByUsername.Message)
+		assert.Equal(t, userF.username, *response.UserByUsername.Username)
+		assert.Equal(t, userF.id, response.UserByUsername.Dbid)
+	}
 }
 
-func testUserByID(t *testing.T) {
-	c := newClient()
-	wallet := newWallet(t)
-	id, username := newUser(t, c, wallet)
+func testUserByAddress(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		c := defaultClient()
 
-	var response = struct {
-		UserByID struct {
-			model.GalleryUser
-			errMessage
-		}
-	}{}
+		var response = struct {
+			UserByAddress struct {
+				model.GalleryUser
+				errMessage
+			}
+		}{}
 
-	post(t, c, mustGet(operations, "userByIdQuery"), &response, client.Var("id", id))
+		post(t, c, mustGet(operations, "userByAddressQuery"), &response,
+			client.Var("input", map[string]string{
+				"address": userF.wallet.address,
+				"chain":   "Ethereum",
+			}),
+		)
 
-	require.Empty(t, response.UserByID.Message)
-	assert.Equal(t, username, *response.UserByID.Username)
-	assert.Equal(t, id, response.UserByID.Dbid)
+		require.Empty(t, response.UserByAddress.Message)
+		assert.Equal(t, userF.username, *response.UserByAddress.Username)
+		assert.Equal(t, userF.id, response.UserByAddress.Dbid)
+	}
 }
 
-func testViewer(t *testing.T) {
-	c := newClient()
-	wallet := newWallet(t)
-	id, username := newUser(t, c, wallet)
+func testUserByID(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		c := defaultClient()
 
-	var response = struct {
-		Viewer struct {
-			model.Viewer
-			errMessage
-		}
-	}{}
+		var response = struct {
+			UserByID struct {
+				model.GalleryUser
+				errMessage
+			}
+		}{}
 
-	post(t, c, mustGet(operations, "viewerQuery"), &response, func(r *client.Request) {
-		jwt, err := auth.JWTGeneratePipeline(context.Background(), id)
-		require.NoError(t, err)
-		r.HTTP.AddCookie(&http.Cookie{
-			Name:  auth.JWTCookieKey,
-			Value: jwt,
+		post(t, c, mustGet(operations, "userByIdQuery"), &response, client.Var("id", userF.id))
+
+		require.Empty(t, response.UserByID.Message)
+		assert.Equal(t, userF.username, *response.UserByID.Username)
+		assert.Equal(t, userF.id, response.UserByID.Dbid)
+	}
+}
+
+func testViewer(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		c := defaultClient()
+
+		var response = struct {
+			Viewer struct {
+				model.Viewer
+				errMessage
+			}
+		}{}
+
+		post(t, c, mustGet(operations, "viewerQuery"), &response, withJWT(t, userF.id))
+
+		require.Empty(t, response.Viewer.Message)
+		assert.Equal(t, userF.username, *response.Viewer.User.Username)
+	}
+}
+
+func testAddWallet(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		c := defaultClient()
+		walletToAdd := newWallet(t)
+		nonce := newNonce(t, c, walletToAdd)
+
+		var response = struct {
+			AddUserWallet struct {
+				model.AddUserWalletPayload
+				errMessage
+			}
+		}{}
+
+		post(t, c, mustGet(operations, "addUserWalletMutation"), &response,
+			withJWT(t, userF.id),
+			client.Var("chainAddress", map[string]string{
+				"address": walletToAdd.address,
+				"chain":   "Ethereum",
+			}),
+			client.Var(
+				"authMechanism", map[string]any{
+					"eoa": map[string]any{
+						"nonce":       nonce,
+						"signature":   walletToAdd.Sign(nonce),
+						"chainPubKey": map[string]string{"pubKey": walletToAdd.address, "chain": "Ethereum"},
+					},
+				},
+			))
+
+		require.Empty(t, string(response.AddUserWallet.Message))
+		wallets := response.AddUserWallet.Viewer.User.Wallets
+		assert.Equal(t, walletToAdd.address, wallets[len(wallets)-1].ChainAddress.Address)
+	}
+}
+
+func testLogin(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		nonce := newNonce(t, defaultClient(), userF.wallet)
+		// Manually create the request so that we can write to a recorder
+		body, _ := json.Marshal(map[string]any{
+			"query": mustGet(operations, "loginMutation"),
+			"variables": map[string]any{
+				"authMechanism": map[string]any{
+					"eoa": map[string]any{
+						"nonce":       nonce,
+						"signature":   userF.wallet.Sign(nonce),
+						"chainPubKey": map[string]string{"pubKey": userF.wallet.address, "chain": "Ethereum"},
+					},
+				},
+			},
 		})
-	})
+		r := httptest.NewRequest(http.MethodPost, "/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
+		r.Header.Set("Content-Type", "application/json")
 
-	require.Empty(t, response.Viewer.Message)
-	assert.Equal(t, username, *response.Viewer.User.Username)
+		// Handle request
+		w := httptest.NewRecorder()
+		handler := server.CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+		handler.ServeHTTP(w, r)
+		res := w.Result()
+		defer res.Body.Close()
+
+		// Check results
+		var response = struct {
+			Data struct {
+				Login struct {
+					Viewer model.Viewer
+					errMessage
+				}
+			}
+		}{}
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(res.Body)
+		err := json.Unmarshal(buf.Bytes(), &response)
+		require.NoError(t, err)
+		require.Empty(t, response.Data.Login.Message)
+		assert.NotEmpty(t, readCookie(t, res, auth.JWTCookieKey))
+		assert.Equal(t, userF.username, *response.Data.Login.Viewer.User.Username)
+		assert.Equal(t, userF.id, response.Data.Login.Viewer.User.Dbid)
+	}
+}
+
+func testLogout(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		// Manually create the request so that we can write to a recorder
+		body, _ := json.Marshal(map[string]string{"query": mustGet(operations, "logoutMutation")})
+		r := httptest.NewRequest(http.MethodPost, "/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
+		r.Header.Set("Content-Type", "application/json")
+		err := addJWT(r, userF.id)
+		require.NoError(t, err)
+
+		// Handle request
+		w := httptest.NewRecorder()
+		handler := server.CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+		handler.ServeHTTP(w, r)
+		res := w.Result()
+		defer res.Body.Close()
+
+		// Check results
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(res.Body)
+		var response = struct {
+			Logout struct {
+				Viewer model.Viewer
+			}
+		}{}
+		err = json.Unmarshal(buf.Bytes(), &response)
+		require.NoError(t, err)
+		assert.Empty(t, readCookie(t, res, auth.JWTCookieKey))
+		assert.Empty(t, response.Logout.Viewer)
+	}
 }
 
 // mustGet fails if the key does not exist in the map
@@ -159,7 +316,7 @@ func mustGet[V any](m map[string]V, key string) V {
 	return val
 }
 
-// errMessage represents a handled graphql error
+// errMessage represents a handled GraphQL error
 type errMessage struct {
 	Typename string `json:"__typename"`
 	Message  string `json:"message"`
@@ -168,8 +325,8 @@ type errMessage struct {
 func post(t *testing.T, c *client.Client, query string, into any, options ...client.Option) {
 	t.Helper()
 	r, err := c.RawPost(query, options...)
-	require.Empty(t, r.Errors)
 	require.NoError(t, err)
+	require.Empty(t, string(r.Errors))
 
 	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:      into,
@@ -184,14 +341,14 @@ func post(t *testing.T, c *client.Client, query string, into any, options ...cli
 	require.NoError(t, err)
 }
 
-type eoa struct {
+type wallet struct {
 	pKey    *ecdsa.PrivateKey
 	pubKey  *ecdsa.PublicKey
 	address string
 }
 
-func (e *eoa) Sign(msg string) string {
-	sig, err := crypto.Sign(crypto.Keccak256([]byte(msg)), e.pKey)
+func (w *wallet) Sign(msg string) string {
+	sig, err := crypto.Sign(crypto.Keccak256([]byte(msg)), w.pKey)
 	if err != nil {
 		panic(err)
 	}
@@ -199,7 +356,7 @@ func (e *eoa) Sign(msg string) string {
 }
 
 // newWallet generates a new wallet for testing purposes
-func newWallet(t *testing.T) eoa {
+func newWallet(t *testing.T) wallet {
 	t.Helper()
 	pk, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -207,74 +364,15 @@ func newWallet(t *testing.T) eoa {
 	pubKey := pk.Public().(*ecdsa.PublicKey)
 	address := crypto.PubkeyToAddress(*pubKey).Hex()
 
-	return eoa{
+	return wallet{
 		pKey:    pk,
 		pubKey:  pubKey,
 		address: address,
 	}
 }
 
-// newClient returns a new graphql client
-// Requests are made to the graphql route by default
-func newClient() *client.Client {
-	handler := server.CoreInit(postgres.NewClient(), postgres.NewPgxClient())
-	return client.New(handler, func(bd *client.Request) {
-		bd.HTTP.URL.Path = "/glry/graphql/query"
-	})
-}
-
-type fixture func(t *testing.T)
-
-// withFixtures sets up each fixture before running the test
-func withFixtures(test func(t *testing.T), fixtures ...fixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		for _, fixture := range fixtures {
-			fixture(t)
-		}
-		test(t)
-	}
-}
-
-// useDefaultEnv sets the test environment to the default server environment
-func useDefaultEnv(t *testing.T) {
-	prevValues := make(map[string]string)
-	for _, envVar := range os.Environ() {
-		kv := strings.Split(envVar, "=")
-		prevValues[kv[0]] = kv[1]
-	}
-
-	server.SetDefaults()
-	curValues := os.Environ()
-
-	t.Cleanup(func() {
-		for _, envVar := range curValues {
-			k := strings.Split(envVar, "=")[0]
-			if prevVal, ok := prevValues[k]; ok {
-				os.Setenv(k, prevVal)
-			} else {
-				os.Unsetenv(k)
-			}
-		}
-	})
-}
-
-// usePostgres starts a running Postgres Docker container with migrations applied.
-// The passed testing.T arg resets the environment and deletes the container
-// when the test and its subtests complete.
-func usePostgres(t *testing.T) {
-	t.Helper()
-	r, err := docker.StartPostgres()
-	require.NoError(t, err)
-	t.Cleanup(func() { r.Close() })
-
-	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
-	t.Setenv("POSTGRES_HOST", hostAndPort[0])
-	t.Setenv("POSTGRES_PORT", hostAndPort[1])
-	err = migrate.RunMigration(postgres.NewClient(), "./db/migrations/core")
-	require.NoError(t, err)
-}
-
-func newNonce(t *testing.T, c *client.Client, wallet eoa) string {
+// newNonce makes a GraphQL request to generate a nonce
+func newNonce(t *testing.T, c *client.Client, w wallet) string {
 	t.Helper()
 	response := struct {
 		GetAuthNonce struct {
@@ -285,7 +383,7 @@ func newNonce(t *testing.T, c *client.Client, wallet eoa) string {
 
 	post(t, c, mustGet(operations, "getAuthNonceMutation"), &response,
 		client.Var("input", map[string]string{
-			"address": wallet.address,
+			"address": w.address,
 			"chain":   "Ethereum",
 		}),
 	)
@@ -294,9 +392,10 @@ func newNonce(t *testing.T, c *client.Client, wallet eoa) string {
 	return *response.GetAuthNonce.Nonce
 }
 
-func newUser(t *testing.T, c *client.Client, wallet eoa) (persist.DBID, string) {
+// newUser makes a GraphQL request to generate a new user
+func newUser(t *testing.T, c *client.Client, w wallet) (persist.DBID, string) {
 	t.Helper()
-	nonce := newNonce(t, c, wallet)
+	nonce := newNonce(t, c, w)
 	username := "user" + persist.GenerateID().String()
 
 	var response = struct {
@@ -308,11 +407,11 @@ func newUser(t *testing.T, c *client.Client, wallet eoa) (persist.DBID, string) 
 
 	post(t, c, mustGet(operations, "createUserMutation"), &response,
 		client.Var("username", username),
-		client.Var("authMethod", map[string]any{
+		client.Var("authMechanism", map[string]any{
 			"eoa": map[string]any{
 				"nonce":       nonce,
-				"signature":   wallet.Sign(nonce),
-				"chainPubKey": map[string]string{"pubKey": wallet.address, "chain": "Ethereum"},
+				"signature":   w.Sign(nonce),
+				"chainPubKey": map[string]string{"pubKey": w.address, "chain": "Ethereum"},
 			},
 		}),
 	)
@@ -321,13 +420,17 @@ func newUser(t *testing.T, c *client.Client, wallet eoa) (persist.DBID, string) 
 	return response.CreateUser.Viewer.User.Dbid, username
 }
 
-// loadOperations loads test queries from the testdata folder
-func loadOperations() map[string]string {
-	ops, err := readOperationsFromFile(loadGeneratedSchema(), util.MustFindFile("./testdata/operations.gql"))
-	if err != nil {
-		panic(err)
-	}
-	return ops
+// defaultClient returns a GraphQL client attached to the backend GraphQL handler
+func defaultClient() *client.Client {
+	handler := server.CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+	return newClient(handler, func(r *client.Request) {
+		r.HTTP.URL.Path = "/glry/graphql/query"
+	})
+}
+
+// newClient returns a gqlgen test client
+func newClient(handler http.Handler, opts ...client.Option) *client.Client {
+	return client.New(handler, opts...)
 }
 
 // readOperationsFromFile reads in a file of named GraphQL operations, validates them against a schema,
@@ -378,4 +481,34 @@ func readOperationsFromFile(schema *ast.Schema, filePath string) (map[string]str
 // loadGeneratedSchema loads the Gallery GraphQL schema via generated code
 func loadGeneratedSchema() *ast.Schema {
 	return generated.NewExecutableSchema(generated.Config{}).Schema()
+}
+
+// readCookie finds a cookie set in the response
+func readCookie(t *testing.T, r *http.Response, name string) string {
+	t.Helper()
+	for _, c := range r.Cookies() {
+		if c.Name == name {
+			return c.Value
+		}
+	}
+	require.NoError(t, fmt.Errorf("%s not set as a cookie", name))
+	return ""
+}
+
+// withJWT adds a JWT to a gqlgen client request
+func withJWT(t *testing.T, userID persist.DBID) func(*client.Request) {
+	return func(r *client.Request) {
+		err := addJWT(r.HTTP, userID)
+		require.NoError(t, err)
+	}
+}
+
+// addJWT adds a JWT to a HTTP request
+func addJWT(r *http.Request, userID persist.DBID) error {
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	if err != nil {
+		return err
+	}
+	r.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	return nil
 }
