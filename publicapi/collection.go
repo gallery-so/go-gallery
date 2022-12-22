@@ -138,7 +138,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	name = validate.SanitizationPolicy.Sanitize(strings.TrimSpace(name))
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -198,7 +198,7 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	name = validate.SanitizationPolicy.Sanitize(name)
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -286,7 +286,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return nil, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}

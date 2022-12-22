@@ -356,7 +356,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 		return "", err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -461,7 +461,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 		return "", err
 	}
 
-	actor, err := getAuthenticatedUser(ctx)
+	actor, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}

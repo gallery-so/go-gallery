@@ -20,6 +20,13 @@ var (
 			persist.ActionTokensAddedToCollection,
 			persist.ActionCollectorsNoteAddedToCollection,
 		},
+		persist.ActionGalleryUpdated: {
+			persist.ActionCollectionUpdated,
+			persist.ActionCollectionCreated,
+			persist.ActionTokensAddedToCollection,
+			persist.ActionCollectorsNoteAddedToCollection,
+			// TODO more actions for specific gallery updates maybe?
+		},
 	}
 	eventGroups = createEventGroups(groupingConfig)
 )
@@ -32,6 +39,7 @@ var (
 		persist.ActionCollectorsNoteAddedToCollection: actorSubjectActionSegment,
 		persist.ActionTokensAddedToCollection:         actorSubjectActionSegment,
 		persist.ActionCollectionUpdated:               actorSubjectSegment,
+		persist.ActionGalleryUpdated:                  actorSubjectActionSegment,
 	}
 
 	// Feed events in this group can contain a collection collector's note
@@ -136,6 +144,8 @@ func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db
 		return b.createCollectorsNoteAddedToCollectionFeedEvent(ctx, event)
 	case persist.ActionTokensAddedToCollection:
 		return b.createTokensAddedToCollectionFeedEvent(ctx, event)
+	case persist.ActionGalleryUpdated:
+		return b.createUpdateGalleryFeedEvent(ctx, event)
 	default:
 		return nil, errUnhandledSingleEvent
 	}
@@ -249,6 +259,22 @@ func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, eve
 			CollectionTokenIDs:          event.Data.CollectionTokenIDs,
 			CollectionNewTokenIDs:       event.Data.CollectionTokenIDs,
 			CollectionNewCollectorsNote: event.Data.CollectionCollectorsNote,
+		},
+		EventTime: event.CreatedAt,
+		EventIds:  persist.DBIDList{event.ID},
+		Caption:   event.Caption,
+	})
+}
+
+func (b *EventBuilder) createUpdateGalleryFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	// TODO event data once we figure out what we want
+
+	return b.feedRepo.Add(ctx, db.FeedEvent{
+		ID:      persist.GenerateID(),
+		OwnerID: persist.NullStrToDBID(event.ActorID),
+		Action:  event.Action,
+		Data: persist.FeedEventData{
+			GalleryID: event.SubjectID,
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},

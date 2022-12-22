@@ -304,9 +304,8 @@ func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain,
 	return nil
 }
 
-
 func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) error {
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 
 	if err != nil {
 		return err
@@ -441,7 +440,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	// Sanitize
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -479,7 +478,7 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -500,7 +499,7 @@ func (api TokenAPI) DeepRefreshByChain(ctx context.Context, chain persist.Chain)
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}

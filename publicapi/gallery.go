@@ -54,7 +54,7 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 		nullDesc = *description
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -157,6 +157,21 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+	_, err = dispatchEvent(ctx, db.Event{
+		ActorID:        persist.DBIDToNullStr(userID),
+		ResourceTypeID: persist.ResourceTypeGallery,
+		SubjectID:      newGall.ID,
+		Action:         persist.ActionGalleryUpdated,
+		GalleryID:      newGall.ID,
+	}, api.validator, nil)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
 	return newGall, nil
 }
 
@@ -255,7 +270,7 @@ func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID)
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -352,7 +367,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -457,25 +472,25 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	gc := util.GinContextFromContext(ctx)
 
 	if auth.GetUserAuthedFromCtx(gc) {
-		userID, err := getAuthenticatedUser(ctx)
+		userID, err := getAuthenticatedUserID(ctx)
 		if err != nil {
 			return db.Gallery{}, err
 		}
 
-		// if gallery.OwnerUserID != userID {
-		// only view gallery if the user hasn't already viewed it in this most recent notification period
+		if gallery.OwnerUserID != userID {
+			// only view gallery if the user hasn't already viewed it in this most recent notification period
 
-		_, err = dispatchEvent(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			ResourceTypeID: persist.ResourceTypeGallery,
-			SubjectID:      galleryID,
-			Action:         persist.ActionViewedGallery,
-			GalleryID:      galleryID,
-		}, api.validator, nil)
-		if err != nil {
-			return db.Gallery{}, err
+			_, err = dispatchEvent(ctx, db.Event{
+				ActorID:        persist.DBIDToNullStr(userID),
+				ResourceTypeID: persist.ResourceTypeGallery,
+				SubjectID:      galleryID,
+				Action:         persist.ActionViewedGallery,
+				GalleryID:      galleryID,
+			}, api.validator, nil)
+			if err != nil {
+				return db.Gallery{}, err
+			}
 		}
-		// }
 	} else {
 		_, err := dispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,

@@ -113,7 +113,7 @@ func newValidator() *validator.Validate {
 	return v
 }
 
-func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
+func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
 	gc := util.GinContextFromContext(ctx)
 	authError := auth.GetAuthErrorFromCtx(gc)
 

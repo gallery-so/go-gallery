@@ -3,8 +3,9 @@ package publicapi
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -58,7 +59,7 @@ func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (
 }
 
 func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}

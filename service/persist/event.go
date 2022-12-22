@@ -26,6 +26,7 @@ const (
 	ActionCommentedOnFeedEvent            Action = "CommentedOnFeedEvent"
 	ActionViewedGallery                   Action = "ViewedGallery"
 	ActionCollectionUpdated               Action = "CollectionUpdated"
+	ActionGalleryUpdated                  Action = "GalleryUpdated"
 )
 
 type EventData struct {
@@ -51,6 +52,7 @@ type FeedEventData struct {
 	CollectionNewCollectorsNote string   `json:"collection_new_collectors_note"`
 	CollectionIsPreFeed         bool     `json:"collection_is_pre_feed"`
 	CollectionIsNew             bool     `json:"collection_is_new"`
+	GalleryID                   DBID     `json:"gallery_id"`
 }
 
 type ErrFeedEventNotFoundByID struct {

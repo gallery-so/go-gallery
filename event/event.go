@@ -42,6 +42,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionCollectorsNoteAddedToCollection, feedHandler)
 	sender.addDelayedHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
+	sender.addDelayedHandler(feed, persist.ActionGalleryUpdated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 
