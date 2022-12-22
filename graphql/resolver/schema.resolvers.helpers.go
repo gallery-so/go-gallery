@@ -44,6 +44,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnComment:        resolveCommentByCommentID,
 	OnMerchToken:     resolveMerchTokenByTokenID,
 	OnViewer:         resolveViewerByID,
+	OnDeletedNode:    resolveDeletedNodeByID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -976,6 +977,12 @@ func resolveViewerByID(ctx context.Context, id string) (*model.Viewer, error) {
 		},
 		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver
+	}, nil
+}
+
+func resolveDeletedNodeByID(ctx context.Context, id persist.DBID) (*model.DeletedNode, error) {
+	return &model.DeletedNode{
+		Dbid: id,
 	}, nil
 }
 
