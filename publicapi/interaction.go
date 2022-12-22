@@ -401,7 +401,7 @@ func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBI
 	if err != nil {
 		return "", err
 	}
-	if admire.ActorID != For(ctx).User.LoggedInUserID(ctx) {
+	if admire.ActorID != For(ctx).User.GetLoggedInUserId(ctx) {
 		return "", ErrOnlyRemoveOwnAdmire
 	}
 
@@ -500,7 +500,7 @@ func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.D
 	if err != nil {
 		return "", err
 	}
-	if comment.ActorID != For(ctx).User.LoggedInUserID(ctx) {
+	if comment.ActorID != For(ctx).User.GetLoggedInUserId(ctx) {
 		return "", ErrOnlyRemoveOwnComment
 	}
 

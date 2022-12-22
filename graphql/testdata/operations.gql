@@ -1,69 +1,79 @@
 query userByUsernameQuery($user: String!) {
 	userByUsername(username: $user) {
-		...on Error {
+		... on Error {
 			__typename
 			message
 		}
-		...on GalleryUser {
+		... on GalleryUser {
 			username
-      dbid
+			dbid
 		}
 	}
 }
 
 query userByIdQuery($id: DBID!) {
 	userById(id: $id) {
-		...on Error {
+		... on Error {
 			__typename
 			message
 		}
-		...on GalleryUser {
+		... on GalleryUser {
 			username
-      dbid
+			dbid
 		}
 	}
 }
 
 query userByAddressQuery($input: ChainAddressInput!) {
 	userByAddress(chainAddress: $input) {
-		...on Error {
+		... on Error {
 			__typename
 			message
 		}
-		...on GalleryUser {
+		... on GalleryUser {
 			username
-      dbid
+			dbid
 		}
 	}
 }
 
 query viewerQuery {
 	viewer {
-		...on Error {
+		... on Error {
 			__typename
 			message
 		}
-		...on Viewer {
-      user {
-        username
-        dbid
-      }
+		... on Viewer {
+			user {
+				username
+				dbid
+			}
 		}
 	}
 }
 
-mutation createUserMutation($authMethod: AuthMechanism!, $username: String!, $bio: String, $email: Email) {
-	createUser(authMechanism: $authMethod, username: $username, bio: $bio, email: $email) {
-		...on Error {
+mutation createUserMutation(
+	$authMethod: AuthMechanism!
+	$username: String!
+	$bio: String
+	$email: Email
+) {
+	createUser(
+		authMechanism: $authMethod
+		username: $username
+		bio: $bio
+		email: $email
+	) {
+		... on Error {
 			__typename
 			message
 		}
-		...on CreateUserPayload {
+		... on CreateUserPayload {
 			viewer {
 				user {
 					username
 					dbid
-          bio
+					bio
 				}
 			}
 		}
@@ -71,14 +81,14 @@ mutation createUserMutation($authMethod: AuthMechanism!, $username: String!, $bi
 }
 
 mutation getAuthNonceMutation($input: ChainAddressInput!) {
-  getAuthNonce(chainAddress: $input) {
-    ...on Error {
-      __typename
-      message
-    }
-    ...on AuthNonce {
-      nonce
-      userExists
-    }
-  }
+	getAuthNonce(chainAddress: $input) {
+		... on Error {
+			__typename
+			message
+		}
+		... on AuthNonce {
+			nonce
+			userExists
+		}
+	}
 }

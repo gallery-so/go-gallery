@@ -61,7 +61,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
-	validator := validate.ValidateWithCustomValidators()
+	validator := validate.WithCustomValidators()
 
 	return &PublicAPI{
 		repos:     repos,
@@ -73,7 +73,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		User:          NewUserAPI(repos, queries, loaders, validator, ethClient, ipfsClient, arweaveClient, storageClient),
+		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
 		Contract:      &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, taskClient: taskClient},
 		Token:         &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
 		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},

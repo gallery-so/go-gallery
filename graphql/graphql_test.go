@@ -65,7 +65,6 @@ func testAPI_User(t *testing.T) {
 
 func testUserByUsername(t *testing.T) {
 	c := newClient()
-
 	wallet := newWallet(t)
 	id, username := newUser(t, c, wallet)
 

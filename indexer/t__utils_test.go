@@ -61,7 +61,7 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	pgx := postgres.NewPgxClient()
 	err = migrate.RunMigration(db, "./db/migrations/indexer")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to seed db: %s", err)
 	}
 
 	return assert.New(t), db, pgx

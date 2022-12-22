@@ -352,8 +352,6 @@ func GetAuthErrorFromCtx(c *gin.Context) error {
 		return nil
 	}
 
-	fmt.Printf("error=%s", err)
-
 	return err.(error)
 }
 
