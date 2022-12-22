@@ -2949,7 +2949,7 @@ func (q *Queries) UpdateCollectionTokens(ctx context.Context, arg UpdateCollecti
 
 const updateCollectionsInfo = `-- name: UpdateCollectionsInfo :exec
 with updates as (
-    select unnest($1::varchar[]) as id, unnest($2::varchar[]) as name, unnest($3::varchar[]) as collectors_note, unnest($4::varchar[]) as layout, unnest($5::varchar[]) as token_settings, unnest($6::bool[]) as hidden
+    select unnest($1::varchar[]) as id, unnest($2::varchar[]) as name, unnest($3::varchar[]) as collectors_note, unnest($4::jsonb[]) as layout, unnest($5::jsonb[]) as token_settings, unnest($6::bool[]) as hidden
 )
 update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now() from updates where c.id = updates.id and c.deleted = false
 `
@@ -2958,8 +2958,8 @@ type UpdateCollectionsInfoParams struct {
 	Ids             []string
 	Names           []string
 	CollectorsNotes []string
-	Layouts         []string
-	TokenSettings   []string
+	Layouts         []pgtype.JSONB
+	TokenSettings   []pgtype.JSONB
 	Hidden          []bool
 }
 

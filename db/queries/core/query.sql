@@ -662,7 +662,7 @@ update collections set deleted = true, last_updated = now() where id = any(@ids:
 
 -- name: UpdateCollectionsInfo :exec
 with updates as (
-    select unnest(@ids::varchar[]) as id, unnest(@names::varchar[]) as name, unnest(@collectors_notes::varchar[]) as collectors_note, unnest(@layouts::varchar[]) as layout, unnest(@token_settings::varchar[]) as token_settings, unnest(@hidden::bool[]) as hidden
+    select unnest(@ids::varchar[]) as id, unnest(@names::varchar[]) as name, unnest(@collectors_notes::varchar[]) as collectors_note, unnest(@layouts::jsonb[]) as layout, unnest(@token_settings::jsonb[]) as token_settings, unnest(@hidden::bool[]) as hidden
 )
 update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now() from updates where c.id = updates.id and c.deleted = false;
 

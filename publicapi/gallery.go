@@ -10,6 +10,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -174,24 +175,35 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	layouts, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+	layouts, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		b, err := json.Marshal(modelToTokenLayout(u.Layout))
 		if err != nil {
-			return "", err
+			return pgtype.JSONB{
+				Status: pgtype.Null,
+			}, err
 		}
-		return string(b), nil
+
+		return pgtype.JSONB{
+			Bytes:  b,
+			Status: pgtype.Present,
+		}, nil
 	})
 	if err != nil {
 		return err
 	}
 
-	tokenSettings, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+	tokenSettings, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		settings := modelToTokenSettings(u.TokenSettings)
 		b, err := json.Marshal(settings)
 		if err != nil {
-			return "", err
+			return pgtype.JSONB{
+				Status: pgtype.Null,
+			}, err
 		}
-		return string(b), nil
+		return pgtype.JSONB{
+			Bytes:  b,
+			Status: pgtype.Present,
+		}, nil
 	})
 	if err != nil {
 		return err
