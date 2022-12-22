@@ -118,15 +118,6 @@ func (q *Queries) GalleryRepoDelete(ctx context.Context, arg GalleryRepoDeletePa
 	return err
 }
 
-const galleryRepoEnsureCollsOwnedByUser = `-- name: GalleryRepoEnsureCollsOwnedByUser :exec
-update galleries set collections = collections || unused_colls.colls from (select array_agg(c.id)::varchar[] as colls from collections c, galleries g where not c.id = any(g.collections) and g.owner_user_id = $1 and c.owner_user_id = $1 and c.deleted = false and g.deleted = false) as unused_colls where galleries.owner_user_id = $1 and galleries.id = (select g.id from galleries g where g.owner_user_id = $1 order by g.position limit 1)
-`
-
-func (q *Queries) GalleryRepoEnsureCollsOwnedByUser(ctx context.Context, userID persist.DBID) error {
-	_, err := q.db.Exec(ctx, galleryRepoEnsureCollsOwnedByUser, userID)
-	return err
-}
-
 const galleryRepoGetByUserIDRaw = `-- name: GalleryRepoGetByUserIDRaw :many
 select id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position from galleries g where g.owner_user_id = $1 and g.deleted = false order by position
 `
