@@ -170,5 +170,3 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenIDList"
           - column: "*.token_hex"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
-          - column: "*.previews"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"

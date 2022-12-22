@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -227,9 +228,10 @@ func StringToPointer(str string) *string {
 	return &str
 }
 
-func FromStringPointer(s *string) string {
+// FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
+func FromPointer[T comparable](s *T) T {
 	if s == nil {
-		return ""
+		return reflect.Zero(reflect.TypeOf(s).Elem()).Interface().(T)
 	}
 	return *s
 }

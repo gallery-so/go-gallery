@@ -46,14 +46,6 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 		return db.Gallery{}, err
 	}
 
-	var nullName, nullDesc string
-	if name != nil {
-		nullName = *name
-	}
-	if description != nil {
-		nullDesc = *description
-	}
-
 	userID, err := getAuthenticatedUser(ctx)
 	if err != nil {
 		return db.Gallery{}, err
@@ -61,8 +53,8 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 
 	gallery, err := api.repos.GalleryRepository.Create(ctx, db.GalleryRepoCreateParams{
 		GalleryID:   persist.GenerateID(),
-		Name:        nullName,
-		Description: nullDesc,
+		Name:        util.FromPointer(name),
+		Description: util.FromPointer(description),
 		Position:    position,
 		OwnerUserID: userID,
 	})
@@ -140,8 +132,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	err = q.UpdateGallery(ctx, db.UpdateGalleryParams{
 		ID:          update.GalleryID,
-		Name:        util.FromStringPointer(update.Name),
-		Description: util.FromStringPointer(update.Description),
+		Name:        util.FromPointer(update.Name),
+		Description: util.FromPointer(update.Description),
 		Collections: update.Order,
 	})
 	if err != nil {
