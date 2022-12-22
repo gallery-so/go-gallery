@@ -935,7 +935,15 @@ func (r *mutationResolver) ViewGallery(ctx context.Context, galleryID persist.DB
 }
 
 func (r *mutationResolver) UpdateGallery(ctx context.Context, input model.UpdateGalleryInput) (model.UpdateGalleryPayloadOrError, error) {
-	panic(fmt.Errorf("not implemented"))
+	res, err := publicapi.For(ctx).Gallery.UpdateGallery(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateGalleryPayload{
+		Gallery: galleryToModel(ctx, res),
+	}
+	return output, nil
 }
 
 func (r *mutationResolver) CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error) {
