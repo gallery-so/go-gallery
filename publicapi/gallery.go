@@ -82,6 +82,15 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	if curGal.OwnerUserID != userID {
+		return db.Gallery{}, fmt.Errorf("user %s is not the owner of gallery %s", userID, update.GalleryID)
+	}
+
 	tx, err := api.repos.BeginTx(ctx)
 	if err != nil {
 		return db.Gallery{}, err
