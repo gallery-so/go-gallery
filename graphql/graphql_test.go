@@ -30,7 +30,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-var operations = loadOperations()
+var ops = loadOperations(util.MustFindFile("./testdata/operations.gql"))
 
 type testCase struct {
 	title    string
@@ -80,7 +80,7 @@ func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
 			}
 		}{}
 
-		post(t, c, mustGet(operations, "createUserMutation"), &response,
+		post(t, c, ops.Op("createUserMutation"), &response,
 			client.Var("username", username),
 			client.Var("authMechanism", map[string]any{
 				"eoa": map[string]any{
@@ -107,7 +107,7 @@ func testUserByUsername(userF newUserFixture) func(t *testing.T) {
 			}
 		}{}
 
-		post(t, c, mustGet(operations, "userByUsernameQuery"), &response, client.Var("user", userF.username))
+		post(t, c, ops.Op("userByUsernameQuery"), &response, client.Var("user", userF.username))
 
 		require.Empty(t, response.UserByUsername.Message)
 		assert.Equal(t, userF.username, *response.UserByUsername.Username)
@@ -126,7 +126,7 @@ func testUserByAddress(userF newUserFixture) func(t *testing.T) {
 			}
 		}{}
 
-		post(t, c, mustGet(operations, "userByAddressQuery"), &response,
+		post(t, c, ops.Op("userByAddressQuery"), &response,
 			client.Var("input", map[string]string{
 				"address": userF.wallet.address,
 				"chain":   "Ethereum",
@@ -150,7 +150,7 @@ func testUserByID(userF newUserFixture) func(t *testing.T) {
 			}
 		}{}
 
-		post(t, c, mustGet(operations, "userByIdQuery"), &response, client.Var("id", userF.id))
+		post(t, c, ops.Op("userByIdQuery"), &response, client.Var("id", userF.id))
 
 		require.Empty(t, response.UserByID.Message)
 		assert.Equal(t, userF.username, *response.UserByID.Username)
@@ -169,7 +169,7 @@ func testViewer(userF newUserFixture) func(t *testing.T) {
 			}
 		}{}
 
-		post(t, c, mustGet(operations, "viewerQuery"), &response, withJWT(newJWT(t, userF.id)))
+		post(t, c, ops.Op("viewerQuery"), &response, withJWT(newJWT(t, userF.id)))
 
 		require.Empty(t, response.Viewer.Message)
 		assert.Equal(t, userF.username, *response.Viewer.User.Username)
@@ -199,7 +199,7 @@ func testAddWallet(userF newUserFixture) func(t *testing.T) {
 			}
 		}{}
 
-		post(t, c, mustGet(operations, "addUserWalletMutation"), &response,
+		post(t, c, ops.Op("addUserWalletMutation"), &response,
 			withJWT(newJWT(t, userF.id)),
 			client.Var("chainAddress", map[string]string{
 				"address": walletToAdd.address,
@@ -248,7 +248,7 @@ func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
 				}
 			}
 		}{}
-		post(t, c, mustGet(operations, "addUserWalletMutation"), &addResponse,
+		post(t, c, ops.Op("addUserWalletMutation"), &addResponse,
 			withJWT(jwt),
 			client.Var("chainAddress", map[string]string{
 				"address": walletToRemove.address,
@@ -286,7 +286,7 @@ func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
 				}
 			}
 		}{}
-		post(t, c, mustGet(operations, "removeUserWalletsMutation"), &removeResponse,
+		post(t, c, ops.Op("removeUserWalletsMutation"), &removeResponse,
 			withJWT(jwt),
 			client.Var("walletIds", []string{lastWallet.Dbid}),
 		)
@@ -303,7 +303,7 @@ func testLogin(userF newUserFixture) func(t *testing.T) {
 		nonce := newNonce(t, defaultClient(), userF.wallet)
 		// Manually create the request so that we can write to a recorder
 		body, _ := json.Marshal(map[string]any{
-			"query": mustGet(operations, "loginMutation"),
+			"query": ops.Op("loginMutation"),
 			"variables": map[string]any{
 				"authMechanism": map[string]any{
 					"eoa": map[string]any{
@@ -348,7 +348,7 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
 		// Manually create the request so that we can write to a recorder
-		body, _ := json.Marshal(map[string]string{"query": mustGet(operations, "logoutMutation")})
+		body, _ := json.Marshal(map[string]string{"query": ops.Op("logoutMutation")})
 		r := httptest.NewRequest(http.MethodPost, "/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
 		r.Header.Set("Content-Type", "application/json")
 		addJWT(r, newJWT(t, userF.id))
@@ -373,25 +373,6 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 		assert.Empty(t, readCookie(t, res, auth.JWTCookieKey))
 		assert.Empty(t, response.Logout.Viewer)
 	}
-}
-
-func loadOperations() map[string]string {
-	schema := loadGeneratedSchema()
-	filePath := util.MustFindFile("./testdata/operations.gql")
-	ops, err := readOperationsFromFile(schema, filePath)
-	if err != nil {
-		panic(err)
-	}
-	return ops
-}
-
-// mustGet fails if the key does not exist in the map
-func mustGet[V any](m map[string]V, key string) V {
-	val, ok := m[key]
-	if !ok {
-		panic(fmt.Sprintf("`%s` does not exist in map", key))
-	}
-	return val
 }
 
 // errMessage represents a handled GraphQL error
@@ -459,7 +440,7 @@ func newNonce(t *testing.T, c *client.Client, w wallet) string {
 		}
 	}{}
 
-	post(t, c, mustGet(operations, "getAuthNonceMutation"), &response,
+	post(t, c, ops.Op("getAuthNonceMutation"), &response,
 		client.Var("input", map[string]string{
 			"address": w.address,
 			"chain":   "Ethereum",
@@ -482,7 +463,7 @@ func newUser(t *testing.T, c *client.Client, w wallet) (persist.DBID, string) {
 		}
 	}{}
 
-	post(t, c, mustGet(operations, "createUserMutation"), &response,
+	post(t, c, ops.Op("createUserMutation"), &response,
 		client.Var("username", username),
 		client.Var("authMechanism", map[string]any{
 			"eoa": map[string]any{
@@ -517,9 +498,28 @@ func newClient(handler http.Handler, opts ...client.Option) *client.Client {
 	return client.New(handler, opts...)
 }
 
+type operations map[string]string
+
+// Op returns the named operation and fails if the operation does not exist
+func (o operations) Op(name string) string {
+	op, ok := o[name]
+	if !ok {
+		panic(fmt.Sprintf("`%s` does not exist", name))
+	}
+	return op
+}
+
+func loadOperations(filePath string) operations {
+	ops, err := readOperationsFromFile(loadGeneratedSchema(), filePath)
+	if err != nil {
+		panic(err)
+	}
+	return ops
+}
+
 // readOperationsFromFile reads in a file of named GraphQL operations, validates them against a schema,
 // and returns a mapping of operation names to operations. All GraphQL operations in the file must have names.
-func readOperationsFromFile(schema *ast.Schema, filePath string) (map[string]string, error) {
+func readOperationsFromFile(schema *ast.Schema, filePath string) (operations, error) {
 	ops := make(map[string]string)
 
 	data, err := os.ReadFile(filePath)
