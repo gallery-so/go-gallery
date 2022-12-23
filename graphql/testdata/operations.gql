@@ -1,169 +1,169 @@
 query userByUsernameQuery($user: String!) {
-	userByUsername(username: $user) {
-		... on Error {
-			__typename
-			message
-		}
-		... on GalleryUser {
-			username
-			dbid
-		}
-	}
+  userByUsername(username: $user) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on GalleryUser {
+      username
+      dbid
+    }
+  }
 }
 
 query userByIdQuery($id: DBID!) {
-	userById(id: $id) {
-		... on Error {
-			__typename
-			message
-		}
-		... on GalleryUser {
-			username
-			dbid
-		}
-	}
+  userById(id: $id) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on GalleryUser {
+      username
+      dbid
+    }
+  }
 }
 
 query userByAddressQuery($input: ChainAddressInput!) {
-	userByAddress(chainAddress: $input) {
-		... on Error {
-			__typename
-			message
-		}
-		... on GalleryUser {
-			username
-			dbid
-		}
-	}
+  userByAddress(chainAddress: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on GalleryUser {
+      username
+      dbid
+    }
+  }
 }
 
 query viewerQuery {
-	viewer {
-		... on Error {
-			__typename
-			message
-		}
-		... on Viewer {
-			user {
-				username
-				dbid
-			}
-		}
-	}
+  viewer {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on Viewer {
+      user {
+        username
+        dbid
+      }
+    }
+  }
 }
 
 mutation createUserMutation(
-	$authMechanism: AuthMechanism!
-	$username: String!
-	$bio: String
-	$email: Email
+  $authMechanism: AuthMechanism!
+  $username: String!
+  $bio: String
+  $email: Email
 ) {
-	createUser(
-		authMechanism: $authMechanism
-		username: $username
-		bio: $bio
-		email: $email
-	) {
-		... on Error {
-			__typename
-		  message
-		}
-		... on CreateUserPayload {
-			viewer {
-				user {
-					username
-					dbid
-					bio
-				}
-			}
-		}
-	}
+  createUser(
+    authMechanism: $authMechanism
+    username: $username
+    bio: $bio
+    email: $email
+  ) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CreateUserPayload {
+      viewer {
+        user {
+          username
+          dbid
+          bio
+        }
+      }
+    }
+  }
 }
 
 mutation getAuthNonceMutation($input: ChainAddressInput!) {
-	getAuthNonce(chainAddress: $input) {
-		... on Error {
-			__typename
-			message
-		}
-		... on AuthNonce {
-			nonce
-			userExists
-		}
-	}
+  getAuthNonce(chainAddress: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AuthNonce {
+      nonce
+      userExists
+    }
+  }
 }
 
 mutation loginMutation($authMechanism: AuthMechanism!) {
-	login(authMechanism: $authMechanism) {
-		... on Error {
-			__typename
-			message
-		}
-		... on LoginPayload {
-			viewer {
-				user {
-					username
-					dbid
-				}
-			}
-		}
-	}
+  login(authMechanism: $authMechanism) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on LoginPayload {
+      viewer {
+        user {
+          username
+          dbid
+        }
+      }
+    }
+  }
 }
 
 mutation logoutMutation {
-	logout {
-		viewer {
-			user {
-				username
-				dbid
-			}
-		}
-	}
+  logout {
+    viewer {
+      user {
+        username
+        dbid
+      }
+    }
+  }
 }
 
 mutation addUserWalletMutation(
-	$chainAddress: ChainAddressInput!
-	$authMechanism: AuthMechanism!
+  $chainAddress: ChainAddressInput!
+  $authMechanism: AuthMechanism!
 ) {
-	addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
-		... on Error {
-			__typename
-			message
-		}
-		... on AddUserWalletPayload {
-			viewer {
-				user {
-					wallets {
-						dbid
-						chainAddress {
-							address
-							chain
-						}
-					}
-				}
-			}
-		}
-	}
+  addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AddUserWalletPayload {
+      viewer {
+        user {
+          wallets {
+            dbid
+            chainAddress {
+              address
+              chain
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 mutation removeUserWalletsMutation($walletIds: [DBID!]!) {
-	removeUserWallets(walletIds: $walletIds) {
-		... on Error {
-			__typename
-			message
-		}
-		... on RemoveUserWalletsPayload {
-			viewer {
-				user {
-					wallets {
-						dbid
-						chainAddress {
-							address
-							chain
-						}
-					}
-				}
-			}
-		}
-	}
+  removeUserWallets(walletIds: $walletIds) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on RemoveUserWalletsPayload {
+      viewer {
+        user {
+          wallets {
+            dbid
+            chainAddress {
+              address
+              chain
+            }
+          }
+        }
+      }
+    }
+  }
 }
