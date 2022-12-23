@@ -7,24 +7,21 @@ package coredb
 
 import (
 	"context"
-	"database/sql"
-	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 const galleryRepoAddCollections = `-- name: GalleryRepoAddCollections :execrows
-update galleries set collections = $2::text[] || collections where id = $3 and owner_user_id = $1
+update galleries set last_updated = now(), collections = $1::text[] || collections where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = coalesce(array_length($1, 1), 0)
 `
 
 type GalleryRepoAddCollectionsParams struct {
-	OwnerUserID   persist.DBID
 	CollectionIds []string
 	GalleryID     persist.DBID
 }
 
 func (q *Queries) GalleryRepoAddCollections(ctx context.Context, arg GalleryRepoAddCollectionsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, galleryRepoAddCollections, arg.OwnerUserID, arg.CollectionIds, arg.GalleryID)
+	result, err := q.db.Exec(ctx, galleryRepoAddCollections, arg.CollectionIds, arg.GalleryID)
 	if err != nil {
 		return 0, err
 	}
@@ -71,30 +68,58 @@ func (q *Queries) GalleryRepoCountColls(ctx context.Context, id persist.DBID) (i
 }
 
 const galleryRepoCreate = `-- name: GalleryRepoCreate :one
-insert into galleries (id, version, collections, owner_user_id) values ($1, $2, $3, $4) returning id
+insert into galleries (id, owner_user_id, name, description, position) values ($1, $2, $3, $4, $5) returning id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position
 `
 
 type GalleryRepoCreateParams struct {
-	ID          persist.DBID
-	Version     sql.NullInt32
-	Collections persist.DBIDList
+	GalleryID   persist.DBID
+	OwnerUserID persist.DBID
+	Name        string
+	Description string
+	Position    string
+}
+
+func (q *Queries) GalleryRepoCreate(ctx context.Context, arg GalleryRepoCreateParams) (Gallery, error) {
+	row := q.db.QueryRow(ctx, galleryRepoCreate,
+		arg.GalleryID,
+		arg.OwnerUserID,
+		arg.Name,
+		arg.Description,
+		arg.Position,
+	)
+	var i Gallery
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Version,
+		&i.OwnerUserID,
+		&i.Collections,
+		&i.Name,
+		&i.Description,
+		&i.Hidden,
+		&i.Position,
+	)
+	return i, err
+}
+
+const galleryRepoDelete = `-- name: GalleryRepoDelete :exec
+update galleries set deleted = true where galleries.id = $1 and (select count(*) from galleries g where g.owner_user_id = $2 and g.deleted = false and not g.id = $1) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = $2), '') = $1
+`
+
+type GalleryRepoDeleteParams struct {
+	GalleryID   persist.DBID
 	OwnerUserID persist.DBID
 }
 
-func (q *Queries) GalleryRepoCreate(ctx context.Context, arg GalleryRepoCreateParams) (persist.DBID, error) {
-	row := q.db.QueryRow(ctx, galleryRepoCreate,
-		arg.ID,
-		arg.Version,
-		arg.Collections,
-		arg.OwnerUserID,
-	)
-	var id persist.DBID
-	err := row.Scan(&id)
-	return id, err
+func (q *Queries) GalleryRepoDelete(ctx context.Context, arg GalleryRepoDeleteParams) error {
+	_, err := q.db.Exec(ctx, galleryRepoDelete, arg.GalleryID, arg.OwnerUserID)
+	return err
 }
 
 const galleryRepoGetByUserIDRaw = `-- name: GalleryRepoGetByUserIDRaw :many
-select id, deleted, last_updated, created_at, version, owner_user_id, collections from galleries g where g.owner_user_id = $1 and g.deleted = false
+select id, deleted, last_updated, created_at, version, owner_user_id, collections, name, description, hidden, position from galleries g where g.owner_user_id = $1 and g.deleted = false order by position
 `
 
 func (q *Queries) GalleryRepoGetByUserIDRaw(ctx context.Context, ownerUserID persist.DBID) ([]Gallery, error) {
@@ -114,34 +139,14 @@ func (q *Queries) GalleryRepoGetByUserIDRaw(ctx context.Context, ownerUserID per
 			&i.Version,
 			&i.OwnerUserID,
 			&i.Collections,
+			&i.Name,
+			&i.Description,
+			&i.Hidden,
+			&i.Position,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const galleryRepoGetCollections = `-- name: GalleryRepoGetCollections :many
-select id from collections where owner_user_id = $1 and deleted = false
-`
-
-func (q *Queries) GalleryRepoGetCollections(ctx context.Context, ownerUserID persist.DBID) ([]persist.DBID, error) {
-	rows, err := q.db.Query(ctx, galleryRepoGetCollections, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []persist.DBID
-	for rows.Next() {
-		var id persist.DBID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -209,23 +214,16 @@ func (q *Queries) GalleryRepoGetPreviewsForUserID(ctx context.Context, arg Galle
 }
 
 const galleryRepoUpdate = `-- name: GalleryRepoUpdate :execrows
-update galleries set last_updated = $1, collections = $2 where id = $4 and owner_user_id = $3
+update galleries set last_updated = now(), collections = $1 where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = coalesce(array_length($1, 1), 0)
 `
 
 type GalleryRepoUpdateParams struct {
-	LastUpdated time.Time
-	Collections persist.DBIDList
-	OwnerUserID persist.DBID
-	GalleryID   persist.DBID
+	CollectionIds persist.DBIDList
+	GalleryID     persist.DBID
 }
 
 func (q *Queries) GalleryRepoUpdate(ctx context.Context, arg GalleryRepoUpdateParams) (int64, error) {
-	result, err := q.db.Exec(ctx, galleryRepoUpdate,
-		arg.LastUpdated,
-		arg.Collections,
-		arg.OwnerUserID,
-		arg.GalleryID,
-	)
+	result, err := q.db.Exec(ctx, galleryRepoUpdate, arg.CollectionIds, arg.GalleryID)
 	if err != nil {
 		return 0, err
 	}

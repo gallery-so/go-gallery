@@ -1,8 +1,8 @@
 # Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
-    forceResolver: Boolean
-    name: String
+  forceResolver: Boolean
+  name: String
 ) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
 # Add @authRequired to any field that requires a user to be logged in. NOTE: Any field tagged with
@@ -23,7 +23,9 @@ directive @scrub on INPUT_FIELD_DEFINITION
 # Use @restrictEnvironment to choose which values of the ENV environment variable the annotated field/object
 # should be usable in (case-insensitive). Example: @restrictEnvironment(allowed:["local", "development"]) would
 # allow a field in "local" and "development" environments but not in "production"
-directive @restrictEnvironment(allowed:[String!]!) on INPUT_FIELD_DEFINITION | INPUT_OBJECT | FIELD_DEFINITION | OBJECT
+directive @restrictEnvironment(
+  allowed: [String!]!
+) on INPUT_FIELD_DEFINITION | INPUT_OBJECT | FIELD_DEFINITION | OBJECT
 
 # All types that implement Node must have a unique GqlID set in their "id" field. For types with
 # a "dbid" field, it's assumed that we can synthesize a unique ID from the type name and the dbid,
@@ -47,51 +49,57 @@ scalar DBID
 scalar Email
 
 interface Node {
-    id: ID!
+  id: ID!
+}
+
+type DeletedNode implements Node {
+  id: ID!
+  dbid: DBID!
 }
 
 interface Error {
-    message: String!
+  message: String!
 }
 
-type GalleryUser implements Node {
-    id: ID!
-    dbid: DBID!
-    username: String
-    bio: String
-    traits: String
-    universal: Boolean
-    roles: [Role] @goField(forceResolver: true)
+type GalleryUser implements Node @goEmbedHelper {
+  id: ID!
+  dbid: DBID!
+  username: String
+  bio: String
+  traits: String
+  universal: Boolean
+  roles: [Role] @goField(forceResolver: true)
 
-    # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
-    # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
-    # that appears in more than one of the user's wallets.
-    tokens: [Token] @goField(forceResolver: true)
-    tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
+  # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
+  # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
+  # that appears in more than one of the user's wallets.
+  tokens: [Token] @goField(forceResolver: true)
+  tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
-    wallets: [Wallet] @goField(forceResolver: true)
-    galleries: [Gallery] @goField(forceResolver: true)
-    badges: [Badge] @goField(forceResolver: true)
-    isAuthenticatedUser: Boolean
-    followers: [GalleryUser] @goField(forceResolver: true)
-    following: [GalleryUser] @goField(forceResolver: true)
-    feed(before: String, after: String, first: Int, last: Int): FeedConnection @goField(forceResolver: true)
+  wallets: [Wallet] @goField(forceResolver: true)
+  featuredGallery: Gallery @goField(forceResolver: true)
+  galleries: [Gallery] @goField(forceResolver: true)
+  badges: [Badge] @goField(forceResolver: true)
+  isAuthenticatedUser: Boolean
+  followers: [GalleryUser] @goField(forceResolver: true)
+  following: [GalleryUser] @goField(forceResolver: true)
+  feed(before: String, after: String, first: Int, last: Int): FeedConnection
+    @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
-    id: ID!
-    dbid: DBID!
-    chainAddress: ChainAddress
-    chain: Chain
-    walletType: WalletType
-    tokens: [Token] @goField(forceResolver: true)
+  id: ID!
+  dbid: DBID!
+  chainAddress: ChainAddress
+  chain: Chain
+  walletType: WalletType
+  tokens: [Token] @goField(forceResolver: true)
 }
 
 type ChainAddress {
-    address: Address
-    chain: Chain
+  address: Address
+  chain: Chain
 }
-
 
 type ChainPubKey {
   pubKey: PubKey
@@ -99,24 +107,24 @@ type ChainPubKey {
 }
 
 type ChainTokens {
-    chain: Chain
-    tokens: [Token]
+  chain: Chain
+  tokens: [Token]
 }
 
 input ChainAddressInput {
-    address: Address! @goField(forceResolver: true)
-    chain: Chain! @goField(forceResolver: true)
+  address: Address! @goField(forceResolver: true)
+  chain: Chain! @goField(forceResolver: true)
 }
 
 input ChainPubKeyInput {
-    pubKey: PubKey! @goField(forceResolver: true)
-    chain: Chain! @goField(forceResolver: true)
+  pubKey: PubKey! @goField(forceResolver: true)
+  chain: Chain! @goField(forceResolver: true)
 }
 
 type Badge {
-    name: String
-    imageURL: String!
-    contract: Contract
+  name: String
+  imageURL: String!
+  contract: Contract
 }
 
 union GalleryUserOrWallet = GalleryUser | Wallet
@@ -138,42 +146,42 @@ union MediaSubtype =
   | InvalidMedia
 
 type PreviewURLSet {
-    raw: String
-    thumbnail: String
-    small: String
-    medium: String
-    large: String
-    srcSet: String
+  raw: String
+  thumbnail: String
+  small: String
+  medium: String
+  large: String
+  srcSet: String
 }
 
 type VideoURLSet {
-    raw: String
-    small: String
-    medium: String
-    large: String
+  raw: String
+  small: String
+  medium: String
+  large: String
 }
 
 interface Media {
-    # Various sizes of preview images for the media
-    previewURLs: PreviewURLSet
+  # Various sizes of preview images for the media
+  previewURLs: PreviewURLSet
 
-    # The original source URL for the media (may be IPFS, etc)
-    mediaURL: String
+  # The original source URL for the media (may be IPFS, etc)
+  mediaURL: String
 
-    # The type of media, as determined by the backend. May be redundant given the approach we're using here
-    # (media subtypes implementing the Media interface)
-    mediaType: String
+  # The type of media, as determined by the backend. May be redundant given the approach we're using here
+  # (media subtypes implementing the Media interface)
+  mediaType: String
 
-    # All Media types will also have something like contentRenderURL or contentRenderURLs,
-    # which are the URL(s) that should actually be used for rendering the media's content
+  # All Media types will also have something like contentRenderURL or contentRenderURLs,
+  # which are the URL(s) that should actually be used for rendering the media's content
 }
 
 type ImageMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 type GIFMedia implements Media {
@@ -185,27 +193,27 @@ type GIFMedia implements Media {
 }
 
 type VideoMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURLs: VideoURLSet
+  contentRenderURLs: VideoURLSet
 }
 
 type AudioMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 type TextMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 type PdfMedia implements Media {
@@ -217,35 +225,35 @@ type PdfMedia implements Media {
 }
 
 type HtmlMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 type JsonMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 type GltfMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 type UnknownMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 type SyncingMedia implements Media {
@@ -257,131 +265,136 @@ type SyncingMedia implements Media {
 }
 
 type InvalidMedia implements Media {
-    previewURLs: PreviewURLSet
-    mediaURL: String
-    mediaType: String
+  previewURLs: PreviewURLSet
+  mediaURL: String
+  mediaType: String
 
-    contentRenderURL: String
+  contentRenderURL: String
 }
 
 enum TokenType {
-    ERC721
-    ERC1155
-    ERC20
+  ERC721
+  ERC1155
+  ERC20
 }
 
 enum Chain {
-    Ethereum
-    Arbitrum
-    Polygon
-    Optimism
-    Tezos
-    POAP
+  Ethereum
+  Arbitrum
+  Polygon
+  Optimism
+  Tezos
+  POAP
 }
 
 enum WalletType {
-    EOA
-    GnosisSafe
+  EOA
+  GnosisSafe
 }
 
 enum InteractionType {
-    Admire
-    Comment
+  Admire
+  Comment
 }
 
 type Token implements Node {
-    id: ID!
-    dbid: DBID!
-    creationTime: Time
-    lastUpdated: Time
-    collectorsNote: String
-    media: MediaSubtype
-    tokenType: TokenType
-    chain: Chain
-    name: String
-    description: String
-    tokenId: String
-    quantity: String # source is a hex string
-    owner: GalleryUser @goField(forceResolver: true)
-    ownedByWallets: [Wallet] @goField(forceResolver: true)
-    ownershipHistory: [OwnerAtBlock]
-    tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
-    contract: Contract @goField(forceResolver: true)
-    externalUrl: String
-    blockNumber: String # source is uint64
-    isSpamByUser: Boolean
-    isSpamByProvider: Boolean
-    # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
-    # struct and may ultimately end up elsewhere
-    creatorAddress: ChainAddress
-    openseaCollectionName: String
+  id: ID!
+  dbid: DBID!
+  creationTime: Time
+  lastUpdated: Time
+  collectorsNote: String
+  media: MediaSubtype
+  tokenType: TokenType
+  chain: Chain
+  name: String
+  description: String
+  tokenId: String
+  quantity: String # source is a hex string
+  owner: GalleryUser @goField(forceResolver: true)
+  ownedByWallets: [Wallet] @goField(forceResolver: true)
+  ownershipHistory: [OwnerAtBlock]
+  tokenMetadata: String # source is map[string]interface{} on backend, not sure what best format is here
+  contract: Contract @goField(forceResolver: true)
+  externalUrl: String
+  blockNumber: String # source is uint64
+  isSpamByUser: Boolean
+  isSpamByProvider: Boolean
+  # These are subject to change; unlike the other fields, they aren't present on the current persist.Token
+  # struct and may ultimately end up elsewhere
+  creatorAddress: ChainAddress
+  openseaCollectionName: String
 
-    # temporary field while we're dependent on opensea
-    openseaId: Int
+  # temporary field while we're dependent on opensea
+  openseaId: Int
 }
 
 type OwnerAtBlock {
-    # TODO: will need to store addresses to make this resolver work
-    owner: GalleryUserOrAddress @goField(forceResolver: true)
-    blockNumber: String # source is uint64
+  # TODO: will need to store addresses to make this resolver work
+  owner: GalleryUserOrAddress @goField(forceResolver: true)
+  blockNumber: String # source is uint64
 }
 
 type CollectionToken implements Node
-@goEmbedHelper
-@goGqlId(fields: ["tokenId", "collectionId"]) {
-    id: ID!
-    token: Token
-    collection: Collection
-    tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
+  @goEmbedHelper
+  @goGqlId(fields: ["tokenId", "collectionId"]) {
+  id: ID!
+  token: Token
+  collection: Collection
+  tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
 }
 
 type CollectionLayout {
-    sections: [Int]
-    sectionLayout: [CollectionSectionLayout]
+  sections: [Int]
+  sectionLayout: [CollectionSectionLayout]
 }
 
 type CollectionSectionLayout {
-    columns: Int
-    whitespace: [Int]
+  columns: Int
+  whitespace: [Int]
 }
 
 type CollectionTokenSettings {
-    renderLive: Boolean
+  renderLive: Boolean
 }
 
 type Collection implements Node {
-    id: ID!
-    dbid: DBID!
-    version: Int
-    name: String
-    collectorsNote: String
-    gallery: Gallery @goField(forceResolver: true)
-    layout: CollectionLayout
-    hidden: Boolean
-    tokens(limit: Int): [CollectionToken] @goField(forceResolver: true)
+  id: ID!
+  dbid: DBID!
+  version: Int
+  name: String
+  collectorsNote: String
+  gallery: Gallery @goField(forceResolver: true)
+  layout: CollectionLayout
+  hidden: Boolean
+  tokens(limit: Int): [CollectionToken] @goField(forceResolver: true)
 }
 
 type Gallery implements Node {
-    id: ID!
-    dbid: DBID!
-    owner: GalleryUser @goField(forceResolver: true)
-    collections: [Collection] @goField(forceResolver: true)
+  id: ID!
+  dbid: DBID!
+  name: String
+  description: String
+  position: String
+  hidden: Boolean
+  tokenPreviews: [String] @goField(forceResolver: true)
+  owner: GalleryUser @goField(forceResolver: true)
+  collections: [Collection] @goField(forceResolver: true)
 }
 
 type TokenHolder @goEmbedHelper {
-    displayName: String
-    wallets: [Wallet] @goField(forceResolver: true)
-    user: GalleryUser @goField(forceResolver: true)
-    previewTokens: [String]
+  displayName: String
+  wallets: [Wallet] @goField(forceResolver: true)
+  user: GalleryUser @goField(forceResolver: true)
+  previewTokens: [String]
 }
 
 type MembershipTier implements Node {
-    id: ID!
-    dbid: DBID!
-    name: String
-    assetUrl: String
-    tokenId: String
-    owners: [TokenHolder]
+  id: ID!
+  dbid: DBID!
+  name: String
+  assetUrl: String
+  tokenId: String
+  owners: [TokenHolder]
 }
 
 type TokenEdge {
@@ -422,44 +435,57 @@ type Community implements Node
   profileBannerURL: String
   badgeURL: String
 
-  tokensInCommunity(before: String, after: String, first: Int, last: Int, onlyGalleryUsers: Boolean): TokensConnection @goField(forceResolver: true)
+  tokensInCommunity(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    onlyGalleryUsers: Boolean
+  ): TokensConnection @goField(forceResolver: true)
 
-  owners(before: String, after: String, first: Int, last: Int, onlyGalleryUsers: Boolean): TokenHoldersConnection @goField(forceResolver: true)
+  owners(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    onlyGalleryUsers: Boolean
+  ): TokenHoldersConnection @goField(forceResolver: true)
 }
 
 type Contract implements Node {
-    id: ID!
-    dbid: DBID!
+  id: ID!
+  dbid: DBID!
 
-    lastUpdated: Time
+  lastUpdated: Time
 
-    contractAddress: ChainAddress
-    creatorAddress: ChainAddress
-    chain: Chain
-    name: String
-    profileImageURL: String
-    profileBannerURL: String
-    badgeURL: String
+  contractAddress: ChainAddress
+  creatorAddress: ChainAddress
+  chain: Chain
+  name: String
+  profileImageURL: String
+  profileBannerURL: String
+  badgeURL: String
 }
 
 # We have this extra type in case we need to stick authed data
 # in here one day.
 type ViewerGallery {
-    gallery: Gallery
+  gallery: Gallery
 }
 
 type NotificationEdge {
-    node: Notification
-    cursor: String
+  node: Notification
+  cursor: String
 }
 
 type NotificationsConnection @goEmbedHelper {
-    edges: [NotificationEdge]
-    unseenCount: Int
-    pageInfo: PageInfo
+  edges: [NotificationEdge]
+  unseenCount: Int
+  pageInfo: PageInfo
 }
 
-type Viewer {
+type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
+  id: ID!
   user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
@@ -495,36 +521,36 @@ input NotificationSettingsInput {
 }
 
 enum EmailVerificationStatus {
-    Unverified
-    Verified
-    Failed
-    Admin
+  Unverified
+  Verified
+  Failed
+  Admin
 }
 
 enum EmailUnsubscriptionType {
-    All
-    Notifications
+  All
+  Notifications
 }
 
 type UserEmail {
-    email: Email
-    verificationStatus: EmailVerificationStatus
-    emailNotificationSettings: EmailNotificationSettings
+  email: Email
+  verificationStatus: EmailVerificationStatus
+  emailNotificationSettings: EmailNotificationSettings
 }
 
 type EmailNotificationSettings {
-    unsubscribedFromAll: Boolean!
-    unsubscribedFromNotifications: Boolean!
+  unsubscribedFromAll: Boolean!
+  unsubscribedFromNotifications: Boolean!
 }
 
 input UpdateEmailNotificationSettingsInput {
-    unsubscribedFromAll: Boolean!
-    unsubscribedFromNotifications: Boolean!
+  unsubscribedFromAll: Boolean!
+  unsubscribedFromNotifications: Boolean!
 }
 
 input UnsubscribeFromEmailTypeInput {
-    type: EmailUnsubscriptionType!
-    token: String! @scrub
+  type: EmailUnsubscriptionType!
+  token: String! @scrub
 }
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
@@ -536,227 +562,243 @@ union UserByAddressOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
 union ViewerOrError = Viewer | ErrNotAuthorized
 
 type ErrCollectionNotFound implements Error {
-    message: String!
+  message: String!
 }
 
 union TokenByIdOrError = Token | ErrTokenNotFound
 
 type ErrTokenNotFound implements Error {
-    message: String!
+  message: String!
 }
 
-union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInput
+union CollectionByIdOrError =
+    Collection
+  | ErrCollectionNotFound
+  | ErrInvalidInput
 
 union CollectionTokenByIdOrError =
     CollectionToken
-    | ErrCollectionNotFound
-    | ErrTokenNotFound
+  | ErrCollectionNotFound
+  | ErrTokenNotFound
 
-union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
+union CommunityByAddressOrError =
+    Community
+  | ErrCommunityNotFound
+  | ErrInvalidInput
 
 type Admire implements Node {
-    id: ID!
-    dbid: DBID!
-    creationTime: Time
-    lastUpdated: Time
-    admirer: GalleryUser @goField(forceResolver: true)
-    # should we include the feed event here?
+  id: ID!
+  dbid: DBID!
+  creationTime: Time
+  lastUpdated: Time
+  admirer: GalleryUser @goField(forceResolver: true)
+  # should we include the feed event here?
 }
 
 type Comment implements Node {
-    id: ID!
-    dbid: DBID!
-    creationTime: Time
-    lastUpdated: Time
-    replyTo: Comment @goField(forceResolver: true)
-    commenter: GalleryUser @goField(forceResolver: true)
-    comment: String
-    # should we include the feed event here?
+  id: ID!
+  dbid: DBID!
+  creationTime: Time
+  lastUpdated: Time
+  replyTo: Comment @goField(forceResolver: true)
+  commenter: GalleryUser @goField(forceResolver: true)
+  comment: String
+  # should we include the feed event here?
 }
 
 # Actions a user can take on a resource
 enum Action {
-    UserCreated
-    UserFollowedUsers
-    CollectorsNoteAddedtoToken
-    CollectionCreated
-    CollectorsNoteAddedToCollection
-    TokensAddedToCollection
+  UserCreated
+  UserFollowedUsers
+  CollectorsNoteAddedtoToken
+  CollectionCreated
+  CollectorsNoteAddedToCollection
+  TokensAddedToCollection
 }
 
 type FollowInfo {
-    user: GalleryUser @goField(forceResolver: true)
-    followedBack: Boolean
+  user: GalleryUser @goField(forceResolver: true)
+  followedBack: Boolean
 }
 
 type FeedEventAdmireEdge {
-    node: Admire
-    event: FeedEvent
-    cursor: String
+  node: Admire
+  event: FeedEvent
+  cursor: String
 }
 
 type FeedEventAdmiresConnection {
-    edges: [FeedEventAdmireEdge]
-    pageInfo: PageInfo!
-
+  edges: [FeedEventAdmireEdge]
+  pageInfo: PageInfo!
 }
 
 type FeedEventCommentEdge {
-    node: Comment
-    event: FeedEvent
-    cursor: String
+  node: Comment
+  event: FeedEvent
+  cursor: String
 }
 
 type FeedEventCommentsConnection {
-    edges: [FeedEventCommentEdge]
-    pageInfo: PageInfo!
+  edges: [FeedEventCommentEdge]
+  pageInfo: PageInfo!
 }
 
 union Interaction = Admire | Comment
 
 type FeedEventInteractionsEdge {
-    node: Interaction
-    event: FeedEvent
-    cursor: String
+  node: Interaction
+  event: FeedEvent
+  cursor: String
 }
 
 type FeedEventInteractionsConnection {
-    edges: [FeedEventInteractionsEdge]
-    pageInfo: PageInfo!
+  edges: [FeedEventInteractionsEdge]
+  pageInfo: PageInfo!
 }
 
 interface FeedEventData {
-    eventTime: Time
-    owner: GalleryUser
-    action: Action
+  eventTime: Time
+  owner: GalleryUser
+  action: Action
 }
 
 type FeedEvent implements Node {
-    id: ID!
-    dbid: DBID!
+  id: ID!
+  dbid: DBID!
 
-    eventData: FeedEventData @goField(forceResolver: true)
-    admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection @goField(forceResolver: true)
-    comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection @goField(forceResolver: true)
-    caption: String
+  eventData: FeedEventData @goField(forceResolver: true)
+  admires(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): FeedEventAdmiresConnection @goField(forceResolver: true)
+  comments(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): FeedEventCommentsConnection @goField(forceResolver: true)
+  caption: String
 
-    # If supplied, typeFilter will only query for the requested interaction types.
-    # If typeFilter is omitted, all interaction types will be queried.
-    interactions(before: String, after: String, first: Int, last: Int, typeFilter:[InteractionType!]): FeedEventInteractionsConnection @goField(forceResolver: true)
+  # If supplied, typeFilter will only query for the requested interaction types.
+  # If typeFilter is omitted, all interaction types will be queried.
+  interactions(
+    before: String
+    after: String
+    first: Int
+    last: Int
+    typeFilter: [InteractionType!]
+  ): FeedEventInteractionsConnection @goField(forceResolver: true)
 
-    viewerAdmire: Admire @goField(forceResolver: true)
+  viewerAdmire: Admire @goField(forceResolver: true)
 
-    # TODO: This is just here while we migrate the frontend over to viewerAdmire.
-    # Remove this in the near future.
-    hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
+  # TODO: This is just here while we migrate the frontend over to viewerAdmire.
+  # Remove this in the near future.
+  hasViewerAdmiredEvent: Boolean @goField(forceResolver: true)
 }
 
 type UserCreatedFeedEventData implements FeedEventData {
-    eventTime: Time
-    owner: GalleryUser @goField(forceResolver: true)
-    action: Action
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
 }
 
 type UserFollowedUsersFeedEventData implements FeedEventData {
-    eventTime: Time
-    owner: GalleryUser @goField(forceResolver: true)
-    action: Action
-    followed: [FollowInfo]
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  followed: [FollowInfo]
 }
 
 type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
-    eventTime: Time
-    owner: GalleryUser @goField(forceResolver: true)
-    action: Action
-    token: CollectionToken @goField(forceResolver: true)
-    newCollectorsNote: String
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  token: CollectionToken @goField(forceResolver: true)
+  newCollectorsNote: String
 }
 
 type CollectionCreatedFeedEventData implements FeedEventData @goEmbedHelper {
-    eventTime: Time
-    owner: GalleryUser @goField(forceResolver: true)
-    action: Action
-    collection: Collection @goField(forceResolver: true)
-    newTokens: [CollectionToken] @goField(forceResolver: true)
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  collection: Collection @goField(forceResolver: true)
+  newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
 type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
-    eventTime: Time
-    owner: GalleryUser @goField(forceResolver: true)
-    action: Action
-    collection: Collection @goField(forceResolver: true)
-    newCollectorsNote: String
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  collection: Collection @goField(forceResolver: true)
+  newCollectorsNote: String
 }
 
-type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelper {
-    eventTime: Time
-    owner: GalleryUser @goField(forceResolver: true)
-    collection: Collection @goField(forceResolver: true)
-    action: Action
-    newTokens: [CollectionToken] @goField(forceResolver: true)
-    isPreFeed: Boolean
+type TokensAddedToCollectionFeedEventData implements FeedEventData
+  @goEmbedHelper {
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  collection: Collection @goField(forceResolver: true)
+  action: Action
+  newTokens: [CollectionToken] @goField(forceResolver: true)
+  isPreFeed: Boolean
 }
 
 type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
-    eventTime: Time
-    owner: GalleryUser @goField(forceResolver: true)
-    action: Action
-    collection: Collection @goField(forceResolver: true)
-    newCollectorsNote: String
-    newTokens: [CollectionToken] @goField(forceResolver: true)
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  collection: Collection @goField(forceResolver: true)
+  newCollectorsNote: String
+  newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
 type ErrUnknownAction implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrFeedEventNotFound implements Error {
-    message: String!
+  message: String!
 }
 
-union FeedEventOrError =
-    FeedEvent
-    | ErrFeedEventNotFound
-    | ErrUnknownAction
+union FeedEventOrError = FeedEvent | ErrFeedEventNotFound | ErrUnknownAction
 
-union FeedEventByIdOrError =
-    FeedEvent
-    | ErrFeedEventNotFound
-    | ErrUnknownAction
+union FeedEventByIdOrError = FeedEvent | ErrFeedEventNotFound | ErrUnknownAction
 
 type PageInfo {
-    total: Int
-    size: Int!
-    hasPreviousPage: Boolean!
-    hasNextPage: Boolean!
-    startCursor: String!
-    endCursor: String!
+  total: Int
+  size: Int!
+  hasPreviousPage: Boolean!
+  hasNextPage: Boolean!
+  startCursor: String!
+  endCursor: String!
 }
 
 type FeedEdge {
-    node: FeedEventOrError
-    cursor: String
+  node: FeedEventOrError
+  cursor: String
 }
 
 type FeedConnection {
-    edges: [FeedEdge]
-    pageInfo: PageInfo!
+  edges: [FeedEdge]
+  pageInfo: PageInfo!
 }
 
 type UserEdge {
-    node: GalleryUser
-    cursor: String
+  node: GalleryUser
+  cursor: String
 }
 
 type UsersConnection {
-    edges: [UserEdge]
-    pageInfo: PageInfo!
+  edges: [UserEdge]
+  pageInfo: PageInfo!
 }
 
 enum Role {
-    ADMIN
-    BETA_TESTER
-    EARLY_ACCESS
+  ADMIN
+  BETA_TESTER
+  EARLY_ACCESS
 }
 
 enum MerchType {
@@ -780,207 +822,224 @@ type MerchTokensPayload {
 union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
 
 type Query {
-    node(id: ID!): Node
-    viewer: ViewerOrError @authRequired
-    userByUsername(username: String!): UserByUsernameOrError
-    userById(id: DBID!): UserByIdOrError
-    userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
-    usersWithTrait(trait: String!): [GalleryUser]
-    membershipTiers(forceRefresh: Boolean): [MembershipTier]
-    collectionById(id: DBID!): CollectionByIdOrError
-    collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
-    tokenById(id: DBID!): TokenByIdOrError
-    collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
-    communityByAddress(communityAddress: ChainAddressInput!, forceRefresh: Boolean): CommunityByAddressOrError
-    generalAllowlist: [ChainAddress!]
-    galleryOfTheWeekWinners: [GalleryUser!]
-    globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
-    feedEventById(id: DBID!): FeedEventByIdOrError
-    getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
+  node(id: ID!): Node
+  viewer: ViewerOrError @authRequired
+  userByUsername(username: String!): UserByUsernameOrError
+  userById(id: DBID!): UserByIdOrError
+  userByAddress(chainAddress: ChainAddressInput!): UserByAddressOrError
+  usersWithTrait(trait: String!): [GalleryUser]
+  membershipTiers(forceRefresh: Boolean): [MembershipTier]
+  collectionById(id: DBID!): CollectionByIdOrError
+  collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
+  tokenById(id: DBID!): TokenByIdOrError
+  collectionTokenById(
+    tokenId: DBID!
+    collectionId: DBID!
+  ): CollectionTokenByIdOrError
+  communityByAddress(
+    communityAddress: ChainAddressInput!
+    forceRefresh: Boolean
+  ): CommunityByAddressOrError
+  generalAllowlist: [ChainAddress!]
+  galleryOfTheWeekWinners: [GalleryUser!]
+  globalFeed(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): FeedConnection
+  feedEventById(id: DBID!): FeedEventByIdOrError
+  getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
 
-    # Retool Specific
-    usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection @retoolAuth
+  # Retool Specific
+  usersByRole(
+    role: Role!
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): UsersConnection @retoolAuth
 }
 
 input CollectionLayoutInput {
-    sections: [Int!]!
-    sectionLayout: [CollectionSectionLayoutInput!]!
+  sections: [Int!]!
+  sectionLayout: [CollectionSectionLayoutInput!]!
 }
 
 input CollectionSectionLayoutInput {
-    columns: Int!
-    whitespace: [Int!]!
+  columns: Int!
+  whitespace: [Int!]!
 }
 
 input CollectionTokenSettingsInput {
-    tokenId: DBID!
-    renderLive: Boolean!
+  tokenId: DBID!
+  renderLive: Boolean!
 }
 
 input CreateCollectionInput {
-    galleryId: DBID!
-    name: String!
-    collectorsNote: String!
-    tokens: [DBID!]!
-    layout: CollectionLayoutInput!
-    tokenSettings: [CollectionTokenSettingsInput!]!
-    caption: String
+  galleryId: DBID!
+  name: String!
+  collectorsNote: String!
+  tokens: [DBID!]!
+  layout: CollectionLayoutInput!
+  tokenSettings: [CollectionTokenSettingsInput!]!
+  caption: String
 }
 
 union CreateCollectionPayloadOrError =
     CreateCollectionPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type CreateCollectionPayload {
-    collection: Collection
-    feedEvent: FeedEvent @goField(forceResolver: true)
+  collection: Collection
+  feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 union DeleteCollectionPayloadOrError =
     DeleteCollectionPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
-    | ErrCollectionNotFound
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrCollectionNotFound
 
 type DeleteCollectionPayload {
-    gallery: Gallery
+  gallery: Gallery
 }
 
 input UpdateCollectionInfoInput {
-    collectionId: DBID!
-    name: String!
-    collectorsNote: String!
+  collectionId: DBID!
+  name: String!
+  collectorsNote: String!
 }
 
 union UpdateCollectionInfoPayloadOrError =
     UpdateCollectionInfoPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateCollectionInfoPayload {
-    collection: Collection
+  collection: Collection
 }
 
 input UpdateCollectionTokensInput {
-    collectionId: DBID!
-    tokens: [DBID!]!
-    layout: CollectionLayoutInput!
-    tokenSettings: [CollectionTokenSettingsInput!]!
-    caption: String
+  collectionId: DBID!
+  tokens: [DBID!]!
+  layout: CollectionLayoutInput!
+  tokenSettings: [CollectionTokenSettingsInput!]!
+  caption: String
 }
 
 union UpdateCollectionTokensPayloadOrError =
     UpdateCollectionTokensPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateCollectionTokensPayload {
-    collection: Collection
-    feedEvent: FeedEvent @goField(forceResolver: true)
+  collection: Collection
+  feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 input UpdateCollectionHiddenInput {
-    collectionId: DBID!
-    hidden: Boolean!
+  collectionId: DBID!
+  hidden: Boolean!
 }
 
 union UpdateCollectionHiddenPayloadOrError =
     UpdateCollectionHiddenPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateCollectionHiddenPayload {
-    collection: Collection
+  collection: Collection
 }
 
 input UpdateGalleryCollectionsInput {
-    galleryId: DBID!
-    collections: [DBID!]!
+  galleryId: DBID!
+  collections: [DBID!]!
 }
 
 union UpdateGalleryCollectionsPayloadOrError =
     UpdateGalleryCollectionsPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateGalleryCollectionsPayload {
-    gallery: Gallery
+  gallery: Gallery
 }
 
 input UpdateTokenInfoInput {
-    tokenId: DBID!
-    collectorsNote: String!
+  tokenId: DBID!
+  collectorsNote: String!
 
-    # Optional (for now). Lets the backend know what collection the token was being edited in.
-    # Currently used to generate feedbot URLs.
-    collectionId: DBID
+  # Optional (for now). Lets the backend know what collection the token was being edited in.
+  # Currently used to generate feedbot URLs.
+  collectionId: DBID
 }
 
 union UpdateTokenInfoPayloadOrError =
     UpdateTokenInfoPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type UpdateTokenInfoPayload {
-    token: Token
+  token: Token
 }
 
 input SetSpamPreferenceInput {
-    tokens: [DBID!]!
-    isSpam: Boolean!
+  tokens: [DBID!]!
+  isSpam: Boolean!
 }
 
 type SetSpamPreferencePayload {
-    tokens: [Token] @goField(forceResolver: true)
+  tokens: [Token] @goField(forceResolver: true)
 }
 
 union SetSpamPreferencePayloadOrError =
     SetSpamPreferencePayload
-    | ErrNotAuthorized
+  | ErrNotAuthorized
 
 union AddUserWalletPayloadOrError =
     AddUserWalletPayload
-    | ErrAuthenticationFailed
-    | ErrNotAuthorized
-    | ErrInvalidInput
-    | ErrAddressOwnedByUser
+  | ErrAuthenticationFailed
+  | ErrNotAuthorized
+  | ErrInvalidInput
+  | ErrAddressOwnedByUser
 
 type AddUserWalletPayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
 union RemoveUserWalletsPayloadOrError =
     RemoveUserWalletsPayload
-    | ErrNotAuthorized
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrInvalidInput
 
 type RemoveUserWalletsPayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
 input UpdateUserInfoInput {
-    username: String!
-    bio: String!
+  username: String!
+  bio: String!
 }
 
 union UpdateUserInfoPayloadOrError =
     UpdateUserInfoPayload
-    | ErrNotAuthorized
-    | ErrUsernameNotAvailable
-    | ErrInvalidInput
+  | ErrNotAuthorized
+  | ErrUsernameNotAvailable
+  | ErrInvalidInput
 
 type UpdateUserInfoPayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
 union SyncTokensPayloadOrError =
     SyncTokensPayload
-    | ErrNotAuthorized
-    | ErrSyncFailed
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type SyncTokensPayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
 union RefreshTokenPayloadOrError =
@@ -989,7 +1048,7 @@ union RefreshTokenPayloadOrError =
   | ErrSyncFailed
 
 type RefreshTokenPayload {
-    token: Token
+  token: Token
 }
 
 union RefreshCollectionPayloadOrError =
@@ -998,7 +1057,7 @@ union RefreshCollectionPayloadOrError =
   | ErrSyncFailed
 
 type RefreshCollectionPayload {
-    collection: Collection
+  collection: Collection
 }
 
 union RefreshContractPayloadOrError =
@@ -1007,185 +1066,190 @@ union RefreshContractPayloadOrError =
   | ErrSyncFailed
 
 type RefreshContractPayload {
-    contract: Contract
+  contract: Contract
 }
 
 type AuthNonce {
-    nonce: String
-    userExists: Boolean
+  nonce: String
+  userExists: Boolean
 }
 
 union GetAuthNoncePayloadOrError = AuthNonce | ErrDoesNotOwnRequiredToken
 
 type ErrAuthenticationFailed implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrUserAlreadyExists implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrUsernameNotAvailable implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrAddressOwnedByUser implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrUserNotFound implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrCommunityNotFound implements Error {
-    message: String!
+  message: String!
 }
 
 union AuthorizationError =
     ErrNoCookie
-    | ErrInvalidToken
-    | ErrDoesNotOwnRequiredToken
+  | ErrInvalidToken
+  | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
-    message: String!
-    cause: AuthorizationError!
+  message: String!
+  cause: AuthorizationError!
 }
 
-
 type ErrInvalidInput implements Error {
-    message: String!
-    parameters: [String!]!
-    reasons: [String!]!
+  message: String!
+  parameters: [String!]!
+  reasons: [String!]!
 }
 
 type ErrNoCookie implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrInvalidToken implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrDoesNotOwnRequiredToken implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrSyncFailed implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrAdmireNotFound implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrAdmireAlreadyExists implements Error {
-    message: String!
+  message: String!
 }
 
 type ErrCommentNotFound implements Error {
-    message: String!
+  message: String!
 }
 
 input AuthMechanism {
-    eoa: EoaAuth
-    gnosisSafe: GnosisSafeAuth
-    debug: DebugAuth
+  eoa: EoaAuth
+  gnosisSafe: GnosisSafeAuth
+  debug: DebugAuth
 }
 
 input EoaAuth {
-    chainPubKey: ChainPubKeyInput!
-    nonce: String!
-    signature: String! @scrub
+  chainPubKey: ChainPubKeyInput!
+  nonce: String!
+  signature: String! @scrub
 }
 
 # DebugAuth is a local-only authentication mechanism for testing and debugging.
 # It creates an authenticator that will return the supplied userId and chainAddresses as if they had been
 # successfully authenticated. For existing users, the asUsername parameter may be supplied as a convenience
 # method to look up and return their userId and chainAddresses.
-input DebugAuth @restrictEnvironment(allowed: ["local"]){
-    # Convenience method to authenticate as an existing user.
-    # Cannot be used in conjunction with the userId and chainAddresses parameters.
-    asUsername: String
+input DebugAuth @restrictEnvironment(allowed: ["local"]) {
+  # Convenience method to authenticate as an existing user.
+  # Cannot be used in conjunction with the userId and chainAddresses parameters.
+  asUsername: String
 
-    # The userId that will be returned from the resulting authenticator.
-    # May be omitted or blank to indicate that there is no user associated with the supplied chainAddresses.
-    # Cannot be used in conjunction with the asUsername parameter.
-    userId: DBID
+  # The userId that will be returned from the resulting authenticator.
+  # May be omitted or blank to indicate that there is no user associated with the supplied chainAddresses.
+  # Cannot be used in conjunction with the asUsername parameter.
+  userId: DBID
 
-    # The chainAddresses that will be returned from the resulting authenticator.
-    # Cannot be used in conjunction with the asUsername parameter.
-    chainAddresses:[ChainAddressInput!]
+  # The chainAddresses that will be returned from the resulting authenticator.
+  # Cannot be used in conjunction with the asUsername parameter.
+  chainAddresses: [ChainAddressInput!]
 }
 
 input GnosisSafeAuth {
-    address: Address!
-    nonce: String!
+  address: Address!
+  nonce: String!
 }
 
 input DeepRefreshInput {
-    chain: Chain!
+  chain: Chain!
 }
 
 type DeepRefreshPayload {
-    chain: Chain
-    submitted: Boolean
+  chain: Chain
+  submitted: Boolean
 }
 
-union DeepRefreshPayloadOrError =
-    DeepRefreshPayload
-    | ErrNotAuthorized
+union DeepRefreshPayloadOrError = DeepRefreshPayload | ErrNotAuthorized
 
 union LoginPayloadOrError =
     LoginPayload
-    | ErrUserNotFound
-    | ErrAuthenticationFailed
-    | ErrDoesNotOwnRequiredToken
+  | ErrUserNotFound
+  | ErrAuthenticationFailed
+  | ErrDoesNotOwnRequiredToken
 
 type LoginPayload {
-    # TODO: Remove userId in favor of viewer
-    userId: DBID
-    viewer: Viewer
+  # TODO: Remove userId in favor of viewer
+  userId: DBID
+  viewer: Viewer
 }
 
 type LogoutPayload {
-    viewer: Viewer
+  viewer: Viewer
+}
+input CreateUserInput {
+  username: String!
+  bio: String
+  email: Email
+  galleryName: String
+  galleryDescription: String
+  galleryPosition: String
 }
 
 union CreateUserPayloadOrError =
     CreateUserPayload
-    | ErrAuthenticationFailed
-    | ErrDoesNotOwnRequiredToken
-    | ErrUserAlreadyExists
-    | ErrUsernameNotAvailable
-    | ErrInvalidInput
+  | ErrAuthenticationFailed
+  | ErrDoesNotOwnRequiredToken
+  | ErrUserAlreadyExists
+  | ErrUsernameNotAvailable
+  | ErrInvalidInput
 
 type CreateUserPayload {
-    userId: DBID
-    galleryId: DBID
-    # TODO: Remove userId and galleryId in favor of viewer
-    viewer: Viewer
+  userId: DBID
+  galleryId: DBID
+  # TODO: Remove userId and galleryId in favor of viewer
+  viewer: Viewer
 }
 
 union FollowUserPayloadOrError =
     FollowUserPayload
-    | ErrAuthenticationFailed
-    | ErrUserNotFound
-    | ErrInvalidInput
+  | ErrAuthenticationFailed
+  | ErrUserNotFound
+  | ErrInvalidInput
 
 union UnfollowUserPayloadOrError =
     UnfollowUserPayload
-    | ErrAuthenticationFailed
-    | ErrUserNotFound
-    | ErrInvalidInput
+  | ErrAuthenticationFailed
+  | ErrUserNotFound
+  | ErrInvalidInput
 
 type FollowUserPayload {
-    viewer: Viewer
-    user: GalleryUser @goField(forceResolver: true)
+  viewer: Viewer
+  user: GalleryUser @goField(forceResolver: true)
 }
 
 type UnfollowUserPayload {
-    viewer: Viewer
-    user: GalleryUser @goField(forceResolver: true)
+  viewer: Viewer
+  user: GalleryUser @goField(forceResolver: true)
 }
 
 union AdmireFeedEventPayloadOrError =
@@ -1216,15 +1280,15 @@ union RemoveCommentPayloadOrError =
   | ErrCommentNotFound
 
 type AdmireFeedEventPayload {
-    viewer: Viewer
-    admire: Admire @goField(forceResolver: true)
-    feedEvent: FeedEvent @goField(forceResolver: true)
+  viewer: Viewer
+  admire: Admire @goField(forceResolver: true)
+  feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 type RemoveAdmirePayload {
-    viewer: Viewer
-    admireID: DBID
-    feedEvent: FeedEvent @goField(forceResolver: true)
+  viewer: Viewer
+  admireID: DBID
+  feedEvent: FeedEvent @goField(forceResolver: true)
 }
 
 type CommentOnFeedEventPayload {
@@ -1240,29 +1304,29 @@ type RemoveCommentPayload {
 }
 
 interface Notification implements Node {
-    id: ID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
+  id: ID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
 }
 
 interface GroupedNotification implements Notification & Node {
-    id: ID!
-    seen: Boolean
-    creationTime: Time
-    updatedTime: Time
+  id: ID!
+  seen: Boolean
+  creationTime: Time
+  updatedTime: Time
 
-    count: Int
+  count: Int
 }
 
 type GroupNotificationUserEdge {
-    node: GalleryUser
-    cursor: String
+  node: GalleryUser
+  cursor: String
 }
 
 type GroupNotificationUsersConnection @goEmbedHelper {
-    edges:  [GroupNotificationUserEdge]
-    pageInfo: PageInfo
+  edges: [GroupNotificationUserEdge]
+  pageInfo: PageInfo
 }
 
 type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification
@@ -1274,7 +1338,12 @@ type SomeoneFollowedYouNotification implements Notification & Node & GroupedNoti
   updatedTime: Time
   count: Int
 
-  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
@@ -1286,7 +1355,12 @@ type SomeoneFollowedYouBackNotification implements Notification & Node & Grouped
   updatedTime: Time
   count: Int
 
-  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
@@ -1299,7 +1373,12 @@ type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & Gr
   count: Int
 
   feedEvent: FeedEvent @goField(forceResolver: true)
-  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  admirers(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): GroupNotificationUsersConnection @goField(forceResolver: true)
 }
 
 type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
@@ -1327,7 +1406,12 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
   count: Int
 
   # unique user viewers, use PageInfo.Total to get the total unique user viewers
-  userViewers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection @goField(forceResolver: true)
+  userViewers(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): GroupNotificationUsersConnection @goField(forceResolver: true)
 
   # count of unique non-user viewers
   nonUserViewerCount: Int
@@ -1335,196 +1419,379 @@ type SomeoneViewedYourGalleryNotification implements Notification & Node & Group
 }
 
 type ClearAllNotificationsPayload {
-    notifications: [Notification]
+  notifications: [Notification]
 }
 
 type ViewGalleryPayload {
-    gallery: Gallery
+  gallery: Gallery
 }
 
-union ViewGalleryPayloadOrError =
-    ViewGalleryPayload
-    | ErrAuthenticationFailed
-
+union ViewGalleryPayloadOrError = ViewGalleryPayload | ErrAuthenticationFailed
 
 input VerifyEmailInput {
-    token: String! @scrub
+  token: String! @scrub
 }
 
 type VerifyEmailPayload {
-    email: Email!
+  email: Email!
 }
 
-union VerifyEmailPayloadOrError =
-    VerifyEmailPayload
-    | ErrInvalidInput
+union VerifyEmailPayloadOrError = VerifyEmailPayload | ErrInvalidInput
 
 input PreverifyEmailInput {
-    email: Email! @scrub
+  email: Email! @scrub
 }
 
 enum PreverifyEmailResult {
-    Invalid
-    Risky
-    Valid
+  Invalid
+  Risky
+  Valid
 }
 
 type PreverifyEmailPayload {
-    email: Email!
-    result: PreverifyEmailResult!
+  email: Email!
+  result: PreverifyEmailResult!
 }
 
-union PreverifyEmailPayloadOrError =
-    PreverifyEmailPayload
-    | ErrInvalidInput
+union PreverifyEmailPayloadOrError = PreverifyEmailPayload | ErrInvalidInput
 
 input UpdateEmailInput {
-    email: Email! @scrub
+  email: Email! @scrub
 }
 
 type UpdateEmailPayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
-union UpdateEmailPayloadOrError =
-    UpdateEmailPayload
-    | ErrInvalidInput
+union UpdateEmailPayloadOrError = UpdateEmailPayload | ErrInvalidInput
 
 type ResendVerificationEmailPayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
 union ResendVerificationEmailPayloadOrError =
     ResendVerificationEmailPayload
-    | ErrInvalidInput
+  | ErrInvalidInput
 
 type UpdateEmailNotificationSettingsPayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
 union UpdateEmailNotificationSettingsPayloadOrError =
     UpdateEmailNotificationSettingsPayload
-    | ErrInvalidInput
+  | ErrInvalidInput
 
 type UnsubscribeFromEmailTypePayload {
-    viewer: Viewer
+  viewer: Viewer
 }
 
 union UnsubscribeFromEmailTypePayloadOrError =
     UnsubscribeFromEmailTypePayload
-    | ErrInvalidInput
+  | ErrInvalidInput
 
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
 
 input UploadPersistedQueriesInput {
-    persistedQueries: String
+  persistedQueries: String
 }
 
-union UploadPersistedQueriesPayloadOrError = UploadPersistedQueriesPayload | ErrNotAuthorized
+union UploadPersistedQueriesPayloadOrError =
+    UploadPersistedQueriesPayload
+  | ErrNotAuthorized
 
 type UploadPersistedQueriesPayload {
-    message: String
+  message: String
 }
 
 input RedeemMerchInput {
-    tokenIds: [String!]!
-    address: ChainAddressInput!
-    walletType: WalletType!
-    signature: String!
+  tokenIds: [String!]!
+  address: ChainAddressInput!
+  walletType: WalletType!
+  signature: String!
 }
 
 type MerchDiscountCode {
-    code: String!
-    tokenId: String
+  code: String!
+  tokenId: String
 }
 
 type RedeemMerchPayload {
-    tokens: [MerchToken]
+  tokens: [MerchToken]
 }
 
-union RedeemMerchPayloadOrError =
-    RedeemMerchPayload
-    | ErrInvalidInput
+union RedeemMerchPayloadOrError = RedeemMerchPayload | ErrInvalidInput
 
 type SyncTokensForUsernamePayload {
-    message: String!
+  message: String!
 }
 
-union SyncTokensForUsernamePayloadOrError = SyncTokensForUsernamePayload | ErrNotAuthorized | ErrSyncFailed
+union SyncTokensForUsernamePayloadOrError =
+    SyncTokensForUsernamePayload
+  | ErrNotAuthorized
+  | ErrSyncFailed
 
 type BanUserFromFeedPayload {
-   user: GalleryUser
+  user: GalleryUser
 }
 
 union BanUserFromFeedPayloadOrError = BanUserFromFeedPayload | ErrNotAuthorized
 
+input GalleryPositionInput {
+  galleryId: DBID!
+  position: String!
+}
+
+input UpdateGalleryOrderInput {
+  positions: [GalleryPositionInput!]!
+}
+
+input UpdateGalleryHiddenInput {
+  id: DBID!
+  hidden: Boolean!
+}
+
+input UpdateGalleryInfoInput {
+  id: DBID!
+  name: String
+  description: String
+}
+
+input CreateGalleryInput {
+  name: String
+  description: String
+  position: String!
+}
+
+type CreateGalleryPayload {
+  gallery: Gallery
+}
+
+union CreateGalleryPayloadOrError =
+    CreateGalleryPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+type UpdateGalleryInfoPayload {
+  gallery: Gallery
+}
+
+union UpdateGalleryInfoPayloadOrError =
+    UpdateGalleryInfoPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+type UpdateGalleryHiddenPayload {
+  gallery: Gallery
+}
+
+union UpdateGalleryHiddenPayloadOrError =
+    UpdateGalleryHiddenPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+type DeleteGalleryPayload {
+  deletedId: DeletedNode
+}
+
+union DeleteGalleryPayloadOrError =
+    DeleteGalleryPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+type UpdateGalleryOrderPayload {
+  viewer: Viewer
+}
+
+union UpdateGalleryOrderPayloadOrError =
+    UpdateGalleryOrderPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+type UpdateFeaturedGalleryPayload {
+  viewer: Viewer
+}
+
+union UpdateFeaturedGalleryPayloadOrError =
+    UpdateFeaturedGalleryPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+input UpdateCollectionInput {
+  dbid: DBID!
+  name: String!
+  collectorsNote: String!
+  tokens: [DBID!]!
+  layout: CollectionLayoutInput!
+  tokenSettings: [CollectionTokenSettingsInput!]!
+  hidden: Boolean!
+}
+
+input CreateCollectionInGalleryInput {
+  name: String!
+  collectorsNote: String!
+  tokens: [DBID!]!
+  layout: CollectionLayoutInput!
+  tokenSettings: [CollectionTokenSettingsInput!]!
+  hidden: Boolean!
+  givenID: DBID!
+}
+
+input UpdateGalleryInput {
+  galleryId: DBID!
+
+  name: String
+  description: String
+
+  caption: String
+
+  deletedCollections: [DBID!]
+
+  updateCollections: [UpdateCollectionInput]
+  createdCollections: [CreateCollectionInGalleryInput]
+
+  order: [DBID!]
+}
+
+type UpdateGalleryPayload {
+  gallery: Gallery
+}
+
+union UpdateGalleryPayloadOrError =
+    UpdateGalleryPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type Mutation {
-    # User Mutations
-    addUserWallet(chainAddress: ChainAddressInput!, authMechanism: AuthMechanism!): AddUserWalletPayloadOrError @authRequired
-    removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
-    updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
+  # User Mutations
+  addUserWallet(
+    chainAddress: ChainAddressInput!
+    authMechanism: AuthMechanism!
+  ): AddUserWalletPayloadOrError @authRequired
+  removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError
+    @authRequired
+  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
+    @authRequired
 
-    # Gallery Mutations
-    updateGalleryCollections(input: UpdateGalleryCollectionsInput!): UpdateGalleryCollectionsPayloadOrError @authRequired
+  # Gallery Mutations
+  updateGalleryCollections(
+    input: UpdateGalleryCollectionsInput!
+  ): UpdateGalleryCollectionsPayloadOrError @authRequired
 
-    # Collection Mutations
-    createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
-    deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
-    updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError @authRequired
-    updateCollectionTokens(input: UpdateCollectionTokensInput!): UpdateCollectionTokensPayloadOrError @authRequired
-    updateCollectionHidden(input: UpdateCollectionHiddenInput!): UpdateCollectionHiddenPayloadOrError @authRequired
+  # Collection Mutations
+  createCollection(
+    input: CreateCollectionInput!
+  ): CreateCollectionPayloadOrError @authRequired
+  deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError
+    @authRequired
+  updateCollectionInfo(
+    input: UpdateCollectionInfoInput!
+  ): UpdateCollectionInfoPayloadOrError @authRequired
+  updateCollectionTokens(
+    input: UpdateCollectionTokensInput!
+  ): UpdateCollectionTokensPayloadOrError @authRequired
+  updateCollectionHidden(
+    input: UpdateCollectionHiddenInput!
+  ): UpdateCollectionHiddenPayloadOrError @authRequired
 
-    # Token Mutations
-    updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
-    setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
+  # Token Mutations
+  updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError
+    @authRequired
+  setSpamPreference(
+    input: SetSpamPreferenceInput!
+  ): SetSpamPreferencePayloadOrError @authRequired
 
-    syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
-    refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
-    refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
-    refreshContract(contractId: DBID!): RefreshContractPayloadOrError
-    deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
+  syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
+  refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
+  refreshCollection(collectionId: DBID!): RefreshCollectionPayloadOrError
+  refreshContract(contractId: DBID!): RefreshContractPayloadOrError
+  deepRefresh(input: DeepRefreshInput!): DeepRefreshPayloadOrError @authRequired
 
-    getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
+  getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-    createUser(authMechanism: AuthMechanism!, username: String!, bio: String, email: Email): CreateUserPayloadOrError
-    updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
-    resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
-    updateEmailNotificationSettings(input: UpdateEmailNotificationSettingsInput!): UpdateEmailNotificationSettingsPayloadOrError @authRequired
-    unsubscribeFromEmailType(input: UnsubscribeFromEmailTypeInput!): UnsubscribeFromEmailTypePayloadOrError
-    login(authMechanism: AuthMechanism!): LoginPayloadOrError
-    logout: LogoutPayload
+  createUser(
+    authMechanism: AuthMechanism!
+    input: CreateUserInput!
+  ): CreateUserPayloadOrError
+  updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
+  resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
+  updateEmailNotificationSettings(
+    input: UpdateEmailNotificationSettingsInput!
+  ): UpdateEmailNotificationSettingsPayloadOrError @authRequired
+  unsubscribeFromEmailType(
+    input: UnsubscribeFromEmailTypeInput!
+  ): UnsubscribeFromEmailTypePayloadOrError
+  login(authMechanism: AuthMechanism!): LoginPayloadOrError
+  logout: LogoutPayload
 
-    followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
-    unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
-    admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
-    removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
-    commentOnFeedEvent(feedEventId: DBID!, replyToID: DBID, comment: String!): CommentOnFeedEventPayloadOrError @authRequired
-    removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
+  followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
+  unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
+  admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError
+    @authRequired
+  removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
+  commentOnFeedEvent(
+    feedEventId: DBID!
+    replyToID: DBID
+    comment: String!
+  ): CommentOnFeedEventPayloadOrError @authRequired
+  removeComment(commentId: DBID!): RemoveCommentPayloadOrError @authRequired
 
-    viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
+  viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
-    clearAllNotifications: ClearAllNotificationsPayload @authRequired
+  updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError
+    @authRequired
 
-    updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
+  createGallery(input: CreateGalleryInput!): CreateGalleryPayloadOrError
+    @authRequired
+  updateGalleryHidden(
+    input: UpdateGalleryHiddenInput!
+  ): UpdateGalleryHiddenPayloadOrError @authRequired
+  deleteGallery(galleryId: DBID!): DeleteGalleryPayloadOrError @authRequired
+  updateGalleryOrder(
+    input: UpdateGalleryOrderInput!
+  ): UpdateGalleryOrderPayloadOrError @authRequired
+  updateGalleryInfo(
+    input: UpdateGalleryInfoInput!
+  ): UpdateGalleryInfoPayloadOrError @authRequired
+  updateFeaturedGallery(galleryId: DBID!): UpdateFeaturedGalleryPayloadOrError
+    @authRequired
 
+  clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
-    preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
-    verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
+  updateNotificationSettings(
+    settings: NotificationSettingsInput
+  ): NotificationSettings
 
-    redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
+  preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
+  verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
 
-    # Retool Specific Mutations
-    addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
-    revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError @retoolAuth
-    syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError @retoolAuth
-    banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
+  redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 
-    # Gallery Frontend Deploy Persisted Queries
-    uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
+  # Retool Specific Mutations
+  addRolesToUser(
+    username: String!
+    roles: [Role]
+  ): AddRolesToUserPayloadOrError @retoolAuth
+  revokeRolesFromUser(
+    username: String!
+    roles: [Role]
+  ): RevokeRolesFromUserPayloadOrError @retoolAuth
+  syncTokensForUsername(
+    username: String!
+    chains: [Chain!]!
+  ): SyncTokensForUsernamePayloadOrError @retoolAuth
+  banUserFromFeed(
+    username: String!
+    action: String!
+  ): BanUserFromFeedPayloadOrError @retoolAuth
+
+  # Gallery Frontend Deploy Persisted Queries
+  uploadPersistedQueries(
+    input: UploadPersistedQueriesInput
+  ): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
 }
 
 type Subscription {
-    newNotification: Notification
-    notificationUpdated: Notification
+  newNotification: Notification
+  notificationUpdated: Notification
 }

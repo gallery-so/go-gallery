@@ -151,6 +151,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	collection := persist.CollectionDB{
 		OwnerUserID:    userID,
 		Tokens:         tokens,
+		GalleryID:      galleryID,
 		Layout:         layout,
 		Name:           persist.NullString(name),
 		CollectorsNote: persist.NullString(collectorsNote),
