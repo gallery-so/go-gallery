@@ -646,7 +646,7 @@ update galleries g set position = updates.position, last_updated = now() from up
 update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
 
 -- name: UpdateGallery :exec
-update galleries set name = @name, description = @description, collections = @collections, last_updated = now() where galleries.id = @id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = array_length(@collections, 1);
+update galleries set name = @name, description = @description, collections = @collections, last_updated = now() where galleries.id = @id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = coalesce(array_length(@collections, 1), 0);
 
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;

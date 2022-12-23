@@ -2,10 +2,10 @@
 insert into galleries (id, owner_user_id, name, description, position) values (@gallery_id, @owner_user_id, @name, @description, @position) returning *;
 
 -- name: GalleryRepoUpdate :execrows
-update galleries set last_updated = now(), collections = @collection_ids where galleries.id = @gallery_id and (select count(*) from collections c where c.id = any(@collection_ids) and c.gallery_id = @gallery_id and c.deleted = false) = array_length(@collection_ids, 1);
+update galleries set last_updated = now(), collections = @collection_ids where galleries.id = @gallery_id and (select count(*) from collections c where c.id = any(@collection_ids) and c.gallery_id = @gallery_id and c.deleted = false) = coalesce(array_length(@collection_ids, 1), 0);
 
 -- name: GalleryRepoAddCollections :execrows
-update galleries set last_updated = now(), collections = @collection_ids::text[] || collections where galleries.id = @gallery_id and (select count(*) from collections c where c.id = any(@collection_ids) and c.gallery_id = @gallery_id and c.deleted = false) = array_length(@collection_ids, 1);
+update galleries set last_updated = now(), collections = @collection_ids::text[] || collections where galleries.id = @gallery_id and (select count(*) from collections c where c.id = any(@collection_ids) and c.gallery_id = @gallery_id and c.deleted = false) = coalesce(array_length(@collection_ids, 1), 0);
 
 -- name: GalleryRepoCheckOwnCollections :one
 select count(*) from collections where id = any(@collection_ids) and owner_user_id = $1;
@@ -33,4 +33,4 @@ select (t.media ->> 'thumbnail_url')::text from galleries g,
     order by collection_ids.ord, token_ids.ord limit $2;
 
 -- name: GalleryRepoDelete :exec
-update galleries set galleries.deleted = true where galleries.id = @gallery_id and (select count(*) from galleries g where g.owner_user_id = @owner_user_id and g.deleted = false and not g.id = @gallery_id) > 0 and not (select featured_gallery from users u where u.id = @owner_user_id) = @gallery_id;
+update galleries set deleted = true where galleries.id = @gallery_id and (select count(*) from galleries g where g.owner_user_id = @owner_user_id and g.deleted = false and not g.id = @gallery_id) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = @owner_user_id), '') = @gallery_id;

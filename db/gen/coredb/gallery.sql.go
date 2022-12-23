@@ -12,7 +12,7 @@ import (
 )
 
 const galleryRepoAddCollections = `-- name: GalleryRepoAddCollections :execrows
-update galleries set last_updated = now(), collections = $1::text[] || collections where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = array_length($1, 1)
+update galleries set last_updated = now(), collections = $1::text[] || collections where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = coalesce(array_length($1, 1), 0)
 `
 
 type GalleryRepoAddCollectionsParams struct {
@@ -105,7 +105,7 @@ func (q *Queries) GalleryRepoCreate(ctx context.Context, arg GalleryRepoCreatePa
 }
 
 const galleryRepoDelete = `-- name: GalleryRepoDelete :exec
-update galleries set galleries.deleted = true where galleries.id = $1 and (select count(*) from galleries g where g.owner_user_id = $2 and g.deleted = false and not g.id = $1) > 0 and not (select featured_gallery from users u where u.id = $2) = $1
+update galleries set deleted = true where galleries.id = $1 and (select count(*) from galleries g where g.owner_user_id = $2 and g.deleted = false and not g.id = $1) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = $2), '') = $1
 `
 
 type GalleryRepoDeleteParams struct {
@@ -214,7 +214,7 @@ func (q *Queries) GalleryRepoGetPreviewsForUserID(ctx context.Context, arg Galle
 }
 
 const galleryRepoUpdate = `-- name: GalleryRepoUpdate :execrows
-update galleries set last_updated = now(), collections = $1 where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = array_length($1, 1)
+update galleries set last_updated = now(), collections = $1 where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = coalesce(array_length($1, 1), 0)
 `
 
 type GalleryRepoUpdateParams struct {

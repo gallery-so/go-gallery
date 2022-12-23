@@ -100,16 +100,20 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	q := api.queries.WithTx(tx)
 
 	// then delete collections
-	err = q.DeleteCollections(ctx, util.StringersToStrings(update.DeletedCollections))
-	if err != nil {
-		return db.Gallery{}, err
+	if len(update.DeletedCollections) > 0 {
+		err = q.DeleteCollections(ctx, util.StringersToStrings(update.DeletedCollections))
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
 
 	// update collections
 
-	err = updateCollectionsInfoAndTokens(ctx, q, update)
-	if err != nil {
-		return db.Gallery{}, err
+	if len(update.UpdateCollections) > 0 {
+		err = updateCollectionsInfoAndTokens(ctx, q, update.UpdateCollections)
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
 
 	// create collections
@@ -162,22 +166,22 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	return newGall, nil
 }
 
-func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update model.UpdateGalleryInput) error {
-	dbids, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update []*model.UpdateCollectionInput) error {
+	dbids, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Dbid.String(), nil
 	})
 	if err != nil {
 		return err
 	}
 
-	collectorNotes, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+	collectorNotes, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.CollectorsNote, nil
 	})
 	if err != nil {
 		return err
 	}
 
-	layouts, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
+	layouts, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		b, err := json.Marshal(modelToTokenLayout(u.Layout))
 		if err != nil {
 			return pgtype.JSONB{
@@ -194,7 +198,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	tokenSettings, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
+	tokenSettings, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		settings := modelToTokenSettings(u.TokenSettings)
 		b, err := json.Marshal(settings)
 		if err != nil {
@@ -211,14 +215,14 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	hiddens, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (bool, error) {
+	hiddens, err := util.Map(update, func(u *model.UpdateCollectionInput) (bool, error) {
 		return u.Hidden, nil
 	})
 	if err != nil {
 		return err
 	}
 
-	names, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+	names, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Name, nil
 	})
 	if err != nil {
@@ -237,7 +241,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	for _, collection := range update.UpdateCollections {
+	for _, collection := range update {
 		err = q.UpdateCollectionTokens(ctx, db.UpdateCollectionTokensParams{
 			ID:   collection.Dbid,
 			Nfts: collection.Tokens,
