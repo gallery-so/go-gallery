@@ -30,19 +30,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-var (
-	operations = loadOperations()
-)
-
-func loadOperations() map[string]string {
-	schema := loadGeneratedSchema()
-	filePath := util.MustFindFile("./testdata/operations.gql")
-	ops, err := readOperationsFromFile(schema, filePath)
-	if err != nil {
-		panic(err)
-	}
-	return ops
-}
+var operations = loadOperations()
 
 type testCase struct {
 	title    string
@@ -55,7 +43,7 @@ func TestGraphQL(t *testing.T) {
 		{
 			title:    "test user API",
 			run:      testGraphQL_User,
-			fixtures: []fixture{useDefaultEnv, usePostgres},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis},
 		},
 	}
 	for _, test := range tests {
@@ -85,7 +73,6 @@ func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
 		nonceF.setup(t)
 		c := defaultClient()
 		username := "user" + persist.GenerateID().String()
-
 		var response = struct {
 			CreateUser struct {
 				Viewer model.Viewer
@@ -113,7 +100,6 @@ func testUserByUsername(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
 		c := defaultClient()
-
 		var response = struct {
 			UserByUsername struct {
 				model.GalleryUser
@@ -133,7 +119,6 @@ func testUserByAddress(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
 		c := defaultClient()
-
 		var response = struct {
 			UserByAddress struct {
 				model.GalleryUser
@@ -158,7 +143,6 @@ func testUserByID(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
 		c := defaultClient()
-
 		var response = struct {
 			UserByID struct {
 				model.GalleryUser
@@ -178,7 +162,6 @@ func testViewer(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
 		c := defaultClient()
-
 		var response = struct {
 			Viewer struct {
 				model.Viewer
@@ -199,7 +182,6 @@ func testAddWallet(userF newUserFixture) func(t *testing.T) {
 		c := defaultClient()
 		walletToAdd := newWallet(t)
 		nonce := newNonce(t, c, walletToAdd)
-
 		var response = struct {
 			AddUserWallet struct {
 				errMessage
@@ -249,7 +231,6 @@ func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
 		walletToRemove := newWallet(t)
 		nonce := newNonce(t, c, walletToRemove)
 		jwt := newJWT(t, userF.id)
-
 		// First add a wallet
 		var addResponse = struct {
 			AddUserWallet struct {
@@ -267,7 +248,6 @@ func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
 				}
 			}
 		}{}
-
 		post(t, c, mustGet(operations, "addUserWalletMutation"), &addResponse,
 			withJWT(jwt),
 			client.Var("chainAddress", map[string]string{
@@ -306,7 +286,6 @@ func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
 				}
 			}
 		}{}
-
 		post(t, c, mustGet(operations, "removeUserWalletsMutation"), &removeResponse,
 			withJWT(jwt),
 			client.Var("walletIds", []string{lastWallet.Dbid}),
@@ -394,6 +373,16 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 		assert.Empty(t, readCookie(t, res, auth.JWTCookieKey))
 		assert.Empty(t, response.Logout.Viewer)
 	}
+}
+
+func loadOperations() map[string]string {
+	schema := loadGeneratedSchema()
+	filePath := util.MustFindFile("./testdata/operations.gql")
+	ops, err := readOperationsFromFile(schema, filePath)
+	if err != nil {
+		panic(err)
+	}
+	return ops
 }
 
 // mustGet fails if the key does not exist in the map
@@ -486,7 +475,6 @@ func newUser(t *testing.T, c *client.Client, w wallet) (persist.DBID, string) {
 	t.Helper()
 	nonce := newNonce(t, c, w)
 	username := "user" + persist.GenerateID().String()
-
 	var response = struct {
 		CreateUser struct {
 			Viewer model.Viewer

@@ -74,7 +74,7 @@ func coreInitServer() *gin.Engine {
 
 	go autoSendNotificationEmails(queries, sendgridClient, pub)
 
-	lim := middleware.NewKeyRateLimiter(1, time.Second*5, redis.NewClient(redis.EmailRateLimiterDB))
+	lim := middleware.NewKeyRateLimiter(1, time.Second*5, redis.NewClient(redis.EmailRateLimiterDB, viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS")))
 
 	return handlersInitServer(router, loaders, queries, sendgridClient, lim)
 }

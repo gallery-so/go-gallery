@@ -73,9 +73,9 @@ func StartRedis() (*dockertest.Resource, error) {
 		return nil, err
 	}
 
-	hostAndPort := r.GetHostPort("6379/tcp")
+	host := r.GetHostPort("6379/tcp")
 
-	if err = pool.Retry(waitOnCache(hostAndPort)); err != nil {
+	if err = pool.Retry(waitOnCache(host, "")); err != nil {
 		log.Fatalf("could not connect to redis: %s", err)
 	}
 
@@ -89,11 +89,15 @@ type compose struct {
 }
 
 type service struct {
-	Image       string                 `yaml:"image"`
-	Ports       []string               `yaml:"ports"`
-	Build       map[string]interface{} `yaml:"build"`
-	Environment []string               `yaml:"environment"`
-	Command     string                 `yaml:"command"`
+	Image string   `yaml:"image"`
+	Ports []string `yaml:"ports"`
+	Build struct {
+		Context    string   `yaml:"context"`
+		Dockerfile string   `yaml:"dockerfile"`
+		Args       []string `yaml:"args"`
+	} `yaml:"build"`
+	Environment []string `yaml:"environment"`
+	Command     string   `yaml:"command"`
 }
 
 func startService(pool *dockertest.Pool, service string) (*dockertest.Resource, error) {
@@ -145,9 +149,10 @@ func waitOnDB(host, port, user, password, db string) func() error {
 	}
 }
 
-func waitOnCache(url string) func() error {
+func waitOnCache(host, password string) func() error {
 	return func() error {
-		return redis.NewCache(0).Close(false)
+		client := redis.NewClient(0, host, password)
+		return client.Close()
 	}
 }
 
@@ -174,20 +179,27 @@ func imageAndTag(s string) (string, string, error) {
 }
 
 func baseImage(s service) (string, string, error) {
-	path := util.MustFindFile("./docker-compose.yml")
-
-	dockerPath := filepath.Join(filepath.Dir(path), s.Build["dockerfile"].(string))
-	absPath, _ := filepath.Abs(dockerPath)
-	res, err := dockerfile.ParseFile(absPath)
-	if err != nil {
-		return "", "", err
-	}
-
-	for _, cmd := range res {
-		if cmd.Cmd == "FROM" {
-			return imageAndTag(cmd.Value[0])
+	if s.Build.Dockerfile != "" {
+		path := util.MustFindFile("./docker-compose.yml")
+		dockerPath := filepath.Join(filepath.Dir(path), s.Build.Dockerfile)
+		absPath, _ := filepath.Abs(dockerPath)
+		res, err := dockerfile.ParseFile(absPath)
+		if err != nil {
+			return "", "", err
 		}
+
+		for _, cmd := range res {
+			if cmd.Cmd == "FROM" {
+				return imageAndTag(cmd.Value[0])
+			}
+		}
+
+		return "", "", errors.New("no `FROM` directive found in dockerfile")
 	}
 
-	return "", "", errors.New("no `FROM` directive found in dockerfile")
+	if s.Image != "" {
+		return imageAndTag(s.Image)
+	}
+
+	return "", "", errors.New("unable to find base image")
 }

@@ -51,14 +51,12 @@ func GetNameForDatabase(databaseId int) string {
 	return fmt.Sprintf("db %d", databaseId)
 }
 
-func NewClient(db int) *redis.Client {
+func NewClient(db int, host, password string) *redis.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	redisURL := viper.GetString("REDIS_URL")
-	redisPass := viper.GetString("REDIS_PASS")
 	client := redis.NewClient(&redis.Options{
-		Addr:     redisURL,
-		Password: redisPass,
+		Addr:     host,
+		Password: password,
 		DB:       db,
 	})
 	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
@@ -75,14 +73,15 @@ type Cache struct {
 
 // NewCache creates a new redis cache
 func NewCache(db int) *Cache {
-	return &Cache{client: NewClient(db)}
+	client := NewClient(db, viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
+	return &Cache{client: client}
 }
 
 // ClearCache deletes the entire cache
 func ClearCache(db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	client := NewClient(db)
+	client := NewClient(db, viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
 	return client.FlushDB(ctx).Err()
 }
 
@@ -119,7 +118,8 @@ func (c *Cache) Close(clear bool) error {
 }
 
 func NewLockClient(db int) *redislock.Client {
-	return redislock.New(NewClient(db))
+	client := NewClient(db, viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
+	return redislock.New(client)
 }
 
 // GlobalLock is a distributed lock that does not depend on a key.

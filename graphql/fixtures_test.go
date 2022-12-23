@@ -56,13 +56,22 @@ func usePostgres(t *testing.T) {
 	t.Helper()
 	r, err := docker.StartPostgres()
 	require.NoError(t, err)
-	t.Cleanup(func() { r.Close() })
-
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
 	err = migrate.RunMigration(postgres.NewClient(), "./db/migrations/core")
 	require.NoError(t, err)
+	t.Cleanup(func() { r.Close() })
+}
+
+// useRedis starts a running Redis Docker container and stops the instance
+// when the test and its subtests complete.
+func useRedis(t *testing.T) {
+	t.Helper()
+	r, err := docker.StartRedis()
+	require.NoError(t, err)
+	t.Setenv("REDIS_URL", r.GetHostPort("6379/tcp"))
+	t.Cleanup(func() { r.Close() })
 }
 
 // fixturer defers running a fixture until setup is called
