@@ -867,6 +867,9 @@ type Query {
     first: Int
     last: Int
   ): UsersConnection @retoolAuth
+
+  galleryById(id: DBID!): GalleryByIdPayloadOrError
+  viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
 }
 
 input CollectionLayoutInput {
