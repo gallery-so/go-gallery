@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/util"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -233,12 +234,9 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 			return nil, PageInfo{}, err
 		}
 
-		asStrings := make([]*string, len(previewURLs))
-		for j, previewURL := range previewURLs {
-			if asString, ok := previewURL.(string); ok {
-				asStrings[j] = &asString
-			}
-		}
+		asPointers, err := util.Map(previewURLs, func(s string) (*string, error) {
+			return &s, nil
+		})
 
 		owners[i] = &model.TokenHolder{
 			HelperTokenHolderData: model.HelperTokenHolderData{
@@ -248,7 +246,7 @@ func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, 
 			DisplayName:   &owner.Username.String,
 			Wallets:       nil, // handled by a dedicated resolver
 			User:          nil, // handled by a dedicated resolver
-			PreviewTokens: asStrings,
+			PreviewTokens: asPointers,
 		}
 	}
 

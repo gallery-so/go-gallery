@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v4"
@@ -210,16 +211,10 @@ func checkNoErr(err error) {
 	}
 }
 
-func dbidsToStrings(dbids []persist.DBID) []string {
-	strings := make([]string, len(dbids))
-	for i, dbid := range dbids {
-		strings[i] = string(dbid)
-	}
-	return strings
-}
-
 // Repositories is the set of all available persistence repositories
 type Repositories struct {
+	db                    *sql.DB
+	pool                  *pgxpool.Pool
 	UserRepository        *UserRepository
 	NonceRepository       *NonceRepository
 	GalleryRepository     *GalleryRepository
@@ -231,4 +226,28 @@ type Repositories struct {
 	WalletRepository      *WalletRepository
 	AdmireRepository      *AdmireRepository
 	CommentRepository     *CommentRepository
+}
+
+func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
+	queries := coredb.New(pgx)
+
+	return &Repositories{
+		db:                    pq,
+		pool:                  pgx,
+		UserRepository:        NewUserRepository(pq, queries),
+		NonceRepository:       NewNonceRepository(pq, queries),
+		TokenRepository:       NewTokenGalleryRepository(pq, queries),
+		CollectionRepository:  NewCollectionTokenRepository(pq, queries),
+		GalleryRepository:     NewGalleryRepository(queries),
+		ContractRepository:    NewContractGalleryRepository(pq, queries),
+		MembershipRepository:  NewMembershipRepository(pq, queries),
+		EarlyAccessRepository: NewEarlyAccessRepository(pq, queries),
+		WalletRepository:      NewWalletRepository(pq, queries),
+		AdmireRepository:      NewAdmireRepository(queries),
+		CommentRepository:     NewCommentRepository(pq, queries),
+	}
+}
+
+func (r *Repositories) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.BeginTx(ctx, pgx.TxOptions{})
 }

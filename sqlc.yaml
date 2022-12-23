@@ -44,6 +44,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.UserNotificationSettings"
           - column: "users*.email_verified"
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
+          - column: "users*.featured_gallery"
+            go_type: "*github.com/mikeydub/go-gallery/service/persist.DBID"
 
           # Galleries
           - column: "galleries.collections"

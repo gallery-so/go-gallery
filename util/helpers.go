@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -190,10 +191,57 @@ func CopyMax(writer io.Writer, it io.Reader, max int64) error {
 	return nil
 }
 
+// Map applies a function to each element of a slice, returning a new slice of the same length.
+func Map[T, U any](xs []T, f func(T) (U, error)) ([]U, error) {
+	result := make([]U, len(xs))
+	for i, x := range xs {
+		it, err := f(x)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = it
+	}
+	return result, nil
+}
+
+// Dedupe removes duplicate elements from a slice, preserving the order of the remaining elements.
+func Dedupe[T comparable](src []T, filterInPlace bool) []T {
+	var result []T
+	if filterInPlace {
+		result = src[:0]
+	} else {
+		result = make([]T, 0, len(src))
+	}
+	seen := make(map[T]bool)
+	for _, x := range src {
+		if !seen[x] {
+			result = append(result, x)
+			seen[x] = true
+		}
+	}
+	return result
+}
+
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
 // a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
 func StringToPointer(str string) *string {
 	return &str
+}
+
+// FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
+func FromPointer[T comparable](s *T) T {
+	if s == nil {
+		return reflect.Zero(reflect.TypeOf(s).Elem()).Interface().(T)
+	}
+	return *s
+}
+
+func StringersToStrings[T fmt.Stringer](stringers []T) []string {
+	strings := make([]string, len(stringers))
+	for i, stringer := range stringers {
+		strings[i] = stringer.String()
+	}
+	return strings
 }
 
 // BoolToPointer returns a pointer to the parameter boolean. Useful for a boolean that would need to be assigned to a variable

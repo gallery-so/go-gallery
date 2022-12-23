@@ -356,3 +356,15 @@ func ContainsDBID(pSrc []DBID, pID DBID) bool {
 	}
 	return false
 }
+
+func ToDBIDs[T any](them []T, convert func(T) (DBID, error)) ([]DBID, error) {
+	result := make([]DBID, len(them))
+	for i, v := range them {
+		d, err := convert(v)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = d
+	}
+	return result, nil
+}

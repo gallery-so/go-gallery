@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/graphql/apq"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/graphql/apq"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/bsm/redislock"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
