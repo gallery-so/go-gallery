@@ -74,10 +74,10 @@ mutation createUserMutation(
 					username
 					dbid
 					bio
-				}
-			}
-		}
-	}
+        }
+      }
+    }
+  }
 }
 
 mutation getAuthNonceMutation($input: ChainAddressInput!) {
@@ -94,53 +94,76 @@ mutation getAuthNonceMutation($input: ChainAddressInput!) {
 }
 
 mutation loginMutation($authMechanism: AuthMechanism!) {
-  login(authMechanism: $authMechanism) {
+	login(authMechanism: $authMechanism) {
 		... on Error {
 			__typename
 			message
 		}
-    ... on LoginPayload {
-      viewer {
-        user {
-          username
-          dbid
-        }
-      }
-    }
-  }
+		... on LoginPayload {
+			viewer {
+				user {
+					username
+					dbid
+				}
+			}
+		}
+	}
 }
 
 mutation logoutMutation {
-  logout {
-    viewer {
-      user {
-        username
-        dbid
-      }
-    }
-  }
+	logout {
+		viewer {
+			user {
+				username
+				dbid
+			}
+		}
+	}
 }
 
 mutation addUserWalletMutation(
-  $chainAddress: ChainAddressInput!,
-  $authMechanism: AuthMechanism!,
+	$chainAddress: ChainAddressInput!
+	$authMechanism: AuthMechanism!
 ) {
-  addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
-    ... on Error {
-      __typename
-      message
-    }
-    ...on AddUserWalletPayload {
-      viewer {
-        user {
-          wallets {
-            chainAddress {
-              address
-              chain
-            }
-          }
-        }
-      }
-    }
-  }
+	addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
+		... on Error {
+			__typename
+			message
+		}
+		... on AddUserWalletPayload {
+			viewer {
+				user {
+					wallets {
+            dbid
+						chainAddress {
+							address
+							chain
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+mutation removeUserWalletsMutation($walletIds: [DBID!]!) {
+	removeUserWallets(walletIds: $walletIds) {
+		... on Error {
+			__typename
+			message
+		}
+		... on RemoveUserWalletsPayload {
+			viewer {
+				user {
+					wallets {
+            dbid
+						chainAddress {
+							address
+							chain
+						}
+					}
+				}
+			}
+		}
+	}
 }

@@ -72,7 +72,8 @@ func testGraphQL_User(t *testing.T) {
 		{title: "should get user by username", run: testUserByUsername(newUserFixture{})},
 		{title: "should get user by address", run: testUserByAddress(newUserFixture{})},
 		{title: "should get viewer", run: testViewer(newUserFixture{})},
-		{title: "can add a wallet", run: testAddWallet(newUserFixture{})},
+		{title: "should add a wallet", run: testAddWallet(newUserFixture{})},
+		{title: "should remove a wallet", run: testRemoveWallet(newUserFixture{})},
 	}
 	for _, test := range tests {
 		t.Run(test.title, withSetup(test.run, test.fixtures...))
@@ -185,7 +186,7 @@ func testViewer(userF newUserFixture) func(t *testing.T) {
 			}
 		}{}
 
-		post(t, c, mustGet(operations, "viewerQuery"), &response, withJWT(t, userF.id))
+		post(t, c, mustGet(operations, "viewerQuery"), &response, withJWT(newJWT(t, userF.id)))
 
 		require.Empty(t, response.Viewer.Message)
 		assert.Equal(t, userF.username, *response.Viewer.User.Username)
@@ -201,13 +202,23 @@ func testAddWallet(userF newUserFixture) func(t *testing.T) {
 
 		var response = struct {
 			AddUserWallet struct {
-				model.AddUserWalletPayload
 				errMessage
+				Viewer struct {
+					User struct {
+						Wallets []struct {
+							Dbid         string
+							ChainAddress struct {
+								Address string
+								Chain   string
+							}
+						}
+					}
+				}
 			}
 		}{}
 
 		post(t, c, mustGet(operations, "addUserWalletMutation"), &response,
-			withJWT(t, userF.id),
+			withJWT(newJWT(t, userF.id)),
 			client.Var("chainAddress", map[string]string{
 				"address": walletToAdd.address,
 				"chain":   "Ethereum",
@@ -220,11 +231,90 @@ func testAddWallet(userF newUserFixture) func(t *testing.T) {
 						"chainPubKey": map[string]string{"pubKey": walletToAdd.address, "chain": "Ethereum"},
 					},
 				},
-			))
+			),
+		)
 
-		require.Empty(t, string(response.AddUserWallet.Message))
+		require.Empty(t, response.AddUserWallet.Message)
 		wallets := response.AddUserWallet.Viewer.User.Wallets
 		assert.Equal(t, walletToAdd.address, wallets[len(wallets)-1].ChainAddress.Address)
+		assert.Equal(t, "Ethereum", wallets[len(wallets)-1].ChainAddress.Chain)
+		assert.Len(t, wallets, 2)
+	}
+}
+
+func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		c := defaultClient()
+		walletToRemove := newWallet(t)
+		nonce := newNonce(t, c, walletToRemove)
+		jwt := newJWT(t, userF.id)
+
+		// First add a wallet
+		var addResponse = struct {
+			AddUserWallet struct {
+				errMessage
+				Viewer struct {
+					User struct {
+						Wallets []struct {
+							Dbid         string
+							ChainAddress struct {
+								Address string
+								Chain   string
+							}
+						}
+					}
+				}
+			}
+		}{}
+
+		post(t, c, mustGet(operations, "addUserWalletMutation"), &addResponse,
+			withJWT(jwt),
+			client.Var("chainAddress", map[string]string{
+				"address": walletToRemove.address,
+				"chain":   "Ethereum",
+			}),
+			client.Var(
+				"authMechanism", map[string]any{
+					"eoa": map[string]any{
+						"nonce":       nonce,
+						"signature":   walletToRemove.Sign(nonce),
+						"chainPubKey": map[string]string{"pubKey": walletToRemove.address, "chain": "Ethereum"},
+					},
+				},
+			),
+		)
+		require.Empty(t, addResponse.AddUserWallet.Message)
+		wallets := addResponse.AddUserWallet.Viewer.User.Wallets
+		lastWallet := wallets[len(wallets)-1]
+		assert.Len(t, wallets, 2)
+
+		// Then remove the wallet
+		var removeResponse = struct {
+			RemoveUserWallets struct {
+				errMessage
+				Viewer struct {
+					User struct {
+						Wallets []struct {
+							Dbid         string
+							ChainAddress struct {
+								Address string
+								Chain   string
+							}
+						}
+					}
+				}
+			}
+		}{}
+
+		post(t, c, mustGet(operations, "removeUserWalletsMutation"), &removeResponse,
+			withJWT(jwt),
+			client.Var("walletIds", []string{lastWallet.Dbid}),
+		)
+
+		require.Empty(t, removeResponse.RemoveUserWallets.Message)
+		assert.Len(t, removeResponse.RemoveUserWallets.Viewer.User.Wallets, 1)
+		assert.NotEqual(t, lastWallet.Dbid, removeResponse.RemoveUserWallets.Viewer.User.Wallets[0].Dbid)
 	}
 }
 
@@ -282,8 +372,7 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{"query": mustGet(operations, "logoutMutation")})
 		r := httptest.NewRequest(http.MethodPost, "/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
 		r.Header.Set("Content-Type", "application/json")
-		err := addJWT(r, userF.id)
-		require.NoError(t, err)
+		addJWT(r, newJWT(t, userF.id))
 
 		// Handle request
 		w := httptest.NewRecorder()
@@ -300,7 +389,7 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 				Viewer model.Viewer
 			}
 		}{}
-		err = json.Unmarshal(buf.Bytes(), &response)
+		err := json.Unmarshal(buf.Bytes(), &response)
 		require.NoError(t, err)
 		assert.Empty(t, readCookie(t, res, auth.JWTCookieKey))
 		assert.Empty(t, response.Logout.Viewer)
@@ -362,7 +451,7 @@ func newWallet(t *testing.T) wallet {
 	require.NoError(t, err)
 
 	pubKey := pk.Public().(*ecdsa.PublicKey)
-	address := crypto.PubkeyToAddress(*pubKey).Hex()
+	address := strings.ToLower(crypto.PubkeyToAddress(*pubKey).Hex())
 
 	return wallet{
 		pKey:    pk,
@@ -418,6 +507,13 @@ func newUser(t *testing.T, c *client.Client, w wallet) (persist.DBID, string) {
 	require.Empty(t, response.CreateUser.Message)
 
 	return response.CreateUser.Viewer.User.Dbid, username
+}
+
+// newJWT generates a JWT
+func newJWT(t *testing.T, userID persist.DBID) string {
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	require.NoError(t, err)
+	return jwt
 }
 
 // defaultClient returns a GraphQL client attached to the backend GraphQL handler
@@ -496,19 +592,13 @@ func readCookie(t *testing.T, r *http.Response, name string) string {
 }
 
 // withJWT adds a JWT to a gqlgen client request
-func withJWT(t *testing.T, userID persist.DBID) func(*client.Request) {
+func withJWT(jwt string) func(*client.Request) {
 	return func(r *client.Request) {
-		err := addJWT(r.HTTP, userID)
-		require.NoError(t, err)
+		addJWT(r.HTTP, jwt)
 	}
 }
 
 // addJWT adds a JWT to a HTTP request
-func addJWT(r *http.Request, userID persist.DBID) error {
-	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
-	if err != nil {
-		return err
-	}
+func addJWT(r *http.Request, jwt string) {
 	r.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
-	return nil
 }
