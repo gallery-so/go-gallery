@@ -66,7 +66,7 @@ mutation createUserMutation(
 	) {
 		... on Error {
 			__typename
-			message
+		  message
 		}
 		... on CreateUserPayload {
 			viewer {
@@ -74,10 +74,10 @@ mutation createUserMutation(
 					username
 					dbid
 					bio
-        }
-      }
-    }
-  }
+				}
+			}
+		}
+	}
 }
 
 mutation getAuthNonceMutation($input: ChainAddressInput!) {
@@ -134,7 +134,7 @@ mutation addUserWalletMutation(
 			viewer {
 				user {
 					wallets {
-            dbid
+						dbid
 						chainAddress {
 							address
 							chain
@@ -156,7 +156,7 @@ mutation removeUserWalletsMutation($walletIds: [DBID!]!) {
 			viewer {
 				user {
 					wallets {
-            dbid
+						dbid
 						chainAddress {
 							address
 							chain
