@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/util"
 
@@ -74,46 +73,6 @@ func (g *GalleryRepository) AddCollections(pCtx context.Context, pID persist.DBI
 	err := ensureCollsOwnedByUserToken(pCtx, g, pCollections, pUserID)
 	if err != nil {
 		return err
-	}
-
-	ct, err := g.queries.GalleryRepoCountColls(pCtx, pID)
-	if err != nil {
-		return err
-	}
-
-	allCollsCt, err := g.queries.GalleryRepoCountAllCollections(pCtx, pUserID)
-	if err != nil {
-		return err
-	}
-
-	if ct+int64(len(pCollections)) != allCollsCt {
-		galleryCollIDs, err := g.queries.GalleryRepoGetGalleryCollections(pCtx, pID)
-		if err != nil {
-			return err
-		}
-		galleryCollIDs = append(pCollections, galleryCollIDs...)
-
-		allColls, err := addUnaccountedForCollectionsToken(pCtx, g, pUserID, galleryCollIDs)
-		if err != nil {
-			return err
-		}
-
-		rowsAffected, err := g.queries.GalleryRepoUpdate(pCtx, db.GalleryRepoUpdateParams{
-			LastUpdated: time.Now(),
-			Collections: allColls,
-			GalleryID:   pID,
-			OwnerUserID: pUserID,
-		})
-
-		if err != nil {
-			return err
-		}
-
-		if rowsAffected == 0 {
-			return persist.ErrGalleryNotFound{ID: pID}
-		}
-
-		return nil
 	}
 
 	rowsAffected, err := g.queries.GalleryRepoAddCollections(pCtx, db.GalleryRepoAddCollectionsParams{
