@@ -50,6 +50,11 @@ func TestGraphQL(t *testing.T) {
 			run:      testGraphQL_Tokens,
 			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasks},
 		},
+		{
+			title:    "test collections API",
+			run:      testGraphQL_Tokens,
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasks},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.title, withSetup(test.run, test.fixtures...))
@@ -76,6 +81,15 @@ func testGraphQL_User(t *testing.T) {
 func testGraphQL_Tokens(t *testing.T) {
 	tests := []testCase{
 		{title: "should sync tokens", run: testSyncTokens(newUserFixture{})},
+	}
+	for _, test := range tests {
+		t.Run(test.title, withSetup(test.run, test.fixtures...))
+	}
+}
+
+func testGraphQL_Collections(t *testing.T) {
+	tests := []testCase{
+		{title: "should add tokens to collection", run: testAddTokens(newUserWithTokensFixtures{})},
 	}
 	for _, test := range tests {
 		t.Run(test.title, withSetup(test.run, test.fixtures...))
@@ -394,12 +408,10 @@ func testSyncTokens(userF newUserFixture) func(t *testing.T) {
 		userF.setup(t)
 		r := server.ResourcesInit(context.Background())
 		p := multichain.Provider{
-			Repos:                 r.Repos,
-			TasksClient:           r.TaskClient,
-			Queries:               r.Queries,
-			Chains:                map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
-			Cache:                 nil, // not needed for test
-			ChainAddressOverrides: nil, // not needed for test
+			Repos:       r.Repos,
+			TasksClient: r.TaskClient,
+			Queries:     r.Queries,
+			Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 		}
 		h := server.CoreInit(r, &p)
 		c := newClient(h)
@@ -410,6 +422,7 @@ func testSyncTokens(userF newUserFixture) func(t *testing.T) {
 					User struct {
 						Tokens []struct {
 							Chain   string
+							DBID    persist.DBID
 							TokenID string
 						}
 					}
@@ -426,6 +439,12 @@ func testSyncTokens(userF newUserFixture) func(t *testing.T) {
 
 		require.Empty(t, response.SyncTokens.Message)
 		assert.NotEmpty(t, response.SyncTokens.Viewer.User.Tokens)
+	}
+}
+
+func testAddTokens(userF newUserWithTokensFixtures) func(*testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
 	}
 }
 
@@ -537,6 +556,40 @@ func newJWT(t *testing.T, userID persist.DBID) string {
 	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
 	require.NoError(t, err)
 	return jwt
+}
+
+// syncTokens makes a GraphQL request to sync a user's wallet
+func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID, address string) []persist.DBID {
+	t.Helper()
+	c := newClient(handler)
+	var response = struct {
+		SyncTokens struct {
+			errMessage
+			Viewer struct {
+				User struct {
+					Tokens []struct {
+						Chain   string
+						DBID    persist.DBID
+						TokenID string
+					}
+				}
+			}
+		}
+	}{}
+
+	post(t, c, ops.Op("syncTokensMutation"), &response,
+		withJWT(newJWT(t, userID)),
+		client.Var("walletIds", []map[string]string{
+			{"address": address, "chain": "Ethereum"},
+		}),
+	)
+	require.Empty(t, response.SyncTokens.Message)
+
+	tokens := make([]persist.DBID, len(response.SyncTokens.Viewer.User.Tokens))
+	for _, token := range response.SyncTokens.Viewer.User.Tokens {
+		tokens = append(tokens, token.DBID)
+	}
+	return tokens
 }
 
 // defaultHandler returns a backend GraphQL http.Handler

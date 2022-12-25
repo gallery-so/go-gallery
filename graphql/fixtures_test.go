@@ -110,7 +110,6 @@ func (f *newNonceFixture) setup(t *testing.T) {
 	wallet := newWallet(t)
 	c := defaultClient()
 	nonce := newNonce(t, c, wallet)
-
 	f.wallet = wallet
 	f.nonce = nonce
 }
@@ -127,10 +126,29 @@ func (f *newUserFixture) setup(t *testing.T) {
 	wallet := newWallet(t)
 	c := defaultClient()
 	id, username := newUser(t, c, wallet)
-
 	f.wallet = wallet
 	f.username = username
 	f.id = id
+}
+
+// newUserWithTokensFixtures generates a new user with tokens synced
+type newUserWithTokensFixtures struct {
+	newUserFixture
+	tokenIDs []persist.DBID
+}
+
+func (f *newUserWithTokensFixtures) setup(t *testing.T) {
+	t.Helper()
+	f.newUserFixture.setup(t)
+	r := server.ResourcesInit(context.Background())
+	p := multichain.Provider{
+		Repos:       r.Repos,
+		TasksClient: r.TaskClient,
+		Queries:     r.Queries,
+		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
+	}
+	h := server.CoreInit(r, &p)
+	f.tokenIDs = syncTokens(t, h, f.id, f.wallet.address)
 }
 
 type stubProvider struct{}

@@ -179,6 +179,7 @@ mutation syncTokensMutation($chains: [Chain!]) {
         user {
           tokens {
             chain
+            dbid
             tokenId
           }
         }
