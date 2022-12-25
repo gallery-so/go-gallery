@@ -167,3 +167,22 @@ mutation removeUserWalletsMutation($walletIds: [DBID!]!) {
     }
   }
 }
+
+mutation syncTokensMutation($chains: [Chain!]) {
+  syncTokens(chains: $chains) {
+    ... on Error {
+      __typename
+      message
+    }
+    ...on SyncTokensPayload {
+      viewer {
+        user {
+          tokens {
+            chain
+            tokenId
+          }
+        }
+      }
+    }
+  }
+}

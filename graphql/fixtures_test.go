@@ -1,13 +1,17 @@
 package graphql_test
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/server"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/stretchr/testify/require"
@@ -19,9 +23,16 @@ type fixture func(t *testing.T)
 // withSetup sets up each fixture before running the test
 func withSetup(test func(t *testing.T), fixtures ...fixture) func(t *testing.T) {
 	return func(t *testing.T) {
+		var wg sync.WaitGroup
 		for _, fixture := range fixtures {
-			fixture(t)
+			fixture := fixture
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				fixture(t)
+			}()
 		}
+		wg.Wait()
 		test(t)
 	}
 }
@@ -74,6 +85,15 @@ func useRedis(t *testing.T) {
 	t.Cleanup(func() { r.Close() })
 }
 
+// useCloudTasks starts a running Cloud Tasks emulator with a set of tasks queues created.
+func useCloudTasks(t *testing.T) {
+	t.Helper()
+	r, err := docker.StartCloudTasks()
+	require.NoError(t, err)
+	t.Setenv("TASK_QUEUE_HOST", r.GetHostPort("8123/tcp"))
+	t.Cleanup(func() { r.Close() })
+}
+
 // fixturer defers running a fixture until setup is called
 type fixturer interface {
 	setup(t *testing.T)
@@ -111,4 +131,45 @@ func (f *newUserFixture) setup(t *testing.T) {
 	f.wallet = wallet
 	f.username = username
 	f.id = id
+}
+
+type stubProvider struct{}
+
+func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+	contract := multichain.ChainAgnosticContract{
+		Address: "0x123",
+		Name:    "testContract",
+		Symbol:  "TEST",
+	}
+
+	tokens := []multichain.ChainAgnosticToken{}
+
+	if limit == 0 {
+		limit = 10
+	}
+
+	for i := 0; i < limit; i++ {
+		tokenID := i * offset
+		tokens = append(tokens, multichain.ChainAgnosticToken{
+			Name:            fmt.Sprintf("testToken%d", tokenID),
+			TokenID:         persist.TokenID(fmt.Sprintf("%X", tokenID)),
+			Quantity:        "1",
+			ContractAddress: contract.Address,
+			OwnerAddress:    address,
+		})
+	}
+
+	return tokens, []multichain.ChainAgnosticContract{contract}, nil
+}
+
+func (p *stubProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	panic("not implemented")
+}
+
+func (p *stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	panic("not implemented")
+}
+
+func (p *stubProvider) GetTokensByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+	panic("not implemented")
 }

@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,7 +12,7 @@ import (
 	"time"
 
 	"github.com/asottile/dockerfile"
-	"github.com/mikeydub/go-gallery/service/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -82,6 +83,14 @@ func StartRedis() (*dockertest.Resource, error) {
 	return r, nil
 }
 
+func StartCloudTasks() (*dockertest.Resource, error) {
+	pool, err := newPool(time.Minute * 3)
+	if err != nil {
+		return nil, err
+	}
+	return startService(pool, "task-emulator")
+}
+
 // N.B. This isn't the entire Docker Compose spec...
 type compose struct {
 	Version  string             `yaml:"version"`
@@ -97,7 +106,8 @@ type service struct {
 		Args       []string `yaml:"args"`
 	} `yaml:"build"`
 	Environment []string `yaml:"environment"`
-	Command     string   `yaml:"command"`
+	Command     []string `yaml:"command"`
+	Expose      []string `yaml:"expose"`
 }
 
 func startService(pool *dockertest.Pool, service string) (*dockertest.Resource, error) {
@@ -118,9 +128,11 @@ func startService(pool *dockertest.Pool, service string) (*dockertest.Resource, 
 
 	return pool.RunWithOptions(
 		&dockertest.RunOptions{
-			Repository: img,
-			Tag:        tag,
-			Env:        serviceConf.Environment,
+			Repository:   img,
+			Tag:          tag,
+			Env:          serviceConf.Environment,
+			Cmd:          serviceConf.Command,
+			ExposedPorts: serviceConf.Expose,
 		},
 		func(c *docker.HostConfig) {
 			c.AutoRemove = true
@@ -151,8 +163,13 @@ func waitOnDB(host, port, user, password, db string) func() error {
 
 func waitOnCache(host, password string) func() error {
 	return func() error {
-		client := redis.NewClient(0, host, password)
-		return client.Close()
+		client := redis.NewClient(&redis.Options{
+			Addr:     host,
+			Password: password,
+			DB:       0,
+		})
+		defer client.Close()
+		return client.Ping(context.Background()).Err()
 	}
 }
 

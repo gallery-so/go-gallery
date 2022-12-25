@@ -47,21 +47,51 @@ import (
 
 // Init initializes the server
 func Init() {
-
 	SetDefaults()
 
 	logger.InitWithGCPDefaults()
 	initSentry()
 
-	router := CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+	r := ResourcesInit(context.Background())
+	provider := NewMultichainProvider(r)
+	router := CoreInit(r, provider)
 
 	http.Handle("/", router)
+}
 
+type resources struct {
+	Repos         *postgres.Repositories
+	Queries       *coredb.Queries
+	HTTPClient    *http.Client
+	EthClient     *ethclient.Client
+	IPFSClient    *shell.Shell
+	ArweaveClient *goar.Client
+	StorageClient *storage.Client
+	TaskClient    *cloudtasks.Client
+	SecretClient  *secretmanager.Client
+	PubSubClient  *pubsub.Client
+}
+
+func ResourcesInit(ctx context.Context) *resources {
+	pq := postgres.NewClient()
+	pgx := postgres.NewPgxClient()
+	return &resources{
+		Repos:         newRepos(pq, pgx),
+		Queries:       db.New(pgx),
+		HTTPClient:    &http.Client{Timeout: 10 * time.Minute},
+		EthClient:     newEthClient(),
+		IPFSClient:    rpc.NewIPFSShell(),
+		ArweaveClient: rpc.NewArweaveClient(),
+		StorageClient: media.NewStorageClient(ctx),
+		TaskClient:    task.NewClient(ctx),
+		SecretClient:  newSecretsClient(),
+		PubSubClient:  newPubSubClient(),
+	}
 }
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
+func CoreInit(r *resources, provider *multichain.Provider) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
@@ -82,50 +112,41 @@ func CoreInit(pqClient *sql.DB, pgx *pgxpool.Pool) *gin.Engine {
 		panic(err)
 	}
 
-	repos := newRepos(pqClient, pgx)
-	ethClient := newEthClient()
-	httpClient := &http.Client{Timeout: 10 * time.Minute}
-	ipfsClient := rpc.NewIPFSShell()
-	arweaveClient := rpc.NewArweaveClient()
-	var storage *storage.Client
-	var pub *pubsub.Client
-	if viper.GetString("ENV") == "local" {
-		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
-		storage = media.NewLocalStorageClient(context.Background(), keyPath)
-		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile(keyPath))
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		storage = media.NewStorageClient(context.Background())
-		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"))
-		if err != nil {
-			panic(err)
-		}
-	}
-	taskClient := task.NewClient(context.Background())
-	secretClient := newSecretsClient()
 	lock := redis.NewLockClient(redis.NotificationLockDB)
-
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 
-	queries := db.New(pgx)
+	return handlersInit(router, r.Repos, r.Queries, r.EthClient, r.IPFSClient, r.ArweaveClient, r.StorageClient, provider, newThrottler(), r.TaskClient, r.PubSubClient, lock, r.SecretClient, graphqlAPQCache)
+}
 
-	return handlersInit(router, repos, queries, ethClient, ipfsClient, arweaveClient, storage, NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), ethClient, httpClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), taskClient), newThrottler(), taskClient, pub, lock, secretClient, graphqlAPQCache)
+func newPubSubClient() *pubsub.Client {
+	options := []option.ClientOption{}
+
+	if viper.GetString("ENV") == "local" {
+		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
+		options = append(options, option.WithCredentialsFile(keyPath))
+	}
+
+	pub, err := pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), options...)
+	if err != nil {
+		panic(err)
+	}
+
+	return pub
 }
 
 func newSecretsClient() *secretmanager.Client {
-	var c *secretmanager.Client
-	var err error
-	if viper.GetString("ENV") != "local" {
-		c, err = secretmanager.NewClient(context.Background())
-	} else {
+	options := []option.ClientOption{}
+
+	if viper.GetString("ENV") == "local" {
 		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
-		c, err = secretmanager.NewClient(context.Background(), option.WithCredentialsFile(keyPath))
+		options = append(options, option.WithCredentialsFile(keyPath))
 	}
+
+	c, err := secretmanager.NewClient(context.Background(), options...)
 	if err != nil {
 		panic(fmt.Sprintf("error creating secrets client: %v", err))
 	}
+
 	return c
 }
 
@@ -254,20 +275,31 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(repos *postgres.Repositories, queries *coredb.Queries, cache *redis.Cache, ethClient *ethclient.Client, httpClient *http.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, taskClient *cloudtasks.Client) *multichain.Provider {
+func NewMultichainProvider(r *resources) *multichain.Provider {
+	indexerHost := viper.GetString("INDEXER_HOST")
+	tezosAPI := viper.GetString("TEZOS_API_URL")
+	tokenProcessingURL := viper.GetString("TOKEN_PROCESSING_URL")
+	ipfsURL := viper.GetString("IPFS_URL")
+	poapAPIKey := viper.GetString("POAP_API_KEY")
+	poapAuthToken := viper.GetString("POAP_AUTH_TOKEN")
+	tokenBucket := viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")
+
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
-	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), httpClient, ethClient, taskClient)
-	openseaProvider := opensea.NewProvider(ethClient, httpClient)
+	ethProvider := eth.NewProvider(indexerHost, r.HTTPClient, r.EthClient, r.TaskClient)
+	openseaProvider := opensea.NewProvider(r.EthClient, r.HTTPClient)
+	tezosPrimary := tezos.NewProvider(tezosAPI, tokenProcessingURL, ipfsURL, r.HTTPClient, r.IPFSClient, r.ArweaveClient, r.StorageClient, tokenBucket)
+	tezosFallback := tezos.NewObjktProvider(ipfsURL)
 	tezosProvider := multichain.FallbackProvider{
-		Primary:  tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), httpClient, ipfsClient, arweaveClient, storageClient, tokenBucket),
-		Fallback: tezos.NewObjktProvider(viper.GetString("IPFS_URL")),
+		Primary:  tezosPrimary,
+		Fallback: tezosFallback,
 		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
 			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
 		},
 	}
-	poapProvider := poap.NewProvider(httpClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
-	return multichain.NewProvider(context.Background(), repos, queries, cache, taskClient,
+	poapProvider := poap.NewProvider(r.HTTPClient, poapAPIKey, poapAuthToken)
+	communityCache := redis.NewCache(redis.CommunitiesDB)
+	return multichain.NewProvider(context.Background(), r.Repos, r.Queries, communityCache, r.TaskClient,
 		overrides,
 		ethProvider,
 		openseaProvider,

@@ -304,7 +304,6 @@ func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain,
 	return nil
 }
 
-
 func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) error {
 	userID, err := getAuthenticatedUser(ctx)
 

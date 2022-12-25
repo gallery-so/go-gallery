@@ -20,8 +20,8 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
@@ -45,6 +45,11 @@ func TestGraphQL(t *testing.T) {
 			run:      testGraphQL_User,
 			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis},
 		},
+		{
+			title:    "test tokens API",
+			run:      testGraphQL_Tokens,
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasks},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.title, withSetup(test.run, test.fixtures...))
@@ -62,6 +67,15 @@ func testGraphQL_User(t *testing.T) {
 		{title: "should get viewer", run: testViewer(newUserFixture{})},
 		{title: "should add a wallet", run: testAddWallet(newUserFixture{})},
 		{title: "should remove a wallet", run: testRemoveWallet(newUserFixture{})},
+	}
+	for _, test := range tests {
+		t.Run(test.title, withSetup(test.run, test.fixtures...))
+	}
+}
+
+func testGraphQL_Tokens(t *testing.T) {
+	tests := []testCase{
+		{title: "should sync tokens", run: testSyncTokens(newUserFixture{})},
 	}
 	for _, test := range tests {
 		t.Run(test.title, withSetup(test.run, test.fixtures...))
@@ -319,7 +333,7 @@ func testLogin(userF newUserFixture) func(t *testing.T) {
 
 		// Handle request
 		w := httptest.NewRecorder()
-		handler := server.CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+		handler := defaultHandler()
 		handler.ServeHTTP(w, r)
 		res := w.Result()
 		defer res.Body.Close()
@@ -355,7 +369,7 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 
 		// Handle request
 		w := httptest.NewRecorder()
-		handler := server.CoreInit(postgres.NewClient(), postgres.NewPgxClient())
+		handler := defaultHandler()
 		handler.ServeHTTP(w, r)
 		res := w.Result()
 		defer res.Body.Close()
@@ -372,6 +386,46 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, readCookie(t, res, auth.JWTCookieKey))
 		assert.Empty(t, response.Logout.Viewer)
+	}
+}
+
+func testSyncTokens(userF newUserFixture) func(t *testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		r := server.ResourcesInit(context.Background())
+		p := multichain.Provider{
+			Repos:                 r.Repos,
+			TasksClient:           r.TaskClient,
+			Queries:               r.Queries,
+			Chains:                map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
+			Cache:                 nil, // not needed for test
+			ChainAddressOverrides: nil, // not needed for test
+		}
+		h := server.CoreInit(r, &p)
+		c := newClient(h)
+		var response = struct {
+			SyncTokens struct {
+				errMessage
+				Viewer struct {
+					User struct {
+						Tokens []struct {
+							Chain   string
+							TokenID string
+						}
+					}
+				}
+			}
+		}{}
+
+		post(t, c, ops.Op("syncTokensMutation"), &response,
+			withJWT(newJWT(t, userF.id)),
+			client.Var("walletIds", []map[string]string{
+				{"address": userF.wallet.address, "chain": "Ethereum"},
+			}),
+		)
+
+		require.Empty(t, response.SyncTokens.Message)
+		assert.NotEmpty(t, response.SyncTokens.Viewer.User.Tokens)
 	}
 }
 
@@ -485,17 +539,25 @@ func newJWT(t *testing.T, userID persist.DBID) string {
 	return jwt
 }
 
-// defaultClient returns a GraphQL client attached to the backend GraphQL handler
-func defaultClient() *client.Client {
-	handler := server.CoreInit(postgres.NewClient(), postgres.NewPgxClient())
-	return newClient(handler, func(r *client.Request) {
+// defaultHandler returns a backend GraphQL http.Handler
+func defaultHandler() http.Handler {
+	r := server.ResourcesInit(context.Background())
+	p := server.NewMultichainProvider(r)
+	handler := server.CoreInit(r, p)
+	return handler
+}
+
+// newClient returns a gqlgen test client
+func newClient(handler http.Handler) *client.Client {
+	return client.New(handler, func(r *client.Request) {
 		r.HTTP.URL.Path = "/glry/graphql/query"
 	})
 }
 
-// newClient returns a gqlgen test client
-func newClient(handler http.Handler, opts ...client.Option) *client.Client {
-	return client.New(handler, opts...)
+// defaultClient returns a GraphQL client attached to a backend GraphQL handler
+func defaultClient() *client.Client {
+	handler := defaultHandler()
+	return newClient(handler)
 }
 
 type operations map[string]string
