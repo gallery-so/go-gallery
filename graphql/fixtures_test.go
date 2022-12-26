@@ -20,8 +20,8 @@ import (
 // fixture runs setup and teardown for a test
 type fixture func(t *testing.T)
 
-// withSetup sets up each fixture before running the test
-func withSetup(test func(t *testing.T), fixtures ...fixture) func(t *testing.T) {
+// withFixtures sets up each fixture before running the test
+func withFixtures(test func(t *testing.T), fixtures ...fixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		var wg sync.WaitGroup
 		for _, fixture := range fixtures {
@@ -116,28 +116,30 @@ func (f *newNonceFixture) setup(t *testing.T) {
 
 // newUserFixture generates a new user
 type newUserFixture struct {
-	wallet   wallet
-	username string
-	id       persist.DBID
+	wallet    wallet
+	username  string
+	id        persist.DBID
+	galleryID persist.DBID
 }
 
 func (f *newUserFixture) setup(t *testing.T) {
 	t.Helper()
 	wallet := newWallet(t)
 	c := defaultClient()
-	id, username := newUser(t, c, wallet)
+	userID, username, galleryID := newUser(t, c, wallet)
 	f.wallet = wallet
 	f.username = username
-	f.id = id
+	f.id = userID
+	f.galleryID = galleryID
 }
 
-// newUserWithTokensFixtures generates a new user with tokens synced
-type newUserWithTokensFixtures struct {
+// newUserWithTokensFixture generates a new user with tokens synced
+type newUserWithTokensFixture struct {
 	newUserFixture
 	tokenIDs []persist.DBID
 }
 
-func (f *newUserWithTokensFixtures) setup(t *testing.T) {
+func (f *newUserWithTokensFixture) setup(t *testing.T) {
 	t.Helper()
 	f.newUserFixture.setup(t)
 	r := server.ResourcesInit(context.Background())
@@ -151,9 +153,10 @@ func (f *newUserWithTokensFixtures) setup(t *testing.T) {
 	f.tokenIDs = syncTokens(t, h, f.id, f.wallet.address)
 }
 
+// stubProvider returns the same response for every call
 type stubProvider struct{}
 
-func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
+func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
 	contract := multichain.ChainAgnosticContract{
 		Address: "0x123",
 		Name:    "testContract",
@@ -162,15 +165,10 @@ func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address per
 
 	tokens := []multichain.ChainAgnosticToken{}
 
-	if limit == 0 {
-		limit = 10
-	}
-
-	for i := 0; i < limit; i++ {
-		tokenID := i * offset
+	for i := 0; i < 10; i++ {
 		tokens = append(tokens, multichain.ChainAgnosticToken{
-			Name:            fmt.Sprintf("testToken%d", tokenID),
-			TokenID:         persist.TokenID(fmt.Sprintf("%X", tokenID)),
+			Name:            fmt.Sprintf("testToken%d", i),
+			TokenID:         persist.TokenID(fmt.Sprintf("%X", i)),
 			Quantity:        "1",
 			ContractAddress: contract.Address,
 			OwnerAddress:    address,
@@ -180,11 +178,11 @@ func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address per
 	return tokens, []multichain.ChainAgnosticContract{contract}, nil
 }
 
-func (p *stubProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *stubProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 
-func (p *stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit int, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
+func (p *stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("not implemented")
 }
 

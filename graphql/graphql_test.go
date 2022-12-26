@@ -52,12 +52,12 @@ func TestGraphQL(t *testing.T) {
 		},
 		{
 			title:    "test collections API",
-			run:      testGraphQL_Tokens,
+			run:      testGraphQL_Collections,
 			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasks},
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.title, withSetup(test.run, test.fixtures...))
+		t.Run(test.title, withFixtures(test.run, test.fixtures...))
 	}
 }
 
@@ -74,7 +74,7 @@ func testGraphQL_User(t *testing.T) {
 		{title: "should remove a wallet", run: testRemoveWallet(newUserFixture{})},
 	}
 	for _, test := range tests {
-		t.Run(test.title, withSetup(test.run, test.fixtures...))
+		t.Run(test.title, withFixtures(test.run, test.fixtures...))
 	}
 }
 
@@ -83,16 +83,16 @@ func testGraphQL_Tokens(t *testing.T) {
 		{title: "should sync tokens", run: testSyncTokens(newUserFixture{})},
 	}
 	for _, test := range tests {
-		t.Run(test.title, withSetup(test.run, test.fixtures...))
+		t.Run(test.title, withFixtures(test.run, test.fixtures...))
 	}
 }
 
 func testGraphQL_Collections(t *testing.T) {
 	tests := []testCase{
-		{title: "should add tokens to collection", run: testAddTokens(newUserWithTokensFixtures{})},
+		{title: "should create a collection", run: testCreateCollection(newUserWithTokensFixture{})},
 	}
 	for _, test := range tests {
-		t.Run(test.title, withSetup(test.run, test.fixtures...))
+		t.Run(test.title, withFixtures(test.run, test.fixtures...))
 	}
 }
 
@@ -442,9 +442,44 @@ func testSyncTokens(userF newUserFixture) func(t *testing.T) {
 	}
 }
 
-func testAddTokens(userF newUserWithTokensFixtures) func(*testing.T) {
+func testCreateCollection(userF newUserWithTokensFixture) func(*testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
+		c := defaultClient()
+
+		var response = struct {
+			CreateCollection struct {
+				model.CreateCollectionPayload
+				errMessage
+			}
+		}{}
+
+		post(t, c, ops.Op("createCollectionMutation"), &response,
+			withJWT(newJWT(t, userF.id)),
+			client.Var("input", map[string]any{
+				"galleryId":      userF.galleryID,
+				"name":           "newCollection",
+				"tokens":         userF.tokenIDs[:1],
+				"collectorsNote": "this is a note",
+				"layout": map[string]any{
+					"sections": []int{0},
+					"sectionLayout": map[string]any{
+						"columns":    0,
+						"whitespace": []int{},
+					},
+				},
+				"tokenSettings": []map[string]any{
+					{
+						"tokenId":    userF.tokenIDs[0],
+						"renderLive": false,
+					},
+				},
+			}),
+		)
+
+		require.Empty(t, response.CreateCollection.Message)
+		assert.NotEmpty(t, response.CreateCollection.Collection.Dbid)
+		assert.Len(t, response.CreateCollection.Collection.Tokens, 1)
 	}
 }
 
@@ -454,6 +489,8 @@ type errMessage struct {
 	Message  string `json:"message"`
 }
 
+// post makes a POST request using the provided client and decodes the response
+// post will fail if an error is returned from the client or if decoding fails
 func post(t *testing.T, c *client.Client, query string, into any, options ...client.Option) {
 	t.Helper()
 	r, err := c.RawPost(query, options...)
@@ -525,10 +562,10 @@ func newNonce(t *testing.T, c *client.Client, w wallet) string {
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, c *client.Client, w wallet) (persist.DBID, string) {
+func newUser(t *testing.T, c *client.Client, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
 	nonce := newNonce(t, c, w)
-	username := "user" + persist.GenerateID().String()
+	username = "user" + persist.GenerateID().String()
 	var response = struct {
 		CreateUser struct {
 			Viewer model.Viewer
@@ -548,7 +585,7 @@ func newUser(t *testing.T, c *client.Client, w wallet) (persist.DBID, string) {
 	)
 	require.Empty(t, response.CreateUser.Message)
 
-	return response.CreateUser.Viewer.User.Dbid, username
+	return response.CreateUser.Viewer.User.Dbid, username, response.CreateUser.Viewer.User.Galleries[0].Dbid
 }
 
 // newJWT generates a JWT
@@ -586,8 +623,8 @@ func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID, address
 	require.Empty(t, response.SyncTokens.Message)
 
 	tokens := make([]persist.DBID, len(response.SyncTokens.Viewer.User.Tokens))
-	for _, token := range response.SyncTokens.Viewer.User.Tokens {
-		tokens = append(tokens, token.DBID)
+	for i, token := range response.SyncTokens.Viewer.User.Tokens {
+		tokens[i] = token.DBID
 	}
 	return tokens
 }

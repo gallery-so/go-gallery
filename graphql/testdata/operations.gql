@@ -74,6 +74,9 @@ mutation createUserMutation(
           username
           dbid
           bio
+          galleries {
+            dbid
+          }
         }
       }
     }
@@ -181,6 +184,26 @@ mutation syncTokensMutation($chains: [Chain!]) {
             chain
             dbid
             tokenId
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation createCollectionMutation($input: CreateCollectionInput!) {
+  createCollection(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CreateCollectionPayload {
+      collection {
+        dbid
+        name
+        tokens {
+          token {
+            dbid
           }
         }
       }
