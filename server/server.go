@@ -59,7 +59,7 @@ func Init() {
 	http.Handle("/", router)
 }
 
-type resources struct {
+type Resources struct {
 	Repos         *postgres.Repositories
 	Queries       *coredb.Queries
 	HTTPClient    *http.Client
@@ -72,10 +72,10 @@ type resources struct {
 	PubSubClient  *pubsub.Client
 }
 
-func ResourcesInit(ctx context.Context) *resources {
+func ResourcesInit(ctx context.Context) *Resources {
 	pq := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
-	return &resources{
+	return &Resources{
 		Repos:         newRepos(pq, pgx),
 		Queries:       db.New(pgx),
 		HTTPClient:    &http.Client{Timeout: 10 * time.Minute},
@@ -91,7 +91,7 @@ func ResourcesInit(ctx context.Context) *resources {
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(r *resources, provider *multichain.Provider) *gin.Engine {
+func CoreInit(r *Resources, provider *multichain.Provider) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
@@ -275,7 +275,7 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(r *resources) *multichain.Provider {
+func NewMultichainProvider(r *Resources) *multichain.Provider {
 	indexerHost := viper.GetString("INDEXER_HOST")
 	tezosAPI := viper.GetString("TEZOS_API_URL")
 	tokenProcessingURL := viper.GetString("TOKEN_PROCESSING_URL")

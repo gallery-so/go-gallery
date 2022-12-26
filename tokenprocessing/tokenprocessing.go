@@ -9,19 +9,15 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
-	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
-	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -41,17 +37,7 @@ func coreInitServer() *gin.Engine {
 	initSentry()
 	logger.InitWithGCPDefaults()
 
-	repos := newRepos(postgres.NewClient(), postgres.NewPgxClient())
-	var s *storage.Client
-	if viper.GetString("ENV") == "local" {
-		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
-	} else {
-		s = media.NewStorageClient(context.Background())
-	}
-
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
-	ipfsClient := rpc.NewIPFSShell()
-	arweaveClient := rpc.NewArweaveClient()
 
 	router := gin.Default()
 
@@ -65,10 +51,10 @@ func coreInitServer() *gin.Engine {
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-	queries := coredb.New(postgres.NewPgxClient())
-	mc := server.NewMultichainProvider(repos, queries, redis.NewCache(redis.CommunitiesDB), rpc.NewEthClient(), http.DefaultClient, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), task.NewClient(context.Background()))
+	r := server.ResourcesInit(context.Background())
+	mc := server.NewMultichainProvider(r)
 
-	return handlersInitServer(router, mc, repos, ipfsClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, mc, r.Repos, r.IPFSClient, r.ArweaveClient, r.StorageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
