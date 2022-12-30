@@ -52,14 +52,14 @@ func Init() {
 	logger.InitWithGCPDefaults()
 	initSentry()
 
-	r := ResourcesInit(context.Background())
-	provider := NewMultichainProvider(r)
-	router := CoreInit(r, provider)
+	c := ClientInit(context.Background())
+	provider := NewMultichainProvider(c)
+	router := CoreInit(c, provider)
 
 	http.Handle("/", router)
 }
 
-type Resources struct {
+type Clients struct {
 	Repos         *postgres.Repositories
 	Queries       *coredb.Queries
 	HTTPClient    *http.Client
@@ -72,10 +72,10 @@ type Resources struct {
 	PubSubClient  *pubsub.Client
 }
 
-func ResourcesInit(ctx context.Context) *Resources {
+func ClientInit(ctx context.Context) *Clients {
 	pq := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
-	return &Resources{
+	return &Clients{
 		Repos:         newRepos(pq, pgx),
 		Queries:       db.New(pgx),
 		HTTPClient:    &http.Client{Timeout: 10 * time.Minute},
@@ -91,7 +91,7 @@ func ResourcesInit(ctx context.Context) *Resources {
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(r *Resources, provider *multichain.Provider) *gin.Engine {
+func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
@@ -115,7 +115,7 @@ func CoreInit(r *Resources, provider *multichain.Provider) *gin.Engine {
 	lock := redis.NewLockClient(redis.NotificationLockDB)
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 
-	return handlersInit(router, r.Repos, r.Queries, r.EthClient, r.IPFSClient, r.ArweaveClient, r.StorageClient, provider, newThrottler(), r.TaskClient, r.PubSubClient, lock, r.SecretClient, graphqlAPQCache)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache)
 }
 
 func newPubSubClient() *pubsub.Client {
@@ -275,7 +275,7 @@ func initSentry() {
 	}
 }
 
-func NewMultichainProvider(r *Resources) *multichain.Provider {
+func NewMultichainProvider(c *Clients) *multichain.Provider {
 	indexerHost := viper.GetString("INDEXER_HOST")
 	tezosAPI := viper.GetString("TEZOS_API_URL")
 	tokenProcessingURL := viper.GetString("TOKEN_PROCESSING_URL")
@@ -286,9 +286,9 @@ func NewMultichainProvider(r *Resources) *multichain.Provider {
 
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
-	ethProvider := eth.NewProvider(indexerHost, r.HTTPClient, r.EthClient, r.TaskClient)
-	openseaProvider := opensea.NewProvider(r.EthClient, r.HTTPClient)
-	tezosPrimary := tezos.NewProvider(tezosAPI, tokenProcessingURL, ipfsURL, r.HTTPClient, r.IPFSClient, r.ArweaveClient, r.StorageClient, tokenBucket)
+	ethProvider := eth.NewProvider(indexerHost, c.HTTPClient, c.EthClient, c.TaskClient)
+	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
+	tezosPrimary := tezos.NewProvider(tezosAPI, tokenProcessingURL, ipfsURL, c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, tokenBucket)
 	tezosFallback := tezos.NewObjktProvider(ipfsURL)
 	tezosProvider := multichain.FallbackProvider{
 		Primary:  tezosPrimary,
@@ -297,9 +297,9 @@ func NewMultichainProvider(r *Resources) *multichain.Provider {
 			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
 		},
 	}
-	poapProvider := poap.NewProvider(r.HTTPClient, poapAPIKey, poapAuthToken)
+	poapProvider := poap.NewProvider(c.HTTPClient, poapAPIKey, poapAuthToken)
 	communityCache := redis.NewCache(redis.CommunitiesDB)
-	return multichain.NewProvider(context.Background(), r.Repos, r.Queries, communityCache, r.TaskClient,
+	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, communityCache, c.TaskClient,
 		overrides,
 		ethProvider,
 		openseaProvider,

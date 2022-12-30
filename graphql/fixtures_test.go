@@ -142,14 +142,14 @@ type newUserWithTokensFixture struct {
 func (f *newUserWithTokensFixture) setup(t *testing.T) {
 	t.Helper()
 	f.newUserFixture.setup(t)
-	r := server.ResourcesInit(context.Background())
+	c := server.ClientInit(context.Background())
 	p := multichain.Provider{
-		Repos:       r.Repos,
-		TasksClient: r.TaskClient,
-		Queries:     r.Queries,
+		Repos:       c.Repos,
+		TasksClient: c.TaskClient,
+		Queries:     c.Queries,
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
-	h := server.CoreInit(r, &p)
+	h := server.CoreInit(c, &p)
 	f.tokenIDs = syncTokens(t, h, f.id, f.wallet.address)
 }
 

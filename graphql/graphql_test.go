@@ -406,14 +406,14 @@ func testLogout(userF newUserFixture) func(t *testing.T) {
 func testSyncTokens(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		r := server.ResourcesInit(context.Background())
+		clients := server.ClientInit(context.Background())
 		p := multichain.Provider{
-			Repos:       r.Repos,
-			TasksClient: r.TaskClient,
-			Queries:     r.Queries,
+			Repos:       clients.Repos,
+			TasksClient: clients.TaskClient,
+			Queries:     clients.Queries,
 			Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 		}
-		h := server.CoreInit(r, &p)
+		h := server.CoreInit(clients, &p)
 		c := newClient(h)
 		var response = struct {
 			SyncTokens struct {
@@ -631,9 +631,9 @@ func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID, address
 
 // defaultHandler returns a backend GraphQL http.Handler
 func defaultHandler() http.Handler {
-	r := server.ResourcesInit(context.Background())
-	p := server.NewMultichainProvider(r)
-	handler := server.CoreInit(r, p)
+	c := server.ClientInit(context.Background())
+	p := server.NewMultichainProvider(c)
+	handler := server.CoreInit(c, p)
 	return handler
 }
 
