@@ -100,5 +100,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.x
-      - run: yarn install
-      - run: yarn prettier --check graphql/schema/schema.graphql
+      - name: Install Dependencies
+        run: yarn install
+      - name: Enforce GraphQL Format
+        run: yarn prettier --check graphql/schema/schema.graphql
