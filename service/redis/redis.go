@@ -75,8 +75,7 @@ type Cache struct {
 
 // NewCache creates a new redis cache
 func NewCache(db int) *Cache {
-	client := NewClient(db)
-	return &Cache{client: client}
+	return &Cache{client: NewClient(db)}
 }
 
 // ClearCache deletes the entire cache
@@ -120,8 +119,7 @@ func (c *Cache) Close(clear bool) error {
 }
 
 func NewLockClient(db int) *redislock.Client {
-	client := NewClient(db)
-	return redislock.New(client)
+	return redislock.New(NewClient(db))
 }
 
 // GlobalLock is a distributed lock that does not depend on a key.
