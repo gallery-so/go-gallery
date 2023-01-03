@@ -78,7 +78,7 @@ func usePostgres(t *testing.T) {
 }
 
 // useRedis starts a running Redis Docker container and stops the instance
-// when the test and its subtests complete.
+// when the test and its subtests complete
 func useRedis(t *testing.T) {
 	t.Helper()
 	r, err := docker.StartRedis()
@@ -87,7 +87,7 @@ func useRedis(t *testing.T) {
 	t.Cleanup(func() { r.Close() })
 }
 
-// useTokenQueue is a fixture that creates a dummy queue for token processing.
+// useTokenQueue is a fixture that creates a dummy queue for token processing
 func useTokenQueue(t *testing.T) {
 	t.Helper()
 	useCloudTasks(t)
@@ -104,7 +104,7 @@ func useTokenQueue(t *testing.T) {
 	t.Setenv("TOKEN_PROCESSING_QUEUE", queue.Name)
 }
 
-// useCloudTasks starts a running Cloud Tasks emulator with a set of tasks queues created.
+// useCloudTasks starts a running Cloud Tasks emulator
 func useCloudTasks(t *testing.T) {
 	t.Helper()
 	r, err := docker.StartCloudTasks()
@@ -172,7 +172,7 @@ func (f *newUserWithTokensFixture) setup(t *testing.T) {
 	f.tokenIDs = syncTokens(t, h, f.id, f.wallet.address)
 }
 
-// stubProvider returns the same response for every call
+// stubProvider returns the same response for every call made to it
 type stubProvider struct{}
 
 func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {

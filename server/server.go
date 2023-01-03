@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"github.com/everFinance/goar"
 	sentry "github.com/getsentry/sentry-go"
 	shell "github.com/ipfs/go-ipfs-api"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
@@ -76,7 +74,7 @@ func ClientInit(ctx context.Context) *Clients {
 	pq := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
 	return &Clients{
-		Repos:         newRepos(pq, pgx),
+		Repos:         postgres.NewRepositories(pq, pgx),
 		Queries:       db.New(pgx),
 		HTTPClient:    &http.Client{Timeout: 10 * time.Minute},
 		EthClient:     newEthClient(),
@@ -225,24 +223,6 @@ func SetDefaults() {
 	}
 }
 
-func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
-	queries := db.New(pgx)
-
-	return &postgres.Repositories{
-		UserRepository:        postgres.NewUserRepository(pq, queries),
-		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
-		GalleryRepository:     postgres.NewGalleryRepository(queries),
-		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
-		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
-		WalletRepository:      postgres.NewWalletRepository(pq, queries),
-		AdmireRepository:      postgres.NewAdmireRepository(queries),
-		CommentRepository:     postgres.NewCommentRepository(pq, queries),
-	}
-}
-
 func newEthClient() *ethclient.Client {
 	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
 	if err != nil {
@@ -286,16 +266,13 @@ func NewMultichainProvider(c *Clients) *multichain.Provider {
 	poapAPIKey := viper.GetString("POAP_API_KEY")
 	poapAuthToken := viper.GetString("POAP_AUTH_TOKEN")
 	tokenBucket := viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")
-
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
 	ethProvider := eth.NewProvider(indexerHost, c.HTTPClient, c.EthClient, c.TaskClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
-	tezosPrimary := tezos.NewProvider(tezosAPI, tokenProcessingURL, ipfsURL, c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, tokenBucket)
-	tezosFallback := tezos.NewObjktProvider(ipfsURL)
 	tezosProvider := multichain.FallbackProvider{
-		Primary:  tezosPrimary,
-		Fallback: tezosFallback,
+		Primary:  tezos.NewProvider(tezosAPI, tokenProcessingURL, ipfsURL, c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, tokenBucket),
+		Fallback: tezos.NewObjktProvider(ipfsURL),
 		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
 			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
 		},

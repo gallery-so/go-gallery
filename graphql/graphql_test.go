@@ -83,7 +83,9 @@ func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
 		}{}
 
 		post(t, c, ops.Op("createUserMutation"), &response,
-			client.Var("username", username),
+			client.Var("input", map[string]string{
+				"username": username,
+			}),
 			client.Var("authMechanism", map[string]any{
 				"eoa": map[string]any{
 					"nonce":       nonceF.nonce,
@@ -548,7 +550,9 @@ func newUser(t *testing.T, c *client.Client, w wallet) (userID persist.DBID, use
 	}{}
 
 	post(t, c, ops.Op("createUserMutation"), &response,
-		client.Var("username", username),
+		client.Var("input", map[string]string{
+			"username": username,
+		}),
 		client.Var("authMechanism", map[string]any{
 			"eoa": map[string]any{
 				"nonce":       nonce,

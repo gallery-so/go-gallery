@@ -54,15 +54,11 @@ query viewerQuery {
 
 mutation createUserMutation(
   $authMechanism: AuthMechanism!
-  $username: String!
-  $bio: String
-  $email: Email
+  $input: CreateUserInput!
 ) {
   createUser(
     authMechanism: $authMechanism
-    username: $username
-    bio: $bio
-    email: $email
+    input: $input
   ) {
     ... on Error {
       __typename
