@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
-	"github.com/mikeydub/go-gallery/graphql/apq"
-	"github.com/mikeydub/go-gallery/service/redis"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/graphql/apq"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/bsm/redislock"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -142,6 +143,8 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 				event.Request.Data = "[filtered]"
 				return event
 			})
+
+			hub.Scope().AddEventProcessor(sentryutil.SpanFilterEventProcessor(c, 1000, 1*time.Millisecond, 8, true))
 		}
 
 		disableDataloaderCaching := false

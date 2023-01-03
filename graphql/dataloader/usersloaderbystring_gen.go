@@ -17,6 +17,8 @@ type UsersLoaderByStringSettings interface {
 	getMaxBatchMany() int
 	getDisableCaching() bool
 	getPublishResults() bool
+	getPreFetchHook() func(context.Context, string) context.Context
+	getPostFetchHook() func(context.Context, string)
 	getSubscriptionRegistry() *[]interface{}
 	getMutexRegistry() *[]*sync.Mutex
 }
@@ -41,6 +43,14 @@ func (l *UsersLoaderByString) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
+func (l *UsersLoaderByString) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+	l.preFetchHook = preFetchHook
+}
+
+func (l *UsersLoaderByString) setPostFetchHook(postFetchHook func(context.Context, string)) {
+	l.postFetchHook = postFetchHook
+}
+
 // NewUsersLoaderByString creates a new UsersLoaderByString with the given settings, functions, and options
 func NewUsersLoaderByString(
 	settings UsersLoaderByStringSettings, fetch func(ctx context.Context, keys []string) ([][]coredb.User, []error),
@@ -50,6 +60,8 @@ func NewUsersLoaderByString(
 		setMaxBatch(int)
 		setDisableCaching(bool)
 		setPublishResults(bool)
+		setPreFetchHook(func(context.Context, string) context.Context)
+		setPostFetchHook(func(context.Context, string))
 	}),
 ) *UsersLoaderByString {
 	loader := &UsersLoaderByString{
@@ -57,6 +69,8 @@ func NewUsersLoaderByString(
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
 		publishResults:       settings.getPublishResults(),
+		preFetchHook:         settings.getPreFetchHook(),
+		postFetchHook:        settings.getPostFetchHook(),
 		subscriptionRegistry: settings.getSubscriptionRegistry(),
 		mutexRegistry:        settings.getMutexRegistry(),
 		maxBatch:             settings.getMaxBatchMany(),
@@ -67,7 +81,22 @@ func NewUsersLoaderByString(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []string) ([][]coredb.User, []error) { return fetch(loader.ctx, keys) }
+	loader.fetch = func(keys []string) ([][]coredb.User, []error) {
+		ctx := loader.ctx
+
+		// Allow the preFetchHook to modify and return a new context
+		if loader.preFetchHook != nil {
+			ctx = loader.preFetchHook(ctx, "UsersLoaderByString")
+		}
+
+		results, errors := fetch(ctx, keys)
+
+		if loader.postFetchHook != nil {
+			loader.postFetchHook(ctx, "UsersLoaderByString")
+		}
+
+		return results, errors
+	}
 
 	if loader.subscriptionRegistry == nil {
 		panic("subscriptionRegistry may not be nil")
@@ -102,6 +131,13 @@ type UsersLoaderByString struct {
 
 	// whether this dataloader will publish its results for others to cache
 	publishResults bool
+
+	// a hook invoked before the fetch operation, useful for things like tracing.
+	// the returned context will be passed to the fetch operation.
+	preFetchHook func(ctx context.Context, loaderName string) context.Context
+
+	// a hook invoked after the fetch operation, useful for things like tracing
+	postFetchHook func(ctx context.Context, loaderName string)
 
 	// a shared slice where dataloaders will register and invoke caching functions.
 	// the same slice should be passed to every dataloader.

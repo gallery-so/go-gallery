@@ -43,6 +43,8 @@ var nodeFetcher = model.NodeFetcher{
 	OnAdmire:         resolveAdmireByAdmireID,
 	OnComment:        resolveCommentByCommentID,
 	OnMerchToken:     resolveMerchTokenByTokenID,
+	OnViewer:         resolveViewerByID,
+	OnDeletedNode:    resolveDeletedNodeByID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -334,6 +336,17 @@ func resolveCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) 
 	return output, nil
 }
 
+func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*string, error) {
+	tokens, err := publicapi.For(ctx).Gallery.GetTokenPreviewsByGalleryID(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.Map(tokens, func(token string) (*string, error) {
+		return &token, nil
+	})
+}
+
 func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (*model.CollectionToken, error) {
 	token, err := resolveTokenByTokenID(ctx, tokenID)
 	if err != nil {
@@ -492,11 +505,17 @@ func resolveWalletByAddress(ctx context.Context, address persist.DBID) (*model.W
 }
 
 func resolveViewer(ctx context.Context) *model.Viewer {
+
 	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
 		return nil
 	}
 
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
 	viewer := &model.Viewer{
+		HelperViewerData: model.HelperViewerData{
+			UserId: userID,
+		},
 		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver
 	}
@@ -941,6 +960,32 @@ func resolveMerchTokenByTokenID(ctx context.Context, tokenID string) (*model.Mer
 	return token, nil
 }
 
+func resolveViewerByID(ctx context.Context, id string) (*model.Viewer, error) {
+
+	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
+		return nil, nil
+	}
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+
+	if userID.String() != id {
+		return nil, nil
+	}
+
+	return &model.Viewer{
+		HelperViewerData: model.HelperViewerData{
+			UserId: userID,
+		},
+		User:            nil, // handled by dedicated resolver
+		ViewerGalleries: nil, // handled by dedicated resolver
+	}, nil
+}
+
+func resolveDeletedNodeByID(ctx context.Context, id persist.DBID) (*model.DeletedNode, error) {
+	return &model.DeletedNode{
+		Dbid: id,
+	}, nil
+}
+
 func verifyEmail(ctx context.Context, token string) (*model.VerifyEmailPayload, error) {
 	output, err := emails.VerifyEmail(ctx, token)
 	if err != nil {
@@ -1157,8 +1202,13 @@ func eventsToFeedEdges(events []db.FeedEvent) ([]*model.FeedEdge, error) {
 }
 
 func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
+
 	return &model.Gallery{
 		Dbid:        gallery.ID,
+		Name:        &gallery.Name,
+		Description: &gallery.Description,
+		Position:    &gallery.Position,
+		Hidden:      &gallery.Hidden,
 		Owner:       nil, // handled by dedicated resolver
 		Collections: nil, // handled by dedicated resolver
 	}
@@ -1208,6 +1258,10 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 	}
 
 	return &model.GalleryUser{
+		HelperGalleryUserData: model.HelperGalleryUserData{
+			UserID:            user.ID,
+			FeaturedGalleryID: user.FeaturedGallery,
+		},
 		Dbid:      user.ID,
 		Username:  &user.Username.String,
 		Bio:       &user.Bio.String,

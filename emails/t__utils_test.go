@@ -102,30 +102,38 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 
 	testUser2.ID = userID2
 
-	collID, err := repos.CollectionRepository.Create(ctx, persist.CollectionDB{
-		Name:        "test coll",
-		OwnerUserID: userID,
-	})
+	galleryInsert := coredb.GalleryRepoCreateParams{OwnerUserID: userID, GalleryID: persist.GenerateID(), Position: "0.1"}
 
-	if err != nil {
-		t.Fatalf("failed to create collection: %s", err)
-	}
-
-	galleryInsert := persist.GalleryDB{OwnerUserID: userID, Collections: []persist.DBID{collID}}
-
-	galleryID, err := repos.GalleryRepository.Create(ctx, galleryInsert)
+	gallery, err := repos.GalleryRepository.Create(ctx, galleryInsert)
 	if err != nil {
 		t.Fatalf("failed to create gallery: %s", err)
 	}
 
-	galleryInsert2 := persist.GalleryDB{OwnerUserID: userID2}
+	galleryInsert2 := coredb.GalleryRepoCreateParams{OwnerUserID: userID2, GalleryID: persist.GenerateID(), Position: "0.2"}
 
 	_, err = repos.GalleryRepository.Create(ctx, galleryInsert2)
 	if err != nil {
 		t.Fatalf("failed to create gallery: %s", err)
 	}
 
-	testGallery, err = q.GetGalleryById(ctx, galleryID)
+	collID, err := repos.CollectionRepository.Create(ctx, persist.CollectionDB{
+		Name:        "test coll",
+		OwnerUserID: userID,
+		GalleryID:   gallery.ID,
+	})
+
+	if err != nil {
+		t.Fatalf("failed to create collection: %s", err)
+	}
+
+	err = repos.GalleryRepository.Update(ctx, gallery.ID, userID, persist.GalleryTokenUpdateInput{
+		Collections: []persist.DBID{collID},
+	})
+	if err != nil {
+		t.Fatalf("failed to update gallery: %s", err)
+	}
+
+	testGallery, err = q.GetGalleryById(ctx, gallery.ID)
 	if err != nil {
 		t.Fatalf("failed to get gallery: %s", err)
 	}

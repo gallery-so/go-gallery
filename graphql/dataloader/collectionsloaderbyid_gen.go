@@ -18,6 +18,8 @@ type CollectionsLoaderByIDSettings interface {
 	getMaxBatchMany() int
 	getDisableCaching() bool
 	getPublishResults() bool
+	getPreFetchHook() func(context.Context, string) context.Context
+	getPostFetchHook() func(context.Context, string)
 	getSubscriptionRegistry() *[]interface{}
 	getMutexRegistry() *[]*sync.Mutex
 }
@@ -42,6 +44,14 @@ func (l *CollectionsLoaderByID) setPublishResults(publishResults bool) {
 	l.publishResults = publishResults
 }
 
+func (l *CollectionsLoaderByID) setPreFetchHook(preFetchHook func(context.Context, string) context.Context) {
+	l.preFetchHook = preFetchHook
+}
+
+func (l *CollectionsLoaderByID) setPostFetchHook(postFetchHook func(context.Context, string)) {
+	l.postFetchHook = postFetchHook
+}
+
 // NewCollectionsLoaderByID creates a new CollectionsLoaderByID with the given settings, functions, and options
 func NewCollectionsLoaderByID(
 	settings CollectionsLoaderByIDSettings, fetch func(ctx context.Context, keys []persist.DBID) ([][]coredb.Collection, []error),
@@ -51,6 +61,8 @@ func NewCollectionsLoaderByID(
 		setMaxBatch(int)
 		setDisableCaching(bool)
 		setPublishResults(bool)
+		setPreFetchHook(func(context.Context, string) context.Context)
+		setPostFetchHook(func(context.Context, string))
 	}),
 ) *CollectionsLoaderByID {
 	loader := &CollectionsLoaderByID{
@@ -58,6 +70,8 @@ func NewCollectionsLoaderByID(
 		wait:                 settings.getWait(),
 		disableCaching:       settings.getDisableCaching(),
 		publishResults:       settings.getPublishResults(),
+		preFetchHook:         settings.getPreFetchHook(),
+		postFetchHook:        settings.getPostFetchHook(),
 		subscriptionRegistry: settings.getSubscriptionRegistry(),
 		mutexRegistry:        settings.getMutexRegistry(),
 		maxBatch:             settings.getMaxBatchMany(),
@@ -68,7 +82,22 @@ func NewCollectionsLoaderByID(
 	}
 
 	// Set this after applying options, in case a different context was set via options
-	loader.fetch = func(keys []persist.DBID) ([][]coredb.Collection, []error) { return fetch(loader.ctx, keys) }
+	loader.fetch = func(keys []persist.DBID) ([][]coredb.Collection, []error) {
+		ctx := loader.ctx
+
+		// Allow the preFetchHook to modify and return a new context
+		if loader.preFetchHook != nil {
+			ctx = loader.preFetchHook(ctx, "CollectionsLoaderByID")
+		}
+
+		results, errors := fetch(ctx, keys)
+
+		if loader.postFetchHook != nil {
+			loader.postFetchHook(ctx, "CollectionsLoaderByID")
+		}
+
+		return results, errors
+	}
 
 	if loader.subscriptionRegistry == nil {
 		panic("subscriptionRegistry may not be nil")
@@ -103,6 +132,13 @@ type CollectionsLoaderByID struct {
 
 	// whether this dataloader will publish its results for others to cache
 	publishResults bool
+
+	// a hook invoked before the fetch operation, useful for things like tracing.
+	// the returned context will be passed to the fetch operation.
+	preFetchHook func(ctx context.Context, loaderName string) context.Context
+
+	// a hook invoked after the fetch operation, useful for things like tracing
+	postFetchHook func(ctx context.Context, loaderName string)
 
 	// a shared slice where dataloaders will register and invoke caching functions.
 	// the same slice should be passed to every dataloader.

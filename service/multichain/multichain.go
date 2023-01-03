@@ -507,6 +507,9 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 
 	user, err := p.Repos.UserRepository.GetByChainAddress(ctx, wallet)
 	if err != nil {
+		if _, ok := err.(persist.ErrWalletNotFound); ok {
+			return nil, nil
+		}
 		return nil, err
 	}
 

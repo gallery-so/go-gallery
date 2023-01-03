@@ -29,6 +29,7 @@ type CollectionDB struct {
 	Name           NullString                       `json:"name"`
 	CollectorsNote NullString                       `json:"collectors_note"`
 	OwnerUserID    DBID                             `json:"owner_user_id"`
+	GalleryID      DBID                             `json:"gallery_id"`
 	Tokens         []DBID                           `json:"tokens"`
 	Hidden         NullBool                         `json:"hidden"` // collections can be hidden from public-viewing
 	TokenSettings  map[DBID]CollectionTokenSettings `json:"token_settings"`
@@ -48,6 +49,7 @@ type Collection struct {
 	Name           NullString                       `json:"name"`
 	CollectorsNote NullString                       `json:"collectors_note"`
 	OwnerUserID    DBID                             `json:"owner_user_id"`
+	GalleryID      DBID                             `json:"gallery_id"`
 	NFTs           []TokenInCollection              `json:"nfts"`
 	Hidden         NullBool                         `json:"hidden"` // collections can be hidden from public-viewing
 	TokenSettings  map[DBID]CollectionTokenSettings `json:"token_settings"`

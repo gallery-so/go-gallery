@@ -11,6 +11,7 @@ import (
 	"github.com/everFinance/goar"
 	sentry "github.com/getsentry/sentry-go"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
@@ -24,7 +25,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
@@ -199,6 +199,7 @@ func SetDefaults() {
 	viper.SetDefault("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
 	viper.SetDefault("MERCH_CONTRACT_ADDRESS", "0x01f55be815fbd10b1770b008b8960931a30e7f65")
+	viper.SetDefault("ETH_PRIVATE_KEY", "")
 
 	viper.AutomaticEnv()
 
@@ -218,6 +219,7 @@ func SetDefaults() {
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")
+		util.VarNotSetTo("ETH_PRIVATE_KEY", "")
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 	}
@@ -258,6 +260,7 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
+		MaxSpans:         100000,
 		Dsn:              viper.GetString("SENTRY_DSN"),
 		Environment:      viper.GetString("ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),

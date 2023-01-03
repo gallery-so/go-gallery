@@ -51,6 +51,10 @@ type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
 
+type CreateGalleryPayloadOrError interface {
+	IsCreateGalleryPayloadOrError()
+}
+
 type CreateUserPayloadOrError interface {
 	IsCreateUserPayloadOrError()
 }
@@ -61,6 +65,10 @@ type DeepRefreshPayloadOrError interface {
 
 type DeleteCollectionPayloadOrError interface {
 	IsDeleteCollectionPayloadOrError()
+}
+
+type DeleteGalleryPayloadOrError interface {
+	IsDeleteGalleryPayloadOrError()
 }
 
 type Error interface {
@@ -214,8 +222,28 @@ type UpdateEmailPayloadOrError interface {
 	IsUpdateEmailPayloadOrError()
 }
 
+type UpdateFeaturedGalleryPayloadOrError interface {
+	IsUpdateFeaturedGalleryPayloadOrError()
+}
+
 type UpdateGalleryCollectionsPayloadOrError interface {
 	IsUpdateGalleryCollectionsPayloadOrError()
+}
+
+type UpdateGalleryHiddenPayloadOrError interface {
+	IsUpdateGalleryHiddenPayloadOrError()
+}
+
+type UpdateGalleryInfoPayloadOrError interface {
+	IsUpdateGalleryInfoPayloadOrError()
+}
+
+type UpdateGalleryOrderPayloadOrError interface {
+	IsUpdateGalleryOrderPayloadOrError()
+}
+
+type UpdateGalleryPayloadOrError interface {
+	IsUpdateGalleryPayloadOrError()
 }
 
 type UpdateTokenInfoPayloadOrError interface {
@@ -473,6 +501,16 @@ type Contract struct {
 
 func (Contract) IsNode() {}
 
+type CreateCollectionInGalleryInput struct {
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	Tokens         []persist.DBID                  `json:"tokens"`
+	Layout         *CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+	Hidden         bool                            `json:"hidden"`
+	GivenID        persist.DBID                    `json:"givenID"`
+}
+
 type CreateCollectionInput struct {
 	GalleryID      persist.DBID                    `json:"galleryId"`
 	Name           string                          `json:"name"`
@@ -489,6 +527,27 @@ type CreateCollectionPayload struct {
 }
 
 func (CreateCollectionPayload) IsCreateCollectionPayloadOrError() {}
+
+type CreateGalleryInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Position    string  `json:"position"`
+}
+
+type CreateGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (CreateGalleryPayload) IsCreateGalleryPayloadOrError() {}
+
+type CreateUserInput struct {
+	Username           string         `json:"username"`
+	Bio                *string        `json:"bio"`
+	Email              *persist.Email `json:"email"`
+	GalleryName        *string        `json:"galleryName"`
+	GalleryDescription *string        `json:"galleryDescription"`
+	GalleryPosition    *string        `json:"galleryPosition"`
+}
 
 type CreateUserPayload struct {
 	UserID    *persist.DBID `json:"userId"`
@@ -520,6 +579,18 @@ type DeleteCollectionPayload struct {
 }
 
 func (DeleteCollectionPayload) IsDeleteCollectionPayloadOrError() {}
+
+type DeleteGalleryPayload struct {
+	DeletedID *DeletedNode `json:"deletedId"`
+}
+
+func (DeleteGalleryPayload) IsDeleteGalleryPayloadOrError() {}
+
+type DeletedNode struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+func (DeletedNode) IsNode() {}
 
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
@@ -654,6 +725,13 @@ func (ErrInvalidInput) IsResendVerificationEmailPayloadOrError()         {}
 func (ErrInvalidInput) IsUpdateEmailNotificationSettingsPayloadOrError() {}
 func (ErrInvalidInput) IsUnsubscribeFromEmailTypePayloadOrError()        {}
 func (ErrInvalidInput) IsRedeemMerchPayloadOrError()                     {}
+func (ErrInvalidInput) IsCreateGalleryPayloadOrError()                   {}
+func (ErrInvalidInput) IsUpdateGalleryInfoPayloadOrError()               {}
+func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()             {}
+func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
+func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
+func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
+func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -694,6 +772,13 @@ func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()      {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()   {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()    {}
 func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()          {}
+func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()            {}
+func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()        {}
+func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()      {}
+func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
+func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
+func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
+func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -830,14 +915,25 @@ func (GIFMedia) IsMediaSubtype() {}
 func (GIFMedia) IsMedia()        {}
 
 type Gallery struct {
-	Dbid        persist.DBID  `json:"dbid"`
-	Owner       *GalleryUser  `json:"owner"`
-	Collections []*Collection `json:"collections"`
+	Dbid          persist.DBID  `json:"dbid"`
+	Name          *string       `json:"name"`
+	Description   *string       `json:"description"`
+	Position      *string       `json:"position"`
+	Hidden        *bool         `json:"hidden"`
+	TokenPreviews []*string     `json:"tokenPreviews"`
+	Owner         *GalleryUser  `json:"owner"`
+	Collections   []*Collection `json:"collections"`
 }
 
 func (Gallery) IsNode() {}
 
+type GalleryPositionInput struct {
+	GalleryID persist.DBID `json:"galleryId"`
+	Position  string       `json:"position"`
+}
+
 type GalleryUser struct {
+	HelperGalleryUserData
 	Dbid                persist.DBID    `json:"dbid"`
 	Username            *string         `json:"username"`
 	Bio                 *string         `json:"bio"`
@@ -847,6 +943,7 @@ type GalleryUser struct {
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
+	FeaturedGallery     *Gallery        `json:"featuredGallery"`
 	Galleries           []*Gallery      `json:"galleries"`
 	Badges              []*Badge        `json:"badges"`
 	IsAuthenticatedUser *bool           `json:"isAuthenticatedUser"`
@@ -1334,6 +1431,16 @@ type UpdateCollectionInfoPayload struct {
 
 func (UpdateCollectionInfoPayload) IsUpdateCollectionInfoPayloadOrError() {}
 
+type UpdateCollectionInput struct {
+	Dbid           persist.DBID                    `json:"dbid"`
+	Name           string                          `json:"name"`
+	CollectorsNote string                          `json:"collectorsNote"`
+	Tokens         []persist.DBID                  `json:"tokens"`
+	Layout         *CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []*CollectionTokenSettingsInput `json:"tokenSettings"`
+	Hidden         bool                            `json:"hidden"`
+}
+
 type UpdateCollectionTokensInput struct {
 	CollectionID  persist.DBID                    `json:"collectionId"`
 	Tokens        []persist.DBID                  `json:"tokens"`
@@ -1370,6 +1477,12 @@ type UpdateEmailPayload struct {
 
 func (UpdateEmailPayload) IsUpdateEmailPayloadOrError() {}
 
+type UpdateFeaturedGalleryPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateFeaturedGalleryPayload) IsUpdateFeaturedGalleryPayloadOrError() {}
+
 type UpdateGalleryCollectionsInput struct {
 	GalleryID   persist.DBID   `json:"galleryId"`
 	Collections []persist.DBID `json:"collections"`
@@ -1380,6 +1493,56 @@ type UpdateGalleryCollectionsPayload struct {
 }
 
 func (UpdateGalleryCollectionsPayload) IsUpdateGalleryCollectionsPayloadOrError() {}
+
+type UpdateGalleryHiddenInput struct {
+	ID     persist.DBID `json:"id"`
+	Hidden bool         `json:"hidden"`
+}
+
+type UpdateGalleryHiddenPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (UpdateGalleryHiddenPayload) IsUpdateGalleryHiddenPayloadOrError() {}
+
+type UpdateGalleryInfoInput struct {
+	ID          persist.DBID `json:"id"`
+	Name        *string      `json:"name"`
+	Description *string      `json:"description"`
+}
+
+type UpdateGalleryInfoPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (UpdateGalleryInfoPayload) IsUpdateGalleryInfoPayloadOrError() {}
+
+type UpdateGalleryInput struct {
+	GalleryID          persist.DBID                      `json:"galleryId"`
+	Name               *string                           `json:"name"`
+	Description        *string                           `json:"description"`
+	Caption            *string                           `json:"caption"`
+	DeletedCollections []persist.DBID                    `json:"deletedCollections"`
+	UpdateCollections  []*UpdateCollectionInput          `json:"updateCollections"`
+	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
+	Order              []persist.DBID                    `json:"order"`
+}
+
+type UpdateGalleryOrderInput struct {
+	Positions []*GalleryPositionInput `json:"positions"`
+}
+
+type UpdateGalleryOrderPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateGalleryOrderPayload) IsUpdateGalleryOrderPayloadOrError() {}
+
+type UpdateGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (UpdateGalleryPayload) IsUpdateGalleryPayloadOrError() {}
 
 type UpdateTokenInfoInput struct {
 	TokenID        persist.DBID  `json:"tokenId"`
@@ -1481,6 +1644,7 @@ type ViewGalleryPayload struct {
 func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
+	HelperViewerData
 	User            *GalleryUser     `json:"user"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 	Feed            *FeedConnection  `json:"feed"`
@@ -1491,6 +1655,7 @@ type Viewer struct {
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
 }
 
+func (Viewer) IsNode()          {}
 func (Viewer) IsViewerOrError() {}
 
 type ViewerGallery struct {

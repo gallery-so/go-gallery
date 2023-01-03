@@ -49,10 +49,10 @@ SELECT g.* FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false
 SELECT g.* FROM galleries g, collections c WHERE c.id = $1 AND c.deleted = false AND $1 = ANY(g.collections) AND g.deleted = false;
 
 -- name: GetGalleriesByUserId :many
-SELECT * FROM galleries WHERE owner_user_id = $1 AND deleted = false;
+SELECT * FROM galleries WHERE owner_user_id = $1 AND deleted = false order by position;
 
 -- name: GetGalleriesByUserIdBatch :batchmany
-SELECT * FROM galleries WHERE owner_user_id = $1 AND deleted = false;
+SELECT * FROM galleries WHERE owner_user_id = $1 AND deleted = false order by position;
 
 -- name: GetCollectionById :one
 SELECT * FROM collections WHERE id = $1 AND deleted = false;
@@ -239,7 +239,7 @@ SELECT u.* FROM tokens t
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false;
 
 -- name: GetPreviewURLsByContractIdAndUserId :many
-SELECT MEDIA->>'thumbnail_url'::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3;
+SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3;
 
 -- name: GetTokensByUserId :many
 SELECT tokens.* FROM tokens, users
@@ -471,7 +471,7 @@ SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = f
     LIMIT $2;
 
 -- name: GetRecentUnseenNotifications :many
-SELECT * FROM notifications WHERE owner_id = $1 AND deleted = false AND seen = false ORDER BY CREATED_AT DESC LIMIT $2;
+SELECT * FROM notifications WHERE owner_id = @owner_id AND deleted = false AND seen = false and created_at > @created_after order by created_at desc limit @lim;
 
 -- name: GetUserNotificationsBatch :batchmany
 SELECT * FROM notifications WHERE owner_id = sqlc.arg('owner_id') AND deleted = false
@@ -633,5 +633,41 @@ select discount_code from merch where token_id = @token_hex and redeemed = true 
 -- name: GetUserOwnsTokenByIdentifiers :one
 select exists(select 1 from tokens where owner_user_id = @user_id and token_id = @token_hex and contract = @contract and chain = @chain and deleted = false) as owns_token;
 
+-- name: UpdateGalleryHidden :one
+update galleries set hidden = @hidden, last_updated = now() where id = @id and deleted = false returning *;
+
+-- name: UpdateGalleryPositions :exec
+with updates as (
+    select unnest(@gallery_ids::text[]) as id, unnest(@positions::text[]) as position
+)
+update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false;
+
+-- name: UpdateGalleryInfo :exec
+update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
+
+-- name: UpdateGallery :exec
+update galleries set name = @name, description = @description, collections = @collections, last_updated = now() where galleries.id = @id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = coalesce(array_length(@collections, 1), 0);
+
+-- name: UpdateUserFeaturedGallery :exec
+update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
+
+-- name: GetGalleryTokenPreviewsByID :many
+select (t.media->>'thumbnail_url')::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3;
+
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
+
+-- name: DeleteCollections :exec
+update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
+
+-- name: UpdateCollectionsInfo :exec
+with updates as (
+    select unnest(@ids::varchar[]) as id, unnest(@names::varchar[]) as name, unnest(@collectors_notes::varchar[]) as collectors_note, unnest(@layouts::jsonb[]) as layout, unnest(@token_settings::jsonb[]) as token_settings, unnest(@hidden::bool[]) as hidden
+)
+update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now() from updates where c.id = updates.id and c.deleted = false;
+
+-- name: UpdateCollectionTokens :exec
+update collections set nfts = @nfts, last_updated = now() where id = @id and deleted = false;
+
+-- name: CreateCollection :one
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) on conflict (id) do update set version = excluded.version, name = excluded.name, collectors_note = excluded.collectors_note, owner_user_id = excluded.owner_user_id, gallery_id = excluded.gallery_id, layout = excluded.layout, nfts = excluded.nfts, hidden = excluded.hidden, token_settings = excluded.token_settings, last_updated = excluded.last_updated returning id;

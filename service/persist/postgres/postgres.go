@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"strings"
 	"time"
+
+	"github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v4"
@@ -114,6 +115,10 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 		return
 	}
 
+	// Get the current time before we do anything else, since this is our best approximation
+	// of when the operation "finished"
+	endTime := time.Now()
+
 	if l.continueOnly {
 		transaction := sentry.TransactionFromContext(ctx)
 		if transaction == nil {
@@ -176,7 +181,8 @@ func (l *pgxTracer) Log(ctx context.Context, level pgx.LogLevel, msg string, dat
 
 	// pgx calls the logger AFTER the operation happens, but it tells us how long the operation took.
 	// We can use that to update our span so it reflects the correct start time.
-	span.StartTime = time.Now().Add(-duration)
+	span.EndTime = endTime
+	span.StartTime = endTime.Add(-duration)
 }
 
 func generateValuesPlaceholders(l, offset int, nows []int) string {
@@ -205,16 +211,10 @@ func checkNoErr(err error) {
 	}
 }
 
-func dbidsToStrings(dbids []persist.DBID) []string {
-	strings := make([]string, len(dbids))
-	for i, dbid := range dbids {
-		strings[i] = string(dbid)
-	}
-	return strings
-}
-
 // Repositories is the set of all available persistence repositories
 type Repositories struct {
+	db                    *sql.DB
+	pool                  *pgxpool.Pool
 	UserRepository        *UserRepository
 	NonceRepository       *NonceRepository
 	GalleryRepository     *GalleryRepository
@@ -226,4 +226,28 @@ type Repositories struct {
 	WalletRepository      *WalletRepository
 	AdmireRepository      *AdmireRepository
 	CommentRepository     *CommentRepository
+}
+
+func NewRepositories(pq *sql.DB, pgx *pgxpool.Pool) *Repositories {
+	queries := coredb.New(pgx)
+
+	return &Repositories{
+		db:                    pq,
+		pool:                  pgx,
+		UserRepository:        NewUserRepository(pq, queries),
+		NonceRepository:       NewNonceRepository(pq, queries),
+		TokenRepository:       NewTokenGalleryRepository(pq, queries),
+		CollectionRepository:  NewCollectionTokenRepository(pq, queries),
+		GalleryRepository:     NewGalleryRepository(queries),
+		ContractRepository:    NewContractGalleryRepository(pq, queries),
+		MembershipRepository:  NewMembershipRepository(pq, queries),
+		EarlyAccessRepository: NewEarlyAccessRepository(pq, queries),
+		WalletRepository:      NewWalletRepository(pq, queries),
+		AdmireRepository:      NewAdmireRepository(queries),
+		CommentRepository:     NewCommentRepository(pq, queries),
+	}
+}
+
+func (r *Repositories) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.BeginTx(ctx, pgx.TxOptions{})
 }

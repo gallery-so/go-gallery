@@ -2,20 +2,15 @@ package tokenprocessing
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
-
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -51,10 +46,10 @@ func coreInitServer() *gin.Engine {
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-	r := server.ResourcesInit(context.Background())
-	mc := server.NewMultichainProvider(r)
+	c := server.ClientInit(context.Background())
+	mc := server.NewMultichainProvider(c)
 
-	return handlersInitServer(router, mc, r.Repos, r.IPFSClient, r.ArweaveClient, r.StorageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, mc, c.Repos, c.IPFSClient, c.ArweaveClient, c.StorageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
@@ -124,23 +119,5 @@ func initSentry() {
 
 	if err != nil {
 		logger.For(nil).Fatalf("failed to start sentry: %s", err)
-	}
-}
-
-func newRepos(pq *sql.DB, pgx *pgxpool.Pool) *postgres.Repositories {
-	queries := coredb.New(pgx)
-
-	return &postgres.Repositories{
-		UserRepository:        postgres.NewUserRepository(pq, queries),
-		NonceRepository:       postgres.NewNonceRepository(pq, queries),
-		TokenRepository:       postgres.NewTokenGalleryRepository(pq, queries),
-		CollectionRepository:  postgres.NewCollectionTokenRepository(pq, queries),
-		GalleryRepository:     postgres.NewGalleryRepository(queries),
-		ContractRepository:    postgres.NewContractGalleryRepository(pq, queries),
-		MembershipRepository:  postgres.NewMembershipRepository(pq, queries),
-		EarlyAccessRepository: postgres.NewEarlyAccessRepository(pq, queries),
-		WalletRepository:      postgres.NewWalletRepository(pq, queries),
-		AdmireRepository:      postgres.NewAdmireRepository(queries),
-		CommentRepository:     postgres.NewCommentRepository(pq, queries),
 	}
 }

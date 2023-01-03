@@ -53,6 +53,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"CreateGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(CreateGalleryPayloadOrError)
+		return obj, ok
+	},
+
 	"CreateUserPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(CreateUserPayloadOrError)
 		return obj, ok
@@ -65,6 +70,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"DeleteCollectionPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(DeleteCollectionPayloadOrError)
+		return obj, ok
+	},
+
+	"DeleteGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(DeleteGalleryPayloadOrError)
 		return obj, ok
 	},
 
@@ -253,8 +263,33 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UpdateFeaturedGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateFeaturedGalleryPayloadOrError)
+		return obj, ok
+	},
+
 	"UpdateGalleryCollectionsPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UpdateGalleryCollectionsPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateGalleryHiddenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateGalleryHiddenPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateGalleryInfoPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateGalleryInfoPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateGalleryOrderPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateGalleryOrderPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateGalleryPayloadOrError)
 		return obj, ok
 	},
 

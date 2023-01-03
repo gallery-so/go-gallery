@@ -54,6 +54,10 @@ func (r *Contract) ID() GqlID {
 	return GqlID(fmt.Sprintf("Contract:%s", r.Dbid))
 }
 
+func (r *DeletedNode) ID() GqlID {
+	return GqlID(fmt.Sprintf("DeletedNode:%s", r.Dbid))
+}
+
 func (r *FeedEvent) ID() GqlID {
 	return GqlID(fmt.Sprintf("FeedEvent:%s", r.Dbid))
 }
@@ -98,6 +102,19 @@ func (r *Token) ID() GqlID {
 	return GqlID(fmt.Sprintf("Token:%s", r.Dbid))
 }
 
+func (r *Viewer) ID() GqlID {
+	//-----------------------------------------------------------------------------------------------
+	//-----------------------------------------------------------------------------------------------
+	// Some fields specified by @goGqlId require manual binding because one of the following is true:
+	// (a) the field does not exist on the Viewer type, or
+	// (b) the field exists but is not a string type
+	//-----------------------------------------------------------------------------------------------
+	// Please create binding methods on the Viewer type with the following signatures:
+	// func (r *Viewer) GetGqlIDField_UserID() string
+	//-----------------------------------------------------------------------------------------------
+	return GqlID(fmt.Sprintf("Viewer:%s", r.GetGqlIDField_UserID()))
+}
+
 func (r *Wallet) ID() GqlID {
 	return GqlID(fmt.Sprintf("Wallet:%s", r.Dbid))
 }
@@ -109,6 +126,7 @@ type NodeFetcher struct {
 	OnComment                                     func(ctx context.Context, dbid persist.DBID) (*Comment, error)
 	OnCommunity                                   func(ctx context.Context, contractAddress string, chain string) (*Community, error)
 	OnContract                                    func(ctx context.Context, dbid persist.DBID) (*Contract, error)
+	OnDeletedNode                                 func(ctx context.Context, dbid persist.DBID) (*DeletedNode, error)
 	OnFeedEvent                                   func(ctx context.Context, dbid persist.DBID) (*FeedEvent, error)
 	OnGallery                                     func(ctx context.Context, dbid persist.DBID) (*Gallery, error)
 	OnGalleryUser                                 func(ctx context.Context, dbid persist.DBID) (*GalleryUser, error)
@@ -120,6 +138,7 @@ type NodeFetcher struct {
 	OnSomeoneFollowedYouNotification              func(ctx context.Context, dbid persist.DBID) (*SomeoneFollowedYouNotification, error)
 	OnSomeoneViewedYourGalleryNotification        func(ctx context.Context, dbid persist.DBID) (*SomeoneViewedYourGalleryNotification, error)
 	OnToken                                       func(ctx context.Context, dbid persist.DBID) (*Token, error)
+	OnViewer                                      func(ctx context.Context, userId string) (*Viewer, error)
 	OnWallet                                      func(ctx context.Context, dbid persist.DBID) (*Wallet, error)
 }
 
@@ -163,6 +182,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Contract' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnContract(ctx, persist.DBID(ids[0]))
+	case "DeletedNode":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'DeletedNode' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnDeletedNode(ctx, persist.DBID(ids[0]))
 	case "FeedEvent":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'FeedEvent' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -218,6 +242,11 @@ func (n *NodeFetcher) GetNodeByGqlID(ctx context.Context, id GqlID) (Node, error
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Token' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
 		}
 		return n.OnToken(ctx, persist.DBID(ids[0]))
+	case "Viewer":
+		if len(ids) != 1 {
+			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Viewer' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
+		}
+		return n.OnViewer(ctx, string(ids[0]))
 	case "Wallet":
 		if len(ids) != 1 {
 			return nil, ErrInvalidIDFormat{message: fmt.Sprintf("'Wallet' type requires 1 ID component(s) (%d component(s) supplied)", len(ids))}
@@ -242,6 +271,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnCommunity")
 	case n.OnContract == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnContract")
+	case n.OnDeletedNode == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnDeletedNode")
 	case n.OnFeedEvent == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnFeedEvent")
 	case n.OnGallery == nil:
@@ -264,6 +295,8 @@ func (n *NodeFetcher) ValidateHandlers() {
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnSomeoneViewedYourGalleryNotification")
 	case n.OnToken == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnToken")
+	case n.OnViewer == nil:
+		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnViewer")
 	case n.OnWallet == nil:
 		panic("NodeFetcher handler validation failed: no handler set for NodeFetcher.OnWallet")
 	}
