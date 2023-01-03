@@ -11,6 +11,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/spf13/viper"
 
@@ -865,4 +866,94 @@ func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType mode
 		},
 		UserID: curUserID,
 	})
+}
+
+func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+	// Validate
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	paginator := positionPaginator{}
+	var userIDs []persist.DBID
+	var err error
+
+	// If we have a cursor, we can page through the original set of recommended users
+	if before != nil {
+		if _, userIDs, err = paginator.decodeCursor(*before); err != nil {
+			return nil, PageInfo{}, err
+		}
+	} else if after != nil {
+		if _, userIDs, err = paginator.decodeCursor(*after); err != nil {
+			return nil, PageInfo{}, err
+		}
+	} else {
+		// Otherwise make a new recommendation
+		curUserID, err := getAuthenticatedUserID(ctx)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		following, err := api.queries.GetFollowEdgesByUserID(ctx, curUserID)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+
+		followingIDs := make([]persist.DBID, len(following))
+		followedTimes := make([]time.Time, len(following))
+
+		for i, follow := range following {
+			followingIDs[i] = follow.Followee
+			followedTimes[i] = follow.LastUpdated
+		}
+
+		userIDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, followingIDs, followedTimes)
+		if err != nil {
+			return nil, PageInfo{}, err
+		}
+	}
+
+	positionLookup := map[persist.DBID]int{}
+	idsAsString := make([]string, len(userIDs))
+
+	for i, id := range userIDs {
+		positionLookup[id] = i
+		idsAsString[i] = id.String()
+	}
+
+	paginator.QueryFunc = func(params positionPagingParams) ([]any, error) {
+		keys, err := api.queries.GetUsersByPositionPaginate(ctx, db.GetUsersByPositionPaginateParams{
+			UserIds:       idsAsString,
+			CurBeforePos:  params.CursorBeforePos,
+			CurAfterPos:   params.CursorAfterPos,
+			PagingForward: params.PagingForward,
+			Limit:         params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]any, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
+	}
+
+	paginator.CursorFunc = func(node any) (int, []persist.DBID, error) {
+		if user, ok := node.(db.User); ok {
+			return positionLookup[user.ID], userIDs, nil
+		}
+		return 0, nil, fmt.Errorf("node is not a db.User")
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	users := make([]db.User, len(results))
+	for i, result := range results {
+		users[i] = result.(db.User)
+	}
+
+	return users, pageInfo, err
 }

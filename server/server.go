@@ -38,6 +38,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -128,7 +129,10 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 	feedCache := redis.NewCache(redis.FeedDB)
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, c.MagicLinkClient)
+	recommender := recommend.NewRecommender(c.Queries)
+	go recommender.Run(context.Background(), time.NewTicker(time.Hour))
+
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, c.MagicLinkClient, recommender)
 }
 
 func newSecretsClient() *secretmanager.Client {

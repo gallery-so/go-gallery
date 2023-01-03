@@ -2916,6 +2916,67 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 	return items, nil
 }
 
+const getUsersByPositionPaginate = `-- name: GetUsersByPositionPaginate :many
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u join unnest($1::text[]) with ordinality t(id, pos) using(id) where u.deleted = false
+  and t.pos > $2::int
+  and t.pos < $3::int
+  order by case when $4::bool then t.pos end desc,
+          case when not $4::bool then t.pos end asc
+  limit $5
+`
+
+type GetUsersByPositionPaginateParams struct {
+	UserIds       []string
+	CurBeforePos  int32
+	CurAfterPos   int32
+	PagingForward bool
+	Limit         int32
+}
+
+func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersByPositionPaginateParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersByPositionPaginate,
+		arg.UserIds,
+		arg.CurBeforePos,
+		arg.CurAfterPos,
+		arg.PagingForward,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
