@@ -51,12 +51,14 @@ func GetNameForDatabase(databaseId int) string {
 	return fmt.Sprintf("db %d", databaseId)
 }
 
-func NewClient(db int, host, password string) *redis.Client {
+func NewClient(db int) *redis.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
+	redisURL := viper.GetString("REDIS_URL")
+	redisPass := viper.GetString("REDIS_PASS")
 	client := redis.NewClient(&redis.Options{
-		Addr:     host,
-		Password: password,
+		Addr:     redisURL,
+		Password: redisPass,
 		DB:       db,
 	})
 	client.AddHook(tracing.NewRedisHook(db, GetNameForDatabase(db), true))
@@ -73,7 +75,7 @@ type Cache struct {
 
 // NewCache creates a new redis cache
 func NewCache(db int) *Cache {
-	client := NewClient(db, viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
+	client := NewClient(db)
 	return &Cache{client: client}
 }
 
@@ -81,7 +83,7 @@ func NewCache(db int) *Cache {
 func ClearCache(db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	client := NewClient(db, viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
+	client := NewClient(db)
 	return client.FlushDB(ctx).Err()
 }
 
@@ -118,7 +120,7 @@ func (c *Cache) Close(clear bool) error {
 }
 
 func NewLockClient(db int) *redislock.Client {
-	client := NewClient(db, viper.GetString("REDIS_URL"), viper.GetString("REDIS_PASS"))
+	client := NewClient(db)
 	return redislock.New(client)
 }
 

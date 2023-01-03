@@ -259,27 +259,20 @@ func initSentry() {
 }
 
 func NewMultichainProvider(c *Clients) *multichain.Provider {
-	indexerHost := viper.GetString("INDEXER_HOST")
-	tezosAPI := viper.GetString("TEZOS_API_URL")
-	tokenProcessingURL := viper.GetString("TOKEN_PROCESSING_URL")
-	ipfsURL := viper.GetString("IPFS_URL")
-	poapAPIKey := viper.GetString("POAP_API_KEY")
-	poapAuthToken := viper.GetString("POAP_AUTH_TOKEN")
-	tokenBucket := viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
-	ethProvider := eth.NewProvider(indexerHost, c.HTTPClient, c.EthClient, c.TaskClient)
+	ethProvider := eth.NewProvider(viper.GetString("INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
 	tezosProvider := multichain.FallbackProvider{
-		Primary:  tezos.NewProvider(tezosAPI, tokenProcessingURL, ipfsURL, c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, tokenBucket),
-		Fallback: tezos.NewObjktProvider(ipfsURL),
+		Primary:  tezos.NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET")),
+		Fallback: tezos.NewObjktProvider(viper.GetString("IPFS_URL")),
 		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
 			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
 		},
 	}
-	poapProvider := poap.NewProvider(c.HTTPClient, poapAPIKey, poapAuthToken)
-	communityCache := redis.NewCache(redis.CommunitiesDB)
-	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, communityCache, c.TaskClient,
+	poapProvider := poap.NewProvider(c.HTTPClient, viper.GetString("POAP_API_KEY"), viper.GetString("POAP_AUTH_TOKEN"))
+	cache := redis.NewCache(redis.CommunitiesDB)
+	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,
 		ethProvider,
 		openseaProvider,
