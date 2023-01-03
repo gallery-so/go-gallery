@@ -38,22 +38,12 @@ type testCase struct {
 	fixtures []fixture
 }
 
-func TestGraphQL(t *testing.T) {
+func TestMain(t *testing.T) {
 	tests := []testCase{
 		{
-			title:    "test user API",
-			run:      testGraphQL_User,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis},
-		},
-		{
-			title:    "test tokens API",
-			run:      testGraphQL_Tokens,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasks},
-		},
-		{
-			title:    "test collections API",
-			run:      testGraphQL_Collections,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useCloudTasks},
+			title:    "test GraphQL",
+			run:      testGraphQL,
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue},
 		},
 	}
 	for _, test := range tests {
@@ -61,7 +51,7 @@ func TestGraphQL(t *testing.T) {
 	}
 }
 
-func testGraphQL_User(t *testing.T) {
+func testGraphQL(t *testing.T) {
 	tests := []testCase{
 		{title: "should create a user", run: testCreateUser(newNonceFixture{})},
 		{title: "should be able to login", run: testLogin(newUserFixture{})},
@@ -72,23 +62,7 @@ func testGraphQL_User(t *testing.T) {
 		{title: "should get viewer", run: testViewer(newUserFixture{})},
 		{title: "should add a wallet", run: testAddWallet(newUserFixture{})},
 		{title: "should remove a wallet", run: testRemoveWallet(newUserFixture{})},
-	}
-	for _, test := range tests {
-		t.Run(test.title, withFixtures(test.run, test.fixtures...))
-	}
-}
-
-func testGraphQL_Tokens(t *testing.T) {
-	tests := []testCase{
 		{title: "should sync tokens", run: testSyncTokens(newUserFixture{})},
-	}
-	for _, test := range tests {
-		t.Run(test.title, withFixtures(test.run, test.fixtures...))
-	}
-}
-
-func testGraphQL_Collections(t *testing.T) {
-	tests := []testCase{
 		{title: "should create a collection", run: testCreateCollection(newUserWithTokensFixture{})},
 	}
 	for _, test := range tests {

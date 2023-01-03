@@ -8,12 +8,14 @@ import (
 	"sync"
 	"testing"
 
+	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/stretchr/testify/require"
 )
 
@@ -83,6 +85,23 @@ func useRedis(t *testing.T) {
 	require.NoError(t, err)
 	t.Setenv("REDIS_URL", r.GetHostPort("6379/tcp"))
 	t.Cleanup(func() { r.Close() })
+}
+
+// useTokenQueue is a fixture that creates a dummy queue for token processing.
+func useTokenQueue(t *testing.T) {
+	t.Helper()
+	useCloudTasks(t)
+	ctx := context.Background()
+	client := task.NewClient(ctx)
+	defer client.Close()
+	queue, err := client.CreateQueue(ctx, &cloudtaskspb.CreateQueueRequest{
+		Parent: "projects/gallery-test/locations/here",
+		Queue: &cloudtaskspb.Queue{
+			Name: "projects/gallery-test/locations/here/queues/token-processing",
+		},
+	})
+	require.NoError(t, err)
+	t.Setenv("TOKEN_PROCESSING_QUEUE", queue.Name)
 }
 
 // useCloudTasks starts a running Cloud Tasks emulator with a set of tasks queues created.

@@ -11,11 +11,17 @@ import (
 	"strings"
 	"time"
 
+	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	"github.com/asottile/dockerfile"
 	"github.com/go-redis/redis/v8"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v2"
 )
 
@@ -57,7 +63,7 @@ func StartPostgresIndexer() (resource *dockertest.Resource, err error) {
 	port := hostAndPort[1]
 
 	if err = pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
-		log.Fatalf("could not connect to postgres: %s", err)
+		return nil, err
 	}
 
 	return r, nil
@@ -74,10 +80,17 @@ func StartRedis() (*dockertest.Resource, error) {
 		return nil, err
 	}
 
-	host := r.GetHostPort("6379/tcp")
-
-	if err = pool.Retry(waitOnCache(host, "")); err != nil {
-		log.Fatalf("could not connect to redis: %s", err)
+	err = pool.Retry(func() error {
+		client := redis.NewClient(&redis.Options{
+			Addr:     r.GetHostPort("6379/tcp"),
+			Password: "",
+			DB:       0,
+		})
+		defer client.Close()
+		return client.Ping(context.Background()).Err()
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return r, nil
@@ -88,7 +101,37 @@ func StartCloudTasks() (*dockertest.Resource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return startService(pool, "task-emulator")
+
+	r, err := startService(pool, "task-emulator")
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a dummy queue to check if the service is available
+	err = pool.Retry(func() error {
+		ctx := context.Background()
+		client, err := gcptasks.NewClient(ctx,
+			option.WithEndpoint(r.GetHostPort("8123/tcp")),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			option.WithoutAuthentication(),
+		)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		_, err = client.CreateQueue(ctx, &cloudtaskspb.CreateQueueRequest{
+			Parent: "projects/gallery-test/locations/here",
+			Queue: &cloudtaskspb.Queue{
+				Name: "projects/gallery-test/locations/here/queues/" + persist.GenerateID().String(),
+			},
+		})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 // N.B. This isn't the entire Docker Compose spec...
@@ -158,18 +201,6 @@ func waitOnDB(host, port, user, password, db string) func() error {
 		}
 		defer db.Close()
 		return db.Ping()
-	}
-}
-
-func waitOnCache(host, password string) func() error {
-	return func() error {
-		client := redis.NewClient(&redis.Options{
-			Addr:     host,
-			Password: password,
-			DB:       0,
-		})
-		defer client.Close()
-		return client.Ping(context.Background()).Err()
 	}
 }
 
