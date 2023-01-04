@@ -22,8 +22,8 @@ import (
 // fixture runs setup and teardown for a test
 type fixture func(t *testing.T)
 
-// withFixtures sets up each fixture before running the test
-func withFixtures(test func(t *testing.T), fixtures ...fixture) func(t *testing.T) {
+// testWithFixtures sets up each fixture before running the test
+func testWithFixtures(test func(t *testing.T), fixtures ...fixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		var wg sync.WaitGroup
 		for _, fixture := range fixtures {
@@ -113,54 +113,45 @@ func useCloudTasks(t *testing.T) {
 	t.Cleanup(func() { r.Close() })
 }
 
-// fixturer defers running a fixture until setup is called
-type fixturer interface {
-	setup(t *testing.T)
-}
-
-// newNonceFixture generates a new nonce
-type newNonceFixture struct {
+type nonceFixture struct {
 	wallet wallet
 	nonce  string
 }
 
-func (f *newNonceFixture) setup(t *testing.T) {
+// newNonceFixture generates a new nonce
+func newNonceFixture(t *testing.T) nonceFixture {
 	t.Helper()
 	wallet := newWallet(t)
 	c := defaultClientNew()
 	nonce := newNonce(t, c, wallet)
-	f.wallet = wallet
-	f.nonce = nonce
+	return nonceFixture{wallet, nonce}
 }
 
-// newUserFixture generates a new user
-type newUserFixture struct {
+type userFixture struct {
 	wallet    wallet
 	username  string
 	id        persist.DBID
 	galleryID persist.DBID
 }
 
-func (f *newUserFixture) setup(t *testing.T) {
+// newUserFixture generates a new user
+func newUserFixture(t *testing.T) userFixture {
 	t.Helper()
 	wallet := newWallet(t)
 	c := defaultClientNew()
 	userID, username, galleryID := newUser(t, c, wallet)
-	f.wallet = wallet
-	f.username = username
-	f.id = userID
-	f.galleryID = galleryID
+	return userFixture{wallet, username, userID, galleryID}
 }
 
-// newUserWithTokensFixture generates a new user with tokens synced
-type newUserWithTokensFixture struct {
-	newUserFixture
+type userWithTokensFixture struct {
+	userFixture
 	tokenIDs []persist.DBID
 }
 
-func (f *newUserWithTokensFixture) setup(t *testing.T) {
+// newUserWithTokensFixture generates a new user with tokens synced
+func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 	t.Helper()
-	f.newUserFixture.setup(t)
+	user := newUserFixture(t)
 	c := server.ClientInit(context.Background())
 	p := multichain.Provider{
 		Repos:       c.Repos,
@@ -169,7 +160,8 @@ func (f *newUserWithTokensFixture) setup(t *testing.T) {
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
 	h := server.CoreInit(c, &p)
-	f.tokenIDs = syncTokens(t, h, f.id)
+	tokenIDs := syncTokens(t, h, user.id)
+	return userWithTokensFixture{user, tokenIDs}
 }
 
 // stubProvider returns the same response for every call made to it

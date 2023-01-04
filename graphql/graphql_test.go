@@ -5,10 +5,11 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	genql "github.com/Khan/genqlient/graphql"
 	"net/http"
 	"strings"
 	"testing"
+
+	genql "github.com/Khan/genqlient/graphql"
 
 	"github.com/99designs/gqlgen/client"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -35,332 +36,249 @@ func TestMain(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.title, withFixtures(test.run, test.fixtures...))
+		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
 	}
 }
 
 func testGraphQL(t *testing.T) {
 	tests := []testCase{
-		{title: "should create a user", run: testCreateUser(newNonceFixture{})},
-		{title: "should be able to login", run: testLogin(newUserFixture{})},
-		{title: "should be able to logout", run: testLogout(newUserFixture{})},
-		{title: "should get user by ID", run: testUserByID(newUserFixture{})},
-		{title: "should get user by username", run: testUserByUsername(newUserFixture{})},
-		{title: "should get user by address", run: testUserByAddress(newUserFixture{})},
-		{title: "should get viewer", run: testViewer(newUserFixture{})},
-		{title: "should add a wallet", run: testAddWallet(newUserFixture{})},
-		{title: "should remove a wallet", run: testRemoveWallet(newUserFixture{})},
-		{title: "should sync tokens", run: testSyncTokens(newUserFixture{})},
-		{title: "should create a collection", run: testCreateCollection(newUserWithTokensFixture{})},
+		{title: "should create a user", run: testCreateUser},
+		{title: "should be able to login", run: testLogin},
+		{title: "should be able to logout", run: testLogout},
+		{title: "should get user by ID", run: testUserByID},
+		{title: "should get user by username", run: testUserByUsername},
+		{title: "should get user by address", run: testUserByAddress},
+		{title: "should get viewer", run: testViewer},
+		{title: "should add a wallet", run: testAddWallet},
+		{title: "should remove a wallet", run: testRemoveWallet},
+		{title: "should sync tokens", run: testSyncTokens},
+		{title: "should create a collection", run: testCreateCollection},
 	}
 	for _, test := range tests {
-		t.Run(test.title, withFixtures(test.run, test.fixtures...))
+		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
 	}
 }
 
-func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		nonceF.setup(t)
-		c := defaultClientNew()
-		username := "user" + persist.GenerateID().String()
+func testCreateUser(t *testing.T) {
+	nonceF := newNonceFixture(t)
+	c := defaultClientNew()
+	username := "user" + persist.GenerateID().String()
 
-		response, err := createUserMutation(context.Background(), c, AuthMechanism{
-			Eoa: &EoaAuth{
-				Nonce:     nonceF.nonce,
-				Signature: nonceF.wallet.Sign(nonceF.nonce),
-				ChainPubKey: ChainPubKeyInput{
-					PubKey: nonceF.wallet.address,
-					Chain:  "Ethereum",
-				},
+	response, err := createUserMutation(context.Background(), c, AuthMechanism{
+		Eoa: &EoaAuth{
+			Nonce:     nonceF.nonce,
+			Signature: nonceF.wallet.Sign(nonceF.nonce),
+			ChainPubKey: ChainPubKeyInput{
+				PubKey: nonceF.wallet.address,
+				Chain:  "Ethereum",
 			},
-		}, CreateUserInput{
-			Username: username,
-		})
+		},
+	}, CreateUserInput{
+		Username: username,
+	})
 
-		if err != nil {
-			panic(err)
-		}
-
-		payload, _ := (*response.CreateUser).(*createUserMutationCreateUserCreateUserPayload)
-
-		assert.Equal(t, username, *payload.Viewer.User.Username)
-	}
+	require.NoError(t, err)
+	payload, _ := (*response.CreateUser).(*createUserMutationCreateUserCreateUserPayload)
+	assert.Equal(t, username, *payload.Viewer.User.Username)
 }
 
-func testUserByUsername(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
+func testUserByUsername(t *testing.T) {
+	userF := newUserFixture(t)
 
-		response, err := userByUsernameQuery(context.Background(), defaultClientNew(), userF.username)
+	response, err := userByUsernameQuery(context.Background(), defaultClientNew(), userF.username)
 
-		if err != nil {
-			panic(err)
-		}
-
-		payload, _ := (*response.UserByUsername).(*userByUsernameQueryUserByUsernameGalleryUser)
-
-		assert.Equal(t, userF.username, *payload.Username)
-		assert.Equal(t, userF.id, payload.Dbid)
-	}
+	require.NoError(t, err)
+	payload, _ := (*response.UserByUsername).(*userByUsernameQueryUserByUsernameGalleryUser)
+	assert.Equal(t, userF.username, *payload.Username)
+	assert.Equal(t, userF.id, payload.Dbid)
 }
 
-func testUserByAddress(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
+func testUserByAddress(t *testing.T) {
+	userF := newUserFixture(t)
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	response, err := userByAddressQuery(ctx, defaultClientNew(), ChainAddressInput{
+		Address: userF.wallet.address,
+		Chain:   "Ethereum",
+	})
+	require.NoError(t, err)
 
-		response, err := userByAddressQuery(ctx, defaultClientNew(), ChainAddressInput{
-			Address: userF.wallet.address,
-			Chain:   "Ethereum",
-		})
-
-		if err != nil {
-			panic(err)
-		}
-
-		payload, _ := (*response.UserByAddress).(*userByAddressQueryUserByAddressGalleryUser)
-
-		assert.Equal(t, userF.username, *payload.Username)
-		assert.Equal(t, userF.id, payload.Dbid)
-	}
+	payload, _ := (*response.UserByAddress).(*userByAddressQueryUserByAddressGalleryUser)
+	assert.Equal(t, userF.username, *payload.Username)
+	assert.Equal(t, userF.id, payload.Dbid)
 }
 
-func testUserByID(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
+func testUserByID(t *testing.T) {
+	userF := newUserFixture(t)
 
-		response, err := userByIdQuery(context.Background(), defaultClientNew(), userF.id)
+	response, err := userByIdQuery(context.Background(), defaultClientNew(), userF.id)
 
-		if err != nil {
-			panic(err)
-		}
-
-		payload, _ := (*response.UserById).(*userByIdQueryUserByIdGalleryUser)
-
-		assert.Equal(t, userF.username, *payload.Username)
-		assert.Equal(t, userF.id, payload.Dbid)
-	}
+	require.NoError(t, err)
+	payload, _ := (*response.UserById).(*userByIdQueryUserByIdGalleryUser)
+	assert.Equal(t, userF.username, *payload.Username)
+	assert.Equal(t, userF.id, payload.Dbid)
 }
 
-func testViewer(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
+func testViewer(t *testing.T) {
+	userF := newUserFixture(t)
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	response, err := viewerQuery(ctx, defaultClientNew())
 
-		response, err := viewerQuery(ctx, defaultClientNew())
-
-		if err != nil {
-			panic(err)
-		}
-
-		payload, _ := (*response.Viewer).(*viewerQueryViewer)
-
-		assert.Equal(t, userF.username, *payload.User.Username)
-	}
+	require.NoError(t, err)
+	payload, _ := (*response.Viewer).(*viewerQueryViewer)
+	assert.Equal(t, userF.username, *payload.User.Username)
 }
 
-func testAddWallet(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
+func testAddWallet(t *testing.T) {
+	userF := newUserFixture(t)
+	walletToAdd := newWallet(t)
+	c := defaultClientNew()
+	nonce := newNonce(t, c, walletToAdd)
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		walletToAdd := newWallet(t)
-		c := defaultClientNew()
-
-		nonce := newNonce(t, c, walletToAdd)
-
-		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
-
-		response, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
-			Address: walletToAdd.address,
-			Chain:   "Ethereum",
-		}, AuthMechanism{
-			Eoa: &EoaAuth{
-				Nonce:     nonce,
-				Signature: walletToAdd.Sign(nonce),
-				ChainPubKey: ChainPubKeyInput{
-					PubKey: walletToAdd.address,
-					Chain:  "Ethereum",
-				},
+	response, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
+		Address: walletToAdd.address,
+		Chain:   "Ethereum",
+	}, AuthMechanism{
+		Eoa: &EoaAuth{
+			Nonce:     nonce,
+			Signature: walletToAdd.Sign(nonce),
+			ChainPubKey: ChainPubKeyInput{
+				PubKey: walletToAdd.address,
+				Chain:  "Ethereum",
 			},
-		})
+		},
+	})
 
-		if err != nil {
-			panic(err)
-		}
-
-		payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
-
-		wallets := payload.Viewer.User.Wallets
-		assert.Equal(t, walletToAdd.address, *wallets[len(wallets)-1].ChainAddress.Address)
-		assert.Equal(t, Chain("Ethereum"), *wallets[len(wallets)-1].ChainAddress.Chain)
-		assert.Len(t, wallets, 2)
-	}
+	require.NoError(t, err)
+	payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
+	wallets := payload.Viewer.User.Wallets
+	assert.Equal(t, walletToAdd.address, *wallets[len(wallets)-1].ChainAddress.Address)
+	assert.Equal(t, Chain("Ethereum"), *wallets[len(wallets)-1].ChainAddress.Chain)
+	assert.Len(t, wallets, 2)
 }
 
-func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
-		walletToRemove := newWallet(t)
-
-		c := defaultClientNew()
-		nonce := newNonce(t, c, walletToRemove)
-
-		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
-
-		addResponse, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
-			Address: walletToRemove.address,
-			Chain:   "Ethereum",
-		}, AuthMechanism{
-			Eoa: &EoaAuth{
-				Nonce:     nonce,
-				Signature: walletToRemove.Sign(nonce),
-				ChainPubKey: ChainPubKeyInput{
-					PubKey: walletToRemove.address,
-					Chain:  "Ethereum",
-				},
+func testRemoveWallet(t *testing.T) {
+	userF := newUserFixture(t)
+	walletToRemove := newWallet(t)
+	c := defaultClientNew()
+	nonce := newNonce(t, c, walletToRemove)
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	addResponse, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
+		Address: walletToRemove.address,
+		Chain:   "Ethereum",
+	}, AuthMechanism{
+		Eoa: &EoaAuth{
+			Nonce:     nonce,
+			Signature: walletToRemove.Sign(nonce),
+			ChainPubKey: ChainPubKeyInput{
+				PubKey: walletToRemove.address,
+				Chain:  "Ethereum",
 			},
-		})
+		},
+	})
+	require.NoError(t, err)
+	wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
+	lastWallet := wallets[len(wallets)-1]
+	assert.Len(t, wallets, 2)
 
-		if err != nil {
-			panic(err)
-		}
+	removeResponse, err := removeUserWalletsMutation(ctx, defaultClientNew(), []persist.DBID{lastWallet.Dbid})
 
-		wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
-		lastWallet := wallets[len(wallets)-1]
-		assert.Len(t, wallets, 2)
-
-		removeResponse, err := removeUserWalletsMutation(ctx, defaultClientNew(), []persist.DBID{lastWallet.Dbid})
-
-		if err != nil {
-			panic(err)
-		}
-
-		payload, _ := (*removeResponse.RemoveUserWallets).(*removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload)
-
-		assert.Len(t, payload.Viewer.User.Wallets, 1)
-		assert.NotEqual(t, lastWallet.Dbid, payload.Viewer.User.Wallets[0].Dbid)
-	}
+	require.NoError(t, err)
+	payload, _ := (*removeResponse.RemoveUserWallets).(*removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload)
+	assert.Len(t, payload.Viewer.User.Wallets, 1)
+	assert.NotEqual(t, lastWallet.Dbid, payload.Viewer.User.Wallets[0].Dbid)
 }
 
-func testLogin(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
-		nonce := newNonce(t, defaultClientNew(), userF.wallet)
+func testLogin(t *testing.T) {
+	userF := newUserFixture(t)
+	nonce := newNonce(t, defaultClientNew(), userF.wallet)
+	c := defaultClientNew()
 
-		c := defaultClientNew()
-
-		response, err := loginMutation(context.Background(), c, AuthMechanism{
-			Eoa: &EoaAuth{
-				Nonce:     nonce,
-				Signature: userF.wallet.Sign(nonce),
-				ChainPubKey: ChainPubKeyInput{
-					PubKey: userF.wallet.address,
-					Chain:  "Ethereum",
-				},
+	response, err := loginMutation(context.Background(), c, AuthMechanism{
+		Eoa: &EoaAuth{
+			Nonce:     nonce,
+			Signature: userF.wallet.Sign(nonce),
+			ChainPubKey: ChainPubKeyInput{
+				PubKey: userF.wallet.address,
+				Chain:  "Ethereum",
 			},
-		})
+		},
+	})
 
-		if err != nil {
-			panic(err)
-		}
-
-		//TODO: TEST FOR COOKIE
-		payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
-
-		assert.Equal(t, userF.username, *payload.Viewer.User.Username)
-		assert.Equal(t, userF.id, payload.Viewer.User.Dbid)
-	}
+	//TODO: TEST FOR COOKIE
+	require.NoError(t, err)
+	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
+	assert.Equal(t, userF.username, *payload.Viewer.User.Username)
+	assert.Equal(t, userF.id, payload.Viewer.User.Dbid)
 }
 
-func testLogout(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
+func testLogout(t *testing.T) {
+	userF := newUserFixture(t)
+	c := defaultClientNew()
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		c := defaultClientNew()
-		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	response, err := logoutMutation(ctx, c)
 
-		response, err := logoutMutation(ctx, c)
-
-		if err != nil {
-			panic(err)
-		}
-
-		assert.Nil(t, response.Logout.Viewer)
-	}
+	require.NoError(t, err)
+	assert.Nil(t, response.Logout.Viewer)
 }
 
-func testSyncTokens(userF newUserFixture) func(t *testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
-		clients := server.ClientInit(context.Background())
-		p := multichain.Provider{
-			Repos:       clients.Repos,
-			TasksClient: clients.TaskClient,
-			Queries:     clients.Queries,
-			Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
-		}
-
-		h := server.CoreInit(clients, &p)
-
-		c := genqlClient{
-			handler:      newClient(h),
-			lastResponse: nil,
-		}
-
-		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
-
-		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
-
-		if err != nil {
-			panic(err)
-		}
-
-		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
-
-		assert.NotEmpty(t, payload.Viewer.User.Tokens)
+func testSyncTokens(t *testing.T) {
+	userF := newUserFixture(t)
+	clients := server.ClientInit(context.Background())
+	p := multichain.Provider{
+		Repos:       clients.Repos,
+		TasksClient: clients.TaskClient,
+		Queries:     clients.Queries,
+		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
+	h := server.CoreInit(clients, &p)
+	c := genqlClient{
+		handler:      newClient(h),
+		lastResponse: nil,
+	}
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+
+	response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+	require.NoError(t, err)
+	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+	assert.NotEmpty(t, payload.Viewer.User.Tokens)
 }
 
-func testCreateCollection(userF newUserWithTokensFixture) func(*testing.T) {
-	return func(t *testing.T) {
-		userF.setup(t)
-		c := defaultClientNew()
-		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
-
-		response, err := createCollectionMutation(ctx, c, CreateCollectionInput{
-			GalleryId:      userF.galleryID,
-			Name:           "newCollection",
-			CollectorsNote: "this is a note",
-			Tokens:         userF.tokenIDs[:1],
-			Layout: CollectionLayoutInput{
-				Sections: []int{0},
-				SectionLayout: []CollectionSectionLayoutInput{
-					{
-						Columns:    0,
-						Whitespace: []int{},
-					},
-				},
-			},
-			TokenSettings: []CollectionTokenSettingsInput{
+func testCreateCollection(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := defaultClientNew()
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	response, err := createCollectionMutation(ctx, c, CreateCollectionInput{
+		GalleryId:      userF.galleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.tokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
 				{
-					TokenId:    userF.tokenIDs[0],
-					RenderLive: false,
+					Columns:    0,
+					Whitespace: []int{},
 				},
 			},
-			Caption: nil,
-		})
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.tokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
+	})
 
-		if err != nil {
-			panic(err)
-		}
-
-		payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
-
-		assert.NotEmpty(t, payload.Collection.Dbid)
-		assert.Len(t, payload.Collection.Tokens, 1)
-	}
+	require.NoError(t, err)
+	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, payload.Collection.Dbid)
+	assert.Len(t, payload.Collection.Tokens, 1)
 }
 
 type wallet struct {
@@ -396,25 +314,18 @@ func newWallet(t *testing.T) wallet {
 // newNonce makes a GraphQL request to generate a nonce
 func newNonce(t *testing.T, c genqlClient, w wallet) string {
 	t.Helper()
-
 	response, err := getAuthNonceMutation(context.Background(), c, ChainAddressInput{
 		Address: w.address,
 		Chain:   "Ethereum",
 	})
-
-	if err != nil {
-		panic(err)
-	}
-
+	require.NoError(t, err)
 	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
-
 	return *payload.Nonce
 }
 
 // newUser makes a GraphQL request to generate a new user
 func newUser(t *testing.T, c genqlClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
-
 	nonce := newNonce(t, c, w)
 	username = "user" + persist.GenerateID().String()
 
@@ -429,12 +340,8 @@ func newUser(t *testing.T, c genqlClient, w wallet) (userID persist.DBID, userna
 		},
 	}, CreateUserInput{Username: username})
 
-	if err != nil {
-		panic(err)
-	}
-
+	require.NoError(t, err)
 	payload := (*response.CreateUser).(*createUserMutationCreateUserCreateUserPayload)
-
 	return payload.Viewer.User.Dbid, username, payload.Viewer.User.Galleries[0].Dbid
 }
 
@@ -448,22 +355,16 @@ func newJWT(t *testing.T, userID persist.DBID) string {
 // syncTokens makes a GraphQL request to sync a user's wallet
 func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID) []persist.DBID {
 	t.Helper()
-
 	c := genqlClient{
 		handler:      newClient(handler),
 		lastResponse: nil,
 	}
-
 	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userID))
 
 	response, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"})
 
-	if err != nil {
-		panic(err)
-	}
-
+	require.NoError(t, err)
 	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
-
 	tokens := make([]persist.DBID, len(payload.Viewer.User.Tokens))
 	for i, token := range payload.Viewer.User.Tokens {
 		tokens[i] = token.Dbid
