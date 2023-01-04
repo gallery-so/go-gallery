@@ -38,7 +38,7 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
-  # Used to proxy cloud tasks requests
+  # TODO: Check if we still need this
   nginx:
     image: nginx
     ports:
@@ -49,7 +49,27 @@ services:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
     expose:
       - "8123"
-    command: ["-host",  "0.0.0.0", "-port", "8123"]
+    command: [
+      "-host", "0.0.0.0",
+      "-port", "8123",
+		  "-queue", "projects/gallery-local/locations/here/queues/feedbot",
+		  "-queue", "projects/gallery-local/locations/here/queues/feed-event",
+		  "-queue", "projects/gallery-local/locations/here/queues/token-processing",
+		  "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes"
+    ]
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    ports:
+      - "8085:8085"
+    command: [
+      "/bin/bash",
+      "-c",
+      "nohup gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local & \
+       sleep 3 && \
+       curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-new-notifications && \
+       curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-updated-notifications && \
+       while true; do sleep 100000; done"
+    ]
   # Uncomment if you want to run tokenprocessing locally as a container
   # tokenprocessing:
   #   build:

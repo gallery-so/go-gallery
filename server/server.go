@@ -14,6 +14,8 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
@@ -118,13 +120,27 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 
 func newPubSubClient() *pubsub.Client {
 	options := []option.ClientOption{}
+	projectID := viper.GetString("GOOGLE_CLOUD_PROJECT")
 
 	if viper.GetString("ENV") == "local" {
-		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
-		options = append(options, option.WithCredentialsFile(keyPath))
+		if host := viper.GetString("PUBSUB_EMULATOR_HOST"); host != "" {
+			options = append(
+				options,
+				option.WithEndpoint(host),
+				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+				option.WithoutAuthentication(),
+			)
+			panic("over here")
+		} else {
+			options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
+		}
+		// Override the project ID to use the dummy emulator project ID
+		if emulatorProjectID := viper.GetString("PUBSUB_PROJECT_ID"); emulatorProjectID != "" {
+			projectID = emulatorProjectID
+		}
 	}
 
-	pub, err := pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), options...)
+	pub, err := pubsub.NewClient(context.Background(), projectID, options...)
 	if err != nil {
 		panic(err)
 	}
@@ -189,10 +205,12 @@ func SetDefaults() {
 	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
-	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
-	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
-	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")
-	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "dev-updated-notifications-sub")
+	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
+	viper.SetDefault("PUBSUB_PROJECT_ID", "")
+	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "local-new-notifications")
+	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "local-updated-notifications")
+	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "local-new-notifications-sub")
+	viper.SetDefault("PUBSUB_SUB_UPDATED_NOTIFICATIONS", "local-updated-notifications-sub")
 	viper.SetDefault("EMAILS_HOST", "http://localhost:5500")
 	viper.SetDefault("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")

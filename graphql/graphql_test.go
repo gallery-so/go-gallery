@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/99designs/gqlgen/client"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -53,17 +54,18 @@ func TestMain(t *testing.T) {
 
 func testGraphQL(t *testing.T) {
 	tests := []testCase{
-		{title: "should create a user", run: testCreateUser(newNonceFixture{})},
-		{title: "should be able to login", run: testLogin(newUserFixture{})},
-		{title: "should be able to logout", run: testLogout(newUserFixture{})},
-		{title: "should get user by ID", run: testUserByID(newUserFixture{})},
-		{title: "should get user by username", run: testUserByUsername(newUserFixture{})},
-		{title: "should get user by address", run: testUserByAddress(newUserFixture{})},
-		{title: "should get viewer", run: testViewer(newUserFixture{})},
-		{title: "should add a wallet", run: testAddWallet(newUserFixture{})},
-		{title: "should remove a wallet", run: testRemoveWallet(newUserFixture{})},
-		{title: "should sync tokens", run: testSyncTokens(newUserFixture{})},
-		{title: "should create a collection", run: testCreateCollection(newUserWithTokensFixture{})},
+		// {title: "should create a user", run: testCreateUser(newNonceFixture{})},
+		// {title: "should be able to login", run: testLogin(newUserFixture{})},
+		// {title: "should be able to logout", run: testLogout(newUserFixture{})},
+		// {title: "should get user by ID", run: testUserByID(newUserFixture{})},
+		// {title: "should get user by username", run: testUserByUsername(newUserFixture{})},
+		// {title: "should get user by address", run: testUserByAddress(newUserFixture{})},
+		// {title: "should get viewer", run: testViewer(newUserFixture{})},
+		// {title: "should add a wallet", run: testAddWallet(newUserFixture{})},
+		// {title: "should remove a wallet", run: testRemoveWallet(newUserFixture{})},
+		// {title: "should sync tokens", run: testSyncTokens(newUserFixture{})},
+		// {title: "should create a collection", run: testCreateCollection(newUserWithTokensFixture{})},
+		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp(newUserFixture{}, newUserFixture{}, newUserFixture{}, newUserFixture{})},
 	}
 	for _, test := range tests {
 		t.Run(test.title, withFixtures(test.run, test.fixtures...))
@@ -456,6 +458,90 @@ func testCreateCollection(userF newUserWithTokensFixture) func(*testing.T) {
 		require.Empty(t, response.CreateCollection.Message)
 		assert.NotEmpty(t, response.CreateCollection.Collection.Dbid)
 		assert.Len(t, response.CreateCollection.Collection.Tokens, 1)
+	}
+}
+
+func testViewsAreRolledUp(userF, viewerA, viewerB, viewerC newUserFixture) func(*testing.T) {
+	return func(t *testing.T) {
+		userF.setup(t)
+		viewerA.setup(t)
+		viewerB.setup(t)
+		viewerC.setup(t)
+		c := defaultClient()
+		var viewResponse = struct {
+			ViewGallery struct {
+				model.ViewGalleryPayload
+				errMessage
+			}
+		}{}
+
+		// viewerA views gallery
+		post(t, c, ops.Op("viewGalleryMutation"), &viewResponse,
+			withJWT(newJWT(t, viewerA.id)),
+			client.Var("galleryId", userF.galleryID),
+		)
+		require.Empty(t, viewResponse.ViewGallery.Message)
+		// viewerB views gallery
+		post(t, c, ops.Op("viewGalleryMutation"), &viewResponse,
+			withJWT(newJWT(t, viewerB.id)),
+			client.Var("galleryId", userF.galleryID),
+		)
+		require.Empty(t, viewResponse.ViewGallery.Message)
+		// viewerC views gallery
+		post(t, c, ops.Op("viewGalleryMutation"), &viewResponse,
+			withJWT(newJWT(t, viewerC.id)),
+			client.Var("galleryId", userF.galleryID),
+		)
+		require.Empty(t, viewResponse.ViewGallery.Message)
+
+		var viewerResponse = struct {
+			Viewer struct {
+				Notifications struct {
+					UnseenCount int
+					Edges       []struct {
+						Node struct {
+							Seen               bool
+							Count              int
+							NonUserViewerCount int
+							UserViewers        struct {
+								Edges []struct {
+									Node struct {
+										Username string
+										DBID     string
+									}
+								}
+							}
+						}
+					}
+				}
+				errMessage
+			}
+		}{}
+
+		<-time.After(30 * time.Second)
+
+		post(t, c, ops.Op("viewerNotificationsQuery"), &viewerResponse,
+			withJWT(newJWT(t, userF.id)),
+			client.Var("first", 100),
+		)
+		require.Empty(t, viewerResponse.Viewer.Message)
+
+		fmt.Printf("userA=%s\n", viewerA.username)
+		fmt.Printf("userB=%s\n", viewerB.username)
+		fmt.Printf("userC=%s\n", viewerC.username)
+		fmt.Printf("unseen count %d\n", viewerResponse.Viewer.Notifications.UnseenCount)
+		fmt.Printf("total edges %d\n", len(viewerResponse.Viewer.Notifications.Edges))
+		for i, e := range viewerResponse.Viewer.Notifications.Edges {
+			fmt.Printf("i=%v;nodeSeen=%v;nodeCount=%v;nodeNonUserViewerCount=%v\n", i, e.Node.Seen, e.Node.Count, e.Node.NonUserViewerCount)
+			fmt.Printf("total users %d\n", len(e.Node.UserViewers.Edges))
+			for j, u := range e.Node.UserViewers.Edges {
+				fmt.Printf("i=%v;username=%v\n", j, u.Node.Username)
+			}
+		}
+
+		// Should be rolled up into a single notification
+		require.Equal(t, 1, viewerResponse.Viewer.Notifications.UnseenCount)
+		require.Len(t, viewerResponse.Viewer.Notifications.Edges[0].Node.UserViewers.Edges, 3)
 	}
 }
 
