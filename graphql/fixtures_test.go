@@ -127,7 +127,7 @@ type newNonceFixture struct {
 func (f *newNonceFixture) setup(t *testing.T) {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient()
+	c := defaultClientNew()
 	nonce := newNonce(t, c, wallet)
 	f.wallet = wallet
 	f.nonce = nonce
@@ -144,7 +144,7 @@ type newUserFixture struct {
 func (f *newUserFixture) setup(t *testing.T) {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient()
+	c := defaultClientNew()
 	userID, username, galleryID := newUser(t, c, wallet)
 	f.wallet = wallet
 	f.username = username
@@ -169,7 +169,7 @@ func (f *newUserWithTokensFixture) setup(t *testing.T) {
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
 	h := server.CoreInit(c, &p)
-	f.tokenIDs = syncTokens(t, h, f.id, f.wallet.address)
+	f.tokenIDs = syncTokens(t, h, f.id)
 }
 
 // stubProvider returns the same response for every call made to it

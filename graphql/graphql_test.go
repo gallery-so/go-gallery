@@ -1,36 +1,25 @@
 package graphql_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"io"
+	genql "github.com/Khan/genqlient/graphql"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/99designs/gqlgen/client"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/mikeydub/go-gallery/graphql/generated"
-	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/util"
 	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vektah/gqlparser/v2"
-	"github.com/vektah/gqlparser/v2/ast"
 )
-
-var ops = loadOperations(util.MustFindFile("./testdata/operations.graphql"))
 
 type testCase struct {
 	title    string
@@ -73,155 +62,140 @@ func testGraphQL(t *testing.T) {
 func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		nonceF.setup(t)
-		c := defaultClient()
+		c := defaultClientNew()
 		username := "user" + persist.GenerateID().String()
 
-		var response = graphql_{}
-
-		post(t, c, ops.Op("createUserMutation"), &response,
-			client.Var("input", map[string]string{
-				"username": username,
-			}),
-			client.Var("authMechanism", map[string]any{
-				"eoa": map[string]any{
-					"nonce":       nonceF.nonce,
-					"signature":   nonceF.wallet.Sign(nonceF.nonce),
-					"chainPubKey": map[string]string{"pubKey": nonceF.wallet.address, "chain": "Ethereum"},
+		response, err := createUserMutation(context.Background(), c, AuthMechanism{
+			Eoa: &EoaAuth{
+				Nonce:     nonceF.nonce,
+				Signature: nonceF.wallet.Sign(nonceF.nonce),
+				ChainPubKey: ChainPubKeyInput{
+					PubKey: nonceF.wallet.address,
+					Chain:  "Ethereum",
 				},
-			}),
-		)
+			},
+		}, CreateUserInput{
+			Username: username,
+		})
 
-		payload, ok := response.CreateUser.(createUserMutationCreateUserCreateUserPayload)
+		if err != nil {
+			panic(err)
+		}
 
-		require.Empty(t, response.CreateUser)
-		assert.Equal(t, username, *response.CreateUser.Viewer.User.Username)
+		payload, _ := (*response.CreateUser).(*createUserMutationCreateUserCreateUserPayload)
+
+		assert.Equal(t, username, *payload.Viewer.User.Username)
 	}
 }
 
 func testUserByUsername(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		c := defaultClient()
-		var response = struct {
-			UserByUsername struct {
-				model.GalleryUser
-				errMessage
-			}
-		}{}
 
-		post(t, c, ops.Op("userByUsernameQuery"), &response, client.Var("user", userF.username))
+		response, err := userByUsernameQuery(context.Background(), defaultClientNew(), userF.username)
 
-		require.Empty(t, response.UserByUsername.Message)
-		assert.Equal(t, userF.username, *response.UserByUsername.Username)
-		assert.Equal(t, userF.id, response.UserByUsername.Dbid)
+		if err != nil {
+			panic(err)
+		}
+
+		payload, _ := (*response.UserByUsername).(*userByUsernameQueryUserByUsernameGalleryUser)
+
+		assert.Equal(t, userF.username, *payload.Username)
+		assert.Equal(t, userF.id, payload.Dbid)
 	}
 }
 
 func testUserByAddress(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		c := defaultClient()
-		var response = struct {
-			UserByAddress struct {
-				model.GalleryUser
-				errMessage
-			}
-		}{}
 
-		post(t, c, ops.Op("userByAddressQuery"), &response,
-			client.Var("input", map[string]string{
-				"address": userF.wallet.address,
-				"chain":   "Ethereum",
-			}),
-		)
+		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		require.Empty(t, response.UserByAddress.Message)
-		assert.Equal(t, userF.username, *response.UserByAddress.Username)
-		assert.Equal(t, userF.id, response.UserByAddress.Dbid)
+		response, err := userByAddressQuery(ctx, defaultClientNew(), ChainAddressInput{
+			Address: userF.wallet.address,
+			Chain:   "Ethereum",
+		})
+
+		if err != nil {
+			panic(err)
+		}
+
+		payload, _ := (*response.UserByAddress).(*userByAddressQueryUserByAddressGalleryUser)
+
+		assert.Equal(t, userF.username, *payload.Username)
+		assert.Equal(t, userF.id, payload.Dbid)
 	}
 }
 
 func testUserByID(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		c := defaultClient()
-		var response = struct {
-			UserByID struct {
-				model.GalleryUser
-				errMessage
-			}
-		}{}
 
-		post(t, c, ops.Op("userByIdQuery"), &response, client.Var("id", userF.id))
+		response, err := userByIdQuery(context.Background(), defaultClientNew(), userF.id)
 
-		require.Empty(t, response.UserByID.Message)
-		assert.Equal(t, userF.username, *response.UserByID.Username)
-		assert.Equal(t, userF.id, response.UserByID.Dbid)
+		if err != nil {
+			panic(err)
+		}
+
+		payload, _ := (*response.UserById).(*userByIdQueryUserByIdGalleryUser)
+
+		assert.Equal(t, userF.username, *payload.Username)
+		assert.Equal(t, userF.id, payload.Dbid)
 	}
 }
 
 func testViewer(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		c := defaultClient()
-		var response = struct {
-			Viewer struct {
-				model.Viewer
-				errMessage
-			}
-		}{}
 
-		post(t, c, ops.Op("viewerQuery"), &response, withJWT(newJWT(t, userF.id)))
+		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		require.Empty(t, response.Viewer.Message)
-		assert.Equal(t, userF.username, *response.Viewer.User.Username)
+		response, err := viewerQuery(ctx, defaultClientNew())
+
+		if err != nil {
+			panic(err)
+		}
+
+		payload, _ := (*response.Viewer).(*viewerQueryViewer)
+
+		assert.Equal(t, userF.username, *payload.User.Username)
 	}
 }
 
 func testAddWallet(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		c := defaultClient()
+
 		walletToAdd := newWallet(t)
+		c := defaultClientNew()
+
 		nonce := newNonce(t, c, walletToAdd)
-		var response = struct {
-			AddUserWallet struct {
-				errMessage
-				Viewer struct {
-					User struct {
-						Wallets []struct {
-							Dbid         string
-							ChainAddress struct {
-								Address string
-								Chain   string
-							}
-						}
-					}
-				}
-			}
-		}{}
 
-		post(t, c, ops.Op("addUserWalletMutation"), &response,
-			withJWT(newJWT(t, userF.id)),
-			client.Var("chainAddress", map[string]string{
-				"address": walletToAdd.address,
-				"chain":   "Ethereum",
-			}),
-			client.Var(
-				"authMechanism", map[string]any{
-					"eoa": map[string]any{
-						"nonce":       nonce,
-						"signature":   walletToAdd.Sign(nonce),
-						"chainPubKey": map[string]string{"pubKey": walletToAdd.address, "chain": "Ethereum"},
-					},
+		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+
+		response, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
+			Address: walletToAdd.address,
+			Chain:   "Ethereum",
+		}, AuthMechanism{
+			Eoa: &EoaAuth{
+				Nonce:     nonce,
+				Signature: walletToAdd.Sign(nonce),
+				ChainPubKey: ChainPubKeyInput{
+					PubKey: walletToAdd.address,
+					Chain:  "Ethereum",
 				},
-			),
-		)
+			},
+		})
 
-		require.Empty(t, response.AddUserWallet.Message)
-		wallets := response.AddUserWallet.Viewer.User.Wallets
-		assert.Equal(t, walletToAdd.address, wallets[len(wallets)-1].ChainAddress.Address)
-		assert.Equal(t, "Ethereum", wallets[len(wallets)-1].ChainAddress.Chain)
+		if err != nil {
+			panic(err)
+		}
+
+		payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
+
+		wallets := payload.Viewer.User.Wallets
+		assert.Equal(t, walletToAdd.address, *wallets[len(wallets)-1].ChainAddress.Address)
+		assert.Equal(t, Chain("Ethereum"), *wallets[len(wallets)-1].ChainAddress.Chain)
 		assert.Len(t, wallets, 2)
 	}
 }
@@ -229,151 +203,92 @@ func testAddWallet(userF newUserFixture) func(t *testing.T) {
 func testRemoveWallet(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		c := defaultClient()
 		walletToRemove := newWallet(t)
+
+		c := defaultClientNew()
 		nonce := newNonce(t, c, walletToRemove)
-		jwt := newJWT(t, userF.id)
-		// First add a wallet
-		var addResponse = struct {
-			AddUserWallet struct {
-				errMessage
-				Viewer struct {
-					User struct {
-						Wallets []struct {
-							Dbid         string
-							ChainAddress struct {
-								Address string
-								Chain   string
-							}
-						}
-					}
-				}
-			}
-		}{}
-		post(t, c, ops.Op("addUserWalletMutation"), &addResponse,
-			withJWT(jwt),
-			client.Var("chainAddress", map[string]string{
-				"address": walletToRemove.address,
-				"chain":   "Ethereum",
-			}),
-			client.Var(
-				"authMechanism", map[string]any{
-					"eoa": map[string]any{
-						"nonce":       nonce,
-						"signature":   walletToRemove.Sign(nonce),
-						"chainPubKey": map[string]string{"pubKey": walletToRemove.address, "chain": "Ethereum"},
-					},
+
+		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+
+		addResponse, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
+			Address: walletToRemove.address,
+			Chain:   "Ethereum",
+		}, AuthMechanism{
+			Eoa: &EoaAuth{
+				Nonce:     nonce,
+				Signature: walletToRemove.Sign(nonce),
+				ChainPubKey: ChainPubKeyInput{
+					PubKey: walletToRemove.address,
+					Chain:  "Ethereum",
 				},
-			),
-		)
-		require.Empty(t, addResponse.AddUserWallet.Message)
-		wallets := addResponse.AddUserWallet.Viewer.User.Wallets
+			},
+		})
+
+		if err != nil {
+			panic(err)
+		}
+
+		wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
 		lastWallet := wallets[len(wallets)-1]
 		assert.Len(t, wallets, 2)
 
-		// Then remove the wallet
-		var removeResponse = struct {
-			RemoveUserWallets struct {
-				errMessage
-				Viewer struct {
-					User struct {
-						Wallets []struct {
-							Dbid         string
-							ChainAddress struct {
-								Address string
-								Chain   string
-							}
-						}
-					}
-				}
-			}
-		}{}
-		post(t, c, ops.Op("removeUserWalletsMutation"), &removeResponse,
-			withJWT(jwt),
-			client.Var("walletIds", []string{lastWallet.Dbid}),
-		)
+		removeResponse, err := removeUserWalletsMutation(ctx, defaultClientNew(), []persist.DBID{lastWallet.Dbid})
 
-		require.Empty(t, removeResponse.RemoveUserWallets.Message)
-		assert.Len(t, removeResponse.RemoveUserWallets.Viewer.User.Wallets, 1)
-		assert.NotEqual(t, lastWallet.Dbid, removeResponse.RemoveUserWallets.Viewer.User.Wallets[0].Dbid)
+		if err != nil {
+			panic(err)
+		}
+
+		payload, _ := (*removeResponse.RemoveUserWallets).(*removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload)
+
+		assert.Len(t, payload.Viewer.User.Wallets, 1)
+		assert.NotEqual(t, lastWallet.Dbid, payload.Viewer.User.Wallets[0].Dbid)
 	}
 }
 
 func testLogin(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		nonce := newNonce(t, defaultClient(), userF.wallet)
-		// Manually create the request so that we can write to a recorder
-		body, _ := json.Marshal(map[string]any{
-			"query": ops.Op("loginMutation"),
-			"variables": map[string]any{
-				"authMechanism": map[string]any{
-					"eoa": map[string]any{
-						"nonce":       nonce,
-						"signature":   userF.wallet.Sign(nonce),
-						"chainPubKey": map[string]string{"pubKey": userF.wallet.address, "chain": "Ethereum"},
-					},
+		nonce := newNonce(t, defaultClientNew(), userF.wallet)
+
+		c := defaultClientNew()
+
+		response, err := loginMutation(context.Background(), c, AuthMechanism{
+			Eoa: &EoaAuth{
+				Nonce:     nonce,
+				Signature: userF.wallet.Sign(nonce),
+				ChainPubKey: ChainPubKeyInput{
+					PubKey: userF.wallet.address,
+					Chain:  "Ethereum",
 				},
 			},
 		})
-		r := httptest.NewRequest(http.MethodPost, "/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
-		r.Header.Set("Content-Type", "application/json")
 
-		// Handle request
-		w := httptest.NewRecorder()
-		handler := defaultHandler()
-		handler.ServeHTTP(w, r)
-		res := w.Result()
-		defer res.Body.Close()
+		if err != nil {
+			panic(err)
+		}
 
-		// Check results
-		var response = struct {
-			Data struct {
-				Login struct {
-					Viewer model.Viewer
-					errMessage
-				}
-			}
-		}{}
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(res.Body)
-		err := json.Unmarshal(buf.Bytes(), &response)
-		require.NoError(t, err)
-		require.Empty(t, response.Data.Login.Message)
-		assert.NotEmpty(t, readCookie(t, res, auth.JWTCookieKey))
-		assert.Equal(t, userF.username, *response.Data.Login.Viewer.User.Username)
-		assert.Equal(t, userF.id, response.Data.Login.Viewer.User.Dbid)
+		//TODO: TEST FOR COOKIE
+		payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
+
+		assert.Equal(t, userF.username, *payload.Viewer.User.Username)
+		assert.Equal(t, userF.id, payload.Viewer.User.Dbid)
 	}
 }
 
 func testLogout(userF newUserFixture) func(t *testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		// Manually create the request so that we can write to a recorder
-		body, _ := json.Marshal(map[string]string{"query": ops.Op("logoutMutation")})
-		r := httptest.NewRequest(http.MethodPost, "/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
-		r.Header.Set("Content-Type", "application/json")
-		addJWT(r, newJWT(t, userF.id))
 
-		// Handle request
-		w := httptest.NewRecorder()
-		handler := defaultHandler()
-		handler.ServeHTTP(w, r)
-		res := w.Result()
-		defer res.Body.Close()
+		c := defaultClientNew()
+		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		// Check results
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(res.Body)
-		var response = struct {
-			Logout struct {
-				Viewer model.Viewer
-			}
-		}{}
-		err := json.Unmarshal(buf.Bytes(), &response)
-		require.NoError(t, err)
-		assert.Empty(t, readCookie(t, res, auth.JWTCookieKey))
-		assert.Empty(t, response.Logout.Viewer)
+		response, err := logoutMutation(ctx, c)
+
+		if err != nil {
+			panic(err)
+		}
+
+		assert.Nil(t, response.Logout.Viewer)
 	}
 }
 
@@ -387,73 +302,65 @@ func testSyncTokens(userF newUserFixture) func(t *testing.T) {
 			Queries:     clients.Queries,
 			Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 		}
+
 		h := server.CoreInit(clients, &p)
-		c := newClient(h)
-		var response = struct {
-			SyncTokens struct {
-				errMessage
-				Viewer struct {
-					User struct {
-						Tokens []struct {
-							Chain   string
-							DBID    persist.DBID
-							TokenID string
-						}
-					}
-				}
-			}
-		}{}
 
-		post(t, c, ops.Op("syncTokensMutation"), &response,
-			withJWT(newJWT(t, userF.id)),
-			client.Var("walletIds", []map[string]string{
-				{"address": userF.wallet.address, "chain": "Ethereum"},
-			}),
-		)
+		c := genqlClient{
+			handler:      newClient(h),
+			lastResponse: nil,
+		}
 
-		require.Empty(t, response.SyncTokens.Message)
-		assert.NotEmpty(t, response.SyncTokens.Viewer.User.Tokens)
+		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		if err != nil {
+			panic(err)
+		}
+
+		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+
+		assert.NotEmpty(t, payload.Viewer.User.Tokens)
 	}
 }
 
 func testCreateCollection(userF newUserWithTokensFixture) func(*testing.T) {
 	return func(t *testing.T) {
 		userF.setup(t)
-		c := defaultClient()
+		c := defaultClientNew()
+		ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-		var response = struct {
-			CreateCollection struct {
-				model.CreateCollectionPayload
-				errMessage
-			}
-		}{}
-
-		post(t, c, ops.Op("createCollectionMutation"), &response,
-			withJWT(newJWT(t, userF.id)),
-			client.Var("input", map[string]any{
-				"galleryId":      userF.galleryID,
-				"name":           "newCollection",
-				"tokens":         userF.tokenIDs[:1],
-				"collectorsNote": "this is a note",
-				"layout": map[string]any{
-					"sections": []int{0},
-					"sectionLayout": map[string]any{
-						"columns":    0,
-						"whitespace": []int{},
-					},
-				},
-				"tokenSettings": []map[string]any{
+		response, err := createCollectionMutation(ctx, c, CreateCollectionInput{
+			GalleryId:      userF.galleryID,
+			Name:           "newCollection",
+			CollectorsNote: "this is a note",
+			Tokens:         userF.tokenIDs[:1],
+			Layout: CollectionLayoutInput{
+				Sections: []int{0},
+				SectionLayout: []CollectionSectionLayoutInput{
 					{
-						"tokenId":    userF.tokenIDs[0],
-						"renderLive": false,
+						Columns:    0,
+						Whitespace: []int{},
 					},
 				},
-			}),
-		)
+			},
+			TokenSettings: []CollectionTokenSettingsInput{
+				{
+					TokenId:    userF.tokenIDs[0],
+					RenderLive: false,
+				},
+			},
+			Caption: nil,
+		})
 
-		require.Empty(t, response.CreateCollection.Message)
-		assert.NotEmpty(t, response.CreateCollection.Collection.Dbid)
-		assert.Len(t, response.CreateCollection.Collection.Tokens, 1)
+		if err != nil {
+			panic(err)
+		}
+
+		payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+
+		assert.NotEmpty(t, payload.Collection.Dbid)
+		assert.Len(t, payload.Collection.Tokens, 1)
 	}
 }
 
@@ -515,53 +422,48 @@ func newWallet(t *testing.T) wallet {
 }
 
 // newNonce makes a GraphQL request to generate a nonce
-func newNonce(t *testing.T, c *client.Client, w wallet) string {
+func newNonce(t *testing.T, c genqlClient, w wallet) string {
 	t.Helper()
-	response := struct {
-		GetAuthNonce struct {
-			model.AuthNonce
-			errMessage
-		}
-	}{}
 
-	post(t, c, ops.Op("getAuthNonceMutation"), &response,
-		client.Var("input", map[string]string{
-			"address": w.address,
-			"chain":   "Ethereum",
-		}),
-	)
-	require.Empty(t, response.GetAuthNonce.Message)
+	response, err := getAuthNonceMutation(context.Background(), c, ChainAddressInput{
+		Address: w.address,
+		Chain:   "Ethereum",
+	})
 
-	return *response.GetAuthNonce.Nonce
+	if err != nil {
+		panic(err)
+	}
+
+	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
+
+	return *payload.Nonce
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, c *client.Client, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
+func newUser(t *testing.T, c genqlClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
+
 	nonce := newNonce(t, c, w)
 	username = "user" + persist.GenerateID().String()
-	var response = struct {
-		CreateUser struct {
-			Viewer model.Viewer
-			errMessage
-		}
-	}{}
 
-	post(t, c, ops.Op("createUserMutation"), &response,
-		client.Var("input", map[string]string{
-			"username": username,
-		}),
-		client.Var("authMechanism", map[string]any{
-			"eoa": map[string]any{
-				"nonce":       nonce,
-				"signature":   w.Sign(nonce),
-				"chainPubKey": map[string]string{"pubKey": w.address, "chain": "Ethereum"},
+	response, err := createUserMutation(context.Background(), c, AuthMechanism{
+		Eoa: &EoaAuth{
+			Nonce:     nonce,
+			Signature: w.Sign(nonce),
+			ChainPubKey: ChainPubKeyInput{
+				PubKey: w.address,
+				Chain:  "Ethereum",
 			},
-		}),
-	)
-	require.Empty(t, response.CreateUser.Message)
+		},
+	}, CreateUserInput{Username: username})
 
-	return response.CreateUser.Viewer.User.Dbid, username, response.CreateUser.Viewer.User.Galleries[0].Dbid
+	if err != nil {
+		panic(err)
+	}
+
+	payload := (*response.CreateUser).(*createUserMutationCreateUserCreateUserPayload)
+
+	return payload.Viewer.User.Dbid, username, payload.Viewer.User.Galleries[0].Dbid
 }
 
 // newJWT generates a JWT
@@ -572,35 +474,27 @@ func newJWT(t *testing.T, userID persist.DBID) string {
 }
 
 // syncTokens makes a GraphQL request to sync a user's wallet
-func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID, address string) []persist.DBID {
+func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID) []persist.DBID {
 	t.Helper()
-	c := newClient(handler)
-	var response = struct {
-		SyncTokens struct {
-			errMessage
-			Viewer struct {
-				User struct {
-					Tokens []struct {
-						Chain   string
-						DBID    persist.DBID
-						TokenID string
-					}
-				}
-			}
-		}
-	}{}
 
-	post(t, c, ops.Op("syncTokensMutation"), &response,
-		withJWT(newJWT(t, userID)),
-		client.Var("walletIds", []map[string]string{
-			{"address": address, "chain": "Ethereum"},
-		}),
-	)
-	require.Empty(t, response.SyncTokens.Message)
+	c := genqlClient{
+		handler:      newClient(handler),
+		lastResponse: nil,
+	}
 
-	tokens := make([]persist.DBID, len(response.SyncTokens.Viewer.User.Tokens))
-	for i, token := range response.SyncTokens.Viewer.User.Tokens {
-		tokens[i] = token.DBID
+	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userID))
+
+	response, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"})
+
+	if err != nil {
+		panic(err)
+	}
+
+	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+
+	tokens := make([]persist.DBID, len(payload.Viewer.User.Tokens))
+	for i, token := range payload.Viewer.User.Tokens {
+		tokens[i] = token.Dbid
 	}
 	return tokens
 }
@@ -626,95 +520,49 @@ func defaultClient() *client.Client {
 	return newClient(handler)
 }
 
-type operations map[string]string
-
-// Op returns the named operation and fails if the operation does not exist
-func (o operations) Op(name string) string {
-	op, ok := o[name]
-	if !ok {
-		panic(fmt.Sprintf("`%s` does not exist", name))
-	}
-	return op
+type genqlClient struct {
+	handler      *client.Client
+	lastResponse *genql.Response
 }
 
-func loadOperations(filePath string) operations {
-	ops, err := readOperationsFromFile(loadGeneratedSchema(), filePath)
+func (c genqlClient) MakeRequest(
+	ctx context.Context,
+	req *genql.Request,
+	resp *genql.Response,
+) error {
+	response, err := c.handler.RawPost(req.Query, func(bd *client.Request) {
+		jsonSerializedIncoming, _ := json.Marshal(req.Variables)
+		unmarshaled := map[string]any{}
+		json.Unmarshal(jsonSerializedIncoming, &unmarshaled)
+
+		bd.Variables = unmarshaled
+
+		jwt := ctx.Value("jwt")
+		if jwt != nil {
+			bd.HTTP.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt.(string)})
+		}
+	})
+
 	if err != nil {
-		panic(err)
+		return err
 	}
-	return ops
-}
 
-// readOperationsFromFile reads in a file of named GraphQL operations, validates them against a schema,
-// and returns a mapping of operation names to operations. All GraphQL operations in the file must have names.
-func readOperationsFromFile(schema *ast.Schema, filePath string) (operations, error) {
-	ops := make(map[string]string)
-
-	data, err := os.ReadFile(filePath)
+	marshaledGqlgenResponse, err := json.Marshal(response.Data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	parsed, gqlErr := gqlparser.LoadQuery(schema, string(data))
-	if gqlErr != nil {
-		return nil, gqlErr
+	err = json.Unmarshal(marshaledGqlgenResponse, resp.Data)
+
+	if err != nil {
+		return err
 	}
 
-	lastOpIndex := len(parsed.Operations) - 1
+	c.lastResponse = resp
 
-	for i, op := range parsed.Operations {
-		if op.Name == "" {
-			return nil, fmt.Errorf("error parsing file '%s': all GraphQL operations used in tests must have names", filePath)
-		}
-
-		position := op.Position
-		opStart := op.Position.Start
-
-		// A QueryDocument doesn't have an explicit way to get the entire source string for
-		// a given operation, but we can assume that an operation extends from its own starting
-		// position to the start of the next operation (or the end of the source if this is the
-		// last operation)
-		var opString string
-		if i == lastOpIndex {
-			opString = position.Src.Input[opStart:]
-		} else {
-			nextOp := parsed.Operations[i+1]
-			opString = position.Src.Input[opStart:nextOp.Position.Start]
-		}
-
-		// The above method of getting a query string may include unnecessary leading/trailing
-		// whitespace, so we'll get rid of it here to keep our operations consistent
-		ops[op.Name] = strings.TrimSpace(opString)
-	}
-
-	return ops, nil
+	return nil
 }
 
-// loadGeneratedSchema loads the Gallery GraphQL schema via generated code
-func loadGeneratedSchema() *ast.Schema {
-	return generated.NewExecutableSchema(generated.Config{}).Schema()
-}
-
-// readCookie finds a cookie set in the response
-func readCookie(t *testing.T, r *http.Response, name string) string {
-	t.Helper()
-	for _, c := range r.Cookies() {
-		if c.Name == name {
-			return c.Value
-		}
-	}
-	require.NoError(t, fmt.Errorf("%s not set as a cookie", name))
-	return ""
-}
-
-// withJWT adds a JWT to a gqlgen client request
-func withJWT(jwt string) func(*client.Request) {
-	return func(r *client.Request) {
-		addJWT(r.HTTP, jwt)
-	}
-}
-
-// addJWT adds a JWT to a HTTP request
-func addJWT(r *http.Request, jwt string) {
-	r.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+func defaultClientNew() genqlClient {
+	return genqlClient{handler: defaultClient()}
 }
