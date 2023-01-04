@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,8 +39,8 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 	host := hostAndPort[0]
 	port := hostAndPort[1]
 
-	if err = pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
-		log.Fatalf("could not connect to postgres: %s", err)
+	if err := pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
+		return nil, err
 	}
 
 	return r, nil

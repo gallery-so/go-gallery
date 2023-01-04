@@ -130,7 +130,6 @@ func newPubSubClient() *pubsub.Client {
 				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 				option.WithoutAuthentication(),
 			)
-			panic("over here")
 		} else {
 			options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
 		}
