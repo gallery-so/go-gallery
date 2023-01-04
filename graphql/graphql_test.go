@@ -30,7 +30,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-var ops = loadOperations(util.MustFindFile("./testdata/operations.gql"))
+var ops = loadOperations(util.MustFindFile("./testdata/operations.graphql"))
 
 type testCase struct {
 	title    string
@@ -75,12 +75,8 @@ func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
 		nonceF.setup(t)
 		c := defaultClient()
 		username := "user" + persist.GenerateID().String()
-		var response = struct {
-			CreateUser struct {
-				Viewer model.Viewer
-				errMessage
-			}
-		}{}
+
+		var response = graphql_{}
 
 		post(t, c, ops.Op("createUserMutation"), &response,
 			client.Var("input", map[string]string{
@@ -95,7 +91,9 @@ func testCreateUser(nonceF newNonceFixture) func(t *testing.T) {
 			}),
 		)
 
-		require.Empty(t, response.CreateUser.Message)
+		payload, ok := response.CreateUser.(createUserMutationCreateUserCreateUserPayload)
+
+		require.Empty(t, response.CreateUser)
 		assert.Equal(t, username, *response.CreateUser.Viewer.User.Username)
 	}
 }
