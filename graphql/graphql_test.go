@@ -16,7 +16,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -362,33 +361,6 @@ func testCreateCollection(userF newUserWithTokensFixture) func(*testing.T) {
 		assert.NotEmpty(t, payload.Collection.Dbid)
 		assert.Len(t, payload.Collection.Tokens, 1)
 	}
-}
-
-// errMessage represents a handled GraphQL error
-type errMessage struct {
-	Typename string `json:"__typename"`
-	Message  string `json:"message"`
-}
-
-// post makes a POST request using the provided client and decodes the response
-// post will fail if an error is returned from the client or if decoding fails
-func post(t *testing.T, c *client.Client, query string, into any, options ...client.Option) {
-	t.Helper()
-	r, err := c.RawPost(query, options...)
-	require.NoError(t, err)
-	require.Empty(t, string(r.Errors))
-
-	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:      into,
-		TagName:     "json",
-		ErrorUnused: true,
-		ZeroFields:  true,
-		Squash:      true,
-	})
-	require.NoError(t, err)
-
-	err = d.Decode(r.Data)
-	require.NoError(t, err)
 }
 
 type wallet struct {
