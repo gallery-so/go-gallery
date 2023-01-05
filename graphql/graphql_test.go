@@ -67,7 +67,7 @@ func testCreateUser(t *testing.T) {
 	c := defaultClient(t)
 	username := "user" + persist.GenerateID().String()
 
-	response, err := createUserMutation(context.Background(), c, eoaAuthMechanismInput(nonceF.wallet, nonceF.nonce),
+	response, err := createUserMutation(context.Background(), c, authMechanismInput(nonceF.wallet, nonceF.nonce),
 		CreateUserInput{
 			Username: username,
 		},
@@ -93,10 +93,7 @@ func testUserByAddress(t *testing.T) {
 	userF := newUserFixture(t)
 	c := authedClient(t, userF.id)
 
-	response, err := userByAddressQuery(context.Background(), c, ChainAddressInput{
-		Address: userF.wallet.address,
-		Chain:   "Ethereum",
-	})
+	response, err := userByAddressQuery(context.Background(), c, chainAddressInput(userF.wallet.address))
 	require.NoError(t, err)
 
 	payload, _ := (*response.UserByAddress).(*userByAddressQueryUserByAddressGalleryUser)
@@ -132,10 +129,7 @@ func testAddWallet(t *testing.T) {
 	c := authedClient(t, userF.id)
 	nonce := newNonce(t, c, walletToAdd)
 
-	response, err := addUserWalletMutation(context.Background(), c, ChainAddressInput{
-		Address: walletToAdd.address,
-		Chain:   "Ethereum",
-	}, eoaAuthMechanismInput(walletToAdd, nonce))
+	response, err := addUserWalletMutation(context.Background(), c, chainAddressInput(walletToAdd.address), authMechanismInput(walletToAdd, nonce))
 
 	require.NoError(t, err)
 	payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
@@ -150,10 +144,7 @@ func testRemoveWallet(t *testing.T) {
 	walletToRemove := newWallet(t)
 	c := authedClient(t, userF.id)
 	nonce := newNonce(t, c, walletToRemove)
-	addResponse, err := addUserWalletMutation(context.Background(), c, ChainAddressInput{
-		Address: walletToRemove.address,
-		Chain:   "Ethereum",
-	}, eoaAuthMechanismInput(walletToRemove, nonce))
+	addResponse, err := addUserWalletMutation(context.Background(), c, chainAddressInput(walletToRemove.address), authMechanismInput(walletToRemove, nonce))
 	require.NoError(t, err)
 	wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
 	lastWallet := wallets[len(wallets)-1]
@@ -172,18 +163,8 @@ func testLogin(t *testing.T) {
 	c := defaultClient(t)
 	nonce := newNonce(t, c, userF.wallet)
 
-	response, err := loginMutation(context.Background(), c, AuthMechanism{
-		Eoa: &EoaAuth{
-			Nonce:     nonce,
-			Signature: userF.wallet.Sign(nonce),
-			ChainPubKey: ChainPubKeyInput{
-				PubKey: userF.wallet.address,
-				Chain:  "Ethereum",
-			},
-		},
-	})
+	response, err := loginMutation(context.Background(), c, authMechanismInput(userF.wallet, nonce))
 
-	//TODO: TEST FOR COOKIE
 	require.NoError(t, err)
 	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
 	assert.NotEmpty(t, readCookie(t, c.response, auth.JWTCookieKey))
@@ -197,8 +178,8 @@ func testLogout(t *testing.T) {
 
 	response, err := logoutMutation(context.Background(), c)
 
-	//TODO: TEST FOR NO COOKIE
 	require.NoError(t, err)
+	assert.Empty(t, readCookie(t, c.response, auth.JWTCookieKey))
 	assert.Nil(t, response.Logout.Viewer)
 }
 
@@ -254,8 +235,8 @@ func testCreateCollection(t *testing.T) {
 	assert.Len(t, payload.Collection.Tokens, 1)
 }
 
-// eoaAuthMechanismInput signs a nonce with an ethereum wallet
-func eoaAuthMechanismInput(w wallet, nonce string) AuthMechanism {
+// authMechanismInput signs a nonce with an ethereum wallet
+func authMechanismInput(w wallet, nonce string) AuthMechanism {
 	return AuthMechanism{
 		Eoa: &EoaAuth{
 			Nonce:     nonce,
@@ -266,6 +247,10 @@ func eoaAuthMechanismInput(w wallet, nonce string) AuthMechanism {
 			},
 		},
 	}
+}
+
+func chainAddressInput(address string) ChainAddressInput {
+	return ChainAddressInput{Address: address, Chain: "Ethereum"}
 }
 
 type wallet struct {
@@ -301,10 +286,7 @@ func newWallet(t *testing.T) wallet {
 // newNonce makes a GraphQL request to generate a nonce
 func newNonce(t *testing.T, c *genqlClient, w wallet) string {
 	t.Helper()
-	response, err := getAuthNonceMutation(context.Background(), c, ChainAddressInput{
-		Address: w.address,
-		Chain:   "Ethereum",
-	})
+	response, err := getAuthNonceMutation(context.Background(), c, chainAddressInput(w.address))
 	require.NoError(t, err)
 	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
 	return *payload.Nonce
@@ -316,16 +298,9 @@ func newUser(t *testing.T, c *genqlClient, w wallet) (userID persist.DBID, usern
 	nonce := newNonce(t, c, w)
 	username = "user" + persist.GenerateID().String()
 
-	response, err := createUserMutation(context.Background(), c, AuthMechanism{
-		Eoa: &EoaAuth{
-			Nonce:     nonce,
-			Signature: w.Sign(nonce),
-			ChainPubKey: ChainPubKeyInput{
-				PubKey: w.address,
-				Chain:  "Ethereum",
-			},
-		},
-	}, CreateUserInput{Username: username})
+	response, err := createUserMutation(context.Background(), c, authMechanismInput(w, nonce),
+		CreateUserInput{Username: username},
+	)
 
 	require.NoError(t, err)
 	payload := (*response.CreateUser).(*createUserMutationCreateUserCreateUserPayload)
