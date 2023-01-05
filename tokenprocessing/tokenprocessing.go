@@ -6,10 +6,6 @@ import (
 	"os"
 	"time"
 
-<<<<<<< HEAD
-	"cloud.google.com/go/storage"
-=======
->>>>>>> main
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/middleware"
