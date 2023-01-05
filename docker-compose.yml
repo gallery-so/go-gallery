@@ -52,6 +52,8 @@ services:
     ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    expose:
+      - "8085"
     ports:
       - "8085:8085"
     command: [

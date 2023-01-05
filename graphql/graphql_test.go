@@ -1,3 +1,4 @@
+//go:generate go run github.com/Khan/genqlient
 package graphql_test
 
 import (
@@ -35,7 +36,7 @@ func TestMain(t *testing.T) {
 		{
 			title:    "test GraphQL",
 			run:      testGraphQL,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNoticationTopics},
 		},
 	}
 	for _, test := range tests {
@@ -237,7 +238,6 @@ func testCreateCollection(t *testing.T) {
 func testViewsAreRolledUp(t *testing.T) {
 	serverF := newServerFixture(t)
 	userF := newUserFixture(t)
-	// c := defaultHandlerClient(t)
 	viewerA := newUserFixture(t)
 	viewerB := newUserFixture(t)
 	// viewerA views gallery
@@ -250,6 +250,8 @@ func testViewsAreRolledUp(t *testing.T) {
 	resp, err = viewGalleryMutation(context.Background(), clientB, userF.galleryID)
 	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
 	require.NoError(t, err)
+
+	// TODO: Actually verify that the views get rolled up
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
@@ -444,7 +446,6 @@ func (c *serverSpy) MakeRequest(ctx context.Context, req *genql.Request, resp *g
 
 	res, err := http.DefaultClient.Do(r)
 	if err != nil {
-		panic(err)
 		return err
 	}
 	c.response = res
@@ -452,7 +453,7 @@ func (c *serverSpy) MakeRequest(ctx context.Context, req *genql.Request, resp *g
 
 	err = json.NewDecoder(res.Body).Decode(resp)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	return nil

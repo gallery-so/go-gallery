@@ -14,8 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/pubsub"
@@ -37,6 +35,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -85,7 +84,7 @@ func ClientInit(ctx context.Context) *Clients {
 		StorageClient: media.NewStorageClient(ctx),
 		TaskClient:    task.NewClient(ctx),
 		SecretClient:  newSecretsClient(),
-		PubSubClient:  newPubSubClient(),
+		PubSubClient:  gcp.NewClient(ctx),
 	}
 }
 
@@ -116,32 +115,6 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 
 	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache)
-}
-
-func newPubSubClient() *pubsub.Client {
-	options := []option.ClientOption{}
-	projectID := viper.GetString("GOOGLE_CLOUD_PROJECT")
-
-	if viper.GetString("ENV") == "local" {
-		if host := viper.GetString("PUBSUB_EMULATOR_HOST"); host != "" {
-			projectID = "gallery-local"
-			options = append(
-				options,
-				option.WithEndpoint(host),
-				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-				option.WithoutAuthentication(),
-			)
-		} else {
-			options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
-		}
-	}
-
-	pub, err := pubsub.NewClient(context.Background(), projectID, options...)
-	if err != nil {
-		panic(err)
-	}
-
-	return pub
 }
 
 func newSecretsClient() *secretmanager.Client {

@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/stretchr/testify/require"
 )
@@ -105,12 +106,39 @@ func useTokenQueue(t *testing.T) {
 	t.Setenv("TOKEN_PROCESSING_QUEUE", queue.Name)
 }
 
+// useNoticationTopics is a fixture that creates dummy pubsub topics for notications
+func useNoticationTopics(t *testing.T) {
+	t.Helper()
+	usePubSub(t)
+	ctx := context.Background()
+	client := gcp.NewClient(ctx)
+
+	newNotificationsTopic := "new-notifications" + persist.GenerateID().String()
+	_, err := client.CreateTopic(ctx, newNotificationsTopic)
+	require.NoError(t, err)
+	t.Setenv("PUBSUB_TOPIC_NEW_NOTIFICATIONS", newNotificationsTopic)
+
+	updatedNotificationsTopic := "updated-notifications" + persist.GenerateID().String()
+	_, err = client.CreateTopic(ctx, updatedNotificationsTopic)
+	require.NoError(t, err)
+	t.Setenv("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", updatedNotificationsTopic)
+}
+
 // useCloudTasks starts a running Cloud Tasks emulator
 func useCloudTasks(t *testing.T) {
 	t.Helper()
 	r, err := docker.StartCloudTasks()
 	require.NoError(t, err)
 	t.Setenv("TASK_QUEUE_HOST", r.GetHostPort("8123/tcp"))
+	t.Cleanup(func() { r.Close() })
+}
+
+// usePubSub starts a running PubSub emulator
+func usePubSub(t *testing.T) {
+	t.Helper()
+	r, err := docker.StartPubSub()
+	require.NoError(t, err)
+	t.Setenv("PUBSUB_EMULATOR_HOST", r.GetHostPort("8085/tcp"))
 	t.Cleanup(func() { r.Close() })
 }
 
