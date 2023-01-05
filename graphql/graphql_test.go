@@ -64,18 +64,11 @@ func testCreateUser(t *testing.T) {
 	c := defaultClient()
 	username := "user" + persist.GenerateID().String()
 
-	response, err := createUserMutation(context.Background(), c, AuthMechanism{
-		Eoa: &EoaAuth{
-			Nonce:     nonceF.nonce,
-			Signature: nonceF.wallet.Sign(nonceF.nonce),
-			ChainPubKey: ChainPubKeyInput{
-				PubKey: nonceF.wallet.address,
-				Chain:  "Ethereum",
-			},
+	response, err := createUserMutation(context.Background(), c, eoaAuthMechanismInput(nonceF.wallet, nonceF.nonce),
+		CreateUserInput{
+			Username: username,
 		},
-	}, CreateUserInput{
-		Username: username,
-	})
+	)
 
 	require.NoError(t, err)
 	payload, _ := (*response.CreateUser).(*createUserMutationCreateUserCreateUserPayload)
@@ -139,16 +132,7 @@ func testAddWallet(t *testing.T) {
 	response, err := addUserWalletMutation(context.Background(), c, ChainAddressInput{
 		Address: walletToAdd.address,
 		Chain:   "Ethereum",
-	}, AuthMechanism{
-		Eoa: &EoaAuth{
-			Nonce:     nonce,
-			Signature: walletToAdd.Sign(nonce),
-			ChainPubKey: ChainPubKeyInput{
-				PubKey: walletToAdd.address,
-				Chain:  "Ethereum",
-			},
-		},
-	})
+	}, eoaAuthMechanismInput(walletToAdd, nonce))
 
 	require.NoError(t, err)
 	payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
@@ -166,16 +150,7 @@ func testRemoveWallet(t *testing.T) {
 	addResponse, err := addUserWalletMutation(context.Background(), c, ChainAddressInput{
 		Address: walletToRemove.address,
 		Chain:   "Ethereum",
-	}, AuthMechanism{
-		Eoa: &EoaAuth{
-			Nonce:     nonce,
-			Signature: walletToRemove.Sign(nonce),
-			ChainPubKey: ChainPubKeyInput{
-				PubKey: walletToRemove.address,
-				Chain:  "Ethereum",
-			},
-		},
-	})
+	}, eoaAuthMechanismInput(walletToRemove, nonce))
 	require.NoError(t, err)
 	wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
 	lastWallet := wallets[len(wallets)-1]
@@ -273,6 +248,20 @@ func testCreateCollection(t *testing.T) {
 	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
 	assert.NotEmpty(t, payload.Collection.Dbid)
 	assert.Len(t, payload.Collection.Tokens, 1)
+}
+
+// eoaAuthMechanismInput signs a nonce with an ethereum wallet
+func eoaAuthMechanismInput(w wallet, nonce string) AuthMechanism {
+	return AuthMechanism{
+		Eoa: &EoaAuth{
+			Nonce:     nonce,
+			Signature: w.Sign(nonce),
+			ChainPubKey: ChainPubKeyInput{
+				PubKey: w.address,
+				Chain:  "Ethereum",
+			},
+		},
+	}
 }
 
 type wallet struct {
