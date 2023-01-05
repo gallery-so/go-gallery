@@ -260,7 +260,8 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("new-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
-		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS")),
+		Topic:            n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS")),
+		ExpirationPolicy: time.Hour * 24 * 3,
 	})
 	if err != nil {
 		panic(err)
@@ -302,7 +303,8 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 
 func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("updated-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
-		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS")),
+		Topic:            n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS")),
+		ExpirationPolicy: time.Hour * 24 * 3,
 	})
 	if err != nil {
 		panic(err)

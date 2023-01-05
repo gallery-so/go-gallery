@@ -124,6 +124,7 @@ func newPubSubClient() *pubsub.Client {
 
 	if viper.GetString("ENV") == "local" {
 		if host := viper.GetString("PUBSUB_EMULATOR_HOST"); host != "" {
+			projectID = "gallery-local"
 			options = append(
 				options,
 				option.WithEndpoint(host),
@@ -132,10 +133,6 @@ func newPubSubClient() *pubsub.Client {
 			)
 		} else {
 			options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
-		}
-		// Override the project ID to use the dummy emulator project ID
-		if emulatorProjectID := viper.GetString("PUBSUB_PROJECT_ID"); emulatorProjectID != "" {
-			projectID = emulatorProjectID
 		}
 	}
 

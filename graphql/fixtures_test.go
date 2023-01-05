@@ -135,7 +135,7 @@ type nonceFixture struct {
 func newNonceFixture(t *testing.T) nonceFixture {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient()
+	c := defaultClient(t)
 	nonce := newNonce(t, c, wallet)
 	return nonceFixture{wallet, nonce}
 }
@@ -151,7 +151,7 @@ type userFixture struct {
 func newUserFixture(t *testing.T) userFixture {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient()
+	c := defaultClient(t)
 	userID, username, galleryID := newUser(t, c, wallet)
 	return userFixture{wallet, username, userID, galleryID}
 }
@@ -173,7 +173,7 @@ func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
 	h := server.CoreInit(c, &p)
-	tokenIDs := syncTokens(t, h, user.id, user.wallet.address)
+	tokenIDs := syncTokens(t, h, user.id)
 	return userWithTokensFixture{user, tokenIDs}
 }
 

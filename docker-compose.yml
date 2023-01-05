@@ -68,7 +68,7 @@ services:
        sleep 3 && \
        curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-new-notifications && \
        curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-updated-notifications && \
-       while true; do sleep 100000; done"
+       while true; do sleep 1000000; done"
     ]
   # Uncomment if you want to run tokenprocessing locally as a container
   # tokenprocessing:
