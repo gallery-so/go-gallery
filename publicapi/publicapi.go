@@ -61,7 +61,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
-	validator := newValidator()
+	validator := validate.WithCustomValidators()
 
 	return &PublicAPI{
 		repos:     repos,
@@ -105,12 +105,6 @@ func For(ctx context.Context) *PublicAPI {
 	// If not, fall back to the one added to the gin context
 	gc := util.GinContextFromContext(ctx)
 	return gc.Value(apiContextKey).(*PublicAPI)
-}
-
-func newValidator() *validator.Validate {
-	v := validator.New()
-	validate.RegisterCustomValidators(v)
-	return v
 }
 
 func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {

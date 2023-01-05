@@ -45,6 +45,11 @@ services:
       - "8080:80"
     volumes:
       - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
+  task-emulator:
+    image: ghcr.io/aertje/cloud-tasks-emulator:latest
+    expose:
+      - "8123"
+    command: ["-host",  "0.0.0.0", "-port", "8123"]
   # Uncomment if you want to run tokenprocessing locally as a container
   # tokenprocessing:
   #   build:

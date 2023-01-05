@@ -20,10 +20,7 @@ func setupTest(t *testing.T) *assert.Assertions {
 }
 
 func newStorageClient(ctx context.Context) *storage.Client {
-	fi, err := util.FindFile("_deploy/service-key-dev.json", 4)
-	if err != nil {
-		panic(err)
-	}
+	fi := util.MustFindFile("_deploy/service-key-dev.json")
 	stg, err := storage.NewClient(ctx, option.WithCredentialsFile(fi))
 	if err != nil {
 		panic(err)
@@ -46,10 +43,7 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	path, err := util.FindFile("_local/app-local-backend.yaml", 5)
-	if err != nil {
-		panic(err)
-	}
+	path := util.MustFindFile("_local/app-local-backend.yaml")
 
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
