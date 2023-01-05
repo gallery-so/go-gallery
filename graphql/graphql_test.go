@@ -61,7 +61,7 @@ func testGraphQL(t *testing.T) {
 
 func testCreateUser(t *testing.T) {
 	nonceF := newNonceFixture(t)
-	c := defaultClientNew()
+	c := defaultClient()
 	username := "user" + persist.GenerateID().String()
 
 	response, err := createUserMutation(context.Background(), c, AuthMechanism{
@@ -85,7 +85,7 @@ func testCreateUser(t *testing.T) {
 func testUserByUsername(t *testing.T) {
 	userF := newUserFixture(t)
 
-	response, err := userByUsernameQuery(context.Background(), defaultClientNew(), userF.username)
+	response, err := userByUsernameQuery(context.Background(), defaultClient(), userF.username)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserByUsername).(*userByUsernameQueryUserByUsernameGalleryUser)
@@ -95,9 +95,9 @@ func testUserByUsername(t *testing.T) {
 
 func testUserByAddress(t *testing.T) {
 	userF := newUserFixture(t)
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	c := authedClient(t, userF.id)
 
-	response, err := userByAddressQuery(ctx, defaultClientNew(), ChainAddressInput{
+	response, err := userByAddressQuery(context.Background(), c, ChainAddressInput{
 		Address: userF.wallet.address,
 		Chain:   "Ethereum",
 	})
@@ -111,7 +111,7 @@ func testUserByAddress(t *testing.T) {
 func testUserByID(t *testing.T) {
 	userF := newUserFixture(t)
 
-	response, err := userByIdQuery(context.Background(), defaultClientNew(), userF.id)
+	response, err := userByIdQuery(context.Background(), defaultClient(), userF.id)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserById).(*userByIdQueryUserByIdGalleryUser)
@@ -121,9 +121,9 @@ func testUserByID(t *testing.T) {
 
 func testViewer(t *testing.T) {
 	userF := newUserFixture(t)
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	c := authedClient(t, userF.id)
 
-	response, err := viewerQuery(ctx, defaultClientNew())
+	response, err := viewerQuery(context.Background(), c)
 
 	require.NoError(t, err)
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
@@ -133,11 +133,10 @@ func testViewer(t *testing.T) {
 func testAddWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToAdd := newWallet(t)
-	c := defaultClientNew()
+	c := authedClient(t, userF.id)
 	nonce := newNonce(t, c, walletToAdd)
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
 
-	response, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
+	response, err := addUserWalletMutation(context.Background(), c, ChainAddressInput{
 		Address: walletToAdd.address,
 		Chain:   "Ethereum",
 	}, AuthMechanism{
@@ -162,10 +161,9 @@ func testAddWallet(t *testing.T) {
 func testRemoveWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToRemove := newWallet(t)
-	c := defaultClientNew()
+	c := authedClient(t, userF.id)
 	nonce := newNonce(t, c, walletToRemove)
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
-	addResponse, err := addUserWalletMutation(ctx, defaultClientNew(), ChainAddressInput{
+	addResponse, err := addUserWalletMutation(context.Background(), c, ChainAddressInput{
 		Address: walletToRemove.address,
 		Chain:   "Ethereum",
 	}, AuthMechanism{
@@ -183,7 +181,7 @@ func testRemoveWallet(t *testing.T) {
 	lastWallet := wallets[len(wallets)-1]
 	assert.Len(t, wallets, 2)
 
-	removeResponse, err := removeUserWalletsMutation(ctx, defaultClientNew(), []persist.DBID{lastWallet.Dbid})
+	removeResponse, err := removeUserWalletsMutation(context.Background(), c, []persist.DBID{lastWallet.Dbid})
 
 	require.NoError(t, err)
 	payload, _ := (*removeResponse.RemoveUserWallets).(*removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload)
@@ -193,8 +191,8 @@ func testRemoveWallet(t *testing.T) {
 
 func testLogin(t *testing.T) {
 	userF := newUserFixture(t)
-	nonce := newNonce(t, defaultClientNew(), userF.wallet)
-	c := defaultClientNew()
+	c := defaultClient()
+	nonce := newNonce(t, c, userF.wallet)
 
 	response, err := loginMutation(context.Background(), c, AuthMechanism{
 		Eoa: &EoaAuth{
@@ -216,11 +214,11 @@ func testLogin(t *testing.T) {
 
 func testLogout(t *testing.T) {
 	userF := newUserFixture(t)
-	c := defaultClientNew()
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	c := authedClient(t, userF.id)
 
-	response, err := logoutMutation(ctx, c)
+	response, err := logoutMutation(context.Background(), c)
 
+	//TODO: TEST FOR NO COOKIE
 	require.NoError(t, err)
 	assert.Nil(t, response.Logout.Viewer)
 }
@@ -235,13 +233,9 @@ func testSyncTokens(t *testing.T) {
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
 	h := server.CoreInit(clients, &p)
-	c := genqlClient{
-		handler:      newClient(h),
-		lastResponse: nil,
-	}
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
+	c := customClient(t, h, withJWTOpt(t, userF.id))
 
-	response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
 	require.NoError(t, err)
 	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
@@ -250,9 +244,9 @@ func testSyncTokens(t *testing.T) {
 
 func testCreateCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := defaultClientNew()
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userF.id))
-	response, err := createCollectionMutation(ctx, c, CreateCollectionInput{
+	c := authedClient(t, userF.id)
+
+	response, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
 		GalleryId:      userF.galleryID,
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
@@ -355,13 +349,9 @@ func newJWT(t *testing.T, userID persist.DBID) string {
 // syncTokens makes a GraphQL request to sync a user's wallet
 func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID) []persist.DBID {
 	t.Helper()
-	c := genqlClient{
-		handler:      newClient(handler),
-		lastResponse: nil,
-	}
-	ctx := context.WithValue(context.Background(), "jwt", newJWT(t, userID))
+	c := customClient(t, handler, withJWTOpt(t, userID))
 
-	response, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"})
+	response, err := syncTokensMutation(context.Background(), c, []Chain{"Ethereum"})
 
 	require.NoError(t, err)
 	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
@@ -381,16 +371,44 @@ func defaultHandler() http.Handler {
 }
 
 // newClient returns a gqlgen test client
-func newClient(handler http.Handler) *client.Client {
-	return client.New(handler, func(r *client.Request) {
-		r.HTTP.URL.Path = "/glry/graphql/query"
-	})
+func newClient(handler http.Handler, opts ...client.Option) *client.Client {
+	defaultOpts := []client.Option{gqlPathOpt}
+	opts = append(opts, defaultOpts...)
+	return client.New(handler, opts...)
 }
 
 // defaultClient returns a GraphQL client attached to a backend GraphQL handler
-func defaultClient() *client.Client {
+func defaultClient() genqlClient {
 	handler := defaultHandler()
-	return newClient(handler)
+	client := newClient(handler)
+	return genqlClient{handler: client}
+}
+
+// authedClient returns a GraphQL client with an authenticated JWT
+func authedClient(t *testing.T, userID persist.DBID) genqlClient {
+	handler := defaultHandler()
+	client := newClient(handler, withJWTOpt(t, userID))
+	return genqlClient{handler: client}
+}
+
+// customClient configures the client with the provided HTTP handler and client options
+func customClient(t *testing.T, handler http.Handler, opts ...client.Option) genqlClient {
+	client := newClient(handler, opts...)
+	return genqlClient{handler: client}
+}
+
+// gqlPathOpt sets all client's request paths to the GraphQL endpoint
+func gqlPathOpt(r *client.Request) {
+	r.HTTP.URL.Path = "/glry/graphql/query"
+}
+
+// withJWTOpt ddds a JWT cookie to the request headers
+func withJWTOpt(t *testing.T, userID persist.DBID) func(*client.Request) {
+	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+	require.NoError(t, err)
+	return func(r *client.Request) {
+		r.HTTP.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	}
 }
 
 type genqlClient struct {
@@ -404,29 +422,21 @@ func (c genqlClient) MakeRequest(
 	resp *genql.Response,
 ) error {
 	response, err := c.handler.RawPost(req.Query, func(bd *client.Request) {
-		jsonSerializedIncoming, _ := json.Marshal(req.Variables)
-		unmarshaled := map[string]any{}
-		json.Unmarshal(jsonSerializedIncoming, &unmarshaled)
-
-		bd.Variables = unmarshaled
-
-		jwt := ctx.Value("jwt")
-		if jwt != nil {
-			bd.HTTP.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt.(string)})
-		}
+		marshalledVars, _ := json.Marshal(req.Variables)
+		unmarshalledVars := map[string]any{}
+		json.Unmarshal(marshalledVars, &unmarshalledVars)
+		bd.Variables = unmarshalledVars
 	})
-
 	if err != nil {
 		return err
 	}
 
-	marshaledGqlgenResponse, err := json.Marshal(response.Data)
+	marshalledResponse, err := json.Marshal(response.Data)
 	if err != nil {
 		return err
 	}
 
-	err = json.Unmarshal(marshaledGqlgenResponse, resp.Data)
-
+	err = json.Unmarshal(marshalledResponse, resp.Data)
 	if err != nil {
 		return err
 	}
@@ -434,8 +444,4 @@ func (c genqlClient) MakeRequest(
 	c.lastResponse = resp
 
 	return nil
-}
-
-func defaultClientNew() genqlClient {
-	return genqlClient{handler: defaultClient()}
 }
