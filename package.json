@@ -5,5 +5,13 @@
   "dependencies": {
     "@supabase/supabase-js": "^1.22.5",
     "json2csv": "^5.0.6"
+  },
+  "devDependencies": {
+    "prettier": "^2.8.1"
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "singleQuote": true,
+    "printWidth": 100
   }
 }

@@ -296,6 +296,15 @@ func FindFile(f string, searchDepth int) (string, error) {
 	return "", fmt.Errorf("could not find file '%s' in path", f)
 }
 
+// MustFindFile panics if the file is not found up to the default search depth.
+func MustFindFile(f string) string {
+	f, err := FindFile(f, 5)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
 // InByteSizeFormat converts a number of bytes to a human-readable string
 // using SI units (kB, MB, GB, TB, PB, EB, ZB, YB)
 func InByteSizeFormat(bytes uint64) string {
@@ -421,10 +430,7 @@ func LoadEnvFile(fileName string) {
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
 	filePath := filepath.Join("_local", fileName)
 	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
-	path, err := FindFile(filePath, 5)
-	if err != nil {
-		panic(err)
-	}
+	path := MustFindFile(filePath)
 
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {

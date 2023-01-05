@@ -49,12 +49,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		}
 	})
 
-	var s *storage.Client
-	if viper.GetString("ENV") == "local" {
-		s = media.NewLocalStorageClient(context.Background(), "./_deploy/service-key-dev.json")
-	} else {
-		s = media.NewStorageClient(context.Background())
-	}
+	s := media.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()
@@ -89,12 +84,7 @@ func coreInitServer(localKeyPath string, quietLogs, enableRPC bool) *gin.Engine 
 		}
 	})
 
-	var s *storage.Client
-	if viper.GetString("ENV") == "local" {
-		s = media.NewLocalStorageClient(context.Background(), localKeyPath)
-	} else {
-		s = media.NewStorageClient(context.Background())
-	}
+	s := media.NewStorageClient(context.Background())
 	tokenRepo, contractRepo, addressFilterRepo := newRepos(s)
 	ethClient := rpc.NewEthSocketClient()
 	ipfsClient := rpc.NewIPFSShell()

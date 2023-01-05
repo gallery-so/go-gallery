@@ -10,6 +10,7 @@ import (
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
@@ -225,7 +226,7 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 		} else {
 			copts = append(
 				copts,
-				option.WithCredentialsFile("./_deploy/service-key-dev.json"),
+				option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")),
 			)
 		}
 	}

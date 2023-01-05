@@ -69,6 +69,12 @@ var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile("^[\\w.]*$")
 // SanitizationPolicy is a policy for sanitizing user input
 var SanitizationPolicy = bluemonday.UGCPolicy()
 
+func WithCustomValidators() *validator.Validate {
+	v := validator.New()
+	RegisterCustomValidators(v)
+	return v
+}
+
 func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("eth_addr", EthValidator)
 	v.RegisterValidation("nonce", NonceValidator)
