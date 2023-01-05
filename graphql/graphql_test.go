@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -185,6 +186,7 @@ func testLogin(t *testing.T) {
 	//TODO: TEST FOR COOKIE
 	require.NoError(t, err)
 	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
+	assert.NotEmpty(t, readCookie(t, c.response, auth.JWTCookieKey))
 	assert.Equal(t, userF.username, *payload.Viewer.User.Username)
 	assert.Equal(t, userF.id, payload.Viewer.User.Dbid)
 }
@@ -422,4 +424,16 @@ func (c *genqlClient) MakeRequest(ctx context.Context, req *genql.Request, resp 
 	}
 
 	return nil
+}
+
+// readCookie finds a cookie set in the response
+func readCookie(t *testing.T, r *http.Response, name string) string {
+	t.Helper()
+	for _, c := range r.Cookies() {
+		if c.Name == name {
+			return c.Value
+		}
+	}
+	require.NoError(t, fmt.Errorf("%s not set as a cookie", name))
+	return ""
 }
