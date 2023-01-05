@@ -61,8 +61,9 @@ func (g *PubSub) Publish(pCtx context.Context, topicName string, message []byte,
 func (g *PubSub) Subscribe(pCtx context.Context, topicName string, handler func(context.Context, []byte) error) error {
 
 	sub, err := g.pubsub.CreateSubscription(pCtx, topicName, pubsub.SubscriptionConfig{
-		Topic:       g.pubsub.Topic(topicName),
-		AckDeadline: time.Second * 10,
+		Topic:            g.pubsub.Topic(topicName),
+		AckDeadline:      time.Second * 10,
+		ExpirationPolicy: time.Hour * 24 * 3,
 	})
 	if err != nil {
 		return err

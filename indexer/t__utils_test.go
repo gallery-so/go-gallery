@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"math/big"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -17,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/ory/dockertest"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
@@ -47,25 +47,22 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	LoadConfigFile("indexer-server", "local")
 	ValidateEnv()
 
-	pg, pgUnpatch := docker.InitPostgresIndexer()
+	r, err := docker.StartPostgresIndexer()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
+	t.Setenv("POSTGRES_HOST", hostAndPort[0])
+	t.Setenv("POSTGRES_PORT", hostAndPort[1])
+	t.Cleanup(func() { r.Close() })
 
 	db := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
-	err := migrate.RunMigration(db, "./db/migrations/indexer")
+	err = migrate.RunMigration(db, "./db/migrations/indexer")
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
 	}
-
-	t.Cleanup(func() {
-		defer db.Close()
-		defer pgUnpatch()
-		defer pgx.Close()
-		for _, r := range []*dockertest.Resource{pg} {
-			if err := r.Close(); err != nil {
-				t.Fatalf("could not purge resource: %s", err)
-			}
-		}
-	})
 
 	return assert.New(t), db, pgx
 }
@@ -94,10 +91,7 @@ func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 }
 
 func newStorageClient(ctx context.Context) *storage.Client {
-	fi, err := util.FindFile("_deploy/service-key-dev.json", 4)
-	if err != nil {
-		panic(err)
-	}
+	fi := util.MustFindFile("_deploy/service-key-dev.json")
 	stg, err := storage.NewClient(ctx, option.WithCredentialsFile(fi))
 	if err != nil {
 		panic(err)

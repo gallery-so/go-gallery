@@ -61,7 +61,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
 
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
-	validator := newValidator()
+	validator := validate.WithCustomValidators()
 
 	return &PublicAPI{
 		repos:     repos,

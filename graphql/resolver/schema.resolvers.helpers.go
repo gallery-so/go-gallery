@@ -44,6 +44,7 @@ var nodeFetcher = model.NodeFetcher{
 	OnComment:        resolveCommentByCommentID,
 	OnMerchToken:     resolveMerchTokenByTokenID,
 	OnViewer:         resolveViewerByID,
+	OnDeletedNode:    resolveDeletedNodeByID,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByIDs(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -341,12 +342,9 @@ func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID
 		return nil, err
 	}
 
-	var output = make([]*string, len(tokens))
-	for i, token := range tokens {
-		output[i] = &token
-	}
-
-	return output, nil
+	return util.Map(tokens, func(token string) (*string, error) {
+		return &token, nil
+	})
 }
 
 func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (*model.CollectionToken, error) {
@@ -963,11 +961,11 @@ func resolveMerchTokenByTokenID(ctx context.Context, tokenID string) (*model.Mer
 }
 
 func resolveViewerByID(ctx context.Context, id string) (*model.Viewer, error) {
-	var userID persist.DBID
+
 	if !publicapi.For(ctx).User.IsUserLoggedIn(ctx) {
 		return nil, nil
 	}
-	userID = publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 
 	if userID.String() != id {
 		return nil, nil
@@ -979,6 +977,12 @@ func resolveViewerByID(ctx context.Context, id string) (*model.Viewer, error) {
 		},
 		User:            nil, // handled by dedicated resolver
 		ViewerGalleries: nil, // handled by dedicated resolver
+	}, nil
+}
+
+func resolveDeletedNodeByID(ctx context.Context, id persist.DBID) (*model.DeletedNode, error) {
+	return &model.DeletedNode{
+		Dbid: id,
 	}, nil
 }
 

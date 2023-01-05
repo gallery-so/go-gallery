@@ -46,14 +46,6 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 		return db.Gallery{}, err
 	}
 
-	var nullName, nullDesc string
-	if name != nil {
-		nullName = *name
-	}
-	if description != nil {
-		nullDesc = *description
-	}
-
 	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return db.Gallery{}, err
@@ -61,8 +53,8 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 
 	gallery, err := api.repos.GalleryRepository.Create(ctx, db.GalleryRepoCreateParams{
 		GalleryID:   persist.GenerateID(),
-		Name:        nullName,
-		Description: nullDesc,
+		Name:        util.FromPointer(name),
+		Description: util.FromPointer(description),
 		Position:    position,
 		OwnerUserID: userID,
 	})
@@ -90,24 +82,38 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	if curGal.OwnerUserID != userID {
+		return db.Gallery{}, fmt.Errorf("user %s is not the owner of gallery %s", userID, update.GalleryID)
+	}
+
 	tx, err := api.repos.BeginTx(ctx)
 	if err != nil {
 		return db.Gallery{}, err
 	}
+	defer tx.Rollback(ctx)
 
 	q := api.queries.WithTx(tx)
 
 	// then delete collections
-	err = q.DeleteCollections(ctx, util.StringersToStrings(update.DeletedCollections))
-	if err != nil {
-		return db.Gallery{}, err
+	if len(update.DeletedCollections) > 0 {
+		err = q.DeleteCollections(ctx, util.StringersToStrings(update.DeletedCollections))
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
 
 	// update collections
 
-	err = updateCollectionsInfoAndTokens(ctx, q, update)
-	if err != nil {
-		return db.Gallery{}, err
+	if len(update.UpdateCollections) > 0 {
+		err = updateCollectionsInfoAndTokens(ctx, q, update.UpdateCollections)
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
 
 	// create collections
@@ -139,8 +145,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	err = q.UpdateGallery(ctx, db.UpdateGalleryParams{
 		ID:          update.GalleryID,
-		Name:        util.FromStringPointer(update.Name),
-		Description: util.FromStringPointer(update.Description),
+		Name:        util.FromPointer(update.Name),
+		Description: util.FromPointer(update.Description),
 		Collections: update.Order,
 	})
 	if err != nil {
@@ -157,10 +163,6 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
-	userID, err := getAuthenticatedUserID(ctx)
-	if err != nil {
-		return db.Gallery{}, err
-	}
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeGallery,
@@ -175,22 +177,22 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	return newGall, nil
 }
 
-func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update model.UpdateGalleryInput) error {
-	dbids, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update []*model.UpdateCollectionInput) error {
+	dbids, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Dbid.String(), nil
 	})
 	if err != nil {
 		return err
 	}
 
-	collectorNotes, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+	collectorNotes, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.CollectorsNote, nil
 	})
 	if err != nil {
 		return err
 	}
 
-	layouts, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
+	layouts, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		b, err := json.Marshal(modelToTokenLayout(u.Layout))
 		if err != nil {
 			return pgtype.JSONB{
@@ -207,7 +209,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	tokenSettings, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
+	tokenSettings, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		settings := modelToTokenSettings(u.TokenSettings)
 		b, err := json.Marshal(settings)
 		if err != nil {
@@ -224,14 +226,14 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	hiddens, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (bool, error) {
+	hiddens, err := util.Map(update, func(u *model.UpdateCollectionInput) (bool, error) {
 		return u.Hidden, nil
 	})
 	if err != nil {
 		return err
 	}
 
-	names, err := util.Map(update.UpdateCollections, func(u *model.UpdateCollectionInput) (string, error) {
+	names, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Name, nil
 	})
 	if err != nil {
@@ -250,7 +252,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update m
 		return err
 	}
 
-	for _, collection := range update.UpdateCollections {
+	for _, collection := range update {
 		err = q.UpdateCollectionTokens(ctx, db.UpdateCollectionTokensParams{
 			ID:   collection.Dbid,
 			Nfts: collection.Tokens,
@@ -350,12 +352,7 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	asString := make([]string, len(previews))
-	for i, preview := range previews {
-		asString[i] = preview.(string)
-	}
-
-	return asString, nil
+	return previews, nil
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {

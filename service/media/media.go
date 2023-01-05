@@ -77,34 +77,26 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 	"pdf":  {persist.MediaTypePDF, "application/pdf"},
 }
 
-func NewLocalStorageClient(ctx context.Context, keyPath string) *storage.Client {
-	scopes := []string{storage.ScopeFullControl}
-	transport, err := htransport.NewTransport(ctx, http.DefaultTransport, option.WithCredentialsFile(keyPath), option.WithScopes(scopes...))
-	if err != nil {
-		panic(err)
-	}
-	client, _, err := htransport.NewClient(ctx, option.WithCredentialsFile(keyPath))
-	if err != nil {
-		panic(err)
-	}
-	client.Transport = transport
-	s, _ := storage.NewClient(ctx, option.WithHTTPClient(client))
-	return s
-}
-
 func NewStorageClient(ctx context.Context) *storage.Client {
-	scopes := []string{storage.ScopeFullControl}
-	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false), option.WithScopes(scopes...))
+	options := []option.ClientOption{}
+
+	if viper.GetString("ENV") == "local" {
+		options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
+	}
+
+	httpClient, _, err := htransport.NewClient(ctx, options...)
 	if err != nil {
 		panic(err)
 	}
-	client, _, err := htransport.NewClient(ctx)
+
+	httpClient.Transport = tracing.NewTracingTransport(http.DefaultTransport, false)
+
+	storageClient, err := storage.NewClient(ctx, option.WithHTTPClient(httpClient), option.WithScopes(storage.ScopeFullControl))
 	if err != nil {
 		panic(err)
 	}
-	client.Transport = transport
-	s, _ := storage.NewClient(ctx, option.WithHTTPClient(client))
-	return s
+
+	return storageClient
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.

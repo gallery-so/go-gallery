@@ -1277,18 +1277,18 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 }
 
 const getGalleryTokenPreviewsByID = `-- name: GetGalleryTokenPreviewsByID :many
-select t.media->>'thumbnail_url'::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3
+select (t.media->>'thumbnail_url')::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3
 `
 
-func (q *Queries) GetGalleryTokenPreviewsByID(ctx context.Context, id persist.DBID) ([]interface{}, error) {
+func (q *Queries) GetGalleryTokenPreviewsByID(ctx context.Context, id persist.DBID) ([]string, error) {
 	rows, err := q.db.Query(ctx, getGalleryTokenPreviewsByID, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []interface{}
+	var items []string
 	for rows.Next() {
-		var previews interface{}
+		var previews string
 		if err := rows.Scan(&previews); err != nil {
 			return nil, err
 		}
@@ -1566,7 +1566,7 @@ func (q *Queries) GetNotificationsByOwnerIDForActionAfter(ctx context.Context, a
 }
 
 const getPreviewURLsByContractIdAndUserId = `-- name: GetPreviewURLsByContractIdAndUserId :many
-SELECT MEDIA->>'thumbnail_url'::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3
+SELECT (MEDIA->>'thumbnail_url')::varchar as thumbnail_url FROM tokens WHERE CONTRACT = $1 AND DELETED = false AND OWNER_USER_ID = $2 AND LENGTH(MEDIA->>'thumbnail_url'::varchar) > 0 ORDER BY ID LIMIT 3
 `
 
 type GetPreviewURLsByContractIdAndUserIdParams struct {
@@ -1574,15 +1574,15 @@ type GetPreviewURLsByContractIdAndUserIdParams struct {
 	OwnerUserID persist.DBID
 }
 
-func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg GetPreviewURLsByContractIdAndUserIdParams) ([]interface{}, error) {
+func (q *Queries) GetPreviewURLsByContractIdAndUserId(ctx context.Context, arg GetPreviewURLsByContractIdAndUserIdParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, getPreviewURLsByContractIdAndUserId, arg.Contract, arg.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []interface{}
+	var items []string
 	for rows.Next() {
-		var thumbnail_url interface{}
+		var thumbnail_url string
 		if err := rows.Scan(&thumbnail_url); err != nil {
 			return nil, err
 		}
@@ -2976,7 +2976,7 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 }
 
 const updateGallery = `-- name: UpdateGallery :exec
-update galleries set name = $1, description = $2, collections = $3, last_updated = now() where galleries.id = $4 and galleries.deleted = false and (select count(*) from collections c where c.id = any($3) and c.gallery_id = $5 and c.deleted = false) = array_length($3, 1)
+update galleries set name = $1, description = $2, collections = $3, last_updated = now() where galleries.id = $4 and galleries.deleted = false and (select count(*) from collections c where c.id = any($3) and c.gallery_id = $5 and c.deleted = false) = coalesce(array_length($3, 1), 0)
 `
 
 type UpdateGalleryParams struct {

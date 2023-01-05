@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -227,9 +228,10 @@ func StringToPointer(str string) *string {
 	return &str
 }
 
-func FromStringPointer(s *string) string {
+// FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
+func FromPointer[T comparable](s *T) T {
 	if s == nil {
-		return ""
+		return reflect.Zero(reflect.TypeOf(s).Elem()).Interface().(T)
 	}
 	return *s
 }
@@ -292,6 +294,15 @@ func FindFile(f string, searchDepth int) (string, error) {
 	}
 
 	return "", fmt.Errorf("could not find file '%s' in path", f)
+}
+
+// MustFindFile panics if the file is not found up to the default search depth.
+func MustFindFile(f string) string {
+	f, err := FindFile(f, 5)
+	if err != nil {
+		panic(err)
+	}
+	return f
 }
 
 // InByteSizeFormat converts a number of bytes to a human-readable string
@@ -419,10 +430,7 @@ func LoadEnvFile(fileName string) {
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
 	filePath := filepath.Join("_local", fileName)
 	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
-	path, err := FindFile(filePath, 5)
-	if err != nil {
-		panic(err)
-	}
+	path := MustFindFile(filePath)
 
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {

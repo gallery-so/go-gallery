@@ -12,7 +12,7 @@ import (
 )
 
 const galleryRepoAddCollections = `-- name: GalleryRepoAddCollections :execrows
-update galleries set last_updated = now(), collections = $1::text[] || collections where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = array_length($1, 1)
+update galleries set last_updated = now(), collections = $1::text[] || collections where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = coalesce(array_length($1, 1), 0)
 `
 
 type GalleryRepoAddCollectionsParams struct {
@@ -105,7 +105,7 @@ func (q *Queries) GalleryRepoCreate(ctx context.Context, arg GalleryRepoCreatePa
 }
 
 const galleryRepoDelete = `-- name: GalleryRepoDelete :exec
-update galleries set galleries.deleted = true where galleries.id = $1 and (select count(*) from galleries g where g.owner_user_id = $2 and g.deleted = false and not g.id = $1) > 0 and not (select featured_gallery from users u where u.id = $2) = $1
+update galleries set deleted = true where galleries.id = $1 and (select count(*) from galleries g where g.owner_user_id = $2 and g.deleted = false and not g.id = $1) > 0 and not coalesce((select featured_gallery::varchar from users u where u.id = $2), '') = $1
 `
 
 type GalleryRepoDeleteParams struct {
@@ -115,15 +115,6 @@ type GalleryRepoDeleteParams struct {
 
 func (q *Queries) GalleryRepoDelete(ctx context.Context, arg GalleryRepoDeleteParams) error {
 	_, err := q.db.Exec(ctx, galleryRepoDelete, arg.GalleryID, arg.OwnerUserID)
-	return err
-}
-
-const galleryRepoEnsureCollsOwnedByUser = `-- name: GalleryRepoEnsureCollsOwnedByUser :exec
-update galleries set collections = collections || unused_colls.colls from (select array_agg(c.id)::varchar[] as colls from collections c, galleries g where not c.id = any(g.collections) and g.owner_user_id = $1 and c.owner_user_id = $1 and c.deleted = false and g.deleted = false) as unused_colls where galleries.owner_user_id = $1 and galleries.id = (select g.id from galleries g where g.owner_user_id = $1 order by g.position limit 1)
-`
-
-func (q *Queries) GalleryRepoEnsureCollsOwnedByUser(ctx context.Context, userID persist.DBID) error {
-	_, err := q.db.Exec(ctx, galleryRepoEnsureCollsOwnedByUser, userID)
 	return err
 }
 
@@ -223,7 +214,7 @@ func (q *Queries) GalleryRepoGetPreviewsForUserID(ctx context.Context, arg Galle
 }
 
 const galleryRepoUpdate = `-- name: GalleryRepoUpdate :execrows
-update galleries set last_updated = now(), collections = $1 where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = array_length($1, 1)
+update galleries set last_updated = now(), collections = $1 where galleries.id = $2 and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = coalesce(array_length($1, 1), 0)
 `
 
 type GalleryRepoUpdateParams struct {
