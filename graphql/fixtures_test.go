@@ -135,7 +135,7 @@ type nonceFixture struct {
 func newNonceFixture(t *testing.T) nonceFixture {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient(t)
+	c := defaultHandlerClient(t)
 	nonce := newNonce(t, c, wallet)
 	return nonceFixture{wallet, nonce}
 }
@@ -151,7 +151,7 @@ type userFixture struct {
 func newUserFixture(t *testing.T) userFixture {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient(t)
+	c := defaultHandlerClient(t)
 	userID, username, galleryID := newUser(t, c, wallet)
 	return userFixture{wallet, username, userID, galleryID}
 }

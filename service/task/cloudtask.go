@@ -60,9 +60,6 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 		"Event ID": message.ID,
 	})
 
-	fmt.Printf("feed queue=%s\n", viper.GetString("GCLOUD_FEED_QUEUE"))
-	fmt.Printf("feed url=%s\n", viper.GetString("FEED_URL"))
-
 	queue := viper.GetString("GCLOUD_FEED_QUEUE")
 	task := &taskspb.Task{
 		ScheduleTime: timestamppb.New(scheduleOn),
