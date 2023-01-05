@@ -283,6 +283,14 @@ type __userByUsernameQueryInput struct {
 // GetUser returns __userByUsernameQueryInput.User, and is useful for accessing the field via an interface.
 func (v *__userByUsernameQueryInput) GetUser() string { return v.User }
 
+// __viewGalleryMutationInput is used internally by genqlient
+type __viewGalleryMutationInput struct {
+	GalleryId persist.DBID `json:"galleryId"`
+}
+
+// GetGalleryId returns __viewGalleryMutationInput.GalleryId, and is useful for accessing the field via an interface.
+func (v *__viewGalleryMutationInput) GetGalleryId() persist.DBID { return v.GalleryId }
+
 // addUserWalletMutationAddUserWalletAddUserWalletPayload includes the requested fields of the GraphQL type AddUserWalletPayload.
 type addUserWalletMutationAddUserWalletAddUserWalletPayload struct {
 	Typename *string                                                       `json:"__typename"`
@@ -2775,6 +2783,193 @@ func __marshaluserByUsernameQueryUserByUsernameUserByUsernameOrError(v *userByUs
 	}
 }
 
+// viewGalleryMutationResponse is returned by viewGalleryMutation on success.
+type viewGalleryMutationResponse struct {
+	ViewGallery *viewGalleryMutationViewGalleryViewGalleryPayloadOrError `json:"-"`
+}
+
+// GetViewGallery returns viewGalleryMutationResponse.ViewGallery, and is useful for accessing the field via an interface.
+func (v *viewGalleryMutationResponse) GetViewGallery() *viewGalleryMutationViewGalleryViewGalleryPayloadOrError {
+	return v.ViewGallery
+}
+
+func (v *viewGalleryMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*viewGalleryMutationResponse
+		ViewGallery json.RawMessage `json:"viewGallery"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.viewGalleryMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.ViewGallery
+		src := firstPass.ViewGallery
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(viewGalleryMutationViewGalleryViewGalleryPayloadOrError)
+			err = __unmarshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal viewGalleryMutationResponse.ViewGallery: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalviewGalleryMutationResponse struct {
+	ViewGallery json.RawMessage `json:"viewGallery"`
+}
+
+func (v *viewGalleryMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *viewGalleryMutationResponse) __premarshalJSON() (*__premarshalviewGalleryMutationResponse, error) {
+	var retval __premarshalviewGalleryMutationResponse
+
+	{
+
+		dst := &retval.ViewGallery
+		src := v.ViewGallery
+		if src != nil {
+			var err error
+			*dst, err = __marshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal viewGalleryMutationResponse.ViewGallery: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// viewGalleryMutationViewGalleryErrAuthenticationFailed includes the requested fields of the GraphQL type ErrAuthenticationFailed.
+type viewGalleryMutationViewGalleryErrAuthenticationFailed struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns viewGalleryMutationViewGalleryErrAuthenticationFailed.Typename, and is useful for accessing the field via an interface.
+func (v *viewGalleryMutationViewGalleryErrAuthenticationFailed) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns viewGalleryMutationViewGalleryErrAuthenticationFailed.Message, and is useful for accessing the field via an interface.
+func (v *viewGalleryMutationViewGalleryErrAuthenticationFailed) GetMessage() string { return v.Message }
+
+// viewGalleryMutationViewGalleryViewGalleryPayload includes the requested fields of the GraphQL type ViewGalleryPayload.
+type viewGalleryMutationViewGalleryViewGalleryPayload struct {
+	Typename *string                                                  `json:"__typename"`
+	Gallery  *viewGalleryMutationViewGalleryViewGalleryPayloadGallery `json:"gallery"`
+}
+
+// GetTypename returns viewGalleryMutationViewGalleryViewGalleryPayload.Typename, and is useful for accessing the field via an interface.
+func (v *viewGalleryMutationViewGalleryViewGalleryPayload) GetTypename() *string { return v.Typename }
+
+// GetGallery returns viewGalleryMutationViewGalleryViewGalleryPayload.Gallery, and is useful for accessing the field via an interface.
+func (v *viewGalleryMutationViewGalleryViewGalleryPayload) GetGallery() *viewGalleryMutationViewGalleryViewGalleryPayloadGallery {
+	return v.Gallery
+}
+
+// viewGalleryMutationViewGalleryViewGalleryPayloadGallery includes the requested fields of the GraphQL type Gallery.
+type viewGalleryMutationViewGalleryViewGalleryPayloadGallery struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns viewGalleryMutationViewGalleryViewGalleryPayloadGallery.Dbid, and is useful for accessing the field via an interface.
+func (v *viewGalleryMutationViewGalleryViewGalleryPayloadGallery) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// viewGalleryMutationViewGalleryViewGalleryPayloadOrError includes the requested fields of the GraphQL interface ViewGalleryPayloadOrError.
+//
+// viewGalleryMutationViewGalleryViewGalleryPayloadOrError is implemented by the following types:
+// viewGalleryMutationViewGalleryViewGalleryPayload
+// viewGalleryMutationViewGalleryErrAuthenticationFailed
+type viewGalleryMutationViewGalleryViewGalleryPayloadOrError interface {
+	implementsGraphQLInterfaceviewGalleryMutationViewGalleryViewGalleryPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *viewGalleryMutationViewGalleryViewGalleryPayload) implementsGraphQLInterfaceviewGalleryMutationViewGalleryViewGalleryPayloadOrError() {
+}
+func (v *viewGalleryMutationViewGalleryErrAuthenticationFailed) implementsGraphQLInterfaceviewGalleryMutationViewGalleryViewGalleryPayloadOrError() {
+}
+
+func __unmarshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(b []byte, v *viewGalleryMutationViewGalleryViewGalleryPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ViewGalleryPayload":
+		*v = new(viewGalleryMutationViewGalleryViewGalleryPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrAuthenticationFailed":
+		*v = new(viewGalleryMutationViewGalleryErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing ViewGalleryPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for viewGalleryMutationViewGalleryViewGalleryPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalviewGalleryMutationViewGalleryViewGalleryPayloadOrError(v *viewGalleryMutationViewGalleryViewGalleryPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *viewGalleryMutationViewGalleryViewGalleryPayload:
+		typename = "ViewGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewGalleryMutationViewGalleryViewGalleryPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewGalleryMutationViewGalleryErrAuthenticationFailed:
+		typename = "ErrAuthenticationFailed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewGalleryMutationViewGalleryErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for viewGalleryMutationViewGalleryViewGalleryPayloadOrError: "%T"`, v)
+	}
+}
+
 // viewerQueryResponse is returned by viewerQuery on success.
 type viewerQueryResponse struct {
 	Viewer *viewerQueryViewerViewerOrError `json:"-"`
@@ -3427,6 +3622,47 @@ query userByUsernameQuery ($user: String!) {
 	var err error
 
 	var data userByUsernameQueryResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+func viewGalleryMutation(
+	ctx context.Context,
+	client graphql.Client,
+	galleryId persist.DBID,
+) (*viewGalleryMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "viewGalleryMutation",
+		Query: `
+mutation viewGalleryMutation ($galleryId: DBID!) {
+	viewGallery(galleryId: $galleryId) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on ViewGalleryPayload {
+			gallery {
+				dbid
+			}
+		}
+	}
+}
+`,
+		Variables: &__viewGalleryMutationInput{
+			GalleryId: galleryId,
+		},
+	}
+	var err error
+
+	var data viewGalleryMutationResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(

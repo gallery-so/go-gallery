@@ -202,7 +202,6 @@ func SetDefaults() {
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
-	viper.SetDefault("PUBSUB_PROJECT_ID", "")
 	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "local-new-notifications")
 	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "local-updated-notifications")
 	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "local-new-notifications-sub")

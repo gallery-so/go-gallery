@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/99designs/gqlgen/client"
 	genql "github.com/Khan/genqlient/graphql"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -201,73 +202,6 @@ func testSyncTokens(t *testing.T) {
 	assert.NotEmpty(t, payload.Viewer.User.Tokens)
 }
 
-// func testViewsAreRolledUp(t *testing.T) {
-// 	serverF := newServerFixture(t)
-// 	userF := newUserFixture(t)
-// 	viewerA := newUserFixture(t)
-// 	viewerB := newUserFixture(t)
-// 	// viewerA views gallery
-// 	body, _ := json.Marshal(map[string]string{"query": ops.Op("viewGalleryMutation")})
-// 	req := httptest.NewRequest(http.MethodPost, serverF.server.URL+"/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
-// 	req.Header.Set("Content-Type", "application/json")
-// 	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: newJWT(t, viewerA.id)})
-// 	_, err := http.DefaultClient.Do(req)
-// 	require.Empty(t, err)
-// 	// viewerB views gallery
-// 	body, _ = json.Marshal(map[string]string{"query": ops.Op("viewGalleryMutation")})
-// 	req = httptest.NewRequest(http.MethodPost, serverF.server.URL+"/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
-// 	req.Header.Set("Content-Type", "application/json")
-// 	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: newJWT(t, viewerA.id)})
-// 	_, err = http.DefaultClient.Do(req)
-// 	require.Empty(t, err)
-//
-// 	var viewerResponse = struct {
-// 		Viewer struct {
-// 			Notifications struct {
-// 				UnseenCount int
-// 				Edges       []struct {
-// 					Node struct {
-// 						Seen               bool
-// 						Count              int
-// 						NonUserViewerCount int
-// 						UserViewers        struct {
-// 							Edges []struct {
-// 								Node struct {
-// 									Username string
-// 									DBID     string
-// 								}
-// 							}
-// 						}
-// 					}
-// 				}
-// 			}
-// 			errMessage
-// 		}
-// 	}{}
-//
-// 	post(t, c, ops.Op("viewerNotificationsQuery"), &viewerResponse,
-// 		withJWT(newJWT(t, userF.id)),
-// 		client.Var("first", 100),
-// 	)
-// 	require.Empty(t, viewerResponse.Viewer.Message)
-//
-// 	fmt.Printf("userA=%s\n", viewerA.username)
-// 	fmt.Printf("userB=%s\n", viewerB.username)
-// 	fmt.Printf("unseen count %d\n", viewerResponse.Viewer.Notifications.UnseenCount)
-// 	fmt.Printf("total edges %d\n", len(viewerResponse.Viewer.Notifications.Edges))
-// 	for i, e := range viewerResponse.Viewer.Notifications.Edges {
-// 		fmt.Printf("i=%v;nodeSeen=%v;nodeCount=%v;nodeNonUserViewerCount=%v\n", i, e.Node.Seen, e.Node.Count, e.Node.NonUserViewerCount)
-// 		fmt.Printf("total users %d\n", len(e.Node.UserViewers.Edges))
-// 		for j, u := range e.Node.UserViewers.Edges {
-// 			fmt.Printf("i=%v;username=%v\n", j, u.Node.Username)
-// 		}
-// 	}
-//
-// 	// Should be rolled up into a single notification
-// 	require.Equal(t, 1, viewerResponse.Viewer.Notifications.UnseenCount)
-// 	require.Len(t, viewerResponse.Viewer.Notifications.Edges[0].Node.UserViewers.Edges, 2)
-// }
-
 func testCreateCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedClient(t, userF.id)
@@ -299,6 +233,76 @@ func testCreateCollection(t *testing.T) {
 	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
 	assert.NotEmpty(t, payload.Collection.Dbid)
 	assert.Len(t, payload.Collection.Tokens, 1)
+}
+
+func testViewsAreRolledUp(t *testing.T) {
+	serverF := newServerFixture(t)
+	userF := newUserFixture(t)
+	viewerA := newUserFixture(t)
+	viewerB := newUserFixture(t)
+
+	clientA := authedClient(t, viewerA.id)
+
+	// viewerA views gallery
+	body, _ := json.Marshal(map[string]string{"query": ops.Op("viewGalleryMutation")})
+	req := httptest.NewRequest(http.MethodPost, serverF.server.URL+"/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: newJWT(t, viewerA.id)})
+	_, err := http.DefaultClient.Do(req)
+	require.Empty(t, err)
+	// viewerB views gallery
+	body, _ = json.Marshal(map[string]string{"query": ops.Op("viewGalleryMutation")})
+	req = httptest.NewRequest(http.MethodPost, serverF.server.URL+"/glry/graphql/query", io.NopCloser(bytes.NewBuffer(body)))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: newJWT(t, viewerA.id)})
+	_, err = http.DefaultClient.Do(req)
+	require.Empty(t, err)
+
+	var viewerResponse = struct {
+		Viewer struct {
+			Notifications struct {
+				UnseenCount int
+				Edges       []struct {
+					Node struct {
+						Seen               bool
+						Count              int
+						NonUserViewerCount int
+						UserViewers        struct {
+							Edges []struct {
+								Node struct {
+									Username string
+									DBID     string
+								}
+							}
+						}
+					}
+				}
+			}
+			errMessage
+		}
+	}{}
+
+	post(t, c, ops.Op("viewerNotificationsQuery"), &viewerResponse,
+		withJWT(newJWT(t, userF.id)),
+		client.Var("first", 100),
+	)
+	require.Empty(t, viewerResponse.Viewer.Message)
+
+	fmt.Printf("userA=%s\n", viewerA.username)
+	fmt.Printf("userB=%s\n", viewerB.username)
+	fmt.Printf("unseen count %d\n", viewerResponse.Viewer.Notifications.UnseenCount)
+	fmt.Printf("total edges %d\n", len(viewerResponse.Viewer.Notifications.Edges))
+	for i, e := range viewerResponse.Viewer.Notifications.Edges {
+		fmt.Printf("i=%v;nodeSeen=%v;nodeCount=%v;nodeNonUserViewerCount=%v\n", i, e.Node.Seen, e.Node.Count, e.Node.NonUserViewerCount)
+		fmt.Printf("total users %d\n", len(e.Node.UserViewers.Edges))
+		for j, u := range e.Node.UserViewers.Edges {
+			fmt.Printf("i=%v;username=%v\n", j, u.Node.Username)
+		}
+	}
+
+	// Should be rolled up into a single notification
+	require.Equal(t, 1, viewerResponse.Viewer.Notifications.UnseenCount)
+	require.Len(t, viewerResponse.Viewer.Notifications.Edges[0].Node.UserViewers.Edges, 2)
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
@@ -349,7 +353,7 @@ func newWallet(t *testing.T) wallet {
 	}
 }
 
-func newNonce(t *testing.T, c *genqlClient, w wallet) string {
+func newNonce(t *testing.T, c *spyClient, w wallet) string {
 	t.Helper()
 	response, err := getAuthNonceMutation(context.Background(), c, chainAddressInput(w.address))
 	require.NoError(t, err)
@@ -358,7 +362,7 @@ func newNonce(t *testing.T, c *genqlClient, w wallet) string {
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, c *genqlClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
+func newUser(t *testing.T, c *spyClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
 	nonce := newNonce(t, c, w)
 	username = "user" + persist.GenerateID().String()
@@ -404,18 +408,18 @@ func defaultHandler() http.Handler {
 }
 
 // defaultClient returns a GraphQL client attached to a backend GraphQL handler
-func defaultClient(t *testing.T) *genqlClient {
+func defaultClient(t *testing.T) *spyClient {
 	return customClient(t, defaultHandler())
 }
 
 // authedClient returns a GraphQL client with an authenticated JWT
-func authedClient(t *testing.T, userID persist.DBID) *genqlClient {
+func authedClient(t *testing.T, userID persist.DBID) *spyClient {
 	return customClient(t, defaultHandler(), withJWTOpt(t, userID))
 }
 
 // customClient configures the client with the provided HTTP handler and client options
-func customClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *genqlClient {
-	return &genqlClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
+func customClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *spyClient {
+	return &spyClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
 }
 
 // withJWTOpt ddds a JWT cookie to the request headers
@@ -427,15 +431,15 @@ func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
 	}
 }
 
-type genqlClient struct {
+// spyClient records the server response for testing purposes
+type spyClient struct {
 	handler  http.Handler
 	endpoint string
 	opts     []func(r *http.Request)
-
-	response *http.Response // Recorded response
+	response *http.Response
 }
 
-func (c *genqlClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
+func (c *spyClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
 	body, err := json.Marshal(map[string]any{
 		"query":     req.Query,
 		"variables": req.Variables,

@@ -267,7 +267,7 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 		panic(err)
 	}
 
-	logger.For(nil).Info("subscribing to new notifications pubsub topic")
+	logger.For(nil).Infof("subscribing to %s", viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
 
 	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
 
@@ -310,7 +310,7 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 		panic(err)
 	}
 
-	logger.For(nil).Infof("subscribed to updated notifications pubsub")
+	logger.For(nil).Infof("subscribing to %s", viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
 
 	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
 		logger.For(ctx).Debugf("received updated notification from pubsub: %s", string(msg.Data))

@@ -206,3 +206,17 @@ mutation createCollectionMutation($input: CreateCollectionInput!) {
     }
   }
 }
+
+mutation viewGalleryMutation($galleryId: DBID!) {
+  viewGallery(galleryId: $galleryId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on ViewGalleryPayload {
+      gallery {
+        dbid
+      }
+    }
+  }
+}
