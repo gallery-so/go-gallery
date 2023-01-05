@@ -234,7 +234,7 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 }
 
 const createCollection = `-- name: CreateCollection :one
-insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) on conflict (id) do update set version = excluded.version, name = excluded.name, collectors_note = excluded.collectors_note, owner_user_id = excluded.owner_user_id, gallery_id = excluded.gallery_id, layout = excluded.layout, nfts = excluded.nfts, hidden = excluded.hidden, token_settings = excluded.token_settings, last_updated = excluded.last_updated returning id
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) returning id
 `
 
 type CreateCollectionParams struct {
@@ -2976,23 +2976,27 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 }
 
 const updateGallery = `-- name: UpdateGallery :exec
-update galleries set name = $1, description = $2, collections = $3, last_updated = now() where galleries.id = $4 and galleries.deleted = false and (select count(*) from collections c where c.id = any($3) and c.gallery_id = $5 and c.deleted = false) = coalesce(array_length($3, 1), 0)
+update galleries set name = case when $1::bool then $2 else name end, description = case when $3::bool then $4 else description end, collections = case when $5::bool then $6 else collections end, last_updated = now() where galleries.id = $7 and galleries.deleted = false and (select count(*) from collections c where c.id = any($6) and c.gallery_id = $7 and c.deleted = false) = cardinality($6)
 `
 
 type UpdateGalleryParams struct {
-	Name        string
-	Description string
-	Collections persist.DBIDList
-	ID          persist.DBID
-	GalleryID   persist.DBID
+	NameUpdated        bool
+	Name               string
+	DescriptionUpdated bool
+	Description        string
+	CollectionsUpdated bool
+	Collections        persist.DBIDList
+	GalleryID          persist.DBID
 }
 
 func (q *Queries) UpdateGallery(ctx context.Context, arg UpdateGalleryParams) error {
 	_, err := q.db.Exec(ctx, updateGallery,
+		arg.NameUpdated,
 		arg.Name,
+		arg.DescriptionUpdated,
 		arg.Description,
+		arg.CollectionsUpdated,
 		arg.Collections,
-		arg.ID,
 		arg.GalleryID,
 	)
 	return err
