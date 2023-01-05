@@ -39,12 +39,12 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
   # TODO: Check if we still need this
-  nginx:
-    image: nginx
-    ports:
-      - "8080:80"
-    volumes:
-      - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
+  # nginx:
+  #   image: nginx
+  #   ports:
+  #     - "8080:80"
+  #   volumes:
+  #     - ${PWD}/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf
   task-emulator:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
     expose:
