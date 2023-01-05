@@ -61,7 +61,7 @@ func testGraphQL(t *testing.T) {
 
 func testCreateUser(t *testing.T) {
 	nonceF := newNonceFixture(t)
-	c := defaultClient()
+	c := defaultClient(t)
 	username := "user" + persist.GenerateID().String()
 
 	response, err := createUserMutation(context.Background(), c, eoaAuthMechanismInput(nonceF.wallet, nonceF.nonce),
@@ -78,7 +78,7 @@ func testCreateUser(t *testing.T) {
 func testUserByUsername(t *testing.T) {
 	userF := newUserFixture(t)
 
-	response, err := userByUsernameQuery(context.Background(), defaultClient(), userF.username)
+	response, err := userByUsernameQuery(context.Background(), defaultClient(t), userF.username)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserByUsername).(*userByUsernameQueryUserByUsernameGalleryUser)
@@ -104,7 +104,7 @@ func testUserByAddress(t *testing.T) {
 func testUserByID(t *testing.T) {
 	userF := newUserFixture(t)
 
-	response, err := userByIdQuery(context.Background(), defaultClient(), userF.id)
+	response, err := userByIdQuery(context.Background(), defaultClient(t), userF.id)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserById).(*userByIdQueryUserByIdGalleryUser)
@@ -166,7 +166,7 @@ func testRemoveWallet(t *testing.T) {
 
 func testLogin(t *testing.T) {
 	userF := newUserFixture(t)
-	c := defaultClient()
+	c := defaultClient(t)
 	nonce := newNonce(t, c, userF.wallet)
 
 	response, err := loginMutation(context.Background(), c, AuthMechanism{
@@ -367,17 +367,15 @@ func newClient(handler http.Handler, opts ...client.Option) *client.Client {
 }
 
 // defaultClient returns a GraphQL client attached to a backend GraphQL handler
-func defaultClient() genqlClient {
+func defaultClient(t *testing.T) genqlClient {
 	handler := defaultHandler()
-	client := newClient(handler)
-	return genqlClient{handler: client}
+	return customClient(t, handler)
 }
 
 // authedClient returns a GraphQL client with an authenticated JWT
 func authedClient(t *testing.T, userID persist.DBID) genqlClient {
 	handler := defaultHandler()
-	client := newClient(handler, withJWTOpt(t, userID))
-	return genqlClient{handler: client}
+	return customClient(t, handler, withJWTOpt(t, userID))
 }
 
 // customClient configures the client with the provided HTTP handler and client options
