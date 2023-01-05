@@ -84,7 +84,7 @@ type GalleryUser implements Node @goEmbedHelper {
   followers: [GalleryUser] @goField(forceResolver: true)
   following: [GalleryUser] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
-  @goField(forceResolver: true)
+    @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -132,7 +132,7 @@ union GalleryUserOrWallet = GalleryUser | Wallet
 union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
-  ImageMedia
+    ImageMedia
   | GIFMedia
   | VideoMedia
   | AudioMedia
@@ -485,7 +485,7 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
-  @goField(forceResolver: true)
+    @goField(forceResolver: true)
 
   email: UserEmail @goField(forceResolver: true)
   """
@@ -802,7 +802,6 @@ type ErrGalleryNotFound implements Error {
 union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
 union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
 
-
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -865,7 +864,7 @@ type CreateCollectionPayload {
 }
 
 union DeleteCollectionPayloadOrError =
-  DeleteCollectionPayload
+    DeleteCollectionPayload
   | ErrNotAuthorized
   | ErrInvalidInput
   | ErrCollectionNotFound
@@ -881,7 +880,7 @@ input UpdateCollectionInfoInput {
 }
 
 union UpdateCollectionInfoPayloadOrError =
-  UpdateCollectionInfoPayload
+    UpdateCollectionInfoPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -898,7 +897,7 @@ input UpdateCollectionTokensInput {
 }
 
 union UpdateCollectionTokensPayloadOrError =
-  UpdateCollectionTokensPayload
+    UpdateCollectionTokensPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -913,7 +912,7 @@ input UpdateCollectionHiddenInput {
 }
 
 union UpdateCollectionHiddenPayloadOrError =
-  UpdateCollectionHiddenPayload
+    UpdateCollectionHiddenPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -927,7 +926,7 @@ input UpdateGalleryCollectionsInput {
 }
 
 union UpdateGalleryCollectionsPayloadOrError =
-  UpdateGalleryCollectionsPayload
+    UpdateGalleryCollectionsPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -962,7 +961,7 @@ type SetSpamPreferencePayload {
 union SetSpamPreferencePayloadOrError = SetSpamPreferencePayload | ErrNotAuthorized
 
 union AddUserWalletPayloadOrError =
-  AddUserWalletPayload
+    AddUserWalletPayload
   | ErrAuthenticationFailed
   | ErrNotAuthorized
   | ErrInvalidInput
@@ -973,7 +972,7 @@ type AddUserWalletPayload {
 }
 
 union RemoveUserWalletsPayloadOrError =
-  RemoveUserWalletsPayload
+    RemoveUserWalletsPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -987,7 +986,7 @@ input UpdateUserInfoInput {
 }
 
 union UpdateUserInfoPayloadOrError =
-  UpdateUserInfoPayload
+    UpdateUserInfoPayload
   | ErrNotAuthorized
   | ErrUsernameNotAvailable
   | ErrInvalidInput
@@ -1140,7 +1139,7 @@ type DeepRefreshPayload {
 union DeepRefreshPayloadOrError = DeepRefreshPayload | ErrNotAuthorized
 
 union LoginPayloadOrError =
-  LoginPayload
+    LoginPayload
   | ErrUserNotFound
   | ErrAuthenticationFailed
   | ErrDoesNotOwnRequiredToken
@@ -1164,7 +1163,7 @@ input CreateUserInput {
 }
 
 union CreateUserPayloadOrError =
-  CreateUserPayload
+    CreateUserPayload
   | ErrAuthenticationFailed
   | ErrDoesNotOwnRequiredToken
   | ErrUserAlreadyExists
@@ -1179,13 +1178,13 @@ type CreateUserPayload {
 }
 
 union FollowUserPayloadOrError =
-  FollowUserPayload
+    FollowUserPayload
   | ErrAuthenticationFailed
   | ErrUserNotFound
   | ErrInvalidInput
 
 union UnfollowUserPayloadOrError =
-  UnfollowUserPayload
+    UnfollowUserPayload
   | ErrAuthenticationFailed
   | ErrUserNotFound
   | ErrInvalidInput
@@ -1201,27 +1200,27 @@ type UnfollowUserPayload {
 }
 
 union AdmireFeedEventPayloadOrError =
-  AdmireFeedEventPayload
+    AdmireFeedEventPayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
   | ErrAdmireAlreadyExists
 
 union RemoveAdmirePayloadOrError =
-  RemoveAdmirePayload
+    RemoveAdmirePayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
   | ErrAdmireNotFound
 
 union CommentOnFeedEventPayloadOrError =
-  CommentOnFeedEventPayload
+    CommentOnFeedEventPayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
 
 union RemoveCommentPayloadOrError =
-  RemoveCommentPayload
+    RemoveCommentPayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
@@ -1278,7 +1277,7 @@ type GroupNotificationUsersConnection @goEmbedHelper {
 }
 
 type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -1291,7 +1290,7 @@ type SomeoneFollowedYouNotification implements Notification & Node & GroupedNoti
 }
 
 type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -1304,7 +1303,7 @@ type SomeoneFollowedYouBackNotification implements Notification & Node & Grouped
 }
 
 type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -1331,7 +1330,7 @@ type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node 
 }
 
 type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -1404,7 +1403,6 @@ type ResendVerificationEmailPayload {
   viewer: Viewer
 }
 
-
 union ResendVerificationEmailPayloadOrError = ResendVerificationEmailPayload | ErrInvalidInput
 
 type UpdateEmailNotificationSettingsPayload {
@@ -1412,7 +1410,7 @@ type UpdateEmailNotificationSettingsPayload {
 }
 
 union UpdateEmailNotificationSettingsPayloadOrError =
-  UpdateEmailNotificationSettingsPayload
+    UpdateEmailNotificationSettingsPayload
   | ErrInvalidInput
 
 type UnsubscribeFromEmailTypePayload {
@@ -1457,7 +1455,7 @@ type SyncTokensForUsernamePayload {
 }
 
 union SyncTokensForUsernamePayloadOrError =
-  SyncTokensForUsernamePayload
+    SyncTokensForUsernamePayload
   | ErrNotAuthorized
   | ErrSyncFailed
 
@@ -1504,7 +1502,7 @@ type UpdateGalleryInfoPayload {
 }
 
 union UpdateGalleryInfoPayloadOrError =
-  UpdateGalleryInfoPayload
+    UpdateGalleryInfoPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -1513,7 +1511,7 @@ type UpdateGalleryHiddenPayload {
 }
 
 union UpdateGalleryHiddenPayloadOrError =
-  UpdateGalleryHiddenPayload
+    UpdateGalleryHiddenPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -1528,7 +1526,7 @@ type UpdateGalleryOrderPayload {
 }
 
 union UpdateGalleryOrderPayloadOrError =
-  UpdateGalleryOrderPayload
+    UpdateGalleryOrderPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -1537,7 +1535,7 @@ type UpdateFeaturedGalleryPayload {
 }
 
 union UpdateFeaturedGalleryPayloadOrError =
-  UpdateFeaturedGalleryPayload
+    UpdateFeaturedGalleryPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
