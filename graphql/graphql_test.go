@@ -1,17 +1,19 @@
 package graphql_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	genql "github.com/Khan/genqlient/graphql"
 
-	"github.com/99designs/gqlgen/client"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -295,7 +297,7 @@ func newWallet(t *testing.T) wallet {
 }
 
 // newNonce makes a GraphQL request to generate a nonce
-func newNonce(t *testing.T, c genqlClient, w wallet) string {
+func newNonce(t *testing.T, c *genqlClient, w wallet) string {
 	t.Helper()
 	response, err := getAuthNonceMutation(context.Background(), c, ChainAddressInput{
 		Address: w.address,
@@ -307,7 +309,7 @@ func newNonce(t *testing.T, c genqlClient, w wallet) string {
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, c genqlClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
+func newUser(t *testing.T, c *genqlClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
 	nonce := newNonce(t, c, w)
 	username = "user" + persist.GenerateID().String()
@@ -359,76 +361,65 @@ func defaultHandler() http.Handler {
 	return handler
 }
 
-// newClient returns a gqlgen test client
-func newClient(handler http.Handler, opts ...client.Option) *client.Client {
-	defaultOpts := []client.Option{gqlPathOpt}
-	opts = append(opts, defaultOpts...)
-	return client.New(handler, opts...)
-}
-
 // defaultClient returns a GraphQL client attached to a backend GraphQL handler
-func defaultClient(t *testing.T) genqlClient {
-	handler := defaultHandler()
-	return customClient(t, handler)
+func defaultClient(t *testing.T) *genqlClient {
+	return customClient(t, defaultHandler())
 }
 
 // authedClient returns a GraphQL client with an authenticated JWT
-func authedClient(t *testing.T, userID persist.DBID) genqlClient {
-	handler := defaultHandler()
-	return customClient(t, handler, withJWTOpt(t, userID))
+func authedClient(t *testing.T, userID persist.DBID) *genqlClient {
+	return customClient(t, defaultHandler(), withJWTOpt(t, userID))
 }
 
 // customClient configures the client with the provided HTTP handler and client options
-func customClient(t *testing.T, handler http.Handler, opts ...client.Option) genqlClient {
-	client := newClient(handler, opts...)
-	return genqlClient{handler: client}
-}
-
-// gqlPathOpt sets all client's request paths to the GraphQL endpoint
-func gqlPathOpt(r *client.Request) {
-	r.HTTP.URL.Path = "/glry/graphql/query"
+func customClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *genqlClient {
+	return &genqlClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
 }
 
 // withJWTOpt ddds a JWT cookie to the request headers
-func withJWTOpt(t *testing.T, userID persist.DBID) func(*client.Request) {
+func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
 	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
 	require.NoError(t, err)
-	return func(r *client.Request) {
-		r.HTTP.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
+	return func(r *http.Request) {
+		r.AddCookie(&http.Cookie{Name: auth.JWTCookieKey, Value: jwt})
 	}
 }
 
 type genqlClient struct {
-	handler      *client.Client
-	lastResponse *genql.Response
+	handler  http.Handler
+	endpoint string
+	opts     []func(r *http.Request)
+
+	response *http.Response // Recorded response
 }
 
-func (c genqlClient) MakeRequest(
-	ctx context.Context,
-	req *genql.Request,
-	resp *genql.Response,
-) error {
-	response, err := c.handler.RawPost(req.Query, func(bd *client.Request) {
-		marshalledVars, _ := json.Marshal(req.Variables)
-		unmarshalledVars := map[string]any{}
-		json.Unmarshal(marshalledVars, &unmarshalledVars)
-		bd.Variables = unmarshalledVars
+func (c *genqlClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
+	body, err := json.Marshal(map[string]any{
+		"query":     req.Query,
+		"variables": req.Variables,
 	})
 	if err != nil {
 		return err
 	}
 
-	marshalledResponse, err := json.Marshal(response.Data)
+	r := httptest.NewRequest(http.MethodPost, c.endpoint, io.NopCloser(bytes.NewBuffer(body)))
+	r.Header.Set("Content-Type", "application/json")
+	r.URL.Path = c.endpoint
+	for _, opt := range c.opts {
+		opt(r)
+	}
+
+	w := httptest.NewRecorder()
+	c.handler.ServeHTTP(w, r)
+
+	res := w.Result()
+	c.response = res
+	defer res.Body.Close()
+
+	err = json.Unmarshal(w.Body.Bytes(), resp)
 	if err != nil {
 		return err
 	}
-
-	err = json.Unmarshal(marshalledResponse, resp.Data)
-	if err != nil {
-		return err
-	}
-
-	c.lastResponse = resp
 
 	return nil
 }
