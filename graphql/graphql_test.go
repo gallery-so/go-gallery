@@ -36,7 +36,7 @@ func TestMain(t *testing.T) {
 		{
 			title:    "test GraphQL",
 			run:      testGraphQL,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNoticationTopics},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNotificationTopics},
 		},
 	}
 	for _, test := range tests {
@@ -302,7 +302,7 @@ func newWallet(t *testing.T) wallet {
 	}
 }
 
-func newNonce(t *testing.T, c *handlerSpy, w wallet) string {
+func newNonce(t *testing.T, c *handlerClient, w wallet) string {
 	t.Helper()
 	response, err := getAuthNonceMutation(context.Background(), c, chainAddressInput(w.address))
 	require.NoError(t, err)
@@ -311,7 +311,7 @@ func newNonce(t *testing.T, c *handlerSpy, w wallet) string {
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, c *handlerSpy, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
+func newUser(t *testing.T, c *handlerClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
 	nonce := newNonce(t, c, w)
 	username = "user" + persist.GenerateID().String()
@@ -357,22 +357,22 @@ func defaultHandler() http.Handler {
 }
 
 // defaultHandlerClient returns a GraphQL client attached to a backend GraphQL handler
-func defaultHandlerClient(t *testing.T) *handlerSpy {
+func defaultHandlerClient(t *testing.T) *handlerClient {
 	return customHandlerClient(t, defaultHandler())
 }
 
 // authedHandlerClient returns a GraphQL client with an authenticated JWT
-func authedHandlerClient(t *testing.T, userID persist.DBID) *handlerSpy {
+func authedHandlerClient(t *testing.T, userID persist.DBID) *handlerClient {
 	return customHandlerClient(t, defaultHandler(), withJWTOpt(t, userID))
 }
 
 // customHandlerClient configures the client with the provided HTTP handler and client options
-func customHandlerClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *handlerSpy {
-	return &handlerSpy{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
+func customHandlerClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *handlerClient {
+	return &handlerClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
 }
 
-func authedServerClient(t *testing.T, url string, userID persist.DBID) *serverSpy {
-	return &serverSpy{url: url + "/glry/graphql/query", opts: []func(*http.Request){withJWTOpt(t, userID)}}
+func authedServerClient(t *testing.T, url string, userID persist.DBID) *serverClient {
+	return &serverClient{url: url + "/glry/graphql/query", opts: []func(*http.Request){withJWTOpt(t, userID)}}
 }
 
 // withJWTOpt ddds a JWT cookie to the request headers
@@ -384,15 +384,15 @@ func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
 	}
 }
 
-// handlerSpy records the server response for testing purposes
-type handlerSpy struct {
+// handlerClient records the server response for testing purposes
+type handlerClient struct {
 	handler  http.Handler
 	endpoint string
 	opts     []func(r *http.Request)
 	response *http.Response
 }
 
-func (c *handlerSpy) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
+func (c *handlerClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
 	body, err := json.Marshal(map[string]any{
 		"query":     req.Query,
 		"variables": req.Variables,
@@ -418,14 +418,14 @@ func (c *handlerSpy) MakeRequest(ctx context.Context, req *genql.Request, resp *
 	return json.Unmarshal(w.Body.Bytes(), resp)
 }
 
-// serverSpy makes a request to a running server
-type serverSpy struct {
+// serverClient makes a request to a running server
+type serverClient struct {
 	url      string
 	opts     []func(r *http.Request)
 	response *http.Response
 }
 
-func (c *serverSpy) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
+func (c *serverClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
 	body, err := json.Marshal(map[string]any{
 		"query":     req.Query,
 		"variables": req.Variables,
