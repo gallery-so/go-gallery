@@ -107,12 +107,6 @@ func For(ctx context.Context) *PublicAPI {
 	return gc.Value(apiContextKey).(*PublicAPI)
 }
 
-func newValidator() *validator.Validate {
-	v := validator.New()
-	validate.RegisterCustomValidators(v)
-	return v
-}
-
 func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
 	gc := util.GinContextFromContext(ctx)
 	authError := auth.GetAuthErrorFromCtx(gc)
