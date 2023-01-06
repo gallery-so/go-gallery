@@ -134,7 +134,7 @@ func StartCloudTasks() (*dockertest.Resource, error) {
 }
 
 func StartPubSub() (*dockertest.Resource, error) {
-	pool, err := newPool(time.Minute * 3)
+	pool, err := newPool(time.Minute * 10)
 	if err != nil {
 		return nil, err
 	}
