@@ -28,11 +28,8 @@
     "debugAdapter": "legacy",
     "substitutePath": []
   },
-  "files.associations": {
-    "*.graphql": "graphql"
-  },
   "[graphql]": {
-    "editor.formatOnSave": false
+    "editor.defaultFormatter": "esbenp.prettier-vscode" 
   },
   "python.formatting.provider": "black"
 }

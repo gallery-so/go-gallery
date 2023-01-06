@@ -45,5 +45,10 @@ docker-build: docker-stop
 docker-start: docker-stop
 	docker-compose up -d
 
-docker-stop: 
+docker-stop:
 	docker-compose down
+
+format-graphql:
+	yarn install;
+	yarn prettier --write graphql/schema/schema.graphql
+	yarn prettier --write graphql/testdata/operations.graphql;
