@@ -372,10 +372,7 @@ func customHandlerClient(t *testing.T, handler http.Handler, opts ...func(*http.
 }
 
 func authedServerClient(t *testing.T, url string, userID persist.DBID) *serverSpy {
-	return &serverSpy{
-		url:  url + "/glry/graphql/query",
-		opts: []func(*http.Request){withJWTOpt(t, userID)},
-	}
+	return &serverSpy{url: url + "/glry/graphql/query", opts: []func(*http.Request){withJWTOpt(t, userID)}}
 }
 
 // withJWTOpt ddds a JWT cookie to the request headers

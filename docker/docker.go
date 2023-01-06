@@ -154,14 +154,10 @@ func StartPubSub() (*dockertest.Resource, error) {
 			option.WithoutAuthentication(),
 		)
 		if err != nil {
-			panic(err)
 			return err
 		}
 		defer client.Close()
 		_, err = client.CreateTopic(ctx, "dummy-topic")
-		if err != nil {
-			panic(err)
-		}
 		return err
 	})
 	if err != nil {

@@ -264,10 +264,11 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 		ExpirationPolicy: time.Hour * 24 * 3,
 	})
 	if err != nil {
+		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
 		panic(err)
 	}
 
-	logger.For(nil).Infof("subscribing to %s", viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
+	logger.For(nil).Info("subscribing to new notifications pubsub topic")
 
 	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
 
@@ -307,12 +308,14 @@ func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
 		ExpirationPolicy: time.Hour * 24 * 3,
 	})
 	if err != nil {
+		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
 		panic(err)
 	}
 
-	logger.For(nil).Infof("subscribing to %s", viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
+	logger.For(nil).Infof("subscribed to updated notifications pubsub")
 
 	err = sub.Receive(context.Background(), func(ctx context.Context, msg *pubsub.Message) {
+
 		logger.For(ctx).Debugf("received updated notification from pubsub: %s", string(msg.Data))
 
 		defer msg.Ack()

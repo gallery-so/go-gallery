@@ -124,16 +124,6 @@ This is available for live environments:
 ```bash
 $ curl api.gallery.so/alive
 ```
-
-After pulling the repo, start the services you're interested in running:
-
-```bash
-# Start each of the services needed in separate sessions
-go run cmd/feed/main.go    # Start the feed
-go run cmd/feedbot/main.go # Start the feedbot
-
-# Start the backend
-go run cmd/server/main.go
 ```
 
 ## Testing
