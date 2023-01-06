@@ -65,10 +65,7 @@ require (
 
 require golang.org/x/exp v0.0.0-20221217163422-3c43f8badb15
 
-require (
-	github.com/mitchellh/mapstructure v1.4.3
-	gotest.tools v2.2.0+incompatible
-)
+require github.com/Khan/genqlient v0.5.0
 
 require (
 	cloud.google.com/go v0.105.0 // indirect
@@ -76,11 +73,8 @@ require (
 	cloud.google.com/go/compute/metadata v0.2.1 // indirect
 	cloud.google.com/go/iam v0.7.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/Khan/genqlient v0.5.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
-	github.com/alexflint/go-arg v1.4.2 // indirect
-	github.com/alexflint/go-scalar v1.0.0 // indirect
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
@@ -154,6 +148,7 @@ require (
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect

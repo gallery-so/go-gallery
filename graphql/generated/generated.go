@@ -6859,7 +6859,7 @@ input UpdateGalleryInput {
 
   deletedCollections: [DBID!]
 
-  updateCollections: [UpdateCollectionInput]
+  updatedCollections: [UpdateCollectionInput]
   createdCollections: [CreateCollectionInGalleryInput]
 
   order: [DBID!]
@@ -28712,11 +28712,11 @@ func (ec *executionContext) unmarshalInputUpdateGalleryInput(ctx context.Context
 			if err != nil {
 				return it, err
 			}
-		case "updateCollections":
+		case "updatedCollections":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("updateCollections"))
-			it.UpdateCollections, err = ec.unmarshalOUpdateCollectionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInput(ctx, v)
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("updatedCollections"))
+			it.UpdatedCollections, err = ec.unmarshalOUpdateCollectionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateCollectionInput(ctx, v)
 			if err != nil {
 				return it, err
 			}

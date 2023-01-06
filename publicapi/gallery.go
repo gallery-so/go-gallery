@@ -109,8 +109,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	// update collections
 
-	if len(update.UpdateCollections) > 0 {
-		err = updateCollectionsInfoAndTokens(ctx, q, update.UpdateCollections)
+	if len(update.UpdatedCollections) > 0 {
+		err = updateCollectionsInfoAndTokens(ctx, q, update.UpdatedCollections)
 		if err != nil {
 			return db.Gallery{}, err
 		}
@@ -143,12 +143,17 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	err = q.UpdateGallery(ctx, db.UpdateGalleryParams{
-		ID:          update.GalleryID,
-		Name:        util.FromPointer(update.Name),
-		Description: util.FromPointer(update.Description),
-		Collections: update.Order,
-	})
+	params := db.UpdateGalleryParams{
+		GalleryID: update.GalleryID,
+	}
+
+	asList := persist.DBIDList(update.Order)
+
+	setConditionalValue(update.Name, &params.Name, &params.NameUpdated)
+	setConditionalValue(update.Description, &params.Description, &params.DescriptionUpdated)
+	setConditionalValue(&asList, &params.Collections, &params.CollectionsUpdated)
+
+	err = q.UpdateGallery(ctx, params)
 	if err != nil {
 		return db.Gallery{}, err
 	}

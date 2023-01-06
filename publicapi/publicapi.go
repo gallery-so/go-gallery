@@ -189,3 +189,12 @@ func pushEvent(ctx context.Context, evt db.Event) {
 		sentryutil.ReportError(ctx, err)
 	}
 }
+
+func setConditionalValue[T any](value *T, param *T, conditional *bool) {
+	if value != nil {
+		*param = *value
+		*conditional = true
+	} else {
+		*conditional = false
+	}
+}

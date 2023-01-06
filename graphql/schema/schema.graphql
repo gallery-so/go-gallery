@@ -1560,7 +1560,7 @@ input UpdateGalleryInput {
 
   deletedCollections: [DBID!]
 
-  updateCollections: [UpdateCollectionInput]
+  updatedCollections: [UpdateCollectionInput]
   createdCollections: [CreateCollectionInGalleryInput]
 
   order: [DBID!]

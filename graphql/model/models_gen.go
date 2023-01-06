@@ -1523,7 +1523,7 @@ type UpdateGalleryInput struct {
 	Description        *string                           `json:"description"`
 	Caption            *string                           `json:"caption"`
 	DeletedCollections []persist.DBID                    `json:"deletedCollections"`
-	UpdateCollections  []*UpdateCollectionInput          `json:"updateCollections"`
+	UpdatedCollections []*UpdateCollectionInput          `json:"updatedCollections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
 	Order              []persist.DBID                    `json:"order"`
 }
