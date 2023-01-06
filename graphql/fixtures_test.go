@@ -106,7 +106,7 @@ func useTokenQueue(t *testing.T) {
 	t.Setenv("TOKEN_PROCESSING_QUEUE", queue.Name)
 }
 
-// useNoticationTopics is a fixture that creates dummy pubsub topics for notications
+// useNoticationTopics is a fixture that creates dummy PubSub topics for notifications
 func useNoticationTopics(t *testing.T) {
 	t.Helper()
 	usePubSub(t)

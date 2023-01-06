@@ -353,18 +353,14 @@ func insertAndPublishNotif(ctx context.Context, notif db.Notification, queries *
 	if err != nil {
 		return err
 	}
-	start := time.Now()
 	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"))
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})
-	logger.For(ctx).Infof("took %s for message to become visible", time.Since(start))
 
 	_, err = result.Get(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to publish new notification: %w", err)
-	} else {
-		logger.For(ctx).Infof("took %s for message to become visible", time.Since(start))
 	}
 
 	logger.For(ctx).Infof("pushed new notification to pubsub: %s", notif.OwnerID)
@@ -404,12 +400,10 @@ func updateAndPublishNotif(ctx context.Context, notif db.Notification, mostRecen
 		return err
 	}
 	t := ps.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"))
-	start := time.Now()
 	result := t.Publish(ctx, &pubsub.Message{
 		Data: marshalled,
 	})
 	_, err = result.Get(ctx)
-	logger.For(ctx).Infof("took %s for message to become visible", time.Since(start))
 	if err != nil {
 		return fmt.Errorf("error publishing updated notification: %w", err)
 	}
