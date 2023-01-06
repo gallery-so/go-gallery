@@ -290,7 +290,7 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 }
 
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
-	dbRoles, err := publicapi.For(ctx).Admin.GetUserRolesByUserID(ctx, obj.Dbid)
+	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}

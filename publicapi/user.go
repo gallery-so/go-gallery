@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/spf13/viper"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -193,6 +194,17 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 	}
 
 	return users, nil
+}
+
+func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
+	address, tokenIDs := parseAddressTokens(viper.GetString("PREMIUM_CONTRACT_ADDRESS"))
+	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
+		UserID:                userID,
+		MembershipAddress:     persist.Address(address),
+		MembershipTokenIds:    tokenIDs,
+		GrantedMembershipRole: persist.RoleEarlyAccess, // Role granted if user carries a matching token
+		Chain:                 persist.ChainETH,
+	})
 }
 
 func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) ([]db.User, PageInfo, error) {
