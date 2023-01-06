@@ -157,6 +157,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
 	case persist.ErrUnknownAction:
 		mappedErr = model.ErrUnknownAction{Message: message}
+	case persist.ErrGalleryNotFound:
+		mappedErr = model.ErrGalleryNotFound{Message: message}
 	}
 
 	if mappedErr != nil {
@@ -388,6 +390,18 @@ func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*mo
 	}
 
 	return gallery, nil
+}
+
+func resolveViewerGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.ViewerGallery, error) {
+	gallery, err := publicapi.For(ctx).Gallery.GetViewerGalleryById(ctx, galleryID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.ViewerGallery{
+		Gallery: galleryToModel(ctx, *gallery),
+	}, nil
 }
 
 func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {

@@ -795,6 +795,13 @@ type MerchTokensPayload {
 
 union MerchTokensPayloadOrError = MerchTokensPayload | ErrInvalidInput
 
+type ErrGalleryNotFound implements Error {
+  message: String!
+}
+
+union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
+union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -816,6 +823,8 @@ type Query {
   globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
+  galleryById(id: DBID!): GalleryByIdPayloadOrError
+  viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
@@ -1587,6 +1596,7 @@ type Mutation {
   ): UpdateGalleryCollectionsPayloadOrError @authRequired
 
   # Collection Mutations
+
   createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
   deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
   updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError
@@ -1622,6 +1632,7 @@ type Mutation {
 
   followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
+
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(

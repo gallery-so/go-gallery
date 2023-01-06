@@ -1345,6 +1345,26 @@ func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, befo
 	}, nil
 }
 
+func (r *queryResolver) GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error) {
+	gallery, err := resolveGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return gallery, nil
+}
+
+func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error) {
+	gallery, err := resolveViewerGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return gallery, nil
+}
+
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }

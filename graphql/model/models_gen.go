@@ -91,6 +91,10 @@ type FollowUserPayloadOrError interface {
 	IsFollowUserPayloadOrError()
 }
 
+type GalleryByIDPayloadOrError interface {
+	IsGalleryByIDPayloadOrError()
+}
+
 type GalleryUserOrAddress interface {
 	IsGalleryUserOrAddress()
 }
@@ -276,6 +280,10 @@ type VerifyEmailPayloadOrError interface {
 
 type ViewGalleryPayloadOrError interface {
 	IsViewGalleryPayloadOrError()
+}
+
+type ViewerGalleryByIDPayloadOrError interface {
+	IsViewerGalleryByIDPayloadOrError()
 }
 
 type ViewerOrError interface {
@@ -685,6 +693,14 @@ func (ErrFeedEventNotFound) IsRemoveAdmirePayloadOrError()       {}
 func (ErrFeedEventNotFound) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrFeedEventNotFound) IsRemoveCommentPayloadOrError()      {}
 
+type ErrGalleryNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrGalleryNotFound) IsError()                           {}
+func (ErrGalleryNotFound) IsGalleryByIDPayloadOrError()       {}
+func (ErrGalleryNotFound) IsViewerGalleryByIDPayloadOrError() {}
+
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
 	Parameters []string `json:"parameters"`
@@ -925,7 +941,8 @@ type Gallery struct {
 	Collections   []*Collection `json:"collections"`
 }
 
-func (Gallery) IsNode() {}
+func (Gallery) IsNode()                      {}
+func (Gallery) IsGalleryByIDPayloadOrError() {}
 
 type GalleryPositionInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
@@ -1661,6 +1678,8 @@ func (Viewer) IsViewerOrError() {}
 type ViewerGallery struct {
 	Gallery *Gallery `json:"gallery"`
 }
+
+func (ViewerGallery) IsViewerGalleryByIDPayloadOrError() {}
 
 type Wallet struct {
 	Dbid         persist.DBID          `json:"dbid"`
