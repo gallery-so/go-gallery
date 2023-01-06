@@ -2,14 +2,12 @@ package publicapi
 
 import (
 	"context"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/spf13/viper"
 )
 
 type AdminAPI struct {
@@ -75,28 +73,4 @@ func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, r
 	})
 
 	return &user, err
-}
-
-func (api *AdminAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	address, tokenIDs := parseAddressTokens(viper.GetString("PREMIUM_CONTRACT_ADDRESS"))
-	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
-		UserID:                userID,
-		MembershipAddress:     persist.Address(address),
-		MembershipTokenIds:    tokenIDs,
-		GrantedMembershipRole: persist.RoleEarlyAccess, // Role granted if user carries a matching token
-		Chain:                 persist.ChainETH,
-	})
-}
-
-// parseAddressTokens returns a contract and tokens from a string encoded as '<address>=[<tokenID>,<tokenID>,...<tokenID>]'.
-// It's helpful for parsing contract and tokens passed as environment variables.
-func parseAddressTokens(s string) (string, []string) {
-	addressTokens := strings.Split(s, "=")
-	if len(addressTokens) != 2 {
-		panic("invalid address tokens format")
-	}
-	address, tokens := addressTokens[0], addressTokens[1]
-	tokens = strings.TrimLeft(tokens, "[")
-	tokens = strings.TrimRight(tokens, "]")
-	return address, strings.Split(tokens, ",")
 }
