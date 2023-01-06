@@ -59,12 +59,17 @@ services:
     command: [
       "/bin/bash",
       "-c",
-      "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local & \
-       sleep 3 && \
-       curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-new-notifications && \
-       curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-updated-notifications && \
-       while true; do sleep 10000000; done"
+      "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local"
     ]
+        # command: [
+        #   "/bin/bash",
+        #   "-c",
+        #   "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local & \
+        #    sleep 3 && \
+        #    curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-new-notifications && \
+        #    curl -X PUT http://0.0.0.0:8085/v1/projects/gallery-local/topics/local-updated-notifications && \
+        #    while true; do sleep 10000000; done"
+        # ]
   # Uncomment if you want to run tokenprocessing locally as a container
   # tokenprocessing:
   #   build:
