@@ -48,6 +48,10 @@ docker-start: docker-stop
 docker-stop:
 	docker-compose down
 
+create-local-topics:
+	curl -X PUT http://127.0.0.1:8085/v1/projects/gallery-local/topics/local-new-notifications
+	curl -X PUT http://127.0.0.1:8085/v1/projects/gallery-local/topics/local-updated-notifications
+
 format-graphql:
 	yarn install;
 	yarn prettier --write graphql/schema/schema.graphql
