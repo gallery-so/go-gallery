@@ -448,12 +448,7 @@ func (c *serverSpy) MakeRequest(ctx context.Context, req *genql.Request, resp *g
 	c.response = res
 	defer res.Body.Close()
 
-	err = json.NewDecoder(res.Body).Decode(resp)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return json.NewDecoder(res.Body).Decode(resp)
 }
 
 // readCookie finds a cookie set in the response
