@@ -77,6 +77,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	events := make([]db.Event, 0, len(update.CreatedCollections)+len(update.UpdateCollections)+1)
+
 	curGal, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
 	if err != nil {
 		return db.Gallery{}, err
@@ -110,10 +112,12 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	// update collections
 
 	if len(update.UpdateCollections) > 0 {
-		err = updateCollectionsInfoAndTokens(ctx, q, update.UpdateCollections)
+		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.UpdateCollections)
 		if err != nil {
 			return db.Gallery{}, err
 		}
+
+		events = append(events, collEvents...)
 	}
 
 	// create collections
@@ -133,6 +137,16 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		if err != nil {
 			return db.Gallery{}, err
 		}
+
+		events = append(events, db.Event{
+			ID:             persist.GenerateID(),
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionCollectionCreated,
+			ResourceTypeID: persist.ResourceTypeCollection,
+			SubjectID:      collectionID,
+			GalleryID:      update.GalleryID,
+		})
+
 		mappedIDs[c.GivenID] = collectionID
 	}
 
@@ -153,6 +167,20 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	if update.Name != nil || update.Description != nil {
+		events = append(events, db.Event{
+			ID:             persist.GenerateID(),
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionGalleryInfoUpdated,
+			ResourceTypeID: persist.ResourceTypeGallery,
+			GalleryID:      update.GalleryID,
+			Data: persist.EventData{
+				GalleryName:        util.FromPointer(update.Name),
+				GalleryDescription: util.FromPointer(update.Description),
+			},
+		})
+	}
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		return db.Gallery{}, err
@@ -163,13 +191,21 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	for _, e := range events {
+		_, err = dispatchEvent(ctx, e, api.validator, update.Caption)
+		if err != nil {
+			return db.Gallery{}, err
+		}
+	}
+
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		ResourceTypeID: persist.ResourceTypeGallery,
 		SubjectID:      newGall.ID,
 		Action:         persist.ActionGalleryUpdated,
 		GalleryID:      newGall.ID,
-	}, api.validator, nil)
+		Caption:        persist.StrToNullStr(update.Caption),
+	}, api.validator, update.Caption)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -177,19 +213,22 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	return newGall, nil
 }
 
-func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update []*model.UpdateCollectionInput) error {
+func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor persist.DBID, update []*model.UpdateCollectionInput) ([]db.Event, error) {
+
+	events := make([]db.Event, 0)
+
 	dbids, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Dbid.String(), nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	collectorNotes, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.CollectorsNote, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	layouts, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
@@ -206,7 +245,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 		}, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tokenSettings, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
@@ -223,21 +262,36 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 		}, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	hiddens, err := util.Map(update, func(u *model.UpdateCollectionInput) (bool, error) {
 		return u.Hidden, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	names, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Name, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	for _, collection := range update {
+		// add event if collectors note updated
+		if collection.CollectorsNote != "" {
+			events = append(events, db.Event{
+				ActorID:        persist.DBIDToNullStr(actor),
+				ResourceTypeID: persist.ResourceTypeCollection,
+				SubjectID:      collection.Dbid,
+				Action:         persist.ActionCollectionUpdated,
+				Data: persist.EventData{
+					CollectionCollectorsNote: collection.CollectorsNote,
+				},
+			})
+		}
 	}
 
 	err = q.UpdateCollectionsInfo(ctx, db.UpdateCollectionsInfoParams{
@@ -249,7 +303,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 		Hidden:          hiddens,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, collection := range update {
@@ -258,10 +312,20 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 			Nfts: collection.Tokens,
 		})
 		if err != nil {
-			return err
+			return nil, err
+		}
+
+		if collection.Tokens != nil {
+			events = append(events, db.Event{
+				ResourceTypeID: persist.ResourceTypeCollection,
+				SubjectID:      collection.Dbid,
+				Action:         persist.ActionTokensAddedToCollection,
+				ActorID:        persist.DBIDToNullStr(actor),
+				CollectionID:   collection.Dbid,
+			})
 		}
 	}
-	return nil
+	return events, nil
 }
 
 func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) error {

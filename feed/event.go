@@ -126,6 +126,7 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 }
 
 func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	// TODO create one handler for any action related to updating a gallery
 	if eventGroups[event.Action] == persist.ActionCollectionUpdated {
 		return b.createCollectionUpdatedFeedEvent(ctx, event)
 	}
@@ -133,6 +134,7 @@ func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Even
 }
 
 func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	// TODO create one handler for any action related to updating a gallery
 	switch event.Action {
 	case persist.ActionUserFollowedUsers:
 		return b.createUserFollowedUsersFeedEvent(ctx, event)

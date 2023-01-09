@@ -27,6 +27,7 @@ const (
 	ActionViewedGallery                   Action = "ViewedGallery"
 	ActionCollectionUpdated               Action = "CollectionUpdated"
 	ActionGalleryUpdated                  Action = "GalleryUpdated"
+	ActionGalleryInfoUpdated              Action = "GalleryInfoUpdated"
 )
 
 type EventData struct {
@@ -37,6 +38,8 @@ type EventData struct {
 	TokenCollectionID        DBID     `json:"token_collection_id"`
 	CollectionTokenIDs       DBIDList `json:"collection_token_ids"`
 	CollectionCollectorsNote string   `json:"collection_collectors_note"`
+	GalleryName              string   `json:"gallery_name"`
+	GalleryDescription       string   `json:"gallery_description"`
 }
 
 type FeedEventData struct {

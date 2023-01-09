@@ -96,7 +96,7 @@ func DispatchImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, erro
 
 	go func() {
 		ctx := sentryutil.NewSentryHubGinContext(ctx)
-		if err := sender.notifications.dispatchDelayed(ctx, *persistedEvent); err != nil {
+		if _, err := sender.notifications.dispatchImmediate(ctx, *persistedEvent); err != nil {
 			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}

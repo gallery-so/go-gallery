@@ -15,6 +15,11 @@ func mergeCollectionEvents(eventsAsc []db.Event) *combinedCollectionEvent {
 	return combined.merge(eventsAsc)
 }
 
+func mergeGalleryEvents(eventsAsc []db.Event) *combinedGalleryEvent {
+	var combined combinedGalleryEvent
+	return combined.merge(eventsAsc)
+}
+
 type combinedFollowEvent struct {
 	event        db.Event
 	eventIDs     []persist.DBID
@@ -84,6 +89,54 @@ func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectio
 		}
 		c.eventIDs = append(c.eventIDs, other.ID)
 		c.isNewCollection = c.isNewCollection || other.Action == persist.ActionCollectionCreated
+	}
+	return c
+}
+
+type combinedGalleryEvent struct {
+	event    db.Event
+	eventIDs []persist.DBID
+}
+
+// TODO
+func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent {
+	for _, other := range eventsAsc {
+		action := c.event.Action
+
+		// If the collection is new, then categorize the event as a new collection event. Otherwise,
+		// if there are two or more unique actions, the resulting event is categorized as
+		// a generic update.
+		if c.event.Action == "" {
+			action = other.Action
+		} else if action != persist.ActionCollectionCreated && c.event.Action != other.Action {
+			action = persist.ActionCollectionUpdated
+		}
+
+		// Not every event has tokens attached to it, so we check that the event is relevant first.
+		collectionTokenIDs := c.event.Data.CollectionTokenIDs
+		if other.Action == persist.ActionCollectionCreated || other.Action == persist.ActionTokensAddedToCollection {
+			collectionTokenIDs = other.Data.CollectionTokenIDs
+		}
+
+		// Not every event has a collector's note attached to it, so we check that the event is relevant first.
+		collectorsNote := c.event.Data.CollectionCollectorsNote
+		if other.Action == persist.ActionCollectionCreated || other.Action == persist.ActionCollectorsNoteAddedToCollection {
+			collectorsNote = other.Data.CollectionCollectorsNote
+		}
+
+		c.event = db.Event{
+			ID:           other.ID,
+			ActorID:      other.ActorID,
+			SubjectID:    other.SubjectID,
+			CollectionID: other.CollectionID,
+			Action:       action,
+			CreatedAt:    other.CreatedAt,
+			Data: persist.EventData{
+				CollectionTokenIDs:       collectionTokenIDs,
+				CollectionCollectorsNote: collectorsNote,
+			},
+		}
+		c.eventIDs = append(c.eventIDs, other.ID)
 	}
 	return c
 }
