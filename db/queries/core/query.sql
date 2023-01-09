@@ -620,7 +620,15 @@ select role from user_roles where user_id = $1 and deleted = false
 union
 select role from (
   select
-    case when exists(select 1 from tokens where owner_user_id = $1 and token_id = any(@membership_token_ids::varchar[]) and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false) and deleted = false)
+    case when exists(
+      select 1
+      from tokens
+      where owner_user_id = $1
+        and token_id = any(@membership_token_ids::varchar[])
+        and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
+        and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
+        and deleted = false
+      )
       then @granted_membership_role else null end as role
 ) r where role is not null;
 

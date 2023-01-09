@@ -3,9 +3,11 @@ package publicapi
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/spf13/viper"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -193,6 +195,30 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 	}
 
 	return users, nil
+}
+
+func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
+	address, tokenIDs := parseAddressTokens(viper.GetString("PREMIUM_CONTRACT_ADDRESS"))
+	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
+		UserID:                userID,
+		MembershipAddress:     persist.Address(address),
+		MembershipTokenIds:    tokenIDs,
+		GrantedMembershipRole: persist.RoleEarlyAccess, // Role granted if user carries a matching token
+		Chain:                 persist.ChainETH,
+	})
+}
+
+// parseAddressTokens returns a contract and tokens from a string encoded as '<address>=[<tokenID>,<tokenID>,...<tokenID>]'.
+// It's helpful for parsing contract and tokens passed as environment variables.
+func parseAddressTokens(s string) (string, []string) {
+	addressTokens := strings.Split(s, "=")
+	if len(addressTokens) != 2 {
+		panic("invalid address tokens format")
+	}
+	address, tokens := addressTokens[0], addressTokens[1]
+	tokens = strings.TrimLeft(tokens, "[")
+	tokens = strings.TrimRight(tokens, "]")
+	return address, strings.Split(tokens, ",")
 }
 
 func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) ([]db.User, PageInfo, error) {
