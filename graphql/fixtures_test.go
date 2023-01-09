@@ -3,6 +3,7 @@ package graphql_test
 import (
 	"context"
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/stretchr/testify/require"
 )
@@ -97,11 +99,29 @@ func useTokenQueue(t *testing.T) {
 	queue, err := client.CreateQueue(ctx, &cloudtaskspb.CreateQueueRequest{
 		Parent: "projects/gallery-test/locations/here",
 		Queue: &cloudtaskspb.Queue{
-			Name: "projects/gallery-test/locations/here/queues/token-processing",
+			Name: "projects/gallery-test/locations/here/queues/token-processing-" + persist.GenerateID().String(),
 		},
 	})
 	require.NoError(t, err)
 	t.Setenv("TOKEN_PROCESSING_QUEUE", queue.Name)
+}
+
+// useNotificationTopics is a fixture that creates dummy PubSub topics for notifications
+func useNotificationTopics(t *testing.T) {
+	t.Helper()
+	usePubSub(t)
+	ctx := context.Background()
+	client := gcp.NewClient(ctx)
+
+	newNotificationsTopic := "new-notifications" + persist.GenerateID().String()
+	_, err := client.CreateTopic(ctx, newNotificationsTopic)
+	require.NoError(t, err)
+	t.Setenv("PUBSUB_TOPIC_NEW_NOTIFICATIONS", newNotificationsTopic)
+
+	updatedNotificationsTopic := "updated-notifications" + persist.GenerateID().String()
+	_, err = client.CreateTopic(ctx, updatedNotificationsTopic)
+	require.NoError(t, err)
+	t.Setenv("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", updatedNotificationsTopic)
 }
 
 // useCloudTasks starts a running Cloud Tasks emulator
@@ -113,6 +133,27 @@ func useCloudTasks(t *testing.T) {
 	t.Cleanup(func() { r.Close() })
 }
 
+// usePubSub starts a running PubSub emulator
+func usePubSub(t *testing.T) {
+	t.Helper()
+	r, err := docker.StartPubSub()
+	require.NoError(t, err)
+	t.Setenv("PUBSUB_EMULATOR_HOST", r.GetHostPort("8085/tcp"))
+	t.Cleanup(func() { r.Close() })
+}
+
+type serverFixture struct {
+	server *httptest.Server
+}
+
+// newServerFixture starts a new HTTP server for end-to-end tests
+func newServerFixture(t *testing.T) serverFixture {
+	t.Helper()
+	server := httptest.NewServer(defaultHandler())
+	t.Cleanup(func() { server.Close() })
+	return serverFixture{server}
+}
+
 type nonceFixture struct {
 	wallet wallet
 	nonce  string
@@ -122,7 +163,7 @@ type nonceFixture struct {
 func newNonceFixture(t *testing.T) nonceFixture {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient(t)
+	c := defaultHandlerClient(t)
 	nonce := newNonce(t, c, wallet)
 	return nonceFixture{wallet, nonce}
 }
@@ -138,7 +179,7 @@ type userFixture struct {
 func newUserFixture(t *testing.T) userFixture {
 	t.Helper()
 	wallet := newWallet(t)
-	c := defaultClient(t)
+	c := defaultHandlerClient(t)
 	userID, username, galleryID := newUser(t, c, wallet)
 	return userFixture{wallet, username, userID, galleryID}
 }

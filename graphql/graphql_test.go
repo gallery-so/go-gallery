@@ -1,3 +1,4 @@
+//go:generate go run github.com/Khan/genqlient
 package graphql_test
 
 import (
@@ -35,7 +36,7 @@ func TestMain(t *testing.T) {
 		{
 			title:    "test GraphQL",
 			run:      testGraphQL,
-			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue},
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNotificationTopics},
 		},
 	}
 	for _, test := range tests {
@@ -56,6 +57,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should remove a wallet", run: testRemoveWallet},
 		{title: "should sync tokens", run: testSyncTokens},
 		{title: "should create a collection", run: testCreateCollection},
+		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -64,7 +66,7 @@ func testGraphQL(t *testing.T) {
 
 func testCreateUser(t *testing.T) {
 	nonceF := newNonceFixture(t)
-	c := defaultClient(t)
+	c := defaultHandlerClient(t)
 	username := "user" + persist.GenerateID().String()
 
 	response, err := createUserMutation(context.Background(), c, authMechanismInput(nonceF.wallet, nonceF.nonce),
@@ -80,8 +82,7 @@ func testCreateUser(t *testing.T) {
 
 func testUserByUsername(t *testing.T) {
 	userF := newUserFixture(t)
-
-	response, err := userByUsernameQuery(context.Background(), defaultClient(t), userF.username)
+	response, err := userByUsernameQuery(context.Background(), defaultHandlerClient(t), userF.username)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserByUsername).(*userByUsernameQueryUserByUsernameGalleryUser)
@@ -91,11 +92,11 @@ func testUserByUsername(t *testing.T) {
 
 func testUserByAddress(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedClient(t, userF.id)
+	c := authedHandlerClient(t, userF.id)
 
 	response, err := userByAddressQuery(context.Background(), c, chainAddressInput(userF.wallet.address))
-	require.NoError(t, err)
 
+	require.NoError(t, err)
 	payload, _ := (*response.UserByAddress).(*userByAddressQueryUserByAddressGalleryUser)
 	assert.Equal(t, userF.username, *payload.Username)
 	assert.Equal(t, userF.id, payload.Dbid)
@@ -103,8 +104,7 @@ func testUserByAddress(t *testing.T) {
 
 func testUserByID(t *testing.T) {
 	userF := newUserFixture(t)
-
-	response, err := userByIdQuery(context.Background(), defaultClient(t), userF.id)
+	response, err := userByIdQuery(context.Background(), defaultHandlerClient(t), userF.id)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserById).(*userByIdQueryUserByIdGalleryUser)
@@ -114,7 +114,7 @@ func testUserByID(t *testing.T) {
 
 func testViewer(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedClient(t, userF.id)
+	c := authedHandlerClient(t, userF.id)
 
 	response, err := viewerQuery(context.Background(), c)
 
@@ -126,7 +126,7 @@ func testViewer(t *testing.T) {
 func testAddWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToAdd := newWallet(t)
-	c := authedClient(t, userF.id)
+	c := authedHandlerClient(t, userF.id)
 	nonce := newNonce(t, c, walletToAdd)
 
 	response, err := addUserWalletMutation(context.Background(), c, chainAddressInput(walletToAdd.address), authMechanismInput(walletToAdd, nonce))
@@ -142,7 +142,7 @@ func testAddWallet(t *testing.T) {
 func testRemoveWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToRemove := newWallet(t)
-	c := authedClient(t, userF.id)
+	c := authedHandlerClient(t, userF.id)
 	nonce := newNonce(t, c, walletToRemove)
 	addResponse, err := addUserWalletMutation(context.Background(), c, chainAddressInput(walletToRemove.address), authMechanismInput(walletToRemove, nonce))
 	require.NoError(t, err)
@@ -160,7 +160,7 @@ func testRemoveWallet(t *testing.T) {
 
 func testLogin(t *testing.T) {
 	userF := newUserFixture(t)
-	c := defaultClient(t)
+	c := defaultHandlerClient(t)
 	nonce := newNonce(t, c, userF.wallet)
 
 	response, err := loginMutation(context.Background(), c, authMechanismInput(userF.wallet, nonce))
@@ -174,7 +174,7 @@ func testLogin(t *testing.T) {
 
 func testLogout(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedClient(t, userF.id)
+	c := authedHandlerClient(t, userF.id)
 
 	response, err := logoutMutation(context.Background(), c)
 
@@ -193,7 +193,7 @@ func testSyncTokens(t *testing.T) {
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
 	h := server.CoreInit(clients, &p)
-	c := customClient(t, h, withJWTOpt(t, userF.id))
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.id))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
 
@@ -204,7 +204,7 @@ func testSyncTokens(t *testing.T) {
 
 func testCreateCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := authedClient(t, userF.id)
+	c := authedHandlerClient(t, userF.id)
 
 	response, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
 		GalleryId:      userF.galleryID,
@@ -233,6 +233,25 @@ func testCreateCollection(t *testing.T) {
 	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
 	assert.NotEmpty(t, payload.Collection.Dbid)
 	assert.Len(t, payload.Collection.Tokens, 1)
+}
+
+func testViewsAreRolledUp(t *testing.T) {
+	serverF := newServerFixture(t)
+	userF := newUserFixture(t)
+	viewerA := newUserFixture(t)
+	viewerB := newUserFixture(t)
+	// viewerA views gallery
+	clientA := authedServerClient(t, serverF.server.URL, viewerA.id)
+	resp, err := viewGalleryMutation(context.Background(), clientA, userF.galleryID)
+	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
+	require.NoError(t, err)
+	// // viewerB views gallery
+	clientB := authedServerClient(t, serverF.server.URL, viewerB.id)
+	resp, err = viewGalleryMutation(context.Background(), clientB, userF.galleryID)
+	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
+	require.NoError(t, err)
+
+	// TODO: Actually verify that the views get rolled up
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
@@ -283,8 +302,7 @@ func newWallet(t *testing.T) wallet {
 	}
 }
 
-// newNonce makes a GraphQL request to generate a nonce
-func newNonce(t *testing.T, c *genqlClient, w wallet) string {
+func newNonce(t *testing.T, c *handlerClient, w wallet) string {
 	t.Helper()
 	response, err := getAuthNonceMutation(context.Background(), c, chainAddressInput(w.address))
 	require.NoError(t, err)
@@ -293,7 +311,7 @@ func newNonce(t *testing.T, c *genqlClient, w wallet) string {
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, c *genqlClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
+func newUser(t *testing.T, c *handlerClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
 	nonce := newNonce(t, c, w)
 	username = "user" + persist.GenerateID().String()
@@ -317,7 +335,7 @@ func newJWT(t *testing.T, userID persist.DBID) string {
 // syncTokens makes a GraphQL request to sync a user's wallet
 func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID) []persist.DBID {
 	t.Helper()
-	c := customClient(t, handler, withJWTOpt(t, userID))
+	c := customHandlerClient(t, handler, withJWTOpt(t, userID))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{"Ethereum"})
 
@@ -338,19 +356,23 @@ func defaultHandler() http.Handler {
 	return handler
 }
 
-// defaultClient returns a GraphQL client attached to a backend GraphQL handler
-func defaultClient(t *testing.T) *genqlClient {
-	return customClient(t, defaultHandler())
+// defaultHandlerClient returns a GraphQL client attached to a backend GraphQL handler
+func defaultHandlerClient(t *testing.T) *handlerClient {
+	return customHandlerClient(t, defaultHandler())
 }
 
-// authedClient returns a GraphQL client with an authenticated JWT
-func authedClient(t *testing.T, userID persist.DBID) *genqlClient {
-	return customClient(t, defaultHandler(), withJWTOpt(t, userID))
+// authedHandlerClient returns a GraphQL client with an authenticated JWT
+func authedHandlerClient(t *testing.T, userID persist.DBID) *handlerClient {
+	return customHandlerClient(t, defaultHandler(), withJWTOpt(t, userID))
 }
 
-// customClient configures the client with the provided HTTP handler and client options
-func customClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *genqlClient {
-	return &genqlClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
+// customHandlerClient configures the client with the provided HTTP handler and client options
+func customHandlerClient(t *testing.T, handler http.Handler, opts ...func(*http.Request)) *handlerClient {
+	return &handlerClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
+}
+
+func authedServerClient(t *testing.T, url string, userID persist.DBID) *serverClient {
+	return &serverClient{url: url + "/glry/graphql/query", opts: []func(*http.Request){withJWTOpt(t, userID)}}
 }
 
 // withJWTOpt ddds a JWT cookie to the request headers
@@ -362,15 +384,15 @@ func withJWTOpt(t *testing.T, userID persist.DBID) func(*http.Request) {
 	}
 }
 
-type genqlClient struct {
+// handlerClient records the server response for testing purposes
+type handlerClient struct {
 	handler  http.Handler
 	endpoint string
 	opts     []func(r *http.Request)
-
-	response *http.Response // Recorded response
+	response *http.Response
 }
 
-func (c *genqlClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
+func (c *handlerClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
 	body, err := json.Marshal(map[string]any{
 		"query":     req.Query,
 		"variables": req.Variables,
@@ -393,12 +415,40 @@ func (c *genqlClient) MakeRequest(ctx context.Context, req *genql.Request, resp 
 	c.response = res
 	defer res.Body.Close()
 
-	err = json.Unmarshal(w.Body.Bytes(), resp)
+	return json.Unmarshal(w.Body.Bytes(), resp)
+}
+
+// serverClient makes a request to a running server
+type serverClient struct {
+	url      string
+	opts     []func(r *http.Request)
+	response *http.Response
+}
+
+func (c *serverClient) MakeRequest(ctx context.Context, req *genql.Request, resp *genql.Response) error {
+	body, err := json.Marshal(map[string]any{
+		"query":     req.Query,
+		"variables": req.Variables,
+	})
 	if err != nil {
 		return err
 	}
 
-	return nil
+	r := httptest.NewRequest(http.MethodPost, c.url, io.NopCloser(bytes.NewBuffer(body)))
+	r.Header.Set("Content-Type", "application/json")
+	r.RequestURI = ""
+	for _, opt := range c.opts {
+		opt(r)
+	}
+
+	res, err := http.DefaultClient.Do(r)
+	if err != nil {
+		return err
+	}
+	c.response = res
+	defer res.Body.Close()
+
+	return json.NewDecoder(res.Body).Decode(resp)
 }
 
 // readCookie finds a cookie set in the response

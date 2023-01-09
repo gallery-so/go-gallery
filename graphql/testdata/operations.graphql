@@ -52,14 +52,8 @@ query viewerQuery {
   }
 }
 
-mutation createUserMutation(
-  $authMechanism: AuthMechanism!
-  $input: CreateUserInput!
-) {
-  createUser(
-    authMechanism: $authMechanism
-    input: $input
-  ) {
+mutation createUserMutation($authMechanism: AuthMechanism!, $input: CreateUserInput!) {
+  createUser(authMechanism: $authMechanism, input: $input) {
     ... on Error {
       __typename
       message
@@ -120,10 +114,7 @@ mutation logoutMutation {
   }
 }
 
-mutation addUserWalletMutation(
-  $chainAddress: ChainAddressInput!
-  $authMechanism: AuthMechanism!
-) {
+mutation addUserWalletMutation($chainAddress: ChainAddressInput!, $authMechanism: AuthMechanism!) {
   addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
     ... on Error {
       __typename
@@ -173,7 +164,7 @@ mutation syncTokensMutation($chains: [Chain!]) {
       __typename
       message
     }
-    ...on SyncTokensPayload {
+    ... on SyncTokensPayload {
       viewer {
         user {
           tokens {
@@ -202,6 +193,20 @@ mutation createCollectionMutation($input: CreateCollectionInput!) {
             dbid
           }
         }
+      }
+    }
+  }
+}
+
+mutation viewGalleryMutation($galleryId: DBID!) {
+  viewGallery(galleryId: $galleryId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on ViewGalleryPayload {
+      gallery {
+        dbid
       }
     }
   }

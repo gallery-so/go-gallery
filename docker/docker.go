@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,9 +12,9 @@ import (
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
+	"cloud.google.com/go/pubsub"
 	"github.com/asottile/dockerfile"
 	"github.com/go-redis/redis/v8"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -40,8 +39,8 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 	host := hostAndPort[0]
 	port := hostAndPort[1]
 
-	if err = pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
-		log.Fatalf("could not connect to postgres: %s", err)
+	if err := pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
+		return nil, err
 	}
 
 	return r, nil
@@ -120,11 +119,45 @@ func StartCloudTasks() (*dockertest.Resource, error) {
 		}
 		defer client.Close()
 		_, err = client.CreateQueue(ctx, &cloudtaskspb.CreateQueueRequest{
-			Parent: "projects/gallery-test/locations/here",
+			Parent: "projects/gallery-local/locations/here",
 			Queue: &cloudtaskspb.Queue{
-				Name: "projects/gallery-test/locations/here/queues/" + persist.GenerateID().String(),
+				Name: "projects/gallery-local/locations/here/queues/dummy-queue",
 			},
 		})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
+func StartPubSub() (*dockertest.Resource, error) {
+	pool, err := newPool(time.Minute * 10)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := startService(pool, "pubsub-emulator")
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a dummy topic to check if the service is available
+	err = pool.Retry(func() error {
+		ctx := context.Background()
+		client, err := pubsub.NewClient(ctx,
+			"gallery-local",
+			option.WithEndpoint(r.GetHostPort("8085/tcp")),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			option.WithoutAuthentication(),
+		)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		_, err = client.CreateTopic(ctx, "dummy-topic")
 		return err
 	})
 	if err != nil {
