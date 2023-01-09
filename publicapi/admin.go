@@ -6,8 +6,10 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/user"
 )
 
 type AdminAPI struct {
@@ -73,4 +75,50 @@ func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, r
 	})
 
 	return &user, err
+}
+
+type authenticator struct {
+	authMethod func(context.Context) (*auth.AuthResult, error)
+}
+
+func (a authenticator) GetDescription() string { return "" }
+func (a authenticator) Authenticate(ctx context.Context) (*auth.AuthResult, error) {
+	return a.authMethod(ctx)
+}
+
+func (api *AdminAPI) AddWalletToUser(ctx context.Context, username string, chainAddress persist.ChainAddress, walletType persist.WalletType) error {
+	if err := auth.RetoolAuthorized(ctx); err != nil {
+		return err
+	}
+
+	if err := validateFields(api.validator, validationMap{
+		"username":     {username, "required,username"},
+		"chainAddress": {chainAddress, "required"},
+	}); err != nil {
+		return err
+	}
+
+	u, err := api.repos.UserRepository.GetByUsername(ctx, username)
+	if err != nil {
+		return err
+	}
+
+	authMethod := func(ctx context.Context) (*auth.AuthResult, error) {
+		err := auth.NonceRotate(ctx, chainAddress, api.repos.NonceRepository)
+		if err != nil {
+			return nil, err
+		}
+
+		authedAddress := auth.AuthenticatedAddress{
+			ChainAddress: chainAddress,
+			WalletID:     "",
+			WalletType:   walletType,
+		}
+
+		return &auth.AuthResult{
+			Addresses: []auth.AuthenticatedAddress{authedAddress},
+		}, nil
+	}
+
+	return user.AddWalletToUser(ctx, u.ID, chainAddress, authenticator{authMethod}, api.repos.UserRepository, api.repos.WalletRepository)
 }
