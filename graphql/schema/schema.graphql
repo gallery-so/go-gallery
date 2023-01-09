@@ -1591,7 +1591,11 @@ type AdminAddWalletPayload {
   user: GalleryUser
 }
 
-union AdminAddWalletPayloadOrError = AdminAddWalletPayload | ErrUserNotFound | ErrAddressOwnedByUser | ErrNotAuthorized
+union AdminAddWalletPayloadOrError =
+    AdminAddWalletPayload
+  | ErrUserNotFound
+  | ErrAddressOwnedByUser
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
