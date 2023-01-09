@@ -157,6 +157,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
 	case persist.ErrUnknownAction:
 		mappedErr = model.ErrUnknownAction{Message: message}
+	case persist.ErrGalleryNotFound:
+		mappedErr = model.ErrGalleryNotFound{Message: message}
 	}
 
 	if mappedErr != nil {
@@ -372,13 +374,34 @@ func resolveCollectionTokenByIDs(ctx context.Context, tokenID persist.DBID, coll
 }
 
 func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
+	dbGal, err := publicapi.For(ctx).Gallery.GetGalleryById(ctx, galleryID)
+	if err != nil {
+		return nil, err
+	}
 	gallery := &model.Gallery{
-		Dbid:        galleryID,
-		Owner:       nil, // handled by dedicated resolver
-		Collections: nil, // handled by dedicated resolver
+		Dbid:          galleryID,
+		Name:          &dbGal.Name,
+		Description:   &dbGal.Description,
+		Position:      &dbGal.Position,
+		Hidden:        &dbGal.Hidden,
+		TokenPreviews: nil, // handled by dedicated resolver
+		Owner:         nil, // handled by dedicated resolver
+		Collections:   nil, // handled by dedicated resolver
 	}
 
 	return gallery, nil
+}
+
+func resolveViewerGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.ViewerGallery, error) {
+	gallery, err := publicapi.For(ctx).Gallery.GetViewerGalleryById(ctx, galleryID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.ViewerGallery{
+		Gallery: galleryToModel(ctx, *gallery),
+	}, nil
 }
 
 func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {

@@ -290,7 +290,7 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 }
 
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
-	dbRoles, err := publicapi.For(ctx).Admin.GetUserRolesByUserID(ctx, obj.Dbid)
+	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
@@ -1343,6 +1343,26 @@ func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, befo
 		Edges:    edges,
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
+}
+
+func (r *queryResolver) GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error) {
+	gallery, err := resolveGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return gallery, nil
+}
+
+func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error) {
+	gallery, err := resolveViewerGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return gallery, nil
 }
 
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {

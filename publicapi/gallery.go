@@ -77,7 +77,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
-	events := make([]db.Event, 0, len(update.CreatedCollections)+len(update.UpdateCollections)+1)
+	events := make([]db.Event, 0, len(update.CreatedCollections)+len(update.UpdatedCollections)+1)
 
 	curGal, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
 	if err != nil {
@@ -111,8 +111,8 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	// update collections
 
-	if len(update.UpdateCollections) > 0 {
-		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.UpdateCollections)
+	if len(update.UpdatedCollections) > 0 {
+		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.UpdatedCollections)
 		if err != nil {
 			return db.Gallery{}, err
 		}
@@ -157,12 +157,17 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	err = q.UpdateGallery(ctx, db.UpdateGalleryParams{
-		ID:          update.GalleryID,
-		Name:        util.FromPointer(update.Name),
-		Description: util.FromPointer(update.Description),
-		Collections: update.Order,
-	})
+	params := db.UpdateGalleryParams{
+		GalleryID: update.GalleryID,
+	}
+
+	asList := persist.DBIDList(update.Order)
+
+	setConditionalValue(update.Name, &params.Name, &params.NameUpdated)
+	setConditionalValue(update.Description, &params.Description, &params.DescriptionUpdated)
+	setConditionalValue(&asList, &params.Collections, &params.CollectionsUpdated)
+
+	err = q.UpdateGallery(ctx, params)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -363,6 +368,32 @@ func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID
 	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
 	if err != nil {
 		return nil, err
+	}
+
+	return &gallery, nil
+}
+
+func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+
+	if err != nil {
+		return nil, persist.ErrGalleryNotFound{ID: galleryID}
+	}
+
+	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	if userID != gallery.OwnerUserID {
+		return nil, persist.ErrGalleryNotFound{ID: galleryID}
 	}
 
 	return &gallery, nil
