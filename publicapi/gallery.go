@@ -381,7 +381,7 @@ func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persis
 		return nil, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 
 	if err != nil {
 		return nil, persist.ErrGalleryNotFound{ID: galleryID}
