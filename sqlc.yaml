@@ -103,6 +103,8 @@ sql:
             go_type: "database/sql.NullString"
           - column: "events.actor_id"
             go_type: "database/sql.NullString"
+          - column: "events.group_id"
+            go_type: "database/sql.NullString"
 
           # Comments
           - column: "comments.reply_to"

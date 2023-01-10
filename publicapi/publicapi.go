@@ -189,8 +189,10 @@ func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate,
 	}
 
 	if caption != nil {
+		groupID := persist.GenerateID()
 		for _, evt := range evts {
 			evt.Caption = persist.StrToNullStr(caption)
+			evt.GroupID = persist.DBIDToNullStr(groupID)
 		}
 		return event.DispatchImmediate(ctx, evts)
 	}
@@ -208,14 +210,5 @@ func pushEvent(ctx context.Context, evt db.Event) {
 	if err := event.DispatchDelayed(ctx, evt); err != nil {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
-	}
-}
-
-func setConditionalValue[T any](value *T, param *T, conditional *bool) {
-	if value != nil {
-		*param = *value
-		*conditional = true
-	} else {
-		*conditional = false
 	}
 }

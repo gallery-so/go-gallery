@@ -116,22 +116,17 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 
 	if isImmediate {
 		// if the event is being dispatched immediately, ensure that it is not supposed to be group with other events that are being dispatched immediately
-		switch eventGroups[event.Action] {
-		case persist.ActionGalleryUpdated:
-			wait, err := b.queries.HasLaterGalleryEvent(ctx, db.HasLaterGalleryEventParams{
-				ActorID:   event.ActorID,
-				Actions:   groupingConfig[persist.ActionGalleryUpdated],
-				GalleryID: event.GalleryID,
-				Caption:   event.Caption,
-				EventID:   event.ID,
-			})
-			if err != nil {
-				return nil, err
-			}
-			if wait {
-				return nil, nil
-			}
+		wait, err := b.queries.HasLaterGroupedEvent(ctx, db.HasLaterGroupedEventParams{
+			GroupID: event.GroupID,
+			EventID: event.ID,
+		})
+		if err != nil {
+			return nil, err
 		}
+		if wait {
+			return nil, nil
+		}
+
 	}
 
 	if useEvent, err := b.useEvent(ctx, event); err != nil || !useEvent {
@@ -225,8 +220,14 @@ func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, eve
 }
 
 func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	// will checking by gallery ID cause some events to slip through the cracks and not be handled?
-	events, err := b.eventRepo.EventsInWindowForGallery(ctx, event.ID, event.GalleryID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
+
+	var events []db.Event
+	var err error
+	if event.GroupID.String != "" {
+		events, err = b.queries.GetEventsInGroup(ctx, event.GroupID)
+	} else {
+		events, err = b.eventRepo.EventsInWindowForGallery(ctx, event.ID, event.GalleryID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +406,13 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 }
 
 func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	events, err := b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionCollectionUpdated], true)
+	var events []db.Event
+	var err error
+	if event.GroupID.String != "" {
+		events, err = b.queries.GetEventsInGroup(ctx, event.GroupID)
+	} else {
+		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionCollectionUpdated], true)
+	}
 	if err != nil {
 		return nil, err
 	}

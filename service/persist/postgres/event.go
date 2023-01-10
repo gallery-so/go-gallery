@@ -43,6 +43,7 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event db.Event) (*db
 		ResourceTypeID: event.ResourceTypeID,
 		UserID:         event.SubjectID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
 	})
 	return &event, err
 }
@@ -55,6 +56,7 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event db.Event) (*d
 		ResourceTypeID: event.ResourceTypeID,
 		TokenID:        event.SubjectID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
 	})
 	return &event, err
 }
@@ -68,6 +70,7 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 		CollectionID:   event.SubjectID,
 		Data:           event.Data,
 		Caption:        event.Caption,
+		GroupID:        event.GroupID,
 	})
 	return &event, err
 }
@@ -81,6 +84,7 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 		AdmireID:       event.AdmireID,
 		FeedEventID:    event.FeedEventID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
 	})
 	return &event, err
 }
@@ -94,6 +98,7 @@ func (r *EventRepository) AddCommentEvent(ctx context.Context, event db.Event) (
 		CommentID:      event.CommentID,
 		FeedEventID:    event.FeedEventID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
 	})
 	return &event, err
 }
@@ -107,6 +112,7 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 		GalleryID:      event.SubjectID,
 		Data:           event.Data,
 		ExternalID:     event.ExternalID,
+		GroupID:        event.GroupID,
 	})
 	return &event, err
 }

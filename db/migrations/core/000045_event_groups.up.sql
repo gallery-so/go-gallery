@@ -1,0 +1,1 @@
+alter table events add column group_id varchar(255);

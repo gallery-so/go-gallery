@@ -280,22 +280,22 @@ WHERE tokens.owner_user_id = $1 AND users.id = $1
 ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
 
 -- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateGalleryEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8) RETURNING *;
 
 -- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
@@ -331,13 +331,13 @@ with recursive activity as (
 )
 select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
--- name: HasLaterGalleryEvent :one
+-- name: GetEventsInGroup :many
+select * from events where group_id = @group_id and deleted = false order by(created_at, id) asc;
+
+-- name: HasLaterGroupedEvent :one
 select exists(
   select 1 from events where deleted = false
-  and actor_id = @actor_id
-  and action = any(@actions)
-  and gallery_id = @gallery_id
-  and caption = @caption
+  and group_id = @group_id
   and id > @event_id
 );
 

@@ -164,9 +164,9 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	asList := persist.DBIDList(update.Order)
 
-	setConditionalValue(update.Name, &params.Name, &params.NameUpdated)
-	setConditionalValue(update.Description, &params.Description, &params.DescriptionUpdated)
-	setConditionalValue(&asList, &params.Collections, &params.CollectionsUpdated)
+	util.SetConditionalValue(update.Name, &params.Name, &params.NameUpdated)
+	util.SetConditionalValue(update.Description, &params.Description, &params.DescriptionUpdated)
+	util.SetConditionalValue(&asList, &params.Collections, &params.CollectionsUpdated)
 
 	err = q.UpdateGallery(ctx, params)
 	if err != nil {

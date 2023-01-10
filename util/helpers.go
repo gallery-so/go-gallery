@@ -232,6 +232,15 @@ func Contains[T comparable](s []T, str T) bool {
 	return false
 }
 
+func SetConditionalValue[T any](value *T, param *T, conditional *bool) {
+	if value != nil {
+		*param = *value
+		*conditional = true
+	} else {
+		*conditional = false
+	}
+}
+
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
 // a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
 func StringToPointer(str string) *string {

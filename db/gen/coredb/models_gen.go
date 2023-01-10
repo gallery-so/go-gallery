@@ -121,6 +121,7 @@ type Event struct {
 	FeedEventID    persist.DBID
 	ExternalID     sql.NullString
 	Caption        sql.NullString
+	GroupID        sql.NullString
 }
 
 type Feature struct {
