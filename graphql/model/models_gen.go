@@ -971,6 +971,8 @@ type GalleryUpdatedFeedEventData struct {
 	Gallery           *Gallery                   `json:"gallery"`
 	CollectionUpdates []*GalleryCollectionUpdate `json:"collectionUpdates"`
 	TokenUpdates      []*GalleryTokenUpdate      `json:"tokenUpdates"`
+	NewName           *string                    `json:"newName"`
+	NewDescription    *string                    `json:"newDescription"`
 }
 
 func (GalleryUpdatedFeedEventData) IsFeedEventData() {}

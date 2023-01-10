@@ -486,6 +486,8 @@ type ComplexityRoot struct {
 		CollectionUpdates func(childComplexity int) int
 		EventTime         func(childComplexity int) int
 		Gallery           func(childComplexity int) int
+		NewDescription    func(childComplexity int) int
+		NewName           func(childComplexity int) int
 		Owner             func(childComplexity int) int
 		TokenUpdates      func(childComplexity int) int
 	}
@@ -2693,6 +2695,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryUpdatedFeedEventData.Gallery(childComplexity), true
+
+	case "GalleryUpdatedFeedEventData.newDescription":
+		if e.complexity.GalleryUpdatedFeedEventData.NewDescription == nil {
+			break
+		}
+
+		return e.complexity.GalleryUpdatedFeedEventData.NewDescription(childComplexity), true
+
+	case "GalleryUpdatedFeedEventData.newName":
+		if e.complexity.GalleryUpdatedFeedEventData.NewName == nil {
+			break
+		}
+
+		return e.complexity.GalleryUpdatedFeedEventData.NewName(childComplexity), true
 
 	case "GalleryUpdatedFeedEventData.owner":
 		if e.complexity.GalleryUpdatedFeedEventData.Owner == nil {
@@ -6120,6 +6136,8 @@ type GalleryUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
   gallery: Gallery @goField(forceResolver: true)
   collectionUpdates: [GalleryCollectionUpdate] @goField(forceResolver: true)
   tokenUpdates: [GalleryTokenUpdate] @goField(forceResolver: true)
+  newName: String
+  newDescription: String
 }
 
 type ErrUnknownAction implements Error {
@@ -15184,6 +15202,70 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData_tokenUpdates(ctx contex
 	res := resTmp.([]*model.GalleryTokenUpdate)
 	fc.Result = res
 	return ec.marshalOGalleryTokenUpdate2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryTokenUpdate(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUpdatedFeedEventData_newName(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryUpdatedFeedEventData_newDescription(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewDescription, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUser_id(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
@@ -35281,6 +35363,20 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData(ctx context.Context, se
 				return innerFunc(ctx)
 
 			})
+		case "newName":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GalleryUpdatedFeedEventData_newName(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "newDescription":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._GalleryUpdatedFeedEventData_newDescription(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

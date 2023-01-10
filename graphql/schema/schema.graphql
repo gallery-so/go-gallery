@@ -746,6 +746,8 @@ type GalleryUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
   gallery: Gallery @goField(forceResolver: true)
   collectionUpdates: [GalleryCollectionUpdate] @goField(forceResolver: true)
   tokenUpdates: [GalleryTokenUpdate] @goField(forceResolver: true)
+  newName: String
+  newDescription: String
 }
 
 type ErrUnknownAction implements Error {

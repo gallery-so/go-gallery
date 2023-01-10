@@ -1284,6 +1284,8 @@ func eventToGalleryUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventData
 		Action:            &event.Action,
 		CollectionUpdates: nil, // handled by dedicated resolver
 		TokenUpdates:      nil, // handled by dedicated resolver
+		NewName:           util.StringToPointerIfNotEmpty(event.Data.GalleryName),
+		NewDescription:    util.StringToPointerIfNotEmpty(event.Data.GalleryDescription),
 		HelperGalleryUpdatedFeedEventDataData: model.HelperGalleryUpdatedFeedEventDataData{
 			FeedEventID: event.ID,
 		},
