@@ -2,6 +2,8 @@ package publicapi
 
 import (
 	"context"
+
+	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -24,7 +26,7 @@ type WalletAPI struct {
 
 func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (*db.Wallet, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"walletID": {walletID, "required"},
 	}); err != nil {
 		return nil, err
@@ -40,7 +42,7 @@ func (api WalletAPI) GetWalletByID(ctx context.Context, walletID persist.DBID) (
 
 func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.Wallet, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"chainAddress": {chainAddress, "required"},
 	}); err != nil {
 		return nil, err
@@ -56,7 +58,7 @@ func (api WalletAPI) GetWalletByChainAddress(ctx context.Context, chainAddress p
 
 func (api WalletAPI) GetWalletsByUserID(ctx context.Context, userID persist.DBID) ([]db.Wallet, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err

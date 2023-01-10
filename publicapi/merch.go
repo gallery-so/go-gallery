@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -62,7 +63,7 @@ type MerchAPI struct {
 
 func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address) ([]*model.MerchToken, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"address": {address, "required"},
 	}); err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 
 func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.TokenID) (*model.MerchToken, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"tokenID": {tokenID, "required"},
 	}); err != nil {
 		return nil, err
@@ -232,7 +233,7 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 
 func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchToken, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"tokenIDs": {tokenIDs, "required,unique"},
 		"address":  {address, "required"},
 		"sig":      {sig, "required"},

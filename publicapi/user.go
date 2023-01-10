@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/spf13/viper"
 
@@ -50,7 +51,7 @@ func (api UserAPI) IsUserLoggedIn(ctx context.Context) bool {
 
 func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -83,7 +84,7 @@ func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.UsersWithPii, error)
 
 func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userIDs": {userIDs, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -147,7 +148,7 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"username": {username, "required"},
 	}); err != nil {
 		return nil, err
@@ -163,7 +164,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.
 
 func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"chainAddress": {chainAddress, "required"},
 	}); err != nil {
 		return nil, err
@@ -183,7 +184,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.Ch
 
 func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"trait": {trait, "required"},
 	}); err != nil {
 		return nil, err
@@ -223,7 +224,7 @@ func parseAddressTokens(s string) (string, []string) {
 
 func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) ([]db.User, PageInfo, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"role": {role, "required,role"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -280,7 +281,7 @@ func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role,
 
 func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"chainAddress":  {chainAddress, "required"},
 		"authenticator": {authenticator, "required"},
 	}); err != nil {
@@ -302,7 +303,7 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 
 func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"walletIDs": {walletIDs, "required,unique,dive,required"},
 	}); err != nil {
 		return err
@@ -323,7 +324,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"username": {username, "required,username"},
 		"bio":      {bio, "bio"},
 	}); err != nil {
@@ -369,7 +370,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"username": {username, "required,username"},
 		"bio":      {bio, "bio"},
 	}); err != nil {
@@ -394,7 +395,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 
 func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return err
@@ -416,7 +417,7 @@ func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.
 
 func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"email": {email, "required"},
 	}); err != nil {
 		return err
@@ -444,7 +445,7 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 
 func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, settings persist.EmailUnsubscriptions) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"settings": {settings, "required"},
 	}); err != nil {
 		return err
@@ -478,7 +479,7 @@ func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
 
 func (api UserAPI) UpdateUserNotificationSettings(ctx context.Context, notificationSettings persist.UserNotificationSettings) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"notification_settings": {notificationSettings, "required"},
 	}); err != nil {
 		return err
@@ -499,7 +500,7 @@ func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([
 
 func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID persist.DBID) (*db.Membership, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"membershipID": {membershipID, "required"},
 	}); err != nil {
 		return nil, err
@@ -515,7 +516,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 
 func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -535,7 +536,7 @@ func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID
 
 func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -560,7 +561,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 		return err
 	}
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userID": {userID, fmt.Sprintf("required,ne=%s", curUserID)},
 	}); err != nil {
 		return err
@@ -583,7 +584,7 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return err

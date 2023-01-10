@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
@@ -38,7 +39,7 @@ type GalleryAPI struct {
 
 func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *string, position string) (db.Gallery, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"name":        {name, "max=200"},
 		"description": {description, "max=600"},
 		"position":    {position, "required"},
@@ -67,7 +68,7 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 
 func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGalleryInput) (db.Gallery, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID":           {update.GalleryID, "required"},
 		"name":                {update.Name, "max=200"},
 		"description":         {update.Description, "max=600"},
@@ -260,7 +261,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 
 func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) error {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return err
@@ -284,7 +285,7 @@ func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID)
 
 func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return nil, err
@@ -300,7 +301,7 @@ func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID
 
 func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return nil, err
@@ -326,7 +327,7 @@ func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persis
 
 func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID persist.DBID) (*db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return nil, err
@@ -342,7 +343,7 @@ func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID
 
 func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.DBID) ([]db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -358,7 +359,7 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 
 func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]string, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return nil, err
@@ -377,7 +378,7 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID":   {galleryID, "required"},
 		"collections": {collections, fmt.Sprintf("required,unique,max=%d", maxCollectionsPerGallery)},
 	}); err != nil {
@@ -401,7 +402,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 
 func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.DBID, name, description *string) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID":   {galleryID, "required"},
 		"name":        {name, "max=200"},
 		"description": {description, "max=600"},
@@ -430,7 +431,7 @@ func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.D
 
 func (api GalleryAPI) UpdateGalleryHidden(ctx context.Context, galleryID persist.DBID, hidden bool) (coredb.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return db.Gallery{}, err
@@ -449,7 +450,7 @@ func (api GalleryAPI) UpdateGalleryHidden(ctx context.Context, galleryID persist
 
 func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*model.GalleryPositionInput) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"positions": {positions, "required,min=1"},
 	}); err != nil {
 		return err
@@ -475,7 +476,7 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 
 func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return db.Gallery{}, err

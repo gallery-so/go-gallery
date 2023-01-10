@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/validate"
 )
 
 const (
@@ -31,7 +32,7 @@ type CollectionAPI struct {
 
 func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID persist.DBID) (*db.Collection, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return nil, err
@@ -48,7 +49,7 @@ func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID per
 func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs []persist.DBID) ([]*db.Collection, []error) {
 	collectionThunk := func(collectionID persist.DBID) func() (db.Collection, error) {
 		// Validate
-		if err := validateFields(api.validator, validationMap{
+		if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 			"collectionID": {collectionID, "required"},
 		}); err != nil {
 			return func() (db.Collection, error) { return db.Collection{}, err }
@@ -85,7 +86,7 @@ func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs 
 
 func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryID persist.DBID) ([]db.Collection, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return nil, err
@@ -100,7 +101,7 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {
-	fieldsToValidate := validationMap{
+	fieldsToValidate := inputcheck.ValidationMap{
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
@@ -112,13 +113,13 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = valWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		fieldsToValidate["caption"] = inputcheck.ValWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}
 
 	// Validate
-	if err := validateFields(api.validator, fieldsToValidate); err != nil {
+	if err := inputcheck.ValidateFields(api.validator, fieldsToValidate); err != nil {
 		return nil, nil, err
 	}
 
@@ -192,7 +193,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return err
@@ -213,7 +214,7 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 
 func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"collectionID":   {collectionID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
@@ -254,7 +255,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 }
 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.FeedEvent, error) {
-	fieldsToValidate := validationMap{
+	fieldsToValidate := inputcheck.ValidationMap{
 		"collectionID": {collectionID, "required"},
 		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 		"sections":     {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
@@ -264,13 +265,13 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = valWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		fieldsToValidate["caption"] = inputcheck.ValWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}
 
 	// Validate
-	if err := validateFields(api.validator, fieldsToValidate); err != nil {
+	if err := inputcheck.ValidateFields(api.validator, fieldsToValidate); err != nil {
 		return nil, err
 	}
 
@@ -322,7 +323,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return err

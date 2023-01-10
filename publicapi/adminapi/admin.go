@@ -1,11 +1,11 @@
-package publicapi
+package adminapi
 
 import (
 	"context"
 
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -15,12 +15,17 @@ import (
 type AdminAPI struct {
 	repos     *postgres.Repositories
 	queries   *db.Queries
-	loaders   *dataloader.Loaders
 	validator *validator.Validate
 }
 
+func NewAPI(repos *postgres.Repositories, queries *db.Queries, validator *validator.Validate) *AdminAPI {
+	return &AdminAPI{repos, queries, validator}
+}
+
 func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
-	if err := validateFields(api.validator, validationMap{
+	requireRetoolAuthorized(ctx)
+
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"username": {username, "required"},
 		"roles":    {roles, "required,unique,dive,role"},
 	}); err != nil {
@@ -52,7 +57,9 @@ func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles 
 }
 
 func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
-	if err := validateFields(api.validator, validationMap{
+	requireRetoolAuthorized(ctx)
+
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"username": {username, "required"},
 		"roles":    {roles, "required,unique,dive,role"},
 	}); err != nil {
@@ -87,11 +94,9 @@ func (a authenticator) Authenticate(ctx context.Context) (*auth.AuthResult, erro
 }
 
 func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username string, chainAddress persist.ChainAddress, walletType persist.WalletType) error {
-	if err := auth.RetoolAuthorized(ctx); err != nil {
-		return err
-	}
+	requireRetoolAuthorized(ctx)
 
-	if err := validateFields(api.validator, validationMap{
+	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
 		"username":     {username, "required,username"},
 		"chainAddress": {chainAddress, "required"},
 	}); err != nil {
@@ -121,4 +126,10 @@ func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username stri
 	}
 
 	return user.AddWalletToUser(ctx, u.ID, chainAddress, authenticator{authMethod}, api.repos.UserRepository, api.repos.WalletRepository)
+}
+
+func requireRetoolAuthorized(ctx context.Context) {
+	if err := auth.RetoolAuthorized(ctx); err != nil {
+		panic(err)
+	}
 }
