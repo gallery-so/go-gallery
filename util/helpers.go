@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -12,10 +13,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/spf13/viper"
+	"go.mozilla.org/sops/v3/decrypt"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -418,6 +421,31 @@ func ResolveEnvFile(service string, env string) string {
 	}
 
 	return fmt.Sprintf("app-local-%s.yaml", service)
+}
+
+// LoadEncryptedEnvFile configures the environment with the configured input file.
+func LoadEncryptedEnvFile(fileName string) {
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+		return
+	}
+
+	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+	filePath := filepath.Join("_local", fileName)
+	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
+	path := MustFindFile(filePath)
+
+	startTime := time.Now()
+	config, err := decrypt.File(path, "yaml")
+	if err != nil {
+		panic(fmt.Sprintf("error decrypting config file: %s\n", err))
+	}
+	fmt.Printf("decryption took %v\n", time.Since(startTime))
+
+	viper.SetConfigType("yaml")
+	if err := viper.ReadConfig(bytes.NewBuffer(config)); err != nil {
+		panic(fmt.Sprintf("error reading viper config: %s\n", err))
+	}
 }
 
 // LoadEnvFile configures the environment with the configured input file.
