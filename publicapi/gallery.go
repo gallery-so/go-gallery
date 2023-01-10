@@ -112,7 +112,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	// update collections
 
 	if len(update.UpdatedCollections) > 0 {
-		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.UpdatedCollections)
+		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.GalleryID, update.UpdatedCollections)
 		if err != nil {
 			return db.Gallery{}, err
 		}
@@ -144,6 +144,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 			Action:         persist.ActionCollectionCreated,
 			ResourceTypeID: persist.ResourceTypeCollection,
 			SubjectID:      collectionID,
+			CollectionID:   collectionID,
 			GalleryID:      update.GalleryID,
 		})
 
@@ -218,7 +219,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	return newGall, nil
 }
 
-func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor persist.DBID, update []*model.UpdateCollectionInput) ([]db.Event, error) {
+func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, gallery persist.DBID, update []*model.UpdateCollectionInput) ([]db.Event, error) {
 
 	events := make([]db.Event, 0)
 
@@ -292,6 +293,8 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor pe
 				ResourceTypeID: persist.ResourceTypeCollection,
 				SubjectID:      collection.Dbid,
 				Action:         persist.ActionCollectionUpdated,
+				CollectionID:   collection.Dbid,
+				GalleryID:      gallery,
 				Data: persist.EventData{
 					CollectionCollectorsNote: collection.CollectorsNote,
 				},

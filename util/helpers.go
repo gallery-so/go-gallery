@@ -222,6 +222,16 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
+func Contains[T comparable](s []T, str T) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
+}
+
 // StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
 // a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
 func StringToPointer(str string) *string {

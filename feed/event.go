@@ -24,8 +24,9 @@ var (
 			persist.ActionCollectionUpdated,
 			persist.ActionCollectionCreated,
 			persist.ActionTokensAddedToCollection,
+			persist.ActionCollectorsNoteAddedToToken,
 			persist.ActionCollectorsNoteAddedToCollection,
-			// TODO more actions for specific gallery updates maybe?
+			persist.ActionGalleryInfoUpdated,
 		},
 	}
 	eventGroups = createEventGroups(groupingConfig)
@@ -34,10 +35,10 @@ var (
 var (
 	eventSegments = map[persist.Action]segment{
 		persist.ActionUserFollowedUsers:               actorActionSegment,
-		persist.ActionCollectorsNoteAddedToToken:      actorSubjectActionSegment,
-		persist.ActionCollectionCreated:               actorSubjectActionSegment,
-		persist.ActionCollectorsNoteAddedToCollection: actorSubjectActionSegment,
-		persist.ActionTokensAddedToCollection:         actorSubjectActionSegment,
+		persist.ActionCollectorsNoteAddedToToken:      actorGallerySegment,
+		persist.ActionCollectionCreated:               actorGallerySegment,
+		persist.ActionCollectorsNoteAddedToCollection: actorGallerySegment,
+		persist.ActionTokensAddedToCollection:         actorGallerySegment,
 		persist.ActionCollectionUpdated:               actorSubjectSegment,
 		persist.ActionGalleryUpdated:                  actorSubjectActionSegment,
 	}
@@ -62,6 +63,7 @@ const (
 	actorActionSegment
 	actorSubjectSegment
 	actorSubjectActionSegment
+	actorGallerySegment
 )
 
 var errUnhandledSingleEvent = errors.New("unhandable single event")
@@ -80,6 +82,7 @@ func createEventGroups(groupingConfig map[persist.Action]persist.ActionList) map
 type segment int
 
 type EventBuilder struct {
+	queries           *db.Queries
 	eventRepo         *postgres.EventRepository
 	feedRepo          *postgres.FeedRepository
 	feedBlocklistRepo *postgres.FeedBlocklistRepository
@@ -93,6 +96,7 @@ type EventBuilder struct {
 
 func NewEventBuilder(queries *db.Queries, skipCooldown bool) *EventBuilder {
 	return &EventBuilder{
+		queries:           queries,
 		eventRepo:         &postgres.EventRepository{Queries: queries},
 		feedRepo:          &postgres.FeedRepository{Queries: queries},
 		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
@@ -129,6 +133,8 @@ func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Even
 	// TODO create one handler for any action related to updating a gallery
 	if eventGroups[event.Action] == persist.ActionCollectionUpdated {
 		return b.createCollectionUpdatedFeedEvent(ctx, event)
+	} else if eventGroups[event.Action] == persist.ActionGalleryUpdated {
+		return b.createGalleryUpdatedFeedEventFromIndividualEvents(ctx, event)
 	}
 	return nil, errUnhandledGroupedEvent
 }
@@ -138,16 +144,8 @@ func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db
 	switch event.Action {
 	case persist.ActionUserFollowedUsers:
 		return b.createUserFollowedUsersFeedEvent(ctx, event)
-	case persist.ActionCollectorsNoteAddedToToken:
-		return b.createCollectorsNoteAddedToTokenFeedEvent(ctx, event)
-	case persist.ActionCollectionCreated:
-		return b.createCollectionCreatedFeedEvent(ctx, event)
-	case persist.ActionCollectorsNoteAddedToCollection:
-		return b.createCollectorsNoteAddedToCollectionFeedEvent(ctx, event)
-	case persist.ActionTokensAddedToCollection:
-		return b.createTokensAddedToCollectionFeedEvent(ctx, event)
-	case persist.ActionGalleryUpdated:
-		return b.createUpdateGalleryFeedEvent(ctx, event)
+	case persist.ActionCollectorsNoteAddedToToken, persist.ActionGalleryInfoUpdated, persist.ActionTokensAddedToCollection, persist.ActionCollectorsNoteAddedToCollection, persist.ActionCollectionCreated:
+		return b.createGalleryUpdatedFeedEventFromIndividualEvents(ctx, event)
 	default:
 		return nil, errUnhandledSingleEvent
 	}
@@ -179,6 +177,8 @@ func (b *EventBuilder) isStillEditing(ctx context.Context, event db.Event) (bool
 		return b.eventRepo.IsActorSubjectActive(ctx, event, b.windowSize)
 	case actorSubjectActionSegment:
 		return b.eventRepo.IsActorSubjectActionActive(ctx, event, getActions(event.Action), b.windowSize)
+	case actorGallerySegment:
+		return b.eventRepo.IsActorGalleryActive(ctx, event, b.windowSize)
 	case noSegment:
 		return false, nil
 	default:
@@ -210,6 +210,58 @@ func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, eve
 	})
 }
 
+func (b *EventBuilder) createGalleryUpdatedFeedEventFromIndividualEvents(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+	// will checking by gallery ID cause some events to slip through the cracks and not be handled?
+	events, err := b.eventRepo.EventsInWindowForGallery(ctx, event.ID, event.GalleryID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
+	if err != nil {
+		return nil, err
+	}
+	if len(events) > 1 {
+		merged := mergeGalleryEvents(events)
+		if len(merged.eventIDs) == 0 {
+			return nil, nil
+		}
+		return b.feedRepo.Add(ctx, db.FeedEvent{
+			ID:        persist.GenerateID(),
+			OwnerID:   merged.actorID,
+			Action:    persist.ActionGalleryUpdated,
+			EventTime: merged.createdAt.Time(),
+			EventIds:  merged.eventIDs,
+			Data: persist.FeedEventData{
+				GalleryID:                           merged.galleryID,
+				GalleryName:                         merged.galleryName,
+				GalleryDescription:                  merged.galleryDescription,
+				GalleryNewCollections:               merged.newCollections,
+				GalleryNewCollectionTokenIDs:        merged.tokensAdded,
+				GalleryNewCollectionCollectorsNotes: merged.collectionCollectorsNotes,
+				GalleryNewTokenCollectorsNotes:      merged.tokenCollectorsNotes,
+			},
+		})
+	}
+	// treat as single event not to be grouped by gallery
+	return b.createSingleUpdateGalleryEvent(event, ctx)
+
+}
+
+func (b *EventBuilder) createSingleUpdateGalleryEvent(event db.Event, ctx context.Context) (*db.FeedEvent, error) {
+	switch event.Action {
+
+	case persist.ActionCollectorsNoteAddedToToken:
+		return b.createCollectorsNoteAddedToTokenFeedEvent(ctx, event)
+	case persist.ActionCollectionCreated:
+		return b.createCollectionCreatedFeedEvent(ctx, event)
+	case persist.ActionCollectorsNoteAddedToCollection:
+		return b.createCollectorsNoteAddedToCollectionFeedEvent(ctx, event)
+	case persist.ActionTokensAddedToCollection:
+		return b.createTokensAddedToCollectionFeedEvent(ctx, event)
+	case persist.ActionGalleryInfoUpdated:
+		return b.createUpdateGalleryInfoFeedEvent(ctx, event)
+	default:
+		return nil, errUnhandledSingleEvent
+	}
+
+}
+
 func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	// don't present empty notes
 	if event.Data.TokenCollectorsNote == "" {
@@ -236,6 +288,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToTokenFeedEvent(ctx context.Con
 		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
+			TokenGalleryID:         event.GalleryID,
 			TokenID:                event.SubjectID,
 			TokenCollectionID:      event.Data.TokenCollectionID,
 			TokenNewCollectorsNote: event.Data.TokenCollectorsNote,
@@ -257,6 +310,7 @@ func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, eve
 		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
+			CollectionGalleryID:         event.GalleryID,
 			CollectionID:                event.SubjectID,
 			CollectionTokenIDs:          event.Data.CollectionTokenIDs,
 			CollectionNewTokenIDs:       event.Data.CollectionTokenIDs,
@@ -268,15 +322,16 @@ func (b *EventBuilder) createCollectionCreatedFeedEvent(ctx context.Context, eve
 	})
 }
 
-func (b *EventBuilder) createUpdateGalleryFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	// TODO event data once we figure out what we want
+func (b *EventBuilder) createUpdateGalleryInfoFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:      persist.GenerateID(),
 		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
-			GalleryID: event.SubjectID,
+			GalleryID:          event.SubjectID,
+			GalleryName:        event.Data.GalleryName,
+			GalleryDescription: event.Data.GalleryDescription,
 		},
 		EventTime: event.CreatedAt,
 		EventIds:  persist.DBIDList{event.ID},
@@ -299,6 +354,7 @@ func (b *EventBuilder) createCollectorsNoteAddedToCollectionFeedEvent(ctx contex
 		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
+			CollectionGalleryID:         event.GalleryID,
 			CollectionID:                event.SubjectID,
 			CollectionNewCollectorsNote: event.Data.CollectionCollectorsNote,
 		},
@@ -324,6 +380,7 @@ func (b *EventBuilder) createTokensAddedToCollectionFeedEvent(ctx context.Contex
 		OwnerID: persist.NullStrToDBID(event.ActorID),
 		Action:  event.Action,
 		Data: persist.FeedEventData{
+			CollectionGalleryID:   event.GalleryID,
 			CollectionID:          event.SubjectID,
 			CollectionTokenIDs:    event.Data.CollectionTokenIDs,
 			CollectionNewTokenIDs: addedTokens,
@@ -380,6 +437,7 @@ func (b *EventBuilder) createCollectionUpdatedFeedEvent(ctx context.Context, eve
 		EventTime: merged.event.CreatedAt,
 		EventIds:  merged.eventIDs,
 		Data: persist.FeedEventData{
+			CollectionGalleryID:         merged.event.GalleryID,
 			CollectionID:                merged.event.SubjectID,
 			CollectionTokenIDs:          merged.event.Data.CollectionTokenIDs,
 			CollectionNewCollectorsNote: merged.event.Data.CollectionCollectorsNote,

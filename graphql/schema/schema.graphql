@@ -727,6 +727,26 @@ type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
   newCollectorsNote: String
   newTokens: [CollectionToken] @goField(forceResolver: true)
 }
+type GalleryCollectionUpdate @goEmbedHelper {
+  collection: Collection @goField(forceResolver: true)
+  newCollectorsNote: String
+  newTokens: [CollectionToken] @goField(forceResolver: true)
+  isCreatedCollection: Boolean
+}
+
+type GalleryTokenUpdate @goEmbedHelper {
+  token: Token @goField(forceResolver: true)
+  newCollectorsNote: String
+}
+
+type GalleryUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  gallery: Gallery @goField(forceResolver: true)
+  collectionUpdates: [GalleryCollectionUpdate] @goField(forceResolver: true)
+  tokenUpdates: [GalleryTokenUpdate] @goField(forceResolver: true)
+}
 
 type ErrUnknownAction implements Error {
   message: String!

@@ -289,6 +289,36 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
+func (r *galleryCollectionUpdateResolver) Collection(ctx context.Context, obj *model.GalleryCollectionUpdate) (*model.Collection, error) {
+	return resolveCollectionByCollectionID(ctx, obj.HelperGalleryCollectionUpdateData.CollectionID)
+}
+
+func (r *galleryCollectionUpdateResolver) NewTokens(ctx context.Context, obj *model.GalleryCollectionUpdate) ([]*model.CollectionToken, error) {
+	return util.Map(obj.NewTokens, func(t *model.CollectionToken) (*model.CollectionToken, error) {
+		return resolveCollectionTokenByIDs(ctx, t.TokenId, t.CollectionId)
+	})
+}
+
+func (r *galleryTokenUpdateResolver) Token(ctx context.Context, obj *model.GalleryTokenUpdate) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.TokenID)
+}
+
+func (r *galleryUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
+}
+
+func (r *galleryUpdatedFeedEventDataResolver) Gallery(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.Gallery, error) {
+	return resolveGalleryByGalleryID(ctx, obj.Gallery.Dbid)
+}
+
+func (r *galleryUpdatedFeedEventDataResolver) CollectionUpdates(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]*model.GalleryCollectionUpdate, error) {
+	return resolveGalleryCollectionUpdatesByFeedEventID(ctx, obj.FeedEventID)
+}
+
+func (r *galleryUpdatedFeedEventDataResolver) TokenUpdates(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]*model.GalleryTokenUpdate, error) {
+	return resolveGalleryTokenUpdatesByFeedEventID(ctx, obj.FeedEventID)
+}
+
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
 	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
 	if err != nil {
@@ -1325,26 +1355,6 @@ func (r *queryResolver) GetMerchTokens(ctx context.Context, wallet persist.Addre
 	return output, nil
 }
 
-func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
-	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
-
-	edges := make([]*model.UserEdge, len(users))
-	for i, user := range users {
-		edges[i] = &model.UserEdge{
-			Node:   userToModel(ctx, user),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.UsersConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-}
-
 func (r *queryResolver) GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error) {
 	gallery, err := resolveGalleryByGalleryID(ctx, id)
 
@@ -1363,6 +1373,26 @@ func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) 
 	}
 
 	return gallery, nil
+}
+
+func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.UserEdge, len(users))
+	for i, user := range users {
+		edges[i] = &model.UserEdge{
+			Node:   userToModel(ctx, user),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.UsersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
@@ -1640,6 +1670,21 @@ func (r *Resolver) FollowUserPayload() generated.FollowUserPayloadResolver {
 // Gallery returns generated.GalleryResolver implementation.
 func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
 
+// GalleryCollectionUpdate returns generated.GalleryCollectionUpdateResolver implementation.
+func (r *Resolver) GalleryCollectionUpdate() generated.GalleryCollectionUpdateResolver {
+	return &galleryCollectionUpdateResolver{r}
+}
+
+// GalleryTokenUpdate returns generated.GalleryTokenUpdateResolver implementation.
+func (r *Resolver) GalleryTokenUpdate() generated.GalleryTokenUpdateResolver {
+	return &galleryTokenUpdateResolver{r}
+}
+
+// GalleryUpdatedFeedEventData returns generated.GalleryUpdatedFeedEventDataResolver implementation.
+func (r *Resolver) GalleryUpdatedFeedEventData() generated.GalleryUpdatedFeedEventDataResolver {
+	return &galleryUpdatedFeedEventDataResolver{r}
+}
+
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
 
@@ -1758,6 +1803,9 @@ type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
+type galleryCollectionUpdateResolver struct{ *Resolver }
+type galleryTokenUpdateResolver struct{ *Resolver }
+type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }

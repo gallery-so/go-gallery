@@ -129,6 +129,15 @@ func (r *EventRepository) IsActorSubjectActive(ctx context.Context, event db.Eve
 	})
 }
 
+func (r *EventRepository) IsActorGalleryActive(ctx context.Context, event db.Event, windowSize time.Duration) (bool, error) {
+	return r.Queries.IsActorGalleryActive(ctx, db.IsActorGalleryActiveParams{
+		ActorID:     event.ActorID,
+		GalleryID:   event.GalleryID,
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(windowSize),
+	})
+}
+
 func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions persist.ActionList, windowSize time.Duration) (bool, error) {
 	return r.Queries.IsActorSubjectActionActive(ctx, db.IsActorSubjectActionActiveParams{
 		ActorID:     event.ActorID,
@@ -146,5 +155,16 @@ func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DB
 		Secs:           float64(windowSeconds),
 		Actions:        actions,
 		IncludeSubject: includeSubject,
+	})
+}
+
+// EventsInWindow returns events belonging to the same window of activity as the given eventID.
+func (r *EventRepository) EventsInWindowForGallery(ctx context.Context, eventID, galleryID persist.DBID, windowSeconds int, actions persist.ActionList, includeSubject bool) ([]db.Event, error) {
+	return r.Queries.GetGalleryEventsInWindow(ctx, db.GetGalleryEventsInWindowParams{
+		ID:             eventID,
+		Secs:           float64(windowSeconds),
+		Actions:        actions,
+		IncludeSubject: includeSubject,
+		GalleryID:      galleryID,
 	})
 }

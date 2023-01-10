@@ -180,6 +180,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: createdCollection.Nfts, CollectionCollectorsNote: collectorsNote},
 	}, api.validator, caption)
@@ -240,12 +241,18 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		return err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return err
+	}
+
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
 	}, api.validator, nil)
@@ -308,12 +315,18 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return nil, err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Send event
 	return dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
 		Caption:        persist.StrToNullStr(caption),

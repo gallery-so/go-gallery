@@ -944,10 +944,36 @@ type Gallery struct {
 func (Gallery) IsNode()                      {}
 func (Gallery) IsGalleryByIDPayloadOrError() {}
 
+type GalleryCollectionUpdate struct {
+	HelperGalleryCollectionUpdateData
+	Collection          *Collection        `json:"collection"`
+	NewCollectorsNote   *string            `json:"newCollectorsNote"`
+	NewTokens           []*CollectionToken `json:"newTokens"`
+	IsCreatedCollection *bool              `json:"isCreatedCollection"`
+}
+
 type GalleryPositionInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
 	Position  string       `json:"position"`
 }
+
+type GalleryTokenUpdate struct {
+	HelperGalleryTokenUpdateData
+	Token             *Token  `json:"token"`
+	NewCollectorsNote *string `json:"newCollectorsNote"`
+}
+
+type GalleryUpdatedFeedEventData struct {
+	HelperGalleryUpdatedFeedEventDataData
+	EventTime         *time.Time                 `json:"eventTime"`
+	Owner             *GalleryUser               `json:"owner"`
+	Action            *persist.Action            `json:"action"`
+	Gallery           *Gallery                   `json:"gallery"`
+	CollectionUpdates []*GalleryCollectionUpdate `json:"collectionUpdates"`
+	TokenUpdates      []*GalleryTokenUpdate      `json:"tokenUpdates"`
+}
+
+func (GalleryUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryUser struct {
 	HelperGalleryUserData

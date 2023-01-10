@@ -1088,6 +1088,8 @@ func feedEventToDataModel(event *db.FeedEvent) (model.FeedEventData, error) {
 		return eventToTokensAddedToCollectionFeedEventData(event), nil
 	case persist.ActionCollectionUpdated:
 		return eventToCollectionUpdatedFeedEventData(event), nil
+	case persist.ActionGalleryUpdated:
+		return eventToGalleryUpdatedFeedEventData(event), nil
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
@@ -1200,6 +1202,89 @@ func eventToCollectionUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventD
 		NewTokens:         nil, // handled by dedicated resolver
 		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
 		HelperCollectionUpdatedFeedEventDataData: model.HelperCollectionUpdatedFeedEventDataData{
+			FeedEventID: event.ID,
+		},
+	}
+}
+
+func resolveGalleryCollectionUpdatesByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.GalleryCollectionUpdate, error) {
+	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, feedEventID)
+	if err != nil {
+		return nil, err
+	}
+	collUpdates := make(map[persist.DBID]model.GalleryCollectionUpdate)
+
+	for collID, collNote := range event.Data.GalleryNewCollectionCollectorsNotes {
+		it := collUpdates[collID]
+		it.CollectionID = collID
+		newColl := util.Contains(event.Data.GalleryNewCollections, collID)
+		it.IsCreatedCollection = &newColl
+		it.NewCollectorsNote = &collNote
+		collUpdates[collID] = it
+	}
+	for _, collID := range event.Data.GalleryNewCollections {
+		it := collUpdates[collID]
+		it.CollectionID = collID
+		newColl := true
+		it.IsCreatedCollection = &newColl
+		collUpdates[collID] = it
+	}
+	for collID, newTokens := range event.Data.GalleryNewCollectionTokenIDs {
+		it := collUpdates[collID]
+		ts := make([]*model.CollectionToken, 0, len(newTokens))
+		for _, tokenID := range newTokens {
+			ts = append(ts, &model.CollectionToken{
+				HelperCollectionTokenData: model.HelperCollectionTokenData{
+					TokenId:      tokenID,
+					CollectionId: collID,
+				},
+				Token:         &model.Token{Dbid: tokenID}, // remaining fields handled by dedicated resolver
+				Collection:    &model.Collection{Dbid: collID},
+				TokenSettings: nil, // handled by dedicated resolver
+			})
+		}
+		it.NewTokens = ts
+		collUpdates[collID] = it
+	}
+
+	allCollUpdates := make([]*model.GalleryCollectionUpdate, 0, len(collUpdates))
+	for _, v := range collUpdates {
+		allCollUpdates = append(allCollUpdates, &v)
+	}
+	return allCollUpdates, nil
+
+}
+
+func resolveGalleryTokenUpdatesByFeedEventID(ctx context.Context, feedEventID persist.DBID) ([]*model.GalleryTokenUpdate, error) {
+	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, feedEventID)
+	if err != nil {
+		return nil, err
+	}
+	allTokenUpdates := make([]*model.GalleryTokenUpdate, 0, len(event.Data.GalleryNewTokenCollectorsNotes))
+
+	for tokenID, tokenNote := range event.Data.GalleryNewTokenCollectorsNotes {
+		allTokenUpdates = append(allTokenUpdates, &model.GalleryTokenUpdate{
+			HelperGalleryTokenUpdateData: model.HelperGalleryTokenUpdateData{
+				TokenID: tokenID,
+			},
+			Token:             &model.Token{Dbid: tokenID}, // remaining fields handled by dedicated resolver
+			NewCollectorsNote: &tokenNote,
+		})
+	}
+
+	return allTokenUpdates, nil
+
+}
+func eventToGalleryUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
+
+	return model.GalleryUpdatedFeedEventData{
+		EventTime:         &event.EventTime,
+		Owner:             &model.GalleryUser{Dbid: event.OwnerID},    // remaining fields handled by dedicated resolver
+		Gallery:           &model.Gallery{Dbid: event.Data.GalleryID}, // remaining fields handled by dedicated resolver
+		Action:            &event.Action,
+		CollectionUpdates: nil, // handled by dedicated resolver
+		TokenUpdates:      nil, // handled by dedicated resolver
+		HelperGalleryUpdatedFeedEventDataData: model.HelperGalleryUpdatedFeedEventDataData{
 			FeedEventID: event.ID,
 		},
 	}

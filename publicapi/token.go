@@ -454,12 +454,18 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		return err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return err
+	}
+
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
 		TokenID:        tokenID,
+		GalleryID:      galleryID,
 		SubjectID:      tokenID,
 		Data: persist.EventData{
 			TokenCollectionID:   collectionID,

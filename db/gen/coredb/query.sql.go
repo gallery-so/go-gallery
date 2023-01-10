@@ -1276,6 +1276,88 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 	return i, err
 }
 
+const getGalleryEventsInWindow = `-- name: GetGalleryEventsInWindow :many
+with recursive activity as (
+    select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption from events where events.id = $1 and deleted = false
+    union
+    select e.id, e.version, e.actor_id, e.resource_type_id, e.subject_id, e.user_id, e.token_id, e.collection_id, e.action, e.data, e.deleted, e.last_updated, e.created_at, e.gallery_id, e.comment_id, e.admire_id, e.feed_event_id, e.external_id, e.caption from events e, activity a
+    where e.actor_id = a.actor_id
+        and e.action = any($3)
+        and e.gallery_id = $4
+        and e.created_at < a.created_at
+        and e.created_at >= a.created_at - make_interval(secs => $2)
+        and e.deleted = false
+        and e.caption is null
+        and (not $5::bool or e.subject_id = a.subject_id)
+)
+select id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption from events where id = any(select id from activity) order by (created_at, id) asc
+`
+
+type GetGalleryEventsInWindowParams struct {
+	ID             persist.DBID
+	Secs           float64
+	Actions        persist.ActionList
+	GalleryID      persist.DBID
+	IncludeSubject bool
+}
+
+func (q *Queries) GetGalleryEventsInWindow(ctx context.Context, arg GetGalleryEventsInWindowParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, getGalleryEventsInWindow,
+		arg.ID,
+		arg.Secs,
+		arg.Actions,
+		arg.GalleryID,
+		arg.IncludeSubject,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.ActorID,
+			&i.ResourceTypeID,
+			&i.SubjectID,
+			&i.UserID,
+			&i.TokenID,
+			&i.CollectionID,
+			&i.Action,
+			&i.Data,
+			&i.Deleted,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.GalleryID,
+			&i.CommentID,
+			&i.AdmireID,
+			&i.FeedEventID,
+			&i.ExternalID,
+			&i.Caption,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getGalleryIDByCollectionID = `-- name: GetGalleryIDByCollectionID :one
+select gallery_id from collections where id = $1 and deleted = false
+`
+
+func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBID) (persist.DBID, error) {
+	row := q.db.QueryRow(ctx, getGalleryIDByCollectionID, id)
+	var gallery_id persist.DBID
+	err := row.Scan(&gallery_id)
+	return gallery_id, err
+}
+
 const getGalleryTokenPreviewsByID = `-- name: GetGalleryTokenPreviewsByID :many
 select (t.media->>'thumbnail_url')::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3
 `
@@ -2842,6 +2924,34 @@ func (q *Queries) IsActorActionActive(ctx context.Context, arg IsActorActionActi
 	row := q.db.QueryRow(ctx, isActorActionActive,
 		arg.ActorID,
 		arg.Actions,
+		arg.WindowStart,
+		arg.WindowEnd,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const isActorGalleryActive = `-- name: IsActorGalleryActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and gallery_id = $2
+  and created_at > $3 and created_at <= $4
+)
+`
+
+type IsActorGalleryActiveParams struct {
+	ActorID     sql.NullString
+	GalleryID   persist.DBID
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+func (q *Queries) IsActorGalleryActive(ctx context.Context, arg IsActorGalleryActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isActorGalleryActive,
+		arg.ActorID,
+		arg.GalleryID,
 		arg.WindowStart,
 		arg.WindowEnd,
 	)

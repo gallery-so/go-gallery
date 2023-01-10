@@ -100,6 +100,17 @@ type HelperCollectionUpdatedFeedEventDataData struct {
 	FeedEventID persist.DBID
 }
 
+type HelperGalleryUpdatedFeedEventDataData struct {
+	FeedEventID persist.DBID
+}
+
+type HelperGalleryCollectionUpdateData struct {
+	CollectionID persist.DBID
+}
+
+type HelperGalleryTokenUpdateData struct {
+	TokenID persist.DBID
+}
 type HelperUserEmailData struct {
 	UserId persist.DBID
 }

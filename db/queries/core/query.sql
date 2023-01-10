@@ -315,6 +315,22 @@ with recursive activity as (
 )
 select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
+-- name: GetGalleryEventsInWindow :many
+with recursive activity as (
+    select * from events where events.id = $1 and deleted = false
+    union
+    select e.* from events e, activity a
+    where e.actor_id = a.actor_id
+        and e.action = any(@actions)
+        and e.gallery_id = @gallery_id
+        and e.created_at < a.created_at
+        and e.created_at >= a.created_at - make_interval(secs => $2)
+        and e.deleted = false
+        and e.caption is null
+        and (not @include_subject::bool or e.subject_id = a.subject_id)
+)
+select * from events where id = any(select id from activity) order by (created_at, id) asc;
+
 -- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false
@@ -330,6 +346,15 @@ select exists(
   and subject_id = $2
   and created_at > @window_start and created_at <= @window_end
 );
+
+-- name: IsActorGalleryActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and gallery_id = $2
+  and created_at > @window_start and created_at <= @window_end
+);
+
 
 -- name: IsActorSubjectActionActive :one
 select exists(
@@ -679,3 +704,6 @@ update collections set nfts = @nfts, last_updated = now() where id = @id and del
 
 -- name: CreateCollection :one
 insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
+
+-- name: GetGalleryIDByCollectionID :one
+select gallery_id from collections where id = $1 and deleted = false;
