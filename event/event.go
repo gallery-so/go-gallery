@@ -182,6 +182,9 @@ func (d *eventDispatcher) dispatchDelayed(ctx context.Context, event db.Event) e
 	return nil
 }
 
+// this will run the handler for each event and return the final non-nil result returned by the handler.
+// in the case of the feed, immediate events should be grouped such that only one feed event is created
+// and one event is returned
 func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event []db.Event) (interface{}, error) {
 
 	resultChan := make(chan interface{})
@@ -194,9 +197,7 @@ func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event []db.Even
 					errChan <- err
 					return
 				}
-				if result != nil {
-					resultChan <- result
-				}
+				resultChan <- result
 			}(e)
 		}
 	}
@@ -205,7 +206,9 @@ func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event []db.Even
 	for i := 0; i < len(event); i++ {
 		select {
 		case r := <-resultChan:
-			result = r
+			if r != nil {
+				result = r
+			}
 		case err := <-errChan:
 			return nil, err
 		}
