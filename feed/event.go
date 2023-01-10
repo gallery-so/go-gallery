@@ -15,11 +15,6 @@ import (
 
 var (
 	groupingConfig = map[persist.Action]persist.ActionList{
-		persist.ActionCollectionUpdated: {
-			persist.ActionCollectionCreated,
-			persist.ActionTokensAddedToCollection,
-			persist.ActionCollectorsNoteAddedToCollection,
-		},
 		persist.ActionGalleryUpdated: {
 			persist.ActionCollectionUpdated,
 			persist.ActionCollectionCreated,
