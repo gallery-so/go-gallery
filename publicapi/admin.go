@@ -86,7 +86,7 @@ func (a authenticator) Authenticate(ctx context.Context) (*auth.AuthResult, erro
 	return a.authMethod(ctx)
 }
 
-func (api *AdminAPI) AdminAddWalletToUser(ctx context.Context, username string, chainAddress persist.ChainAddress, walletType persist.WalletType) error {
+func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username string, chainAddress persist.ChainAddress, walletType persist.WalletType) error {
 	if err := auth.RetoolAuthorized(ctx); err != nil {
 		return err
 	}

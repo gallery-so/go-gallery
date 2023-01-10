@@ -573,7 +573,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
-		AdminAddWallet                  func(childComplexity int, input model.AdminAddWalletInput) int
+		AddWalletToUserUnchecked        func(childComplexity int, input model.AdminAddWalletInput) int
 		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
 		BanUserFromFeed                 func(childComplexity int, username string, action string) int
 		ClearAllNotifications           func(childComplexity int) int
@@ -1160,7 +1160,7 @@ type MutationResolver interface {
 	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (model.VerifyEmailPayloadOrError, error)
 	RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
-	AdminAddWallet(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error)
+	AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
 	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
@@ -3038,17 +3038,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.AddUserWallet(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
 
-	case "Mutation.adminAddWallet":
-		if e.complexity.Mutation.AdminAddWallet == nil {
+	case "Mutation.addWalletToUserUnchecked":
+		if e.complexity.Mutation.AddWalletToUserUnchecked == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_adminAddWallet_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_addWalletToUserUnchecked_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AdminAddWallet(childComplexity, args["input"].(model.AdminAddWalletInput)), true
+		return e.complexity.Mutation.AddWalletToUserUnchecked(childComplexity, args["input"].(model.AdminAddWalletInput)), true
 
 	case "Mutation.admireFeedEvent":
 		if e.complexity.Mutation.AdmireFeedEvent == nil {
@@ -6867,7 +6867,11 @@ type AdminAddWalletPayload {
   user: GalleryUser
 }
 
-union AdminAddWalletPayloadOrError = AdminAddWalletPayload | ErrUserNotFound | ErrAddressOwnedByUser | ErrNotAuthorized
+union AdminAddWalletPayloadOrError =
+    AdminAddWalletPayload
+  | ErrUserNotFound
+  | ErrAddressOwnedByUser
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -6954,7 +6958,7 @@ type Mutation {
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
-  adminAddWallet(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
     @retoolAuth
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
@@ -7350,7 +7354,7 @@ func (ec *executionContext) field_Mutation_addUserWallet_args(ctx context.Contex
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_adminAddWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_addWalletToUserUnchecked_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 model.AdminAddWalletInput
@@ -18976,7 +18980,7 @@ func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field 
 	return ec.marshalOAddRolesToUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddRolesToUserPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_adminAddWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_addWalletToUserUnchecked(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -18993,7 +18997,7 @@ func (ec *executionContext) _Mutation_adminAddWallet(ctx context.Context, field 
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_adminAddWallet_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_addWalletToUserUnchecked_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -19002,7 +19006,7 @@ func (ec *executionContext) _Mutation_adminAddWallet(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AdminAddWallet(rctx, args["input"].(model.AdminAddWalletInput))
+			return ec.resolvers.Mutation().AddWalletToUserUnchecked(rctx, args["input"].(model.AdminAddWalletInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {
@@ -35943,9 +35947,9 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "adminAddWallet":
+		case "addWalletToUserUnchecked":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_adminAddWallet(ctx, field)
+				return ec._Mutation_addWalletToUserUnchecked(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)

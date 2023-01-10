@@ -1124,8 +1124,8 @@ func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, 
 	return userToModel(ctx, *user), nil
 }
 
-func (r *mutationResolver) AdminAddWallet(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error) {
-	err := publicapi.For(ctx).Admin.AdminAddWalletToUser(ctx, input.Username, *input.ChainAddress, input.WalletType)
+func (r *mutationResolver) AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).Admin.AddWalletToUserUnchecked(ctx, input.Username, *input.ChainAddress, input.WalletType)
 	if err != nil {
 		return nil, err
 	}
