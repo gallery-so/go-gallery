@@ -189,8 +189,10 @@ func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event []db.Even
 
 	resultChan := make(chan interface{})
 	errChan := make(chan error)
+	var handleables int
 	for _, e := range event {
 		if handler, ok := d.immediateHandlers[e.Action]; ok {
+			handleables++
 			go func(event db.Event) {
 				result, err := handler.handleImmediate(ctx, event)
 				if err != nil {
@@ -203,7 +205,7 @@ func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event []db.Even
 	}
 
 	var result interface{}
-	for i := 0; i < len(event); i++ {
+	for i := 0; i < handleables; i++ {
 		select {
 		case r := <-resultChan:
 			if r != nil {
