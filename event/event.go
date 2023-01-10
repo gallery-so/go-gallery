@@ -45,6 +45,9 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addDelayedHandler(feed, persist.ActionGalleryUpdated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
+	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToCollection, feedHandler)
+	sender.addImmediateHandler(feed, persist.ActionGalleryUpdated, feedHandler)
+	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToToken, feedHandler)
 
 	notifications := newEventDispatcher()
 	notificationHandler := newNotificationHandler(notif, disableDataloaderCaching, queries)
@@ -80,29 +83,37 @@ func DispatchDelayed(ctx context.Context, event db.Event) error {
 }
 
 // DispatchImmediate flushes the event immediately to its registered handlers.
-func DispatchImmediate(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func DispatchImmediate(ctx context.Context, events []db.Event) (*db.FeedEvent, error) {
 	gc := util.GinContextFromContext(ctx)
 	sender := For(gc)
 
-	if _, handable := sender.registry[immediateKey][event.Action]; !handable {
-		logger.For(ctx).WithField("action", event.Action).Warn("no immediate handler configured for action")
-		return nil, nil
+	for _, e := range events {
+		if _, handable := sender.registry[immediateKey][e.Action]; !handable {
+			logger.For(ctx).WithField("action", e.Action).Warn("no immediate handler configured for action")
+			return nil, nil
+		}
 	}
 
-	persistedEvent, err := sender.eventRepo.Add(ctx, event)
-	if err != nil {
-		return nil, err
+	persistedEvents := make([]db.Event, 0, len(events))
+	for _, e := range events {
+		persistedEvent, err := sender.eventRepo.Add(ctx, e)
+		if err != nil {
+			return nil, err
+		}
+
+		persistedEvents = append(persistedEvents, *persistedEvent)
 	}
 
 	go func() {
 		ctx := sentryutil.NewSentryHubGinContext(ctx)
-		if _, err := sender.notifications.dispatchImmediate(ctx, *persistedEvent); err != nil {
+		if _, err := sender.notifications.dispatchImmediate(ctx, persistedEvents); err != nil {
 			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
 		}
+
 	}()
 
-	feedEvent, err := sender.feed.dispatchImmediate(ctx, *persistedEvent)
+	feedEvent, err := sender.feed.dispatchImmediate(ctx, persistedEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -171,11 +182,36 @@ func (d *eventDispatcher) dispatchDelayed(ctx context.Context, event db.Event) e
 	return nil
 }
 
-func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event db.Event) (interface{}, error) {
-	if handler, ok := d.immediateHandlers[event.Action]; ok {
-		return handler.handleImmediate(ctx, event)
+func (d *eventDispatcher) dispatchImmediate(ctx context.Context, event []db.Event) (interface{}, error) {
+
+	resultChan := make(chan interface{})
+	errChan := make(chan error)
+	for _, e := range event {
+		if handler, ok := d.immediateHandlers[e.Action]; ok {
+			go func(event db.Event) {
+				result, err := handler.handleImmediate(ctx, event)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				if result != nil {
+					resultChan <- result
+				}
+			}(e)
+		}
 	}
-	return nil, nil
+
+	var result interface{}
+	for i := 0; i < len(event); i++ {
+		select {
+		case r := <-resultChan:
+			result = r
+		case err := <-errChan:
+			return nil, err
+		}
+	}
+
+	return result, nil
 }
 
 type delayedHandler interface {
@@ -207,7 +243,7 @@ func (h feedHandler) handleDelayed(ctx context.Context, persistedEvent db.Event)
 
 // handledImmediate sidesteps the Feed service so that an event is immediately available as a feed event.
 func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Event) (interface{}, error) {
-	return h.eventBuilder.NewFeedEventFromEvent(ctx, persistedEvent)
+	return h.eventBuilder.NewFeedEventFromEvent(ctx, persistedEvent, true)
 }
 
 // notificationHandlers handles events for consumption as notifications.

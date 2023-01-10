@@ -173,10 +173,31 @@ func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, cap
 
 	if caption != nil {
 		evt.Caption = persist.StrToNullStr(caption)
-		return event.DispatchImmediate(ctx, evt)
+		return event.DispatchImmediate(ctx, []db.Event{evt})
 	}
 
 	go pushEvent(ctx, evt)
+	return nil, nil
+}
+
+func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
+	for _, evt := range evts {
+		if err := v.Struct(evt); err != nil {
+			return nil, err
+		}
+	}
+
+	if caption != nil {
+		for _, evt := range evts {
+			evt.Caption = persist.StrToNullStr(caption)
+		}
+		return event.DispatchImmediate(ctx, evts)
+	}
+
+	for _, evt := range evts {
+		go pushEvent(ctx, evt)
+	}
 	return nil, nil
 }
 

@@ -331,6 +331,16 @@ with recursive activity as (
 )
 select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
+-- name: HasLaterGalleryEvent :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = @actor_id
+  and action = any(@actions)
+  and gallery_id = @gallery_id
+  and caption = @caption
+  and id > @event_id
+);
+
 -- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false

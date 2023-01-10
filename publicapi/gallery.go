@@ -197,23 +197,12 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	// TODO find a way to make events dispatch immediately but grouped with caption
 	for _, e := range events {
 		_, err = dispatchEvent(ctx, e, api.validator, update.Caption)
 		if err != nil {
 			return db.Gallery{}, err
 		}
-	}
-
-	_, err = dispatchEvent(ctx, db.Event{
-		ActorID:        persist.DBIDToNullStr(userID),
-		ResourceTypeID: persist.ResourceTypeGallery,
-		SubjectID:      newGall.ID,
-		Action:         persist.ActionGalleryUpdated,
-		GalleryID:      newGall.ID,
-		Caption:        persist.StrToNullStr(update.Caption),
-	}, api.validator, update.Caption)
-	if err != nil {
-		return db.Gallery{}, err
 	}
 
 	return newGall, nil

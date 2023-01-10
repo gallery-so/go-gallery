@@ -114,10 +114,30 @@ func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.Fe
 		return nil, err
 	}
 
-	return b.NewFeedEventFromEvent(ctx, event)
+	return b.NewFeedEventFromEvent(ctx, event, false)
 }
 
-func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event, isImmediate bool) (*db.FeedEvent, error) {
+
+	if isImmediate {
+		switch eventGroups[event.Action] {
+		case persist.ActionGalleryUpdated:
+			wait, err := b.queries.HasLaterGalleryEvent(ctx, db.HasLaterGalleryEventParams{
+				ActorID:   event.ActorID,
+				Actions:   groupingConfig[persist.ActionGalleryUpdated],
+				GalleryID: event.GalleryID,
+				Caption:   event.Caption,
+				EventID:   event.ID,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if wait {
+				return nil, nil
+			}
+		}
+	}
+
 	if useEvent, err := b.useEvent(ctx, event); err != nil || !useEvent {
 		return nil, err
 	}
@@ -130,22 +150,20 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 }
 
 func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	// TODO create one handler for any action related to updating a gallery
 	if eventGroups[event.Action] == persist.ActionCollectionUpdated {
 		return b.createCollectionUpdatedFeedEvent(ctx, event)
 	} else if eventGroups[event.Action] == persist.ActionGalleryUpdated {
-		return b.createGalleryUpdatedFeedEventFromIndividualEvents(ctx, event)
+		return b.createGalleryUpdatedFeedEvent(ctx, event)
 	}
 	return nil, errUnhandledGroupedEvent
 }
 
 func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
-	// TODO create one handler for any action related to updating a gallery
 	switch event.Action {
 	case persist.ActionUserFollowedUsers:
 		return b.createUserFollowedUsersFeedEvent(ctx, event)
 	case persist.ActionCollectorsNoteAddedToToken, persist.ActionGalleryInfoUpdated, persist.ActionTokensAddedToCollection, persist.ActionCollectorsNoteAddedToCollection, persist.ActionCollectionCreated:
-		return b.createGalleryUpdatedFeedEventFromIndividualEvents(ctx, event)
+		return b.createGalleryUpdatedFeedEvent(ctx, event)
 	default:
 		return nil, errUnhandledSingleEvent
 	}
@@ -210,36 +228,34 @@ func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, eve
 	})
 }
 
-func (b *EventBuilder) createGalleryUpdatedFeedEventFromIndividualEvents(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	// will checking by gallery ID cause some events to slip through the cracks and not be handled?
 	events, err := b.eventRepo.EventsInWindowForGallery(ctx, event.ID, event.GalleryID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
 	if err != nil {
 		return nil, err
 	}
-	if len(events) > 1 {
-		merged := mergeGalleryEvents(events)
-		if len(merged.eventIDs) == 0 {
-			return nil, nil
-		}
-		return b.feedRepo.Add(ctx, db.FeedEvent{
-			ID:        persist.GenerateID(),
-			OwnerID:   merged.actorID,
-			Action:    persist.ActionGalleryUpdated,
-			EventTime: merged.createdAt.Time(),
-			EventIds:  merged.eventIDs,
-			Data: persist.FeedEventData{
-				GalleryID:                           merged.galleryID,
-				GalleryName:                         merged.galleryName,
-				GalleryDescription:                  merged.galleryDescription,
-				GalleryNewCollections:               merged.newCollections,
-				GalleryNewCollectionTokenIDs:        merged.tokensAdded,
-				GalleryNewCollectionCollectorsNotes: merged.collectionCollectorsNotes,
-				GalleryNewTokenCollectorsNotes:      merged.tokenCollectorsNotes,
-			},
-		})
+
+	merged := mergeGalleryEvents(events)
+	if len(merged.eventIDs) == 0 {
+		return nil, nil
 	}
-	// treat as single event not to be grouped by gallery
-	return b.createSingleUpdateGalleryEvent(event, ctx)
+	return b.feedRepo.Add(ctx, db.FeedEvent{
+		ID:        persist.GenerateID(),
+		OwnerID:   merged.actorID,
+		Action:    persist.ActionGalleryUpdated,
+		EventTime: merged.createdAt.Time(),
+		EventIds:  merged.eventIDs,
+		Caption:   persist.StrToNullStr(merged.caption),
+		Data: persist.FeedEventData{
+			GalleryID:                           merged.galleryID,
+			GalleryName:                         merged.galleryName,
+			GalleryDescription:                  merged.galleryDescription,
+			GalleryNewCollections:               merged.newCollections,
+			GalleryNewCollectionTokenIDs:        merged.tokensAdded,
+			GalleryNewCollectionCollectorsNotes: merged.collectionCollectorsNotes,
+			GalleryNewTokenCollectorsNotes:      merged.tokenCollectorsNotes,
+		},
+	})
 
 }
 

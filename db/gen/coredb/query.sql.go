@@ -2904,6 +2904,38 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 	return items, nil
 }
 
+const hasLaterGalleryEvent = `-- name: HasLaterGalleryEvent :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and action = any($2)
+  and gallery_id = $3
+  and caption = $4
+  and id > $5
+)
+`
+
+type HasLaterGalleryEventParams struct {
+	ActorID   sql.NullString
+	Actions   persist.ActionList
+	GalleryID persist.DBID
+	Caption   sql.NullString
+	EventID   persist.DBID
+}
+
+func (q *Queries) HasLaterGalleryEvent(ctx context.Context, arg HasLaterGalleryEventParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasLaterGalleryEvent,
+		arg.ActorID,
+		arg.Actions,
+		arg.GalleryID,
+		arg.Caption,
+		arg.EventID,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const isActorActionActive = `-- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false

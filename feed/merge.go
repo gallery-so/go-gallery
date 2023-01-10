@@ -54,6 +54,7 @@ type combinedCollectionEvent struct {
 func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectionEvent {
 	for _, other := range eventsAsc {
 		action := c.event.Action
+		caption := c.event.Caption
 
 		// If the collection is new, then categorize the event as a new collection event. Otherwise,
 		// if there are two or more unique actions, the resulting event is categorized as
@@ -62,6 +63,10 @@ func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectio
 			action = other.Action
 		} else if action != persist.ActionCollectionCreated && c.event.Action != other.Action {
 			action = persist.ActionCollectionUpdated
+		}
+
+		if c.event.Caption.String == "" {
+			caption = other.Caption
 		}
 
 		// Not every event has tokens attached to it, so we check that the event is relevant first.
@@ -84,6 +89,7 @@ func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectio
 			CollectionID: other.CollectionID,
 			Action:       action,
 			CreatedAt:    other.CreatedAt,
+			Caption:      caption,
 			Data: persist.EventData{
 				CollectionTokenIDs:       collectionTokenIDs,
 				CollectionCollectorsNote: collectorsNote,
@@ -106,9 +112,11 @@ type combinedGalleryEvent struct {
 	tokensAdded               map[persist.DBID]persist.DBIDList
 	galleryName               string
 	galleryDescription        string
+	caption                   *string
 }
 
 func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent {
+
 	// first group collection events by coll id
 	collectionEvents := make(map[persist.DBID][]db.Event)
 	for _, event := range eventsAsc {
@@ -122,6 +130,10 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			}
 			c.tokenCollectorsNotes[event.SubjectID] = event.Data.TokenCollectorsNote
 			continue
+		}
+
+		if event.Caption.String != "" {
+			c.caption = &event.Caption.String
 		}
 
 		collectionEvents[event.CollectionID] = append(collectionEvents[event.CollectionID], event)
@@ -148,6 +160,10 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 		}
 		if collEvent.isNewCollection {
 			c.newCollections = append(c.newCollections, collEvent.event.CollectionID)
+		}
+
+		if collEvent.event.Caption.String != "" {
+			c.caption = &collEvent.event.Caption.String
 		}
 	}
 
