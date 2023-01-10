@@ -115,6 +115,7 @@ func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.Fe
 func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event, isImmediate bool) (*db.FeedEvent, error) {
 
 	if isImmediate {
+		// if the event is being dispatched immediately, ensure that it is not supposed to be group with other events that are being dispatched immediately
 		switch eventGroups[event.Action] {
 		case persist.ActionGalleryUpdated:
 			wait, err := b.queries.HasLaterGalleryEvent(ctx, db.HasLaterGalleryEventParams{
