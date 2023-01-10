@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	admin "github.com/mikeydub/go-gallery/adminapi"
 	"github.com/mikeydub/go-gallery/graphql/apq"
-	"github.com/mikeydub/go-gallery/publicapi/adminapi"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
@@ -53,7 +53,7 @@ type PublicAPI struct {
 	Feed          *FeedAPI
 	Notifications *NotificationsAPI
 	Interaction   *InteractionAPI
-	Admin         *adminapi.AdminAPI
+	Admin         *admin.AdminAPI
 	Merch         *MerchAPI
 }
 
@@ -81,7 +81,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
-		Admin:         adminapi.NewAPI(repos, queries, validator),
+		Admin:         admin.NewAPI(repos, queries, validator),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }
