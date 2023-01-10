@@ -36,6 +36,7 @@ func (c *combinedFollowEvent) merge(eventsAsc []db.Event) *combinedFollowEvent {
 				ActorID:   other.ActorID,
 				Action:    other.Action,
 				CreatedAt: other.CreatedAt,
+				GroupID:   other.GroupID,
 			}
 			c.eventIDs = append(c.eventIDs, other.ID)
 			c.followedIDs = append(c.followedIDs, other.SubjectID)
@@ -90,6 +91,7 @@ func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectio
 			Action:       action,
 			CreatedAt:    other.CreatedAt,
 			Caption:      caption,
+			GroupID:      other.GroupID,
 			Data: persist.EventData{
 				CollectionTokenIDs:       collectionTokenIDs,
 				CollectionCollectorsNote: collectorsNote,
