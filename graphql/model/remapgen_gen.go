@@ -13,6 +13,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"AdminAddWalletPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdminAddWalletPayloadOrError)
+		return obj, ok
+	},
+
 	"AdmireFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AdmireFeedEventPayloadOrError)
 		return obj, ok

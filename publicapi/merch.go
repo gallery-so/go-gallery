@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/validate"
 	"github.com/spf13/viper"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
@@ -62,7 +63,7 @@ type MerchAPI struct {
 
 func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address) ([]*model.MerchToken, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"address": {address, "required"},
 	}); err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 
 func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.TokenID) (*model.MerchToken, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": {tokenID, "required"},
 	}); err != nil {
 		return nil, err
@@ -232,7 +233,7 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 
 func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.TokenID, address persist.ChainAddress, sig string, walletType persist.WalletType) ([]*model.MerchToken, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenIDs": {tokenIDs, "required,unique"},
 		"address":  {address, "required"},
 		"sig":      {sig, "required"},
