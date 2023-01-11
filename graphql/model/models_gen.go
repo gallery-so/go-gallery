@@ -19,6 +19,10 @@ type AddUserWalletPayloadOrError interface {
 	IsAddUserWalletPayloadOrError()
 }
 
+type AdminAddWalletPayloadOrError interface {
+	IsAdminAddWalletPayloadOrError()
+}
+
 type AdmireFeedEventPayloadOrError interface {
 	IsAdmireFeedEventPayloadOrError()
 }
@@ -250,6 +254,10 @@ type UpdateGalleryPayloadOrError interface {
 	IsUpdateGalleryPayloadOrError()
 }
 
+type UpdatePrimaryWalletPayloadOrError interface {
+	IsUpdatePrimaryWalletPayloadOrError()
+}
+
 type UpdateTokenInfoPayloadOrError interface {
 	IsUpdateTokenInfoPayloadOrError()
 }
@@ -295,6 +303,18 @@ type AddUserWalletPayload struct {
 }
 
 func (AddUserWalletPayload) IsAddUserWalletPayloadOrError() {}
+
+type AdminAddWalletInput struct {
+	Username     string                `json:"username"`
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	WalletType   persist.WalletType    `json:"walletType"`
+}
+
+type AdminAddWalletPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (AdminAddWalletPayload) IsAdminAddWalletPayloadOrError() {}
 
 type Admire struct {
 	Dbid         persist.DBID `json:"dbid"`
@@ -615,8 +635,9 @@ type ErrAddressOwnedByUser struct {
 	Message string `json:"message"`
 }
 
-func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError() {}
-func (ErrAddressOwnedByUser) IsError()                       {}
+func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError()  {}
+func (ErrAddressOwnedByUser) IsError()                        {}
+func (ErrAddressOwnedByUser) IsAdminAddWalletPayloadOrError() {}
 
 type ErrAdmireAlreadyExists struct {
 	Message string `json:"message"`
@@ -747,6 +768,7 @@ func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()             {}
 func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
 func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
+func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
 
 type ErrInvalidToken struct {
@@ -794,7 +816,9 @@ func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()      {}
 func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
 func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
+func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
+func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -834,13 +858,14 @@ type ErrUserNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserNotFound) IsUserByUsernameOrError()      {}
-func (ErrUserNotFound) IsUserByIDOrError()            {}
-func (ErrUserNotFound) IsUserByAddressOrError()       {}
-func (ErrUserNotFound) IsError()                      {}
-func (ErrUserNotFound) IsLoginPayloadOrError()        {}
-func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
-func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
+func (ErrUserNotFound) IsUserByUsernameOrError()        {}
+func (ErrUserNotFound) IsUserByIDOrError()              {}
+func (ErrUserNotFound) IsUserByAddressOrError()         {}
+func (ErrUserNotFound) IsError()                        {}
+func (ErrUserNotFound) IsLoginPayloadOrError()          {}
+func (ErrUserNotFound) IsFollowUserPayloadOrError()     {}
+func (ErrUserNotFound) IsUnfollowUserPayloadOrError()   {}
+func (ErrUserNotFound) IsAdminAddWalletPayloadOrError() {}
 
 type ErrUsernameNotAvailable struct {
 	Message string `json:"message"`
@@ -988,6 +1013,7 @@ type GalleryUser struct {
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
+	PrimaryWallet       *Wallet         `json:"primaryWallet"`
 	FeaturedGallery     *Gallery        `json:"featuredGallery"`
 	Galleries           []*Gallery      `json:"galleries"`
 	Badges              []*Badge        `json:"badges"`
@@ -1588,6 +1614,12 @@ type UpdateGalleryPayload struct {
 }
 
 func (UpdateGalleryPayload) IsUpdateGalleryPayloadOrError() {}
+
+type UpdatePrimaryWalletPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdatePrimaryWalletPayload) IsUpdatePrimaryWalletPayloadOrError() {}
 
 type UpdateTokenInfoInput struct {
 	TokenID        persist.DBID  `json:"tokenId"`

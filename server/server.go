@@ -35,6 +35,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/tezos"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -83,7 +84,7 @@ func ClientInit(ctx context.Context) *Clients {
 		StorageClient: media.NewStorageClient(ctx),
 		TaskClient:    task.NewClient(ctx),
 		SecretClient:  newSecretsClient(),
-		PubSubClient:  newPubSubClient(),
+		PubSubClient:  gcp.NewClient(ctx),
 	}
 }
 
@@ -114,22 +115,6 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 
 	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache)
-}
-
-func newPubSubClient() *pubsub.Client {
-	options := []option.ClientOption{}
-
-	if viper.GetString("ENV") == "local" {
-		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
-		options = append(options, option.WithCredentialsFile(keyPath))
-	}
-
-	pub, err := pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), options...)
-	if err != nil {
-		panic(err)
-	}
-
-	return pub
 }
 
 func newSecretsClient() *secretmanager.Client {
@@ -189,6 +174,7 @@ func SetDefaults() {
 	viper.SetDefault("GAE_VERSION", "")
 	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
+	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
 	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
 	viper.SetDefault("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS", "dev-updated-notifications")
 	viper.SetDefault("PUBSUB_SUB_NEW_NOTIFICATIONS", "dev-new-notifications-sub")

@@ -96,6 +96,10 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
+	AdminAddWalletPayload struct {
+		User func(childComplexity int) int
+	}
+
 	Admire struct {
 		Admirer      func(childComplexity int) int
 		CreationTime func(childComplexity int) int
@@ -503,6 +507,7 @@ type ComplexityRoot struct {
 		Galleries           func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
+		PrimaryWallet       func(childComplexity int) int
 		Roles               func(childComplexity int) int
 		Tokens              func(childComplexity int) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
@@ -595,6 +600,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
+		AddWalletToUserUnchecked        func(childComplexity int, input model.AdminAddWalletInput) int
 		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
 		BanUserFromFeed                 func(childComplexity int, username string, action string) int
 		ClearAllNotifications           func(childComplexity int) int
@@ -636,6 +642,7 @@ type ComplexityRoot struct {
 		UpdateGalleryInfo               func(childComplexity int, input model.UpdateGalleryInfoInput) int
 		UpdateGalleryOrder              func(childComplexity int, input model.UpdateGalleryOrderInput) int
 		UpdateNotificationSettings      func(childComplexity int, settings *model.NotificationSettingsInput) int
+		UpdatePrimaryWallet             func(childComplexity int, walletID persist.DBID) int
 		UpdateTokenInfo                 func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
 		UploadPersistedQueries          func(childComplexity int, input *model.UploadPersistedQueriesInput) int
@@ -962,6 +969,10 @@ type ComplexityRoot struct {
 		Gallery func(childComplexity int) int
 	}
 
+	UpdatePrimaryWalletPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	UpdateTokenInfoPayload struct {
 		Token func(childComplexity int) int
 	}
@@ -1143,6 +1154,7 @@ type GalleryUserResolver interface {
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
+	PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error)
 	FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error)
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
 	Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error)
@@ -1196,10 +1208,12 @@ type MutationResolver interface {
 	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (model.VerifyEmailPayloadOrError, error)
 	RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
+	AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
 	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
 	UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error)
+	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -1328,6 +1342,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AddUserWalletPayload.Viewer(childComplexity), true
+
+	case "AdminAddWalletPayload.user":
+		if e.complexity.AdminAddWalletPayload.User == nil {
+			break
+		}
+
+		return e.complexity.AdminAddWalletPayload.User(childComplexity), true
 
 	case "Admire.admirer":
 		if e.complexity.Admire.Admirer == nil {
@@ -2799,6 +2820,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.IsAuthenticatedUser(childComplexity), true
 
+	case "GalleryUser.primaryWallet":
+		if e.complexity.GalleryUser.PrimaryWallet == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.PrimaryWallet(childComplexity), true
+
 	case "GalleryUser.roles":
 		if e.complexity.GalleryUser.Roles == nil {
 			break
@@ -3163,6 +3191,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.AddUserWallet(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
+
+	case "Mutation.addWalletToUserUnchecked":
+		if e.complexity.Mutation.AddWalletToUserUnchecked == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_addWalletToUserUnchecked_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AddWalletToUserUnchecked(childComplexity, args["input"].(model.AdminAddWalletInput)), true
 
 	case "Mutation.admireFeedEvent":
 		if e.complexity.Mutation.AdmireFeedEvent == nil {
@@ -3640,6 +3680,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateNotificationSettings(childComplexity, args["settings"].(*model.NotificationSettingsInput)), true
+
+	case "Mutation.updatePrimaryWallet":
+		if e.complexity.Mutation.UpdatePrimaryWallet == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updatePrimaryWallet_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdatePrimaryWallet(childComplexity, args["walletID"].(persist.DBID)), true
 
 	case "Mutation.updateTokenInfo":
 		if e.complexity.Mutation.UpdateTokenInfo == nil {
@@ -5010,6 +5062,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UpdateGalleryPayload.Gallery(childComplexity), true
 
+	case "UpdatePrimaryWalletPayload.viewer":
+		if e.complexity.UpdatePrimaryWalletPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UpdatePrimaryWalletPayload.Viewer(childComplexity), true
+
 	case "UpdateTokenInfoPayload.token":
 		if e.complexity.UpdateTokenInfoPayload.Token == nil {
 			break
@@ -5467,6 +5526,7 @@ type GalleryUser implements Node @goEmbedHelper {
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
+  primaryWallet: Wallet @goField(forceResolver: true)
   featuredGallery: Gallery @goField(forceResolver: true)
   galleries: [Gallery] @goField(forceResolver: true)
   badges: [Badge] @goField(forceResolver: true)
@@ -6991,7 +7051,29 @@ type UpdateGalleryPayload {
   gallery: Gallery
 }
 
+type UpdatePrimaryWalletPayload {
+  viewer: Viewer
+}
+
+union UpdatePrimaryWalletPayloadOrError = UpdatePrimaryWalletPayload | ErrInvalidInput | ErrNotAuthorized
+
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
+
+input AdminAddWalletInput {
+  username: String!
+  chainAddress: ChainAddressInput!
+  walletType: WalletType!
+}
+
+type AdminAddWalletPayload {
+  user: GalleryUser
+}
+
+union AdminAddWalletPayloadOrError =
+    AdminAddWalletPayload
+  | ErrUserNotFound
+  | ErrAddressOwnedByUser
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -7078,6 +7160,7 @@ type Mutation {
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
     @retoolAuth
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
@@ -7087,6 +7170,8 @@ type Mutation {
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
     @frontendBuildAuth
+
+  updatePrimaryWallet(walletID: DBID!): UpdatePrimaryWalletPayloadOrError @authRequired
 }
 
 type Subscription {
@@ -7470,6 +7555,21 @@ func (ec *executionContext) field_Mutation_addUserWallet_args(ctx context.Contex
 		}
 	}
 	args["authMechanism"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_addWalletToUserUnchecked_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.AdminAddWalletInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNAdminAddWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -8094,6 +8194,21 @@ func (ec *executionContext) field_Mutation_updateNotificationSettings_args(ctx c
 		}
 	}
 	args["settings"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updatePrimaryWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["walletID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("walletID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["walletID"] = arg0
 	return args, nil
 }
 
@@ -8843,6 +8958,38 @@ func (ec *executionContext) _AddUserWalletPayload_viewer(ctx context.Context, fi
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AdminAddWalletPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.AdminAddWalletPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AdminAddWalletPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Admire_id(ctx context.Context, field graphql.CollectedField, obj *model.Admire) (ret graphql.Marshaler) {
@@ -15601,6 +15748,38 @@ func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field grap
 	return ec.marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _GalleryUser_primaryWallet(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().PrimaryWallet(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Wallet)
+	fc.Result = res
+	return ec.marshalOWallet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _GalleryUser_featuredGallery(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19500,6 +19679,65 @@ func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field 
 	return ec.marshalOAddRolesToUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddRolesToUserPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_addWalletToUserUnchecked(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_addWalletToUserUnchecked_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AddWalletToUserUnchecked(rctx, args["input"].(model.AdminAddWalletInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.AdminAddWalletPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AdminAddWalletPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.AdminAddWalletPayloadOrError)
+	fc.Result = res
+	return ec.marshalOAdminAddWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_revokeRolesFromUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19734,6 +19972,65 @@ func (ec *executionContext) _Mutation_uploadPersistedQueries(ctx context.Context
 	res := resTmp.(model.UploadPersistedQueriesPayloadOrError)
 	fc.Result = res
 	return ec.marshalOUploadPersistedQueriesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUploadPersistedQueriesPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updatePrimaryWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updatePrimaryWallet_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdatePrimaryWallet(rctx, args["walletID"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdatePrimaryWalletPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdatePrimaryWalletPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdatePrimaryWalletPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdatePrimaryWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdatePrimaryWalletPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
@@ -25584,6 +25881,38 @@ func (ec *executionContext) _UpdateGalleryPayload_gallery(ctx context.Context, f
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _UpdatePrimaryWalletPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdatePrimaryWalletPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdatePrimaryWalletPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UpdateTokenInfoPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.UpdateTokenInfoPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -28111,6 +28440,45 @@ func (ec *executionContext) ___Type_specifiedByURL(ctx context.Context, field gr
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputAdminAddWalletInput(ctx context.Context, obj interface{}) (model.AdminAddWalletInput, error) {
+	var it model.AdminAddWalletInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "username":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+			it.Username, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "chainAddress":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			it.ChainAddress, err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "walletType":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("walletType"))
+			it.WalletType, err = ec.unmarshalNWalletType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj interface{}) (model.AuthMechanism, error) {
 	var it model.AuthMechanism
 	asMap := map[string]interface{}{}
@@ -29624,6 +29992,43 @@ func (ec *executionContext) _AddUserWalletPayloadOrError(ctx context.Context, se
 			return graphql.Null
 		}
 		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _AdminAddWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AdminAddWalletPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.AdminAddWalletPayload:
+		return ec._AdminAddWalletPayload(ctx, sel, &obj)
+	case *model.AdminAddWalletPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AdminAddWalletPayload(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
+	case model.ErrAddressOwnedByUser:
+		return ec._ErrAddressOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -31751,6 +32156,36 @@ func (ec *executionContext) _UpdateGalleryPayloadOrError(ctx context.Context, se
 	}
 }
 
+func (ec *executionContext) _UpdatePrimaryWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdatePrimaryWalletPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdatePrimaryWalletPayload:
+		return ec._UpdatePrimaryWalletPayload(ctx, sel, &obj)
+	case *model.UpdatePrimaryWalletPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdatePrimaryWalletPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -32040,6 +32475,34 @@ func (ec *executionContext) _AddUserWalletPayload(ctx context.Context, sel ast.S
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._AddUserWalletPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var adminAddWalletPayloadImplementors = []string{"AdminAddWalletPayload", "AdminAddWalletPayloadOrError"}
+
+func (ec *executionContext) _AdminAddWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AdminAddWalletPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, adminAddWalletPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AdminAddWalletPayload")
+		case "user":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._AdminAddWalletPayload_user(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -33785,7 +34248,7 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 	return out
 }
 
-var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error"}
+var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error", "AdminAddWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressOwnedByUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAddressOwnedByUserImplementors)
@@ -34095,7 +34558,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -34208,7 +34671,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError", "AdminAddWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -34373,7 +34836,7 @@ func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.S
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdminAddWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)
@@ -35514,6 +35977,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
+		case "primaryWallet":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_primaryWallet(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "featuredGallery":
 			field := field
 
@@ -36542,6 +37022,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "addWalletToUserUnchecked":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_addWalletToUserUnchecked(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "revokeRolesFromUser":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_revokeRolesFromUser(ctx, field)
@@ -36566,6 +37053,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "uploadPersistedQueries":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_uploadPersistedQueries(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updatePrimaryWallet":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updatePrimaryWallet(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -39370,6 +39864,34 @@ func (ec *executionContext) _UpdateGalleryPayload(ctx context.Context, sel ast.S
 	return out
 }
 
+var updatePrimaryWalletPayloadImplementors = []string{"UpdatePrimaryWalletPayload", "UpdatePrimaryWalletPayloadOrError"}
+
+func (ec *executionContext) _UpdatePrimaryWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdatePrimaryWalletPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updatePrimaryWalletPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdatePrimaryWalletPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdatePrimaryWalletPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var updateTokenInfoPayloadImplementors = []string{"UpdateTokenInfoPayload", "UpdateTokenInfoPayloadOrError"}
 
 func (ec *executionContext) _UpdateTokenInfoPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateTokenInfoPayload) graphql.Marshaler {
@@ -40516,6 +41038,11 @@ func (ec *executionContext) marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalle
 	return res
 }
 
+func (ec *executionContext) unmarshalNAdminAddWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletInput(ctx context.Context, v interface{}) (model.AdminAddWalletInput, error) {
+	res, err := ec.unmarshalInputAdminAddWalletInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
 	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -41391,6 +41918,13 @@ func (ec *executionContext) unmarshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgal
 func (ec *executionContext) marshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v persist.Address) graphql.Marshaler {
 	res := graphql.MarshalString(string(v))
 	return res
+}
+
+func (ec *executionContext) marshalOAdminAddWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AdminAddWalletPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AdminAddWalletPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx context.Context, sel ast.SelectionSet, v *model.Admire) graphql.Marshaler {
@@ -43793,6 +44327,13 @@ func (ec *executionContext) marshalOUpdateGalleryPayloadOrError2githubᚗcomᚋm
 		return graphql.Null
 	}
 	return ec._UpdateGalleryPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdatePrimaryWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdatePrimaryWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdatePrimaryWalletPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdatePrimaryWalletPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateTokenInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {

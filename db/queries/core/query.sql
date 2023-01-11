@@ -636,6 +636,11 @@ update users set email_verified = 0 where users.id = @user_id;
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
 
+-- name: UpdateUserPrimaryWallet :exec
+update users set primary_wallet_id = @wallet_id from wallets
+    where users.id = @user_id and wallets.id = @wallet_id
+    and wallets.id = any(users.wallets) and wallets.deleted = false;
+
 -- name: GetUsersByChainAddresses :many
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
 

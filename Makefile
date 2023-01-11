@@ -1,6 +1,3 @@
-cloud-tasks : export APP_ENGINE_EMULATOR_HOST := http://localhost:8080
-
-
 contracts: solc abi-gen
 
 solc:
@@ -53,11 +50,5 @@ docker-stop:
 
 format-graphql:
 	yarn install;
-	yarn prettier --write graphql/schema/schema.graphql;
-
-cloud-tasks:
-	@cd ./cloud-tasks-emulator && go run ./ -port 8123 \
-		-queue projects/gallery-local/locations/here/queues/feedbot \
-		-queue projects/gallery-local/locations/here/queues/feed-event \
-		-queue projects/gallery-local/locations/here/queues/token-processing \
-		-queue projects/gallery-local/locations/here/queues/indexer-refreshes
+	yarn prettier --write graphql/schema/schema.graphql
+	yarn prettier --write graphql/testdata/operations.graphql;

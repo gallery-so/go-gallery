@@ -5,12 +5,13 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/util"
 
 	"cloud.google.com/go/pubsub"
-	"cloud.google.com/go/pubsub/pstest"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // PubSub is a GCP PubSub client
@@ -20,28 +21,33 @@ type PubSub struct {
 
 // NewPubSub creates a new GCPPubSub instance.
 func NewPubSub(pCtx context.Context, opts ...option.ClientOption) (*PubSub, error) {
+	return &PubSub{pubsub: NewClient(pCtx)}, nil
+}
 
-	if viper.GetString("ENV") != "local" {
-		pubsub, err := pubsub.NewClient(pCtx, viper.GetString("GOOGLE_CLOUD_PROJECT"), opts...)
-		if err != nil {
-			return nil, err
+func NewClient(ctx context.Context) *pubsub.Client {
+	options := []option.ClientOption{}
+	projectID := viper.GetString("GOOGLE_CLOUD_PROJECT")
+
+	if viper.GetString("ENV") == "local" {
+		if host := viper.GetString("PUBSUB_EMULATOR_HOST"); host != "" {
+			projectID = "gallery-local"
+			options = append(
+				options,
+				option.WithEndpoint(host),
+				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+				option.WithoutAuthentication(),
+			)
+		} else {
+			options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
 		}
-		return &PubSub{pubsub: pubsub}, nil
 	}
-	srv := pstest.NewServer()
-	// Connect to the server without using TLS.
-	conn, err := grpc.Dial(srv.Addr, grpc.WithInsecure())
+
+	pub, err := pubsub.NewClient(ctx, projectID, options...)
 	if err != nil {
 		panic(err)
 	}
-	opts = append(opts, option.WithGRPCConn(conn))
-	// Use the connection when creating a pubsub client.
-	pubsub, err := pubsub.NewClient(pCtx, viper.GetString("GOOGLE_PROJECT_ID"), opts...)
-	if err != nil {
-		return nil, err
-	}
 
-	return &PubSub{pubsub: pubsub}, nil
+	return pub
 }
 
 // Publish publishes a message to a topic

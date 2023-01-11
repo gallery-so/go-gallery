@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -150,8 +151,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommentNotFound{Message: message}
 	case publicapi.ErrTokenRefreshFailed:
 		mappedErr = model.ErrSyncFailed{Message: message}
-	case publicapi.ErrInvalidInput:
-		validationErr, _ := err.(publicapi.ErrInvalidInput)
+	case validate.ErrInvalidInput:
+		validationErr, _ := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 	case persist.ErrFeedEventNotFoundByID:
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
@@ -643,6 +644,21 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 	}
 
 	return output, nil
+}
+
+func resolvePrimaryWalletByUserID(ctx context.Context, userID persist.DBID) (*model.Wallet, error) {
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, user.PrimaryWalletID)
+	if err != nil {
+		return nil, err
+	}
+
+	return walletToModelSqlc(ctx, *wallet), nil
 }
 
 func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.FeedEvent, error) {

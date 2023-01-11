@@ -262,7 +262,7 @@ func (wa *WalletType) UnmarshalGQL(v interface{}) error {
 	switch n {
 	case "EOA":
 		*wa = WalletTypeEOA
-	case "Gnosis":
+	case "GnosisSafe":
 		*wa = WalletTypeGnosis
 	default:
 		return fmt.Errorf("unknown WalletType: %s", n)
@@ -276,7 +276,7 @@ func (wa WalletType) MarshalGQL(w io.Writer) {
 	case WalletTypeEOA:
 		w.Write([]byte(`"EOA"`))
 	case WalletTypeGnosis:
-		w.Write([]byte(`"Gnosis"`))
+		w.Write([]byte(`"GnosisSafe"`))
 	}
 }
 

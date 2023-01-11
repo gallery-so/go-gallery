@@ -1,0 +1,1 @@
+alter table drop column primary_wallet_id;

@@ -122,6 +122,7 @@ type Event struct {
 	ExternalID     sql.NullString
 	Caption        sql.NullString
 	GroupID        sql.NullString
+	Index          interface{}
 }
 
 type Feature struct {
@@ -314,6 +315,7 @@ type User struct {
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
+	PrimaryWalletID      persist.DBID
 }
 
 type UserEvent struct {

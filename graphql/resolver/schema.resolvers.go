@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model.GalleryUser, error) {
@@ -352,6 +353,10 @@ func (r *galleryUserResolver) TokensByChain(ctx context.Context, obj *model.Gall
 
 func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
 	return resolveWalletsByUserID(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error) {
+	return resolvePrimaryWalletByUserID(ctx, obj.HelperGalleryUserData.UserID)
 }
 
 func (r *galleryUserResolver) FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error) {
@@ -1154,6 +1159,20 @@ func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, 
 	return userToModel(ctx, *user), nil
 }
 
+func (r *mutationResolver) AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).Admin.AddWalletToUserUnchecked(ctx, input.Username, *input.ChainAddress, input.WalletType)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, input.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.AdminAddWalletPayload{User: userToModel(ctx, *user)}, nil
+}
+
 func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.RemoveRolesFromUser(ctx, username, roles)
 
@@ -1215,6 +1234,16 @@ func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *mo
 	message := "Persisted queries uploaded successfully"
 
 	return model.UploadPersistedQueriesPayload{Message: &message}, nil
+}
+
+func (r *mutationResolver) UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateUserPrimaryWallet(ctx, walletID)
+	if err != nil {
+		return nil, err
+	}
+	return model.UpdatePrimaryWalletPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
@@ -1282,7 +1311,7 @@ func (r *queryResolver) CollectionsByIds(ctx context.Context, ids []persist.DBID
 			models[i] = collections[i]
 		} else if notFoundErr, ok := err.(persist.ErrCollectionNotFoundByID); ok {
 			models[i] = model.ErrCollectionNotFound{Message: notFoundErr.Error()}
-		} else if validationErr, ok := err.(publicapi.ErrInvalidInput); ok {
+		} else if validationErr, ok := err.(validate.ErrInvalidInput); ok {
 			models[i] = model.ErrInvalidInput{Message: validationErr.Error(), Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 		} else {
 			// Unhandled error -- add it to the unhandled error stack, but don't fail the whole operation

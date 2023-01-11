@@ -216,10 +216,10 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 	// Configure the client depending on whether or not
 	// the cloud task emulator is used.
 	if viper.GetString("ENV") == "local" {
-		if viper.GetString("TASK_QUEUE_HOST") != "" {
+		if host := viper.GetString("TASK_QUEUE_HOST"); host != "" {
 			copts = append(
 				copts,
-				option.WithEndpoint(viper.GetString("TASK_QUEUE_HOST")),
+				option.WithEndpoint(host),
 				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 				option.WithoutAuthentication(),
 			)

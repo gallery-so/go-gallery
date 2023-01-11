@@ -77,6 +77,7 @@ type GalleryUser implements Node @goEmbedHelper {
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
+  primaryWallet: Wallet @goField(forceResolver: true)
   featuredGallery: Gallery @goField(forceResolver: true)
   galleries: [Gallery] @goField(forceResolver: true)
   badges: [Badge] @goField(forceResolver: true)
@@ -1601,7 +1602,29 @@ type UpdateGalleryPayload {
   gallery: Gallery
 }
 
+type UpdatePrimaryWalletPayload {
+  viewer: Viewer
+}
+
+union UpdatePrimaryWalletPayloadOrError = UpdatePrimaryWalletPayload | ErrInvalidInput | ErrNotAuthorized
+
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
+
+input AdminAddWalletInput {
+  username: String!
+  chainAddress: ChainAddressInput!
+  walletType: WalletType!
+}
+
+type AdminAddWalletPayload {
+  user: GalleryUser
+}
+
+union AdminAddWalletPayloadOrError =
+    AdminAddWalletPayload
+  | ErrUserNotFound
+  | ErrAddressOwnedByUser
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -1688,6 +1711,7 @@ type Mutation {
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
     @retoolAuth
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
@@ -1697,6 +1721,8 @@ type Mutation {
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
     @frontendBuildAuth
+
+  updatePrimaryWallet(walletID: DBID!): UpdatePrimaryWalletPayloadOrError @authRequired
 }
 
 type Subscription {
