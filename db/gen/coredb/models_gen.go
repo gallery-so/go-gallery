@@ -122,7 +122,6 @@ type Event struct {
 	ExternalID     sql.NullString
 	Caption        sql.NullString
 	GroupID        sql.NullString
-	Index          interface{}
 }
 
 type Feature struct {
