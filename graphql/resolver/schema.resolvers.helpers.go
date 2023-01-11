@@ -645,6 +645,21 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 	return output, nil
 }
 
+func resolvePrimaryWalletByUserID(ctx context.Context, userID persist.DBID) (*model.Wallet, error) {
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, user.PrimaryWalletID)
+	if err != nil {
+		return nil, err
+	}
+
+	return walletToModelSqlc(ctx, *wallet), nil
+}
+
 func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.FeedEvent, error) {
 	event, err := publicapi.For(ctx).Feed.GetEventById(ctx, eventID)
 	if err != nil {

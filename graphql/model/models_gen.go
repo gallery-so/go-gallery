@@ -250,6 +250,10 @@ type UpdateGalleryPayloadOrError interface {
 	IsUpdateGalleryPayloadOrError()
 }
 
+type UpdatePrimaryWalletPayloadOrError interface {
+	IsUpdatePrimaryWalletPayloadOrError()
+}
+
 type UpdateTokenInfoPayloadOrError interface {
 	IsUpdateTokenInfoPayloadOrError()
 }
@@ -747,6 +751,7 @@ func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()             {}
 func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
 func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
+func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
 
 type ErrInvalidToken struct {
@@ -794,6 +799,7 @@ func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()      {}
 func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
 func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
+func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
 
 type ErrSyncFailed struct {
@@ -960,6 +966,7 @@ type GalleryUser struct {
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
+	PrimaryWallet       *Wallet         `json:"primaryWallet"`
 	FeaturedGallery     *Gallery        `json:"featuredGallery"`
 	Galleries           []*Gallery      `json:"galleries"`
 	Badges              []*Badge        `json:"badges"`
@@ -1560,6 +1567,12 @@ type UpdateGalleryPayload struct {
 }
 
 func (UpdateGalleryPayload) IsUpdateGalleryPayloadOrError() {}
+
+type UpdatePrimaryWalletPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdatePrimaryWalletPayload) IsUpdatePrimaryWalletPayloadOrError() {}
 
 type UpdateTokenInfoInput struct {
 	TokenID        persist.DBID  `json:"tokenId"`

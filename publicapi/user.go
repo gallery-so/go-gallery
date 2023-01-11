@@ -392,6 +392,27 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	return nil
 }
 
+func (api UserAPI) UpdateUserPrimaryWallet(ctx context.Context, primaryWalletID persist.DBID) error {
+	// Validate
+	if err := validateFields(api.validator, validationMap{
+		"primaryWalletID": {primaryWalletID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.UpdateUserPrimaryWallet(ctx, db.UpdateUserPrimaryWalletParams{WalletID: primaryWalletID, UserID: userID})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.DBID) error {
 	// Validate
 	if err := validateFields(api.validator, validationMap{
