@@ -3166,7 +3166,9 @@ func (q *Queries) UpdateUserFeaturedGallery(ctx context.Context, arg UpdateUserF
 }
 
 const updateUserPrimaryWallet = `-- name: UpdateUserPrimaryWallet :exec
-update users set primary_wallet_id = $1 where users.id = $2 and (select exists(select 1 from wallets where wallets.id = $1 and wallets.owner_user_id = $2 and wallets.deleted = false))
+update users set primary_wallet_id = $1 from wallets
+    where users.id = $2 and wallets.id = $1
+    and wallets.id = any(users.wallets) and wallets.deleted = false
 `
 
 type UpdateUserPrimaryWalletParams struct {

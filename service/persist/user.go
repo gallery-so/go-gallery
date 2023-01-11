@@ -26,6 +26,7 @@ type User struct {
 	Bio                NullString      `json:"bio"`
 	Traits             Traits          `json:"traits"`
 	Universal          NullBool        `json:"universal"`
+	PrimaryWalletID    NullString      `json:"primary_wallet_id"`
 }
 
 // UserUpdateInfoInput represents the data to be updated when updating a user
