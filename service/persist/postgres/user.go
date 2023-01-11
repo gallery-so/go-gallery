@@ -51,7 +51,7 @@ func NewUserRepository(db *sql.DB, queries *db.Queries) *UserRepository {
 	updateInfoStmt, err := db.PrepareContext(ctx, `UPDATE users SET USERNAME = $2, USERNAME_IDEMPOTENT = $3, LAST_UPDATED = $4, BIO = $5 WHERE ID = $1;`)
 	checkNoErr(err)
 
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS, UNIVERSAL, EMAIL_UNSUBSCRIPTIONS) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID;`)
+	createStmt, err := db.PrepareContext(ctx, `INSERT INTO users (ID, USERNAME, USERNAME_IDEMPOTENT, BIO, WALLETS, UNIVERSAL, EMAIL_UNSUBSCRIPTIONS, PRIMARY_WALLET_ID) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ID;`)
 	checkNoErr(err)
 
 	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,BIO,TRAITS,WALLETS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE ID = $1 AND DELETED = false;`)
@@ -247,7 +247,7 @@ func (u *UserRepository) Create(pCtx context.Context, pUser persist.CreateUserIn
 	}
 
 	var id persist.DBID
-	err = tx.StmtContext(pCtx, u.createStmt).QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Bio, []persist.DBID{walletID}, pUser.Universal, pUser.EmailNotificationsSettings).Scan(&id)
+	err = tx.StmtContext(pCtx, u.createStmt).QueryRowContext(pCtx, persist.GenerateID(), pUser.Username, strings.ToLower(pUser.Username), pUser.Bio, []persist.DBID{walletID}, pUser.Universal, pUser.EmailNotificationsSettings, walletID).Scan(&id)
 	if err != nil {
 		return "", err
 	}
