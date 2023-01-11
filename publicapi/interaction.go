@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/validate"
 
@@ -49,7 +48,7 @@ func (api InteractionAPI) makeTagMap(typeFilter []persist.InteractionType) map[p
 func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
 	first *int, last *int, typeFilter []persist.InteractionType) ([]interface{}, PageInfo, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
 		"typeFilter":  {typeFilter, fmt.Sprintf("omitempty,min=1,unique,dive,gte=%d,lte=%d", persist.MinInteractionTypeValue, persist.MaxInteractionTypeValue)},
 	}); err != nil {
@@ -187,7 +186,7 @@ func (api InteractionAPI) PaginateInteractionsByFeedEventID(ctx context.Context,
 func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]db.Admire, PageInfo, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -251,7 +250,7 @@ func (api InteractionAPI) PaginateAdmiresByFeedEventID(ctx context.Context, feed
 func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, feedEventID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]db.Comment, PageInfo, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -314,7 +313,7 @@ func (api InteractionAPI) PaginateCommentsByFeedEventID(ctx context.Context, fee
 
 func (api InteractionAPI) GetAdmireByActorIDAndFeedEventID(ctx context.Context, actorID persist.DBID, feedEventID persist.DBID) (*db.Admire, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"actorID":     {actorID, "required"},
 		"feedEventID": {feedEventID, "required"},
 	}); err != nil {
@@ -335,7 +334,7 @@ func (api InteractionAPI) GetAdmireByActorIDAndFeedEventID(ctx context.Context, 
 
 func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DBID) (*db.Admire, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"admireID": {admireID, "required"},
 	}); err != nil {
 		return nil, err
@@ -351,7 +350,7 @@ func (api InteractionAPI) GetAdmireByID(ctx context.Context, admireID persist.DB
 
 func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (persist.DBID, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
 	}); err != nil {
 		return "", err
@@ -391,7 +390,7 @@ func (api InteractionAPI) AdmireFeedEvent(ctx context.Context, feedEventID persi
 
 func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBID) (persist.DBID, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"admireID": {admireID, "required"},
 	}); err != nil {
 		return "", err
@@ -411,7 +410,7 @@ func (api InteractionAPI) RemoveAdmire(ctx context.Context, admireID persist.DBI
 
 func (api InteractionAPI) HasUserAdmiredFeedEvent(ctx context.Context, userID persist.DBID, feedEventID persist.DBID) (*bool, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID":      {userID, "required"},
 		"feedEventID": {feedEventID, "required"},
 	}); err != nil {
@@ -435,7 +434,7 @@ func (api InteractionAPI) HasUserAdmiredFeedEvent(ctx context.Context, userID pe
 
 func (api InteractionAPI) GetCommentByID(ctx context.Context, commentID persist.DBID) (*db.Comment, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"commentID": {commentID, "required"},
 	}); err != nil {
 		return nil, err
@@ -455,7 +454,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 	comment = strings.TrimSpace(comment)
 
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
 		"comment":     {comment, "required"},
 	}); err != nil {
@@ -492,7 +491,7 @@ func (api InteractionAPI) CommentOnFeedEvent(ctx context.Context, feedEventID pe
 
 func (api InteractionAPI) RemoveComment(ctx context.Context, commentID persist.DBID) (persist.DBID, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"commentID": {commentID, "required"},
 	}); err != nil {
 		return "", err

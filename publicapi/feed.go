@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -25,7 +25,7 @@ type FeedAPI struct {
 
 func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
 	// Validate
-	err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userId": {userId, "required"},
 		"action": {action, "required"},
 	})
@@ -45,7 +45,7 @@ func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action pe
 
 func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
 	}); err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 	}
 
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -117,7 +117,7 @@ func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, aft
 func (api FeedAPI) PaginateUserFeed(ctx context.Context, userID persist.DBID, before *string, after *string,
 	first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err

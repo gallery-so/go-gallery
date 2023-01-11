@@ -13,12 +13,12 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/graphql/model"
-	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -151,8 +151,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommentNotFound{Message: message}
 	case publicapi.ErrTokenRefreshFailed:
 		mappedErr = model.ErrSyncFailed{Message: message}
-	case inputcheck.ErrInvalidInput:
-		validationErr, _ := err.(inputcheck.ErrInvalidInput)
+	case validate.ErrInvalidInput:
+		validationErr, _ := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 	case persist.ErrFeedEventNotFoundByID:
 		mappedErr = model.ErrFeedEventNotFound{Message: message}

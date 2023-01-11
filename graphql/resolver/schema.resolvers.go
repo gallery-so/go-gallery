@@ -13,11 +13,11 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
-	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model.GalleryUser, error) {
@@ -1267,7 +1267,7 @@ func (r *queryResolver) CollectionsByIds(ctx context.Context, ids []persist.DBID
 			models[i] = collections[i]
 		} else if notFoundErr, ok := err.(persist.ErrCollectionNotFoundByID); ok {
 			models[i] = model.ErrCollectionNotFound{Message: notFoundErr.Error()}
-		} else if validationErr, ok := err.(inputcheck.ErrInvalidInput); ok {
+		} else if validationErr, ok := err.(validate.ErrInvalidInput); ok {
 			models[i] = model.ErrInvalidInput{Message: validationErr.Error(), Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 		} else {
 			// Unhandled error -- add it to the unhandled error stack, but don't fail the whole operation

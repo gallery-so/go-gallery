@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/validate"
 )
@@ -39,7 +38,7 @@ type PageInfo struct {
 }
 
 func validatePaginationParams(validator *validator.Validate, first *int, last *int) error {
-	if err := inputcheck.ValidateFields(validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(validator, validate.ValidationMap{
 		"first": {first, "omitempty,gte=0"},
 		"last":  {last, "omitempty,gte=0"},
 	}); err != nil {

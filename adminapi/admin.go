@@ -5,11 +5,11 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/user"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 type AdminAPI struct {
@@ -25,7 +25,7 @@ func NewAPI(repos *postgres.Repositories, queries *db.Queries, validator *valida
 func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
 	requireRetoolAuthorized(ctx)
 
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username": {username, "required"},
 		"roles":    {roles, "required,unique,dive,role"},
 	}); err != nil {
@@ -59,7 +59,7 @@ func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles 
 func (api *AdminAPI) RemoveRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
 	requireRetoolAuthorized(ctx)
 
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username": {username, "required"},
 		"roles":    {roles, "required,unique,dive,role"},
 	}); err != nil {
@@ -96,7 +96,7 @@ func (a authenticator) Authenticate(ctx context.Context) (*auth.AuthResult, erro
 func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username string, chainAddress persist.ChainAddress, walletType persist.WalletType) error {
 	requireRetoolAuthorized(ctx)
 
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username":     {username, "required,username"},
 		"chainAddress": {chainAddress, "required"},
 	}); err != nil {

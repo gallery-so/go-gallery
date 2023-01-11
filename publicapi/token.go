@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikeydub/go-gallery/publicapi/inputcheck"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/gammazero/workerpool"
@@ -44,7 +43,7 @@ func (e ErrTokenRefreshFailed) Error() string {
 
 func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": {tokenID, "required"},
 	}); err != nil {
 		return nil, err
@@ -60,7 +59,7 @@ func (api TokenAPI) GetTokenById(ctx context.Context, tokenID persist.DBID) (*db
 
 func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID persist.DBID, limit *int) ([]db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return nil, err
@@ -79,7 +78,7 @@ func (api TokenAPI) GetTokensByCollectionId(ctx context.Context, collectionID pe
 
 func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persist.DBID) ([]db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
 	}); err != nil {
 		return nil, err
@@ -95,7 +94,7 @@ func (api TokenAPI) GetTokensByContractId(ctx context.Context, contractID persis
 
 func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractID persist.DBID, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]db.Token, PageInfo, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -189,7 +188,7 @@ func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.
 // the tokens added, so the caller should handle the matching of arguments to response if used in that context.
 func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persist.DBID) ([]db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"eventID": {eventID, "required"},
 	}); err != nil {
 		return nil, err
@@ -205,7 +204,7 @@ func (api TokenAPI) GetNewTokensByFeedEventID(ctx context.Context, eventID persi
 
 func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DBID) ([]db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"walletID": {walletID, "required"},
 	}); err != nil {
 		return nil, err
@@ -221,7 +220,7 @@ func (api TokenAPI) GetTokensByWalletID(ctx context.Context, walletID persist.DB
 
 func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) ([]db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -237,7 +236,7 @@ func (api TokenAPI) GetTokensByUserID(ctx context.Context, userID persist.DBID) 
 
 func (api TokenAPI) GetTokensByUserIDAndContractID(ctx context.Context, userID, contractID persist.DBID) ([]db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID":     {userID, "required"},
 		"contractID": {contractID, "required"},
 	}); err != nil {
@@ -254,7 +253,7 @@ func (api TokenAPI) GetTokensByUserIDAndContractID(ctx context.Context, userID, 
 
 func (api TokenAPI) GetTokensByUserIDAndChain(ctx context.Context, userID persist.DBID, chain persist.Chain) ([]db.Token, error) {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 		"chain":  {chain, "chain"},
 	}); err != nil {
@@ -327,7 +326,7 @@ func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) erro
 }
 
 func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) error {
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID": {tokenDBID, "required"},
 	}); err != nil {
 		return err
@@ -363,7 +362,7 @@ func (api TokenAPI) RefreshToken(ctx context.Context, tokenDBID persist.DBID) er
 }
 
 func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.ContractIdentifiers) error {
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractIdentifiers": {ci, "required"},
 	}); err != nil {
 		return err
@@ -378,7 +377,7 @@ func (api TokenAPI) RefreshTokensInCollection(ctx context.Context, ci persist.Co
 }
 
 func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persist.DBID) error {
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": {collectionDBID, "required"},
 	}); err != nil {
 		return err
@@ -431,7 +430,7 @@ func (api TokenAPI) RefreshCollection(ctx context.Context, collectionDBID persis
 
 func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID, collectorsNote string) error {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokenID":        {tokenID, "required"},
 		"collectorsNote": {collectorsNote, "token_note"},
 	}); err != nil {
@@ -473,7 +472,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 
 func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID, isSpam bool) error {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"tokens": {tokens, "required,unique"},
 	}); err != nil {
 		return err
@@ -494,7 +493,7 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 
 func (api TokenAPI) DeepRefreshByChain(ctx context.Context, chain persist.Chain) error {
 	// Validate
-	if err := inputcheck.ValidateFields(api.validator, inputcheck.ValidationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"chain": {chain, "chain"},
 	}); err != nil {
 		return err
