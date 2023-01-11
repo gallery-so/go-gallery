@@ -7055,7 +7055,10 @@ type UpdatePrimaryWalletPayload {
   viewer: Viewer
 }
 
-union UpdatePrimaryWalletPayloadOrError = UpdatePrimaryWalletPayload | ErrInvalidInput | ErrNotAuthorized
+union UpdatePrimaryWalletPayloadOrError =
+    UpdatePrimaryWalletPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
 
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
