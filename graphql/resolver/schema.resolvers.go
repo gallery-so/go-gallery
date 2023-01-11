@@ -325,6 +325,10 @@ func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUse
 	return resolveWalletsByUserID(ctx, obj.Dbid)
 }
 
+func (r *galleryUserResolver) PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error) {
+	return resolvePrimaryWalletByUserID(ctx, obj.HelperGalleryUserData.UserID)
+}
+
 func (r *galleryUserResolver) FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error) {
 	if obj.HelperGalleryUserData.FeaturedGalleryID == nil {
 		return nil, nil
@@ -1200,6 +1204,16 @@ func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *mo
 	message := "Persisted queries uploaded successfully"
 
 	return model.UploadPersistedQueriesPayload{Message: &message}, nil
+}
+
+func (r *mutationResolver) UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateUserPrimaryWallet(ctx, walletID)
+	if err != nil {
+		return nil, err
+	}
+	return model.UpdatePrimaryWalletPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {

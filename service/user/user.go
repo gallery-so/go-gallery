@@ -21,7 +21,8 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
+var errUserCannotRemoveAllWallets = errors.New("user does not have enough wallets to remove")
+var errUserCannotRemovePrimaryWallet = errors.New("cannot remove primary wallet address")
 var errMustResolveENS = errors.New("ENS username must resolve to owner address")
 
 // GetUserInput is the input for the user get pipeline
@@ -147,8 +148,14 @@ func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletID
 		return err
 	}
 
+	for _, walletID := range pWalletIDs {
+		if user.PrimaryWalletID.String() == walletID.String() {
+			return errUserCannotRemovePrimaryWallet
+		}
+	}
+
 	if len(user.Wallets) <= len(pWalletIDs) {
-		return errUserCannotRemoveAllAddresses
+		return errUserCannotRemoveAllWallets
 	}
 	for _, walletID := range pWalletIDs {
 		if err := userRepo.RemoveWallet(pCtx, pUserID, walletID); err != nil {
@@ -194,7 +201,7 @@ func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pI
 	}
 
 	if len(user.Wallets) <= len(pInput.Addresses) {
-		return errUserCannotRemoveAllAddresses
+		return errUserCannotRemoveAllWallets
 	}
 
 	return nil

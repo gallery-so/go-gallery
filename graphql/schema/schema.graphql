@@ -77,6 +77,7 @@ type GalleryUser implements Node @goEmbedHelper {
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
+  primaryWallet: Wallet @goField(forceResolver: true)
   featuredGallery: Gallery @goField(forceResolver: true)
   galleries: [Gallery] @goField(forceResolver: true)
   badges: [Badge] @goField(forceResolver: true)
@@ -1579,6 +1580,12 @@ type UpdateGalleryPayload {
   gallery: Gallery
 }
 
+type UpdatePrimaryWalletPayload {
+  viewer: Viewer
+}
+
+union UpdatePrimaryWalletPayloadOrError = UpdatePrimaryWalletPayload | ErrInvalidInput | ErrNotAuthorized
+
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
 input AdminAddWalletInput {
@@ -1692,6 +1699,8 @@ type Mutation {
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
     @frontendBuildAuth
+
+  updatePrimaryWallet(walletID: DBID!): UpdatePrimaryWalletPayloadOrError @authRequired
 }
 
 type Subscription {
