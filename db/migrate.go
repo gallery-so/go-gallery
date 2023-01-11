@@ -24,7 +24,11 @@ func RunMigration(client *sql.DB, file string) error {
 	if err != nil {
 		return err
 	}
-	m.Up()
+
+	err = m.Up()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
