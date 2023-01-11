@@ -1,1 +1,1 @@
-alter table wallets drop column if exists primary_wallet_id;
+alter table users drop column if exists primary_wallet_id;
