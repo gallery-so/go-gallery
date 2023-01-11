@@ -465,6 +465,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
 		TokenID:        tokenID,
+		CollectionID:   collectionID,
 		GalleryID:      galleryID,
 		SubjectID:      tokenID,
 		Data: persist.EventData{

@@ -130,7 +130,7 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			if c.tokenCollectorsNotes == nil {
 				c.tokenCollectorsNotes = make(map[persist.DBID]string)
 			}
-			c.tokenCollectorsNotes[event.SubjectID] = event.Data.TokenCollectorsNote
+			c.tokenCollectorsNotes[event.CollectionID] = event.Data.TokenCollectorsNote
 			continue
 		}
 

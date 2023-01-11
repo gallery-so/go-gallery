@@ -278,7 +278,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 				ActorID:        persist.DBIDToNullStr(actor),
 				ResourceTypeID: persist.ResourceTypeCollection,
 				SubjectID:      collection.Dbid,
-				Action:         persist.ActionCollectionUpdated,
+				Action:         persist.ActionCollectorsNoteAddedToCollection,
 				CollectionID:   collection.Dbid,
 				GalleryID:      gallery,
 				Data: persist.EventData{
