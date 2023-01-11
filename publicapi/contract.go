@@ -8,6 +8,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -33,7 +34,7 @@ type ContractAPI struct {
 
 func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.DBID) (*db.Contract, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
 	}); err != nil {
 		return nil, err
@@ -49,7 +50,7 @@ func (api ContractAPI) GetContractByID(ctx context.Context, contractID persist.D
 
 func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress persist.ChainAddress) (*db.Contract, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractAddress": {contractAddress, "required"},
 	}); err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func (api ContractAPI) GetContractByAddress(ctx context.Context, contractAddress
 
 func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -81,7 +82,7 @@ func (api ContractAPI) GetContractsByUserID(ctx context.Context, userID persist.
 
 func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID persist.DBID) ([]db.Contract, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func (api ContractAPI) GetContractsDisplayedByUserID(ctx context.Context, userID
 // RefreshContract refreshes the metadata for a given contract DBID
 func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
 	}); err != nil {
 		return err
@@ -120,7 +121,7 @@ func (api ContractAPI) RefreshContract(ctx context.Context, contractID persist.D
 
 func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persist.DBID, forceRefresh bool) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractID": {contractID, "required"},
 	}); err != nil {
 		return err
@@ -144,7 +145,7 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 
 func (api ContractAPI) GetCommunityOwnersByContractAddress(ctx context.Context, contractAddress persist.ChainAddress, before, after *string, first, last *int, onlyGalleryUsers *bool) ([]*model.TokenHolder, PageInfo, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"contractAddress": {contractAddress, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err

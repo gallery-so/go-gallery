@@ -3,8 +3,8 @@ package publicapi
 import (
 	"context"
 	"errors"
-	"fmt"
 
+	admin "github.com/mikeydub/go-gallery/adminapi"
 	"github.com/mikeydub/go-gallery/graphql/apq"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -53,7 +53,7 @@ type PublicAPI struct {
 	Feed          *FeedAPI
 	Notifications *NotificationsAPI
 	Interaction   *InteractionAPI
-	Admin         *AdminAPI
+	Admin         *admin.AdminAPI
 	Merch         *MerchAPI
 }
 
@@ -81,7 +81,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
-		Admin:         &AdminAPI{queries: queries, loaders: loaders, validator: validator},
+		Admin:         admin.NewAPI(repos, queries, validator),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }
@@ -117,52 +117,6 @@ func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
 
 	userID := auth.GetUserIDFromCtx(gc)
 	return userID, nil
-}
-
-type valWithTags struct {
-	value interface{}
-	tag   string
-}
-
-type validationMap map[string]valWithTags
-
-func validateFields(validator *validator.Validate, fields validationMap) error {
-	validationErr := ErrInvalidInput{}
-	foundErrors := false
-
-	for k, v := range fields {
-		err := validator.Var(v.value, v.tag)
-		if err != nil {
-			foundErrors = true
-			validationErr.Append(k, err.Error())
-		}
-	}
-
-	if foundErrors {
-		return validationErr
-	}
-
-	return nil
-}
-
-type ErrInvalidInput struct {
-	Parameters []string
-	Reasons    []string
-}
-
-func (e *ErrInvalidInput) Append(parameter string, reason string) {
-	e.Parameters = append(e.Parameters, parameter)
-	e.Reasons = append(e.Reasons, reason)
-}
-
-func (e ErrInvalidInput) Error() string {
-	str := "invalid input:\n"
-
-	for i := range e.Parameters {
-		str += fmt.Sprintf("    parameter: %s, reason: %s\n", e.Parameters[i], e.Reasons[i])
-	}
-
-	return str
 }
 
 func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
