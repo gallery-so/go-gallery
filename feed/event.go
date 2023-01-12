@@ -244,7 +244,7 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 		ID:        persist.GenerateID(),
 		OwnerID:   merged.actorID,
 		Action:    persist.ActionGalleryUpdated,
-		EventTime: merged.createdAt.Time(),
+		EventTime: merged.eventTime,
 		EventIds:  merged.eventIDs,
 		Caption:   persist.StrToNullStr(merged.caption),
 		Data: persist.FeedEventData{

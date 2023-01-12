@@ -1,6 +1,8 @@
 package feed
 
 import (
+	"time"
+
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
@@ -104,7 +106,7 @@ func (c *combinedCollectionEvent) merge(eventsAsc []db.Event) *combinedCollectio
 }
 
 type combinedGalleryEvent struct {
-	createdAt                 persist.CreationTime
+	eventTime                 time.Time
 	galleryID                 persist.DBID
 	actorID                   persist.DBID
 	eventIDs                  []persist.DBID
@@ -122,6 +124,16 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 	// first group collection events by coll id
 	collectionEvents := make(map[persist.DBID][]db.Event)
 	for _, event := range eventsAsc {
+		c.eventTime = event.CreatedAt
+		if c.actorID == "" {
+			c.actorID = persist.DBID(event.ActorID.String)
+		}
+		if c.galleryID == "" {
+			c.galleryID = event.GalleryID
+		}
+		if event.Caption.String != "" {
+			c.caption = &event.Caption.String
+		}
 		if event.Action == persist.ActionGalleryInfoUpdated {
 			c.galleryName = event.Data.GalleryName
 			c.galleryDescription = event.Data.GalleryDescription
@@ -132,10 +144,6 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			}
 			c.tokenCollectorsNotes[event.CollectionID] = event.Data.TokenCollectorsNote
 			continue
-		}
-
-		if event.Caption.String != "" {
-			c.caption = &event.Caption.String
 		}
 
 		collectionEvents[event.CollectionID] = append(collectionEvents[event.CollectionID], event)

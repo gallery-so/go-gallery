@@ -180,6 +180,7 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 			Action:         persist.ActionGalleryInfoUpdated,
 			ResourceTypeID: persist.ResourceTypeGallery,
 			GalleryID:      update.GalleryID,
+			SubjectID:      update.GalleryID,
 			Data: persist.EventData{
 				GalleryName:        util.FromPointer(update.Name),
 				GalleryDescription: util.FromPointer(update.Description),
@@ -316,6 +317,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 				Action:         persist.ActionTokensAddedToCollection,
 				ActorID:        persist.DBIDToNullStr(actor),
 				CollectionID:   collection.Dbid,
+				GalleryID:      gallery,
 			})
 		}
 	}

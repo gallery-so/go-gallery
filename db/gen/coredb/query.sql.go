@@ -143,7 +143,7 @@ func (q *Queries) CountUserUnseenNotifications(ctx context.Context, ownerID pers
 }
 
 const createAdmireEvent = `-- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
 `
 
 type CreateAdmireEventParams struct {
@@ -155,6 +155,7 @@ type CreateAdmireEventParams struct {
 	FeedEventID    persist.DBID
 	Data           persist.EventData
 	GroupID        sql.NullString
+	Caption        sql.NullString
 }
 
 func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventParams) (Event, error) {
@@ -167,6 +168,7 @@ func (q *Queries) CreateAdmireEvent(ctx context.Context, arg CreateAdmireEventPa
 		arg.FeedEventID,
 		arg.Data,
 		arg.GroupID,
+		arg.Caption,
 	)
 	var i Event
 	err := row.Scan(
@@ -322,7 +324,7 @@ func (q *Queries) CreateCollectionEvent(ctx context.Context, arg CreateCollectio
 }
 
 const createCommentEvent = `-- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
 `
 
 type CreateCommentEventParams struct {
@@ -334,6 +336,7 @@ type CreateCommentEventParams struct {
 	FeedEventID    persist.DBID
 	Data           persist.EventData
 	GroupID        sql.NullString
+	Caption        sql.NullString
 }
 
 func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEventParams) (Event, error) {
@@ -346,6 +349,7 @@ func (q *Queries) CreateCommentEvent(ctx context.Context, arg CreateCommentEvent
 		arg.FeedEventID,
 		arg.Data,
 		arg.GroupID,
+		arg.Caption,
 	)
 	var i Event
 	err := row.Scan(
@@ -499,7 +503,7 @@ func (q *Queries) CreateFollowNotification(ctx context.Context, arg CreateFollow
 }
 
 const createGalleryEvent = `-- name: CreateGalleryEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
 `
 
 type CreateGalleryEventParams struct {
@@ -511,6 +515,7 @@ type CreateGalleryEventParams struct {
 	Data           persist.EventData
 	ExternalID     sql.NullString
 	GroupID        sql.NullString
+	Caption        sql.NullString
 }
 
 func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEventParams) (Event, error) {
@@ -523,6 +528,7 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 		arg.Data,
 		arg.ExternalID,
 		arg.GroupID,
+		arg.Caption,
 	)
 	var i Event
 	err := row.Scan(
@@ -551,7 +557,7 @@ func (q *Queries) CreateGalleryEvent(ctx context.Context, arg CreateGalleryEvent
 }
 
 const createTokenEvent = `-- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
 `
 
 type CreateTokenEventParams struct {
@@ -562,6 +568,7 @@ type CreateTokenEventParams struct {
 	TokenID        persist.DBID
 	Data           persist.EventData
 	GroupID        sql.NullString
+	Caption        sql.NullString
 }
 
 func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventParams) (Event, error) {
@@ -573,6 +580,7 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 		arg.TokenID,
 		arg.Data,
 		arg.GroupID,
+		arg.Caption,
 	)
 	var i Event
 	err := row.Scan(
@@ -601,7 +609,7 @@ func (q *Queries) CreateTokenEvent(ctx context.Context, arg CreateTokenEventPara
 }
 
 const createUserEvent = `-- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING id, version, actor_id, resource_type_id, subject_id, user_id, token_id, collection_id, action, data, deleted, last_updated, created_at, gallery_id, comment_id, admire_id, feed_event_id, external_id, caption, group_id
 `
 
 type CreateUserEventParams struct {
@@ -612,6 +620,7 @@ type CreateUserEventParams struct {
 	UserID         persist.DBID
 	Data           persist.EventData
 	GroupID        sql.NullString
+	Caption        sql.NullString
 }
 
 func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams) (Event, error) {
@@ -623,6 +632,7 @@ func (q *Queries) CreateUserEvent(ctx context.Context, arg CreateUserEventParams
 		arg.UserID,
 		arg.Data,
 		arg.GroupID,
+		arg.Caption,
 	)
 	var i Event
 	err := row.Scan(

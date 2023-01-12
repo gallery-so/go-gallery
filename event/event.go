@@ -46,7 +46,7 @@ func AddTo(ctx *gin.Context, disableDataloaderCaching bool, notif *notifications
 	sender.addImmediateHandler(feed, persist.ActionCollectionCreated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionTokensAddedToCollection, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToCollection, feedHandler)
-	sender.addImmediateHandler(feed, persist.ActionGalleryUpdated, feedHandler)
+	sender.addImmediateHandler(feed, persist.ActionGalleryInfoUpdated, feedHandler)
 	sender.addImmediateHandler(feed, persist.ActionCollectorsNoteAddedToToken, feedHandler)
 
 	notifications := newEventDispatcher()
