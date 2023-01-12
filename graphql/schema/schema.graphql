@@ -803,6 +803,23 @@ type ErrGalleryNotFound implements Error {
 union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
 union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
 
+enum ReportWindow {
+  LAST_7_DAYS
+  ALL_TIME
+}
+
+input TrendingUsersInput {
+  report: ReportWindow!
+}
+
+type TrendingUsersPayload {
+  # User are in descending order i.e. the most trending user is first.
+  users: [GalleryUser!]
+}
+
+union TrendingUsersPayloadOrError = TrendingUsersPayload
+
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -826,6 +843,7 @@ type Query {
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
+  trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection

@@ -691,6 +691,7 @@ type ComplexityRoot struct {
 		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
 		Node                    func(childComplexity int, id model.GqlID) int
 		TokenByID               func(childComplexity int, id persist.DBID) int
+		TrendingUsers           func(childComplexity int, input model.TrendingUsersInput) int
 		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                func(childComplexity int, id persist.DBID) int
 		UserByUsername          func(childComplexity int, username string) int
@@ -880,6 +881,10 @@ type ComplexityRoot struct {
 	TokensConnection struct {
 		Edges    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
+	}
+
+	TrendingUsersPayload struct {
+		Users func(childComplexity int) int
 	}
 
 	UnfollowUserPayload struct {
@@ -1197,6 +1202,7 @@ type QueryResolver interface {
 	GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error)
 	GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error)
 	ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error)
+	TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
@@ -3963,6 +3969,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
 
+	case "Query.trendingUsers":
+		if e.complexity.Query.TrendingUsers == nil {
+			break
+		}
+
+		args, err := ec.field_Query_trendingUsers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TrendingUsers(childComplexity, args["input"].(model.TrendingUsersInput)), true
+
 	case "Query.userByAddress":
 		if e.complexity.Query.UserByAddress == nil {
 			break
@@ -4789,6 +4807,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TokensConnection.PageInfo(childComplexity), true
+
+	case "TrendingUsersPayload.users":
+		if e.complexity.TrendingUsersPayload.Users == nil {
+			break
+		}
+
+		return e.complexity.TrendingUsersPayload.Users(childComplexity), true
 
 	case "UnfollowUserPayload.user":
 		if e.complexity.UnfollowUserPayload.User == nil {
@@ -6113,6 +6138,23 @@ type ErrGalleryNotFound implements Error {
 union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
 union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
 
+enum ReportWindow {
+  LAST_7_DAYS
+  ALL_TIME
+}
+
+input TrendingUsersInput {
+  report: ReportWindow!
+}
+
+type TrendingUsersPayload {
+  # User are in descending order i.e. the most popular user is first.
+  users: [GalleryUser!]
+}
+
+union TrendingUsersPayloadOrError = TrendingUsersPayload
+
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -6136,6 +6178,7 @@ type Query {
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
+  trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
@@ -6894,7 +6937,10 @@ type UpdatePrimaryWalletPayload {
   viewer: Viewer
 }
 
-union UpdatePrimaryWalletPayloadOrError = UpdatePrimaryWalletPayload | ErrInvalidInput | ErrNotAuthorized
+union UpdatePrimaryWalletPayloadOrError =
+    UpdatePrimaryWalletPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
 
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
@@ -8348,6 +8394,21 @@ func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawA
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_trendingUsers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.TrendingUsersInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -21113,6 +21174,45 @@ func (ec *executionContext) _Query_viewerGalleryById(ctx context.Context, field 
 	return ec.marshalOViewerGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGalleryByIDPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_trendingUsers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_trendingUsers_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TrendingUsers(rctx, args["input"].(model.TrendingUsersInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.TrendingUsersPayloadOrError)
+	fc.Result = res
+	return ec.marshalOTrendingUsersPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -24662,6 +24762,38 @@ func (ec *executionContext) _TokensConnection_pageInfo(ctx context.Context, fiel
 	res := resTmp.(*model.PageInfo)
 	fc.Result = res
 	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TrendingUsersPayload_users(ctx context.Context, field graphql.CollectedField, obj *model.TrendingUsersPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TrendingUsersPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Users, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
@@ -28717,6 +28849,29 @@ func (ec *executionContext) unmarshalInputSetSpamPreferenceInput(ctx context.Con
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputTrendingUsersInput(ctx context.Context, obj interface{}) (model.TrendingUsersInput, error) {
+	var it model.TrendingUsersInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "report":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("report"))
+			it.Report, err = ec.unmarshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUnsubscribeFromEmailTypeInput(ctx context.Context, obj interface{}) (model.UnsubscribeFromEmailTypeInput, error) {
 	var it model.UnsubscribeFromEmailTypeInput
 	asMap := map[string]interface{}{}
@@ -31159,6 +31314,22 @@ func (ec *executionContext) _TokenByIdOrError(ctx context.Context, sel ast.Selec
 			return graphql.Null
 		}
 		return ec._ErrTokenNotFound(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _TrendingUsersPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.TrendingUsersPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.TrendingUsersPayload:
+		return ec._TrendingUsersPayload(ctx, sel, &obj)
+	case *model.TrendingUsersPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._TrendingUsersPayload(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -37029,6 +37200,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "trendingUsers":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_trendingUsers(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "usersByRole":
 			field := field
 
@@ -38559,6 +38750,34 @@ func (ec *executionContext) _TokensConnection(ctx context.Context, sel ast.Selec
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var trendingUsersPayloadImplementors = []string{"TrendingUsersPayload", "TrendingUsersPayloadOrError"}
+
+func (ec *executionContext) _TrendingUsersPayload(ctx context.Context, sel ast.SelectionSet, obj *model.TrendingUsersPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, trendingUsersPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TrendingUsersPayload")
+		case "users":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TrendingUsersPayload_users(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -40636,6 +40855,16 @@ func (ec *executionContext) unmarshalNRedeemMerchInput2githubᚗcomᚋmikeydub�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx context.Context, v interface{}) (model.Window, error) {
+	var res model.Window
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx context.Context, sel ast.SelectionSet, v model.Window) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNRole2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx context.Context, v interface{}) (persist.Role, error) {
 	var res persist.Role
 	err := res.UnmarshalGQL(v)
@@ -40696,6 +40925,11 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx context.Context, v interface{}) (model.TrendingUsersInput, error) {
+	res, err := ec.unmarshalInputTrendingUsersInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUnsubscribeFromEmailTypeInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnsubscribeFromEmailTypeInput(ctx context.Context, v interface{}) (model.UnsubscribeFromEmailTypeInput, error) {
@@ -43265,6 +43499,13 @@ func (ec *executionContext) marshalOTokensConnection2ᚖgithubᚗcomᚋmikeydub�
 		return graphql.Null
 	}
 	return ec._TokensConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOTrendingUsersPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.TrendingUsersPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TrendingUsersPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnfollowUserPayloadOrError) graphql.Marshaler {

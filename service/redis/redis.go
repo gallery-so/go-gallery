@@ -30,6 +30,7 @@ const (
 	NotificationLockDB        = 10
 	EmailRateLimiterDB        = 11
 	GraphQLAPQ                = 12
+	FeedDB                    = 13
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.
@@ -46,6 +47,8 @@ func GetNameForDatabase(databaseId int) string {
 		return "RequireNftsDB"
 	case TestSuiteDB:
 		return "TestSuiteDB"
+	case FeedDB:
+		return "FeedDB"
 	}
 
 	return fmt.Sprintf("db %d", databaseId)

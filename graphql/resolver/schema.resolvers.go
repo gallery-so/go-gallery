@@ -1374,6 +1374,20 @@ func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) 
 	return gallery, nil
 }
 
+func (r *queryResolver) TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error) {
+	trending, err := publicapi.For(ctx).Feed.TrendingUsers(ctx, input.Report)
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]*model.GalleryUser, len(trending))
+	for i, g := range trending {
+		users[i] = userToModel(ctx, g)
+	}
+
+	return model.TrendingUsersPayload{users}, nil
+}
+
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
 	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
 	if err != nil {

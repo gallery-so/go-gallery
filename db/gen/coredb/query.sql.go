@@ -2098,6 +2098,60 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 	return items, nil
 }
 
+const getTrendingUsers = `-- name: GetTrendingUsers :many
+with topN as (
+  select g.owner_user_id id
+  from events e, users u, galleries g
+  where action = 'ViewedGallery' and e.created_at >= $1 and u.deleted = false and g.deleted = false and e.gallery_id = g.id and g.owner_user_id = u.id
+  group by g.owner_user_id
+  order by count(*) desc
+  limit $2
+)
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id from users, topN where users.id = topN.id
+`
+
+type GetTrendingUsersParams struct {
+	WindowEnd time.Time
+	Size      int32
+}
+
+func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getTrendingUsers, arg.WindowEnd, arg.Size)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserById = `-- name: GetUserById :one
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id FROM users WHERE id = $1 AND deleted = false
 `
