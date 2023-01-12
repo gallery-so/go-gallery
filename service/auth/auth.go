@@ -240,7 +240,7 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 }
 
 type MagicLinkAuthenticator struct {
-	Token       *token.Token
+	Token       token.Token
 	MagicClient *magicclient.API
 	UserRepo    *postgres.UserRepository
 }

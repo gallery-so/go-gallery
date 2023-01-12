@@ -197,7 +197,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 		if err != nil {
 			return nil, err
 		}
-		return authApi.NewMagicLinkAuthenticator(t), nil
+		return authApi.NewMagicLinkAuthenticator(*t), nil
 	}
 
 	return nil, errNoAuthMechanismFound

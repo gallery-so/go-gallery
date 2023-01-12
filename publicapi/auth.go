@@ -96,7 +96,7 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 	return debugtools.NewDebugAuthenticator(&user, addresses), nil
 }
 
-func (api AuthAPI) NewMagicLinkAuthenticator(token *token.Token) auth.Authenticator {
+func (api AuthAPI) NewMagicLinkAuthenticator(token token.Token) auth.Authenticator {
 	authenticator := auth.MagicLinkAuthenticator{
 		Token:       token,
 		MagicClient: api.magicLinkClient,
