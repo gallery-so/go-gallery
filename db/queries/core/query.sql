@@ -691,10 +691,10 @@ with updates as (
 update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false;
 
 -- name: UpdateGalleryInfo :exec
-update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
+update galleries set name = case when @name_set::bool then @name else name end, description = case when @description_set::bool then @description else description end, last_updated = now() where id = @id and deleted = false;
 
--- name: UpdateGallery :exec
-update galleries set name = case when @name_updated::bool then @name else name end, description = case when @description_updated::bool then @description else description end, collections = case when @collections_updated::bool then @collections else collections end, last_updated = now() where galleries.id = @gallery_id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = cardinality(@collections);
+-- name: UpdateGalleryCollections :exec
+update galleries set collections = @collections, last_updated = now() where galleries.id = @gallery_id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = cardinality(@collections);
 
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;

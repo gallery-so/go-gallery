@@ -45,6 +45,22 @@ query viewerQuery {
     }
     ... on Viewer {
       user {
+        feed(first: 10) {
+          edges {
+            node {
+              ... on Error {
+                message
+              }
+              ... on FeedEvent {
+                dbid
+                caption
+                eventData {
+                  action
+                }
+              }
+            }
+          }
+        }
         username
         dbid
       }
@@ -207,6 +223,31 @@ mutation viewGalleryMutation($galleryId: DBID!) {
     ... on ViewGalleryPayload {
       gallery {
         dbid
+      }
+    }
+  }
+}
+
+mutation updateGalleryMutation($input: UpdateGalleryInput!) {
+  updateGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on UpdateGalleryPayload {
+      gallery {
+        dbid
+        name
+        description
+        collections {
+          dbid
+          name
+          tokens {
+            token {
+              dbid
+            }
+          }
+        }
       }
     }
   }

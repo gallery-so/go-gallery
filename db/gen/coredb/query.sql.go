@@ -3197,30 +3197,17 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 	return err
 }
 
-const updateGallery = `-- name: UpdateGallery :exec
-update galleries set name = case when $1::bool then $2 else name end, description = case when $3::bool then $4 else description end, collections = case when $5::bool then $6 else collections end, last_updated = now() where galleries.id = $7 and galleries.deleted = false and (select count(*) from collections c where c.id = any($6) and c.gallery_id = $7 and c.deleted = false) = cardinality($6)
+const updateGalleryCollections = `-- name: UpdateGalleryCollections :exec
+update galleries set collections = $1, last_updated = now() where galleries.id = $2 and galleries.deleted = false and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = cardinality($1)
 `
 
-type UpdateGalleryParams struct {
-	NameUpdated        bool
-	Name               string
-	DescriptionUpdated bool
-	Description        string
-	CollectionsUpdated bool
-	Collections        persist.DBIDList
-	GalleryID          persist.DBID
+type UpdateGalleryCollectionsParams struct {
+	Collections persist.DBIDList
+	GalleryID   persist.DBID
 }
 
-func (q *Queries) UpdateGallery(ctx context.Context, arg UpdateGalleryParams) error {
-	_, err := q.db.Exec(ctx, updateGallery,
-		arg.NameUpdated,
-		arg.Name,
-		arg.DescriptionUpdated,
-		arg.Description,
-		arg.CollectionsUpdated,
-		arg.Collections,
-		arg.GalleryID,
-	)
+func (q *Queries) UpdateGalleryCollections(ctx context.Context, arg UpdateGalleryCollectionsParams) error {
+	_, err := q.db.Exec(ctx, updateGalleryCollections, arg.Collections, arg.GalleryID)
 	return err
 }
 
@@ -3253,17 +3240,25 @@ func (q *Queries) UpdateGalleryHidden(ctx context.Context, arg UpdateGalleryHidd
 }
 
 const updateGalleryInfo = `-- name: UpdateGalleryInfo :exec
-update galleries set name = $1, description = $2, last_updated = now() where id = $3 and deleted = false
+update galleries set name = case when $1::bool then $2 else name end, description = case when $3::bool then $4 else description end, last_updated = now() where id = $5 and deleted = false
 `
 
 type UpdateGalleryInfoParams struct {
-	Name        string
-	Description string
-	ID          persist.DBID
+	NameSet        bool
+	Name           string
+	DescriptionSet bool
+	Description    string
+	ID             persist.DBID
 }
 
 func (q *Queries) UpdateGalleryInfo(ctx context.Context, arg UpdateGalleryInfoParams) error {
-	_, err := q.db.Exec(ctx, updateGalleryInfo, arg.Name, arg.Description, arg.ID)
+	_, err := q.db.Exec(ctx, updateGalleryInfo,
+		arg.NameSet,
+		arg.Name,
+		arg.DescriptionSet,
+		arg.Description,
+		arg.ID,
+	)
 	return err
 }
 

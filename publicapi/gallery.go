@@ -69,10 +69,10 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":           {update.GalleryID, "required"},
-		"name":                {update.Name, "max=200"},
-		"description":         {update.Description, "max=600"},
-		"deleted_collections": {update.DeletedCollections, "unique"},
-		"created_collections": {update.CreatedCollections, "created_collections"},
+		"name":                {update.Name, "omitempty,max=200"},
+		"description":         {update.Description, "omitempty,max=600"},
+		"deleted_collections": {update.DeletedCollections, "omitempty,unique"},
+		"created_collections": {update.CreatedCollections, "omitempty,created_collections"},
 	}); err != nil {
 		return db.Gallery{}, err
 	}
@@ -158,17 +158,14 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	params := db.UpdateGalleryParams{
-		GalleryID: update.GalleryID,
+	params := db.UpdateGalleryInfoParams{
+		ID: update.GalleryID,
 	}
 
-	asList := persist.DBIDList(update.Order)
+	util.SetConditionalValue(update.Name, &params.Name, &params.NameSet)
+	util.SetConditionalValue(update.Description, &params.Description, &params.DescriptionSet)
 
-	util.SetConditionalValue(update.Name, &params.Name, &params.NameUpdated)
-	util.SetConditionalValue(update.Description, &params.Description, &params.DescriptionUpdated)
-	util.SetConditionalValue(&asList, &params.Collections, &params.CollectionsUpdated)
-
-	err = q.UpdateGallery(ctx, params)
+	err = q.UpdateGalleryInfo(ctx, params)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -186,6 +183,18 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 				GalleryDescription: util.FromPointer(update.Description),
 			},
 		})
+	}
+
+	asList := persist.DBIDList(update.Order)
+
+	if len(asList) > 0 {
+		err = q.UpdateGalleryCollections(ctx, db.UpdateGalleryCollectionsParams{
+			GalleryID:   update.GalleryID,
+			Collections: asList,
+		})
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
 
 	err = tx.Commit(ctx)
