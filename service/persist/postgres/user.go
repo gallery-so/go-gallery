@@ -26,6 +26,7 @@ type UserRepository struct {
 	getByIDsStmt             *sql.Stmt
 	getByWalletIDStmt        *sql.Stmt
 	getByUsernameStmt        *sql.Stmt
+	getByEmailStmt           *sql.Stmt
 	deleteStmt               *sql.Stmt
 	getGalleriesStmt         *sql.Stmt
 	updateCollectionsStmt    *sql.Stmt
@@ -64,6 +65,9 @@ func NewUserRepository(db *sql.DB, queries *db.Queries) *UserRepository {
 	checkNoErr(err)
 
 	getByUsernameStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users WHERE USERNAME_IDEMPOTENT = $1 AND DELETED = false AND UNIVERSAL = false;`)
+	checkNoErr(err)
+
+	getByEmailStmt, err := db.PrepareContext(ctx, `SELECT ID,DELETED,VERSION,USERNAME,USERNAME_IDEMPOTENT,WALLETS,BIO,TRAITS,UNIVERSAL,PRIMARY_WALLET_ID,CREATED_AT,LAST_UPDATED FROM users_with_pii WHERE PII_EMAIL_ADDRESS = $1 AND DELETED = false;`)
 	checkNoErr(err)
 
 	deleteStmt, err := db.PrepareContext(ctx, `UPDATE users SET DELETED = TRUE WHERE ID = $1;`)
@@ -114,6 +118,7 @@ func NewUserRepository(db *sql.DB, queries *db.Queries) *UserRepository {
 		getByIDsStmt:      getByIDsStmt,
 		getByWalletIDStmt: getByWalletIDStmt,
 		getByUsernameStmt: getByUsernameStmt,
+		getByEmailStmt:    getByEmailStmt,
 		deleteStmt:        deleteStmt,
 
 		getGalleriesStmt:         getGalleriesStmt,
@@ -369,6 +374,21 @@ func (u *UserRepository) GetByUsername(pCtx context.Context, pUsername string) (
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return persist.User{}, persist.ErrUserNotFound{Username: pUsername}
+		}
+		return persist.User{}, err
+	}
+	return user, nil
+
+}
+
+// GetByEmail gets the user with the given email address
+func (u *UserRepository) GetByEmail(pCtx context.Context, pEmail persist.Email) (persist.User, error) {
+
+	var user persist.User
+	err := u.getByEmailStmt.QueryRowContext(pCtx, pEmail.String()).Scan(&user.ID, &user.Deleted, &user.Version, &user.Username, &user.UsernameIdempotent, pq.Array(&user.Wallets), &user.Bio, &user.Traits, &user.Universal, &user.PrimaryWalletID, &user.CreationTime, &user.LastUpdated)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return persist.User{}, persist.ErrUserNotFound{Email: pEmail}
 		}
 		return persist.User{}, err
 	}

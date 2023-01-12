@@ -3,6 +3,9 @@ package publicapi
 import (
 	"context"
 	"fmt"
+
+	magicclient "github.com/magiclabs/magic-admin-go/client"
+	"github.com/magiclabs/magic-admin-go/token"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -24,6 +27,7 @@ type AuthAPI struct {
 	validator          *validator.Validate
 	ethClient          *ethclient.Client
 	multiChainProvider *multichain.Provider
+	magicLinkClient    *magicclient.API
 }
 
 func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce string, signature string, walletType persist.WalletType) auth.Authenticator {
@@ -90,6 +94,15 @@ func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.
 	}
 
 	return debugtools.NewDebugAuthenticator(&user, addresses), nil
+}
+
+func (api AuthAPI) NewMagicLinkAuthenticator(token *token.Token) auth.Authenticator {
+	authenticator := auth.MagicLinkAuthenticator{
+		Token:       token,
+		MagicClient: api.magicLinkClient,
+		UserRepo:    api.repos.UserRepository,
+	}
+	return authenticator
 }
 
 func chainAddressPointersToChainAddresses(chainAddresses []*persist.ChainAddress) []persist.ChainAddress {
