@@ -819,7 +819,6 @@ type TrendingUsersPayload {
 
 union TrendingUsersPayloadOrError = TrendingUsersPayload
 
-
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired

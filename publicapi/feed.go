@@ -28,11 +28,6 @@ type FeedAPI struct {
 	cache     *redis.Cache
 }
 
-var (
-	trendingUsersTTL        = time.Hour
-	trendingUsersReportSize = 10
-)
-
 func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
 	// Validate
 	err := validate.ValidateFields(api.validator, validate.ValidationMap{
@@ -218,14 +213,15 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 	return feedEvents, pageInfo, err
 }
 
-func (api FeedAPI) TrendingUsers(ctx context.Context, window model.Window) ([]db.User, error) {
-	byt, err := api.cache.Get(ctx, "trend.users."+window.Name)
+func (api FeedAPI) TrendingUserIDs(ctx context.Context, report model.Window) (users []persist.DBID, err error) {
+	byt, err := api.cache.Get(ctx, "trending.users."+report.Name)
 	var notFoundErr redis.ErrKeyNotFound
 	switch {
 	case errors.As(err, &notFoundErr):
 		users, err := api.queries.GetTrendingUsers(ctx, db.GetTrendingUsersParams{
-			WindowEnd: time.Now().Add(-time.Duration(window.Duration)),
-			Size:      int32(trendingUsersReportSize),
+			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
+			// Fetch a few more on the off chance a trending user gets deleted
+			Size: 20,
 		})
 		if err != nil {
 			return nil, err
@@ -236,17 +232,19 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, window model.Window) ([]db
 			return nil, err
 		}
 
-		err = api.cache.Set(ctx, "trend.users."+window.Name, byt, trendingUsersTTL)
+		err = api.cache.Set(ctx, "trending.users."+report.Name, byt, time.Hour)
 		if err != nil {
 			return nil, err
 		}
-
 		return users, nil
 	case err != nil:
 		return nil, err
 	default:
-		users := make([]db.User, trendingUsersReportSize)
-		return users, json.Unmarshal(byt, &users)
+		err := json.Unmarshal(byt, &users)
+		if err != nil {
+			return nil, err
+		}
+		return users, nil
 	}
 }
 

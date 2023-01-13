@@ -2099,52 +2099,36 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getTrendingUsers = `-- name: GetTrendingUsers :many
-with topN as (
-  select g.owner_user_id id
-  from events e, users u, galleries g
-  where action = 'ViewedGallery' and e.created_at >= $1 and u.deleted = false and g.deleted = false and e.gallery_id = g.id and g.owner_user_id = u.id
-  group by g.owner_user_id
-  order by count(*) desc
-  limit $2
+with rollup as (
+	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= $2 group by e.gallery_id
 )
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id from users, topN where users.id = topN.id
+select p.id from (
+	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
+	from rollup r, galleries g, users u
+	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
+	group by u.id
+) p
+where position <= $1::int
 `
 
 type GetTrendingUsersParams struct {
-	WindowEnd time.Time
 	Size      int32
+	WindowEnd time.Time
 }
 
-func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getTrendingUsers, arg.WindowEnd, arg.Size)
+func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTrendingUsers, arg.Size, arg.WindowEnd)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []persist.DBID
 	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.Deleted,
-			&i.Version,
-			&i.LastUpdated,
-			&i.CreatedAt,
-			&i.Username,
-			&i.UsernameIdempotent,
-			&i.Wallets,
-			&i.Bio,
-			&i.Traits,
-			&i.Universal,
-			&i.NotificationSettings,
-			&i.EmailVerified,
-			&i.EmailUnsubscriptions,
-			&i.FeaturedGallery,
-			&i.PrimaryWalletID,
-		); err != nil {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

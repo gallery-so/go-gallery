@@ -686,12 +686,13 @@ update collections set nfts = @nfts, last_updated = now() where id = @id and del
 insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
 
 -- name: GetTrendingUsers :many
-with topN as (
-  select g.owner_user_id id
-  from events e, users u, galleries g
-  where action = 'ViewedGallery' and e.created_at >= @window_end and u.deleted = false and g.deleted = false and e.gallery_id = g.id and g.owner_user_id = u.id
-  group by g.owner_user_id
-  order by count(*) desc
-  limit @size
+with rollup as (
+	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= @window_end group by e.gallery_id
 )
-select users.* from users, topN where users.id = topN.id;
+select p.id from (
+	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
+	from rollup r, galleries g, users u
+	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
+	group by u.id
+) p
+where position <= @size::int;
