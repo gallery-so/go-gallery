@@ -246,7 +246,7 @@ type MagicLinkAuthenticator struct {
 }
 
 func (e MagicLinkAuthenticator) GetDescription() string {
-	return fmt.Sprintf("MagicLinkAuthenticator(token: %s)", e.Token)
+	return fmt.Sprintf("MagicLinkAuthenticator(token: %v)", e.Token)
 }
 
 func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
