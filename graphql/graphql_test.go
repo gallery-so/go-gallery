@@ -271,15 +271,26 @@ func testTrendingUsers(t *testing.T) {
 		viewGallery(t, c, userC.galleryID)
 	}
 	expected := []persist.DBID{userA.id, userB.id, userC.id}
-
-	resp, err := trendingUsersQuery(ctx, c, TrendingUsersInput{Report: "LAST_7_DAYS"})
-	require.NoError(t, err)
-	users := (*resp.GetTrendingUsers()).(*trendingUsersQueryTrendingUsersTrendingUsersPayload).GetUsers()
-	actual := make([]persist.DBID, len(users))
-	for i, u := range users {
-		actual[i] = u.Dbid
+	getTrending := func(t *testing.T, report ReportWindow) []persist.DBID {
+		resp, err := trendingUsersQuery(ctx, c, TrendingUsersInput{Report: report})
+		require.NoError(t, err)
+		users := (*resp.GetTrendingUsers()).(*trendingUsersQueryTrendingUsersTrendingUsersPayload).GetUsers()
+		actual := make([]persist.DBID, len(users))
+		for i, u := range users {
+			actual[i] = u.Dbid
+		}
+		return actual
 	}
-	assert.EqualValues(t, expected, actual)
+
+	t.Run("should pull the last 7 days", func(t *testing.T) {
+		actual := getTrending(t, "LAST_7_DAYS")
+		assert.EqualValues(t, expected, actual)
+	})
+
+	t.Run("should pull all time", func(t *testing.T) {
+		actual := getTrending(t, "ALL_TIME")
+		assert.EqualValues(t, expected, actual)
+	})
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet

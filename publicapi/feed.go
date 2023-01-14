@@ -231,7 +231,12 @@ func (api FeedAPI) TrendingUserIDs(ctx context.Context, report model.Window) (us
 			return nil, err
 		}
 
-		err = api.cache.Set(ctx, "trending.users."+report.Name, byt, time.Hour)
+		ttl := time.Hour
+		if report.Duration > 7*24*time.Hour {
+			ttl *= 24
+		}
+
+		err = api.cache.Set(ctx, "trending.users."+report.Name, byt, ttl)
 		if err != nil {
 			return nil, err
 		}
