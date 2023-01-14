@@ -253,11 +253,12 @@ func testViewsAreRolledUp(t *testing.T) {
 }
 
 func testTrendingUsers(t *testing.T) {
+	serverF := newServerFixture(t)
 	userA := newUserFixture(t)
 	userB := newUserFixture(t)
 	userC := newUserFixture(t)
 	ctx := context.Background()
-	c := defaultHandlerClient(t)
+	c := defaultServerClient(t, serverF.server.URL)
 	// view userA a few times
 	for i := 0; i < 5; i++ {
 		viewGallery(t, c, userA.galleryID)
@@ -417,9 +418,14 @@ func customHandlerClient(t *testing.T, handler http.Handler, opts ...func(*http.
 	return &handlerClient{handler: handler, opts: opts, endpoint: "/glry/graphql/query"}
 }
 
-// authedServerClient makes a request to a live server
-func authedServerClient(t *testing.T, url string, userID persist.DBID) *serverClient {
-	return &serverClient{url: url + "/glry/graphql/query", opts: []func(*http.Request){withJWTOpt(t, userID)}}
+// defaultServerClient provides a client to a live server
+func defaultServerClient(t *testing.T, host string) *serverClient {
+	return &serverClient{url: host + "/glry/graphql/query"}
+}
+
+// authedServerClient provides an authenticated client to a live server
+func authedServerClient(t *testing.T, host string, userID persist.DBID) *serverClient {
+	return &serverClient{url: host + "/glry/graphql/query", opts: []func(*http.Request){withJWTOpt(t, userID)}}
 }
 
 // withJWTOpt ddds a JWT cookie to the request headers
