@@ -220,8 +220,7 @@ func (api FeedAPI) TrendingUserIDs(ctx context.Context, report model.Window) (us
 	case errors.As(err, &notFoundErr):
 		users, err := api.queries.GetTrendingUsers(ctx, db.GetTrendingUsersParams{
 			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
-			// Fetch a few more on the off chance a trending user gets deleted
-			Size: 20,
+			Size:      20,
 		})
 		if err != nil {
 			return nil, err
@@ -236,6 +235,7 @@ func (api FeedAPI) TrendingUserIDs(ctx context.Context, report model.Window) (us
 		if err != nil {
 			return nil, err
 		}
+
 		return users, nil
 	case err != nil:
 		return nil, err

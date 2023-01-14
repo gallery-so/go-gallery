@@ -6148,12 +6148,11 @@ input TrendingUsersInput {
 }
 
 type TrendingUsersPayload {
-  # User are in descending order i.e. the most popular user is first.
+  # User are in descending order i.e. the most trending user is first.
   users: [GalleryUser!]
 }
 
 union TrendingUsersPayloadOrError = TrendingUsersPayload
-
 
 type Query {
   node(id: ID!): Node
