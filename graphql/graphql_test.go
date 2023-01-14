@@ -387,7 +387,7 @@ func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID) []persi
 	return tokens
 }
 
-// viewGallery makes a GraphqL request to view a gallery
+// viewGallery makes a GraphQL request to view a gallery
 func viewGallery(t *testing.T, c graphql.Client, galleryID persist.DBID) {
 	resp, err := viewGalleryMutation(context.Background(), c, galleryID)
 	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
