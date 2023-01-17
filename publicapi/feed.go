@@ -48,7 +48,7 @@ func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action pe
 	return err
 }
 
-func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
+func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
@@ -57,6 +57,22 @@ func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (
 	}
 
 	event, err := api.loaders.FeedEventByFeedEventID.Load(feedEventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
+func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*db.Event, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"eventID": {eventID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	event, err := api.queries.GetEvent(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}

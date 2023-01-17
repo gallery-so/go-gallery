@@ -995,14 +995,13 @@ type GalleryTokenUpdate struct {
 
 type GalleryUpdatedFeedEventData struct {
 	HelperGalleryUpdatedFeedEventDataData
-	EventTime         *time.Time                 `json:"eventTime"`
-	Owner             *GalleryUser               `json:"owner"`
-	Action            *persist.Action            `json:"action"`
-	Gallery           *Gallery                   `json:"gallery"`
-	CollectionUpdates []*GalleryCollectionUpdate `json:"collectionUpdates"`
-	TokenUpdates      []*GalleryTokenUpdate      `json:"tokenUpdates"`
-	NewName           *string                    `json:"newName"`
-	NewDescription    *string                    `json:"newDescription"`
+	EventTime      *time.Time      `json:"eventTime"`
+	Owner          *GalleryUser    `json:"owner"`
+	Action         *persist.Action `json:"action"`
+	Gallery        *Gallery        `json:"gallery"`
+	SubEventDatas  []FeedEventData `json:"subEventDatas"`
+	NewName        *string         `json:"newName"`
+	NewDescription *string         `json:"newDescription"`
 }
 
 func (GalleryUpdatedFeedEventData) IsFeedEventData() {}

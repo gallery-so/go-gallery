@@ -49,11 +49,13 @@ type HelperCommunityData struct {
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {
-	FeedEventID persist.DBID
+	TokenIDs     persist.DBIDList
+	CollectionID persist.DBID
 }
 
 type HelperCollectionCreatedFeedEventDataData struct {
-	FeedEventID persist.DBID
+	TokenIDs     persist.DBIDList
+	CollectionID persist.DBID
 }
 
 type HelperGroupNotificationUsersConnectionData struct {
@@ -99,7 +101,8 @@ type HelperNotificationsConnectionData struct {
 }
 
 type HelperCollectionUpdatedFeedEventDataData struct {
-	FeedEventID persist.DBID
+	TokenIDs     persist.DBIDList
+	CollectionID persist.DBID
 }
 
 type HelperGalleryUpdatedFeedEventDataData struct {

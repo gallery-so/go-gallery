@@ -486,14 +486,13 @@ type ComplexityRoot struct {
 	}
 
 	GalleryUpdatedFeedEventData struct {
-		Action            func(childComplexity int) int
-		CollectionUpdates func(childComplexity int) int
-		EventTime         func(childComplexity int) int
-		Gallery           func(childComplexity int) int
-		NewDescription    func(childComplexity int) int
-		NewName           func(childComplexity int) int
-		Owner             func(childComplexity int) int
-		TokenUpdates      func(childComplexity int) int
+		Action         func(childComplexity int) int
+		EventTime      func(childComplexity int) int
+		Gallery        func(childComplexity int) int
+		NewDescription func(childComplexity int) int
+		NewName        func(childComplexity int) int
+		Owner          func(childComplexity int) int
+		SubEventDatas  func(childComplexity int) int
 	}
 
 	GalleryUser struct {
@@ -1151,8 +1150,7 @@ type GalleryUpdatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.GalleryUser, error)
 
 	Gallery(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.Gallery, error)
-	CollectionUpdates(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]*model.GalleryCollectionUpdate, error)
-	TokenUpdates(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]*model.GalleryTokenUpdate, error)
+	SubEventDatas(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]model.FeedEventData, error)
 }
 type GalleryUserResolver interface {
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
@@ -2702,13 +2700,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUpdatedFeedEventData.Action(childComplexity), true
 
-	case "GalleryUpdatedFeedEventData.collectionUpdates":
-		if e.complexity.GalleryUpdatedFeedEventData.CollectionUpdates == nil {
-			break
-		}
-
-		return e.complexity.GalleryUpdatedFeedEventData.CollectionUpdates(childComplexity), true
-
 	case "GalleryUpdatedFeedEventData.eventTime":
 		if e.complexity.GalleryUpdatedFeedEventData.EventTime == nil {
 			break
@@ -2744,12 +2735,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUpdatedFeedEventData.Owner(childComplexity), true
 
-	case "GalleryUpdatedFeedEventData.tokenUpdates":
-		if e.complexity.GalleryUpdatedFeedEventData.TokenUpdates == nil {
+	case "GalleryUpdatedFeedEventData.subEventDatas":
+		if e.complexity.GalleryUpdatedFeedEventData.SubEventDatas == nil {
 			break
 		}
 
-		return e.complexity.GalleryUpdatedFeedEventData.TokenUpdates(childComplexity), true
+		return e.complexity.GalleryUpdatedFeedEventData.SubEventDatas(childComplexity), true
 
 	case "GalleryUser.badges":
 		if e.complexity.GalleryUser.Badges == nil {
@@ -6219,8 +6210,7 @@ type GalleryUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
   owner: GalleryUser @goField(forceResolver: true)
   action: Action
   gallery: Gallery @goField(forceResolver: true)
-  collectionUpdates: [GalleryCollectionUpdate] @goField(forceResolver: true)
-  tokenUpdates: [GalleryTokenUpdate] @goField(forceResolver: true)
+  subEventDatas: [FeedEventData!] @goField(forceResolver: true)
   newName: String
   newDescription: String
 }
@@ -15352,7 +15342,7 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData_gallery(ctx context.Con
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _GalleryUpdatedFeedEventData_collectionUpdates(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUpdatedFeedEventData) (ret graphql.Marshaler) {
+func (ec *executionContext) _GalleryUpdatedFeedEventData_subEventDatas(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUpdatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -15370,7 +15360,7 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData_collectionUpdates(ctx c
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUpdatedFeedEventData().CollectionUpdates(rctx, obj)
+		return ec.resolvers.GalleryUpdatedFeedEventData().SubEventDatas(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15379,41 +15369,9 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData_collectionUpdates(ctx c
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.GalleryCollectionUpdate)
+	res := resTmp.([]model.FeedEventData)
 	fc.Result = res
-	return ec.marshalOGalleryCollectionUpdate2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionUpdate(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryUpdatedFeedEventData_tokenUpdates(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUpdatedFeedEventData) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryUpdatedFeedEventData",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryUpdatedFeedEventData().TokenUpdates(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]*model.GalleryTokenUpdate)
-	fc.Result = res
-	return ec.marshalOGalleryTokenUpdate2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryTokenUpdate(ctx, field.Selections, res)
+	return ec.marshalOFeedEventData2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventDataᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUpdatedFeedEventData_newName(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUpdatedFeedEventData) (ret graphql.Marshaler) {
@@ -35998,7 +35956,7 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData(ctx context.Context, se
 				return innerFunc(ctx)
 
 			})
-		case "collectionUpdates":
+		case "subEventDatas":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -36007,24 +35965,7 @@ func (ec *executionContext) _GalleryUpdatedFeedEventData(ctx context.Context, se
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._GalleryUpdatedFeedEventData_collectionUpdates(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "tokenUpdates":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._GalleryUpdatedFeedEventData_tokenUpdates(ctx, field, obj)
+				res = ec._GalleryUpdatedFeedEventData_subEventDatas(ctx, field, obj)
 				return res
 			}
 
@@ -41566,6 +41507,16 @@ func (ec *executionContext) marshalNEmailUnsubscriptionType2githubᚗcomᚋmikey
 	return v
 }
 
+func (ec *executionContext) marshalNFeedEventData2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventData(ctx context.Context, sel ast.SelectionSet, v model.FeedEventData) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._FeedEventData(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNGalleryPositionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryPositionInputᚄ(ctx context.Context, v interface{}) ([]*model.GalleryPositionInput, error) {
 	var vSlice []interface{}
 	if v != nil {
@@ -43087,6 +43038,53 @@ func (ec *executionContext) marshalOFeedEventData2githubᚗcomᚋmikeydubᚋgo�
 	return ec._FeedEventData(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOFeedEventData2ᚕgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventDataᚄ(ctx context.Context, sel ast.SelectionSet, v []model.FeedEventData) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFeedEventData2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventData(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) marshalOFeedEventInteractionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFeedEventInteractionsConnection(ctx context.Context, sel ast.SelectionSet, v *model.FeedEventInteractionsConnection) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -43257,102 +43255,6 @@ func (ec *executionContext) marshalOGalleryByIdPayloadOrError2githubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._GalleryByIdPayloadOrError(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOGalleryCollectionUpdate2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionUpdate(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryCollectionUpdate) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOGalleryCollectionUpdate2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionUpdate(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOGalleryCollectionUpdate2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryCollectionUpdate(ctx context.Context, sel ast.SelectionSet, v *model.GalleryCollectionUpdate) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GalleryCollectionUpdate(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOGalleryTokenUpdate2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryTokenUpdate(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryTokenUpdate) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOGalleryTokenUpdate2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryTokenUpdate(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
-func (ec *executionContext) marshalOGalleryTokenUpdate2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryTokenUpdate(ctx context.Context, sel ast.SelectionSet, v *model.GalleryTokenUpdate) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GalleryTokenUpdate(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryUser) graphql.Marshaler {

@@ -79,7 +79,7 @@ func (r *collectionCreatedFeedEventDataResolver) Collection(ctx context.Context,
 }
 
 func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
+	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
 func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error) {
@@ -95,7 +95,7 @@ func (r *collectionUpdatedFeedEventDataResolver) Collection(ctx context.Context,
 }
 
 func (r *collectionUpdatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
+	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
 func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
@@ -111,7 +111,7 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Owner(ctx context.Cont
 }
 
 func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error) {
-	return resolveCollectionTokenByIDs(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
+	return resolveCollectionTokenByID(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
 }
 
 func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error) {
@@ -297,7 +297,7 @@ func (r *galleryCollectionUpdateResolver) Collection(ctx context.Context, obj *m
 
 func (r *galleryCollectionUpdateResolver) NewTokens(ctx context.Context, obj *model.GalleryCollectionUpdate) ([]*model.CollectionToken, error) {
 	return util.Map(obj.NewTokens, func(t *model.CollectionToken) (*model.CollectionToken, error) {
-		return resolveCollectionTokenByIDs(ctx, t.TokenId, t.CollectionId)
+		return resolveCollectionTokenByID(ctx, t.TokenId, t.CollectionId)
 	})
 }
 
@@ -313,12 +313,8 @@ func (r *galleryUpdatedFeedEventDataResolver) Gallery(ctx context.Context, obj *
 	return resolveGalleryByGalleryID(ctx, obj.Gallery.Dbid)
 }
 
-func (r *galleryUpdatedFeedEventDataResolver) CollectionUpdates(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]*model.GalleryCollectionUpdate, error) {
-	return resolveGalleryCollectionUpdatesByFeedEventID(ctx, obj.FeedEventID)
-}
-
-func (r *galleryUpdatedFeedEventDataResolver) TokenUpdates(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]*model.GalleryTokenUpdate, error) {
-	return resolveGalleryTokenUpdatesByFeedEventID(ctx, obj.FeedEventID)
+func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]model.FeedEventData, error) {
+	return resolveSubEventDatasByFeedEventID(ctx, obj.FeedEventID)
 }
 
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
@@ -1330,7 +1326,7 @@ func (r *queryResolver) TokenByID(ctx context.Context, id persist.DBID) (model.T
 }
 
 func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error) {
-	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
+	return resolveCollectionTokenByID(ctx, tokenID, collectionID)
 }
 
 func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
@@ -1567,7 +1563,7 @@ func (r *tokensAddedToCollectionFeedEventDataResolver) Collection(ctx context.Co
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
+	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
 func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
