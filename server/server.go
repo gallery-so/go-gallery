@@ -10,6 +10,7 @@ import (
 	"github.com/everFinance/goar"
 	sentry "github.com/getsentry/sentry-go"
 	shell "github.com/ipfs/go-ipfs-api"
+	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
@@ -26,6 +27,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/middleware"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/multichain"
@@ -59,32 +61,34 @@ func Init() {
 }
 
 type Clients struct {
-	Repos         *postgres.Repositories
-	Queries       *coredb.Queries
-	HTTPClient    *http.Client
-	EthClient     *ethclient.Client
-	IPFSClient    *shell.Shell
-	ArweaveClient *goar.Client
-	StorageClient *storage.Client
-	TaskClient    *cloudtasks.Client
-	SecretClient  *secretmanager.Client
-	PubSubClient  *pubsub.Client
+	Repos           *postgres.Repositories
+	Queries         *coredb.Queries
+	HTTPClient      *http.Client
+	EthClient       *ethclient.Client
+	IPFSClient      *shell.Shell
+	ArweaveClient   *goar.Client
+	StorageClient   *storage.Client
+	TaskClient      *cloudtasks.Client
+	SecretClient    *secretmanager.Client
+	PubSubClient    *pubsub.Client
+	MagicLinkClient *magicclient.API
 }
 
 func ClientInit(ctx context.Context) *Clients {
 	pq := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
 	return &Clients{
-		Repos:         postgres.NewRepositories(pq, pgx),
-		Queries:       db.New(pgx),
-		HTTPClient:    &http.Client{Timeout: 10 * time.Minute},
-		EthClient:     newEthClient(),
-		IPFSClient:    rpc.NewIPFSShell(),
-		ArweaveClient: rpc.NewArweaveClient(),
-		StorageClient: media.NewStorageClient(ctx),
-		TaskClient:    task.NewClient(ctx),
-		SecretClient:  newSecretsClient(),
-		PubSubClient:  gcp.NewClient(ctx),
+		Repos:           postgres.NewRepositories(pq, pgx),
+		Queries:         db.New(pgx),
+		HTTPClient:      &http.Client{Timeout: 10 * time.Minute},
+		EthClient:       newEthClient(),
+		IPFSClient:      rpc.NewIPFSShell(),
+		ArweaveClient:   rpc.NewArweaveClient(),
+		StorageClient:   media.NewStorageClient(ctx),
+		TaskClient:      task.NewClient(ctx),
+		SecretClient:    newSecretsClient(),
+		PubSubClient:    gcp.NewClient(ctx),
+		MagicLinkClient: auth.NewMagicLinkClient(),
 	}
 }
 
@@ -114,7 +118,7 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	lock := redis.NewLockClient(redis.NotificationLockDB)
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, c.MagicLinkClient)
 }
 
 func newSecretsClient() *secretmanager.Client {
@@ -184,6 +188,7 @@ func SetDefaults() {
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
 	viper.SetDefault("MERCH_CONTRACT_ADDRESS", "0x01f55be815fbd10b1770b008b8960931a30e7f65")
 	viper.SetDefault("ETH_PRIVATE_KEY", "")
+	viper.SetDefault("MAGIC_LINK_SECRET_KEY", "")
 
 	viper.AutomaticEnv()
 
