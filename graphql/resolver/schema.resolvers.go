@@ -6,6 +6,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -1402,6 +1403,33 @@ func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) 
 	}
 
 	return gallery, nil
+}
+
+func (r *queryResolver) TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error) {
+	trendingIDs, err := publicapi.For(ctx).Feed.TrendingUserIDs(ctx, input.Report)
+	if err != nil {
+		return nil, err
+	}
+
+	ranking := map[persist.DBID]int{}
+	for i, u := range trendingIDs {
+		ranking[u] = i
+	}
+
+	trendingUsers, _, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, trendingIDs, nil, nil, nil, util.IntToPointer(len(trendingIDs)))
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(trendingUsers, func(i, j int) bool {
+		return ranking[trendingUsers[i].ID] < ranking[trendingUsers[j].ID]
+	})
+
+	users := make([]*model.GalleryUser, len(trendingUsers))
+	for i, u := range trendingUsers {
+		users[i] = userToModel(ctx, u)
+	}
+
+	return model.TrendingUsersPayload{Users: users}, nil
 }
 
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {

@@ -722,3 +722,15 @@ insert into collections (id, version, name, collectors_note, owner_user_id, gall
 
 -- name: GetGalleryIDByCollectionID :one
 select gallery_id from collections where id = $1 and deleted = false;
+
+-- name: GetTrendingUsers :many
+with rollup as (
+	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= @window_end group by e.gallery_id
+)
+select p.id from (
+	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
+	from rollup r, galleries g, users u
+	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
+	group by u.id
+) p
+where position <= @size::int;

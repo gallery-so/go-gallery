@@ -2,16 +2,20 @@ package publicapi
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
@@ -21,6 +25,7 @@ type FeedAPI struct {
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 	ethClient *ethclient.Client
+	cache     *redis.Cache
 }
 
 func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action persist.Action) error {
@@ -206,6 +211,46 @@ func (api FeedAPI) PaginateGlobalFeed(ctx context.Context, before *string, after
 	}
 
 	return feedEvents, pageInfo, err
+}
+
+func (api FeedAPI) TrendingUserIDs(ctx context.Context, report model.Window) (users []persist.DBID, err error) {
+	byt, err := api.cache.Get(ctx, "trending.users."+report.Name)
+	var notFoundErr redis.ErrKeyNotFound
+	switch {
+	case errors.As(err, &notFoundErr):
+		users, err := api.queries.GetTrendingUsers(ctx, db.GetTrendingUsersParams{
+			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
+			Size:      20,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		byt, err := json.Marshal(users)
+		if err != nil {
+			return nil, err
+		}
+
+		ttl := time.Hour
+		if report.Duration > 7*24*time.Hour {
+			ttl *= 24
+		}
+
+		err = api.cache.Set(ctx, "trending.users."+report.Name, byt, ttl)
+		if err != nil {
+			return nil, err
+		}
+
+		return users, nil
+	case err != nil:
+		return nil, err
+	default:
+		err := json.Unmarshal(byt, &users)
+		if err != nil {
+			return nil, err
+		}
+		return users, nil
+	}
 }
 
 func feedCursor(i interface{}) (time.Time, persist.DBID, error) {

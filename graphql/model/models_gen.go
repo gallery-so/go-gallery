@@ -202,6 +202,10 @@ type TokenByIDOrError interface {
 	IsTokenByIDOrError()
 }
 
+type TrendingUsersPayloadOrError interface {
+	IsTrendingUsersPayloadOrError()
+}
+
 type UnfollowUserPayloadOrError interface {
 	IsUnfollowUserPayloadOrError()
 }
@@ -348,6 +352,7 @@ type AuthMechanism struct {
 	Eoa        *EoaAuth        `json:"eoa"`
 	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
 	Debug      *DebugAuth      `json:"debug"`
+	MagicLink  *MagicLinkAuth  `json:"magicLink"`
 }
 
 type AuthNonce struct {
@@ -1109,6 +1114,10 @@ type LogoutPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
+type MagicLinkAuth struct {
+	Token string `json:"token"`
+}
+
 type MembershipTier struct {
 	Dbid     persist.DBID   `json:"dbid"`
 	Name     *string        `json:"name"`
@@ -1450,6 +1459,16 @@ type TokensConnection struct {
 	Edges    []*TokenEdge `json:"edges"`
 	PageInfo *PageInfo    `json:"pageInfo"`
 }
+
+type TrendingUsersInput struct {
+	Report Window `json:"report"`
+}
+
+type TrendingUsersPayload struct {
+	Users []*GalleryUser `json:"users"`
+}
+
+func (TrendingUsersPayload) IsTrendingUsersPayloadOrError() {}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`

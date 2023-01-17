@@ -77,6 +77,7 @@ type UserRepository interface {
 	GetByWalletID(context.Context, DBID) (User, error)
 	GetByChainAddress(context.Context, ChainAddress) (User, error)
 	GetByUsername(context.Context, string) (User, error)
+	GetByEmail(context.Context, Email) (User, error)
 	Delete(context.Context, DBID) error
 	MergeUsers(context.Context, DBID, DBID) error
 	AddFollower(pCtx context.Context, follower DBID, followee DBID) (refollowed bool, err error)
@@ -122,6 +123,7 @@ type ErrUserNotFound struct {
 	WalletID      DBID
 	ChainAddress  ChainAddress
 	Username      string
+	Email         Email
 	Authenticator string
 }
 
@@ -145,6 +147,11 @@ func (e ErrUserNotFound) Error() string {
 
 	if e.ChainAddress != (ChainAddress{}) {
 		method := fmt.Sprintf("method=%s;chainAddress=%s", "byChainAddress", e.ChainAddress)
+		return fmt.Sprintf(template, method, e.Authenticator)
+	}
+
+	if e.Email != "" {
+		method := fmt.Sprintf("method=%s;email=%s", "byEmail", e.Email)
 		return fmt.Sprintf(template, method, e.Authenticator)
 	}
 

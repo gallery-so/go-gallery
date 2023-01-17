@@ -238,6 +238,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"TrendingUsersPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(TrendingUsersPayloadOrError)
+		return obj, ok
+	},
+
 	"UnfollowUserPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UnfollowUserPayloadOrError)
 		return obj, ok

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gammazero/workerpool"
+	"github.com/magiclabs/magic-admin-go/token"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -189,6 +190,14 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
 		return authApi.NewNonceAuthenticator(persist.NewChainPubKey(persist.PubKey(m.GnosisSafe.Address), persist.ChainETH), m.GnosisSafe.Nonce, "0x", persist.WalletTypeGnosis), nil
+	}
+
+	if m.MagicLink != nil && m.MagicLink.Token != "" {
+		t, err := token.NewToken(m.MagicLink.Token)
+		if err != nil {
+			return nil, err
+		}
+		return authApi.NewMagicLinkAuthenticator(*t), nil
 	}
 
 	return nil, errNoAuthMechanismFound
