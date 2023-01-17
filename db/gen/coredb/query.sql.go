@@ -2098,6 +2098,44 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 	return items, nil
 }
 
+const getTrendingUsers = `-- name: GetTrendingUsers :many
+with rollup as (
+	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= $2 group by e.gallery_id
+)
+select p.id from (
+	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
+	from rollup r, galleries g, users u
+	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
+	group by u.id
+) p
+where position <= $1::int
+`
+
+type GetTrendingUsersParams struct {
+	Size      int32
+	WindowEnd time.Time
+}
+
+func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTrendingUsers, arg.Size, arg.WindowEnd)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserById = `-- name: GetUserById :one
 SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id FROM users WHERE id = $1 AND deleted = false
 `

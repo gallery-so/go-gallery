@@ -202,6 +202,10 @@ type TokenByIDOrError interface {
 	IsTokenByIDOrError()
 }
 
+type TrendingUsersPayloadOrError interface {
+	IsTrendingUsersPayloadOrError()
+}
+
 type UnfollowUserPayloadOrError interface {
 	IsUnfollowUserPayloadOrError()
 }
@@ -1427,6 +1431,16 @@ type TokensConnection struct {
 	Edges    []*TokenEdge `json:"edges"`
 	PageInfo *PageInfo    `json:"pageInfo"`
 }
+
+type TrendingUsersInput struct {
+	Report Window `json:"report"`
+}
+
+type TrendingUsersPayload struct {
+	Users []*GalleryUser `json:"users"`
+}
+
+func (TrendingUsersPayload) IsTrendingUsersPayloadOrError() {}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
