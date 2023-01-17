@@ -352,6 +352,7 @@ type AuthMechanism struct {
 	Eoa        *EoaAuth        `json:"eoa"`
 	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
 	Debug      *DebugAuth      `json:"debug"`
+	MagicLink  *MagicLinkAuth  `json:"magicLink"`
 }
 
 type AuthNonce struct {
@@ -1083,6 +1084,10 @@ func (LoginPayload) IsLoginPayloadOrError() {}
 
 type LogoutPayload struct {
 	Viewer *Viewer `json:"viewer"`
+}
+
+type MagicLinkAuth struct {
+	Token string `json:"token"`
 }
 
 type MembershipTier struct {

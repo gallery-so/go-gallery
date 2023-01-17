@@ -352,6 +352,8 @@ type UsersWithPii struct {
 	NotificationSettings persist.UserNotificationSettings
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
+	FeaturedGallery      *persist.DBID
+	PrimaryWalletID      persist.DBID
 	PiiEmailAddress      persist.Email
 }
 

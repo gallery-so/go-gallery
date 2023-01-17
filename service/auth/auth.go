@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/magiclabs/magic-admin-go"
+	magicclient "github.com/magiclabs/magic-admin-go/client"
+	"github.com/magiclabs/magic-admin-go/token"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -77,6 +80,8 @@ var ErrInvalidAuthHeader = errors.New("invalid auth header format")
 
 // ErrSignatureInvalid is returned when the signed nonce's signature is invalid
 var ErrSignatureInvalid = errors.New("signature invalid")
+
+var ErrInvalidMagicLink = errors.New("invalid magic link")
 
 // LoginInput is the input to the login pipeline
 type LoginInput struct {
@@ -232,6 +237,43 @@ func (e NonceAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, err
 	}
 
 	return &authResult, nil
+}
+
+type MagicLinkAuthenticator struct {
+	Token       token.Token
+	MagicClient *magicclient.API
+	UserRepo    *postgres.UserRepository
+}
+
+func (e MagicLinkAuthenticator) GetDescription() string {
+	return "MagicLinkAuthenticator"
+}
+
+func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult, error) {
+
+	err := e.Token.Validate()
+	if err != nil {
+		return nil, ErrInvalidMagicLink
+	}
+
+	info, err := e.MagicClient.User.GetMetadataByIssuer(e.Token.GetIssuer())
+	if err != nil {
+		return nil, ErrInvalidMagicLink
+	}
+
+	user, err := e.UserRepo.GetByEmail(pCtx, persist.Email(info.Email))
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthResult{
+		User:      &user,
+		Addresses: []AuthenticatedAddress{},
+	}, nil
+}
+
+func NewMagicLinkClient() *magicclient.API {
+	return magicclient.New(viper.GetString("MAGIC_LINK_SECRET_KEY"), magic.NewDefaultClient())
 }
 
 // Login logs in a user with a given authentication scheme

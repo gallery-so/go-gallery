@@ -1113,6 +1113,7 @@ input AuthMechanism {
   eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
   debug: DebugAuth
+  magicLink: MagicLinkAuth
 }
 
 input EoaAuth {
@@ -1143,6 +1144,10 @@ input DebugAuth @restrictEnvironment(allowed: ["local"]) {
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
+}
+
+input MagicLinkAuth {
+  token: String!
 }
 
 input DeepRefreshInput {

@@ -6448,6 +6448,7 @@ input AuthMechanism {
   eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
   debug: DebugAuth
+  magicLink: MagicLinkAuth
 }
 
 input EoaAuth {
@@ -6478,6 +6479,10 @@ input DebugAuth @restrictEnvironment(allowed: ["local"]) {
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
+}
+
+input MagicLinkAuth {
+  token: String!
 }
 
 input DeepRefreshInput {
@@ -28056,6 +28061,14 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugAuth`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
 			}
+		case "magicLink":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("magicLink"))
+			it.MagicLink, err = ec.unmarshalOMagicLinkAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMagicLinkAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
 		}
 	}
 
@@ -28691,6 +28704,29 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
 			it.Nonce, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputMagicLinkAuth(ctx context.Context, obj interface{}) (model.MagicLinkAuth, error) {
+	var it model.MagicLinkAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			it.Token, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -42682,6 +42718,14 @@ func (ec *executionContext) marshalOLogoutPayload2ᚖgithubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._LogoutPayload(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOMagicLinkAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMagicLinkAuth(ctx context.Context, v interface{}) (*model.MagicLinkAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputMagicLinkAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx context.Context, sel ast.SelectionSet, v model.MediaSubtype) graphql.Marshaler {

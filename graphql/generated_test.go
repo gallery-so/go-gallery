@@ -15,6 +15,7 @@ type AuthMechanism struct {
 	Eoa        *EoaAuth        `json:"eoa"`
 	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
 	Debug      *DebugAuth      `json:"debug"`
+	MagicLink  *MagicLinkAuth  `json:"magicLink"`
 }
 
 // GetEoa returns AuthMechanism.Eoa, and is useful for accessing the field via an interface.
@@ -25,6 +26,9 @@ func (v *AuthMechanism) GetGnosisSafe() *GnosisSafeAuth { return v.GnosisSafe }
 
 // GetDebug returns AuthMechanism.Debug, and is useful for accessing the field via an interface.
 func (v *AuthMechanism) GetDebug() *DebugAuth { return v.Debug }
+
+// GetMagicLink returns AuthMechanism.MagicLink, and is useful for accessing the field via an interface.
+func (v *AuthMechanism) GetMagicLink() *MagicLinkAuth { return v.MagicLink }
 
 type Chain string
 
@@ -194,6 +198,13 @@ func (v *GnosisSafeAuth) GetAddress() string { return v.Address }
 
 // GetNonce returns GnosisSafeAuth.Nonce, and is useful for accessing the field via an interface.
 func (v *GnosisSafeAuth) GetNonce() string { return v.Nonce }
+
+type MagicLinkAuth struct {
+	Token string `json:"token"`
+}
+
+// GetToken returns MagicLinkAuth.Token, and is useful for accessing the field via an interface.
+func (v *MagicLinkAuth) GetToken() string { return v.Token }
 
 type ReportWindow string
 
