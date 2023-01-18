@@ -2103,26 +2103,54 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 	return items, nil
 }
 
-const getTrendingUsers = `-- name: GetTrendingUsers :many
-with rollup as (
-	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= $2 group by e.gallery_id
-)
+const getTrendingFeedEventIDs = `-- name: GetTrendingFeedEventIDs :many
+select feed_event_id from events where action in ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and created_at >= $1 and feed_event_id is not null
+group by feed_event_id order by count(*) desc, max(created_at) desc limit $2
+`
+
+type GetTrendingFeedEventIDsParams struct {
+	WindowEnd time.Time
+	Limit     int32
+}
+
+func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFeedEventIDsParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs, arg.WindowEnd, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var feed_event_id persist.DBID
+		if err := rows.Scan(&feed_event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, feed_event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTrendingUserIDs = `-- name: GetTrendingUserIDs :many
+with rollup as (select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= $2 group by e.gallery_id)
 select p.id from (
 	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
-	from rollup r, galleries g, users u
+	from galleries g, users u, rollup r
 	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
 	group by u.id
 ) p
 where position <= $1::int
 `
 
-type GetTrendingUsersParams struct {
+type GetTrendingUserIDsParams struct {
 	Size      int32
 	WindowEnd time.Time
 }
 
-func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersParams) ([]persist.DBID, error) {
-	rows, err := q.db.Query(ctx, getTrendingUsers, arg.Size, arg.WindowEnd)
+func (q *Queries) GetTrendingUserIDs(ctx context.Context, arg GetTrendingUserIDsParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTrendingUserIDs, arg.Size, arg.WindowEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -2134,6 +2162,47 @@ func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersPara
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTrendingUsersByIDs = `-- name: GetTrendingUsersByIDs :many
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
+`
+
+func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) ([]User, error) {
+	rows, err := q.db.Query(ctx, getTrendingUsersByIDs, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -2980,6 +3049,61 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
+select f.id, f.version, f.owner_id, f.action, f.data, f.event_time, f.event_ids, f.deleted, f.last_updated, f.created_at, f.caption from feed_events f join unnest($1::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
+  and t.pos < $2::int
+  and t.pos > $3::int
+  order by case when $4::bool then t.pos end asc,
+          case when not $4::bool then t.pos end desc
+  limit $5
+`
+
+type PaginateTrendingFeedParams struct {
+	FeedEventIds  []string
+	CurBeforePos  int32
+	CurAfterPos   int32
+	PagingForward bool
+	Limit         int32
+}
+
+func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]FeedEvent, error) {
+	rows, err := q.db.Query(ctx, paginateTrendingFeed,
+		arg.FeedEventIds,
+		arg.CurBeforePos,
+		arg.CurAfterPos,
+		arg.PagingForward,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeedEvent
+	for rows.Next() {
+		var i FeedEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.OwnerID,
+			&i.Action,
+			&i.Data,
+			&i.EventTime,
+			&i.EventIds,
+			&i.Deleted,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Caption,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const redeemMerch = `-- name: RedeemMerch :one

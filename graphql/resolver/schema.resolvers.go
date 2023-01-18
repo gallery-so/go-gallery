@@ -6,7 +6,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -1339,6 +1338,23 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 	}, nil
 }
 
+func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
 }
@@ -1376,30 +1392,17 @@ func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) 
 }
 
 func (r *queryResolver) TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error) {
-	trendingIDs, err := publicapi.For(ctx).Feed.TrendingUserIDs(ctx, input.Report)
+	users, err := publicapi.For(ctx).Feed.TrendingUsers(ctx, input.Report)
 	if err != nil {
 		return nil, err
 	}
 
-	ranking := map[persist.DBID]int{}
-	for i, u := range trendingIDs {
-		ranking[u] = i
+	result := make([]*model.GalleryUser, len(users))
+	for i, u := range users {
+		result[i] = userToModel(ctx, u)
 	}
 
-	trendingUsers, _, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, trendingIDs, nil, nil, nil, util.IntToPointer(len(trendingIDs)))
-	if err != nil {
-		return nil, err
-	}
-	sort.SliceStable(trendingUsers, func(i, j int) bool {
-		return ranking[trendingUsers[i].ID] < ranking[trendingUsers[j].ID]
-	})
-
-	users := make([]*model.GalleryUser, len(trendingUsers))
-	for i, u := range trendingUsers {
-		users[i] = userToModel(ctx, u)
-	}
-
-	return model.TrendingUsersPayload{Users: users}, nil
+	return model.TrendingUsersPayload{Users: result}, nil
 }
 
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
