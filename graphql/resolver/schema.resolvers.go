@@ -273,7 +273,7 @@ func (r *followUserPayloadResolver) User(ctx context.Context, obj *model.FollowU
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
 }
 
-func (r *galleryResolver) TokenPreviews(ctx context.Context, obj *model.Gallery) ([]*string, error) {
+func (r *galleryResolver) TokenPreviews(ctx context.Context, obj *model.Gallery) ([]*model.PreviewURLSet, error) {
 	return resolveTokenPreviewsByGalleryID(ctx, obj.Dbid)
 }
 
