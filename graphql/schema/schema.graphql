@@ -375,7 +375,7 @@ type Gallery implements Node {
   description: String
   position: String
   hidden: Boolean
-  tokenPreviews: [String] @goField(forceResolver: true)
+  tokenPreviews: [PreviewURLSet] @goField(forceResolver: true)
   owner: GalleryUser @goField(forceResolver: true)
   collections: [Collection] @goField(forceResolver: true)
 }

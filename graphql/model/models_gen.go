@@ -961,14 +961,14 @@ func (GIFMedia) IsMediaSubtype() {}
 func (GIFMedia) IsMedia()        {}
 
 type Gallery struct {
-	Dbid          persist.DBID  `json:"dbid"`
-	Name          *string       `json:"name"`
-	Description   *string       `json:"description"`
-	Position      *string       `json:"position"`
-	Hidden        *bool         `json:"hidden"`
-	TokenPreviews []*string     `json:"tokenPreviews"`
-	Owner         *GalleryUser  `json:"owner"`
-	Collections   []*Collection `json:"collections"`
+	Dbid          persist.DBID     `json:"dbid"`
+	Name          *string          `json:"name"`
+	Description   *string          `json:"description"`
+	Position      *string          `json:"position"`
+	Hidden        *bool            `json:"hidden"`
+	TokenPreviews []*PreviewURLSet `json:"tokenPreviews"`
+	Owner         *GalleryUser     `json:"owner"`
+	Collections   []*Collection    `json:"collections"`
 }
 
 func (Gallery) IsNode()                      {}

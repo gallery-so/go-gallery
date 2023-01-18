@@ -348,14 +348,14 @@ func resolveCollectionsByGalleryID(ctx context.Context, galleryID persist.DBID) 
 	return output, nil
 }
 
-func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*string, error) {
-	tokens, err := publicapi.For(ctx).Gallery.GetTokenPreviewsByGalleryID(ctx, galleryID)
+func resolveTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]*model.PreviewURLSet, error) {
+	medias, err := publicapi.For(ctx).Gallery.GetTokenPreviewsByGalleryID(ctx, galleryID)
 	if err != nil {
 		return nil, err
 	}
 
-	return util.Map(tokens, func(token string) (*string, error) {
-		return &token, nil
+	return util.Map(medias, func(token persist.Media) (*model.PreviewURLSet, error) {
+		return getPreviewUrls(ctx, token), nil
 	})
 }
 
