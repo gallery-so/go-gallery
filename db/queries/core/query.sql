@@ -653,7 +653,10 @@ update galleries set hidden = @hidden, last_updated = now() where id = @id and d
 with updates as (
     select unnest(@gallery_ids::text[]) as id, unnest(@positions::text[]) as position
 )
-update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false;
+update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false and g.owner_user_id = @owner_user_id;
+
+-- name: UserHasDuplicateGalleryPositions :one
+select exists(select position,count(*) from galleries where owner_user_id = $1 group by position having count(*) > 0);
 
 -- name: UpdateGalleryInfo :exec
 update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;

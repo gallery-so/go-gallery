@@ -468,6 +468,11 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 		return err
 	}
 
+	user, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
 	ids := make([]string, len(positions))
 	pos := make([]string, len(positions))
 	for i, position := range positions {
@@ -475,15 +480,32 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 		pos[i] = position.Position
 	}
 
-	err := api.queries.UpdateGalleryPositions(ctx, db.UpdateGalleryPositionsParams{
-		GalleryIds: ids,
-		Positions:  pos,
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	q := api.queries.WithTx(tx)
+
+	err = q.UpdateGalleryPositions(ctx, db.UpdateGalleryPositionsParams{
+		GalleryIds:  ids,
+		Positions:   pos,
+		OwnerUserID: user,
 	})
 	if err != nil {
 		return err
 	}
 
-	return nil
+	areDuplicates, err := q.UserHasDuplicateGalleryPositions(ctx, user)
+	if err != nil {
+		return err
+	}
+	if areDuplicates {
+		return fmt.Errorf("gallery positions are not unique for user %s", user)
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {

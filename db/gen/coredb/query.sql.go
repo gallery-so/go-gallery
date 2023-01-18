@@ -3112,18 +3112,19 @@ func (q *Queries) UpdateGalleryInfo(ctx context.Context, arg UpdateGalleryInfoPa
 
 const updateGalleryPositions = `-- name: UpdateGalleryPositions :exec
 with updates as (
-    select unnest($1::text[]) as id, unnest($2::text[]) as position
+    select unnest($2::text[]) as id, unnest($3::text[]) as position
 )
-update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false
+update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false and g.owner_user_id = $1
 `
 
 type UpdateGalleryPositionsParams struct {
-	GalleryIds []string
-	Positions  []string
+	OwnerUserID persist.DBID
+	GalleryIds  []string
+	Positions   []string
 }
 
 func (q *Queries) UpdateGalleryPositions(ctx context.Context, arg UpdateGalleryPositionsParams) error {
-	_, err := q.db.Exec(ctx, updateGalleryPositions, arg.GalleryIds, arg.Positions)
+	_, err := q.db.Exec(ctx, updateGalleryPositions, arg.OwnerUserID, arg.GalleryIds, arg.Positions)
 	return err
 }
 
@@ -3242,4 +3243,15 @@ type UpdateUserVerificationStatusParams struct {
 func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {
 	_, err := q.db.Exec(ctx, updateUserVerificationStatus, arg.ID, arg.EmailVerified)
 	return err
+}
+
+const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one
+select exists(select position,count(*) from galleries where owner_user_id = $1 group by position having count(*) > 0)
+`
+
+func (q *Queries) UserHasDuplicateGalleryPositions(ctx context.Context, ownerUserID persist.DBID) (bool, error) {
+	row := q.db.QueryRow(ctx, userHasDuplicateGalleryPositions, ownerUserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
