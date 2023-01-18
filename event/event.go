@@ -227,10 +227,17 @@ func (h notificationHandler) handleDelayed(ctx context.Context, persistedEvent d
 	if err != nil {
 		return err
 	}
+
 	// Don't notify the user on self events
 	if persist.DBID(persist.NullStrToStr(persistedEvent.ActorID)) == owner {
 		return nil
 	}
+
+	// Don't notify the user on un-authed views
+	if persistedEvent.Action == persist.ActionViewedGallery && persistedEvent.ActorID.String == "" {
+		return nil
+	}
+
 	return h.notificationHandlers.Notifications.Dispatch(ctx, db.Notification{
 		OwnerID:     owner,
 		Action:      persistedEvent.Action,

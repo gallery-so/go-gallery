@@ -12,12 +12,14 @@ import (
 	"strings"
 
 	"github.com/gammazero/workerpool"
+	"github.com/magiclabs/magic-admin-go/token"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/mikeydub/go-gallery/debugtools"
 	"github.com/spf13/viper"
@@ -150,8 +152,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrCommentNotFound{Message: message}
 	case publicapi.ErrTokenRefreshFailed:
 		mappedErr = model.ErrSyncFailed{Message: message}
-	case publicapi.ErrInvalidInput:
-		validationErr, _ := err.(publicapi.ErrInvalidInput)
+	case validate.ErrInvalidInput:
+		validationErr, _ := err.(validate.ErrInvalidInput)
 		mappedErr = model.ErrInvalidInput{Message: message, Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 	case persist.ErrFeedEventNotFoundByID:
 		mappedErr = model.ErrFeedEventNotFound{Message: message}
@@ -188,6 +190,14 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 	if m.GnosisSafe != nil {
 		// GnosisSafe passes an empty signature
 		return authApi.NewNonceAuthenticator(persist.NewChainPubKey(persist.PubKey(m.GnosisSafe.Address), persist.ChainETH), m.GnosisSafe.Nonce, "0x", persist.WalletTypeGnosis), nil
+	}
+
+	if m.MagicLink != nil && m.MagicLink.Token != "" {
+		t, err := token.NewToken(m.MagicLink.Token)
+		if err != nil {
+			return nil, err
+		}
+		return authApi.NewMagicLinkAuthenticator(*t), nil
 	}
 
 	return nil, errNoAuthMechanismFound
@@ -643,6 +653,21 @@ func resolveWalletsByUserID(ctx context.Context, userID persist.DBID) ([]*model.
 	}
 
 	return output, nil
+}
+
+func resolvePrimaryWalletByUserID(ctx context.Context, userID persist.DBID) (*model.Wallet, error) {
+
+	user, err := publicapi.For(ctx).User.GetUserById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	wallet, err := publicapi.For(ctx).Wallet.GetWalletByID(ctx, user.PrimaryWalletID)
+	if err != nil {
+		return nil, err
+	}
+
+	return walletToModelSqlc(ctx, *wallet), nil
 }
 
 func resolveFeedEventByEventID(ctx context.Context, eventID persist.DBID) (*model.FeedEvent, error) {

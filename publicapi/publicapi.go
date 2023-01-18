@@ -3,11 +3,13 @@ package publicapi
 import (
 	"context"
 	"errors"
-	"fmt"
 
+	magicclient "github.com/magiclabs/magic-admin-go/client"
+	admin "github.com/mikeydub/go-gallery/adminapi"
 	"github.com/mikeydub/go-gallery/graphql/apq"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -53,13 +55,12 @@ type PublicAPI struct {
 	Feed          *FeedAPI
 	Notifications *NotificationsAPI
 	Interaction   *InteractionAPI
-	Admin         *AdminAPI
+	Admin         *admin.AdminAPI
 	Merch         *MerchAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
-
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
 	validator := validate.WithCustomValidators()
 
@@ -70,7 +71,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		validator: validator,
 		APQ:       apq,
 
-		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
+		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
@@ -78,10 +79,10 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Token:         &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
 		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:          &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
-		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, cache: feedCache},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
-		Admin:         &AdminAPI{queries: queries, loaders: loaders, validator: validator},
+		Admin:         admin.NewAPI(repos, queries, validator),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }
@@ -117,52 +118,6 @@ func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
 
 	userID := auth.GetUserIDFromCtx(gc)
 	return userID, nil
-}
-
-type valWithTags struct {
-	value interface{}
-	tag   string
-}
-
-type validationMap map[string]valWithTags
-
-func validateFields(validator *validator.Validate, fields validationMap) error {
-	validationErr := ErrInvalidInput{}
-	foundErrors := false
-
-	for k, v := range fields {
-		err := validator.Var(v.value, v.tag)
-		if err != nil {
-			foundErrors = true
-			validationErr.Append(k, err.Error())
-		}
-	}
-
-	if foundErrors {
-		return validationErr
-	}
-
-	return nil
-}
-
-type ErrInvalidInput struct {
-	Parameters []string
-	Reasons    []string
-}
-
-func (e *ErrInvalidInput) Append(parameter string, reason string) {
-	e.Parameters = append(e.Parameters, parameter)
-	e.Reasons = append(e.Reasons, reason)
-}
-
-func (e ErrInvalidInput) Error() string {
-	str := "invalid input:\n"
-
-	for i := range e.Parameters {
-		str += fmt.Sprintf("    parameter: %s, reason: %s\n", e.Parameters[i], e.Reasons[i])
-	}
-
-	return str
 }
 
 func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {

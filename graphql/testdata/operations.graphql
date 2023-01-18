@@ -52,6 +52,16 @@ query viewerQuery {
   }
 }
 
+query trendingUsersQuery($input: TrendingUsersInput!) {
+  trendingUsers(input: $input) {
+    ... on TrendingUsersPayload {
+      users {
+        dbid
+      }
+    }
+  }
+}
+
 mutation createUserMutation($authMechanism: AuthMechanism!, $input: CreateUserInput!) {
   createUser(authMechanism: $authMechanism, input: $input) {
     ... on Error {

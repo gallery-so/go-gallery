@@ -601,6 +601,11 @@ update users set email_verified = 0 where users.id = @user_id;
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
 
+-- name: UpdateUserPrimaryWallet :exec
+update users set primary_wallet_id = @wallet_id from wallets
+    where users.id = @user_id and wallets.id = @wallet_id
+    and wallets.id = any(users.wallets) and wallets.deleted = false;
+
 -- name: GetUsersByChainAddresses :many
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
 
@@ -679,3 +684,15 @@ update collections set nfts = @nfts, last_updated = now() where id = @id and del
 
 -- name: CreateCollection :one
 insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
+
+-- name: GetTrendingUsers :many
+with rollup as (
+	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= @window_end group by e.gallery_id
+)
+select p.id from (
+	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
+	from rollup r, galleries g, users u
+	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
+	group by u.id
+) p
+where position <= @size::int;

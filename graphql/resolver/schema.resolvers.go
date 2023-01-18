@@ -6,6 +6,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -17,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model.GalleryUser, error) {
@@ -322,6 +324,10 @@ func (r *galleryUserResolver) TokensByChain(ctx context.Context, obj *model.Gall
 
 func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
 	return resolveWalletsByUserID(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error) {
+	return resolvePrimaryWalletByUserID(ctx, obj.HelperGalleryUserData.UserID)
 }
 
 func (r *galleryUserResolver) FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error) {
@@ -1124,6 +1130,20 @@ func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, 
 	return userToModel(ctx, *user), nil
 }
 
+func (r *mutationResolver) AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).Admin.AddWalletToUserUnchecked(ctx, input.Username, *input.ChainAddress, input.WalletType)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, input.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.AdminAddWalletPayload{User: userToModel(ctx, *user)}, nil
+}
+
 func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.RemoveRolesFromUser(ctx, username, roles)
 
@@ -1185,6 +1205,16 @@ func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *mo
 	message := "Persisted queries uploaded successfully"
 
 	return model.UploadPersistedQueriesPayload{Message: &message}, nil
+}
+
+func (r *mutationResolver) UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateUserPrimaryWallet(ctx, walletID)
+	if err != nil {
+		return nil, err
+	}
+	return model.UpdatePrimaryWalletPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
@@ -1252,7 +1282,7 @@ func (r *queryResolver) CollectionsByIds(ctx context.Context, ids []persist.DBID
 			models[i] = collections[i]
 		} else if notFoundErr, ok := err.(persist.ErrCollectionNotFoundByID); ok {
 			models[i] = model.ErrCollectionNotFound{Message: notFoundErr.Error()}
-		} else if validationErr, ok := err.(publicapi.ErrInvalidInput); ok {
+		} else if validationErr, ok := err.(validate.ErrInvalidInput); ok {
 			models[i] = model.ErrInvalidInput{Message: validationErr.Error(), Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 		} else {
 			// Unhandled error -- add it to the unhandled error stack, but don't fail the whole operation
@@ -1325,26 +1355,6 @@ func (r *queryResolver) GetMerchTokens(ctx context.Context, wallet persist.Addre
 	return output, nil
 }
 
-func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
-	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
-	if err != nil {
-		return nil, err
-	}
-
-	edges := make([]*model.UserEdge, len(users))
-	for i, user := range users {
-		edges[i] = &model.UserEdge{
-			Node:   userToModel(ctx, user),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
-	return &model.UsersConnection{
-		Edges:    edges,
-		PageInfo: pageInfoToModel(ctx, pageInfo),
-	}, nil
-}
-
 func (r *queryResolver) GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error) {
 	gallery, err := resolveGalleryByGalleryID(ctx, id)
 
@@ -1363,6 +1373,53 @@ func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) 
 	}
 
 	return gallery, nil
+}
+
+func (r *queryResolver) TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error) {
+	trendingIDs, err := publicapi.For(ctx).Feed.TrendingUserIDs(ctx, input.Report)
+	if err != nil {
+		return nil, err
+	}
+
+	ranking := map[persist.DBID]int{}
+	for i, u := range trendingIDs {
+		ranking[u] = i
+	}
+
+	trendingUsers, _, err := publicapi.For(ctx).User.GetUsersByIDs(ctx, trendingIDs, nil, nil, nil, util.IntToPointer(len(trendingIDs)))
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(trendingUsers, func(i, j int) bool {
+		return ranking[trendingUsers[i].ID] < ranking[trendingUsers[j].ID]
+	})
+
+	users := make([]*model.GalleryUser, len(trendingUsers))
+	for i, u := range trendingUsers {
+		users[i] = userToModel(ctx, u)
+	}
+
+	return model.TrendingUsersPayload{Users: users}, nil
+}
+
+func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.PaginateUsersWithRole(ctx, role, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.UserEdge, len(users))
+	for i, user := range users {
+		edges[i] = &model.UserEdge{
+			Node:   userToModel(ctx, user),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.UsersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {

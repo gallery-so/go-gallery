@@ -313,6 +313,7 @@ type User struct {
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
+	PrimaryWalletID      persist.DBID
 }
 
 type UserEvent struct {
@@ -351,6 +352,8 @@ type UsersWithPii struct {
 	NotificationSettings persist.UserNotificationSettings
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
+	FeaturedGallery      *persist.DBID
+	PrimaryWalletID      persist.DBID
 	PiiEmailAddress      persist.Email
 }
 

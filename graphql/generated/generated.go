@@ -93,6 +93,10 @@ type ComplexityRoot struct {
 		Viewer func(childComplexity int) int
 	}
 
+	AdminAddWalletPayload struct {
+		User func(childComplexity int) int
+	}
+
 	Admire struct {
 		Admirer      func(childComplexity int) int
 		CreationTime func(childComplexity int) int
@@ -477,6 +481,7 @@ type ComplexityRoot struct {
 		Galleries           func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAuthenticatedUser func(childComplexity int) int
+		PrimaryWallet       func(childComplexity int) int
 		Roles               func(childComplexity int) int
 		Tokens              func(childComplexity int) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
@@ -569,6 +574,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
+		AddWalletToUserUnchecked        func(childComplexity int, input model.AdminAddWalletInput) int
 		AdmireFeedEvent                 func(childComplexity int, feedEventID persist.DBID) int
 		BanUserFromFeed                 func(childComplexity int, username string, action string) int
 		ClearAllNotifications           func(childComplexity int) int
@@ -610,6 +616,7 @@ type ComplexityRoot struct {
 		UpdateGalleryInfo               func(childComplexity int, input model.UpdateGalleryInfoInput) int
 		UpdateGalleryOrder              func(childComplexity int, input model.UpdateGalleryOrderInput) int
 		UpdateNotificationSettings      func(childComplexity int, settings *model.NotificationSettingsInput) int
+		UpdatePrimaryWallet             func(childComplexity int, walletID persist.DBID) int
 		UpdateTokenInfo                 func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
 		UploadPersistedQueries          func(childComplexity int, input *model.UploadPersistedQueriesInput) int
@@ -684,6 +691,7 @@ type ComplexityRoot struct {
 		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
 		Node                    func(childComplexity int, id model.GqlID) int
 		TokenByID               func(childComplexity int, id persist.DBID) int
+		TrendingUsers           func(childComplexity int, input model.TrendingUsersInput) int
 		UserByAddress           func(childComplexity int, chainAddress persist.ChainAddress) int
 		UserByID                func(childComplexity int, id persist.DBID) int
 		UserByUsername          func(childComplexity int, username string) int
@@ -875,6 +883,10 @@ type ComplexityRoot struct {
 		PageInfo func(childComplexity int) int
 	}
 
+	TrendingUsersPayload struct {
+		Users func(childComplexity int) int
+	}
+
 	UnfollowUserPayload struct {
 		User   func(childComplexity int) int
 		Viewer func(childComplexity int) int
@@ -934,6 +946,10 @@ type ComplexityRoot struct {
 
 	UpdateGalleryPayload struct {
 		Gallery func(childComplexity int) int
+	}
+
+	UpdatePrimaryWalletPayload struct {
+		Viewer func(childComplexity int) int
 	}
 
 	UpdateTokenInfoPayload struct {
@@ -1102,6 +1118,7 @@ type GalleryUserResolver interface {
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
+	PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error)
 	FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error)
 	Galleries(ctx context.Context, obj *model.GalleryUser) ([]*model.Gallery, error)
 	Badges(ctx context.Context, obj *model.GalleryUser) ([]*model.Badge, error)
@@ -1155,10 +1172,12 @@ type MutationResolver interface {
 	VerifyEmail(ctx context.Context, input model.VerifyEmailInput) (model.VerifyEmailPayloadOrError, error)
 	RedeemMerch(ctx context.Context, input model.RedeemMerchInput) (model.RedeemMerchPayloadOrError, error)
 	AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (model.AddRolesToUserPayloadOrError, error)
+	AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error)
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
 	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
 	UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error)
+	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -1181,9 +1200,10 @@ type QueryResolver interface {
 	GlobalFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error)
 	GetMerchTokens(ctx context.Context, wallet persist.Address) (model.MerchTokensPayloadOrError, error)
-	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error)
 	ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error)
+	TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error)
+	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -1287,6 +1307,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AddUserWalletPayload.Viewer(childComplexity), true
+
+	case "AdminAddWalletPayload.user":
+		if e.complexity.AdminAddWalletPayload.User == nil {
+			break
+		}
+
+		return e.complexity.AdminAddWalletPayload.User(childComplexity), true
 
 	case "Admire.admirer":
 		if e.complexity.Admire.Admirer == nil {
@@ -2660,6 +2687,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.IsAuthenticatedUser(childComplexity), true
 
+	case "GalleryUser.primaryWallet":
+		if e.complexity.GalleryUser.PrimaryWallet == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.PrimaryWallet(childComplexity), true
+
 	case "GalleryUser.roles":
 		if e.complexity.GalleryUser.Roles == nil {
 			break
@@ -3024,6 +3058,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.AddUserWallet(childComplexity, args["chainAddress"].(persist.ChainAddress), args["authMechanism"].(model.AuthMechanism)), true
+
+	case "Mutation.addWalletToUserUnchecked":
+		if e.complexity.Mutation.AddWalletToUserUnchecked == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_addWalletToUserUnchecked_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AddWalletToUserUnchecked(childComplexity, args["input"].(model.AdminAddWalletInput)), true
 
 	case "Mutation.admireFeedEvent":
 		if e.complexity.Mutation.AdmireFeedEvent == nil {
@@ -3502,6 +3548,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateNotificationSettings(childComplexity, args["settings"].(*model.NotificationSettingsInput)), true
 
+	case "Mutation.updatePrimaryWallet":
+		if e.complexity.Mutation.UpdatePrimaryWallet == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updatePrimaryWallet_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdatePrimaryWallet(childComplexity, args["walletID"].(persist.DBID)), true
+
 	case "Mutation.updateTokenInfo":
 		if e.complexity.Mutation.UpdateTokenInfo == nil {
 			break
@@ -3910,6 +3968,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.TokenByID(childComplexity, args["id"].(persist.DBID)), true
+
+	case "Query.trendingUsers":
+		if e.complexity.Query.TrendingUsers == nil {
+			break
+		}
+
+		args, err := ec.field_Query_trendingUsers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TrendingUsers(childComplexity, args["input"].(model.TrendingUsersInput)), true
 
 	case "Query.userByAddress":
 		if e.complexity.Query.UserByAddress == nil {
@@ -4738,6 +4808,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TokensConnection.PageInfo(childComplexity), true
 
+	case "TrendingUsersPayload.users":
+		if e.complexity.TrendingUsersPayload.Users == nil {
+			break
+		}
+
+		return e.complexity.TrendingUsersPayload.Users(childComplexity), true
+
 	case "UnfollowUserPayload.user":
 		if e.complexity.UnfollowUserPayload.User == nil {
 			break
@@ -4870,6 +4947,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.UpdateGalleryPayload.Gallery(childComplexity), true
+
+	case "UpdatePrimaryWalletPayload.viewer":
+		if e.complexity.UpdatePrimaryWalletPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UpdatePrimaryWalletPayload.Viewer(childComplexity), true
 
 	case "UpdateTokenInfoPayload.token":
 		if e.complexity.UpdateTokenInfoPayload.Token == nil {
@@ -5328,6 +5412,7 @@ type GalleryUser implements Node @goEmbedHelper {
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
+  primaryWallet: Wallet @goField(forceResolver: true)
   featuredGallery: Gallery @goField(forceResolver: true)
   galleries: [Gallery] @goField(forceResolver: true)
   badges: [Badge] @goField(forceResolver: true)
@@ -5335,7 +5420,7 @@ type GalleryUser implements Node @goEmbedHelper {
   followers: [GalleryUser] @goField(forceResolver: true)
   following: [GalleryUser] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
-  @goField(forceResolver: true)
+    @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -5383,7 +5468,7 @@ union GalleryUserOrWallet = GalleryUser | Wallet
 union GalleryUserOrAddress = GalleryUser | ChainAddress
 
 union MediaSubtype =
-  ImageMedia
+    ImageMedia
   | GIFMedia
   | VideoMedia
   | AudioMedia
@@ -5585,9 +5670,7 @@ type OwnerAtBlock {
   blockNumber: String # source is uint64
 }
 
-type CollectionToken implements Node
-@goEmbedHelper
-@goGqlId(fields: ["tokenId", "collectionId"]) {
+type CollectionToken implements Node @goEmbedHelper @goGqlId(fields: ["tokenId", "collectionId"]) {
   id: ID!
   token: Token
   collection: Collection
@@ -5668,9 +5751,7 @@ type TokenHoldersConnection {
   pageInfo: PageInfo!
 }
 
-type Community implements Node
-@goGqlId(fields: ["contractAddress", "chain"])
-@goEmbedHelper {
+type Community implements Node @goGqlId(fields: ["contractAddress", "chain"]) @goEmbedHelper {
   dbid: DBID!
   id: ID!
 
@@ -5740,19 +5821,15 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   user: GalleryUser @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
-  @goField(forceResolver: true)
+    @goField(forceResolver: true)
 
   email: UserEmail @goField(forceResolver: true)
   """
   Returns a list of notifications in reverse chronological order.
   Seen notifications come after unseen notifications
   """
-  notifications(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): NotificationsConnection @goField(forceResolver: true)
+  notifications(before: String, after: String, first: Int, last: Int): NotificationsConnection
+    @goField(forceResolver: true)
 
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 }
@@ -5822,20 +5899,11 @@ type ErrTokenNotFound implements Error {
   message: String!
 }
 
-union CollectionByIdOrError =
-  Collection
-  | ErrCollectionNotFound
-  | ErrInvalidInput
+union CollectionByIdOrError = Collection | ErrCollectionNotFound | ErrInvalidInput
 
-union CollectionTokenByIdOrError =
-  CollectionToken
-  | ErrCollectionNotFound
-  | ErrTokenNotFound
+union CollectionTokenByIdOrError = CollectionToken | ErrCollectionNotFound | ErrTokenNotFound
 
-union CommunityByAddressOrError =
-  Community
-  | ErrCommunityNotFound
-  | ErrInvalidInput
+union CommunityByAddressOrError = Community | ErrCommunityNotFound | ErrInvalidInput
 
 type Admire implements Node {
   id: ID!
@@ -5918,18 +5986,10 @@ type FeedEvent implements Node {
   dbid: DBID!
 
   eventData: FeedEventData @goField(forceResolver: true)
-  admires(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): FeedEventAdmiresConnection @goField(forceResolver: true)
-  comments(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): FeedEventCommentsConnection @goField(forceResolver: true)
+  admires(before: String, after: String, first: Int, last: Int): FeedEventAdmiresConnection
+    @goField(forceResolver: true)
+  comments(before: String, after: String, first: Int, last: Int): FeedEventCommentsConnection
+    @goField(forceResolver: true)
   caption: String
 
   # If supplied, typeFilter will only query for the requested interaction types.
@@ -5986,8 +6046,7 @@ type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
   newCollectorsNote: String
 }
 
-type TokensAddedToCollectionFeedEventData implements FeedEventData
-@goEmbedHelper {
+type TokensAddedToCollectionFeedEventData implements FeedEventData @goEmbedHelper {
   eventTime: Time
   owner: GalleryUser @goField(forceResolver: true)
   collection: Collection @goField(forceResolver: true)
@@ -6079,6 +6138,21 @@ type ErrGalleryNotFound implements Error {
 union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
 union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
 
+enum ReportWindow {
+  LAST_7_DAYS
+  ALL_TIME
+}
+
+input TrendingUsersInput {
+  report: ReportWindow!
+}
+
+type TrendingUsersPayload {
+  # User are in descending order i.e. the most trending user is first.
+  users: [GalleryUser!]
+}
+
+union TrendingUsersPayloadOrError = TrendingUsersPayload
 
 type Query {
   node(id: ID!): Node
@@ -6091,36 +6165,23 @@ type Query {
   collectionById(id: DBID!): CollectionByIdOrError
   collectionsByIds(ids: [DBID!]!): [CollectionByIdOrError]
   tokenById(id: DBID!): TokenByIdOrError
-  collectionTokenById(
-    tokenId: DBID!
-    collectionId: DBID!
-  ): CollectionTokenByIdOrError
+  collectionTokenById(tokenId: DBID!, collectionId: DBID!): CollectionTokenByIdOrError
   communityByAddress(
     communityAddress: ChainAddressInput!
     forceRefresh: Boolean
   ): CommunityByAddressOrError
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
-  globalFeed(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): FeedConnection
+  globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
-
-  # Retool Specific
-  usersByRole(
-    role: Role!
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): UsersConnection @retoolAuth
-
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
+  trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
+
+  # Retool Specific
+  usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
+    @retoolAuth
 }
 
 input CollectionLayoutInput {
@@ -6148,10 +6209,7 @@ input CreateCollectionInput {
   caption: String
 }
 
-union CreateCollectionPayloadOrError =
-  CreateCollectionPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+union CreateCollectionPayloadOrError = CreateCollectionPayload | ErrNotAuthorized | ErrInvalidInput
 
 type CreateCollectionPayload {
   collection: Collection
@@ -6159,7 +6217,7 @@ type CreateCollectionPayload {
 }
 
 union DeleteCollectionPayloadOrError =
-  DeleteCollectionPayload
+    DeleteCollectionPayload
   | ErrNotAuthorized
   | ErrInvalidInput
   | ErrCollectionNotFound
@@ -6175,7 +6233,7 @@ input UpdateCollectionInfoInput {
 }
 
 union UpdateCollectionInfoPayloadOrError =
-  UpdateCollectionInfoPayload
+    UpdateCollectionInfoPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -6192,7 +6250,7 @@ input UpdateCollectionTokensInput {
 }
 
 union UpdateCollectionTokensPayloadOrError =
-  UpdateCollectionTokensPayload
+    UpdateCollectionTokensPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -6207,7 +6265,7 @@ input UpdateCollectionHiddenInput {
 }
 
 union UpdateCollectionHiddenPayloadOrError =
-  UpdateCollectionHiddenPayload
+    UpdateCollectionHiddenPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -6221,7 +6279,7 @@ input UpdateGalleryCollectionsInput {
 }
 
 union UpdateGalleryCollectionsPayloadOrError =
-  UpdateGalleryCollectionsPayload
+    UpdateGalleryCollectionsPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -6238,10 +6296,7 @@ input UpdateTokenInfoInput {
   collectionId: DBID
 }
 
-union UpdateTokenInfoPayloadOrError =
-  UpdateTokenInfoPayload
-  | ErrNotAuthorized
-  | ErrInvalidInput
+union UpdateTokenInfoPayloadOrError = UpdateTokenInfoPayload | ErrNotAuthorized | ErrInvalidInput
 
 type UpdateTokenInfoPayload {
   token: Token
@@ -6256,12 +6311,10 @@ type SetSpamPreferencePayload {
   tokens: [Token] @goField(forceResolver: true)
 }
 
-union SetSpamPreferencePayloadOrError =
-  SetSpamPreferencePayload
-  | ErrNotAuthorized
+union SetSpamPreferencePayloadOrError = SetSpamPreferencePayload | ErrNotAuthorized
 
 union AddUserWalletPayloadOrError =
-  AddUserWalletPayload
+    AddUserWalletPayload
   | ErrAuthenticationFailed
   | ErrNotAuthorized
   | ErrInvalidInput
@@ -6272,7 +6325,7 @@ type AddUserWalletPayload {
 }
 
 union RemoveUserWalletsPayloadOrError =
-  RemoveUserWalletsPayload
+    RemoveUserWalletsPayload
   | ErrNotAuthorized
   | ErrInvalidInput
 
@@ -6286,7 +6339,7 @@ input UpdateUserInfoInput {
 }
 
 union UpdateUserInfoPayloadOrError =
-  UpdateUserInfoPayload
+    UpdateUserInfoPayload
   | ErrNotAuthorized
   | ErrUsernameNotAvailable
   | ErrInvalidInput
@@ -6295,37 +6348,25 @@ type UpdateUserInfoPayload {
   viewer: Viewer
 }
 
-union SyncTokensPayloadOrError =
-  SyncTokensPayload
-  | ErrNotAuthorized
-  | ErrSyncFailed
+union SyncTokensPayloadOrError = SyncTokensPayload | ErrNotAuthorized | ErrSyncFailed
 
 type SyncTokensPayload {
   viewer: Viewer
 }
 
-union RefreshTokenPayloadOrError =
-  RefreshTokenPayload
-  | ErrInvalidInput
-  | ErrSyncFailed
+union RefreshTokenPayloadOrError = RefreshTokenPayload | ErrInvalidInput | ErrSyncFailed
 
 type RefreshTokenPayload {
   token: Token
 }
 
-union RefreshCollectionPayloadOrError =
-  RefreshCollectionPayload
-  | ErrInvalidInput
-  | ErrSyncFailed
+union RefreshCollectionPayloadOrError = RefreshCollectionPayload | ErrInvalidInput | ErrSyncFailed
 
 type RefreshCollectionPayload {
   collection: Collection
 }
 
-union RefreshContractPayloadOrError =
-  RefreshContractPayload
-  | ErrInvalidInput
-  | ErrSyncFailed
+union RefreshContractPayloadOrError = RefreshContractPayload | ErrInvalidInput | ErrSyncFailed
 
 type RefreshContractPayload {
   contract: Contract
@@ -6362,10 +6403,7 @@ type ErrCommunityNotFound implements Error {
   message: String!
 }
 
-union AuthorizationError =
-  ErrNoCookie
-  | ErrInvalidToken
-  | ErrDoesNotOwnRequiredToken
+union AuthorizationError = ErrNoCookie | ErrInvalidToken | ErrDoesNotOwnRequiredToken
 
 type ErrNotAuthorized implements Error {
   message: String!
@@ -6410,6 +6448,7 @@ input AuthMechanism {
   eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
   debug: DebugAuth
+  magicLink: MagicLinkAuth
 }
 
 input EoaAuth {
@@ -6442,6 +6481,10 @@ input GnosisSafeAuth {
   nonce: String!
 }
 
+input MagicLinkAuth {
+  token: String!
+}
+
 input DeepRefreshInput {
   chain: Chain!
 }
@@ -6454,7 +6497,7 @@ type DeepRefreshPayload {
 union DeepRefreshPayloadOrError = DeepRefreshPayload | ErrNotAuthorized
 
 union LoginPayloadOrError =
-  LoginPayload
+    LoginPayload
   | ErrUserNotFound
   | ErrAuthenticationFailed
   | ErrDoesNotOwnRequiredToken
@@ -6478,7 +6521,7 @@ input CreateUserInput {
 }
 
 union CreateUserPayloadOrError =
-  CreateUserPayload
+    CreateUserPayload
   | ErrAuthenticationFailed
   | ErrDoesNotOwnRequiredToken
   | ErrUserAlreadyExists
@@ -6493,13 +6536,13 @@ type CreateUserPayload {
 }
 
 union FollowUserPayloadOrError =
-  FollowUserPayload
+    FollowUserPayload
   | ErrAuthenticationFailed
   | ErrUserNotFound
   | ErrInvalidInput
 
 union UnfollowUserPayloadOrError =
-  UnfollowUserPayload
+    UnfollowUserPayload
   | ErrAuthenticationFailed
   | ErrUserNotFound
   | ErrInvalidInput
@@ -6515,27 +6558,27 @@ type UnfollowUserPayload {
 }
 
 union AdmireFeedEventPayloadOrError =
-  AdmireFeedEventPayload
+    AdmireFeedEventPayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
   | ErrAdmireAlreadyExists
 
 union RemoveAdmirePayloadOrError =
-  RemoveAdmirePayload
+    RemoveAdmirePayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
   | ErrAdmireNotFound
 
 union CommentOnFeedEventPayloadOrError =
-  CommentOnFeedEventPayload
+    CommentOnFeedEventPayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
 
 union RemoveCommentPayloadOrError =
-  RemoveCommentPayload
+    RemoveCommentPayload
   | ErrAuthenticationFailed
   | ErrFeedEventNotFound
   | ErrInvalidInput
@@ -6592,7 +6635,7 @@ type GroupNotificationUsersConnection @goEmbedHelper {
 }
 
 type SomeoneFollowedYouNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -6600,16 +6643,12 @@ type SomeoneFollowedYouNotification implements Notification & Node & GroupedNoti
   updatedTime: Time
   count: Int
 
-  followers(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
 }
 
 type SomeoneFollowedYouBackNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -6617,16 +6656,12 @@ type SomeoneFollowedYouBackNotification implements Notification & Node & Grouped
   updatedTime: Time
   count: Int
 
-  followers(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): GroupNotificationUsersConnection @goField(forceResolver: true)
+  followers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
 }
 
 type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -6635,16 +6670,11 @@ type SomeoneAdmiredYourFeedEventNotification implements Notification & Node & Gr
   count: Int
 
   feedEvent: FeedEvent @goField(forceResolver: true)
-  admirers(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): GroupNotificationUsersConnection @goField(forceResolver: true)
+  admirers(before: String, after: String, first: Int, last: Int): GroupNotificationUsersConnection
+    @goField(forceResolver: true)
 }
 
-type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
-@goEmbedHelper {
+type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -6658,7 +6688,7 @@ type SomeoneCommentedOnYourFeedEventNotification implements Notification & Node
 }
 
 type SomeoneViewedYourGalleryNotification implements Notification & Node & GroupedNotification
-@goEmbedHelper {
+  @goEmbedHelper {
   id: ID!
   dbid: DBID!
   seen: Boolean
@@ -6731,25 +6761,21 @@ type ResendVerificationEmailPayload {
   viewer: Viewer
 }
 
-union ResendVerificationEmailPayloadOrError =
-  ResendVerificationEmailPayload
-  | ErrInvalidInput
+union ResendVerificationEmailPayloadOrError = ResendVerificationEmailPayload | ErrInvalidInput
 
 type UpdateEmailNotificationSettingsPayload {
   viewer: Viewer
 }
 
 union UpdateEmailNotificationSettingsPayloadOrError =
-  UpdateEmailNotificationSettingsPayload
+    UpdateEmailNotificationSettingsPayload
   | ErrInvalidInput
 
 type UnsubscribeFromEmailTypePayload {
   viewer: Viewer
 }
 
-union UnsubscribeFromEmailTypePayloadOrError =
-  UnsubscribeFromEmailTypePayload
-  | ErrInvalidInput
+union UnsubscribeFromEmailTypePayloadOrError = UnsubscribeFromEmailTypePayload | ErrInvalidInput
 
 union AddRolesToUserPayloadOrError = GalleryUser | ErrNotAuthorized
 union RevokeRolesFromUserPayloadOrError = GalleryUser | ErrNotAuthorized
@@ -6758,9 +6784,7 @@ input UploadPersistedQueriesInput {
   persistedQueries: String
 }
 
-union UploadPersistedQueriesPayloadOrError =
-  UploadPersistedQueriesPayload
-  | ErrNotAuthorized
+union UploadPersistedQueriesPayloadOrError = UploadPersistedQueriesPayload | ErrNotAuthorized
 
 type UploadPersistedQueriesPayload {
   message: String
@@ -6789,7 +6813,7 @@ type SyncTokensForUsernamePayload {
 }
 
 union SyncTokensForUsernamePayloadOrError =
-  SyncTokensForUsernamePayload
+    SyncTokensForUsernamePayload
   | ErrNotAuthorized
   | ErrSyncFailed
 
@@ -6829,17 +6853,14 @@ type CreateGalleryPayload {
   gallery: Gallery
 }
 
-union CreateGalleryPayloadOrError =
-  CreateGalleryPayload
-  | ErrInvalidInput
-  | ErrNotAuthorized
+union CreateGalleryPayloadOrError = CreateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
 type UpdateGalleryInfoPayload {
   gallery: Gallery
 }
 
 union UpdateGalleryInfoPayloadOrError =
-  UpdateGalleryInfoPayload
+    UpdateGalleryInfoPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -6848,7 +6869,7 @@ type UpdateGalleryHiddenPayload {
 }
 
 union UpdateGalleryHiddenPayloadOrError =
-  UpdateGalleryHiddenPayload
+    UpdateGalleryHiddenPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -6856,17 +6877,14 @@ type DeleteGalleryPayload {
   deletedId: DeletedNode
 }
 
-union DeleteGalleryPayloadOrError =
-  DeleteGalleryPayload
-  | ErrInvalidInput
-  | ErrNotAuthorized
+union DeleteGalleryPayloadOrError = DeleteGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
 type UpdateGalleryOrderPayload {
   viewer: Viewer
 }
 
 union UpdateGalleryOrderPayloadOrError =
-  UpdateGalleryOrderPayload
+    UpdateGalleryOrderPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -6875,7 +6893,7 @@ type UpdateFeaturedGalleryPayload {
 }
 
 union UpdateFeaturedGalleryPayloadOrError =
-  UpdateFeaturedGalleryPayload
+    UpdateFeaturedGalleryPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -6919,9 +6937,31 @@ type UpdateGalleryPayload {
   gallery: Gallery
 }
 
-union UpdateGalleryPayloadOrError =
-  UpdateGalleryPayload
+type UpdatePrimaryWalletPayload {
+  viewer: Viewer
+}
+
+union UpdatePrimaryWalletPayloadOrError =
+    UpdatePrimaryWalletPayload
   | ErrInvalidInput
+  | ErrNotAuthorized
+
+union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
+
+input AdminAddWalletInput {
+  username: String!
+  chainAddress: ChainAddressInput!
+  walletType: WalletType!
+}
+
+type AdminAddWalletPayload {
+  user: GalleryUser
+}
+
+union AdminAddWalletPayloadOrError =
+    AdminAddWalletPayload
+  | ErrUserNotFound
+  | ErrAddressOwnedByUser
   | ErrNotAuthorized
 
 type Mutation {
@@ -6930,10 +6970,8 @@ type Mutation {
     chainAddress: ChainAddressInput!
     authMechanism: AuthMechanism!
   ): AddUserWalletPayloadOrError @authRequired
-  removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError
-  @authRequired
-  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError
-  @authRequired
+  removeUserWallets(walletIds: [DBID!]!): RemoveUserWalletsPayloadOrError @authRequired
+  updateUserInfo(input: UpdateUserInfoInput!): UpdateUserInfoPayloadOrError @authRequired
 
   # Gallery Mutations
   updateGalleryCollections(
@@ -6941,27 +6979,19 @@ type Mutation {
   ): UpdateGalleryCollectionsPayloadOrError @authRequired
 
   # Collection Mutations
-  createCollection(
-    input: CreateCollectionInput!
-  ): CreateCollectionPayloadOrError @authRequired
-  deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError
-  @authRequired
-  updateCollectionInfo(
-    input: UpdateCollectionInfoInput!
-  ): UpdateCollectionInfoPayloadOrError @authRequired
-  updateCollectionTokens(
-    input: UpdateCollectionTokensInput!
-  ): UpdateCollectionTokensPayloadOrError @authRequired
-  updateCollectionHidden(
-    input: UpdateCollectionHiddenInput!
-  ): UpdateCollectionHiddenPayloadOrError @authRequired
+
+  createCollection(input: CreateCollectionInput!): CreateCollectionPayloadOrError @authRequired
+  deleteCollection(collectionId: DBID!): DeleteCollectionPayloadOrError @authRequired
+  updateCollectionInfo(input: UpdateCollectionInfoInput!): UpdateCollectionInfoPayloadOrError
+    @authRequired
+  updateCollectionTokens(input: UpdateCollectionTokensInput!): UpdateCollectionTokensPayloadOrError
+    @authRequired
+  updateCollectionHidden(input: UpdateCollectionHiddenInput!): UpdateCollectionHiddenPayloadOrError
+    @authRequired
 
   # Token Mutations
-  updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError
-  @authRequired
-  setSpamPreference(
-    input: SetSpamPreferenceInput!
-  ): SetSpamPreferencePayloadOrError @authRequired
+  updateTokenInfo(input: UpdateTokenInfoInput!): UpdateTokenInfoPayloadOrError @authRequired
+  setSpamPreference(input: SetSpamPreferenceInput!): SetSpamPreferencePayloadOrError @authRequired
 
   syncTokens(chains: [Chain!]): SyncTokensPayloadOrError @authRequired
   refreshToken(tokenId: DBID!): RefreshTokenPayloadOrError
@@ -6971,10 +7001,7 @@ type Mutation {
 
   getAuthNonce(chainAddress: ChainAddressInput!): GetAuthNoncePayloadOrError
 
-  createUser(
-    authMechanism: AuthMechanism!
-    input: CreateUserInput!
-  ): CreateUserPayloadOrError
+  createUser(authMechanism: AuthMechanism!, input: CreateUserInput!): CreateUserPayloadOrError
   updateEmail(input: UpdateEmailInput!): UpdateEmailPayloadOrError @authRequired
   resendVerificationEmail: ResendVerificationEmailPayloadOrError @authRequired
   updateEmailNotificationSettings(
@@ -6988,8 +7015,8 @@ type Mutation {
 
   followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
-  admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError
-  @authRequired
+
+  admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired
   removeAdmire(admireId: DBID!): RemoveAdmirePayloadOrError @authRequired
   commentOnFeedEvent(
     feedEventId: DBID!
@@ -7000,29 +7027,20 @@ type Mutation {
 
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
-  updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError
-  @authRequired
+  updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
 
-  createGallery(input: CreateGalleryInput!): CreateGalleryPayloadOrError
-  @authRequired
-  updateGalleryHidden(
-    input: UpdateGalleryHiddenInput!
-  ): UpdateGalleryHiddenPayloadOrError @authRequired
+  createGallery(input: CreateGalleryInput!): CreateGalleryPayloadOrError @authRequired
+  updateGalleryHidden(input: UpdateGalleryHiddenInput!): UpdateGalleryHiddenPayloadOrError
+    @authRequired
   deleteGallery(galleryId: DBID!): DeleteGalleryPayloadOrError @authRequired
-  updateGalleryOrder(
-    input: UpdateGalleryOrderInput!
-  ): UpdateGalleryOrderPayloadOrError @authRequired
-  updateGalleryInfo(
-    input: UpdateGalleryInfoInput!
-  ): UpdateGalleryInfoPayloadOrError @authRequired
-  updateFeaturedGallery(galleryId: DBID!): UpdateFeaturedGalleryPayloadOrError
-  @authRequired
+  updateGalleryOrder(input: UpdateGalleryOrderInput!): UpdateGalleryOrderPayloadOrError
+    @authRequired
+  updateGalleryInfo(input: UpdateGalleryInfoInput!): UpdateGalleryInfoPayloadOrError @authRequired
+  updateFeaturedGallery(galleryId: DBID!): UpdateFeaturedGalleryPayloadOrError @authRequired
 
   clearAllNotifications: ClearAllNotificationsPayload @authRequired
 
-  updateNotificationSettings(
-    settings: NotificationSettingsInput
-  ): NotificationSettings
+  updateNotificationSettings(settings: NotificationSettingsInput): NotificationSettings
 
   preverifyEmail(input: PreverifyEmailInput!): PreverifyEmailPayloadOrError
   verifyEmail(input: VerifyEmailInput!): VerifyEmailPayloadOrError
@@ -7030,33 +7048,26 @@ type Mutation {
   redeemMerch(input: RedeemMerchInput!): RedeemMerchPayloadOrError @authRequired
 
   # Retool Specific Mutations
-  addRolesToUser(
-    username: String!
-    roles: [Role]
-  ): AddRolesToUserPayloadOrError @retoolAuth
-  revokeRolesFromUser(
-    username: String!
-    roles: [Role]
-  ): RevokeRolesFromUserPayloadOrError @retoolAuth
-  syncTokensForUsername(
-    username: String!
-    chains: [Chain!]!
-  ): SyncTokensForUsernamePayloadOrError @retoolAuth
-  banUserFromFeed(
-    username: String!
-    action: String!
-  ): BanUserFromFeedPayloadOrError @retoolAuth
+  addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
+  revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
+    @retoolAuth
+  syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
+    @retoolAuth
+  banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
 
   # Gallery Frontend Deploy Persisted Queries
-  uploadPersistedQueries(
-    input: UploadPersistedQueriesInput
-  ): UploadPersistedQueriesPayloadOrError @frontendBuildAuth
+  uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
+    @frontendBuildAuth
+
+  updatePrimaryWallet(walletID: DBID!): UpdatePrimaryWalletPayloadOrError @authRequired
 }
 
 type Subscription {
   newNotification: Notification
   notificationUpdated: Notification
-}`, BuiltIn: false},
+}
+`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
@@ -7433,6 +7444,21 @@ func (ec *executionContext) field_Mutation_addUserWallet_args(ctx context.Contex
 		}
 	}
 	args["authMechanism"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_addWalletToUserUnchecked_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.AdminAddWalletInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNAdminAddWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -8060,6 +8086,21 @@ func (ec *executionContext) field_Mutation_updateNotificationSettings_args(ctx c
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_updatePrimaryWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.DBID
+	if tmp, ok := rawArgs["walletID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("walletID"))
+		arg0, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["walletID"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateTokenInfo_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -8357,6 +8398,21 @@ func (ec *executionContext) field_Query_tokenById_args(ctx context.Context, rawA
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_trendingUsers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.TrendingUsersInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -8806,6 +8862,38 @@ func (ec *executionContext) _AddUserWalletPayload_viewer(ctx context.Context, fi
 	res := resTmp.(*model.Viewer)
 	fc.Result = res
 	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AdminAddWalletPayload_user(ctx context.Context, field graphql.CollectedField, obj *model.AdminAddWalletPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AdminAddWalletPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Admire_id(ctx context.Context, field graphql.CollectedField, obj *model.Admire) (ret graphql.Marshaler) {
@@ -15116,6 +15204,38 @@ func (ec *executionContext) _GalleryUser_wallets(ctx context.Context, field grap
 	return ec.marshalOWallet2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _GalleryUser_primaryWallet(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().PrimaryWallet(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Wallet)
+	fc.Result = res
+	return ec.marshalOWallet2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWallet(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _GalleryUser_featuredGallery(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19015,6 +19135,65 @@ func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field 
 	return ec.marshalOAddRolesToUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAddRolesToUserPayloadOrError(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_addWalletToUserUnchecked(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_addWalletToUserUnchecked_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AddWalletToUserUnchecked(rctx, args["input"].(model.AdminAddWalletInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.AdminAddWalletPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.AdminAddWalletPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.AdminAddWalletPayloadOrError)
+	fc.Result = res
+	return ec.marshalOAdminAddWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletPayloadOrError(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_revokeRolesFromUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19249,6 +19428,65 @@ func (ec *executionContext) _Mutation_uploadPersistedQueries(ctx context.Context
 	res := resTmp.(model.UploadPersistedQueriesPayloadOrError)
 	fc.Result = res
 	return ec.marshalOUploadPersistedQueriesPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUploadPersistedQueriesPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updatePrimaryWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updatePrimaryWallet_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdatePrimaryWallet(rctx, args["walletID"].(persist.DBID))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdatePrimaryWalletPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdatePrimaryWalletPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdatePrimaryWalletPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdatePrimaryWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdatePrimaryWalletPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
@@ -20862,65 +21100,6 @@ func (ec *executionContext) _Query_getMerchTokens(ctx context.Context, field gra
 	return ec.marshalOMerchTokensPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokensPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Query_usersByRole_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().UsersByRole(rctx, args["role"].(persist.Role), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.RetoolAuth == nil {
-				return nil, errors.New("directive retoolAuth is not implemented")
-			}
-			return ec.directives.RetoolAuth(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*model.UsersConnection); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.UsersConnection`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.UsersConnection)
-	fc.Result = res
-	return ec.marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _Query_galleryById(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -20997,6 +21176,104 @@ func (ec *executionContext) _Query_viewerGalleryById(ctx context.Context, field 
 	res := resTmp.(model.ViewerGalleryByIDPayloadOrError)
 	fc.Result = res
 	return ec.marshalOViewerGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewerGalleryByIDPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_trendingUsers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_trendingUsers_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TrendingUsers(rctx, args["input"].(model.TrendingUsersInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.TrendingUsersPayloadOrError)
+	fc.Result = res
+	return ec.marshalOTrendingUsersPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_usersByRole_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().UsersByRole(rctx, args["role"].(persist.Role), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.RetoolAuth == nil {
+				return nil, errors.New("directive retoolAuth is not implemented")
+			}
+			return ec.directives.RetoolAuth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.UsersConnection); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.UsersConnection`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.UsersConnection)
+	fc.Result = res
+	return ec.marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -24491,6 +24768,38 @@ func (ec *executionContext) _TokensConnection_pageInfo(ctx context.Context, fiel
 	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐPageInfo(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TrendingUsersPayload_users(ctx context.Context, field graphql.CollectedField, obj *model.TrendingUsersPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TrendingUsersPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Users, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserᚄ(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -25097,6 +25406,38 @@ func (ec *executionContext) _UpdateGalleryPayload_gallery(ctx context.Context, f
 	res := resTmp.(*model.Gallery)
 	fc.Result = res
 	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UpdatePrimaryWalletPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdatePrimaryWalletPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdatePrimaryWalletPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _UpdateTokenInfoPayload_token(ctx context.Context, field graphql.CollectedField, obj *model.UpdateTokenInfoPayload) (ret graphql.Marshaler) {
@@ -27626,6 +27967,45 @@ func (ec *executionContext) ___Type_specifiedByURL(ctx context.Context, field gr
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputAdminAddWalletInput(ctx context.Context, obj interface{}) (model.AdminAddWalletInput, error) {
+	var it model.AdminAddWalletInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "username":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+			it.Username, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "chainAddress":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("chainAddress"))
+			it.ChainAddress, err = ec.unmarshalNChainAddressInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐChainAddress(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "walletType":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("walletType"))
+			it.WalletType, err = ec.unmarshalNWalletType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐWalletType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj interface{}) (model.AuthMechanism, error) {
 	var it model.AuthMechanism
 	asMap := map[string]interface{}{}
@@ -27680,6 +28060,14 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 			} else {
 				err := fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.DebugAuth`, tmp)
 				return it, graphql.ErrorOnPath(ctx, err)
+			}
+		case "magicLink":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("magicLink"))
+			it.MagicLink, err = ec.unmarshalOMagicLinkAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMagicLinkAuth(ctx, v)
+			if err != nil {
+				return it, err
 			}
 		}
 	}
@@ -28325,6 +28713,29 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputMagicLinkAuth(ctx context.Context, obj interface{}) (model.MagicLinkAuth, error) {
+	var it model.MagicLinkAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "token":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+			it.Token, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputNotificationSettingsInput(ctx context.Context, obj interface{}) (model.NotificationSettingsInput, error) {
 	var it model.NotificationSettingsInput
 	asMap := map[string]interface{}{}
@@ -28464,6 +28875,29 @@ func (ec *executionContext) unmarshalInputSetSpamPreferenceInput(ctx context.Con
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isSpam"))
 			it.IsSpam, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTrendingUsersInput(ctx context.Context, obj interface{}) (model.TrendingUsersInput, error) {
+	var it model.TrendingUsersInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "report":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("report"))
+			it.Report, err = ec.unmarshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -29139,6 +29573,43 @@ func (ec *executionContext) _AddUserWalletPayloadOrError(ctx context.Context, se
 			return graphql.Null
 		}
 		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _AdminAddWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.AdminAddWalletPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.AdminAddWalletPayload:
+		return ec._AdminAddWalletPayload(ctx, sel, &obj)
+	case *model.AdminAddWalletPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AdminAddWalletPayload(ctx, sel, obj)
+	case model.ErrUserNotFound:
+		return ec._ErrUserNotFound(ctx, sel, &obj)
+	case *model.ErrUserNotFound:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrUserNotFound(ctx, sel, obj)
+	case model.ErrAddressOwnedByUser:
+		return ec._ErrAddressOwnedByUser(ctx, sel, &obj)
+	case *model.ErrAddressOwnedByUser:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrAddressOwnedByUser(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -30883,6 +31354,22 @@ func (ec *executionContext) _TokenByIdOrError(ctx context.Context, sel ast.Selec
 	}
 }
 
+func (ec *executionContext) _TrendingUsersPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.TrendingUsersPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.TrendingUsersPayload:
+		return ec._TrendingUsersPayload(ctx, sel, &obj)
+	case *model.TrendingUsersPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._TrendingUsersPayload(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UnfollowUserPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -31259,6 +31746,36 @@ func (ec *executionContext) _UpdateGalleryPayloadOrError(ctx context.Context, se
 	}
 }
 
+func (ec *executionContext) _UpdatePrimaryWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdatePrimaryWalletPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdatePrimaryWalletPayload:
+		return ec._UpdatePrimaryWalletPayload(ctx, sel, &obj)
+	case *model.UpdatePrimaryWalletPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdatePrimaryWalletPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _UpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -31548,6 +32065,34 @@ func (ec *executionContext) _AddUserWalletPayload(ctx context.Context, sel ast.S
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._AddUserWalletPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var adminAddWalletPayloadImplementors = []string{"AdminAddWalletPayload", "AdminAddWalletPayloadOrError"}
+
+func (ec *executionContext) _AdminAddWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.AdminAddWalletPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, adminAddWalletPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AdminAddWalletPayload")
+		case "user":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._AdminAddWalletPayload_user(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -33293,7 +33838,7 @@ func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel 
 	return out
 }
 
-var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error"}
+var errAddressOwnedByUserImplementors = []string{"ErrAddressOwnedByUser", "AddUserWalletPayloadOrError", "Error", "AdminAddWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrAddressOwnedByUser(ctx context.Context, sel ast.SelectionSet, obj *model.ErrAddressOwnedByUser) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errAddressOwnedByUserImplementors)
@@ -33603,7 +34148,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -33716,7 +34261,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError", "AdminAddWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -33881,7 +34426,7 @@ func (ec *executionContext) _ErrUserAlreadyExists(ctx context.Context, sel ast.S
 	return out
 }
 
-var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError"}
+var errUserNotFoundImplementors = []string{"ErrUserNotFound", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "Error", "LoginPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdminAddWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrUserNotFound(ctx context.Context, sel ast.SelectionSet, obj *model.ErrUserNotFound) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errUserNotFoundImplementors)
@@ -34784,6 +35329,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._GalleryUser_wallets(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "primaryWallet":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_primaryWallet(ctx, field, obj)
 				return res
 			}
 
@@ -35819,6 +36381,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
+		case "addWalletToUserUnchecked":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_addWalletToUserUnchecked(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
 		case "revokeRolesFromUser":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_revokeRolesFromUser(ctx, field)
@@ -35843,6 +36412,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "uploadPersistedQueries":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_uploadPersistedQueries(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updatePrimaryWallet":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updatePrimaryWallet(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -36619,26 +37195,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
-		case "usersByRole":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_usersByRole(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
 		case "galleryById":
 			field := field
 
@@ -36669,6 +37225,46 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_viewerGalleryById(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "trendingUsers":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_trendingUsers(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "usersByRole":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_usersByRole(ctx, field)
 				return res
 			}
 
@@ -38200,6 +38796,34 @@ func (ec *executionContext) _TokensConnection(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var trendingUsersPayloadImplementors = []string{"TrendingUsersPayload", "TrendingUsersPayloadOrError"}
+
+func (ec *executionContext) _TrendingUsersPayload(ctx context.Context, sel ast.SelectionSet, obj *model.TrendingUsersPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, trendingUsersPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TrendingUsersPayload")
+		case "users":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TrendingUsersPayload_users(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var unfollowUserPayloadImplementors = []string{"UnfollowUserPayload", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _UnfollowUserPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnfollowUserPayload) graphql.Marshaler {
@@ -38632,6 +39256,34 @@ func (ec *executionContext) _UpdateGalleryPayload(ctx context.Context, sel ast.S
 		case "gallery":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UpdateGalleryPayload_gallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updatePrimaryWalletPayloadImplementors = []string{"UpdatePrimaryWalletPayload", "UpdatePrimaryWalletPayloadOrError"}
+
+func (ec *executionContext) _UpdatePrimaryWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdatePrimaryWalletPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updatePrimaryWalletPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdatePrimaryWalletPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdatePrimaryWalletPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -39793,6 +40445,11 @@ func (ec *executionContext) marshalNAddress2githubᚗcomᚋmikeydubᚋgoᚑgalle
 	return res
 }
 
+func (ec *executionContext) unmarshalNAdminAddWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletInput(ctx context.Context, v interface{}) (model.AdminAddWalletInput, error) {
+	res, err := ec.unmarshalInputAdminAddWalletInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAuthMechanism(ctx context.Context, v interface{}) (model.AuthMechanism, error) {
 	res, err := ec.unmarshalInputAuthMechanism(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -40233,6 +40890,16 @@ func (ec *executionContext) unmarshalNRedeemMerchInput2githubᚗcomᚋmikeydub�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx context.Context, v interface{}) (model.Window, error) {
+	var res model.Window
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx context.Context, sel ast.SelectionSet, v model.Window) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNRole2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx context.Context, v interface{}) (persist.Role, error) {
 	var res persist.Role
 	err := res.UnmarshalGQL(v)
@@ -40293,6 +40960,11 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNTrendingUsersInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersInput(ctx context.Context, v interface{}) (model.TrendingUsersInput, error) {
+	res, err := ec.unmarshalInputTrendingUsersInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUnsubscribeFromEmailTypeInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnsubscribeFromEmailTypeInput(ctx context.Context, v interface{}) (model.UnsubscribeFromEmailTypeInput, error) {
@@ -40668,6 +41340,13 @@ func (ec *executionContext) unmarshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgal
 func (ec *executionContext) marshalOAddress2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAddress(ctx context.Context, sel ast.SelectionSet, v persist.Address) graphql.Marshaler {
 	res := graphql.MarshalString(string(v))
 	return res
+}
+
+func (ec *executionContext) marshalOAdminAddWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdminAddWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.AdminAddWalletPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AdminAddWalletPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOAdmire2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐAdmire(ctx context.Context, sel ast.SelectionSet, v *model.Admire) graphql.Marshaler {
@@ -42041,6 +42720,14 @@ func (ec *executionContext) marshalOLogoutPayload2ᚖgithubᚗcomᚋmikeydubᚋg
 	return ec._LogoutPayload(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalOMagicLinkAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMagicLinkAuth(ctx context.Context, v interface{}) (*model.MagicLinkAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputMagicLinkAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx context.Context, sel ast.SelectionSet, v model.MediaSubtype) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -42857,6 +43544,13 @@ func (ec *executionContext) marshalOTokensConnection2ᚖgithubᚗcomᚋmikeydub�
 	return ec._TokensConnection(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOTrendingUsersPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTrendingUsersPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.TrendingUsersPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TrendingUsersPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnfollowUserPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -42974,6 +43668,13 @@ func (ec *executionContext) marshalOUpdateGalleryPayloadOrError2githubᚗcomᚋm
 		return graphql.Null
 	}
 	return ec._UpdateGalleryPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdatePrimaryWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdatePrimaryWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdatePrimaryWalletPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdatePrimaryWalletPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateTokenInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {

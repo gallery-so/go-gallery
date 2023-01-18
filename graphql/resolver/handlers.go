@@ -143,35 +143,12 @@ func RemapAndReportErrors(ctx context.Context, next gqlgen.Resolver) (res interf
 
 func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
-		gc := util.GinContextFromContext(ctx)
-
-		authError := model.ErrNotAuthorized{
-			Message: "Not authorized",
-			Cause:   model.ErrInvalidToken{Message: "Retool: not authorized"},
+		if err := auth.RetoolAuthorized(ctx); err != nil {
+			return model.ErrNotAuthorized{
+				Message: err.Error(),
+				Cause:   model.ErrInvalidToken{Message: "Retool: not authorized"},
+			}, nil
 		}
-
-		parts := strings.SplitN(gc.GetHeader("Authorization"), "Basic ", 2)
-		if len(parts) != 2 {
-			return authError, nil
-		}
-
-		usernameAndPassword, err := base64.StdEncoding.DecodeString(parts[1])
-		if err != nil {
-			return authError, nil
-		}
-
-		usernameAndPasswordParts := strings.SplitN(string(usernameAndPassword), ":", 2)
-		if len(usernameAndPasswordParts) != 2 {
-			return authError, nil
-		}
-
-		password := usernameAndPasswordParts[1]
-		passwordBytes := []byte(password)
-
-		if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("RETOOL_AUTH_TOKEN")), passwordBytes); cmp != 1 {
-			return authError, nil
-		}
-
 		return next(ctx)
 	}
 }

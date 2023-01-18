@@ -77,6 +77,7 @@ type GalleryUser implements Node @goEmbedHelper {
   tokensByChain(chain: Chain!): ChainTokens @goField(forceResolver: true)
 
   wallets: [Wallet] @goField(forceResolver: true)
+  primaryWallet: Wallet @goField(forceResolver: true)
   featuredGallery: Gallery @goField(forceResolver: true)
   galleries: [Gallery] @goField(forceResolver: true)
   badges: [Badge] @goField(forceResolver: true)
@@ -802,6 +803,22 @@ type ErrGalleryNotFound implements Error {
 union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
 union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
 
+enum ReportWindow {
+  LAST_7_DAYS
+  ALL_TIME
+}
+
+input TrendingUsersInput {
+  report: ReportWindow!
+}
+
+type TrendingUsersPayload {
+  # User are in descending order i.e. the most trending user is first.
+  users: [GalleryUser!]
+}
+
+union TrendingUsersPayloadOrError = TrendingUsersPayload
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -825,6 +842,7 @@ type Query {
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
+  trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
@@ -1095,6 +1113,7 @@ input AuthMechanism {
   eoa: EoaAuth
   gnosisSafe: GnosisSafeAuth
   debug: DebugAuth
+  magicLink: MagicLinkAuth
 }
 
 input EoaAuth {
@@ -1125,6 +1144,10 @@ input DebugAuth @restrictEnvironment(allowed: ["local"]) {
 input GnosisSafeAuth {
   address: Address!
   nonce: String!
+}
+
+input MagicLinkAuth {
+  token: String!
 }
 
 input DeepRefreshInput {
@@ -1579,7 +1602,32 @@ type UpdateGalleryPayload {
   gallery: Gallery
 }
 
+type UpdatePrimaryWalletPayload {
+  viewer: Viewer
+}
+
+union UpdatePrimaryWalletPayloadOrError =
+    UpdatePrimaryWalletPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
+
+input AdminAddWalletInput {
+  username: String!
+  chainAddress: ChainAddressInput!
+  walletType: WalletType!
+}
+
+type AdminAddWalletPayload {
+  user: GalleryUser
+}
+
+union AdminAddWalletPayloadOrError =
+    AdminAddWalletPayload
+  | ErrUserNotFound
+  | ErrAddressOwnedByUser
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -1666,6 +1714,7 @@ type Mutation {
 
   # Retool Specific Mutations
   addRolesToUser(username: String!, roles: [Role]): AddRolesToUserPayloadOrError @retoolAuth
+  addWalletToUserUnchecked(input: AdminAddWalletInput!): AdminAddWalletPayloadOrError @retoolAuth
   revokeRolesFromUser(username: String!, roles: [Role]): RevokeRolesFromUserPayloadOrError
     @retoolAuth
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
@@ -1675,6 +1724,8 @@ type Mutation {
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
     @frontendBuildAuth
+
+  updatePrimaryWallet(walletID: DBID!): UpdatePrimaryWalletPayloadOrError @authRequired
 }
 
 type Subscription {

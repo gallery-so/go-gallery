@@ -100,7 +100,9 @@ models:
   Role:
     model:
       - github.com/mikeydub/go-gallery/service/persist.Role
-
+  ReportWindow:
+    model:
+      - github.com/mikeydub/go-gallery/graphql/model.Window
 directives:
   goGqlId:
     skip_runtime: true
