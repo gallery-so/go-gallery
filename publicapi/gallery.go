@@ -356,7 +356,7 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 	return galleries, nil
 }
 
-func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]string, error) {
+func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]persist.Media, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
@@ -364,7 +364,10 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	previews, err := api.queries.GetGalleryTokenPreviewsByID(ctx, galleryID)
+	previews, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
+		ID:    galleryID,
+		Limit: 4,
+	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -372,7 +375,17 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	return previews, nil
+	medias := make([]persist.Media, len(previews))
+	for i, preview := range previews {
+		var media persist.Media
+		err = preview.AssignTo(&media)
+		if err != nil {
+			return nil, err
+		}
+		medias[i] = media
+	}
+
+	return medias, nil
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
