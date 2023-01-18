@@ -833,6 +833,17 @@ func (q *Queries) GetCollectionById(ctx context.Context, id persist.DBID) (Colle
 	return i, err
 }
 
+const getCollectionTokensByCollectionID = `-- name: GetCollectionTokensByCollectionID :one
+select nfts from collections where id = $1 and deleted = false
+`
+
+func (q *Queries) GetCollectionTokensByCollectionID(ctx context.Context, id persist.DBID) (persist.DBIDList, error) {
+	row := q.db.QueryRow(ctx, getCollectionTokensByCollectionID, id)
+	var nfts persist.DBIDList
+	err := row.Scan(&nfts)
+	return nfts, err
+}
+
 const getCollectionsByGalleryId = `-- name: GetCollectionsByGalleryId :many
 SELECT c.id, c.deleted, c.owner_user_id, c.nfts, c.version, c.last_updated, c.created_at, c.hidden, c.collectors_note, c.name, c.layout, c.token_settings, c.gallery_id FROM galleries g, unnest(g.collections)
     WITH ORDINALITY AS x(coll_id, coll_ord)
@@ -1435,7 +1446,7 @@ func (q *Queries) GetGalleryIDByCollectionID(ctx context.Context, id persist.DBI
 }
 
 const getGalleryTokenMediasByGalleryID = `-- name: GetGalleryTokenMediasByGalleryID :many
-select t.media as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
+select t.media from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
 `
 
 type GetGalleryTokenMediasByGalleryIDParams struct {
@@ -1443,19 +1454,19 @@ type GetGalleryTokenMediasByGalleryIDParams struct {
 	Limit int32
 }
 
-func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetGalleryTokenMediasByGalleryIDParams) ([]persist.NullString, error) {
+func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetGalleryTokenMediasByGalleryIDParams) ([]persist.Media, error) {
 	rows, err := q.db.Query(ctx, getGalleryTokenMediasByGalleryID, arg.ID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []persist.NullString
+	var items []persist.Media
 	for rows.Next() {
-		var previews persist.NullString
-		if err := rows.Scan(&previews); err != nil {
+		var media persist.Media
+		if err := rows.Scan(&media); err != nil {
 			return nil, err
 		}
-		items = append(items, previews)
+		items = append(items, media)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

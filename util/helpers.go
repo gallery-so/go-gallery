@@ -232,6 +232,17 @@ func Contains[T comparable](s []T, str T) bool {
 	return false
 }
 
+// Difference will take in 2 arrays and return the elements that exist in the second array but are not in the first
+func Difference[T comparable](old []T, new []T) []T {
+	var added []T
+	for _, v := range new {
+		if !Contains(old, v) {
+			added = append(added, v)
+		}
+	}
+	return added
+}
+
 func SetConditionalValue[T any](value *T, param *T, conditional *bool) {
 	if value != nil {
 		*param = *value

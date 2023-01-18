@@ -311,6 +311,11 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 	}
 
 	for _, collection := range update {
+		curTokens, err := q.GetCollectionTokensByCollectionID(ctx, collection.Dbid)
+		if err != nil {
+			return nil, err
+		}
+
 		err = q.UpdateCollectionTokens(ctx, db.UpdateCollectionTokensParams{
 			ID:   collection.Dbid,
 			Nfts: collection.Tokens,
@@ -318,6 +323,8 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 		if err != nil {
 			return nil, err
 		}
+
+		diff := util.Difference(curTokens, collection.Tokens)
 
 		if collection.Tokens != nil {
 			events = append(events, db.Event{
@@ -327,6 +334,9 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 				ActorID:        persist.DBIDToNullStr(actor),
 				CollectionID:   collection.Dbid,
 				GalleryID:      gallery,
+				Data: persist.EventData{
+					CollectionTokenIDs: diff,
+				},
 			})
 		}
 	}
@@ -439,7 +449,7 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	previews, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
+	medias, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
 		ID:    galleryID,
 		Limit: 4,
 	})
@@ -448,16 +458,6 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	medias := make([]persist.Media, len(previews))
-	for i, preview := range previews {
-		var media persist.Media
-		err = preview.AssignTo(&media)
-		if err != nil {
-			return nil, err
-		}
-		medias[i] = media
 	}
 
 	return medias, nil
@@ -543,7 +543,7 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 		return err
 	}
 
-	user, err := getAuthenticatedUser(ctx)
+	user, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
