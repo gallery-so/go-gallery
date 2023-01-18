@@ -364,7 +364,10 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	previews, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, galleryID)
+	previews, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
+		ID:    galleryID,
+		Limit: 4,
+	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

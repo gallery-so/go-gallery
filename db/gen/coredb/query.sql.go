@@ -1277,11 +1277,16 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 }
 
 const getGalleryTokenMediasByGalleryID = `-- name: GetGalleryTokenMediasByGalleryID :many
-select t.media as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3
+select t.media as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
 `
 
-func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, id persist.DBID) ([]pgtype.JSONB, error) {
-	rows, err := q.db.Query(ctx, getGalleryTokenMediasByGalleryID, id)
+type GetGalleryTokenMediasByGalleryIDParams struct {
+	ID    persist.DBID
+	Limit int32
+}
+
+func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetGalleryTokenMediasByGalleryIDParams) ([]pgtype.JSONB, error) {
+	rows, err := q.db.Query(ctx, getGalleryTokenMediasByGalleryID, arg.ID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
