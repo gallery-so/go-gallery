@@ -1319,7 +1319,7 @@ func resolveSubEventDatasByFeedEventID(ctx context.Context, feedEventID persist.
 		return nil, err
 	}
 
-	result := make([]model.FeedEventData, len(feedEvent.EventIds))
+	result := make([]model.FeedEventData, 0, len(feedEvent.EventIds))
 	for _, eventID := range feedEvent.EventIds {
 		event, err := publicapi.For(ctx).Feed.GetRawEventById(ctx, eventID)
 		if err != nil {
