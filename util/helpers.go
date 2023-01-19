@@ -8,17 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/spf13/viper"
+	"go.mozilla.org/sops/v3/decrypt"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/spf13/viper"
-	"go.mozilla.org/sops/v3/decrypt"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -406,41 +404,35 @@ func InDocker() bool {
 
 // ResolveEnvFile finds the appropriate env file to use for the service.
 func ResolveEnvFile(service string, env string) string {
+	if env != "local" && env != "dev" && env != "prod" {
+		env = "local"
+	}
+
+	secretsDir := filepath.Join("secrets", env, "local")
+
 	format := "app-%s-%s.yaml"
 	if InDocker() {
-		return fmt.Sprintf(format, "docker", service)
+		return filepath.Join(secretsDir, fmt.Sprintf(format, "docker", service))
 	}
 
-	switch env {
-	case "local":
-		return fmt.Sprintf(format, "local", service)
-	case "dev":
-		return fmt.Sprintf(format, "dev", service)
-	case "prod":
-		return fmt.Sprintf(format, "prod", service)
-	}
-
-	return fmt.Sprintf("app-local-%s.yaml", service)
+	return filepath.Join(secretsDir, fmt.Sprintf(format, env, service))
 }
 
 // LoadEncryptedEnvFile configures the environment with the configured input file.
-func LoadEncryptedEnvFile(fileName string) {
+func LoadEncryptedEnvFile(filePath string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
 
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	filePath := filepath.Join("_local", fileName)
 	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
 	path := MustFindFile(filePath)
 
-	startTime := time.Now()
 	config, err := decrypt.File(path, "yaml")
 	if err != nil {
 		panic(fmt.Sprintf("error decrypting config file: %s\n", err))
 	}
-	fmt.Printf("decryption took %v\n", time.Since(startTime))
 
 	viper.SetConfigType("yaml")
 	if err := viper.ReadConfig(bytes.NewBuffer(config)); err != nil {
@@ -449,14 +441,13 @@ func LoadEncryptedEnvFile(fileName string) {
 }
 
 // LoadEnvFile configures the environment with the configured input file.
-func LoadEnvFile(fileName string) {
+func LoadEnvFile(filePath string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
 
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	filePath := filepath.Join("_local", fileName)
 	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
 	path := MustFindFile(filePath)
 

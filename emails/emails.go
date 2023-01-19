@@ -111,7 +111,7 @@ func setDefaults() {
 			fi = os.Args[1]
 		}
 		envFile := util.ResolveEnvFile("emails", fi)
-		util.LoadEnvFile(envFile)
+		util.LoadEncryptedEnvFile(envFile)
 	}
 
 	if viper.GetString("ENV") != "local" {

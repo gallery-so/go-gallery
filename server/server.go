@@ -201,7 +201,7 @@ func SetDefaults() {
 			fi = os.Args[1]
 		}
 		envFile := util.ResolveEnvFile("backend", fi)
-		util.LoadEnvFile(envFile)
+		util.LoadEncryptedEnvFile(envFile)
 	}
 
 	util.VarNotSetTo("IMGIX_SECRET", "")

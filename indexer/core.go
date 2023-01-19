@@ -142,7 +142,7 @@ func LoadConfigFile(service string, manualEnv string) {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
-	util.LoadEnvFile(util.ResolveEnvFile(service, manualEnv))
+	util.LoadEncryptedEnvFile(util.ResolveEnvFile(service, manualEnv))
 }
 
 func ValidateEnv() {
