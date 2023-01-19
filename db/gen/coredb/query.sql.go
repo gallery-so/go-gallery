@@ -1276,19 +1276,24 @@ func (q *Queries) GetGalleryById(ctx context.Context, id persist.DBID) (Gallery,
 	return i, err
 }
 
-const getGalleryTokenPreviewsByID = `-- name: GetGalleryTokenPreviewsByID :many
-select (t.media->>'thumbnail_url')::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3
+const getGalleryTokenMediasByGalleryID = `-- name: GetGalleryTokenMediasByGalleryID :many
+select t.media as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2
 `
 
-func (q *Queries) GetGalleryTokenPreviewsByID(ctx context.Context, id persist.DBID) ([]string, error) {
-	rows, err := q.db.Query(ctx, getGalleryTokenPreviewsByID, id)
+type GetGalleryTokenMediasByGalleryIDParams struct {
+	ID    persist.DBID
+	Limit int32
+}
+
+func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetGalleryTokenMediasByGalleryIDParams) ([]pgtype.JSONB, error) {
+	rows, err := q.db.Query(ctx, getGalleryTokenMediasByGalleryID, arg.ID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []pgtype.JSONB
 	for rows.Next() {
-		var previews string
+		var previews pgtype.JSONB
 		if err := rows.Scan(&previews); err != nil {
 			return nil, err
 		}
@@ -3107,18 +3112,19 @@ func (q *Queries) UpdateGalleryInfo(ctx context.Context, arg UpdateGalleryInfoPa
 
 const updateGalleryPositions = `-- name: UpdateGalleryPositions :exec
 with updates as (
-    select unnest($1::text[]) as id, unnest($2::text[]) as position
+    select unnest($2::text[]) as id, unnest($3::text[]) as position
 )
-update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false
+update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false and g.owner_user_id = $1
 `
 
 type UpdateGalleryPositionsParams struct {
-	GalleryIds []string
-	Positions  []string
+	OwnerUserID persist.DBID
+	GalleryIds  []string
+	Positions   []string
 }
 
 func (q *Queries) UpdateGalleryPositions(ctx context.Context, arg UpdateGalleryPositionsParams) error {
-	_, err := q.db.Exec(ctx, updateGalleryPositions, arg.GalleryIds, arg.Positions)
+	_, err := q.db.Exec(ctx, updateGalleryPositions, arg.OwnerUserID, arg.GalleryIds, arg.Positions)
 	return err
 }
 
@@ -3237,4 +3243,15 @@ type UpdateUserVerificationStatusParams struct {
 func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {
 	_, err := q.db.Exec(ctx, updateUserVerificationStatus, arg.ID, arg.EmailVerified)
 	return err
+}
+
+const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one
+select exists(select position,count(*) from galleries where owner_user_id = $1 group by position having count(*) > 0)
+`
+
+func (q *Queries) UserHasDuplicateGalleryPositions(ctx context.Context, ownerUserID persist.DBID) (bool, error) {
+	row := q.db.QueryRow(ctx, userHasDuplicateGalleryPositions, ownerUserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

@@ -356,7 +356,7 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 	return galleries, nil
 }
 
-func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]string, error) {
+func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]persist.Media, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
@@ -364,7 +364,10 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	previews, err := api.queries.GetGalleryTokenPreviewsByID(ctx, galleryID)
+	previews, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
+		ID:    galleryID,
+		Limit: 4,
+	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -372,7 +375,17 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	return previews, nil
+	medias := make([]persist.Media, len(previews))
+	for i, preview := range previews {
+		var media persist.Media
+		err = preview.AssignTo(&media)
+		if err != nil {
+			return nil, err
+		}
+		medias[i] = media
+	}
+
+	return medias, nil
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
@@ -455,6 +468,11 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 		return err
 	}
 
+	user, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
 	ids := make([]string, len(positions))
 	pos := make([]string, len(positions))
 	for i, position := range positions {
@@ -462,15 +480,32 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 		pos[i] = position.Position
 	}
 
-	err := api.queries.UpdateGalleryPositions(ctx, db.UpdateGalleryPositionsParams{
-		GalleryIds: ids,
-		Positions:  pos,
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	q := api.queries.WithTx(tx)
+
+	err = q.UpdateGalleryPositions(ctx, db.UpdateGalleryPositionsParams{
+		GalleryIds:  ids,
+		Positions:   pos,
+		OwnerUserID: user,
 	})
 	if err != nil {
 		return err
 	}
 
-	return nil
+	areDuplicates, err := q.UserHasDuplicateGalleryPositions(ctx, user)
+	if err != nil {
+		return err
+	}
+	if areDuplicates {
+		return fmt.Errorf("gallery positions are not unique for user %s", user)
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
