@@ -61,7 +61,7 @@ func coreInitServer() *gin.Engine {
 	var pub *pubsub.Client
 	var err error
 	if viper.GetString("ENV") == "local" {
-		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
 		if err != nil {
 			panic(err)
 		}

@@ -32,8 +32,8 @@ func Init(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) {
 }
 
 // InitServer initializes the indexer server
-func InitServer(keyFile string, quietLogs, enableRPC bool) {
-	router := coreInitServer(keyFile, quietLogs, enableRPC)
+func InitServer(quietLogs, enableRPC bool) {
+	router := coreInitServer(quietLogs, enableRPC)
 	logger.For(nil).Info("Starting indexer server...")
 	http.Handle("/", router)
 }
@@ -73,7 +73,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	return handlersInit(router, i, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s), i
 }
 
-func coreInitServer(localKeyPath string, quietLogs, enableRPC bool) *gin.Engine {
+func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	ctx := sentry.SetHubOnContext(context.Background(), sentry.CurrentHub())
 	initSentry()
 	logger.InitWithGCPDefaults()

@@ -126,8 +126,7 @@ func newSecretsClient() *secretmanager.Client {
 	options := []option.ClientOption{}
 
 	if viper.GetString("ENV") == "local" {
-		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
-		options = append(options, option.WithCredentialsFile(keyPath))
+		options = append(options, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
 	}
 
 	c, err := secretmanager.NewClient(context.Background(), options...)
@@ -155,7 +154,6 @@ func SetDefaults() {
 	viper.SetDefault("IPFS_PROJECT_SECRET", "")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
-	viper.SetDefault("GOOGLE_APPLICATION_CREDENTIALS", "_deploy/service-key.json")
 	viper.SetDefault("PREMIUM_CONTRACT_ADDRESS", "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698=[0,1,2,3,4,5,6,7,8]")
 	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")

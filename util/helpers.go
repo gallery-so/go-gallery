@@ -394,6 +394,18 @@ func VarNotSetTo(envVar, emptyVal string) {
 	}
 }
 
+// LoadEncryptedServiceKey loads an encrypted service key JSON file from disk
+func LoadEncryptedServiceKey(filePath string) []byte {
+	path := MustFindFile(filePath)
+
+	serviceKey, err := decrypt.File(path, "json")
+	if err != nil {
+		panic(fmt.Sprintf("error decrypting service key: %s\n", err))
+	}
+
+	return serviceKey
+}
+
 // InDocker returns true if the service is running as a container.
 func InDocker() bool {
 	if _, err := os.Stat("/.dockerenv"); err == nil {

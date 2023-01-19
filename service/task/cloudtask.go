@@ -226,7 +226,7 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 		} else {
 			copts = append(
 				copts,
-				option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")),
+				option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")),
 			)
 		}
 	}
