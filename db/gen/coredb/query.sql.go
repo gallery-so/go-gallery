@@ -2134,10 +2134,12 @@ func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFe
 }
 
 const getTrendingUserIDs = `-- name: GetTrendingUserIDs :many
-with rollup as (select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= $2 group by e.gallery_id)
+with rollup as (
+	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= $2 group by e.gallery_id
+)
 select p.id from (
 	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
-	from galleries g, users u, rollup r
+	from rollup r, galleries g, users u
 	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
 	group by u.id
 ) p

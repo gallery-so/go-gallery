@@ -215,6 +215,7 @@ type userWithFeedEventsFixture struct {
 	feedEventIDs []persist.DBID
 }
 
+// newUserWithTokensFixture generates a new user with feed events pre-generated
 func newUserWithFeedEventsFixture(t *testing.T) userWithFeedEventsFixture {
 	t.Helper()
 	serverF := newServerFixture(t)
