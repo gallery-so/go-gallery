@@ -838,6 +838,7 @@ type Query {
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
   globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  # Paging forward i.e. providing the `first` argument will return events in order of descending popularity.
   trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError

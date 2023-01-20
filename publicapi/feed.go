@@ -238,8 +238,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 	} else {
 		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
 			return api.queries.GetTrendingFeedEventIDs(ctx, db.GetTrendingFeedEventIDsParams{
-				// XXX: WindowEnd: time.Now().Add(-time.Duration(72 * time.Hour)),
-				WindowEnd: time.Now().Add(-24 * 356 * time.Hour),
+				WindowEnd: time.Now().Add(-time.Duration(72 * time.Hour)),
 				Limit:     100,
 			})
 		}

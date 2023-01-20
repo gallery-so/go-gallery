@@ -129,10 +129,11 @@ func testViewer(t *testing.T) {
 func testAddWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToAdd := newWallet(t)
+	ctx := context.Background()
 	c := authedHandlerClient(t, userF.id)
-	nonce := newNonce(t, c, walletToAdd)
+	nonce := newNonce(t, ctx, c, walletToAdd)
 
-	response, err := addUserWalletMutation(context.Background(), c, chainAddressInput(walletToAdd.address), authMechanismInput(walletToAdd, nonce))
+	response, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToAdd.address), authMechanismInput(walletToAdd, nonce))
 
 	require.NoError(t, err)
 	payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
@@ -145,15 +146,16 @@ func testAddWallet(t *testing.T) {
 func testRemoveWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToRemove := newWallet(t)
+	ctx := context.Background()
 	c := authedHandlerClient(t, userF.id)
-	nonce := newNonce(t, c, walletToRemove)
-	addResponse, err := addUserWalletMutation(context.Background(), c, chainAddressInput(walletToRemove.address), authMechanismInput(walletToRemove, nonce))
+	nonce := newNonce(t, ctx, c, walletToRemove)
+	addResponse, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToRemove.address), authMechanismInput(walletToRemove, nonce))
 	require.NoError(t, err)
 	wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
 	lastWallet := wallets[len(wallets)-1]
 	assert.Len(t, wallets, 2)
 
-	removeResponse, err := removeUserWalletsMutation(context.Background(), c, []persist.DBID{lastWallet.Dbid})
+	removeResponse, err := removeUserWalletsMutation(ctx, c, []persist.DBID{lastWallet.Dbid})
 
 	require.NoError(t, err)
 	payload, _ := (*removeResponse.RemoveUserWallets).(*removeUserWalletsMutationRemoveUserWalletsRemoveUserWalletsPayload)
@@ -163,10 +165,11 @@ func testRemoveWallet(t *testing.T) {
 
 func testLogin(t *testing.T) {
 	userF := newUserFixture(t)
+	ctx := context.Background()
 	c := defaultHandlerClient(t)
-	nonce := newNonce(t, c, userF.wallet)
+	nonce := newNonce(t, ctx, c, userF.wallet)
 
-	response, err := loginMutation(context.Background(), c, authMechanismInput(userF.wallet, nonce))
+	response, err := loginMutation(ctx, c, authMechanismInput(userF.wallet, nonce))
 
 	require.NoError(t, err)
 	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
@@ -213,29 +216,16 @@ func testCreateCollection(t *testing.T) {
 		GalleryId:      userF.galleryID,
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
-		Tokens:         userF.tokenIDs[:1],
-		Layout: CollectionLayoutInput{
-			Sections: []int{0},
-			SectionLayout: []CollectionSectionLayoutInput{
-				{
-					Columns:    0,
-					Whitespace: []int{},
-				},
-			},
-		},
-		TokenSettings: []CollectionTokenSettingsInput{
-			{
-				TokenId:    userF.tokenIDs[0],
-				RenderLive: false,
-			},
-		},
-		Caption: nil,
+		Tokens:         userF.tokenIDs,
+		Layout:         defaultLayout(),
+		TokenSettings:  defaultTokenSettings(userF.tokenIDs),
+		Caption:        nil,
 	})
 
 	require.NoError(t, err)
 	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
 	assert.NotEmpty(t, payload.Collection.Dbid)
-	assert.Len(t, payload.Collection.Tokens, 1)
+	assert.Len(t, payload.Collection.Tokens, len(userF.tokenIDs))
 }
 
 func testViewsAreRolledUp(t *testing.T) {
@@ -243,12 +233,13 @@ func testViewsAreRolledUp(t *testing.T) {
 	userF := newUserFixture(t)
 	bob := newUserFixture(t)
 	alice := newUserFixture(t)
+	ctx := context.Background()
 	// bob views gallery
 	client := authedServerClient(t, serverF.server.URL, bob.id)
-	viewGallery(t, client, userF.galleryID)
+	viewGallery(t, ctx, client, userF.galleryID)
 	// // alice views gallery
 	client = authedServerClient(t, serverF.server.URL, alice.id)
-	viewGallery(t, client, userF.galleryID)
+	viewGallery(t, ctx, client, userF.galleryID)
 
 	// TODO: Actually verify that the views get rolled up
 }
@@ -262,15 +253,15 @@ func testTrendingUsers(t *testing.T) {
 	c := defaultServerClient(t, serverF.server.URL)
 	// view bob a few times
 	for i := 0; i < 5; i++ {
-		viewGallery(t, c, bob.galleryID)
+		viewGallery(t, ctx, c, bob.galleryID)
 	}
 	// view alice a few times
 	for i := 0; i < 3; i++ {
-		viewGallery(t, c, alice.galleryID)
+		viewGallery(t, ctx, c, alice.galleryID)
 	}
 	// view dave a few times
 	for i := 0; i < 1; i++ {
-		viewGallery(t, c, dave.galleryID)
+		viewGallery(t, ctx, c, dave.galleryID)
 	}
 	expected := []persist.DBID{bob.id, alice.id, dave.id}
 	getTrending := func(t *testing.T, report ReportWindow) []persist.DBID {
@@ -296,13 +287,22 @@ func testTrendingUsers(t *testing.T) {
 }
 
 func testTrendingFeedEvents(t *testing.T) {
-	// serverF := newServerFixture(t)
-	// bob := newUserWithTokensFixture(t)
+	ctx := context.Background()
+	userF := newUserWithFeedEventsFixture(t)
+	c := authedHandlerClient(t, userF.id)
+	admireFeedEvent(t, ctx, c, userF.feedEventIDs[1])
+	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[1], "a")
+	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[1], "b")
+	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[1], "c")
+	admireFeedEvent(t, ctx, c, userF.feedEventIDs[0])
+	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "a")
+	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "b")
+	admireFeedEvent(t, ctx, c, userF.feedEventIDs[2])
+	expected := []persist.DBID{userF.feedEventIDs[1], userF.feedEventIDs[0], userF.feedEventIDs[2]}
 
-	// create a few events
-	// create a collection
-	// add a description to a collection
-	// add a caption to a token
+	actual := trendingFeedEvents(t, ctx, c, 10)
+
+	assert.Equal(t, expected, actual)
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
@@ -353,21 +353,21 @@ func newWallet(t *testing.T) wallet {
 	}
 }
 
-func newNonce(t *testing.T, c *handlerClient, w wallet) string {
+func newNonce(t *testing.T, ctx context.Context, c graphql.Client, w wallet) string {
 	t.Helper()
-	response, err := getAuthNonceMutation(context.Background(), c, chainAddressInput(w.address))
+	response, err := getAuthNonceMutation(ctx, c, chainAddressInput(w.address))
 	require.NoError(t, err)
 	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
 	return *payload.Nonce
 }
 
 // newUser makes a GraphQL request to generate a new user
-func newUser(t *testing.T, c *handlerClient, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
+func newUser(t *testing.T, ctx context.Context, c graphql.Client, w wallet) (userID persist.DBID, username string, galleryID persist.DBID) {
 	t.Helper()
-	nonce := newNonce(t, c, w)
+	nonce := newNonce(t, ctx, c, w)
 	username = "user" + persist.GenerateID().String()
 
-	response, err := createUserMutation(context.Background(), c, authMechanismInput(w, nonce),
+	response, err := createUserMutation(ctx, c, authMechanismInput(w, nonce),
 		CreateUserInput{Username: username},
 	)
 
@@ -377,18 +377,18 @@ func newUser(t *testing.T, c *handlerClient, w wallet) (userID persist.DBID, use
 }
 
 // newJWT generates a JWT
-func newJWT(t *testing.T, userID persist.DBID) string {
-	jwt, err := auth.JWTGeneratePipeline(context.Background(), userID)
+func newJWT(t *testing.T, ctx context.Context, userID persist.DBID) string {
+	jwt, err := auth.JWTGeneratePipeline(ctx, userID)
 	require.NoError(t, err)
 	return jwt
 }
 
 // syncTokens makes a GraphQL request to sync a user's wallet
-func syncTokens(t *testing.T, c graphql.Client, userID persist.DBID) []persist.DBID {
+func syncTokens(t *testing.T, ctx context.Context, c graphql.Client, userID persist.DBID) []persist.DBID {
 	t.Helper()
-	response, err := syncTokensMutation(context.Background(), c, []Chain{"Ethereum"})
+	resp, err := syncTokensMutation(ctx, c, []Chain{"Ethereum"})
 	require.NoError(t, err)
-	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+	payload := (*resp.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
 	tokens := make([]persist.DBID, len(payload.Viewer.User.Tokens))
 	for i, token := range payload.Viewer.User.Tokens {
 		tokens[i] = token.Dbid
@@ -397,15 +397,86 @@ func syncTokens(t *testing.T, c graphql.Client, userID persist.DBID) []persist.D
 }
 
 // viewGallery makes a GraphQL request to view a gallery
-func viewGallery(t *testing.T, c graphql.Client, galleryID persist.DBID) {
+func viewGallery(t *testing.T, ctx context.Context, c graphql.Client, galleryID persist.DBID) {
 	t.Helper()
-	resp, err := viewGalleryMutation(context.Background(), c, galleryID)
-	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
+	resp, err := viewGalleryMutation(ctx, c, galleryID)
 	require.NoError(t, err)
+	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
 }
 
 // createCollection makes a GraphQL request to create a collection
-func createCollection(t *testing.T, c graphql.Client) {
+func createCollection(t *testing.T, ctx context.Context, c graphql.Client, input CreateCollectionInput) persist.DBID {
+	t.Helper()
+	resp, err := createCollectionMutation(ctx, c, input)
+	require.NoError(t, err)
+	payload := (*resp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	return payload.Collection.Dbid
+}
+
+// globalFeedEvents makes a GraphQL request to return existing feed events
+func globalFeedEvents(t *testing.T, ctx context.Context, c graphql.Client, limit int) []persist.DBID {
+	t.Helper()
+	resp, err := globalFeedQuery(ctx, c, &limit)
+	require.NoError(t, err)
+	feedEvents := make([]persist.DBID, len(resp.GlobalFeed.Edges))
+	for i, event := range resp.GlobalFeed.Edges {
+		e := (*event.Node).(*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		feedEvents[i] = e.Dbid
+
+	}
+	return feedEvents
+}
+
+// trendingFeedEvents makes a GraphQL request to return trending feedEvents
+func trendingFeedEvents(t *testing.T, ctx context.Context, c graphql.Client, limit int) []persist.DBID {
+	t.Helper()
+	resp, err := trendingFeedQuery(ctx, c, &limit)
+	require.NoError(t, err)
+	feedEvents := make([]persist.DBID, len(resp.TrendingFeed.Edges))
+	for i, event := range resp.TrendingFeed.Edges {
+		e := (*event.Node).(*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		feedEvents[i] = e.Dbid
+
+	}
+	return feedEvents
+}
+
+// admireFeedEvent makes a GraphQL request to admire a feed event
+func admireFeedEvent(t *testing.T, ctx context.Context, c graphql.Client, feedEventID persist.DBID) {
+	t.Helper()
+	resp, err := admireFeedEventMutation(ctx, c, feedEventID)
+	require.NoError(t, err)
+	_ = (*resp.AdmireFeedEvent).(*admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload)
+}
+
+// commentOnFeedEvent makes a GraphQL request to admire a feed event
+func commentOnFeedEvent(t *testing.T, ctx context.Context, c graphql.Client, feedEventID persist.DBID, comment string) {
+	t.Helper()
+	resp, err := commentOnFeedEventMutation(ctx, c, feedEventID, comment)
+	require.NoError(t, err)
+	_ = (*resp.CommentOnFeedEvent).(*commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload)
+}
+
+// defaultLayout returns a collection layout of one section with one column
+func defaultLayout() CollectionLayoutInput {
+	return CollectionLayoutInput{
+		Sections: []int{0},
+		SectionLayout: []CollectionSectionLayoutInput{
+			{
+				Columns:    0,
+				Whitespace: []int{},
+			},
+		},
+	}
+}
+
+// defaultTokenSettings returns default display token settings
+func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput {
+	settings := make([]CollectionTokenSettingsInput, len(tokens))
+	for i, token := range tokens {
+		settings[i] = CollectionTokenSettingsInput{TokenId: token}
+	}
+	return settings
 }
 
 // defaultHandler returns a backend GraphQL http.Handler
