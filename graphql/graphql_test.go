@@ -60,6 +60,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should create a collection", run: testCreateCollection},
 		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
+		{title: "should get trending feed events", run: testTrendingFeedEvents},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -240,38 +241,38 @@ func testCreateCollection(t *testing.T) {
 func testViewsAreRolledUp(t *testing.T) {
 	serverF := newServerFixture(t)
 	userF := newUserFixture(t)
-	viewerA := newUserFixture(t)
-	viewerB := newUserFixture(t)
-	// viewerA views gallery
-	clientA := authedServerClient(t, serverF.server.URL, viewerA.id)
-	viewGallery(t, clientA, userF.galleryID)
-	// // viewerB views gallery
-	clientB := authedServerClient(t, serverF.server.URL, viewerB.id)
-	viewGallery(t, clientB, userF.galleryID)
+	bob := newUserFixture(t)
+	alice := newUserFixture(t)
+	// bob views gallery
+	client := authedServerClient(t, serverF.server.URL, bob.id)
+	viewGallery(t, client, userF.galleryID)
+	// // alice views gallery
+	client = authedServerClient(t, serverF.server.URL, alice.id)
+	viewGallery(t, client, userF.galleryID)
 
 	// TODO: Actually verify that the views get rolled up
 }
 
 func testTrendingUsers(t *testing.T) {
 	serverF := newServerFixture(t)
-	userA := newUserFixture(t)
-	userB := newUserFixture(t)
-	userC := newUserFixture(t)
+	bob := newUserFixture(t)
+	alice := newUserFixture(t)
+	dave := newUserFixture(t)
 	ctx := context.Background()
 	c := defaultServerClient(t, serverF.server.URL)
-	// view userA a few times
+	// view bob a few times
 	for i := 0; i < 5; i++ {
-		viewGallery(t, c, userA.galleryID)
+		viewGallery(t, c, bob.galleryID)
 	}
-	// view userB a few times
+	// view alice a few times
 	for i := 0; i < 3; i++ {
-		viewGallery(t, c, userB.galleryID)
+		viewGallery(t, c, alice.galleryID)
 	}
-	// view userC a few times
+	// view dave a few times
 	for i := 0; i < 1; i++ {
-		viewGallery(t, c, userC.galleryID)
+		viewGallery(t, c, dave.galleryID)
 	}
-	expected := []persist.DBID{userA.id, userB.id, userC.id}
+	expected := []persist.DBID{bob.id, alice.id, dave.id}
 	getTrending := func(t *testing.T, report ReportWindow) []persist.DBID {
 		resp, err := trendingUsersQuery(ctx, c, TrendingUsersInput{Report: report})
 		require.NoError(t, err)
@@ -292,6 +293,16 @@ func testTrendingUsers(t *testing.T) {
 		actual := getTrending(t, "ALL_TIME")
 		assert.EqualValues(t, expected, actual)
 	})
+}
+
+func testTrendingFeedEvents(t *testing.T) {
+	// serverF := newServerFixture(t)
+	// bob := newUserWithTokensFixture(t)
+
+	// create a few events
+	// create a collection
+	// add a description to a collection
+	// add a caption to a token
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
@@ -373,12 +384,9 @@ func newJWT(t *testing.T, userID persist.DBID) string {
 }
 
 // syncTokens makes a GraphQL request to sync a user's wallet
-func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID) []persist.DBID {
+func syncTokens(t *testing.T, c graphql.Client, userID persist.DBID) []persist.DBID {
 	t.Helper()
-	c := customHandlerClient(t, handler, withJWTOpt(t, userID))
-
 	response, err := syncTokensMutation(context.Background(), c, []Chain{"Ethereum"})
-
 	require.NoError(t, err)
 	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
 	tokens := make([]persist.DBID, len(payload.Viewer.User.Tokens))
@@ -390,9 +398,14 @@ func syncTokens(t *testing.T, handler http.Handler, userID persist.DBID) []persi
 
 // viewGallery makes a GraphQL request to view a gallery
 func viewGallery(t *testing.T, c graphql.Client, galleryID persist.DBID) {
+	t.Helper()
 	resp, err := viewGalleryMutation(context.Background(), c, galleryID)
 	_ = (*resp.ViewGallery).(*viewGalleryMutationViewGalleryViewGalleryPayload)
 	require.NoError(t, err)
+}
+
+// createCollection makes a GraphQL request to create a collection
+func createCollection(t *testing.T, c graphql.Client) {
 }
 
 // defaultHandler returns a backend GraphQL http.Handler
@@ -420,12 +433,17 @@ func customHandlerClient(t *testing.T, handler http.Handler, opts ...func(*http.
 
 // defaultServerClient provides a client to a live server
 func defaultServerClient(t *testing.T, host string) *serverClient {
-	return &serverClient{url: host + "/glry/graphql/query"}
+	return customServerClient(t, host)
 }
 
 // authedServerClient provides an authenticated client to a live server
 func authedServerClient(t *testing.T, host string, userID persist.DBID) *serverClient {
-	return &serverClient{url: host + "/glry/graphql/query", opts: []func(*http.Request){withJWTOpt(t, userID)}}
+	return customServerClient(t, host, withJWTOpt(t, userID))
+}
+
+// customServerClient provides a client to a live server with custom options
+func customServerClient(t *testing.T, host string, opts ...func(*http.Request)) *serverClient {
+	return &serverClient{url: host + "/glry/graphql/query", opts: opts}
 }
 
 // withJWTOpt ddds a JWT cookie to the request headers

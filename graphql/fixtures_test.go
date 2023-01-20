@@ -193,15 +193,16 @@ type userWithTokensFixture struct {
 func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 	t.Helper()
 	user := newUserFixture(t)
-	c := server.ClientInit(context.Background())
+	clients := server.ClientInit(context.Background())
 	p := multichain.Provider{
-		Repos:       c.Repos,
-		TasksClient: c.TaskClient,
-		Queries:     c.Queries,
+		Repos:       clients.Repos,
+		TasksClient: clients.TaskClient,
+		Queries:     clients.Queries,
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
-	h := server.CoreInit(c, &p)
-	tokenIDs := syncTokens(t, h, user.id)
+	h := server.CoreInit(clients, &p)
+	c := customHandlerClient(t, h, withJWTOpt(t, user.id))
+	tokenIDs := syncTokens(t, c, user.id)
 	return userWithTokensFixture{user, tokenIDs}
 }
 
