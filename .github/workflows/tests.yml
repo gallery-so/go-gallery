@@ -73,8 +73,6 @@ jobs:
           credentials_json: "${{ secrets.GCP_DEV_CREDENTIALS }}"
       - name: "Install gcloud cli"
         uses: google-github-actions/setup-gcloud@v0
-      - name: "Set up gcloud application default credentials"
-        run: gcloud auth application-default login
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
