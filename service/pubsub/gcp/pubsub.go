@@ -38,7 +38,7 @@ func NewClient(ctx context.Context) *pubsub.Client {
 				option.WithoutAuthentication(),
 			)
 		} else {
-			options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
+			options = append(options, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
 		}
 	}
 

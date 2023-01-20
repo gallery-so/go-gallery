@@ -81,7 +81,7 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 	options := []option.ClientOption{}
 
 	if viper.GetString("ENV") == "local" {
-		options = append(options, option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")))
+		options = append(options, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
 	}
 
 	httpClient, _, err := htransport.NewClient(ctx, options...)

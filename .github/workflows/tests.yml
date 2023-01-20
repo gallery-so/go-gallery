@@ -3,6 +3,8 @@ on: [push]
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
     steps:
       - name: Dump GitHub context
         run: echo "$GITHUB_CONTEXT"
@@ -19,27 +21,18 @@ jobs:
           go install gotest.tools/gotestsum@v1.8.2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip secrets"
-        run: echo "A" | unzip _deploy.zip -d _deploy
-      - name: "Decrypt local"
-        run: keybase decrypt -i _encrypted_local -o _local.zip
-      - name: "Unzip local"
-        run: echo "A" | unzip _local.zip -d _local
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_DEV_CREDENTIALS }}"
+      - name: "Install gcloud cli"
+        uses: google-github-actions/setup-gcloud@v0
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
@@ -50,6 +43,8 @@ jobs:
           gotestsum --junitfile /tmp/test-reports/indexer-integration-tests.xml -- -race ./indexer/...
   unit:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
     steps:
       - name: Dump GitHub context
         run: echo "$GITHUB_CONTEXT"
@@ -66,27 +61,18 @@ jobs:
           go install gotest.tools/gotestsum@v1.8.2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip secrets"
-        run: echo "A" | unzip _deploy.zip -d _deploy
-      - name: "Decrypt local"
-        run: keybase decrypt -i _encrypted_local -o _local.zip
-      - name: "Unzip local"
-        run: echo "A" | unzip _local.zip -d _local
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_DEV_CREDENTIALS }}"
+      - name: "Install gcloud cli"
+        uses: google-github-actions/setup-gcloud@v0
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
