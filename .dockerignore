@@ -22,6 +22,6 @@
 !docker
 !debugtools
 !tokenprocessing
-!_deploy/root-certs
+!root-certs
 !emails
 !adminapi

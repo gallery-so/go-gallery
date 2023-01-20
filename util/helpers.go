@@ -2,20 +2,21 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/spf13/viper"
+	"go.mozilla.org/sops/v3/decrypt"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-
-	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/spf13/viper"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -440,6 +441,33 @@ func VarNotSetTo(envVar, emptyVal string) {
 	}
 }
 
+// LoadEncryptedServiceKey loads an encrypted service key JSON file from disk
+func LoadEncryptedServiceKey(filePath string) []byte {
+	path := MustFindFile(filePath)
+
+	serviceKey, err := decrypt.File(path, "json")
+	if err != nil {
+		panic(fmt.Sprintf("error decrypting service key: %s\n", err))
+	}
+
+	return serviceKey
+}
+
+// LoadEncryptedServiceKeyOrError loads an encrypted service key JSON file from disk or errors
+func LoadEncryptedServiceKeyOrError(filePath string) ([]byte,error) {
+	path, err := MustFindFileOrError(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceKey, err := decrypt.File(path, "json")
+	if err != nil {
+		return nil, fmt.Errorf("error decrypting service key: %s\n", err)
+	}
+
+	return serviceKey
+}
+
 // InDocker returns true if the service is running as a container.
 func InDocker() bool {
 	if _, err := os.Stat("/.dockerenv"); err == nil {
@@ -450,38 +478,56 @@ func InDocker() bool {
 
 // ResolveEnvFile finds the appropriate env file to use for the service.
 func ResolveEnvFile(service string, env string) string {
+	if env != "local" && env != "dev" && env != "prod" {
+		env = "local"
+	}
+
+	secretsDir := filepath.Join("secrets", env, "local")
+
 	format := "app-%s-%s.yaml"
 	if InDocker() {
-		return fmt.Sprintf(format, "docker", service)
+		return filepath.Join(secretsDir, fmt.Sprintf(format, "docker", service))
 	}
 
-	switch env {
-	case "local":
-		return fmt.Sprintf(format, "local", service)
-	case "dev":
-		return fmt.Sprintf(format, "dev", service)
-	case "prod":
-		return fmt.Sprintf(format, "prod", service)
-	}
-
-	return fmt.Sprintf("app-local-%s.yaml", service)
+	return filepath.Join(secretsDir, fmt.Sprintf(format, env, service))
 }
 
-// LoadEnvFile configures the environment with the configured input file.
-func LoadEnvFile(fileName string) {
+// LoadEncryptedEnvFile configures the environment with the configured input file.
+func LoadEncryptedEnvFile(filePath string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
 
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	filePath := filepath.Join("_local", fileName)
+	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
+	path := MustFindFile(filePath)
+
+	config, err := decrypt.File(path, "yaml")
+	if err != nil {
+		panic(fmt.Sprintf("error decrypting config file: %s\n", err))
+	}
+
+	viper.SetConfigType("yaml")
+	if err := viper.ReadConfig(bytes.NewBuffer(config)); err != nil {
+		panic(fmt.Sprintf("error reading viper config: %s\n", err))
+	}
+}
+
+// LoadEnvFile configures the environment with the configured input file.
+func LoadEnvFile(filePath string) {
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+		return
+	}
+
+	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
 	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
 	path := MustFindFile(filePath)
 
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
+		panic(fmt.Sprintf("error reading viper config: %s\n", err))
 	}
 }
 

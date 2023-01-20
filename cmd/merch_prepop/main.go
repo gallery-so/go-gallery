@@ -77,9 +77,5 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 
-	viper.SetDefault("POSTGRES_SERVER_CA", "")
-	viper.SetDefault("POSTGRES_CLIENT_CERT", "")
-	viper.SetDefault("POSTGRES_CLIENT_KEY", "")
-
 	viper.AutomaticEnv()
 }

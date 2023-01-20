@@ -17,25 +17,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -45,9 +34,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-dev-backend
+        run: make deploy-dev-backend
   deploy-prod-backend:
     runs-on: ubuntu-latest
     steps:
@@ -58,25 +45,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -86,9 +62,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-prod-backend
+        run: make deploy-prod-backend
   deploy-dev-tokenprocessing:
     runs-on: ubuntu-latest
     steps:
@@ -99,25 +73,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -127,9 +90,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-dev-tokenprocessing
+        run: make deploy-dev-tokenprocessing
   deploy-prod-tokenprocessing:
     runs-on: ubuntu-latest
     steps:
@@ -140,25 +101,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -168,9 +118,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-prod-tokenprocessing
+        run: make deploy-prod-tokenprocessing
   deploy-prod-indexer-api:
     runs-on: ubuntu-latest
     steps:
@@ -181,25 +129,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -209,9 +146,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-prod-indexer-server
+        run: make deploy-prod-indexer-server
   deploy-dev-emails:
     runs-on: ubuntu-latest
     steps:
@@ -222,25 +157,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -250,9 +174,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-dev-emails
+        run: make deploy-dev-emails
   deploy-prod-emails:
     runs-on: ubuntu-latest
     steps:
@@ -263,25 +185,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -291,9 +202,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-prod-emails
+        run: make deploy-prod-emails
   deploy-dev-feed:
     runs-on: ubuntu-latest
     steps:
@@ -304,25 +213,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -332,9 +230,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-dev-feed
+        run: make deploy-dev-feed
   deploy-prod-feed:
     runs-on: ubuntu-latest
     steps:
@@ -345,25 +241,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -373,9 +258,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-prod-feed
+        run: make deploy-prod-feed
   deploy-dev-feedbot:
     runs-on: ubuntu-latest
     steps:
@@ -386,25 +269,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -414,9 +286,7 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-dev-feedbot
+        run: make deploy-dev-feedbot
   deploy-prod-feedbot:
     runs-on: ubuntu-latest
     steps:
@@ -427,25 +297,14 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Update apt"
         run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
       - name: "Install Sentry CLI"
         run: curl -sL https://sentry.io/get-cli/ | bash
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip"
-        run: echo "A" | unzip _deploy.zip -d _deploy
       - id: "auth"
         uses: "google-github-actions/auth@v0"
         with:
@@ -455,6 +314,4 @@ jobs:
       - name: "Docker auth"
         run: gcloud auth configure-docker us-east1-docker.pkg.dev
       - name: "Deploy"
-        run: |
-          cd _deploy
-          make deploy-prod-feedbot
+        run: make deploy-prod-feedbot

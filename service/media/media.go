@@ -81,12 +81,12 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 	options := []option.ClientOption{}
 
 	if viper.GetString("ENV") == "local" {
-		fi, err := util.MustFindFileOrError("./_deploy/service-key-dev.json")
+		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
 		if err != nil {
 			logger.For(ctx).WithError(err).Error("failed to find service key file (local), running without storage client")
 			return nil
 		}
-		options = append(options, option.WithCredentialsFile(fi))
+		options = append(options, option.WithCredentialsJSON(fi))
 	}
 
 	httpClient, _, err := htransport.NewClient(ctx, options...)

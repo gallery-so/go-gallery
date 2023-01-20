@@ -32,30 +32,34 @@ func getSqlConnectionString() string {
 	}
 
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	return connStr
 
-	dbServerCa := viper.GetString("POSTGRES_SERVER_CA")
-	dbClientKey := viper.GetString("POSTGRES_CLIENT_KEY")
-	dbClientCert := viper.GetString("POSTGRES_CLIENT_CERT")
+	// Commented out because we should be using Cloud SQL Proxy in any context where we would have supplied
+	// certificates. Keeping the code here in case we do need to allow certificates again some day.
 
-	numSSLParams := countNonEmptyStrings(dbServerCa, dbClientKey, dbClientCert)
-	if numSSLParams == 0 {
-		return connStr
-	} else if numSSLParams == 3 {
-		return connStr + fmt.Sprintf(" sslmode=verify-ca sslrootcert=%s sslcert=%s sslkey=%s", dbServerCa, dbClientCert, dbClientKey)
-	}
-
-	panic(fmt.Errorf("POSTGRES_SERVER_CA, POSTGRES_CLIENT_KEY, and POSTGRES_CLIENT_CERT must be set together (all must have values or all must be empty)"))
-}
-
-func countNonEmptyStrings(str ...string) int {
-	numNotEmpty := 0
-	for _, s := range str {
-		if s != "" {
-			numNotEmpty++
-		}
-	}
-
-	return numNotEmpty
+	//countNonEmptyStrings := func(str ...string) int {
+	//	numNotEmpty := 0
+	//	for _, s := range str {
+	//		if s != "" {
+	//			numNotEmpty++
+	//		}
+	//	}
+	//
+	//	return numNotEmpty
+	//}
+	//
+	//dbServerCa := viper.GetString("POSTGRES_SERVER_CA")
+	//dbClientKey := viper.GetString("POSTGRES_CLIENT_KEY")
+	//dbClientCert := viper.GetString("POSTGRES_CLIENT_CERT")
+	//
+	//numSSLParams := countNonEmptyStrings(dbServerCa, dbClientKey, dbClientCert)
+	//if numSSLParams == 0 {
+	//	return connStr
+	//} else if numSSLParams == 3 {
+	//	return connStr + fmt.Sprintf(" sslmode=verify-ca sslrootcert=%s sslcert=%s sslkey=%s", dbServerCa, dbClientCert, dbClientKey)
+	//}
+	//
+	//panic(fmt.Errorf("POSTGRES_SERVER_CA, POSTGRES_CLIENT_KEY, and POSTGRES_CLIENT_CERT must be set together (all must have values or all must be empty)"))
 }
 
 // NewClient creates a new postgres client
