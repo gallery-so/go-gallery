@@ -2,7 +2,6 @@ package tezos
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -41,12 +40,6 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	path := util.MustFindFile("secrets/local/local/app-local-backend.yaml")
-
-	viper.SetConfigFile(path)
-	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("error reading viper config: %s\n", err))
-	}
-
+	envFile := util.ResolveEnvFile("backend", "local")
+	util.LoadEncryptedEnvFile(envFile)
 }

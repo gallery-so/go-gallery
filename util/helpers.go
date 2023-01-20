@@ -465,7 +465,7 @@ func LoadEnvFile(filePath string) {
 
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
+		panic(fmt.Sprintf("error reading viper config: %s\n", err))
 	}
 }
 
