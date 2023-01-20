@@ -55,8 +55,7 @@ type ResolverRoot interface {
 	FollowInfo() FollowInfoResolver
 	FollowUserPayload() FollowUserPayloadResolver
 	Gallery() GalleryResolver
-	GalleryCollectionUpdate() GalleryCollectionUpdateResolver
-	GalleryTokenUpdate() GalleryTokenUpdateResolver
+	GalleryInfoUpdatedFeedEventData() GalleryInfoUpdatedFeedEventDataResolver
 	GalleryUpdatedFeedEventData() GalleryUpdatedFeedEventDataResolver
 	GalleryUser() GalleryUserResolver
 	Mutation() MutationResolver
@@ -473,16 +472,12 @@ type ComplexityRoot struct {
 		TokenPreviews func(childComplexity int) int
 	}
 
-	GalleryCollectionUpdate struct {
-		Collection          func(childComplexity int) int
-		IsCreatedCollection func(childComplexity int) int
-		NewCollectorsNote   func(childComplexity int) int
-		NewTokens           func(childComplexity int) int
-	}
-
-	GalleryTokenUpdate struct {
-		NewCollectorsNote func(childComplexity int) int
-		Token             func(childComplexity int) int
+	GalleryInfoUpdatedFeedEventData struct {
+		Action         func(childComplexity int) int
+		EventTime      func(childComplexity int) int
+		NewDescription func(childComplexity int) int
+		NewName        func(childComplexity int) int
+		Owner          func(childComplexity int) int
 	}
 
 	GalleryUpdatedFeedEventData struct {
@@ -1138,13 +1133,8 @@ type GalleryResolver interface {
 	Owner(ctx context.Context, obj *model.Gallery) (*model.GalleryUser, error)
 	Collections(ctx context.Context, obj *model.Gallery) ([]*model.Collection, error)
 }
-type GalleryCollectionUpdateResolver interface {
-	Collection(ctx context.Context, obj *model.GalleryCollectionUpdate) (*model.Collection, error)
-
-	NewTokens(ctx context.Context, obj *model.GalleryCollectionUpdate) ([]*model.CollectionToken, error)
-}
-type GalleryTokenUpdateResolver interface {
-	Token(ctx context.Context, obj *model.GalleryTokenUpdate) (*model.Token, error)
+type GalleryInfoUpdatedFeedEventDataResolver interface {
+	Owner(ctx context.Context, obj *model.GalleryInfoUpdatedFeedEventData) (*model.GalleryUser, error)
 }
 type GalleryUpdatedFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.GalleryUser, error)
@@ -2651,47 +2641,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Gallery.TokenPreviews(childComplexity), true
 
-	case "GalleryCollectionUpdate.collection":
-		if e.complexity.GalleryCollectionUpdate.Collection == nil {
+	case "GalleryInfoUpdatedFeedEventData.action":
+		if e.complexity.GalleryInfoUpdatedFeedEventData.Action == nil {
 			break
 		}
 
-		return e.complexity.GalleryCollectionUpdate.Collection(childComplexity), true
+		return e.complexity.GalleryInfoUpdatedFeedEventData.Action(childComplexity), true
 
-	case "GalleryCollectionUpdate.isCreatedCollection":
-		if e.complexity.GalleryCollectionUpdate.IsCreatedCollection == nil {
+	case "GalleryInfoUpdatedFeedEventData.eventTime":
+		if e.complexity.GalleryInfoUpdatedFeedEventData.EventTime == nil {
 			break
 		}
 
-		return e.complexity.GalleryCollectionUpdate.IsCreatedCollection(childComplexity), true
+		return e.complexity.GalleryInfoUpdatedFeedEventData.EventTime(childComplexity), true
 
-	case "GalleryCollectionUpdate.newCollectorsNote":
-		if e.complexity.GalleryCollectionUpdate.NewCollectorsNote == nil {
+	case "GalleryInfoUpdatedFeedEventData.newDescription":
+		if e.complexity.GalleryInfoUpdatedFeedEventData.NewDescription == nil {
 			break
 		}
 
-		return e.complexity.GalleryCollectionUpdate.NewCollectorsNote(childComplexity), true
+		return e.complexity.GalleryInfoUpdatedFeedEventData.NewDescription(childComplexity), true
 
-	case "GalleryCollectionUpdate.newTokens":
-		if e.complexity.GalleryCollectionUpdate.NewTokens == nil {
+	case "GalleryInfoUpdatedFeedEventData.newName":
+		if e.complexity.GalleryInfoUpdatedFeedEventData.NewName == nil {
 			break
 		}
 
-		return e.complexity.GalleryCollectionUpdate.NewTokens(childComplexity), true
+		return e.complexity.GalleryInfoUpdatedFeedEventData.NewName(childComplexity), true
 
-	case "GalleryTokenUpdate.newCollectorsNote":
-		if e.complexity.GalleryTokenUpdate.NewCollectorsNote == nil {
+	case "GalleryInfoUpdatedFeedEventData.owner":
+		if e.complexity.GalleryInfoUpdatedFeedEventData.Owner == nil {
 			break
 		}
 
-		return e.complexity.GalleryTokenUpdate.NewCollectorsNote(childComplexity), true
-
-	case "GalleryTokenUpdate.token":
-		if e.complexity.GalleryTokenUpdate.Token == nil {
-			break
-		}
-
-		return e.complexity.GalleryTokenUpdate.Token(childComplexity), true
+		return e.complexity.GalleryInfoUpdatedFeedEventData.Owner(childComplexity), true
 
 	case "GalleryUpdatedFeedEventData.action":
 		if e.complexity.GalleryUpdatedFeedEventData.Action == nil {
@@ -6193,16 +6176,13 @@ type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
   newCollectorsNote: String
   newTokens: [CollectionToken] @goField(forceResolver: true)
 }
-type GalleryCollectionUpdate @goEmbedHelper {
-  collection: Collection @goField(forceResolver: true)
-  newCollectorsNote: String
-  newTokens: [CollectionToken] @goField(forceResolver: true)
-  isCreatedCollection: Boolean
-}
 
-type GalleryTokenUpdate @goEmbedHelper {
-  token: Token @goField(forceResolver: true)
-  newCollectorsNote: String
+type GalleryInfoUpdatedFeedEventData implements FeedEventData {
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  newName: String
+  newDescription: String
+  action: Action
 }
 
 type GalleryUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
@@ -15022,7 +15002,7 @@ func (ec *executionContext) _Gallery_collections(ctx context.Context, field grap
 	return ec.marshalOCollection2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _GalleryCollectionUpdate_collection(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollectionUpdate) (ret graphql.Marshaler) {
+func (ec *executionContext) _GalleryInfoUpdatedFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.GalleryInfoUpdatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -15030,39 +15010,7 @@ func (ec *executionContext) _GalleryCollectionUpdate_collection(ctx context.Cont
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "GalleryCollectionUpdate",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryCollectionUpdate().Collection(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Collection)
-	fc.Result = res
-	return ec.marshalOCollection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollection(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollectionUpdate_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollectionUpdate) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollectionUpdate",
+		Object:     "GalleryInfoUpdatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -15072,7 +15020,71 @@ func (ec *executionContext) _GalleryCollectionUpdate_newCollectorsNote(ctx conte
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.NewCollectorsNote, nil
+		return obj.EventTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryInfoUpdatedFeedEventData_owner(ctx context.Context, field graphql.CollectedField, obj *model.GalleryInfoUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryInfoUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryInfoUpdatedFeedEventData().Owner(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryInfoUpdatedFeedEventData_newName(ctx context.Context, field graphql.CollectedField, obj *model.GalleryInfoUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryInfoUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewName, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15086,7 +15098,7 @@ func (ec *executionContext) _GalleryCollectionUpdate_newCollectorsNote(ctx conte
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _GalleryCollectionUpdate_newTokens(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollectionUpdate) (ret graphql.Marshaler) {
+func (ec *executionContext) _GalleryInfoUpdatedFeedEventData_newDescription(ctx context.Context, field graphql.CollectedField, obj *model.GalleryInfoUpdatedFeedEventData) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -15094,39 +15106,7 @@ func (ec *executionContext) _GalleryCollectionUpdate_newTokens(ctx context.Conte
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "GalleryCollectionUpdate",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryCollectionUpdate().NewTokens(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]*model.CollectionToken)
-	fc.Result = res
-	return ec.marshalOCollectionToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryCollectionUpdate_isCreatedCollection(ctx context.Context, field graphql.CollectedField, obj *model.GalleryCollectionUpdate) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryCollectionUpdate",
+		Object:     "GalleryInfoUpdatedFeedEventData",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -15136,71 +15116,7 @@ func (ec *executionContext) _GalleryCollectionUpdate_isCreatedCollection(ctx con
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.IsCreatedCollection, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryTokenUpdate_token(ctx context.Context, field graphql.CollectedField, obj *model.GalleryTokenUpdate) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryTokenUpdate",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.GalleryTokenUpdate().Token(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.Token)
-	fc.Result = res
-	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _GalleryTokenUpdate_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.GalleryTokenUpdate) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "GalleryTokenUpdate",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.NewCollectorsNote, nil
+		return obj.NewDescription, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15212,6 +15128,38 @@ func (ec *executionContext) _GalleryTokenUpdate_newCollectorsNote(ctx context.Co
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _GalleryInfoUpdatedFeedEventData_action(ctx context.Context, field graphql.CollectedField, obj *model.GalleryInfoUpdatedFeedEventData) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryInfoUpdatedFeedEventData",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Action, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*persist.Action)
+	fc.Result = res
+	return ec.marshalOAction2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐAction(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _GalleryUpdatedFeedEventData_eventTime(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUpdatedFeedEventData) (ret graphql.Marshaler) {
@@ -30839,6 +30787,13 @@ func (ec *executionContext) _FeedEventData(ctx context.Context, sel ast.Selectio
 			return graphql.Null
 		}
 		return ec._CollectionUpdatedFeedEventData(ctx, sel, obj)
+	case model.GalleryInfoUpdatedFeedEventData:
+		return ec._GalleryInfoUpdatedFeedEventData(ctx, sel, &obj)
+	case *model.GalleryInfoUpdatedFeedEventData:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GalleryInfoUpdatedFeedEventData(ctx, sel, obj)
 	case model.GalleryUpdatedFeedEventData:
 		return ec._GalleryUpdatedFeedEventData(ctx, sel, &obj)
 	case *model.GalleryUpdatedFeedEventData:
@@ -35784,41 +35739,24 @@ func (ec *executionContext) _Gallery(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var galleryCollectionUpdateImplementors = []string{"GalleryCollectionUpdate"}
+var galleryInfoUpdatedFeedEventDataImplementors = []string{"GalleryInfoUpdatedFeedEventData", "FeedEventData"}
 
-func (ec *executionContext) _GalleryCollectionUpdate(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryCollectionUpdate) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, galleryCollectionUpdateImplementors)
+func (ec *executionContext) _GalleryInfoUpdatedFeedEventData(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryInfoUpdatedFeedEventData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, galleryInfoUpdatedFeedEventDataImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("GalleryCollectionUpdate")
-		case "collection":
-			field := field
-
+			out.Values[i] = graphql.MarshalString("GalleryInfoUpdatedFeedEventData")
+		case "eventTime":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._GalleryCollectionUpdate_collection(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "newCollectorsNote":
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollectionUpdate_newCollectorsNote(ctx, field, obj)
+				return ec._GalleryInfoUpdatedFeedEventData_eventTime(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		case "newTokens":
+		case "owner":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -35827,7 +35765,7 @@ func (ec *executionContext) _GalleryCollectionUpdate(ctx context.Context, sel as
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._GalleryCollectionUpdate_newTokens(ctx, field, obj)
+				res = ec._GalleryInfoUpdatedFeedEventData_owner(ctx, field, obj)
 				return res
 			}
 
@@ -35835,54 +35773,23 @@ func (ec *executionContext) _GalleryCollectionUpdate(ctx context.Context, sel as
 				return innerFunc(ctx)
 
 			})
-		case "isCreatedCollection":
+		case "newName":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryCollectionUpdate_isCreatedCollection(ctx, field, obj)
+				return ec._GalleryInfoUpdatedFeedEventData_newName(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
 
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var galleryTokenUpdateImplementors = []string{"GalleryTokenUpdate"}
-
-func (ec *executionContext) _GalleryTokenUpdate(ctx context.Context, sel ast.SelectionSet, obj *model.GalleryTokenUpdate) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, galleryTokenUpdateImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("GalleryTokenUpdate")
-		case "token":
-			field := field
-
+		case "newDescription":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._GalleryTokenUpdate_token(ctx, field, obj)
-				return res
+				return ec._GalleryInfoUpdatedFeedEventData_newDescription(ctx, field, obj)
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
+			out.Values[i] = innerFunc(ctx)
 
-			})
-		case "newCollectorsNote":
+		case "action":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._GalleryTokenUpdate_newCollectorsNote(ctx, field, obj)
+				return ec._GalleryInfoUpdatedFeedEventData_action(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

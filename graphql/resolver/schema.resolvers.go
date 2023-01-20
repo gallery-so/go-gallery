@@ -291,18 +291,8 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
-func (r *galleryCollectionUpdateResolver) Collection(ctx context.Context, obj *model.GalleryCollectionUpdate) (*model.Collection, error) {
-	return resolveCollectionByCollectionID(ctx, obj.HelperGalleryCollectionUpdateData.CollectionID)
-}
-
-func (r *galleryCollectionUpdateResolver) NewTokens(ctx context.Context, obj *model.GalleryCollectionUpdate) ([]*model.CollectionToken, error) {
-	return util.Map(obj.NewTokens, func(t *model.CollectionToken) (*model.CollectionToken, error) {
-		return resolveCollectionTokenByID(ctx, t.TokenId, t.CollectionId)
-	})
-}
-
-func (r *galleryTokenUpdateResolver) Token(ctx context.Context, obj *model.GalleryTokenUpdate) (*model.Token, error) {
-	return resolveTokenByTokenID(ctx, obj.TokenID)
+func (r *galleryInfoUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.GalleryInfoUpdatedFeedEventData) (*model.GalleryUser, error) {
+	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *galleryUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.GalleryUser, error) {
@@ -1723,14 +1713,9 @@ func (r *Resolver) FollowUserPayload() generated.FollowUserPayloadResolver {
 // Gallery returns generated.GalleryResolver implementation.
 func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
 
-// GalleryCollectionUpdate returns generated.GalleryCollectionUpdateResolver implementation.
-func (r *Resolver) GalleryCollectionUpdate() generated.GalleryCollectionUpdateResolver {
-	return &galleryCollectionUpdateResolver{r}
-}
-
-// GalleryTokenUpdate returns generated.GalleryTokenUpdateResolver implementation.
-func (r *Resolver) GalleryTokenUpdate() generated.GalleryTokenUpdateResolver {
-	return &galleryTokenUpdateResolver{r}
+// GalleryInfoUpdatedFeedEventData returns generated.GalleryInfoUpdatedFeedEventDataResolver implementation.
+func (r *Resolver) GalleryInfoUpdatedFeedEventData() generated.GalleryInfoUpdatedFeedEventDataResolver {
+	return &galleryInfoUpdatedFeedEventDataResolver{r}
 }
 
 // GalleryUpdatedFeedEventData returns generated.GalleryUpdatedFeedEventDataResolver implementation.
@@ -1856,8 +1841,7 @@ type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
-type galleryCollectionUpdateResolver struct{ *Resolver }
-type galleryTokenUpdateResolver struct{ *Resolver }
+type galleryInfoUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }

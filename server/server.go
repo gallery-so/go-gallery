@@ -126,7 +126,11 @@ func newSecretsClient() *secretmanager.Client {
 	options := []option.ClientOption{}
 
 	if viper.GetString("ENV") == "local" {
-		keyPath := util.MustFindFile("./_deploy/service-key-dev.json")
+		keyPath, err := util.MustFindFileOrError("./_deploy/service-key-dev.json")
+		if err != nil {
+			logger.For(nil).WithError(err).Error("error finding service key, running without secrets client")
+			return nil
+		}
 		options = append(options, option.WithCredentialsFile(keyPath))
 	}
 
@@ -205,8 +209,8 @@ func SetDefaults() {
 		util.LoadEnvFile(envFile)
 	}
 
-	util.VarNotSetTo("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {
+		util.VarNotSetTo("IMGIX_SECRET", "")
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")

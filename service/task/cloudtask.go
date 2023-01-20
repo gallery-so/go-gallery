@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -224,9 +225,14 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 				option.WithoutAuthentication(),
 			)
 		} else {
+			fi, err := util.MustFindFileOrError("./_deploy/service-key-dev.json")
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
+				return nil
+			}
 			copts = append(
 				copts,
-				option.WithCredentialsFile(util.MustFindFile("./_deploy/service-key-dev.json")),
+				option.WithCredentialsFile(fi),
 			)
 		}
 	}

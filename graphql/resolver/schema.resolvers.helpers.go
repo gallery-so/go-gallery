@@ -1125,6 +1125,8 @@ func rawGalleryEventToFeedEventDataModel(event *db.Event) (model.FeedEventData, 
 		return rawEventToCollectorsNoteAddedToCollectionFeedEventData(event), nil
 	case persist.ActionTokensAddedToCollection:
 		return rawEventToTokensAddedToCollectionFeedEventData(event), nil
+	case persist.ActionGalleryInfoUpdated:
+		return rawEventToGalleryInfoUpdatedFeedEventData(event), nil
 	default:
 		return nil, persist.ErrUnknownAction{Action: event.Action}
 	}
@@ -1282,6 +1284,16 @@ func rawEventToTokensAddedToCollectionFeedEventData(event *db.Event) model.FeedE
 	}
 }
 
+func rawEventToGalleryInfoUpdatedFeedEventData(event *db.Event) model.FeedEventData {
+	return model.GalleryInfoUpdatedFeedEventData{
+		EventTime:      &event.CreatedAt,
+		Owner:          &model.GalleryUser{Dbid: persist.DBID(event.ActorID.String)}, // remaining fields handled by dedicated resolver
+		Action:         &event.Action,
+		NewName:        util.StringToPointerIfNotEmpty(event.Data.GalleryName),
+		NewDescription: util.StringToPointerIfNotEmpty(event.Data.GalleryDescription),
+	}
+}
+
 func feedEventToCollectionUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventData {
 	return model.CollectionUpdatedFeedEventData{
 		EventTime:         &event.EventTime,
@@ -1325,10 +1337,12 @@ func resolveSubEventDatasByFeedEventID(ctx context.Context, feedEventID persist.
 		if err != nil {
 			return nil, err
 		}
+		logger.For(ctx).Debugf("sub event action: %v", event.Action)
 		eventData, err := rawGalleryEventToFeedEventDataModel(event)
 		if err != nil {
 			return nil, err
 		}
+		logger.For(ctx).Infof("event data type: %T", eventData)
 		result = append(result, eventData)
 	}
 

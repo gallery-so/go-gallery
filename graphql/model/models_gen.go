@@ -974,23 +974,19 @@ type Gallery struct {
 func (Gallery) IsNode()                      {}
 func (Gallery) IsGalleryByIDPayloadOrError() {}
 
-type GalleryCollectionUpdate struct {
-	HelperGalleryCollectionUpdateData
-	Collection          *Collection        `json:"collection"`
-	NewCollectorsNote   *string            `json:"newCollectorsNote"`
-	NewTokens           []*CollectionToken `json:"newTokens"`
-	IsCreatedCollection *bool              `json:"isCreatedCollection"`
+type GalleryInfoUpdatedFeedEventData struct {
+	EventTime      *time.Time      `json:"eventTime"`
+	Owner          *GalleryUser    `json:"owner"`
+	NewName        *string         `json:"newName"`
+	NewDescription *string         `json:"newDescription"`
+	Action         *persist.Action `json:"action"`
 }
+
+func (GalleryInfoUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryPositionInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
 	Position  string       `json:"position"`
-}
-
-type GalleryTokenUpdate struct {
-	HelperGalleryTokenUpdateData
-	Token             *Token  `json:"token"`
-	NewCollectorsNote *string `json:"newCollectorsNote"`
 }
 
 type GalleryUpdatedFeedEventData struct {

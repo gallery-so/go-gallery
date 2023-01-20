@@ -343,6 +343,15 @@ func MustFindFile(f string) string {
 	return f
 }
 
+// MustFindFile panics if the file is not found up to the default search depth.
+func MustFindFileOrError(f string) (string, error) {
+	f, err := FindFile(f, 5)
+	if err != nil {
+		return "", err
+	}
+	return f, nil
+}
+
 // InByteSizeFormat converts a number of bytes to a human-readable string
 // using SI units (kB, MB, GB, TB, PB, EB, ZB, YB)
 func InByteSizeFormat(bytes uint64) string {
