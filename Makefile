@@ -23,8 +23,8 @@ SENTRY_RELEASE       = sentry-cli releases -o $(SENTRY_ORG) -p $(SENTRY_PROJECT)
 IMAGE_TAG            = $(DOCKER_REGISTRY)/$(GCP_PROJECT)/$(REPO)/$(CURRENT_BRANCH):$(CURRENT_COMMIT_HASH)
 DOCKER_BUILD         = docker build --file $(DOCKER_FILE) --platform linux/amd64 -t $(IMAGE_TAG) --build-arg VERSION=$(DEPLOY_VERSION) $(DOCKER_CONTEXT)
 DOCKER_PUSH          = docker push $(IMAGE_TAG)
-DOCKER_DIR           := ../docker
-DOCKER_CONTEXT       := ..
+DOCKER_DIR           := ./docker
+DOCKER_CONTEXT       := .
 DOCKER_REGISTRY      := us-east1-docker.pkg.dev
 
 # Environments
