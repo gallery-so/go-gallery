@@ -1,10 +1,10 @@
 name: ci
 on: [push]
-env:
-  GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
     steps:
       - name: Dump GitHub context
         run: echo "$GITHUB_CONTEXT"
@@ -33,8 +33,6 @@ jobs:
           credentials_json: "${{ secrets.GCP_DEV_CREDENTIALS }}"
       - name: "Install gcloud cli"
         uses: google-github-actions/setup-gcloud@v0
-      - name: "Set up gcloud application default credentials"
-        run: gcloud auth application-default login
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
@@ -45,6 +43,8 @@ jobs:
           gotestsum --junitfile /tmp/test-reports/indexer-integration-tests.xml -- -race ./indexer/...
   unit:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
     steps:
       - name: Dump GitHub context
         run: echo "$GITHUB_CONTEXT"
