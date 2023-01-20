@@ -20,9 +20,9 @@ jobs:
       - name: "Update apt"
         run: sudo apt-get update
       - name: "Download sops"
-        run: curl --remote-name https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
       - name: "Install sops"
-        run: sudo apt-get install ./sops_3.7.3_amd64.deb
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
       - id: "auth"
@@ -58,9 +58,9 @@ jobs:
       - name: "Update apt"
         run: sudo apt-get update
       - name: "Download sops"
-        run: curl --remote-name https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
       - name: "Install sops"
-        run: sudo apt-get install ./sops_3.7.3_amd64.deb
+        run: sudo apt-get install ./sops.deb
       - name: "ls"
         run: ls
       - id: "auth"
