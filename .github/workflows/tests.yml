@@ -1,5 +1,7 @@
 name: ci
 on: [push]
+env:
+  GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
 jobs:
   e2e:
     runs-on: ubuntu-latest
