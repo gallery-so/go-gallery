@@ -42,11 +42,11 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	path := util.MustFindFile("_local/app-local-backend.yaml")
+	path := util.MustFindFile("secrets/local/local/app-local-backend.yaml")
 
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
+		panic(fmt.Sprintf("error reading viper config: %s\n", err))
 	}
 
 }
