@@ -292,7 +292,7 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 }
 
 func (r *galleryInfoUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.GalleryInfoUpdatedFeedEventData) (*model.GalleryUser, error) {
-	panic(fmt.Errorf("not implemented"))
+	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
 func (r *galleryUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.GalleryUser, error) {
