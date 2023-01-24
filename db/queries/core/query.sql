@@ -656,7 +656,7 @@ with updates as (
 update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false and g.owner_user_id = @owner_user_id;
 
 -- name: UserHasDuplicateGalleryPositions :one
-select exists(select position,count(*) from galleries where owner_user_id = $1 group by position having count(*) > 0);
+select exists(select position,count(*) from galleries where owner_user_id = $1 and deleted = false group by position having count(*) > 1);
 
 -- name: UpdateGalleryInfo :exec
 update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
