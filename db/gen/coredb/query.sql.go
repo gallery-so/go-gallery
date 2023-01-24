@@ -2173,7 +2173,7 @@ func (q *Queries) GetTrendingUserIDs(ctx context.Context, arg GetTrendingUserIDs
 }
 
 const getTrendingUsersByIDs = `-- name: GetTrendingUsersByIDs :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
 `
 
 func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) ([]User, error) {
@@ -2202,6 +2202,7 @@ func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) (
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
+			&i.UserExperiences,
 		); err != nil {
 			return nil, err
 		}
