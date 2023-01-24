@@ -209,7 +209,7 @@ func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, c
 }
 
 func CreateTaskForWalletValidation(ctx context.Context, message ValidateNFTsMessage, client *gcptasks.Client) error {
-	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForDeepRefresh")
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletValidate")
 	defer tracing.FinishSpan(span)
 
 	queue := viper.GetString("GCLOUD_WALLET_VALIDATE_QUEUE")
