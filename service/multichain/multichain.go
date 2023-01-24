@@ -149,6 +149,11 @@ type verifier interface {
 	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
 }
 
+type walletHooker interface {
+	// WalletCreated is called when a wallet is created
+	WalletCreated(context.Context, persist.DBID, persist.Address, persist.WalletType, persist.Chain) error
+}
+
 // tokensFetcher supports fetching tokens for syncing
 type tokensFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
