@@ -365,6 +365,14 @@ SELECT * FROM feed_events WHERE owner_id = sqlc.arg('owner_id') AND deleted = fa
             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (event_time, id) END DESC
     LIMIT sqlc.arg('limit');
 
+-- name: PaginateTrendingFeed :many
+select f.* from feed_events f join unnest(@feed_event_ids::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
+  and t.pos < @cur_before_pos::int
+  and t.pos > @cur_after_pos::int
+  order by case when @paging_forward::bool then t.pos end asc,
+          case when not @paging_forward::bool then t.pos end desc
+  limit sqlc.arg('limit');
+
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
@@ -686,9 +694,9 @@ update collections c set collectors_note = updates.collectors_note, layout = upd
 update collections set nfts = @nfts, last_updated = now() where id = @id and deleted = false;
 
 -- name: CreateCollection :one
-insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 1, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
 
--- name: GetTrendingUsers :many
+-- name: GetTrendingUserIDs :many
 with rollup as (
 	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= @window_end group by e.gallery_id
 )
@@ -700,10 +708,15 @@ select p.id from (
 ) p
 where position <= @size::int;
 
-
 -- name: GetUserExperiencesByUserID :one
 select user_experiences from users where id = $1;
 
 -- name: UpdateUserExperience :exec
 update users set user_experiences = jsonb_set(user_experiences, '{' || @experience || '}', to_jsonb(@value)) where id = @user_id;
 
+-- name: GetTrendingUsersByIDs :many
+select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
+
+-- name: GetTrendingFeedEventIDs :many
+select feed_event_id from events where action in ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and created_at >= @window_end and feed_event_id is not null
+group by feed_event_id order by count(*) desc, max(created_at) desc limit sqlc.arg('limit');
