@@ -553,6 +553,33 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 	return nil
 }
 
+// RunWalletCreationHooks runs hooks for when a wallet is created
+func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DBID, walletAddress persist.Address, walletType persist.WalletType, chain persist.Chain) error {
+	if _, ok := d.Chains[chain]; !ok {
+		return nil
+	}
+
+	// User doesn't exist
+	_, err := d.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// TODO check if user wallets contains wallet using new util.Contains in other PR
+
+	for _, provider := range d.Chains[chain] {
+
+		if refresher, ok := provider.(walletHooker); ok {
+			if err := refresher.WalletCreated(ctx, userID, walletAddress, walletType, chain); err != nil {
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
 // VerifySignature verifies a signature for a wallet address
 func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
 	providers, ok := p.Chains[pChainAddress.Chain()]
