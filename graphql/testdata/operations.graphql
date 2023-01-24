@@ -62,6 +62,38 @@ query trendingUsersQuery($input: TrendingUsersInput!) {
   }
 }
 
+query globalFeedQuery($first: Int) {
+  globalFeed(first: $first) {
+    edges {
+      node {
+        ... on Error {
+          __typename
+          message
+        }
+        ... on FeedEvent {
+          dbid
+        }
+      }
+    }
+  }
+}
+
+query trendingFeedQuery($first: Int) {
+  trendingFeed(first: $first) {
+    edges {
+      node {
+        ... on Error {
+          __typename
+          message
+        }
+        ... on FeedEvent {
+          dbid
+        }
+      }
+    }
+  }
+}
+
 mutation createUserMutation($authMechanism: AuthMechanism!, $input: CreateUserInput!) {
   createUser(authMechanism: $authMechanism, input: $input) {
     ... on Error {
@@ -216,6 +248,34 @@ mutation viewGalleryMutation($galleryId: DBID!) {
     }
     ... on ViewGalleryPayload {
       gallery {
+        dbid
+      }
+    }
+  }
+}
+
+mutation admireFeedEventMutation($feedEventId: DBID!) {
+  admireFeedEvent(feedEventId: $feedEventId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AdmireFeedEventPayload {
+      feedEvent {
+        dbid
+      }
+    }
+  }
+}
+
+mutation commentOnFeedEventMutation($feedEventId: DBID!, $comment: String!) {
+  commentOnFeedEvent(feedEventId: $feedEventId, comment: $comment) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CommentOnFeedEventPayload {
+      feedEvent {
         dbid
       }
     }
