@@ -686,7 +686,7 @@ update collections c set collectors_note = updates.collectors_note, layout = upd
 update collections set nfts = @nfts, last_updated = now() where id = @id and deleted = false;
 
 -- name: CreateCollection :one
-insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 1, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
 
 -- name: GetTrendingUsers :many
 with rollup as (
