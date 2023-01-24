@@ -1,0 +1,35 @@
+name: deployer
+on:
+  workflow_dispatch:
+env:
+  CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+jobs:
+  deploy-dev-feedbot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump GitHub context
+        run: echo "$GITHUB_CONTEXT"
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+      - uses: actions/checkout@v2
+      - name: "Update apt"
+        run: sudo apt-get update
+      - name: "Install Sentry CLI"
+        run: curl -sL https://sentry.io/get-cli/ | bash
+      - name: "Download sops"
+        run: curl -L https://github.com/mozilla/sops/releases/download/v3.7.3/sops_3.7.3_amd64.deb > sops.deb
+      - name: "Install sops"
+        run: sudo apt-get install ./sops.deb
+      - name: "ls"
+        run: ls
+      - id: "auth"
+        uses: "google-github-actions/auth@v0"
+        with:
+          credentials_json: "${{ secrets.GCP_DEV_CREDENTIALS }}"
+      - name: "Install gcloud cli"
+        uses: google-github-actions/setup-gcloud@v0
+      - name: "Docker auth"
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev
+      - name: "Deploy"
+        run: make deploy-dev-feedbot
