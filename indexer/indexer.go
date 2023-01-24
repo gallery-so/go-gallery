@@ -806,8 +806,6 @@ func ownersPluginReceiver(
 	return func() {
 		defer wg.Done()
 		for result := range results {
-			// Current owner
-			ownersMap[result.currentOwner.ti] = result.currentOwner
 
 			// Previous owners
 			currentPreviousOwners, ok := previousOwnersMap[result.previousOwner.ti]
@@ -816,6 +814,17 @@ func ownersPluginReceiver(
 			}
 			currentPreviousOwners = append(currentPreviousOwners, result.previousOwner)
 			previousOwnersMap[result.previousOwner.ti] = currentPreviousOwners
+
+			// Current owners
+			if cur, ok := ownersMap[result.currentOwner.ti]; ok && cur.block > result.currentOwner.block {
+				// Currently stored owner is newer than incoming owner
+				// do not process incoming owner
+				continue
+			} else {
+				// Incoming owner is newer than the one we already have stored
+				// set them as the current owner
+				ownersMap[result.currentOwner.ti] = result.currentOwner
+			}
 		}
 	}
 }
@@ -1115,6 +1124,9 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 		allTransfersAtBlock[i] = transfersAtBlock
 		i++
 	}
+	sort.Slice(allTransfersAtBlock, func(i, j int) bool {
+		return allTransfersAtBlock[i].block < allTransfersAtBlock[j].block
+	})
 	return allTransfersAtBlock
 }
 
