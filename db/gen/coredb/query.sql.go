@@ -3246,7 +3246,7 @@ func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUs
 }
 
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one
-select exists(select position,count(*) from galleries where owner_user_id = $1 group by position having count(*) > 0)
+select exists(select position,count(*) from galleries where owner_user_id = $1 and deleted = false group by position having count(*) > 1)
 `
 
 func (q *Queries) UserHasDuplicateGalleryPositions(ctx context.Context, ownerUserID persist.DBID) (bool, error) {
