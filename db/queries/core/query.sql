@@ -699,3 +699,11 @@ select p.id from (
 	group by u.id
 ) p
 where position <= @size::int;
+
+
+-- name: GetUserExperiencesByUserID :one
+select user_experiences from users where id = $1;
+
+-- name: UpdateUserExperience :exec
+update users set user_experiences = jsonb_set(user_experiences, '{' || @experience || '}', to_jsonb(@value)) where id = @user_id;
+
