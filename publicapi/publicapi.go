@@ -82,7 +82,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, cache: feedCache},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
-		Admin:         admin.NewAPI(repos, queries, validator),
+		Admin:         admin.NewAPI(repos, queries, validator, multichainProvider),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }

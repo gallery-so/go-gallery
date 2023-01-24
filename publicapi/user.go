@@ -294,7 +294,7 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository)
+	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository, api.multichainProvider)
 	if err != nil {
 		return err
 	}
