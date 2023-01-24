@@ -306,6 +306,8 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 		})
 	}
 
+	// Reports that calculating trending users greater than a week or more
+	// are calculated once every 24 hours rather than once an hour.
 	ttl := time.Hour
 	if report.Duration > 7*24*time.Hour {
 		ttl *= 24
