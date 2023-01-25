@@ -291,7 +291,7 @@ mutation viewGalleryMutation($galleryId: DBID!) {
   }
 }
 
-    mutation updateGalleryMutation($input: UpdateGalleryInput!) {
+mutation updateGalleryMutation($input: UpdateGalleryInput!) {
   updateGallery(input: $input) {
     ... on UpdateGalleryPayload {
       gallery {
@@ -310,7 +310,8 @@ mutation viewGalleryMutation($galleryId: DBID!) {
       }
     }
   }
-    }
+}
+
 mutation admireFeedEventMutation($feedEventId: DBID!) {
   admireFeedEvent(feedEventId: $feedEventId) {
     ... on Error {
