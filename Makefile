@@ -48,7 +48,7 @@ migrate-prod-coredb  : REQUIRED_SOPS_SECRETS := $(SOPS_PROD_SECRETS)
 
 # Environment-specific settings
 $(DEPLOY)-$(DEV)-%                : ENV                    := $(DEV)
-$(DEPLOY)-$(SANDBOX)-%            : ENV                    := $(DEV)
+$(DEPLOY)-$(SANDBOX)-%            : ENV                    := $(SANDBOX)
 $(DEPLOY)-$(PROD)-%               : ENV                    := $(PROD)
 $(DEPLOY)-$(DEV)-%                : REQUIRED_SOPS_SECRETS  := $(SOPS_DEV_SECRETS)
 $(DEPLOY)-$(SANDBOX)-%            : REQUIRED_SOPS_SECRETS  := $(SOPS_DEV_SECRETS)
@@ -124,6 +124,7 @@ $(DEPLOY)-$(DEV)-emails                : SERVICE        := emails-dev
 $(DEPLOY)-$(PROD)-emails               : SERVICE        := emails-v2
 $(DEPLOY)-%-backend                    : REPO           := backend
 $(DEPLOY)-$(DEV)-backend               : DOCKER_FILE    := $(DOCKER_DIR)/backend/dev/Dockerfile
+$(DEPLOY)-$(SANDBOX)-backend           : DOCKER_FILE    := $(DOCKER_DIR)/backend/dev/Dockerfile
 $(DEPLOY)-$(PROD)-backend              : DOCKER_FILE    := $(DOCKER_DIR)/backend/prod/Dockerfile
 $(DEPLOY)-%-backend                    : PORT           := 4000
 $(DEPLOY)-%-backend                    : TIMEOUT        := $(BACKEND_TIMEOUT)
@@ -131,6 +132,7 @@ $(DEPLOY)-%-backend                    : CPU            := $(BACKEND_CPU)
 $(DEPLOY)-%-backend                    : MEMORY         := $(BACKEND_MEMORY)
 $(DEPLOY)-%-backend                    : CONCURRENCY    := $(BACKEND_CONCURRENCY)
 $(DEPLOY)-$(DEV)-backend               : SERVICE        := backend-dev
+$(DEPLOY)-$(SANDBOX)-backend           : SERVICE        := backend-sandbox
 $(DEPLOY)-$(PROD)-backend              : SERVICE        := backend
 $(DEPLOY)-%-feed                       : REPO           := feed
 $(DEPLOY)-%-feed                       : DOCKER_FILE    := $(DOCKER_DIR)/feed/Dockerfile
@@ -280,7 +282,7 @@ $(DEPLOY)-$(DEV)-feedbot          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-fee
 $(DEPLOY)-$(DEV)-routing-rules    : _set-project-$(ENV) _$(DEPLOY)-routing-rules
 
 # SANDBOX deployments
-$(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
+$(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
 
 # PROD deployments
 $(DEPLOY)-$(PROD)-backend         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend

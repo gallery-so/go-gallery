@@ -348,6 +348,26 @@ func (v *__addUserWalletMutationInput) GetChainAddress() ChainAddressInput { ret
 // GetAuthMechanism returns __addUserWalletMutationInput.AuthMechanism, and is useful for accessing the field via an interface.
 func (v *__addUserWalletMutationInput) GetAuthMechanism() AuthMechanism { return v.AuthMechanism }
 
+// __admireFeedEventMutationInput is used internally by genqlient
+type __admireFeedEventMutationInput struct {
+	FeedEventId persist.DBID `json:"feedEventId"`
+}
+
+// GetFeedEventId returns __admireFeedEventMutationInput.FeedEventId, and is useful for accessing the field via an interface.
+func (v *__admireFeedEventMutationInput) GetFeedEventId() persist.DBID { return v.FeedEventId }
+
+// __commentOnFeedEventMutationInput is used internally by genqlient
+type __commentOnFeedEventMutationInput struct {
+	FeedEventId persist.DBID `json:"feedEventId"`
+	Comment     string       `json:"comment"`
+}
+
+// GetFeedEventId returns __commentOnFeedEventMutationInput.FeedEventId, and is useful for accessing the field via an interface.
+func (v *__commentOnFeedEventMutationInput) GetFeedEventId() persist.DBID { return v.FeedEventId }
+
+// GetComment returns __commentOnFeedEventMutationInput.Comment, and is useful for accessing the field via an interface.
+func (v *__commentOnFeedEventMutationInput) GetComment() string { return v.Comment }
+
 // __createCollectionMutationInput is used internally by genqlient
 type __createCollectionMutationInput struct {
 	Input CreateCollectionInput `json:"input"`
@@ -376,6 +396,14 @@ type __getAuthNonceMutationInput struct {
 // GetInput returns __getAuthNonceMutationInput.Input, and is useful for accessing the field via an interface.
 func (v *__getAuthNonceMutationInput) GetInput() ChainAddressInput { return v.Input }
 
+// __globalFeedQueryInput is used internally by genqlient
+type __globalFeedQueryInput struct {
+	First *int `json:"first"`
+}
+
+// GetFirst returns __globalFeedQueryInput.First, and is useful for accessing the field via an interface.
+func (v *__globalFeedQueryInput) GetFirst() *int { return v.First }
+
 // __loginMutationInput is used internally by genqlient
 type __loginMutationInput struct {
 	AuthMechanism AuthMechanism `json:"authMechanism"`
@@ -399,6 +427,14 @@ type __syncTokensMutationInput struct {
 
 // GetChains returns __syncTokensMutationInput.Chains, and is useful for accessing the field via an interface.
 func (v *__syncTokensMutationInput) GetChains() []Chain { return v.Chains }
+
+// __trendingFeedQueryInput is used internally by genqlient
+type __trendingFeedQueryInput struct {
+	First *int `json:"first"`
+}
+
+// GetFirst returns __trendingFeedQueryInput.First, and is useful for accessing the field via an interface.
+func (v *__trendingFeedQueryInput) GetFirst() *int { return v.First }
 
 // __trendingUsersQueryInput is used internally by genqlient
 type __trendingUsersQueryInput struct {
@@ -757,6 +793,536 @@ func (v *addUserWalletMutationResponse) __premarshalJSON() (*__premarshaladdUser
 			if err != nil {
 				return nil, fmt.Errorf(
 					"Unable to marshal addUserWalletMutationResponse.AddUserWallet: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload includes the requested fields of the GraphQL type AdmireFeedEventPayload.
+type admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload struct {
+	Typename  *string                                                                `json:"__typename"`
+	FeedEvent *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadFeedEvent `json:"feedEvent"`
+}
+
+// GetTypename returns admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload.Typename, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetFeedEvent returns admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload.FeedEvent, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload) GetFeedEvent() *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadFeedEvent {
+	return v.FeedEvent
+}
+
+// admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadFeedEvent includes the requested fields of the GraphQL type FeedEvent.
+type admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadFeedEvent struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadFeedEvent.Dbid, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadFeedEvent) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError includes the requested fields of the GraphQL interface AdmireFeedEventPayloadOrError.
+//
+// admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError is implemented by the following types:
+// admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload
+// admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed
+// admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound
+// admireFeedEventMutationAdmireFeedEventErrInvalidInput
+// admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists
+type admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError interface {
+	implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
+}
+func (v *admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
+}
+func (v *admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
+}
+func (v *admireFeedEventMutationAdmireFeedEventErrInvalidInput) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
+}
+func (v *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists) implementsGraphQLInterfaceadmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError() {
+}
+
+func __unmarshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError(b []byte, v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "AdmireFeedEventPayload":
+		*v = new(admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrAuthenticationFailed":
+		*v = new(admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
+	case "ErrFeedEventNotFound":
+		*v = new(admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(admireFeedEventMutationAdmireFeedEventErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrAdmireAlreadyExists":
+		*v = new(admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing AdmireFeedEventPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError(v *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload:
+		typename = "AdmireFeedEventPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed:
+		typename = "ErrAuthenticationFailed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound:
+		typename = "ErrFeedEventNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireFeedEventMutationAdmireFeedEventErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireFeedEventMutationAdmireFeedEventErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists:
+		typename = "ErrAdmireAlreadyExists"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError: "%T"`, v)
+	}
+}
+
+// admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists includes the requested fields of the GraphQL type ErrAdmireAlreadyExists.
+type admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists.Typename, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists.Message, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrAdmireAlreadyExists) GetMessage() string {
+	return v.Message
+}
+
+// admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed includes the requested fields of the GraphQL type ErrAuthenticationFailed.
+type admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed.Typename, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed.Message, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrAuthenticationFailed) GetMessage() string {
+	return v.Message
+}
+
+// admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound includes the requested fields of the GraphQL type ErrFeedEventNotFound.
+type admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound.Message, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrFeedEventNotFound) GetMessage() string {
+	return v.Message
+}
+
+// admireFeedEventMutationAdmireFeedEventErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type admireFeedEventMutationAdmireFeedEventErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns admireFeedEventMutationAdmireFeedEventErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns admireFeedEventMutationAdmireFeedEventErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationAdmireFeedEventErrInvalidInput) GetMessage() string { return v.Message }
+
+// admireFeedEventMutationResponse is returned by admireFeedEventMutation on success.
+type admireFeedEventMutationResponse struct {
+	AdmireFeedEvent *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError `json:"-"`
+}
+
+// GetAdmireFeedEvent returns admireFeedEventMutationResponse.AdmireFeedEvent, and is useful for accessing the field via an interface.
+func (v *admireFeedEventMutationResponse) GetAdmireFeedEvent() *admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError {
+	return v.AdmireFeedEvent
+}
+
+func (v *admireFeedEventMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*admireFeedEventMutationResponse
+		AdmireFeedEvent json.RawMessage `json:"admireFeedEvent"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.admireFeedEventMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.AdmireFeedEvent
+		src := firstPass.AdmireFeedEvent
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(admireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError)
+			err = __unmarshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal admireFeedEventMutationResponse.AdmireFeedEvent: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaladmireFeedEventMutationResponse struct {
+	AdmireFeedEvent json.RawMessage `json:"admireFeedEvent"`
+}
+
+func (v *admireFeedEventMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *admireFeedEventMutationResponse) __premarshalJSON() (*__premarshaladmireFeedEventMutationResponse, error) {
+	var retval __premarshaladmireFeedEventMutationResponse
+
+	{
+
+		dst := &retval.AdmireFeedEvent
+		src := v.AdmireFeedEvent
+		if src != nil {
+			var err error
+			*dst, err = __marshaladmireFeedEventMutationAdmireFeedEventAdmireFeedEventPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal admireFeedEventMutationResponse.AdmireFeedEvent: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload includes the requested fields of the GraphQL type CommentOnFeedEventPayload.
+type commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload struct {
+	Typename  *string                                                                         `json:"__typename"`
+	FeedEvent *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent `json:"feedEvent"`
+}
+
+// GetTypename returns commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload.Typename, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetFeedEvent returns commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload.FeedEvent, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload) GetFeedEvent() *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent {
+	return v.FeedEvent
+}
+
+// commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent includes the requested fields of the GraphQL type FeedEvent.
+type commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent.Dbid, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadFeedEvent) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError includes the requested fields of the GraphQL interface CommentOnFeedEventPayloadOrError.
+//
+// commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError is implemented by the following types:
+// commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload
+// commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed
+// commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound
+// commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput
+type commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError interface {
+	implementsGraphQLInterfacecommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload) implementsGraphQLInterfacecommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError() {
+}
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed) implementsGraphQLInterfacecommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError() {
+}
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound) implementsGraphQLInterfacecommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError() {
+}
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput) implementsGraphQLInterfacecommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError() {
+}
+
+func __unmarshalcommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError(b []byte, v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "CommentOnFeedEventPayload":
+		*v = new(commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrAuthenticationFailed":
+		*v = new(commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed)
+		return json.Unmarshal(b, *v)
+	case "ErrFeedEventNotFound":
+		*v = new(commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing CommentOnFeedEventPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalcommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError(v *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload:
+		typename = "CommentOnFeedEventPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed:
+		typename = "ErrAuthenticationFailed"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed
+		}{typename, v}
+		return json.Marshal(result)
+	case *commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound:
+		typename = "ErrFeedEventNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError: "%T"`, v)
+	}
+}
+
+// commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed includes the requested fields of the GraphQL type ErrAuthenticationFailed.
+type commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed.Typename, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed.Message, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrAuthenticationFailed) GetMessage() string {
+	return v.Message
+}
+
+// commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound includes the requested fields of the GraphQL type ErrFeedEventNotFound.
+type commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound.Message, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrFeedEventNotFound) GetMessage() string {
+	return v.Message
+}
+
+// commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationCommentOnFeedEventErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// commentOnFeedEventMutationResponse is returned by commentOnFeedEventMutation on success.
+type commentOnFeedEventMutationResponse struct {
+	CommentOnFeedEvent *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError `json:"-"`
+}
+
+// GetCommentOnFeedEvent returns commentOnFeedEventMutationResponse.CommentOnFeedEvent, and is useful for accessing the field via an interface.
+func (v *commentOnFeedEventMutationResponse) GetCommentOnFeedEvent() *commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError {
+	return v.CommentOnFeedEvent
+}
+
+func (v *commentOnFeedEventMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*commentOnFeedEventMutationResponse
+		CommentOnFeedEvent json.RawMessage `json:"commentOnFeedEvent"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.commentOnFeedEventMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.CommentOnFeedEvent
+		src := firstPass.CommentOnFeedEvent
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(commentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError)
+			err = __unmarshalcommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalcommentOnFeedEventMutationResponse struct {
+	CommentOnFeedEvent json.RawMessage `json:"commentOnFeedEvent"`
+}
+
+func (v *commentOnFeedEventMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *commentOnFeedEventMutationResponse) __premarshalJSON() (*__premarshalcommentOnFeedEventMutationResponse, error) {
+	var retval __premarshalcommentOnFeedEventMutationResponse
+
+	{
+
+		dst := &retval.CommentOnFeedEvent
+		src := v.CommentOnFeedEvent
+		if src != nil {
+			var err error
+			*dst, err = __marshalcommentOnFeedEventMutationCommentOnFeedEventCommentOnFeedEventPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
 			}
 		}
 	}
@@ -1530,6 +2096,237 @@ func (v *getAuthNonceMutationResponse) __premarshalJSON() (*__premarshalgetAuthN
 		}
 	}
 	return &retval, nil
+}
+
+// globalFeedQueryGlobalFeedFeedConnection includes the requested fields of the GraphQL type FeedConnection.
+type globalFeedQueryGlobalFeedFeedConnection struct {
+	Edges []*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge `json:"edges"`
+}
+
+// GetEdges returns globalFeedQueryGlobalFeedFeedConnection.Edges, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnection) GetEdges() []*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge {
+	return v.Edges
+}
+
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge includes the requested fields of the GraphQL type FeedEdge.
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge struct {
+	Node *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError `json:"-"`
+}
+
+// GetNode returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) GetNode() *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError {
+	return v.Node
+}
+
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge
+		Node json.RawMessage `json:"node"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.Node
+		src := firstPass.Node
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError)
+			err = __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge struct {
+	Node json.RawMessage `json:"node"`
+}
+
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge) __premarshalJSON() (*__premarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge, error) {
+	var retval __premarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge
+
+	{
+
+		dst := &retval.Node
+		src := v.Node
+		if src != nil {
+			var err error
+			*dst, err = __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound includes the requested fields of the GraphQL type ErrFeedEventNotFound.
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound.Message, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) GetMessage() string {
+	return v.Message
+}
+
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction includes the requested fields of the GraphQL type ErrUnknownAction.
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction.Typename, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction.Message, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) GetMessage() string {
+	return v.Message
+}
+
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
+	Typename *string      `json:"__typename"`
+	Dbid     persist.DBID `json:"dbid"`
+}
+
+// GetTypename returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Typename, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetTypename() *string {
+	return v.Typename
+}
+
+// GetDbid returns globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Dbid, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError includes the requested fields of the GraphQL interface FeedEventOrError.
+//
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+// globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+type globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
+	implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+
+func __unmarshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "FeedEvent":
+		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		return json.Unmarshal(b, *v)
+	case "ErrFeedEventNotFound":
+		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrUnknownAction":
+		*v = new(globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing FeedEventOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalglobalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(v *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+		typename = "FeedEvent"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+		}{typename, v}
+		return json.Marshal(result)
+	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
+		typename = "ErrFeedEventNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
+		typename = "ErrUnknownAction"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for globalFeedQueryGlobalFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%T"`, v)
+	}
+}
+
+// globalFeedQueryResponse is returned by globalFeedQuery on success.
+type globalFeedQueryResponse struct {
+	GlobalFeed *globalFeedQueryGlobalFeedFeedConnection `json:"globalFeed"`
+}
+
+// GetGlobalFeed returns globalFeedQueryResponse.GlobalFeed, and is useful for accessing the field via an interface.
+func (v *globalFeedQueryResponse) GetGlobalFeed() *globalFeedQueryGlobalFeedFeedConnection {
+	return v.GlobalFeed
 }
 
 // loginMutationLoginErrAuthenticationFailed includes the requested fields of the GraphQL type ErrAuthenticationFailed.
@@ -2331,6 +3128,237 @@ func (v *syncTokensMutationSyncTokensSyncTokensPayloadViewerUserGalleryUserToken
 	return v.TokenId
 }
 
+// trendingFeedQueryResponse is returned by trendingFeedQuery on success.
+type trendingFeedQueryResponse struct {
+	TrendingFeed *trendingFeedQueryTrendingFeedFeedConnection `json:"trendingFeed"`
+}
+
+// GetTrendingFeed returns trendingFeedQueryResponse.TrendingFeed, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryResponse) GetTrendingFeed() *trendingFeedQueryTrendingFeedFeedConnection {
+	return v.TrendingFeed
+}
+
+// trendingFeedQueryTrendingFeedFeedConnection includes the requested fields of the GraphQL type FeedConnection.
+type trendingFeedQueryTrendingFeedFeedConnection struct {
+	Edges []*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge `json:"edges"`
+}
+
+// GetEdges returns trendingFeedQueryTrendingFeedFeedConnection.Edges, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnection) GetEdges() []*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge {
+	return v.Edges
+}
+
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge includes the requested fields of the GraphQL type FeedEdge.
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge struct {
+	Node *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError `json:"-"`
+}
+
+// GetNode returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) GetNode() *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError {
+	return v.Node
+}
+
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge
+		Node json.RawMessage `json:"node"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.Node
+		src := firstPass.Node
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError)
+			err = __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge struct {
+	Node json.RawMessage `json:"node"`
+}
+
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge) __premarshalJSON() (*__premarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge, error) {
+	var retval __premarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge
+
+	{
+
+		dst := &retval.Node
+		src := v.Node
+		if src != nil {
+			var err error
+			*dst, err = __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound includes the requested fields of the GraphQL type ErrFeedEventNotFound.
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound.Message, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) GetMessage() string {
+	return v.Message
+}
+
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction includes the requested fields of the GraphQL type ErrUnknownAction.
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction.Typename, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction.Message, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) GetMessage() string {
+	return v.Message
+}
+
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
+	Typename *string      `json:"__typename"`
+	Dbid     persist.DBID `json:"dbid"`
+}
+
+// GetTypename returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Typename, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetTypename() *string {
+	return v.Typename
+}
+
+// GetDbid returns trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Dbid, and is useful for accessing the field via an interface.
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError includes the requested fields of the GraphQL interface FeedEventOrError.
+//
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+// trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+type trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
+	implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfacetrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+
+func __unmarshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "FeedEvent":
+		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		return json.Unmarshal(b, *v)
+	case "ErrFeedEventNotFound":
+		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrUnknownAction":
+		*v = new(trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing FeedEventOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaltrendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(v *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+		typename = "FeedEvent"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+		}{typename, v}
+		return json.Marshal(result)
+	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
+		typename = "ErrFeedEventNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
+		typename = "ErrUnknownAction"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for trendingFeedQueryTrendingFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%T"`, v)
+	}
+}
+
 // trendingUsersQueryResponse is returned by trendingUsersQuery on success.
 type trendingUsersQueryResponse struct {
 	TrendingUsers *trendingUsersQueryTrendingUsersTrendingUsersPayloadOrError `json:"-"`
@@ -2571,26 +3599,18 @@ func (v *updateGalleryMutationResponse) __premarshalJSON() (*__premarshalupdateG
 // updateGalleryMutationUpdateGalleryErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
 type updateGalleryMutationUpdateGalleryErrInvalidInput struct {
 	Typename *string `json:"__typename"`
-	Message  string  `json:"message"`
 }
 
 // GetTypename returns updateGalleryMutationUpdateGalleryErrInvalidInput.Typename, and is useful for accessing the field via an interface.
 func (v *updateGalleryMutationUpdateGalleryErrInvalidInput) GetTypename() *string { return v.Typename }
 
-// GetMessage returns updateGalleryMutationUpdateGalleryErrInvalidInput.Message, and is useful for accessing the field via an interface.
-func (v *updateGalleryMutationUpdateGalleryErrInvalidInput) GetMessage() string { return v.Message }
-
 // updateGalleryMutationUpdateGalleryErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
 type updateGalleryMutationUpdateGalleryErrNotAuthorized struct {
 	Typename *string `json:"__typename"`
-	Message  string  `json:"message"`
 }
 
 // GetTypename returns updateGalleryMutationUpdateGalleryErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
 func (v *updateGalleryMutationUpdateGalleryErrNotAuthorized) GetTypename() *string { return v.Typename }
-
-// GetMessage returns updateGalleryMutationUpdateGalleryErrNotAuthorized.Message, and is useful for accessing the field via an interface.
-func (v *updateGalleryMutationUpdateGalleryErrNotAuthorized) GetMessage() string { return v.Message }
 
 // updateGalleryMutationUpdateGalleryUpdateGalleryPayload includes the requested fields of the GraphQL type UpdateGalleryPayload.
 type updateGalleryMutationUpdateGalleryUpdateGalleryPayload struct {
@@ -4901,6 +5921,90 @@ mutation addUserWalletMutation ($chainAddress: ChainAddressInput!, $authMechanis
 	return &data, err
 }
 
+func admireFeedEventMutation(
+	ctx context.Context,
+	client graphql.Client,
+	feedEventId persist.DBID,
+) (*admireFeedEventMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "admireFeedEventMutation",
+		Query: `
+mutation admireFeedEventMutation ($feedEventId: DBID!) {
+	admireFeedEvent(feedEventId: $feedEventId) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on AdmireFeedEventPayload {
+			feedEvent {
+				dbid
+			}
+		}
+	}
+}
+`,
+		Variables: &__admireFeedEventMutationInput{
+			FeedEventId: feedEventId,
+		},
+	}
+	var err error
+
+	var data admireFeedEventMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+func commentOnFeedEventMutation(
+	ctx context.Context,
+	client graphql.Client,
+	feedEventId persist.DBID,
+	comment string,
+) (*commentOnFeedEventMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "commentOnFeedEventMutation",
+		Query: `
+mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
+	commentOnFeedEvent(feedEventId: $feedEventId, comment: $comment) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on CommentOnFeedEventPayload {
+			feedEvent {
+				dbid
+			}
+		}
+	}
+}
+`,
+		Variables: &__commentOnFeedEventMutationInput{
+			FeedEventId: feedEventId,
+			Comment:     comment,
+		},
+	}
+	var err error
+
+	var data commentOnFeedEventMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 func createCollectionMutation(
 	ctx context.Context,
 	client graphql.Client,
@@ -5027,6 +6131,49 @@ mutation getAuthNonceMutation ($input: ChainAddressInput!) {
 	var err error
 
 	var data getAuthNonceMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+func globalFeedQuery(
+	ctx context.Context,
+	client graphql.Client,
+	first *int,
+) (*globalFeedQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "globalFeedQuery",
+		Query: `
+query globalFeedQuery ($first: Int) {
+	globalFeed(first: $first) {
+		edges {
+			node {
+				__typename
+				... on Error {
+					__typename
+					message
+				}
+				... on FeedEvent {
+					dbid
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__globalFeedQueryInput{
+			First: first,
+		},
+	}
+	var err error
+
+	var data globalFeedQueryResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(
@@ -5211,6 +6358,49 @@ mutation syncTokensMutation ($chains: [Chain!]) {
 	return &data, err
 }
 
+func trendingFeedQuery(
+	ctx context.Context,
+	client graphql.Client,
+	first *int,
+) (*trendingFeedQueryResponse, error) {
+	req := &graphql.Request{
+		OpName: "trendingFeedQuery",
+		Query: `
+query trendingFeedQuery ($first: Int) {
+	trendingFeed(first: $first) {
+		edges {
+			node {
+				__typename
+				... on Error {
+					__typename
+					message
+				}
+				... on FeedEvent {
+					dbid
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__trendingFeedQueryInput{
+			First: first,
+		},
+	}
+	var err error
+
+	var data trendingFeedQueryResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 func trendingUsersQuery(
 	ctx context.Context,
 	client graphql.Client,
@@ -5259,10 +6449,6 @@ func updateGalleryMutation(
 mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
 	updateGallery(input: $input) {
 		__typename
-		... on Error {
-			__typename
-			message
-		}
 		... on UpdateGalleryPayload {
 			gallery {
 				dbid

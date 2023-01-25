@@ -18,6 +18,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -163,8 +164,9 @@ type nonceFixture struct {
 func newNonceFixture(t *testing.T) nonceFixture {
 	t.Helper()
 	wallet := newWallet(t)
+	ctx := context.Background()
 	c := defaultHandlerClient(t)
-	nonce := newNonce(t, c, wallet)
+	nonce := newNonce(t, ctx, c, wallet)
 	return nonceFixture{wallet, nonce}
 }
 
@@ -179,8 +181,9 @@ type userFixture struct {
 func newUserFixture(t *testing.T) userFixture {
 	t.Helper()
 	wallet := newWallet(t)
+	ctx := context.Background()
 	c := defaultHandlerClient(t)
-	userID, username, galleryID := newUser(t, c, wallet)
+	userID, username, galleryID := newUser(t, ctx, c, wallet)
 	return userFixture{wallet, username, userID, galleryID}
 }
 
@@ -193,16 +196,59 @@ type userWithTokensFixture struct {
 func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 	t.Helper()
 	user := newUserFixture(t)
-	c := server.ClientInit(context.Background())
+	ctx := context.Background()
+	clients := server.ClientInit(ctx)
 	p := multichain.Provider{
-		Repos:       c.Repos,
-		TasksClient: c.TaskClient,
-		Queries:     c.Queries,
+		Repos:       clients.Repos,
+		TasksClient: clients.TaskClient,
+		Queries:     clients.Queries,
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
-	h := server.CoreInit(c, &p)
-	tokenIDs := syncTokens(t, h, user.id)
+	h := server.CoreInit(clients, &p)
+	c := customHandlerClient(t, h, withJWTOpt(t, user.id))
+	tokenIDs := syncTokens(t, ctx, c, user.id)
 	return userWithTokensFixture{user, tokenIDs}
+}
+
+type userWithFeedEventsFixture struct {
+	userWithTokensFixture
+	feedEventIDs []persist.DBID
+}
+
+// newUserWithFeedEventsFixture generates a new user with feed events pre-generated
+func newUserWithFeedEventsFixture(t *testing.T) userWithFeedEventsFixture {
+	t.Helper()
+	serverF := newServerFixture(t)
+	user := newUserWithTokensFixture(t)
+	ctx := context.Background()
+	c := authedServerClient(t, serverF.server.URL, user.id)
+	// At the moment, we rely on captioning to ensure that that feed events are
+	// generated near instantly so that we don't have to add arbitrary sleep
+	// times during tests.
+	createCollection(t, ctx, c, CreateCollectionInput{
+		GalleryId:     user.galleryID,
+		Tokens:        user.tokenIDs,
+		Layout:        defaultLayout(),
+		TokenSettings: defaultTokenSettings(user.tokenIDs),
+		Caption:       util.StringToPointer("this is a caption"),
+	})
+	createCollection(t, ctx, c, CreateCollectionInput{
+		GalleryId:     user.galleryID,
+		Tokens:        user.tokenIDs,
+		Layout:        defaultLayout(),
+		TokenSettings: defaultTokenSettings(user.tokenIDs),
+		Caption:       util.StringToPointer("this is a caption"),
+	})
+	createCollection(t, ctx, c, CreateCollectionInput{
+		GalleryId:     user.galleryID,
+		Tokens:        user.tokenIDs,
+		Layout:        defaultLayout(),
+		TokenSettings: defaultTokenSettings(user.tokenIDs),
+		Caption:       util.StringToPointer("this is a caption"),
+	})
+	feedEvents := globalFeedEvents(t, ctx, c, 3)
+	require.Len(t, feedEvents, 3)
+	return userWithFeedEventsFixture{user, feedEvents}
 }
 
 // stubProvider returns the same response for every call made to it

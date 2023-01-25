@@ -343,6 +343,11 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		return "", "", err
 	}
 
+	err = api.queries.UpdateUserFeaturedGallery(ctx, db.UpdateUserFeaturedGalleryParams{GalleryID: galleryID, UserID: userID})
+	if err != nil {
+		return "", "", err
+	}
+
 	if email != nil && *email != "" {
 		// TODO email validation ahead of time
 		err = emails.RequestVerificationEmail(ctx, userID)

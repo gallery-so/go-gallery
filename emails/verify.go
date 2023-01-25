@@ -108,16 +108,16 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), viper.GetString("SENDGRID_DEFAULT_LIST_ID"))
+		err = queries.UpdateUserVerificationStatus(c, coredb.UpdateUserVerificationStatusParams{
+			ID:            userID,
+			EmailVerified: persist.EmailVerificationStatusVerified,
+		})
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		err = queries.UpdateUserVerificationStatus(c, coredb.UpdateUserVerificationStatusParams{
-			ID:            userID,
-			EmailVerified: persist.EmailVerificationStatusVerified,
-		})
+		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), viper.GetString("SENDGRID_DEFAULT_LIST_ID"))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
