@@ -146,6 +146,10 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 			SubjectID:      collectionID,
 			CollectionID:   collectionID,
 			GalleryID:      update.GalleryID,
+			Data: persist.EventData{
+				CollectionTokenIDs:       c.Tokens,
+				CollectionCollectorsNote: c.CollectorsNote,
+			},
 		})
 
 		mappedIDs[c.GivenID] = collectionID

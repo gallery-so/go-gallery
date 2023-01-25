@@ -245,13 +245,88 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.id)
 
-	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
-		GalleryId: userF.galleryID,
-		Name:      util.StringToPointer("newName"),
-		Caption:   util.StringToPointer("newCaption"),
+	colResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
+		GalleryId:      userF.galleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.tokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
+				{
+					Columns:    0,
+					Whitespace: []int{},
+				},
+			},
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.tokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
 	})
 
 	require.NoError(t, err)
+	colPay := (*colResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, colPay.Collection.Dbid)
+	assert.Len(t, colPay.Collection.Tokens, 1)
+
+	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId: userF.galleryID,
+		Name:      util.StringToPointer("newName"),
+		UpdatedCollections: []*UpdateCollectionInput{
+			{
+				Dbid:           colPay.Collection.Dbid,
+				Tokens:         userF.tokenIDs[:2],
+				Name:           "yes",
+				CollectorsNote: "no",
+				Layout: CollectionLayoutInput{
+					Sections: []int{0},
+					SectionLayout: []CollectionSectionLayoutInput{
+						{
+							Columns:    0,
+							Whitespace: []int{},
+						},
+					},
+				},
+				TokenSettings: []CollectionTokenSettingsInput{
+					{
+						TokenId:    userF.tokenIDs[0],
+						RenderLive: false,
+					},
+				}},
+		},
+		CreatedCollections: []*CreateCollectionInGalleryInput{
+			{
+				GivenID:        "wow",
+				Tokens:         userF.tokenIDs[:3],
+				CollectorsNote: "this is a note",
+				Name:           "newCollection",
+				Layout: CollectionLayoutInput{
+					Sections: []int{0},
+					SectionLayout: []CollectionSectionLayoutInput{
+						{
+							Columns:    3,
+							Whitespace: []int{},
+						},
+					},
+				},
+				TokenSettings: []CollectionTokenSettingsInput{
+					{
+						TokenId:    userF.tokenIDs[0],
+						RenderLive: false,
+					},
+				},
+			},
+		},
+		Order:   []persist.DBID{colPay.Collection.Dbid, "wow"},
+		Caption: util.StringToPointer("newCaption"),
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, response.UpdateGallery)
 	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
 	if !ok {
 		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
@@ -266,7 +341,19 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 	assert.NotNil(t, node)
 	feedEvent := (*node).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
 	assert.Equal(t, "newCaption", *feedEvent.Caption)
-	assert.EqualValues(t, persist.ActionGalleryUpdated, *(*feedEvent.EventData).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData).Action)
+	edata := *(*feedEvent.EventData).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData)
+	assert.EqualValues(t, persist.ActionGalleryUpdated, *edata.Action)
+	for _, c := range edata.SubEventDatas {
+		ac := c.GetAction()
+		if persist.Action(*ac) == persist.ActionCollectionCreated {
+			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData)
+			assert.Greater(t, len(ca.NewTokens), 0)
+		}
+		if persist.Action(*ac) == persist.ActionTokensAddedToCollection {
+			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
+			assert.Greater(t, len(ca.NewTokens), 0)
+		}
+	}
 }
 
 func testUpdateGalleryWithNoNameChange(t *testing.T) {

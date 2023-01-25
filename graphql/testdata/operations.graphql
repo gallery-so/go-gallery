@@ -54,9 +54,30 @@ query viewerQuery {
               ... on FeedEvent {
                 dbid
                 caption
-                eventData {
-                  action
-                }
+                  eventData {
+                    action
+                    ... on GalleryUpdatedFeedEventData {
+                      subEventDatas {
+                        action
+                        ... on TokensAddedToCollectionFeedEventData {
+                          newTokens {
+                            token {
+                              dbid
+                              name
+                            }
+                          }
+                        }
+                        ... on CollectionCreatedFeedEventData {
+                          newTokens {
+                            token {
+                              dbid
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
               }
             }
           }
