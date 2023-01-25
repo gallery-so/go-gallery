@@ -572,7 +572,7 @@ func processRefreshes(idxr *indexer, storageClient *storage.Client) gin.HandlerF
 						close(transferCh)
 					}()
 					go idxr.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
-					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, nil)
+					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, nil)
 				}
 			})
 		}

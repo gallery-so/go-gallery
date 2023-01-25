@@ -8,15 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/spf13/viper"
-	"go.mozilla.org/sops/v3/decrypt"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/spf13/viper"
+	"go.mozilla.org/sops/v3/decrypt"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched

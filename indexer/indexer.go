@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"strconv"
@@ -70,6 +71,20 @@ var (
 	}
 )
 
+type errForTokenAtBlockAndIndex struct {
+	err error
+	boi blockchainOrderInfo
+	ti  persist.EthereumTokenIdentifiers
+}
+
+func (e errForTokenAtBlockAndIndex) TokenIdentifiers() persist.EthereumTokenIdentifiers {
+	return e.ti
+}
+
+func (e errForTokenAtBlockAndIndex) OrderInfo() blockchainOrderInfo {
+	return e.boi
+}
+
 // eventHash represents an event keccak256 hash
 type eventHash string
 
@@ -80,16 +95,47 @@ type tokenMetadata struct {
 
 type tokenBalances struct {
 	ti      persist.EthereumTokenIdentifiers
+	boi     blockchainOrderInfo
 	from    persist.EthereumAddress
 	to      persist.EthereumAddress
 	fromAmt *big.Int
 	toAmt   *big.Int
-	block   persist.BlockNumber
+}
+
+func (t tokenBalances) TokenIdentifiers() persist.EthereumTokenIdentifiers {
+	return t.ti
+}
+
+func (t tokenBalances) OrderInfo() blockchainOrderInfo {
+	return t.boi
 }
 
 type tokenURI struct {
+	boi blockchainOrderInfo
 	ti  persist.EthereumTokenIdentifiers
 	uri persist.TokenURI
+}
+
+func (t tokenURI) TokenIdentifiers() persist.EthereumTokenIdentifiers {
+	return t.ti
+}
+
+func (t tokenURI) OrderInfo() blockchainOrderInfo {
+	return t.boi
+}
+
+type tokenBalancesAtBlock struct {
+	ti       persist.EthereumTokenIdentifiers
+	boi      blockchainOrderInfo
+	balances map[persist.EthereumAddress]balanceAtBlock
+}
+
+func (t tokenBalancesAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
+	return t.ti
+}
+
+func (t tokenBalancesAtBlock) OrderInfo() blockchainOrderInfo {
+	return t.boi
 }
 
 type transfersAtBlock struct {
@@ -99,8 +145,30 @@ type transfersAtBlock struct {
 
 type ownerAtBlock struct {
 	ti    persist.EthereumTokenIdentifiers
+	boi   blockchainOrderInfo
 	owner persist.EthereumAddress
-	block persist.BlockNumber
+}
+
+func (o ownerAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
+	return o.ti
+}
+
+func (o ownerAtBlock) OrderInfo() blockchainOrderInfo {
+	return o.boi
+}
+
+type previousOwnersAtBlock struct {
+	owners []ownerAtBlock
+	ti     persist.EthereumTokenIdentifiers
+	boi    blockchainOrderInfo
+}
+
+func (p previousOwnersAtBlock) TokenIdentifiers() persist.EthereumTokenIdentifiers {
+	return p.ti
+}
+
+func (p previousOwnersAtBlock) OrderInfo() blockchainOrderInfo {
+	return p.boi
 }
 
 type balanceAtBlock struct {
@@ -288,7 +356,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	startTime := time.Now()
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
-	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
+	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in, plugins.previousOwners.in}
 
 	go func() {
 		ctx := sentryutil.NewSentryHubContext(ctx)
@@ -299,7 +367,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 		i.processLogs(ctx, transfers, logs)
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
-	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, plugins.refresh.out)
+	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, plugins.refresh.out)
 	logger.For(ctx).Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
 
@@ -312,7 +380,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
-	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, plugins.refresh.out)
+	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, plugins.refresh.out)
 }
 
 func (i *indexer) listenForNewBlocks(ctx context.Context) {
@@ -678,7 +746,7 @@ func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, f
 			return tokenBalances{}, err
 		}
 	}
-	bal := tokenBalances{key, from, to, fromBalance, toBalance, blockNumber}
+	bal := tokenBalances{key, blockchainOrderInfo{blockNumber: blockNumber, txIndex: math.MaxUint}, from, to, fromBalance, toBalance}
 	return bal, nil
 }
 
@@ -713,62 +781,49 @@ func getURI(ctx context.Context, contractAddress persist.EthereumAddress, tokenI
 
 func (i *indexer) processTokens(ctx context.Context,
 	uris <-chan tokenURI,
-	owners <-chan ownersPluginResult,
+	owners <-chan ownerAtBlock,
+	previousOwners <-chan ownerAtBlock,
 	balances <-chan tokenBalances,
-	refreshes <-chan error,
+	refreshes <-chan errForTokenAtBlockAndIndex,
 ) {
 	ownersMap := map[persist.EthereumTokenIdentifiers]ownerAtBlock{}
-	previousOwnersMap := map[persist.EthereumTokenIdentifiers][]ownerAtBlock{}
-	balancesMap := map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock{}
-	metadatasMap := map[persist.EthereumTokenIdentifiers]tokenMetadata{}
+	previousOwnersMap := map[persist.EthereumTokenIdentifiers]*previousOwnersAtBlock{}
+	balancesMap := map[persist.EthereumTokenIdentifiers]*tokenBalancesAtBlock{}
 	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
 
-	receivers := make([]PluginReceiver, 0)
-	wg := &sync.WaitGroup{}
+	// we won't be storing any results of this plugin
+	RunPluginReceiver(ctx, refreshesPluginReceiver(ctx), refreshes)
 
-	if uris != nil {
-		receivers = AddReceiver(
-			wg,
-			receivers,
-			urisPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, uris, urisMap),
-		)
+	for i := 0; i < 4; i++ {
+		select {
+		case umap := <-RunPluginReceiver(ctx, urisPluginReceiver, uris):
+			if umap != nil {
+				urisMap = umap
+			}
+		case balMap := <-RunPluginReceiver(ctx, balancesPluginReceiver, balances):
+			if balMap != nil {
+				balancesMap = balMap
+			}
+		case ownerMap := <-RunPluginReceiver(ctx, ownersPluginReceiver, owners):
+			if ownerMap != nil {
+				ownersMap = ownerMap
+			}
+		case previousOwnerMap := <-RunPluginReceiver(ctx, previousOwnersPluginReceiver, previousOwners):
+			if previousOwnerMap != nil {
+				previousOwnersMap = previousOwnerMap
+			}
+		}
 	}
-
-	if owners != nil {
-		receivers = AddReceiver(
-			wg,
-			receivers,
-			ownersPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, owners, ownersMap, previousOwnersMap, i.tokenRepo),
-		)
-	}
-
-	if balances != nil {
-		receivers = AddReceiver(
-			wg,
-			receivers,
-			balancesPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, balances, balancesMap, i.tokenRepo),
-		)
-	}
-
-	if refreshes != nil {
-		receivers = AddReceiver(
-			wg,
-			receivers,
-			refreshesPluginReceiver(sentryutil.NewSentryHubContext(ctx), wg, refreshes),
-		)
-	}
-
-	ReceivePlugins(ctx, wg, receivers)
 
 	logger.For(ctx).Info("Done recieving field data, converting fields into tokens...")
 
-	i.createTokens(ctx, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
+	i.createTokens(ctx, ownersMap, previousOwnersMap, balancesMap, make(map[persist.EthereumTokenIdentifiers]tokenMetadata), urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
 }
 
 func (i *indexer) createTokens(ctx context.Context,
 	ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock,
-	previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
-	balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
+	previousOwnersMap map[persist.EthereumTokenIdentifiers]*previousOwnersAtBlock,
+	balancesMap map[persist.EthereumTokenIdentifiers]*tokenBalancesAtBlock,
 	metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata,
 	urisMap map[persist.EthereumTokenIdentifiers]tokenURI,
 	mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia,
@@ -795,115 +850,81 @@ func (i *indexer) createTokens(ctx context.Context,
 	logger.For(ctx).Info("Done upserting tokens and contracts")
 }
 
-func ownersPluginReceiver(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	results <-chan ownersPluginResult,
-	ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock,
-	previousOwnersMap map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
-	tokenRepo persist.TokenRepository,
-) PluginReceiver {
-	return func() {
-		defer wg.Done()
-		for result := range results {
-
-			// Previous owners
-			currentPreviousOwners, ok := previousOwnersMap[result.previousOwner.ti]
-			if !ok {
-				currentPreviousOwners = make([]ownerAtBlock, 0, 20)
-			}
-			currentPreviousOwners = append(currentPreviousOwners, result.previousOwner)
-			previousOwnersMap[result.previousOwner.ti] = currentPreviousOwners
-
-			// Current owners
-			if cur, ok := ownersMap[result.currentOwner.ti]; ok && cur.block > result.currentOwner.block {
-				// Currently stored owner is newer than incoming owner
-				// do not process incoming owner
-				continue
-			} else {
-				// Incoming owner is newer than the one we already have stored
-				// set them as the current owner
-				ownersMap[result.currentOwner.ti] = result.currentOwner
-			}
-		}
-	}
+func ownersPluginReceiver(cur ownerAtBlock, inc ownerAtBlock) ownerAtBlock {
+	return inc
 }
 
-func balancesPluginReceiver(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	results <-chan tokenBalances,
-	balancesMap map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
-	tokenRepo persist.TokenRepository,
-) PluginReceiver {
-	return func() {
-		defer wg.Done()
-		for balance := range results {
-			balanceMap, ok := balancesMap[balance.ti]
-			if !ok {
-				balanceMap = make(map[persist.EthereumAddress]balanceAtBlock)
-			}
-			toBal := balanceMap[balance.to]
-			if toBal.block < balance.block {
-				toBal.block = balance.block
-				toBal.amnt = balance.toAmt
-				balanceMap[balance.to] = toBal
-			}
-
-			fromBal := balanceMap[balance.from]
-			if fromBal.block < balance.block {
-				fromBal.block = balance.block
-				fromBal.amnt = balance.fromAmt
-				balanceMap[balance.from] = fromBal
-			}
-
-			if len(balanceMap) > 0 {
-				balancesMap[balance.ti] = balanceMap
-			}
-		}
+func previousOwnersPluginReceiver(cur *previousOwnersAtBlock, inc ownerAtBlock) *previousOwnersAtBlock {
+	var curPrev []ownerAtBlock
+	if cur == nil {
+		cur.owners = []ownerAtBlock{}
 	}
+	curPrev = cur.owners
+
+	curPrev = append(curPrev, inc)
+
+	curPrev = util.Dedupe(curPrev, true)
+
+	cur.owners = curPrev
+	cur.boi = inc.boi
+
+	return cur
 }
 
-func urisPluginReceiver(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	results <-chan tokenURI,
-	urisMap map[persist.EthereumTokenIdentifiers]tokenURI,
-) PluginReceiver {
-	return func() {
-		defer wg.Done()
-		for uri := range results {
-			urisMap[uri.ti] = uri
+func balancesPluginReceiver(cur *tokenBalancesAtBlock, balance tokenBalances) *tokenBalancesAtBlock {
+
+	if cur == nil {
+		cur = &tokenBalancesAtBlock{
+			ti:       balance.ti,
+			boi:      balance.boi,
+			balances: make(map[persist.EthereumAddress]balanceAtBlock),
 		}
+
 	}
+	balanceMap := cur.balances
+	toBal := balanceMap[balance.to]
+	if toBal.block < balance.boi.blockNumber {
+		toBal.block = balance.boi.blockNumber
+		toBal.amnt = balance.toAmt
+		balanceMap[balance.to] = toBal
+	}
+
+	fromBal := balanceMap[balance.from]
+	if fromBal.block < balance.boi.blockNumber {
+		fromBal.block = balance.boi.blockNumber
+		fromBal.amnt = balance.fromAmt
+		balanceMap[balance.from] = fromBal
+	}
+
+	cur.balances = balanceMap
+	cur.boi = balance.boi
+
+	return cur
+
 }
 
-func refreshesPluginReceiver(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	results <-chan error,
-) PluginReceiver {
-	return func() {
-		defer wg.Done()
-		for err := range results {
-			if err != nil {
-				logger.For(ctx).WithError(err).Error("failed to save filter")
-			}
-		}
+func urisPluginReceiver(cur tokenURI, inc tokenURI) tokenURI {
+	return inc
+}
+
+func refreshesPluginReceiver(ctx context.Context) PluginReceiver[errForTokenAtBlockAndIndex, errForTokenAtBlockAndIndex] {
+	return func(cur errForTokenAtBlockAndIndex, inc errForTokenAtBlockAndIndex) errForTokenAtBlockAndIndex {
+		logger.For(ctx).WithError(inc.err).Error("failed to save filter")
+		return inc
 	}
 }
 
 func (i *indexer) fieldMapsToTokens(ctx context.Context,
 	owners map[persist.EthereumTokenIdentifiers]ownerAtBlock,
-	previousOwners map[persist.EthereumTokenIdentifiers][]ownerAtBlock,
-	balances map[persist.EthereumTokenIdentifiers]map[persist.EthereumAddress]balanceAtBlock,
+	previousOwners map[persist.EthereumTokenIdentifiers]*previousOwnersAtBlock,
+	balances map[persist.EthereumTokenIdentifiers]*tokenBalancesAtBlock,
 	metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata,
 	uris map[persist.EthereumTokenIdentifiers]tokenURI,
 	medias map[persist.EthereumTokenIdentifiers]tokenMedia,
 ) []persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
-		totalBalances += len(v)
+		totalBalances += len(v.balances)
 	}
 	result := make([]persist.Token, 0, len(owners)+totalBalances)
 
@@ -913,9 +934,9 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 			logger.For(ctx).WithError(err).Errorf("error getting parts from %s: - %s | val: %+v", k, err, v)
 			continue
 		}
-		previousOwnerAddresses := make([]persist.EthereumAddressAtBlock, len(previousOwners[k]))
-		for i, w := range previousOwners[k] {
-			previousOwnerAddresses[i] = persist.EthereumAddressAtBlock{Address: w.owner, Block: w.block}
+		previousOwnerAddresses := make([]persist.EthereumAddressAtBlock, len(previousOwners[k].owners))
+		for i, w := range previousOwners[k].owners {
+			previousOwnerAddresses[i] = persist.EthereumAddressAtBlock{Address: w.owner, Block: w.boi.blockNumber}
 		}
 		delete(previousOwners, k)
 		metadata := metadatas[k]
@@ -942,7 +963,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 			TokenMetadata:    metadata.md,
 			TokenURI:         uri.uri,
 			Chain:            i.chain,
-			BlockNumber:      v.block,
+			BlockNumber:      v.boi.blockNumber,
 			Media:            media.media,
 		}
 
@@ -968,7 +989,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 		media := medias[k]
 		delete(medias, k)
 
-		for addr, balance := range v {
+		for addr, balance := range v.balances {
 
 			t := persist.Token{
 				TokenID:         tokenID,
