@@ -929,9 +929,12 @@ func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (m
 func resolveCollectionTokensByTokenIDs(ctx context.Context, collectionID persist.DBID, tokenIDs persist.DBIDList) ([]*model.CollectionToken, error) {
 
 	tokens, errs := publicapi.For(ctx).Token.GetTokensByTokenIDs(ctx, tokenIDs)
-	if errs != nil && len(errs) > 0 {
-
-		return nil, fmt.Errorf("error resolving tokens: %v", errs)
+	if errs != nil {
+		for _, err := range errs {
+			if err != nil {
+				return nil, fmt.Errorf("error resolving tokens: %v", errs)
+			}
+		}
 	}
 
 	newTokens := make([]*model.CollectionToken, len(tokens))
@@ -1271,6 +1274,7 @@ func feedEventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.
 }
 
 func rawEventToTokensAddedToCollectionFeedEventData(event *db.Event) model.FeedEventData {
+	logger.For(nil).Infof("here it is before: coll id: %s - token ids: %+v", event.CollectionID, event.Data.CollectionTokenIDs)
 	return model.TokensAddedToCollectionFeedEventData{
 		EventTime:  &event.CreatedAt,
 		Owner:      &model.GalleryUser{Dbid: persist.DBID(event.ActorID.String)}, // remaining fields handled by dedicated resolver
@@ -1337,12 +1341,12 @@ func resolveSubEventDatasByFeedEventID(ctx context.Context, feedEventID persist.
 		if err != nil {
 			return nil, err
 		}
-		logger.For(ctx).Debugf("sub event action: %v", event.Action)
+
 		eventData, err := rawGalleryEventToFeedEventDataModel(event)
 		if err != nil {
 			return nil, err
 		}
-		logger.For(ctx).Infof("event data type: %T", eventData)
+
 		result = append(result, eventData)
 	}
 
