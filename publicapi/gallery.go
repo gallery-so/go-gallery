@@ -330,7 +330,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 
 		diff := util.Difference(curTokens, collection.Tokens)
 
-		if collection.Tokens != nil {
+		if len(diff) > 0 {
 			events = append(events, db.Event{
 				ResourceTypeID: persist.ResourceTypeCollection,
 				SubjectID:      collection.Dbid,
