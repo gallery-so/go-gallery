@@ -302,3 +302,43 @@ mutation updateUserExperience($input: UpdateUserExperienceInput!) {
     }
   }
 }
+
+mutation moveCollectionToGallery($input: MoveCollectionToGalleryInput!) {
+  moveCollectionToGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on MoveCollectionToGalleryPayload {
+      oldGallery {
+        dbid
+        collections {
+          dbid
+        }
+      }
+      newGallery {
+        dbid
+        collections {
+          dbid
+        }
+      }
+    }
+  }
+}
+
+mutation createGalleryMutation($input: CreateGalleryInput!) {
+  createGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CreateGalleryPayload {
+      gallery {
+        dbid
+        name
+        description
+        position
+      }
+    }
+  }
+}

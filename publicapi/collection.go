@@ -342,3 +342,79 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 
 	return nil
 }
+
+// UpdateCollectionGallery updates the gallery of a collection and returns the ID of the old gallery.
+func (api CollectionAPI) UpdateCollectionGallery(ctx context.Context, collectionID, galleryID persist.DBID) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"collectionID": {collectionID, "required"},
+		"galleryID":    {galleryID, "required"},
+	}); err != nil {
+		return "", err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// check ownership
+	if ownsCollection, err := api.queries.UserOwnsCollection(ctx, db.UserOwnsCollectionParams{
+		ID:          collectionID,
+		OwnerUserID: userID,
+	}); err != nil {
+		return "", err
+	} else if !ownsCollection {
+		return "", fmt.Errorf("user does not own collection: %s", collectionID)
+	}
+
+	if ownsGallery, err := api.queries.UserOwnsGallery(ctx, db.UserOwnsGalleryParams{
+		ID:          galleryID,
+		OwnerUserID: userID,
+	}); err != nil {
+		return "", err
+	} else if !ownsGallery {
+		return "", fmt.Errorf("user does not own gallery: %s", galleryID)
+	}
+
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	defer tx.Rollback(ctx)
+
+	q := api.queries.WithTx(tx)
+
+	curCol, err := q.GetCollectionById(ctx, collectionID)
+	if err != nil {
+		return "", err
+	}
+
+	if err := q.UpdateCollectionGallery(ctx, db.UpdateCollectionGalleryParams{
+		GalleryID: galleryID,
+		ID:        collectionID,
+	}); err != nil {
+		return "", err
+	}
+
+	if err := q.AddCollectionToGallery(ctx, db.AddCollectionToGalleryParams{
+		GalleryID:    galleryID,
+		CollectionID: collectionID,
+	}); err != nil {
+		return "", err
+	}
+
+	if err := q.RemoveCollectionFromGallery(ctx, db.RemoveCollectionFromGalleryParams{
+		GalleryID:    curCol.GalleryID,
+		CollectionID: collectionID,
+	}); err != nil {
+		return "", err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+
+	return curCol.GalleryID, nil
+}

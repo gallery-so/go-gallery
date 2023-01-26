@@ -22,6 +22,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,6 +63,8 @@ func testGraphQL(t *testing.T) {
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
 		{title: "should get trending feed events", run: testTrendingFeedEvents},
 		{title: "should update user experiences", run: testUpdateUserExperiences},
+		{title: "should create gallery", run: testCreateGallery},
+		{title: "should move collection to new gallery", run: testMoveCollection},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -227,6 +230,66 @@ func testCreateCollection(t *testing.T) {
 	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
 	assert.NotEmpty(t, payload.Collection.Dbid)
 	assert.Len(t, payload.Collection.Tokens, len(userF.tokenIDs))
+}
+
+func testCreateGallery(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	response, err := createGalleryMutation(context.Background(), c, CreateGalleryInput{
+		Name:        util.StringToPointer("newGallery"),
+		Description: util.StringToPointer("this is a description"),
+		Position:    "a1",
+	})
+
+	require.NoError(t, err)
+	payload := (*response.CreateGallery).(*createGalleryMutationCreateGalleryCreateGalleryPayload)
+	assert.NotEmpty(t, payload.Gallery.Dbid)
+	assert.Equal(t, "newGallery", *payload.Gallery.Name)
+	assert.Equal(t, "this is a description", *payload.Gallery.Description)
+	assert.Equal(t, "a1", *payload.Gallery.Position)
+}
+
+func testMoveCollection(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	createResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
+		GalleryId:      userF.galleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.tokenIDs,
+		Layout:         defaultLayout(),
+		TokenSettings:  defaultTokenSettings(userF.tokenIDs),
+		Caption:        nil,
+	})
+
+	require.NoError(t, err)
+	createPayload := (*createResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, createPayload.Collection.Dbid)
+
+	createGalResp, err := createGalleryMutation(context.Background(), c, CreateGalleryInput{
+		Name:        util.StringToPointer("newGallery"),
+		Description: util.StringToPointer("this is a description"),
+		Position:    "a1",
+	})
+
+	require.NoError(t, err)
+	createGalPayload := (*createGalResp.CreateGallery).(*createGalleryMutationCreateGalleryCreateGalleryPayload)
+	assert.NotEmpty(t, createGalPayload.Gallery.Dbid)
+
+	response, err := moveCollectionToGallery(context.Background(), c, MoveCollectionToGalleryInput{
+		SourceCollectionId: createPayload.Collection.Dbid,
+		TargetGalleryId:    createGalPayload.Gallery.Dbid,
+	})
+
+	require.NoError(t, err)
+	payload := (*response.MoveCollectionToGallery).(*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload)
+	assert.NotEmpty(t, payload.OldGallery.Dbid)
+	assert.Len(t, payload.OldGallery.Collections, 0)
+	assert.NotEmpty(t, payload.NewGallery.Dbid)
+	assert.Len(t, payload.NewGallery.Collections, 1)
+
 }
 
 func testUpdateUserExperiences(t *testing.T) {

@@ -571,6 +571,11 @@ type ComplexityRoot struct {
 		Tokens func(childComplexity int) int
 	}
 
+	MoveCollectionToGalleryPayload struct {
+		NewGallery func(childComplexity int) int
+		OldGallery func(childComplexity int) int
+	}
+
 	Mutation struct {
 		AddRolesToUser                  func(childComplexity int, username string, roles []*persist.Role) int
 		AddUserWallet                   func(childComplexity int, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) int
@@ -589,6 +594,7 @@ type ComplexityRoot struct {
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                          func(childComplexity int) int
+		MoveCollectionToGallery         func(childComplexity int, input *model.MoveCollectionToGalleryInput) int
 		PreverifyEmail                  func(childComplexity int, input model.PreverifyEmailInput) int
 		RedeemMerch                     func(childComplexity int, input model.RedeemMerchInput) int
 		RefreshCollection               func(childComplexity int, collectionID persist.DBID) int
@@ -1191,6 +1197,7 @@ type MutationResolver interface {
 	UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error)
 	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 	UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error)
+	MoveCollectionToGallery(ctx context.Context, input *model.MoveCollectionToGalleryInput) (model.MoveCollectionToGalleryPayloadOrError, error)
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
@@ -3050,6 +3057,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MerchTokensPayload.Tokens(childComplexity), true
 
+	case "MoveCollectionToGalleryPayload.newGallery":
+		if e.complexity.MoveCollectionToGalleryPayload.NewGallery == nil {
+			break
+		}
+
+		return e.complexity.MoveCollectionToGalleryPayload.NewGallery(childComplexity), true
+
+	case "MoveCollectionToGalleryPayload.oldGallery":
+		if e.complexity.MoveCollectionToGalleryPayload.OldGallery == nil {
+			break
+		}
+
+		return e.complexity.MoveCollectionToGalleryPayload.OldGallery(childComplexity), true
+
 	case "Mutation.addRolesToUser":
 		if e.complexity.Mutation.AddRolesToUser == nil {
 			break
@@ -3243,6 +3264,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.Logout(childComplexity), true
+
+	case "Mutation.moveCollectionToGallery":
+		if e.complexity.Mutation.MoveCollectionToGallery == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_moveCollectionToGallery_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.MoveCollectionToGallery(childComplexity, args["input"].(*model.MoveCollectionToGalleryInput)), true
 
 	case "Mutation.preverifyEmail":
 		if e.complexity.Mutation.PreverifyEmail == nil {
@@ -6251,6 +6284,7 @@ type Query {
   generalAllowlist: [ChainAddress!]
   galleryOfTheWeekWinners: [GalleryUser!]
   globalFeed(before: String, after: String, first: Int, last: Int): FeedConnection
+  # Paging forward i.e. providing the ` + "`" + `first` + "`" + ` argument will return events in order of descending popularity.
   trendingFeed(before: String, after: String, first: Int, last: Int): FeedConnection
   feedEventById(id: DBID!): FeedEventByIdOrError
   getMerchTokens(wallet: Address!): MerchTokensPayloadOrError
@@ -7057,6 +7091,18 @@ union UpdateUserExperiencePayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
+input MoveCollectionToGalleryInput {
+  sourceCollectionId: DBID!
+  targetGalleryId: DBID!
+}
+
+type MoveCollectionToGalleryPayload {
+  oldGallery: Gallery,
+  newGallery: Gallery
+}
+
+union MoveCollectionToGalleryPayloadOrError = MoveCollectionToGalleryPayload | ErrInvalidInput | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -7157,6 +7203,8 @@ type Mutation {
 
   updateUserExperience(input: UpdateUserExperienceInput!): UpdateUserExperiencePayloadOrError
     @authRequired
+
+  moveCollectionToGallery(input: MoveCollectionToGalleryInput): MoveCollectionToGalleryPayloadOrError  @authRequired
 }
 
 type Subscription {
@@ -7771,6 +7819,21 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 		}
 	}
 	args["authMechanism"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_moveCollectionToGallery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.MoveCollectionToGalleryInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalOMoveCollectionToGalleryInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMoveCollectionToGalleryInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -16953,6 +17016,70 @@ func (ec *executionContext) _MerchTokensPayload_tokens(ctx context.Context, fiel
 	return ec.marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokenᚄ(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _MoveCollectionToGalleryPayload_oldGallery(ctx context.Context, field graphql.CollectedField, obj *model.MoveCollectionToGalleryPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MoveCollectionToGalleryPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OldGallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MoveCollectionToGalleryPayload_newGallery(ctx context.Context, field graphql.CollectedField, obj *model.MoveCollectionToGalleryPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MoveCollectionToGalleryPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewGallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_addUserWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -19699,6 +19826,65 @@ func (ec *executionContext) _Mutation_updateUserExperience(ctx context.Context, 
 	res := resTmp.(model.UpdateUserExperiencePayloadOrError)
 	fc.Result = res
 	return ec.marshalOUpdateUserExperiencePayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateUserExperiencePayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_moveCollectionToGallery(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_moveCollectionToGallery_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().MoveCollectionToGallery(rctx, args["input"].(*model.MoveCollectionToGalleryInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.MoveCollectionToGalleryPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.MoveCollectionToGalleryPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.MoveCollectionToGalleryPayloadOrError)
+	fc.Result = res
+	return ec.marshalOMoveCollectionToGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMoveCollectionToGalleryPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _NotificationEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.NotificationEdge) (ret graphql.Marshaler) {
@@ -29121,6 +29307,37 @@ func (ec *executionContext) unmarshalInputMagicLinkAuth(ctx context.Context, obj
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputMoveCollectionToGalleryInput(ctx context.Context, obj interface{}) (model.MoveCollectionToGalleryInput, error) {
+	var it model.MoveCollectionToGalleryInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "sourceCollectionId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sourceCollectionId"))
+			it.SourceCollectionID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "targetGalleryId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetGalleryId"))
+			it.TargetGalleryID, err = ec.unmarshalNDBID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐDBID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputNotificationSettingsInput(ctx context.Context, obj interface{}) (model.NotificationSettingsInput, error) {
 	var it model.NotificationSettingsInput
 	asMap := map[string]interface{}{}
@@ -31151,6 +31368,36 @@ func (ec *executionContext) _MerchTokensPayloadOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _MoveCollectionToGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.MoveCollectionToGalleryPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.MoveCollectionToGalleryPayload:
+		return ec._MoveCollectionToGalleryPayload(ctx, sel, &obj)
+	case *model.MoveCollectionToGalleryPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._MoveCollectionToGalleryPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -34594,7 +34841,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError", "UpdateUserExperiencePayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -34707,7 +34954,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateGalleryPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -36500,6 +36747,41 @@ func (ec *executionContext) _MerchTokensPayload(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var moveCollectionToGalleryPayloadImplementors = []string{"MoveCollectionToGalleryPayload", "MoveCollectionToGalleryPayloadOrError"}
+
+func (ec *executionContext) _MoveCollectionToGalleryPayload(ctx context.Context, sel ast.SelectionSet, obj *model.MoveCollectionToGalleryPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, moveCollectionToGalleryPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MoveCollectionToGalleryPayload")
+		case "oldGallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MoveCollectionToGalleryPayload_oldGallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "newGallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._MoveCollectionToGalleryPayload_newGallery(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -36872,6 +37154,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateUserExperience":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateUserExperience(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "moveCollectionToGallery":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_moveCollectionToGallery(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -43467,6 +43756,21 @@ func (ec *executionContext) marshalOMerchTokensPayloadOrError2githubᚗcomᚋmik
 		return graphql.Null
 	}
 	return ec._MerchTokensPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOMoveCollectionToGalleryInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMoveCollectionToGalleryInput(ctx context.Context, v interface{}) (*model.MoveCollectionToGalleryInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputMoveCollectionToGalleryInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOMoveCollectionToGalleryPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMoveCollectionToGalleryPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.MoveCollectionToGalleryPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MoveCollectionToGalleryPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalONode2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNode(ctx context.Context, sel ast.SelectionSet, v model.Node) graphql.Marshaler {
