@@ -734,14 +734,10 @@ update collections set nfts = @nfts, last_updated = now() where id = @id and del
 -- name: CreateCollection :one
 insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 1, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
 
-<<<<<<< HEAD
 -- name: GetGalleryIDByCollectionID :one
 select gallery_id from collections where id = $1 and deleted = false;
 
--- name: GetTrendingUsers :many
-=======
 -- name: GetTrendingUserIDs :many
->>>>>>> main
 with rollup as (
 	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= @window_end group by e.gallery_id
 )

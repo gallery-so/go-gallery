@@ -65,6 +65,7 @@ func testGraphQL(t *testing.T) {
 		{title: "update gallery with a new collection", run: testUpdateGalleryWithNewCollection},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
 		{title: "should get trending feed events", run: testTrendingFeedEvents},
+		{title: "should delete collection in gallery update", run: testUpdateGalleryDeleteCollection},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -345,6 +346,54 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 			assert.Greater(t, len(ca.NewTokens), 0)
 		}
 	}
+}
+
+func testUpdateGalleryDeleteCollection(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	colResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
+		GalleryId:      userF.galleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.tokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
+				{
+					Columns:    0,
+					Whitespace: []int{},
+				},
+			},
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.tokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
+	})
+
+	require.NoError(t, err)
+	colPay := (*colResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, colPay.Collection.Dbid)
+	assert.Len(t, colPay.Collection.Tokens, 1)
+
+	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId:          userF.galleryID,
+		DeletedCollections: []persist.DBID{colPay.Collection.Dbid},
+		Order:              []persist.DBID{},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, response.UpdateGallery)
+	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	if !ok {
+		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		t.Fatal(err)
+	}
+	assert.Len(t, payload.Gallery.Collections, 0)
 }
 
 func testUpdateGalleryWithNoNameChange(t *testing.T) {
