@@ -3348,17 +3348,16 @@ func (q *Queries) UpdateUserEmailUnsubscriptions(ctx context.Context, arg Update
 }
 
 const updateUserExperience = `-- name: UpdateUserExperience :exec
-update users set user_experiences = jsonb_set(user_experiences, '{' || $1 || '}', to_jsonb($2)) where id = $3
+update users set user_experiences = user_experiences || $1 where id = $2
 `
 
 type UpdateUserExperienceParams struct {
-	Experience sql.NullString
-	Value      interface{}
+	Experience pgtype.JSONB
 	UserID     persist.DBID
 }
 
 func (q *Queries) UpdateUserExperience(ctx context.Context, arg UpdateUserExperienceParams) error {
-	_, err := q.db.Exec(ctx, updateUserExperience, arg.Experience, arg.Value, arg.UserID)
+	_, err := q.db.Exec(ctx, updateUserExperience, arg.Experience, arg.UserID)
 	return err
 }
 

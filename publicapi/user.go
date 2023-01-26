@@ -2,11 +2,12 @@ package publicapi
 
 import (
 	"context"
-	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/spf13/viper"
 
@@ -684,9 +685,20 @@ func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType mode
 		return err
 	}
 
+	in := map[string]interface{}{
+		experienceType.String(): value,
+	}
+
+	marshalled, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+
 	return api.queries.UpdateUserExperience(ctx, db.UpdateUserExperienceParams{
-		Experience: sql.NullString{String: experienceType.String(), Valid: true},
-		Value:      value,
-		UserID:     curUserID,
+		Experience: pgtype.JSONB{
+			Bytes:  marshalled,
+			Status: pgtype.Present,
+		},
+		UserID: curUserID,
 	})
 }

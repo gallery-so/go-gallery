@@ -61,6 +61,7 @@ func testGraphQL(t *testing.T) {
 		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
 		{title: "should get trending feed events", run: testTrendingFeedEvents},
+		{title: "should update user experiences", run: testUpdateUserExperiences},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -226,6 +227,27 @@ func testCreateCollection(t *testing.T) {
 	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
 	assert.NotEmpty(t, payload.Collection.Dbid)
 	assert.Len(t, payload.Collection.Tokens, len(userF.tokenIDs))
+}
+
+func testUpdateUserExperiences(t *testing.T) {
+	userF := newUserFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	response, err := updateUserExperience(context.Background(), c, UpdateUserExperienceInput{
+		ExperienceType: UserExperienceTypeMultigalleryannouncement,
+		Experienced:    true,
+	})
+
+	require.NoError(t, err)
+	bs, _ := json.Marshal(response)
+	require.NotNil(t, response.UpdateUserExperience, string(bs))
+	payload := (*response.UpdateUserExperience).(*updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload)
+	assert.NotEmpty(t, payload.Viewer.UserExperiences)
+	for _, experience := range payload.Viewer.UserExperiences {
+		if experience.Type == UserExperienceTypeMultigalleryannouncement {
+			assert.True(t, experience.Experienced)
+		}
+	}
 }
 
 func testViewsAreRolledUp(t *testing.T) {
