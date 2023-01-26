@@ -140,10 +140,9 @@ Run all tests in subdirectory (e.g. /server):
 $ go test ./server/...
 ```
 
-Run a specific test by passing the name as an option:
-
+Run a specific test by passing including the `-run` flag. The example will run GraphQL tests under the `TestMain` suite that start with "should get trending".
 ```bash
-go test -run {testName}
+go test -run=TestMain/"test GraphQL"/"should get trending" ./graphql
 ```
 
 Add `-v` for detailed logs.
