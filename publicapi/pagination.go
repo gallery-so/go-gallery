@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -26,6 +27,11 @@ var (
 	defaultCursorBeforeKey = strings.Repeat("Z", 255)
 	// Some value that comes before any other sequence of characters
 	defaultCursorAfterKey = ""
+
+	// Some position that comes after any other position
+	defaultCursorBeforeScore = math.MaxInt32
+	// Some position that comes before any other position
+	defaultCursorAfterScore = -1
 )
 
 type PageInfo struct {
@@ -447,6 +453,115 @@ func (p *lexicalPaginator) paginate(before *string, after *string, first *int, l
 		}
 
 		return p.encodeCursor(nodeKey, nodeID)
+	}
+
+	paginator := keysetPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  p.CountFunc,
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
+// positionPaginator paginates results based on a position of an element in a fixed list
+type positionPaginator struct {
+	// QueryFunc returns paginated results for the given paging parameters
+	QueryFunc func(params positionPagingParams) ([]any, error)
+
+	// CursorFunc returns the current position and a fixed slice of DBIDs that will be encoded into a cursor string
+	CursorFunc func(node interface{}) (int, []persist.DBID, error)
+
+	// CountFunc returns the total number of items that can be paginated. May be nil, in which
+	// case the resulting PageInfo will omit the total field.
+	CountFunc func() (count int, err error)
+}
+
+type positionPagingParams struct {
+	Limit           int32
+	CursorBeforePos int32
+	CursorAfterPos  int32
+	PagingForward   bool
+	IDs             []persist.DBID
+}
+
+func (p *positionPaginator) encodeCursor(position int, ids []persist.DBID) (string, error) {
+	encoder := newCursorEncoder()
+	encoder.appendInt64(int64(position))
+	encoder.appendInt64(int64(len(ids)))
+	for _, id := range ids {
+		encoder.appendDBID(id)
+	}
+	return encoder.AsBase64(), nil
+}
+
+func (p *positionPaginator) decodeCursor(cursor string) (int, []persist.DBID, error) {
+	decoder, err := newCursorDecoder(cursor)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	position, err := decoder.readInt64()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	totalItems, err := decoder.readInt64()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	ids := make([]persist.DBID, totalItems)
+	for i := int64(0); i < totalItems; i++ {
+		id, err := decoder.readDBID()
+		if err != nil {
+			return 0, nil, err
+		}
+		ids[i] = id
+	}
+
+	return int(position), ids, nil
+}
+
+func (p *positionPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+		curBeforePos := defaultCursorBeforeScore
+		curAfterPos := defaultCursorAfterScore
+
+		var err error
+		var ids []persist.DBID
+
+		if before != nil {
+			curBeforePos, ids, err = p.decodeCursor(*before)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if after != nil {
+			curAfterPos, ids, err = p.decodeCursor(*after)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		queryParams := positionPagingParams{
+			Limit:           limit,
+			CursorBeforePos: int32(curBeforePos),
+			CursorAfterPos:  int32(curAfterPos),
+			PagingForward:   pagingForward,
+			IDs:             ids,
+		}
+
+		return p.QueryFunc(queryParams)
+	}
+
+	cursorFunc := func(node any) (string, error) {
+		score, nodeID, err := p.CursorFunc(node)
+		if err != nil {
+			return "", err
+		}
+		return p.encodeCursor(score, nodeID)
 	}
 
 	paginator := keysetPaginator{

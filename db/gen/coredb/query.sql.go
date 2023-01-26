@@ -234,7 +234,7 @@ func (q *Queries) CreateAdmireNotification(ctx context.Context, arg CreateAdmire
 }
 
 const createCollection = `-- name: CreateCollection :one
-insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values ($1, 0, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) returning id
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) returning id
 `
 
 type CreateCollectionParams struct {
@@ -1723,7 +1723,7 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -1748,6 +1748,7 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
+		&i.UserExperiences,
 	)
 	return i, err
 }
@@ -2103,26 +2104,60 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 	return items, nil
 }
 
-const getTrendingUsers = `-- name: GetTrendingUsers :many
+const getTrendingFeedEventIDs = `-- name: GetTrendingFeedEventIDs :many
+select feed_event_id from events where action in ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and created_at >= $1 and feed_event_id is not null
+group by feed_event_id order by count(*) desc, max(created_at) desc limit $2
+`
+
+type GetTrendingFeedEventIDsParams struct {
+	WindowEnd time.Time
+	Limit     int32
+}
+
+func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFeedEventIDsParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs, arg.WindowEnd, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var feed_event_id persist.DBID
+		if err := rows.Scan(&feed_event_id); err != nil {
+			return nil, err
+		}
+		items = append(items, feed_event_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTrendingUserIDs = `-- name: GetTrendingUserIDs :many
 with rollup as (
-	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= $2 group by e.gallery_id
+  select e.gallery_id, count(*) view_count
+  from events e
+  where action = 'ViewedGallery' and e.created_at >= $1
+  group by e.gallery_id
 )
 select p.id from (
-	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
+	select u.id, row_number() over(order by sum(r.view_count) + coalesce(sum(v.view_count),0) desc, max(u.created_at) desc) as position
 	from rollup r, galleries g, users u
+	left join legacy_views v on u.id = v.user_id and v.deleted = false and v.created_at >= $1
 	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
 	group by u.id
 ) p
-where position <= $1::int
+where position <= $2::int
 `
 
-type GetTrendingUsersParams struct {
-	Size      int32
+type GetTrendingUserIDsParams struct {
 	WindowEnd time.Time
+	Size      int32
 }
 
-func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersParams) ([]persist.DBID, error) {
-	rows, err := q.db.Query(ctx, getTrendingUsers, arg.Size, arg.WindowEnd)
+func (q *Queries) GetTrendingUserIDs(ctx context.Context, arg GetTrendingUserIDsParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getTrendingUserIDs, arg.WindowEnd, arg.Size)
 	if err != nil {
 		return nil, err
 	}
@@ -2141,8 +2176,50 @@ func (q *Queries) GetTrendingUsers(ctx context.Context, arg GetTrendingUsersPara
 	return items, nil
 }
 
+const getTrendingUsersByIDs = `-- name: GetTrendingUsersByIDs :many
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
+`
+
+func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) ([]User, error) {
+	rows, err := q.db.Query(ctx, getTrendingUsersByIDs, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -2165,12 +2242,13 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
+		&i.UserExperiences,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -2193,8 +2271,20 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
+		&i.UserExperiences,
 	)
 	return i, err
+}
+
+const getUserExperiencesByUserID = `-- name: GetUserExperiencesByUserID :one
+select user_experiences from users where id = $1
+`
+
+func (q *Queries) GetUserExperiencesByUserID(ctx context.Context, id persist.DBID) (pgtype.JSONB, error) {
+	row := q.db.QueryRow(ctx, getUserExperiencesByUserID, id)
+	var user_experiences pgtype.JSONB
+	err := row.Scan(&user_experiences)
+	return user_experiences, err
 }
 
 const getUserNotifications = `-- name: GetUserNotifications :many
@@ -2426,7 +2516,7 @@ func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (
 }
 
 const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
 `
 
 type GetUsersByChainAddressesParams struct {
@@ -2451,6 +2541,7 @@ type GetUsersByChainAddressesRow struct {
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
+	UserExperiences      pgtype.JSONB
 	Address              persist.Address
 }
 
@@ -2480,6 +2571,7 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
+			&i.UserExperiences,
 			&i.Address,
 		); err != nil {
 			return nil, err
@@ -2493,7 +2585,7 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id FROM users WHERE id = ANY($2) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE id = ANY($2) AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -2545,6 +2637,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
+			&i.UserExperiences,
 		); err != nil {
 			return nil, err
 		}
@@ -2696,7 +2789,7 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 }
 
 const getUsersWithRolePaginate = `-- name: GetUsersWithRolePaginate :many
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id from users u, user_roles ur where u.deleted = false and ur.deleted = false
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u, user_roles ur where u.deleted = false and ur.deleted = false
     and u.id = ur.user_id and ur.role = $2
     and (u.username_idempotent, u.id) < ($3::varchar, $4)
     and (u.username_idempotent, u.id) > ($5::varchar, $6)
@@ -2749,6 +2842,7 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
+			&i.UserExperiences,
 		); err != nil {
 			return nil, err
 		}
@@ -2761,7 +2855,7 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 }
 
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -2790,6 +2884,7 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
+			&i.UserExperiences,
 		); err != nil {
 			return nil, err
 		}
@@ -2980,6 +3075,61 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
+select f.id, f.version, f.owner_id, f.action, f.data, f.event_time, f.event_ids, f.deleted, f.last_updated, f.created_at, f.caption from feed_events f join unnest($1::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
+  and t.pos < $2::int
+  and t.pos > $3::int
+  order by case when $4::bool then t.pos end asc,
+          case when not $4::bool then t.pos end desc
+  limit $5
+`
+
+type PaginateTrendingFeedParams struct {
+	FeedEventIds  []string
+	CurBeforePos  int32
+	CurAfterPos   int32
+	PagingForward bool
+	Limit         int32
+}
+
+func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrendingFeedParams) ([]FeedEvent, error) {
+	rows, err := q.db.Query(ctx, paginateTrendingFeed,
+		arg.FeedEventIds,
+		arg.CurBeforePos,
+		arg.CurAfterPos,
+		arg.PagingForward,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeedEvent
+	for rows.Next() {
+		var i FeedEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.OwnerID,
+			&i.Action,
+			&i.Data,
+			&i.EventTime,
+			&i.EventIds,
+			&i.Deleted,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Caption,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const redeemMerch = `-- name: RedeemMerch :one
@@ -3201,6 +3351,20 @@ func (q *Queries) UpdateUserEmailUnsubscriptions(ctx context.Context, arg Update
 	return err
 }
 
+const updateUserExperience = `-- name: UpdateUserExperience :exec
+update users set user_experiences = user_experiences || $1 where id = $2
+`
+
+type UpdateUserExperienceParams struct {
+	Experience pgtype.JSONB
+	UserID     persist.DBID
+}
+
+func (q *Queries) UpdateUserExperience(ctx context.Context, arg UpdateUserExperienceParams) error {
+	_, err := q.db.Exec(ctx, updateUserExperience, arg.Experience, arg.UserID)
+	return err
+}
+
 const updateUserFeaturedGallery = `-- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = $1, last_updated = now() from galleries where users.id = $2 and galleries.id = $1 and galleries.owner_user_id = $2 and galleries.deleted = false
 `
@@ -3246,7 +3410,7 @@ func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUs
 }
 
 const userHasDuplicateGalleryPositions = `-- name: UserHasDuplicateGalleryPositions :one
-select exists(select position,count(*) from galleries where owner_user_id = $1 group by position having count(*) > 0)
+select exists(select position,count(*) from galleries where owner_user_id = $1 and deleted = false group by position having count(*) > 1)
 `
 
 func (q *Queries) UserHasDuplicateGalleryPositions(ctx context.Context, ownerUserID persist.DBID) (bool, error) {

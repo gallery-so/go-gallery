@@ -414,6 +414,10 @@ func resolveViewerGalleryByGalleryID(ctx context.Context, galleryID persist.DBID
 	}, nil
 }
 
+func resolveViewerExperiencesByUserID(ctx context.Context, userID persist.DBID) ([]*model.UserExperience, error) {
+	return publicapi.For(ctx).User.GetUserExperiences(ctx, userID)
+}
+
 func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 

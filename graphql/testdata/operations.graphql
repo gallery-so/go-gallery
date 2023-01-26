@@ -44,6 +44,10 @@ query viewerQuery {
       message
     }
     ... on Viewer {
+      userExperiences {
+        type
+        experienced
+      }
       user {
         username
         dbid
@@ -57,6 +61,38 @@ query trendingUsersQuery($input: TrendingUsersInput!) {
     ... on TrendingUsersPayload {
       users {
         dbid
+      }
+    }
+  }
+}
+
+query globalFeedQuery($first: Int) {
+  globalFeed(first: $first) {
+    edges {
+      node {
+        ... on Error {
+          __typename
+          message
+        }
+        ... on FeedEvent {
+          dbid
+        }
+      }
+    }
+  }
+}
+
+query trendingFeedQuery($first: Int) {
+  trendingFeed(first: $first) {
+    edges {
+      node {
+        ... on Error {
+          __typename
+          message
+        }
+        ... on FeedEvent {
+          dbid
+        }
       }
     }
   }
@@ -217,6 +253,51 @@ mutation viewGalleryMutation($galleryId: DBID!) {
     ... on ViewGalleryPayload {
       gallery {
         dbid
+      }
+    }
+  }
+}
+
+mutation admireFeedEventMutation($feedEventId: DBID!) {
+  admireFeedEvent(feedEventId: $feedEventId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AdmireFeedEventPayload {
+      feedEvent {
+        dbid
+      }
+    }
+  }
+}
+
+mutation commentOnFeedEventMutation($feedEventId: DBID!, $comment: String!) {
+  commentOnFeedEvent(feedEventId: $feedEventId, comment: $comment) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CommentOnFeedEventPayload {
+      feedEvent {
+        dbid
+      }
+    }
+  }
+}
+
+mutation updateUserExperience($input: UpdateUserExperienceInput!) {
+  updateUserExperience(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on UpdateUserExperiencePayload {
+      viewer {
+        userExperiences {
+          type
+          experienced
+        }
       }
     }
   }
