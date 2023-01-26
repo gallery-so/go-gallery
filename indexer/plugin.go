@@ -55,12 +55,8 @@ func (b blockchainOrderInfo) Less(other blockchainOrderInfo) bool {
 	return b.txIndex < other.txIndex
 }
 
-type tokenIdentifiable interface {
-	TokenIdentifiers() persist.EthereumTokenIdentifiers
-}
-
 type orderedBlockChainData interface {
-	tokenIdentifiable
+	TokenIdentifiers() persist.EthereumTokenIdentifiers
 	OrderInfo() blockchainOrderInfo
 }
 
@@ -84,7 +80,7 @@ func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenR
 	}
 }
 
-// RunPlugins returns when all plugins have received the message.
+// RunPlugins returns when all plugins have received the message. Every plugin recieves the same message.
 func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, plugins []chan<- PluginMsg) {
 	span, ctx := tracing.StartSpan(ctx, "indexer.plugin", "submitMessage")
 	defer tracing.FinishSpan(span)
@@ -98,30 +94,32 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 	}
 }
 
+// RunPluginReceiver runs a plugin receiver and returns a channel that will return exactly one result once all of the incoming messages have been processed.
+// If the incoming channel is nil, the result channel will return a single nil value immediately.
+// The result will be a map of token identifiers to the result of the plugin, ensuring that whatever is returned by the plugin is the most recent result for that token.
+// The caller is responsible with closing the channel returned by this function.
 func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, receiver PluginReceiver[T, V], incoming <-chan T) chan map[persist.EthereumTokenIdentifiers]V {
-	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "receivePlugins")
+	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "runPluginReceiver")
 	defer tracing.FinishSpan(span)
 
 	out := make(chan map[persist.EthereumTokenIdentifiers]V)
 
 	if incoming == nil {
 		go func() {
-			defer close(out)
 			out <- nil
 		}()
 		return out
 	}
 
 	go func() {
-		defer close(out)
 		result := make(map[persist.EthereumTokenIdentifiers]V)
 
 		for it := range incoming {
 
 			processed := receiver(result[it.TokenIdentifiers()], it)
-			cur := result[it.TokenIdentifiers()]
+			cur := result[processed.TokenIdentifiers()]
 			if cur.OrderInfo().Less(processed.OrderInfo()) {
-				result[it.TokenIdentifiers()] = processed
+				result[processed.TokenIdentifiers()] = processed
 			}
 		}
 

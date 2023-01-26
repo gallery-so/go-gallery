@@ -792,26 +792,36 @@ func (i *indexer) processTokens(ctx context.Context,
 	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
 
 	// we won't be storing any results of this plugin
-	RunPluginReceiver(ctx, refreshesPluginReceiver(ctx), refreshes)
+	refreshChan := RunPluginReceiver(ctx, refreshesPluginReceiver(ctx), refreshes)
 
-	for i := 0; i < 4; i++ {
+	// run the receivers in parallel and return one result from each channel for a total of totalRunningPlugins (5)
+	uMapChan := RunPluginReceiver(ctx, urisPluginReceiver, uris)
+	balMapChan := RunPluginReceiver(ctx, balancesPluginReceiver, balances)
+	ownerMapChan := RunPluginReceiver(ctx, ownersPluginReceiver, owners)
+	prevOwnerMapChan := RunPluginReceiver(ctx, previousOwnersPluginReceiver, previousOwners)
+
+	totalRunningPlugins := 5
+
+	for i := 0; i < totalRunningPlugins; i++ {
 		select {
-		case umap := <-RunPluginReceiver(ctx, urisPluginReceiver, uris):
+		case umap := <-uMapChan:
 			if umap != nil {
 				urisMap = umap
 			}
-		case balMap := <-RunPluginReceiver(ctx, balancesPluginReceiver, balances):
+		case balMap := <-balMapChan:
 			if balMap != nil {
 				balancesMap = balMap
 			}
-		case ownerMap := <-RunPluginReceiver(ctx, ownersPluginReceiver, owners):
+		case ownerMap := <-ownerMapChan:
 			if ownerMap != nil {
 				ownersMap = ownerMap
 			}
-		case previousOwnerMap := <-RunPluginReceiver(ctx, previousOwnersPluginReceiver, previousOwners):
+		case previousOwnerMap := <-prevOwnerMapChan:
 			if previousOwnerMap != nil {
 				previousOwnersMap = previousOwnerMap
 			}
+		case <-refreshChan:
+			// do nothing
 		}
 	}
 
