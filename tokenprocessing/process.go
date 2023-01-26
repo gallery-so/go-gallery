@@ -48,28 +48,23 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 		}
 		defer throttler.Unlock(ctx, input.UserID.String())
 
-		allTokens, err := tokenRepo.GetByUserID(ctx, input.UserID, -1, -1)
-		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		filtered := make([]persist.TokenGallery, 0, len(allTokens))
-		for _, token := range allTokens {
-			if token.Chain == input.Chain && !token.Media.IsServable() {
-				filtered = append(filtered, token)
-			}
-		}
-
 		wp := workerpool.New(100)
-		for _, token := range filtered {
-			t := token
+		for _, tokenID := range input.TokenIDs {
+			t, err := tokenRepo.GetByID(ctx, tokenID)
+			if err != nil {
+				logger.For(ctx).Errorf("failed to fetch tokenID=%s: %s", tokenID, err)
+				continue
+			}
+
 			contract, err := contractRepo.GetByID(ctx, t.Contract)
 			if err != nil {
 				logger.For(ctx).Errorf("Error getting contract: %s", err)
 			}
+
 			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-				err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
+				err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords)
 				if err != nil {
 					logger.For(c).Errorf("Error processing token: %s", err)
 				}
@@ -149,31 +144,35 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	}
 
 	totalTimeOfMedia := time.Now()
-	med, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
+	newMedia, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
 		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
-		med = persist.Media{
+		newMedia = persist.Media{
 			MediaType: persist.MediaTypeUnknown,
 		}
 	}
 	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTimeOfMedia))
 
-	up := persist.TokenUpdateAllURIDerivedFieldsInput{
-		Media:       med,
-		Metadata:    t.TokenMetadata,
-		TokenURI:    t.TokenURI,
-		Name:        persist.NullString(name),
-		Description: persist.NullString(description),
-		LastUpdated: persist.LastUpdatedTime{},
+	// Only update the token with refreshed fields if the new media is servable.
+	if newMedia.IsServable() {
+		logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
+		totalUpdateTime := time.Now()
+		up := persist.TokenUpdateAllURIDerivedFieldsInput{
+			Media:       newMedia,
+			Metadata:    t.TokenMetadata,
+			TokenURI:    t.TokenURI,
+			Name:        persist.NullString(name),
+			Description: persist.NullString(description),
+			LastUpdated: persist.LastUpdatedTime{},
+		}
+		if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
+			logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
+			return err
+		}
+		logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
+	} else {
+		logger.For(ctx).Infof("Media: %s was not servable!!!", newMedia)
 	}
-	totalUpdateTime := time.Now()
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
-	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
-		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
-		return err
-	}
-
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
 
 	logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTime))
 	return nil

@@ -3,22 +3,25 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgtype"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 
 	"github.com/lib/pq"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // TokenGalleryRepository represents a postgres repository for tokens
 type TokenGalleryRepository struct {
 	db                                                  *sql.DB
 	queries                                             *db.Queries
+	getByID                                             *sql.Stmt
 	getByUserIDStmt                                     *sql.Stmt
 	getByUserIDPaginateStmt                             *sql.Stmt
 	getByTokenIDStmt                                    *sql.Stmt
@@ -48,6 +51,9 @@ var errTokensNotOwnedByUser = errors.New("not all tokens are owned by user")
 func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	getByIDStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE ID = $1 AND DELETED = false;`)
+	checkNoErr(err)
 
 	getByUserIDStmt, err := db.PrepareContext(ctx, `SELECT ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM FROM tokens WHERE OWNER_USER_ID = $1 AND DELETED = false ORDER BY BLOCK_NUMBER DESC;`)
 	checkNoErr(err)
@@ -112,6 +118,7 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	return &TokenGalleryRepository{
 		db:                                     db,
 		queries:                                queries,
+		getByID:                                getByIDStmt,
 		getByUserIDStmt:                        getByUserIDStmt,
 		getByUserIDPaginateStmt:                getByUserIDPaginateStmt,
 		getByTokenIdentifiersStmt:              getByTokenIdentifiersStmt,
@@ -134,6 +141,16 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 		deleteTokensOfOwnerBeforeTimeStampStmt:              deleteTokensOfOwnerBeforeTimeStampStmt,
 	}
 
+}
+
+// GetByID gets a token by its DBID
+func (t *TokenGalleryRepository) GetByID(pCtx context.Context, tokenID persist.DBID) (persist.TokenGallery, error) {
+	token := persist.TokenGallery{}
+	err := t.getByID.QueryRowContext(pCtx, tokenID).Scan(&token.ID, &token.CollectorsNote, &token.Media, &token.TokenType, &token.Chain, &token.Name, &token.Description, &token.TokenID, &token.TokenURI, &token.Quantity, &token.OwnerUserID, pq.Array(&token.OwnedByWallets), pq.Array(&token.OwnershipHistory), &token.TokenMetadata, &token.Contract, &token.ExternalURL, &token.BlockNumber, &token.Version, &token.CreationTime, &token.LastUpdated, &token.IsUserMarkedSpam, &token.IsProviderMarkedSpam)
+	if err != nil {
+		return persist.TokenGallery{}, err
+	}
+	return token, nil
 }
 
 // GetByUserID gets all tokens for a user
@@ -260,10 +277,10 @@ func (t *TokenGalleryRepository) GetByTokenID(pCtx context.Context, pTokenID per
 }
 
 // BulkUpsertByOwnerUserID upserts multiple tokens for a user and removes any tokens that are not in the list
-func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery, skipDelete bool) error {
-	now, err := t.bulkUpsert(pCtx, pTokens)
+func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, ownerUserID persist.DBID, chains []persist.Chain, pTokens []persist.TokenGallery, skipDelete bool) ([]persist.TokenGallery, error) {
+	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// delete tokens of owner before timestamp
@@ -271,23 +288,23 @@ func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, o
 	if !skipDelete {
 		res, err := t.deleteTokensOfOwnerBeforeTimeStampStmt.ExecContext(pCtx, ownerUserID, chains, now)
 		if err != nil {
-			return fmt.Errorf("failed to delete tokens: %w", err)
+			return nil, fmt.Errorf("failed to delete tokens: %w", err)
 		}
 
 		rowsAffected, err := res.RowsAffected()
 		if err != nil {
-			return fmt.Errorf("failed to get rows affected: %w", err)
+			return nil, fmt.Errorf("failed to get rows affected: %w", err)
 		}
 
 		logger.For(pCtx).Infof("deleted %d tokens", rowsAffected)
 	}
 
-	return nil
+	return persistedTokens, nil
 }
 
 // BulkUpsertTokensOfContract upserts all tokens of a contract and deletes the old tokens
 func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery, skipDelete bool) error {
-	now, err := t.bulkUpsert(pCtx, pTokens)
+	now, _, err := t.bulkUpsert(pCtx, pTokens)
 	if err != nil {
 		return err
 	}
@@ -303,71 +320,142 @@ func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context
 	return nil
 }
 
-func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery) (time.Time, error) {
-
-	// Postgres only allows 65535 parameters at a time.
-	// TODO: Consider trying this implementation at some point instead of chunking:
-	//       https://klotzandrew.com/blog/postgres-passing-65535-parameter-limit
-	if len(pTokens) == 0 {
-		return time.Time{}, nil
-	}
-
-	logger.For(pCtx).Infof("Checking 0 quantities for tokens...")
-	newTokens, err := t.deleteZeroQuantityTokens(pCtx, pTokens)
+func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery) (time.Time, []persist.TokenGallery, error) {
+	tokens, err := t.excludeZeroQuantityTokens(pCtx, pTokens)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, nil, err
 	}
 
-	if len(newTokens) == 0 {
-		return time.Time{}, nil
+	if len(tokens) == 0 {
+		return time.Time{}, []persist.TokenGallery{}, nil
 	}
 
-	paramsPerRow := 23
-	rowsPerQuery := 65535 / paramsPerRow
-
-	var recursedSyncTime *time.Time
-	if len(newTokens) > rowsPerQuery {
-		logrus.Debugf("Chunking %d tokens recursively into %d queries", len(newTokens), len(newTokens)/rowsPerQuery)
-		next := newTokens[rowsPerQuery:]
-		current := newTokens[:rowsPerQuery]
-		recursiveSyncTime, err := t.bulkUpsert(pCtx, next)
-		if err != nil {
-			return time.Time{}, err
+	appendBool := func(dest *[]bool, src *bool, errs *[]error) {
+		if src == nil {
+			*dest = append(*dest, false)
+			return
 		}
-		newTokens = current
-		recursedSyncTime = &recursiveSyncTime
+		*dest = append(*dest, *src)
 	}
 
-	newTokens = t.dedupeTokens(newTokens)
-
-	sqlStr := `INSERT INTO tokens (ID,COLLECTORS_NOTE,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_USER_ID,OWNED_BY_WALLETS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED,DELETED,IS_PROVIDER_MARKED_SPAM,LAST_SYNCED) VALUES `
-	vals := make([]interface{}, 0, len(newTokens)*paramsPerRow)
-	for i, token := range newTokens {
-		// 23 is the index of last_synced, the param that we want set to now()
-		sqlStr += generateValuesPlaceholders(paramsPerRow, i*paramsPerRow, []int{23}) + ","
-		vals = append(vals, persist.GenerateID(), token.CollectorsNote, token.Media, token.TokenType, token.Chain, token.Name, token.Description, token.TokenID, "", token.Quantity, token.OwnerUserID, pq.Array(token.OwnedByWallets), pq.Array(token.OwnershipHistory), token.TokenMetadata, token.Contract, token.ExternalURL, token.BlockNumber, token.Version, token.CreationTime, token.LastUpdated, token.Deleted, token.IsProviderMarkedSpam, token.LastSynced)
+	appendJSONB := func(dest *[]pgtype.JSONB, src any, errs *[]error) {
+		jsonb, err := persist.ToJSONB(src)
+		if err != nil {
+			*errs = append(*errs, err)
+			return
+		}
+		*dest = append(*dest, jsonb)
 	}
 
-	sqlStr = sqlStr[:len(sqlStr)-1]
+	appendAddressAtBlockArray := func(dest *[]string, src []persist.AddressAtBlock, delim string, errs *[]error) {
+		valuers := make([]driver.Valuer, len(src))
+		for i, item := range src {
+			valuers[i] = item
+		}
+		appendArrayType[[]byte](dest, valuers, delim, errs)
+	}
 
-	sqlStr += ` ON CONFLICT (TOKEN_ID,CONTRACT,CHAIN,OWNER_USER_ID) WHERE DELETED = false DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_USER_ID = EXCLUDED.OWNER_USER_ID,OWNED_BY_WALLETS = EXCLUDED.OWNED_BY_WALLETS,OWNERSHIP_HISTORY = tokens.OWNERSHIP_HISTORY || EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,LAST_UPDATED = EXCLUDED.LAST_UPDATED,IS_USER_MARKED_SPAM = tokens.IS_USER_MARKED_SPAM,IS_PROVIDER_MARKED_SPAM = EXCLUDED.IS_PROVIDER_MARKED_SPAM,LAST_SYNCED = GREATEST(EXCLUDED.LAST_SYNCED,tokens.LAST_SYNCED) RETURNING LAST_SYNCED;`
+	appendWalletArray := func(dest *[]string, src []persist.Wallet, delim string, errs *[]error) {
+		valuers := make([]driver.Valuer, len(src))
+		for i, item := range src {
+			valuers[i] = item
+		}
+		appendArrayType[string](dest, valuers, delim, errs)
+	}
 
-	var now time.Time
-	err = t.db.QueryRowContext(pCtx, sqlStr, vals...).Scan(&now)
+	addIDIfMissing := func(t *persist.TokenGallery) {
+		if t.ID == persist.DBID("") {
+			(*t).ID = persist.GenerateID()
+		}
+	}
+
+	addTimesIfMissing := func(t *persist.TokenGallery, ts time.Time) {
+		if t.CreationTime.Time().IsZero() {
+			(*t).CreationTime = persist.CreationTime(ts)
+		}
+		if t.LastSynced.Time().IsZero() {
+			(*t).LastSynced = persist.LastUpdatedTime(ts)
+		}
+		if t.LastUpdated.Time().IsZero() {
+			(*t).LastUpdated = persist.LastUpdatedTime(ts)
+		}
+	}
+
+	tokens = t.dedupeTokens(tokens)
+	params := db.UpsertTokensParams{Delim: "|"}
+	now := time.Now()
+
+	var errors []error
+
+	for i := range tokens {
+		t := &tokens[i]
+		addIDIfMissing(t)
+		addTimesIfMissing(t, now)
+		params.ID = append(params.ID, t.ID.String())
+		params.Deleted = append(params.Deleted, t.Deleted.Bool())
+		params.Version = append(params.Version, t.Version.Int32())
+		params.CreatedAt = append(params.CreatedAt, t.CreationTime.Time())
+		params.LastUpdated = append(params.LastUpdated, t.LastUpdated.Time())
+		params.Name = append(params.Name, t.Name.String())
+		params.Description = append(params.Description, t.Description.String())
+		params.CollectorsNote = append(params.CollectorsNote, t.CollectorsNote.String())
+		appendJSONB(&params.Media, t.Media, &errors)
+		params.TokenType = append(params.TokenType, t.TokenType.String())
+		params.TokenID = append(params.TokenID, t.TokenID.String())
+		params.Quantity = append(params.Quantity, t.Quantity.String())
+		appendAddressAtBlockArray(&params.OwnershipHistorySerialized, t.OwnershipHistory, params.Delim, &errors)
+		appendJSONB(&params.TokenMetadata, t.TokenMetadata, &errors)
+		params.ExternalUrl = append(params.ExternalUrl, t.ExternalURL.String())
+		params.BlockNumber = append(params.BlockNumber, t.BlockNumber.BigInt().Int64())
+		params.OwnerUserID = append(params.OwnerUserID, t.OwnerUserID.String())
+		appendWalletArray(&params.OwnedByWalletsSerialized, t.OwnedByWallets, params.Delim, &errors)
+		params.Chain = append(params.Chain, int32(t.Chain))
+		params.Contract = append(params.Contract, t.Contract.String())
+		appendBool(&params.IsUserMarkedSpam, t.IsUserMarkedSpam, &errors)
+		appendBool(&params.IsProviderMarkedSpam, t.IsProviderMarkedSpam, &errors)
+		params.LastSynced = append(params.LastSynced, t.LastSynced.Time())
+		params.TokenUri = append(params.TokenUri, "")
+
+		// Defer error checking until now to keep the code above from being
+		// littered with multiline "if" statements
+		if len(errors) > 0 {
+			panic(err)
+			return time.Time{}, nil, errors[0]
+		}
+	}
+
+	upserted, err := t.queries.UpsertTokens(pCtx, params)
 	if err != nil {
-		logrus.Debugf("SQL: %s", sqlStr)
-		return time.Time{}, fmt.Errorf("failed to upsert tokens: %w", err)
+		panic(err)
+		return time.Time{}, nil, err
 	}
 
-	logger.For(pCtx).Infof("upserted %d tokens", len(newTokens))
-
-	if recursedSyncTime != nil {
-		return *recursedSyncTime, nil
+	// Update tokens with the existing creation time and ID if the token already exists
+	for i := range tokens {
+		t := &tokens[i]
+		(*t).ID = upserted[i].ID
+		(*t).CreationTime = persist.CreationTime(upserted[i].CreatedAt)
+		(*t).LastUpdated = persist.LastUpdatedTime(upserted[i].LastUpdated)
+		(*t).LastSynced = persist.LastUpdatedTime(upserted[i].LastSynced)
 	}
-	return now, nil
+
+	return now, tokens, nil
 }
 
-func (t *TokenGalleryRepository) deleteZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
+func appendArrayType[T string | []byte](dest *[]string, src []driver.Valuer, delim string, errs *[]error) {
+	valued := make([]string, len(src))
+	for i, item := range src {
+		v, err := item.Value()
+		if err != nil {
+			*errs = append(*errs, err)
+			return
+		}
+		valued[i] = string(v.(T))
+	}
+	*dest = append(*dest, strings.Join(valued, delim))
+}
+
+func (t *TokenGalleryRepository) excludeZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
 	newTokens := make([]persist.TokenGallery, 0, len(pTokens))
 	for _, token := range pTokens {
 		if token.Quantity == "" || token.Quantity == "0" {
