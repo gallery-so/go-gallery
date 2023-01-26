@@ -302,7 +302,7 @@ func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db
 	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
 		return api.queries.GetTrendingUserIDs(ctx, db.GetTrendingUserIDsParams{
 			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
-			Size:      20,
+			Size:      24,
 		})
 	}
 
