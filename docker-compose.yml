@@ -50,7 +50,8 @@ services:
       "-queue", "projects/gallery-local/locations/here/queues/feedbot",
       "-queue", "projects/gallery-local/locations/here/queues/feed-event",
       "-queue", "projects/gallery-local/locations/here/queues/token-processing",
-      "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes"
+      "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes",
+      "-queue", "projects/gallery-local/locations/here/queues/wallet-validate",
     ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
