@@ -712,6 +712,12 @@ select p.id from (
 ) p
 where position <= @size::int;
 
+-- name: GetUserExperiencesByUserID :one
+select user_experiences from users where id = $1;
+
+-- name: UpdateUserExperience :exec
+update users set user_experiences = user_experiences || @experience where id = @user_id;
+
 -- name: GetTrendingUsersByIDs :many
 select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
