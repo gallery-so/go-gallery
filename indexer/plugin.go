@@ -98,34 +98,38 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 // If the incoming channel is nil, the result channel will return a single nil value immediately.
 // The result will be a map of token identifiers to the result of the plugin, ensuring that whatever is returned by the plugin is the most recent result for that token.
 // The caller is responsible with closing the channel returned by this function.
-func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, receiver PluginReceiver[T, V], incoming <-chan T) chan map[persist.EthereumTokenIdentifiers]V {
+func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync.WaitGroup, receiver PluginReceiver[T, V], incoming <-chan T, out map[persist.EthereumTokenIdentifiers]V) {
 	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "runPluginReceiver")
 	defer tracing.FinishSpan(span)
 
-	out := make(chan map[persist.EthereumTokenIdentifiers]V)
+	wg.Add(1)
+	defer wg.Done()
 
 	if incoming == nil {
-		go func() {
-			out <- nil
-		}()
-		return out
+
+		return
 	}
 
 	go func() {
-		result := make(map[persist.EthereumTokenIdentifiers]V)
 
 		for it := range incoming {
 
-			processed := receiver(result[it.TokenIdentifiers()], it)
-			cur := result[processed.TokenIdentifiers()]
-			if cur.OrderInfo().Less(processed.OrderInfo()) {
-				result[processed.TokenIdentifiers()] = processed
+			if out != nil {
+				processed := receiver(out[it.TokenIdentifiers()], it)
+				cur := out[processed.TokenIdentifiers()]
+				if cur.OrderInfo().Less(processed.OrderInfo()) {
+					out[processed.TokenIdentifiers()] = processed
+				}
+			} else {
+				out = make(map[persist.EthereumTokenIdentifiers]V)
+				cur := receiver(out[it.TokenIdentifiers()], it)
+				out[cur.TokenIdentifiers()] = cur
 			}
+
 		}
 
-		out <- result
 	}()
-	return out
+
 }
 
 // urisPlugin pulls URI information for a token.

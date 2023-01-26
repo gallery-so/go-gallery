@@ -791,39 +791,18 @@ func (i *indexer) processTokens(ctx context.Context,
 	balancesMap := map[persist.EthereumTokenIdentifiers]*tokenBalancesAtBlock{}
 	urisMap := map[persist.EthereumTokenIdentifiers]tokenURI{}
 
+	wg := &sync.WaitGroup{}
+
 	// we won't be storing any results of this plugin
-	refreshChan := RunPluginReceiver(ctx, refreshesPluginReceiver(ctx), refreshes)
+	RunPluginReceiver(ctx, wg, refreshesPluginReceiver(ctx), refreshes, nil)
 
 	// run the receivers in parallel and return one result from each channel for a total of totalRunningPlugins (5)
-	uMapChan := RunPluginReceiver(ctx, urisPluginReceiver, uris)
-	balMapChan := RunPluginReceiver(ctx, balancesPluginReceiver, balances)
-	ownerMapChan := RunPluginReceiver(ctx, ownersPluginReceiver, owners)
-	prevOwnerMapChan := RunPluginReceiver(ctx, previousOwnersPluginReceiver, previousOwners)
+	RunPluginReceiver(ctx, wg, urisPluginReceiver, uris, urisMap)
+	RunPluginReceiver(ctx, wg, balancesPluginReceiver, balances, balancesMap)
+	RunPluginReceiver(ctx, wg, ownersPluginReceiver, owners, ownersMap)
+	RunPluginReceiver(ctx, wg, previousOwnersPluginReceiver, previousOwners, previousOwnersMap)
 
-	totalRunningPlugins := 5
-
-	for i := 0; i < totalRunningPlugins; i++ {
-		select {
-		case umap := <-uMapChan:
-			if umap != nil {
-				urisMap = umap
-			}
-		case balMap := <-balMapChan:
-			if balMap != nil {
-				balancesMap = balMap
-			}
-		case ownerMap := <-ownerMapChan:
-			if ownerMap != nil {
-				ownersMap = ownerMap
-			}
-		case previousOwnerMap := <-prevOwnerMapChan:
-			if previousOwnerMap != nil {
-				previousOwnersMap = previousOwnerMap
-			}
-		case <-refreshChan:
-			// do nothing
-		}
-	}
+	wg.Wait()
 
 	logger.For(ctx).Info("Done recieving field data, converting fields into tokens...")
 
