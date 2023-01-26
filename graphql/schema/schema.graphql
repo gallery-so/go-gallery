@@ -1656,6 +1656,18 @@ union UpdateUserExperiencePayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
+input MoveCollectionToGalleryInput {
+  sourceCollectionId: DBID!
+  targetGalleryId: DBID!
+}
+
+type MoveCollectionToGalleryPayload {
+  oldGallery: Gallery,
+  newGallery: Gallery
+}
+
+union MoveCollectionToGalleryPayloadOrError =  MoveCollectionToGalleryPayload | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -1756,6 +1768,8 @@ type Mutation {
 
   updateUserExperience(input: UpdateUserExperienceInput!): UpdateUserExperiencePayloadOrError
     @authRequired
+
+  moveCollectionGoGallery(input: MoveCollectionToGalleryInput): MoveCollectionToGalleryPayloadOrError  @authRequired
 }
 
 type Subscription {
