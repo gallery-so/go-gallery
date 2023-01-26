@@ -497,6 +497,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
     @goField(forceResolver: true)
 
   notificationSettings: NotificationSettings @goField(forceResolver: true)
+
+  userExperiences: [UserExperience!] @goField(forceResolver: true)
 }
 
 type NotificationSettings {
@@ -544,6 +546,15 @@ input UpdateEmailNotificationSettingsInput {
 input UnsubscribeFromEmailTypeInput {
   type: EmailUnsubscriptionType!
   token: String! @scrub
+}
+
+enum UserExperienceType {
+  MultiGalleryAnnouncement
+}
+
+type UserExperience {
+  type: UserExperienceType!
+  experienced: Boolean!
 }
 
 union UserByUsernameOrError = GalleryUser | ErrUserNotFound | ErrInvalidInput
@@ -1649,6 +1660,20 @@ union AdminAddWalletPayloadOrError =
   | ErrAddressOwnedByUser
   | ErrNotAuthorized
 
+input UpdateUserExperienceInput {
+  experienceType: UserExperienceType!
+  experienced: Boolean!
+}
+
+type UpdateUserExperiencePayload {
+  viewer: Viewer
+}
+
+union UpdateUserExperiencePayloadOrError =
+    UpdateUserExperiencePayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -1746,6 +1771,9 @@ type Mutation {
     @frontendBuildAuth
 
   updatePrimaryWallet(walletID: DBID!): UpdatePrimaryWalletPayloadOrError @authRequired
+
+  updateUserExperience(input: UpdateUserExperienceInput!): UpdateUserExperiencePayloadOrError
+    @authRequired
 }
 
 type Subscription {

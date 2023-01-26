@@ -2,10 +2,12 @@ package publicapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/spf13/viper"
 
@@ -16,6 +18,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/membership"
@@ -638,5 +641,64 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		UserID:         curUserID,
 		SubjectID:      followedUserID,
 		Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+	})
+}
+
+func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) ([]*model.UserExperience, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	experiences, err := api.queries.GetUserExperiencesByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	asJSON := map[string]bool{}
+	if err := experiences.AssignTo(&asJSON); err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.UserExperience, len(model.AllUserExperienceType))
+	for i, experienceType := range model.AllUserExperienceType {
+		result[i] = &model.UserExperience{
+			Type:        experienceType,
+			Experienced: asJSON[experienceType.String()],
+		}
+	}
+	return result, nil
+}
+
+func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType model.UserExperienceType, value bool) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"experienceType": {experienceType, "required"},
+	}); err != nil {
+		return err
+	}
+
+	curUserID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	in := map[string]interface{}{
+		experienceType.String(): value,
+	}
+
+	marshalled, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+
+	return api.queries.UpdateUserExperience(ctx, db.UpdateUserExperienceParams{
+		Experience: pgtype.JSONB{
+			Bytes:  marshalled,
+			Status: pgtype.Present,
+		},
+		UserID: curUserID,
 	})
 }

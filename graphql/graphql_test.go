@@ -66,6 +66,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
 		{title: "should get trending feed events", run: testTrendingFeedEvents},
 		{title: "should delete collection in gallery update", run: testUpdateGalleryDeleteCollection},
+		{title: "should update user experiences", run: testUpdateUserExperiences},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -344,6 +345,27 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 		if persist.Action(*ac) == persist.ActionTokensAddedToCollection {
 			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
 			assert.Greater(t, len(ca.NewTokens), 0)
+		}
+	}
+}
+
+func testUpdateUserExperiences(t *testing.T) {
+	userF := newUserFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	response, err := updateUserExperience(context.Background(), c, UpdateUserExperienceInput{
+		ExperienceType: UserExperienceTypeMultigalleryannouncement,
+		Experienced:    true,
+	})
+
+	require.NoError(t, err)
+	bs, _ := json.Marshal(response)
+	require.NotNil(t, response.UpdateUserExperience, string(bs))
+	payload := (*response.UpdateUserExperience).(*updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload)
+	assert.NotEmpty(t, payload.Viewer.UserExperiences)
+	for _, experience := range payload.Viewer.UserExperiences {
+		if experience.Type == UserExperienceTypeMultigalleryannouncement {
+			assert.True(t, experience.Experienced)
 		}
 	}
 }

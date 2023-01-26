@@ -1232,6 +1232,16 @@ func (r *mutationResolver) UpdatePrimaryWallet(ctx context.Context, walletID per
 	}, nil
 }
 
+func (r *mutationResolver) UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateUserExperience(ctx, input.ExperienceType, input.Experienced)
+	if err != nil {
+		return nil, err
+	}
+	return model.UpdateUserExperiencePayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+}
+
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
 	panic(fmt.Errorf("not implemented"))
 }
@@ -1628,6 +1638,10 @@ func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, b
 
 func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error) {
 	return resolveViewerNotificationSettings(ctx)
+}
+
+func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error) {
+	return resolveViewerExperiencesByUserID(ctx, obj.UserId)
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {

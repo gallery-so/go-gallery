@@ -185,6 +185,14 @@ type Gallery struct {
 	Position    string
 }
 
+type LegacyView struct {
+	UserID      persist.DBID
+	ViewCount   sql.NullInt32
+	LastUpdated time.Time
+	CreatedAt   time.Time
+	Deleted     sql.NullBool
+}
+
 type LoginAttempt struct {
 	ID                 persist.DBID
 	Deleted            bool
@@ -315,6 +323,7 @@ type User struct {
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
+	UserExperiences      pgtype.JSONB
 }
 
 type UserEvent struct {

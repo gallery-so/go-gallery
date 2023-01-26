@@ -739,15 +739,25 @@ select gallery_id from collections where id = $1 and deleted = false;
 
 -- name: GetTrendingUserIDs :many
 with rollup as (
-	select e.gallery_id, count(*) view_count from events e where action = 'ViewedGallery' and e.created_At >= @window_end group by e.gallery_id
+  select e.gallery_id, count(*) view_count
+  from events e
+  where action = 'ViewedGallery' and e.created_at >= @window_end
+  group by e.gallery_id
 )
 select p.id from (
-	select u.id, row_number() over(order by sum(view_count) desc, max(u.created_at) desc) as position
+	select u.id, row_number() over(order by sum(r.view_count) + coalesce(sum(v.view_count),0) desc, max(u.created_at) desc) as position
 	from rollup r, galleries g, users u
+	left join legacy_views v on u.id = v.user_id and v.deleted = false and v.created_at >= @window_end
 	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
 	group by u.id
 ) p
 where position <= @size::int;
+
+-- name: GetUserExperiencesByUserID :one
+select user_experiences from users where id = $1;
+
+-- name: UpdateUserExperience :exec
+update users set user_experiences = user_experiences || @experience where id = @user_id;
 
 -- name: GetTrendingUsersByIDs :many
 select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;

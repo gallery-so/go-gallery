@@ -44,6 +44,10 @@ query viewerQuery {
       message
     }
     ... on Viewer {
+      userExperiences {
+        type
+        experienced
+      }
       user {
         feed(first: 10) {
           edges {
@@ -335,6 +339,23 @@ mutation commentOnFeedEventMutation($feedEventId: DBID!, $comment: String!) {
     ... on CommentOnFeedEventPayload {
       feedEvent {
         dbid
+      }
+    }
+  }
+}
+
+mutation updateUserExperience($input: UpdateUserExperienceInput!) {
+  updateUserExperience(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on UpdateUserExperiencePayload {
+      viewer {
+        userExperiences {
+          type
+          experienced
+        }
       }
     }
   }

@@ -336,6 +336,23 @@ func (v *UpdateGalleryInput) GetCreatedCollections() []*CreateCollectionInGaller
 // GetOrder returns UpdateGalleryInput.Order, and is useful for accessing the field via an interface.
 func (v *UpdateGalleryInput) GetOrder() []persist.DBID { return v.Order }
 
+type UpdateUserExperienceInput struct {
+	ExperienceType UserExperienceType `json:"experienceType"`
+	Experienced    bool               `json:"experienced"`
+}
+
+// GetExperienceType returns UpdateUserExperienceInput.ExperienceType, and is useful for accessing the field via an interface.
+func (v *UpdateUserExperienceInput) GetExperienceType() UserExperienceType { return v.ExperienceType }
+
+// GetExperienced returns UpdateUserExperienceInput.Experienced, and is useful for accessing the field via an interface.
+func (v *UpdateUserExperienceInput) GetExperienced() bool { return v.Experienced }
+
+type UserExperienceType string
+
+const (
+	UserExperienceTypeMultigalleryannouncement UserExperienceType = "MultiGalleryAnnouncement"
+)
+
 // __addUserWalletMutationInput is used internally by genqlient
 type __addUserWalletMutationInput struct {
 	ChainAddress  ChainAddressInput `json:"chainAddress"`
@@ -451,6 +468,14 @@ type __updateGalleryMutationInput struct {
 
 // GetInput returns __updateGalleryMutationInput.Input, and is useful for accessing the field via an interface.
 func (v *__updateGalleryMutationInput) GetInput() UpdateGalleryInput { return v.Input }
+
+// __updateUserExperienceInput is used internally by genqlient
+type __updateUserExperienceInput struct {
+	Input UpdateUserExperienceInput `json:"input"`
+}
+
+// GetInput returns __updateUserExperienceInput.Input, and is useful for accessing the field via an interface.
+func (v *__updateUserExperienceInput) GetInput() UpdateUserExperienceInput { return v.Input }
 
 // __userByAddressQueryInput is used internally by genqlient
 type __userByAddressQueryInput struct {
@@ -3785,6 +3810,243 @@ func __marshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(v *u
 	}
 }
 
+// updateUserExperienceResponse is returned by updateUserExperience on success.
+type updateUserExperienceResponse struct {
+	UpdateUserExperience *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError `json:"-"`
+}
+
+// GetUpdateUserExperience returns updateUserExperienceResponse.UpdateUserExperience, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceResponse) GetUpdateUserExperience() *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError {
+	return v.UpdateUserExperience
+}
+
+func (v *updateUserExperienceResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*updateUserExperienceResponse
+		UpdateUserExperience json.RawMessage `json:"updateUserExperience"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.updateUserExperienceResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.UpdateUserExperience
+		src := firstPass.UpdateUserExperience
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError)
+			err = __unmarshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalupdateUserExperienceResponse struct {
+	UpdateUserExperience json.RawMessage `json:"updateUserExperience"`
+}
+
+func (v *updateUserExperienceResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *updateUserExperienceResponse) __premarshalJSON() (*__premarshalupdateUserExperienceResponse, error) {
+	var retval __premarshalupdateUserExperienceResponse
+
+	{
+
+		dst := &retval.UpdateUserExperience
+		src := v.UpdateUserExperience
+		if src != nil {
+			var err error
+			*dst, err = __marshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// updateUserExperienceUpdateUserExperienceErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type updateUserExperienceUpdateUserExperienceErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns updateUserExperienceUpdateUserExperienceErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns updateUserExperienceUpdateUserExperienceErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// updateUserExperienceUpdateUserExperienceErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type updateUserExperienceUpdateUserExperienceErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns updateUserExperienceUpdateUserExperienceErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrNotAuthorized) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns updateUserExperienceUpdateUserExperienceErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrNotAuthorized) GetMessage() string {
+	return v.Message
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload includes the requested fields of the GraphQL type UpdateUserExperiencePayload.
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload struct {
+	Typename *string                                                                    `json:"__typename"`
+	Viewer   *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer `json:"viewer"`
+}
+
+// GetTypename returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload.Typename, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetViewer returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload.Viewer, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) GetViewer() *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer {
+	return v.Viewer
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError includes the requested fields of the GraphQL interface UpdateUserExperiencePayloadOrError.
+//
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError is implemented by the following types:
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
+// updateUserExperienceUpdateUserExperienceErrInvalidInput
+// updateUserExperienceUpdateUserExperienceErrNotAuthorized
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError interface {
+	implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
+}
+func (v *updateUserExperienceUpdateUserExperienceErrInvalidInput) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
+}
+func (v *updateUserExperienceUpdateUserExperienceErrNotAuthorized) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
+}
+
+func __unmarshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(b []byte, v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "UpdateUserExperiencePayload":
+		*v = new(updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(updateUserExperienceUpdateUserExperienceErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(updateUserExperienceUpdateUserExperienceErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing UpdateUserExperiencePayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload:
+		typename = "UpdateUserExperiencePayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateUserExperienceUpdateUserExperienceErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateUserExperienceUpdateUserExperienceErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateUserExperienceUpdateUserExperienceErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateUserExperienceUpdateUserExperienceErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError: "%T"`, v)
+	}
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer includes the requested fields of the GraphQL type Viewer.
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer struct {
+	UserExperiences []updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience `json:"userExperiences"`
+}
+
+// GetUserExperiences returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer.UserExperiences, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer) GetUserExperiences() []updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience {
+	return v.UserExperiences
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience includes the requested fields of the GraphQL type UserExperience.
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience struct {
+	Type        UserExperienceType `json:"type"`
+	Experienced bool               `json:"experienced"`
+}
+
+// GetType returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience.Type, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience) GetType() UserExperienceType {
+	return v.Type
+}
+
+// GetExperienced returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience.Experienced, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience) GetExperienced() bool {
+	return v.Experienced
+}
+
 // userByAddressQueryResponse is returned by userByAddressQuery on success.
 type userByAddressQueryResponse struct {
 	UserByAddress *userByAddressQueryUserByAddressUserByAddressOrError `json:"-"`
@@ -4657,12 +4919,18 @@ func (v *viewerQueryResponse) __premarshalJSON() (*__premarshalviewerQueryRespon
 
 // viewerQueryViewer includes the requested fields of the GraphQL type Viewer.
 type viewerQueryViewer struct {
-	Typename *string                           `json:"__typename"`
-	User     *viewerQueryViewerUserGalleryUser `json:"user"`
+	Typename        *string                                          `json:"__typename"`
+	UserExperiences []viewerQueryViewerUserExperiencesUserExperience `json:"userExperiences"`
+	User            *viewerQueryViewerUserGalleryUser                `json:"user"`
 }
 
 // GetTypename returns viewerQueryViewer.Typename, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewer) GetTypename() *string { return v.Typename }
+
+// GetUserExperiences returns viewerQueryViewer.UserExperiences, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewer) GetUserExperiences() []viewerQueryViewerUserExperiencesUserExperience {
+	return v.UserExperiences
+}
 
 // GetUser returns viewerQueryViewer.User, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewer) GetUser() *viewerQueryViewerUserGalleryUser { return v.User }
@@ -4678,6 +4946,18 @@ func (v *viewerQueryViewerErrNotAuthorized) GetTypename() *string { return v.Typ
 
 // GetMessage returns viewerQueryViewerErrNotAuthorized.Message, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerErrNotAuthorized) GetMessage() string { return v.Message }
+
+// viewerQueryViewerUserExperiencesUserExperience includes the requested fields of the GraphQL type UserExperience.
+type viewerQueryViewerUserExperiencesUserExperience struct {
+	Type        UserExperienceType `json:"type"`
+	Experienced bool               `json:"experienced"`
+}
+
+// GetType returns viewerQueryViewerUserExperiencesUserExperience.Type, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserExperiencesUserExperience) GetType() UserExperienceType { return v.Type }
+
+// GetExperienced returns viewerQueryViewerUserExperiencesUserExperience.Experienced, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserExperiencesUserExperience) GetExperienced() bool { return v.Experienced }
 
 // viewerQueryViewerUserGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type viewerQueryViewerUserGalleryUser struct {
@@ -6486,6 +6766,50 @@ mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
 	return &data, err
 }
 
+func updateUserExperience(
+	ctx context.Context,
+	client graphql.Client,
+	input UpdateUserExperienceInput,
+) (*updateUserExperienceResponse, error) {
+	req := &graphql.Request{
+		OpName: "updateUserExperience",
+		Query: `
+mutation updateUserExperience ($input: UpdateUserExperienceInput!) {
+	updateUserExperience(input: $input) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on UpdateUserExperiencePayload {
+			viewer {
+				userExperiences {
+					type
+					experienced
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__updateUserExperienceInput{
+			Input: input,
+		},
+	}
+	var err error
+
+	var data updateUserExperienceResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 func userByAddressQuery(
 	ctx context.Context,
 	client graphql.Client,
@@ -6662,6 +6986,10 @@ query viewerQuery {
 			message
 		}
 		... on Viewer {
+			userExperiences {
+				type
+				experienced
+			}
 			user {
 				feed(first: 10) {
 					edges {

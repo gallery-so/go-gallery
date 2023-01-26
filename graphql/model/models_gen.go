@@ -266,6 +266,10 @@ type UpdateTokenInfoPayloadOrError interface {
 	IsUpdateTokenInfoPayloadOrError()
 }
 
+type UpdateUserExperiencePayloadOrError interface {
+	IsUpdateUserExperiencePayloadOrError()
+}
+
 type UpdateUserInfoPayloadOrError interface {
 	IsUpdateUserInfoPayloadOrError()
 }
@@ -775,6 +779,7 @@ func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
 func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
 func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
+func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -824,6 +829,7 @@ func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
 func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
+func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()     {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1647,6 +1653,17 @@ type UpdateTokenInfoPayload struct {
 
 func (UpdateTokenInfoPayload) IsUpdateTokenInfoPayloadOrError() {}
 
+type UpdateUserExperienceInput struct {
+	ExperienceType UserExperienceType `json:"experienceType"`
+	Experienced    bool               `json:"experienced"`
+}
+
+type UpdateUserExperiencePayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateUserExperiencePayload) IsUpdateUserExperiencePayloadOrError() {}
+
 type UpdateUserInfoInput struct {
 	Username string `json:"username"`
 	Bio      string `json:"bio"`
@@ -1685,6 +1702,11 @@ type UserEmail struct {
 	Email                     *persist.Email                   `json:"email"`
 	VerificationStatus        *persist.EmailVerificationStatus `json:"verificationStatus"`
 	EmailNotificationSettings *EmailNotificationSettings       `json:"emailNotificationSettings"`
+}
+
+type UserExperience struct {
+	Type        UserExperienceType `json:"type"`
+	Experienced bool               `json:"experienced"`
 }
 
 type UserFollowedUsersFeedEventData struct {
@@ -1744,6 +1766,7 @@ type Viewer struct {
 	// Seen notifications come after unseen notifications
 	Notifications        *NotificationsConnection `json:"notifications"`
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
+	UserExperiences      []*UserExperience        `json:"userExperiences"`
 }
 
 func (Viewer) IsNode()          {}
@@ -1933,5 +1956,44 @@ func (e *TokenType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e TokenType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type UserExperienceType string
+
+const (
+	UserExperienceTypeMultiGalleryAnnouncement UserExperienceType = "MultiGalleryAnnouncement"
+)
+
+var AllUserExperienceType = []UserExperienceType{
+	UserExperienceTypeMultiGalleryAnnouncement,
+}
+
+func (e UserExperienceType) IsValid() bool {
+	switch e {
+	case UserExperienceTypeMultiGalleryAnnouncement:
+		return true
+	}
+	return false
+}
+
+func (e UserExperienceType) String() string {
+	return string(e)
+}
+
+func (e *UserExperienceType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = UserExperienceType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid UserExperienceType", str)
+	}
+	return nil
+}
+
+func (e UserExperienceType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
