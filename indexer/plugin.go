@@ -94,10 +94,8 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 	}
 }
 
-// RunPluginReceiver runs a plugin receiver and returns a channel that will return exactly one result once all of the incoming messages have been processed.
-// If the incoming channel is nil, the result channel will return a single nil value immediately.
-// The result will be a map of token identifiers to the result of the plugin, ensuring that whatever is returned by the plugin is the most recent result for that token.
-// The caller is responsible with closing the channel returned by this function.
+// RunPluginReceiver runs a plugin receiver and will update the out map with the results of the receiver, ensuring that the most recent data is kept.
+// If the incoming channel is nil, the function will return immediately.
 func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync.WaitGroup, receiver PluginReceiver[T, V], incoming <-chan T, out map[persist.EthereumTokenIdentifiers]V) {
 	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "runPluginReceiver")
 	defer tracing.FinishSpan(span)
