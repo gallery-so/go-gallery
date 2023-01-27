@@ -746,6 +746,7 @@ func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, f
 			return tokenBalances{}, err
 		}
 	}
+	// MaxUint because there is no txIndex, this is simply the most up to date balance on the blockchain so it should always be ahead of any other information at this block
 	bal := tokenBalances{key, blockchainOrderInfo{blockNumber: blockNumber, txIndex: math.MaxUint}, from, to, fromBalance, toBalance}
 	return bal, nil
 }

@@ -45,6 +45,7 @@ type blockchainOrderInfo struct {
 	txIndex     uint
 }
 
+// Less returns true if the current block number and tx index are less than the other block number and tx index.
 func (b blockchainOrderInfo) Less(other blockchainOrderInfo) bool {
 	if b.blockNumber < other.blockNumber {
 		return true
