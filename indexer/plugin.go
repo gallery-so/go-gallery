@@ -100,12 +100,10 @@ func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync
 	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "runPluginReceiver")
 	defer tracing.FinishSpan(span)
 
-	wg.Add(1)
-
 	if incoming == nil {
-		wg.Done()
 		return
 	}
+	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
