@@ -101,14 +101,14 @@ func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync
 	defer tracing.FinishSpan(span)
 
 	wg.Add(1)
-	defer wg.Done()
 
 	if incoming == nil {
-
+		wg.Done()
 		return
 	}
 
 	go func() {
+		defer wg.Done()
 
 		for it := range incoming {
 

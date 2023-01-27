@@ -81,6 +81,7 @@ func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 			Topics:      []common.Hash{common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"), common.HexToHash(testAddress), common.HexToHash("0x0000000000000000000000008914496dc01efcc49a2fa340331fb90969b6f1d2"), common.HexToHash("0x00000000000000000000000000000000000000000000000000000000000000d9")},
 			Data:        []byte{},
 			BlockNumber: 51,
+			TxIndex:     1,
 		}}
 		if curBlock.Uint64() == 0 {
 			return allLogs, nil
