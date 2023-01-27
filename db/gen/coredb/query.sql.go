@@ -14,6 +14,20 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+const addCollectionToGallery = `-- name: AddCollectionToGallery :exec
+update galleries set collections = array_append(collections, $1), last_updated = now() where id = $2 and deleted = false
+`
+
+type AddCollectionToGalleryParams struct {
+	CollectionID interface{}
+	GalleryID    persist.DBID
+}
+
+func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionToGalleryParams) error {
+	_, err := q.db.Exec(ctx, addCollectionToGallery, arg.CollectionID, arg.GalleryID)
+	return err
+}
+
 const addUserRoles = `-- name: AddUserRoles :exec
 insert into user_roles (id, user_id, role, created_at, last_updated)
 select unnest($2::varchar[]), $1, unnest($3::varchar[]), now(), now()
@@ -3148,6 +3162,34 @@ func (q *Queries) RedeemMerch(ctx context.Context, arg RedeemMerchParams) (sql.N
 	return discount_code, err
 }
 
+const removeCollectionFromGallery = `-- name: RemoveCollectionFromGallery :exec
+update galleries set collections = array_remove(collections, $1), last_updated = now() where id = $2 and deleted = false
+`
+
+type RemoveCollectionFromGalleryParams struct {
+	CollectionID interface{}
+	GalleryID    persist.DBID
+}
+
+func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCollectionFromGalleryParams) error {
+	_, err := q.db.Exec(ctx, removeCollectionFromGallery, arg.CollectionID, arg.GalleryID)
+	return err
+}
+
+const updateCollectionGallery = `-- name: UpdateCollectionGallery :exec
+update collections set gallery_id = $1, last_updated = now() where id = $2 and deleted = false
+`
+
+type UpdateCollectionGalleryParams struct {
+	GalleryID persist.DBID
+	ID        persist.DBID
+}
+
+func (q *Queries) UpdateCollectionGallery(ctx context.Context, arg UpdateCollectionGalleryParams) error {
+	_, err := q.db.Exec(ctx, updateCollectionGallery, arg.GalleryID, arg.ID)
+	return err
+}
+
 const updateCollectionTokens = `-- name: UpdateCollectionTokens :exec
 update collections set nfts = $1, last_updated = now() where id = $2 and deleted = false
 `
@@ -3415,6 +3457,38 @@ select exists(select position,count(*) from galleries where owner_user_id = $1 a
 
 func (q *Queries) UserHasDuplicateGalleryPositions(ctx context.Context, ownerUserID persist.DBID) (bool, error) {
 	row := q.db.QueryRow(ctx, userHasDuplicateGalleryPositions, ownerUserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const userOwnsCollection = `-- name: UserOwnsCollection :one
+select exists(select 1 from collections where id = $1 and owner_user_id = $2 and deleted = false)
+`
+
+type UserOwnsCollectionParams struct {
+	ID          persist.DBID
+	OwnerUserID persist.DBID
+}
+
+func (q *Queries) UserOwnsCollection(ctx context.Context, arg UserOwnsCollectionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, userOwnsCollection, arg.ID, arg.OwnerUserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const userOwnsGallery = `-- name: UserOwnsGallery :one
+select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and deleted = false)
+`
+
+type UserOwnsGalleryParams struct {
+	ID          persist.DBID
+	OwnerUserID persist.DBID
+}
+
+func (q *Queries) UserOwnsGallery(ctx context.Context, arg UserOwnsGalleryParams) (bool, error) {
+	row := q.db.QueryRow(ctx, userOwnsGallery, arg.ID, arg.OwnerUserID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
