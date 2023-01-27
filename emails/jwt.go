@@ -2,6 +2,7 @@ package emails
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -27,6 +28,19 @@ func jwtParse(pJWTtokenStr string) (persist.DBID, string, error) {
 		func(pJWTtoken *jwt.Token) (interface{}, error) {
 			return []byte(viper.GetString("JWT_SECRET")), nil
 		})
+
+	if err != nil || !JWTtoken.Valid {
+		// If the token wasn't valid, see if we're rotating an existing key out.
+		// If so, try validating the token with that key.
+		oldKey := viper.GetString("JWT_SECRET_ROTATING_OUT")
+		if strings.TrimSpace(oldKey) != "" {
+			JWTtoken, err = jwt.ParseWithClaims(pJWTtokenStr,
+				&claims,
+				func(pJWTtoken *jwt.Token) (interface{}, error) {
+					return []byte(oldKey), nil
+				})
+		}
+	}
 
 	if err != nil || !JWTtoken.Valid {
 		return "", "", errInvalidJWT

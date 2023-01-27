@@ -3,11 +3,9 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
-
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/sirupsen/logrus"
 
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
@@ -15,7 +13,6 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -29,41 +26,6 @@ type errUserDoesNotHaveRequiredNFT struct {
 	addresses []persist.Wallet
 }
 
-// AuthRequired is a middleware that checks if the user is authenticated
-func AuthRequired(userRepository postgres.UserRepository, ethClient *ethclient.Client) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		authHeaders := strings.Split(header, " ")
-		if len(authHeaders) == 2 {
-			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				auth.SetAuthStateForCtx(c, persist.DBID(authHeaders[1]), nil)
-				c.Next()
-				return
-			}
-		}
-		jwt, err := c.Cookie(auth.JWTCookieKey)
-		if err != nil {
-			if err == http.ErrNoCookie {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrNoCookie.Error()})
-				return
-			}
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: auth.ErrInvalidJWT.Error()})
-			return
-		}
-
-		// use an env variable as jwt secret as upposed to using a stateful secret stored in
-		// database that is unique to every user and session
-		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: err.Error()})
-			return
-		}
-
-		auth.SetAuthStateForCtx(c, userID, nil)
-		c.Next()
-	}
-}
-
 // AdminRequired is a middleware that checks if the user is authenticated as an admin
 func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -75,48 +37,9 @@ func AdminRequired() gin.HandlerFunc {
 	}
 }
 
-// AuthOptional is a middleware that checks if the user is authenticated and if so stores
-// auth data in the context
-func AuthOptional() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		authHeaders := strings.Split(header, " ")
-		if len(authHeaders) == 2 {
-			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				auth.SetAuthStateForCtx(c, persist.DBID(authHeaders[1]), nil)
-				c.Next()
-				return
-			}
-		}
-		jwt, err := c.Cookie(auth.JWTCookieKey)
-		if err != nil {
-			if err == http.ErrNoCookie {
-				auth.SetAuthStateForCtx(c, "", err)
-				c.Next()
-				return
-			}
-			c.AbortWithError(http.StatusUnauthorized, err)
-			return
-		}
-		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
-		auth.SetAuthStateForCtx(c, userID, err)
-		c.Next()
-	}
-}
-
 // AddAuthToContext is a middleware that validates auth data and stores the results in the context
 func AddAuthToContext() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		authHeaders := strings.Split(header, " ")
-		if len(authHeaders) == 2 {
-			if authHeaders[0] == viper.GetString("ADMIN_PASS") {
-				auth.SetAuthStateForCtx(c, persist.DBID(authHeaders[1]), nil)
-				c.Next()
-				return
-			}
-		}
-
 		jwt, err := c.Cookie(auth.JWTCookieKey)
 
 		// Treat empty cookies the same way we treat missing cookies, since setting a cookie to the empty
@@ -135,7 +58,18 @@ func AddAuthToContext() gin.HandlerFunc {
 			return
 		}
 
+		// See if the user's token is valid based on our current JWT secret
 		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
+
+		if err != nil {
+			// If the token wasn't valid, see if we're rotating an existing key out.
+			// If so, try validating the token with that key.
+			oldKey := viper.GetString("JWT_SECRET_ROTATING_OUT")
+			if strings.TrimSpace(oldKey) != "" {
+				userID, err = auth.JWTParse(jwt, oldKey)
+			}
+		}
+
 		auth.SetAuthStateForCtx(c, userID, err)
 
 		// If we have a successfully authenticated user, add their ID to all subsequent logging
