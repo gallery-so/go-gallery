@@ -2156,7 +2156,7 @@ with rollup as (
   group by e.gallery_id
 )
 select p.id from (
-	select u.id, row_number() over(order by sum(r.view_count) + coalesce(sum(v.view_count),0) desc, max(u.created_at) desc) as position
+	select u.id, row_number() over(order by sum(r.view_count) + max(coalesce(v.view_count,0)) desc, max(u.created_at) desc) as position
 	from rollup r, galleries g, users u
 	left join legacy_views v on u.id = v.user_id and v.deleted = false and v.created_at >= $1
 	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
