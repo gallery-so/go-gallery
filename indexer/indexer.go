@@ -846,6 +846,9 @@ func ownersPluginReceiver(cur ownerAtBlock, inc ownerAtBlock) ownerAtBlock {
 func previousOwnersPluginReceiver(cur *previousOwnersAtBlock, inc ownerAtBlock) *previousOwnersAtBlock {
 	var curPrev []ownerAtBlock
 	if cur == nil {
+		cur = &previousOwnersAtBlock{}
+		cur.owners = []ownerAtBlock{}
+	} else if cur.owners == nil {
 		cur.owners = []ownerAtBlock{}
 	}
 	curPrev = cur.owners
