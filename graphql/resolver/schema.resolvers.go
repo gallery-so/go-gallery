@@ -718,7 +718,7 @@ func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefr
 	}
 	return model.DeepRefreshPayload{
 		Chain:     &input.Chain,
-		Submitted: util.BoolToPointer(true),
+		Submitted: util.ToPointer(true),
 	}, nil
 }
 
