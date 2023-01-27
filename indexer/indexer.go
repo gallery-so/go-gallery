@@ -846,8 +846,11 @@ func ownersPluginReceiver(cur ownerAtBlock, inc ownerAtBlock) ownerAtBlock {
 func previousOwnersPluginReceiver(cur *previousOwnersAtBlock, inc ownerAtBlock) *previousOwnersAtBlock {
 	var curPrev []ownerAtBlock
 	if cur == nil {
-		cur = &previousOwnersAtBlock{}
-		cur.owners = []ownerAtBlock{}
+		cur = &previousOwnersAtBlock{
+			owners: []ownerAtBlock{},
+			ti:     inc.ti,
+			boi:    inc.boi,
+		}
 	} else if cur.owners == nil {
 		cur.owners = []ownerAtBlock{}
 	}
@@ -1159,10 +1162,10 @@ func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsT
 }
 
 func recoverAndWait(ctx context.Context) {
-	if err := recover(); err != nil {
-		logger.For(ctx).Errorf("Error in indexer: %v", err)
-		time.Sleep(time.Second * 10)
-	}
+	// if err := recover(); err != nil {
+	// 	logger.For(ctx).Errorf("Error in indexer: %v", err)
+	// 	time.Sleep(time.Second * 10)
+	// }
 }
 
 func logEthCallRPCError(entry *logrus.Entry, err error, message string) {

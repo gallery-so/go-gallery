@@ -304,7 +304,7 @@ func newPreviousOwnersPlugin(ctx context.Context) previousOwnersPlugin {
 	out := make(chan ownerAtBlock)
 
 	go func() {
-		span, _ := startSpan(ctx, "ownerPlugin", "handleBatch")
+		span, _ := startSpan(ctx, "previousOwnerPlugin", "handleBatch")
 		defer tracing.FinishSpan(span)
 		defer close(out)
 
@@ -313,13 +313,13 @@ func newPreviousOwnersPlugin(ctx context.Context) previousOwnersPlugin {
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
-				child := span.StartChild("plugin.ownerPlugin")
+				child := span.StartChild("plugin.previousOwnerPlugin")
 				child.Description = "handleMessage"
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
 					out <- ownerAtBlock{
 						ti:    msg.key,
-						owner: msg.transfer.To,
+						owner: msg.transfer.From,
 						boi: blockchainOrderInfo{
 							blockNumber: msg.transfer.BlockNumber,
 							txIndex:     msg.transfer.TxIndex,
