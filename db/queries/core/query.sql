@@ -2,7 +2,7 @@
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
 -- name: GetUserWithPIIByID :one
-select * from users_with_pii where id = @user_id and deleted = false;
+select * from pii.user_view where id = @user_id and deleted = false;
 
 -- name: GetUserByIdBatch :batchone
 SELECT * FROM users WHERE id = $1 AND deleted = false;
@@ -560,7 +560,7 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 
 -- for some reason this query will not allow me to use @tags for $1
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many
-select * from users_with_pii
+select * from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and (email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar = 'false' or email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
@@ -572,7 +572,7 @@ select * from users_with_pii
 
 -- name: GetUsersWithEmailNotificationsOn :many
 -- TODO: Does not appear to be used
-select * from users_with_pii
+select * from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
     and (created_at, id) < (@cur_before_time, @cur_before_id)
@@ -595,7 +595,7 @@ UPDATE users SET email_verified = $2 WHERE id = $1;
 
 -- name: UpdateUserEmail :exec
 with upsert_pii as (
-    insert into pii_for_users (user_id, pii_email_address) values (@user_id, @email_address)
+    insert into pii.for_users (user_id, pii_email_address) values (@user_id, @email_address)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
 ),
 
