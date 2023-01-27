@@ -868,7 +868,8 @@ func balancesPluginReceiver(cur *tokenBalancesAtBlock, balance tokenBalances) *t
 			boi:      balance.boi,
 			balances: make(map[persist.EthereumAddress]balanceAtBlock),
 		}
-
+	} else if cur.balances == nil {
+		cur.balances = make(map[persist.EthereumAddress]balanceAtBlock)
 	}
 	balanceMap := cur.balances
 	toBal := balanceMap[balance.to]
