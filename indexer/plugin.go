@@ -114,8 +114,8 @@ func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync
 
 			if out != nil {
 				processed := receiver(out[it.TokenIdentifiers()], it)
-				cur := out[processed.TokenIdentifiers()]
-				if cur.OrderInfo().Less(processed.OrderInfo()) {
+				cur, ok := out[processed.TokenIdentifiers()]
+				if !ok || cur.OrderInfo().Less(processed.OrderInfo()) {
 					out[processed.TokenIdentifiers()] = processed
 				}
 			} else {
