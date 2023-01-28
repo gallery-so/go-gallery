@@ -131,6 +131,21 @@ func (v *CreateCollectionInput) GetTokenSettings() []CollectionTokenSettingsInpu
 // GetCaption returns CreateCollectionInput.Caption, and is useful for accessing the field via an interface.
 func (v *CreateCollectionInput) GetCaption() *string { return v.Caption }
 
+type CreateGalleryInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Position    string  `json:"position"`
+}
+
+// GetName returns CreateGalleryInput.Name, and is useful for accessing the field via an interface.
+func (v *CreateGalleryInput) GetName() *string { return v.Name }
+
+// GetDescription returns CreateGalleryInput.Description, and is useful for accessing the field via an interface.
+func (v *CreateGalleryInput) GetDescription() *string { return v.Description }
+
+// GetPosition returns CreateGalleryInput.Position, and is useful for accessing the field via an interface.
+func (v *CreateGalleryInput) GetPosition() string { return v.Position }
+
 type CreateUserInput struct {
 	Username           string  `json:"username"`
 	Bio                *string `json:"bio"`
@@ -206,6 +221,19 @@ type MagicLinkAuth struct {
 // GetToken returns MagicLinkAuth.Token, and is useful for accessing the field via an interface.
 func (v *MagicLinkAuth) GetToken() string { return v.Token }
 
+type MoveCollectionToGalleryInput struct {
+	SourceCollectionId persist.DBID `json:"sourceCollectionId"`
+	TargetGalleryId    persist.DBID `json:"targetGalleryId"`
+}
+
+// GetSourceCollectionId returns MoveCollectionToGalleryInput.SourceCollectionId, and is useful for accessing the field via an interface.
+func (v *MoveCollectionToGalleryInput) GetSourceCollectionId() persist.DBID {
+	return v.SourceCollectionId
+}
+
+// GetTargetGalleryId returns MoveCollectionToGalleryInput.TargetGalleryId, and is useful for accessing the field via an interface.
+func (v *MoveCollectionToGalleryInput) GetTargetGalleryId() persist.DBID { return v.TargetGalleryId }
+
 type ReportWindow string
 
 const (
@@ -219,6 +247,23 @@ type TrendingUsersInput struct {
 
 // GetReport returns TrendingUsersInput.Report, and is useful for accessing the field via an interface.
 func (v *TrendingUsersInput) GetReport() ReportWindow { return v.Report }
+
+type UpdateUserExperienceInput struct {
+	ExperienceType UserExperienceType `json:"experienceType"`
+	Experienced    bool               `json:"experienced"`
+}
+
+// GetExperienceType returns UpdateUserExperienceInput.ExperienceType, and is useful for accessing the field via an interface.
+func (v *UpdateUserExperienceInput) GetExperienceType() UserExperienceType { return v.ExperienceType }
+
+// GetExperienced returns UpdateUserExperienceInput.Experienced, and is useful for accessing the field via an interface.
+func (v *UpdateUserExperienceInput) GetExperienced() bool { return v.Experienced }
+
+type UserExperienceType string
+
+const (
+	UserExperienceTypeMultigalleryannouncement UserExperienceType = "MultiGalleryAnnouncement"
+)
 
 // __addUserWalletMutationInput is used internally by genqlient
 type __addUserWalletMutationInput struct {
@@ -260,6 +305,14 @@ type __createCollectionMutationInput struct {
 // GetInput returns __createCollectionMutationInput.Input, and is useful for accessing the field via an interface.
 func (v *__createCollectionMutationInput) GetInput() CreateCollectionInput { return v.Input }
 
+// __createGalleryMutationInput is used internally by genqlient
+type __createGalleryMutationInput struct {
+	Input CreateGalleryInput `json:"input"`
+}
+
+// GetInput returns __createGalleryMutationInput.Input, and is useful for accessing the field via an interface.
+func (v *__createGalleryMutationInput) GetInput() CreateGalleryInput { return v.Input }
+
 // __createUserMutationInput is used internally by genqlient
 type __createUserMutationInput struct {
 	AuthMechanism AuthMechanism   `json:"authMechanism"`
@@ -296,6 +349,14 @@ type __loginMutationInput struct {
 // GetAuthMechanism returns __loginMutationInput.AuthMechanism, and is useful for accessing the field via an interface.
 func (v *__loginMutationInput) GetAuthMechanism() AuthMechanism { return v.AuthMechanism }
 
+// __moveCollectionToGalleryInput is used internally by genqlient
+type __moveCollectionToGalleryInput struct {
+	Input MoveCollectionToGalleryInput `json:"input"`
+}
+
+// GetInput returns __moveCollectionToGalleryInput.Input, and is useful for accessing the field via an interface.
+func (v *__moveCollectionToGalleryInput) GetInput() MoveCollectionToGalleryInput { return v.Input }
+
 // __removeUserWalletsMutationInput is used internally by genqlient
 type __removeUserWalletsMutationInput struct {
 	WalletIds []persist.DBID `json:"walletIds"`
@@ -327,6 +388,14 @@ type __trendingUsersQueryInput struct {
 
 // GetInput returns __trendingUsersQueryInput.Input, and is useful for accessing the field via an interface.
 func (v *__trendingUsersQueryInput) GetInput() TrendingUsersInput { return v.Input }
+
+// __updateUserExperienceInput is used internally by genqlient
+type __updateUserExperienceInput struct {
+	Input UpdateUserExperienceInput `json:"input"`
+}
+
+// GetInput returns __updateUserExperienceInput.Input, and is useful for accessing the field via an interface.
+func (v *__updateUserExperienceInput) GetInput() UpdateUserExperienceInput { return v.Input }
 
 // __userByAddressQueryInput is used internally by genqlient
 type __userByAddressQueryInput struct {
@@ -1458,6 +1527,237 @@ func (v *createCollectionMutationResponse) __premarshalJSON() (*__premarshalcrea
 	return &retval, nil
 }
 
+// createGalleryMutationCreateGalleryCreateGalleryPayload includes the requested fields of the GraphQL type CreateGalleryPayload.
+type createGalleryMutationCreateGalleryCreateGalleryPayload struct {
+	Typename *string                                                        `json:"__typename"`
+	Gallery  *createGalleryMutationCreateGalleryCreateGalleryPayloadGallery `json:"gallery"`
+}
+
+// GetTypename returns createGalleryMutationCreateGalleryCreateGalleryPayload.Typename, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryCreateGalleryPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetGallery returns createGalleryMutationCreateGalleryCreateGalleryPayload.Gallery, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryCreateGalleryPayload) GetGallery() *createGalleryMutationCreateGalleryCreateGalleryPayloadGallery {
+	return v.Gallery
+}
+
+// createGalleryMutationCreateGalleryCreateGalleryPayloadGallery includes the requested fields of the GraphQL type Gallery.
+type createGalleryMutationCreateGalleryCreateGalleryPayloadGallery struct {
+	Dbid        persist.DBID `json:"dbid"`
+	Name        *string      `json:"name"`
+	Description *string      `json:"description"`
+	Position    *string      `json:"position"`
+}
+
+// GetDbid returns createGalleryMutationCreateGalleryCreateGalleryPayloadGallery.Dbid, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryCreateGalleryPayloadGallery) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetName returns createGalleryMutationCreateGalleryCreateGalleryPayloadGallery.Name, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryCreateGalleryPayloadGallery) GetName() *string {
+	return v.Name
+}
+
+// GetDescription returns createGalleryMutationCreateGalleryCreateGalleryPayloadGallery.Description, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryCreateGalleryPayloadGallery) GetDescription() *string {
+	return v.Description
+}
+
+// GetPosition returns createGalleryMutationCreateGalleryCreateGalleryPayloadGallery.Position, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryCreateGalleryPayloadGallery) GetPosition() *string {
+	return v.Position
+}
+
+// createGalleryMutationCreateGalleryCreateGalleryPayloadOrError includes the requested fields of the GraphQL interface CreateGalleryPayloadOrError.
+//
+// createGalleryMutationCreateGalleryCreateGalleryPayloadOrError is implemented by the following types:
+// createGalleryMutationCreateGalleryCreateGalleryPayload
+// createGalleryMutationCreateGalleryErrInvalidInput
+// createGalleryMutationCreateGalleryErrNotAuthorized
+type createGalleryMutationCreateGalleryCreateGalleryPayloadOrError interface {
+	implementsGraphQLInterfacecreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *createGalleryMutationCreateGalleryCreateGalleryPayload) implementsGraphQLInterfacecreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError() {
+}
+func (v *createGalleryMutationCreateGalleryErrInvalidInput) implementsGraphQLInterfacecreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError() {
+}
+func (v *createGalleryMutationCreateGalleryErrNotAuthorized) implementsGraphQLInterfacecreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError() {
+}
+
+func __unmarshalcreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError(b []byte, v *createGalleryMutationCreateGalleryCreateGalleryPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "CreateGalleryPayload":
+		*v = new(createGalleryMutationCreateGalleryCreateGalleryPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(createGalleryMutationCreateGalleryErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(createGalleryMutationCreateGalleryErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing CreateGalleryPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for createGalleryMutationCreateGalleryCreateGalleryPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalcreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError(v *createGalleryMutationCreateGalleryCreateGalleryPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *createGalleryMutationCreateGalleryCreateGalleryPayload:
+		typename = "CreateGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*createGalleryMutationCreateGalleryCreateGalleryPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *createGalleryMutationCreateGalleryErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*createGalleryMutationCreateGalleryErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *createGalleryMutationCreateGalleryErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*createGalleryMutationCreateGalleryErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for createGalleryMutationCreateGalleryCreateGalleryPayloadOrError: "%T"`, v)
+	}
+}
+
+// createGalleryMutationCreateGalleryErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type createGalleryMutationCreateGalleryErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns createGalleryMutationCreateGalleryErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// GetMessage returns createGalleryMutationCreateGalleryErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryErrInvalidInput) GetMessage() string { return v.Message }
+
+// createGalleryMutationCreateGalleryErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type createGalleryMutationCreateGalleryErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns createGalleryMutationCreateGalleryErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// GetMessage returns createGalleryMutationCreateGalleryErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationCreateGalleryErrNotAuthorized) GetMessage() string { return v.Message }
+
+// createGalleryMutationResponse is returned by createGalleryMutation on success.
+type createGalleryMutationResponse struct {
+	CreateGallery *createGalleryMutationCreateGalleryCreateGalleryPayloadOrError `json:"-"`
+}
+
+// GetCreateGallery returns createGalleryMutationResponse.CreateGallery, and is useful for accessing the field via an interface.
+func (v *createGalleryMutationResponse) GetCreateGallery() *createGalleryMutationCreateGalleryCreateGalleryPayloadOrError {
+	return v.CreateGallery
+}
+
+func (v *createGalleryMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*createGalleryMutationResponse
+		CreateGallery json.RawMessage `json:"createGallery"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.createGalleryMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.CreateGallery
+		src := firstPass.CreateGallery
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(createGalleryMutationCreateGalleryCreateGalleryPayloadOrError)
+			err = __unmarshalcreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal createGalleryMutationResponse.CreateGallery: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalcreateGalleryMutationResponse struct {
+	CreateGallery json.RawMessage `json:"createGallery"`
+}
+
+func (v *createGalleryMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *createGalleryMutationResponse) __premarshalJSON() (*__premarshalcreateGalleryMutationResponse, error) {
+	var retval __premarshalcreateGalleryMutationResponse
+
+	{
+
+		dst := &retval.CreateGallery
+		src := v.CreateGallery
+		if src != nil {
+			var err error
+			*dst, err = __marshalcreateGalleryMutationCreateGalleryCreateGalleryPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal createGalleryMutationResponse.CreateGallery: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 // createUserMutationCreateUserCreateUserPayload includes the requested fields of the GraphQL type CreateUserPayload.
 type createUserMutationCreateUserCreateUserPayload struct {
 	Typename *string                                              `json:"__typename"`
@@ -2498,6 +2798,275 @@ type logoutMutationResponse struct {
 // GetLogout returns logoutMutationResponse.Logout, and is useful for accessing the field via an interface.
 func (v *logoutMutationResponse) GetLogout() *logoutMutationLogoutLogoutPayload { return v.Logout }
 
+// moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized) GetMessage() string {
+	return v.Message
+}
+
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload includes the requested fields of the GraphQL type MoveCollectionToGalleryPayload.
+type moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload struct {
+	Typename   *string                                                                                 `json:"__typename"`
+	OldGallery *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery `json:"oldGallery"`
+	NewGallery *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery `json:"newGallery"`
+}
+
+// GetTypename returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload.Typename, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetOldGallery returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload.OldGallery, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload) GetOldGallery() *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery {
+	return v.OldGallery
+}
+
+// GetNewGallery returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload.NewGallery, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload) GetNewGallery() *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery {
+	return v.NewGallery
+}
+
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery includes the requested fields of the GraphQL type Gallery.
+type moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery struct {
+	Dbid        persist.DBID                                                                                                   `json:"dbid"`
+	Collections []*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGalleryCollectionsCollection `json:"collections"`
+}
+
+// GetDbid returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery.Dbid, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetCollections returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery.Collections, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGallery) GetCollections() []*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGalleryCollectionsCollection {
+	return v.Collections
+}
+
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGalleryCollectionsCollection includes the requested fields of the GraphQL type Collection.
+type moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGalleryCollectionsCollection struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGalleryCollectionsCollection.Dbid, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadNewGalleryCollectionsCollection) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery includes the requested fields of the GraphQL type Gallery.
+type moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery struct {
+	Dbid        persist.DBID                                                                                                   `json:"dbid"`
+	Collections []*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGalleryCollectionsCollection `json:"collections"`
+}
+
+// GetDbid returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery.Dbid, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetCollections returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery.Collections, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGallery) GetCollections() []*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGalleryCollectionsCollection {
+	return v.Collections
+}
+
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGalleryCollectionsCollection includes the requested fields of the GraphQL type Collection.
+type moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGalleryCollectionsCollection struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGalleryCollectionsCollection.Dbid, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOldGalleryCollectionsCollection) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError includes the requested fields of the GraphQL interface MoveCollectionToGalleryPayloadOrError.
+//
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError is implemented by the following types:
+// moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload
+// moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput
+// moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized
+type moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError interface {
+	implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload) implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError() {
+}
+func (v *moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput) implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError() {
+}
+func (v *moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized) implementsGraphQLInterfacemoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError() {
+}
+
+func __unmarshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError(b []byte, v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "MoveCollectionToGalleryPayload":
+		*v = new(moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing MoveCollectionToGalleryPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError(v *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload:
+		typename = "MoveCollectionToGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*moveCollectionToGalleryMoveCollectionToGalleryErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*moveCollectionToGalleryMoveCollectionToGalleryErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError: "%T"`, v)
+	}
+}
+
+// moveCollectionToGalleryResponse is returned by moveCollectionToGallery on success.
+type moveCollectionToGalleryResponse struct {
+	MoveCollectionToGallery *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError `json:"-"`
+}
+
+// GetMoveCollectionToGallery returns moveCollectionToGalleryResponse.MoveCollectionToGallery, and is useful for accessing the field via an interface.
+func (v *moveCollectionToGalleryResponse) GetMoveCollectionToGallery() *moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError {
+	return v.MoveCollectionToGallery
+}
+
+func (v *moveCollectionToGalleryResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*moveCollectionToGalleryResponse
+		MoveCollectionToGallery json.RawMessage `json:"moveCollectionToGallery"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.moveCollectionToGalleryResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.MoveCollectionToGallery
+		src := firstPass.MoveCollectionToGallery
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError)
+			err = __unmarshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal moveCollectionToGalleryResponse.MoveCollectionToGallery: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalmoveCollectionToGalleryResponse struct {
+	MoveCollectionToGallery json.RawMessage `json:"moveCollectionToGallery"`
+}
+
+func (v *moveCollectionToGalleryResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *moveCollectionToGalleryResponse) __premarshalJSON() (*__premarshalmoveCollectionToGalleryResponse, error) {
+	var retval __premarshalmoveCollectionToGalleryResponse
+
+	{
+
+		dst := &retval.MoveCollectionToGallery
+		src := v.MoveCollectionToGallery
+		if src != nil {
+			var err error
+			*dst, err = __marshalmoveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal moveCollectionToGalleryResponse.MoveCollectionToGallery: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
 // removeUserWalletsMutationRemoveUserWalletsErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
 type removeUserWalletsMutationRemoveUserWalletsErrInvalidInput struct {
 	Typename *string `json:"__typename"`
@@ -3396,6 +3965,243 @@ func (v *trendingUsersQueryTrendingUsersTrendingUsersPayloadUsersGalleryUser) Ge
 	return v.Dbid
 }
 
+// updateUserExperienceResponse is returned by updateUserExperience on success.
+type updateUserExperienceResponse struct {
+	UpdateUserExperience *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError `json:"-"`
+}
+
+// GetUpdateUserExperience returns updateUserExperienceResponse.UpdateUserExperience, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceResponse) GetUpdateUserExperience() *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError {
+	return v.UpdateUserExperience
+}
+
+func (v *updateUserExperienceResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*updateUserExperienceResponse
+		UpdateUserExperience json.RawMessage `json:"updateUserExperience"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.updateUserExperienceResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.UpdateUserExperience
+		src := firstPass.UpdateUserExperience
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError)
+			err = __unmarshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalupdateUserExperienceResponse struct {
+	UpdateUserExperience json.RawMessage `json:"updateUserExperience"`
+}
+
+func (v *updateUserExperienceResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *updateUserExperienceResponse) __premarshalJSON() (*__premarshalupdateUserExperienceResponse, error) {
+	var retval __premarshalupdateUserExperienceResponse
+
+	{
+
+		dst := &retval.UpdateUserExperience
+		src := v.UpdateUserExperience
+		if src != nil {
+			var err error
+			*dst, err = __marshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal updateUserExperienceResponse.UpdateUserExperience: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// updateUserExperienceUpdateUserExperienceErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type updateUserExperienceUpdateUserExperienceErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns updateUserExperienceUpdateUserExperienceErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns updateUserExperienceUpdateUserExperienceErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// updateUserExperienceUpdateUserExperienceErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type updateUserExperienceUpdateUserExperienceErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns updateUserExperienceUpdateUserExperienceErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrNotAuthorized) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns updateUserExperienceUpdateUserExperienceErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceErrNotAuthorized) GetMessage() string {
+	return v.Message
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload includes the requested fields of the GraphQL type UpdateUserExperiencePayload.
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload struct {
+	Typename *string                                                                    `json:"__typename"`
+	Viewer   *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer `json:"viewer"`
+}
+
+// GetTypename returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload.Typename, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetViewer returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload.Viewer, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) GetViewer() *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer {
+	return v.Viewer
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError includes the requested fields of the GraphQL interface UpdateUserExperiencePayloadOrError.
+//
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError is implemented by the following types:
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
+// updateUserExperienceUpdateUserExperienceErrInvalidInput
+// updateUserExperienceUpdateUserExperienceErrNotAuthorized
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError interface {
+	implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
+}
+func (v *updateUserExperienceUpdateUserExperienceErrInvalidInput) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
+}
+func (v *updateUserExperienceUpdateUserExperienceErrNotAuthorized) implementsGraphQLInterfaceupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError() {
+}
+
+func __unmarshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(b []byte, v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "UpdateUserExperiencePayload":
+		*v = new(updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(updateUserExperienceUpdateUserExperienceErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(updateUserExperienceUpdateUserExperienceErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing UpdateUserExperiencePayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalupdateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError(v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload:
+		typename = "UpdateUserExperiencePayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateUserExperienceUpdateUserExperienceErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateUserExperienceUpdateUserExperienceErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateUserExperienceUpdateUserExperienceErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateUserExperienceUpdateUserExperienceErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError: "%T"`, v)
+	}
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer includes the requested fields of the GraphQL type Viewer.
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer struct {
+	UserExperiences []updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience `json:"userExperiences"`
+}
+
+// GetUserExperiences returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer.UserExperiences, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewer) GetUserExperiences() []updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience {
+	return v.UserExperiences
+}
+
+// updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience includes the requested fields of the GraphQL type UserExperience.
+type updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience struct {
+	Type        UserExperienceType `json:"type"`
+	Experienced bool               `json:"experienced"`
+}
+
+// GetType returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience.Type, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience) GetType() UserExperienceType {
+	return v.Type
+}
+
+// GetExperienced returns updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience.Experienced, and is useful for accessing the field via an interface.
+func (v *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadViewerUserExperiencesUserExperience) GetExperienced() bool {
+	return v.Experienced
+}
+
 // userByAddressQueryResponse is returned by userByAddressQuery on success.
 type userByAddressQueryResponse struct {
 	UserByAddress *userByAddressQueryUserByAddressUserByAddressOrError `json:"-"`
@@ -4268,12 +5074,18 @@ func (v *viewerQueryResponse) __premarshalJSON() (*__premarshalviewerQueryRespon
 
 // viewerQueryViewer includes the requested fields of the GraphQL type Viewer.
 type viewerQueryViewer struct {
-	Typename *string                           `json:"__typename"`
-	User     *viewerQueryViewerUserGalleryUser `json:"user"`
+	Typename        *string                                          `json:"__typename"`
+	UserExperiences []viewerQueryViewerUserExperiencesUserExperience `json:"userExperiences"`
+	User            *viewerQueryViewerUserGalleryUser                `json:"user"`
 }
 
 // GetTypename returns viewerQueryViewer.Typename, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewer) GetTypename() *string { return v.Typename }
+
+// GetUserExperiences returns viewerQueryViewer.UserExperiences, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewer) GetUserExperiences() []viewerQueryViewerUserExperiencesUserExperience {
+	return v.UserExperiences
+}
 
 // GetUser returns viewerQueryViewer.User, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewer) GetUser() *viewerQueryViewerUserGalleryUser { return v.User }
@@ -4289,6 +5101,18 @@ func (v *viewerQueryViewerErrNotAuthorized) GetTypename() *string { return v.Typ
 
 // GetMessage returns viewerQueryViewerErrNotAuthorized.Message, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerErrNotAuthorized) GetMessage() string { return v.Message }
+
+// viewerQueryViewerUserExperiencesUserExperience includes the requested fields of the GraphQL type UserExperience.
+type viewerQueryViewerUserExperiencesUserExperience struct {
+	Type        UserExperienceType `json:"type"`
+	Experienced bool               `json:"experienced"`
+}
+
+// GetType returns viewerQueryViewerUserExperiencesUserExperience.Type, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserExperiencesUserExperience) GetType() UserExperienceType { return v.Type }
+
+// GetExperienced returns viewerQueryViewerUserExperiencesUserExperience.Experienced, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserExperiencesUserExperience) GetExperienced() bool { return v.Experienced }
 
 // viewerQueryViewerUserGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type viewerQueryViewerUserGalleryUser struct {
@@ -4556,6 +5380,50 @@ mutation createCollectionMutation ($input: CreateCollectionInput!) {
 	return &data, err
 }
 
+func createGalleryMutation(
+	ctx context.Context,
+	client graphql.Client,
+	input CreateGalleryInput,
+) (*createGalleryMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "createGalleryMutation",
+		Query: `
+mutation createGalleryMutation ($input: CreateGalleryInput!) {
+	createGallery(input: $input) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on CreateGalleryPayload {
+			gallery {
+				dbid
+				name
+				description
+				position
+			}
+		}
+	}
+}
+`,
+		Variables: &__createGalleryMutationInput{
+			Input: input,
+		},
+	}
+	var err error
+
+	var data createGalleryMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 func createUserMutation(
 	ctx context.Context,
 	client graphql.Client,
@@ -4766,6 +5634,56 @@ mutation logoutMutation {
 	return &data, err
 }
 
+func moveCollectionToGallery(
+	ctx context.Context,
+	client graphql.Client,
+	input MoveCollectionToGalleryInput,
+) (*moveCollectionToGalleryResponse, error) {
+	req := &graphql.Request{
+		OpName: "moveCollectionToGallery",
+		Query: `
+mutation moveCollectionToGallery ($input: MoveCollectionToGalleryInput!) {
+	moveCollectionToGallery(input: $input) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on MoveCollectionToGalleryPayload {
+			oldGallery {
+				dbid
+				collections {
+					dbid
+				}
+			}
+			newGallery {
+				dbid
+				collections {
+					dbid
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__moveCollectionToGalleryInput{
+			Input: input,
+		},
+	}
+	var err error
+
+	var data moveCollectionToGalleryResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 func removeUserWalletsMutation(
 	ctx context.Context,
 	client graphql.Client,
@@ -4931,6 +5849,50 @@ query trendingUsersQuery ($input: TrendingUsersInput!) {
 	var err error
 
 	var data trendingUsersQueryResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+func updateUserExperience(
+	ctx context.Context,
+	client graphql.Client,
+	input UpdateUserExperienceInput,
+) (*updateUserExperienceResponse, error) {
+	req := &graphql.Request{
+		OpName: "updateUserExperience",
+		Query: `
+mutation updateUserExperience ($input: UpdateUserExperienceInput!) {
+	updateUserExperience(input: $input) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on UpdateUserExperiencePayload {
+			viewer {
+				userExperiences {
+					type
+					experienced
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__updateUserExperienceInput{
+			Input: input,
+		},
+	}
+	var err error
+
+	var data updateUserExperienceResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(
@@ -5118,6 +6080,10 @@ query viewerQuery {
 			message
 		}
 		... on Viewer {
+			userExperiences {
+				type
+				experienced
+			}
 			user {
 				username
 				dbid

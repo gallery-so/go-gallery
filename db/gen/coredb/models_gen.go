@@ -342,6 +342,7 @@ type User struct {
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
+	UserExperiences      pgtype.JSONB
 }
 
 type UserEvent struct {
