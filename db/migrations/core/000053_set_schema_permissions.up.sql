@@ -31,13 +31,10 @@ grant access_ro_pii to postgres;
 grant access_rw_pii to postgres;
 
 --------------------------------------------------------------------------------------
--- access_ro: has read-only access to all current and future objects in public schema
+-- access_ro: has read-only access to the public schema
 --------------------------------------------------------------------------------------
--- Grant read-only privileges for all current objects in the public schema
+-- Grant usage on the public schema
 grant usage on schema public to access_ro;
-grant select on all tables in schema public to access_ro;
-grant usage on all sequences in schema public to access_ro;
-grant execute on all functions in schema public to access_ro;
 
 -- Grant read-only privileges for all future objects created by access_rw in the public schema
 alter default privileges for role access_rw in schema public grant select on tables to access_ro;
@@ -45,25 +42,18 @@ alter default privileges for role access_rw in schema public grant usage on sequ
 alter default privileges for role access_rw in schema public grant execute on functions to access_ro;
 
 --------------------------------------------------------------------------------------
--- access_ro_pii: has read-only access to all current and future objects in both the
---                public schema and pii schema
+-- access_ro_pii: has read-only access to objects in both the public and pii schemas
 --------------------------------------------------------------------------------------
--- Grant read-only privileges for all current objects in the public schema
+-- Grant usage on the public schema
 grant usage on schema public to access_ro_pii;
-grant select on all tables in schema public to access_ro_pii;
-grant usage on all sequences in schema public to access_ro_pii;
-grant execute on all functions in schema public to access_ro_pii;
 
 -- Grant read-only privileges for all future objects created by access_rw in the public schema
 alter default privileges for role access_rw in schema public grant select on tables to access_ro_pii;
 alter default privileges for role access_rw in schema public grant usage on sequences to access_ro_pii;
 alter default privileges for role access_rw in schema public grant execute on functions to access_ro_pii;
 
--- Grant read-only privileges for all current objects in the pii schema
+-- Grant usage on the pii schema
 grant usage on schema pii to access_ro_pii;
-grant select on all tables in schema pii to access_ro_pii;
-grant usage on all sequences in schema pii to access_ro_pii;
-grant execute on all functions in schema pii to access_ro_pii;
 
 -- Grant read-only privileges for all future objects created by access_rw_pii in the pii schema
 alter default privileges for role access_rw_pii in schema pii grant select on tables to access_ro_pii;
@@ -73,11 +63,8 @@ alter default privileges for role access_rw_pii in schema pii grant execute on f
 --------------------------------------------------------------------------------------
 -- access_rw: has read/write access to all current and future objects in public schema
 --------------------------------------------------------------------------------------
--- Grant read/write privileges to access_rw for all current objects in the public schema
+-- Grant usage + create privileges on the public schema
 grant all on schema public to access_rw;
-grant all on all tables in schema public to access_rw;
-grant all on all sequences in schema public to access_rw;
-grant all on all functions in schema public to access_rw;
 
 -- Make sure access_rw owns the public schema
 alter schema public owner to access_rw;
@@ -89,24 +76,18 @@ alter schema public owner to access_rw;
 --                public schema and pii schema
 --------------------------------------------------------------------------------------
 
--- Grant read/write privileges to access_rw_pii for all current objects in the public schema,
--- but don't give it create permission (because access_rw should own all objects in the public
+-- Grant usage privileges to access_rw_pii for the public schema, but don't give
+-- it create permission (because access_rw should own all objects in the public
 -- schema, which means it should be the only role creating objects there)
 grant usage on schema public to access_rw_pii;
-grant all on all tables in schema public to access_rw_pii;
-grant all on all sequences in schema public to access_rw_pii;
-grant all on all functions in schema public to access_rw_pii;
 
 -- Grant read/write privileges for all future objects created by access_rw in the public schema
 alter default privileges for role access_rw in schema public grant all on tables to access_rw_pii;
 alter default privileges for role access_rw in schema public grant all on sequences to access_rw_pii;
 alter default privileges for role access_rw in schema public grant all on functions to access_rw_pii;
 
--- Grant read/write privileges to access_rw_pii for all current objects in the pii schema
+-- Grant usage + create privileges on the pii schema
 grant all on schema pii to access_rw_pii;
-grant all on all tables in schema pii to access_rw_pii;
-grant all on all sequences in schema pii to access_rw_pii;
-grant all on all functions in schema pii to access_rw_pii;
 
 -- Make sure access_rw_pii owns the pii schema
 alter schema pii owner to access_rw_pii;
