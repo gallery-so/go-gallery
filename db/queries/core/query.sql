@@ -367,8 +367,8 @@ SELECT * FROM feed_events WHERE owner_id = sqlc.arg('owner_id') AND deleted = fa
 
 -- name: PaginateTrendingFeed :many
 select f.* from feed_events f join unnest(@feed_event_ids::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
-  and t.pos < @cur_before_pos::int
-  and t.pos > @cur_after_pos::int
+  and t.pos > @cur_before_pos::int
+  and t.pos < @cur_after_pos::int
   order by case when @paging_forward::bool then t.pos end asc,
           case when not @paging_forward::bool then t.pos end desc
   limit sqlc.arg('limit');
@@ -724,7 +724,6 @@ select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id
 -- name: GetTrendingFeedEventIDs :many
 select feed_event_id from events where action in ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and created_at >= @window_end and feed_event_id is not null
 group by feed_event_id order by count(*) desc, max(created_at) desc limit sqlc.arg('limit');
-
 
 -- name: UpdateCollectionGallery :exec
 update collections set gallery_id = @gallery_id, last_updated = now() where id = @id and deleted = false;

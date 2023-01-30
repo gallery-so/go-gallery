@@ -383,7 +383,11 @@ func testTrendingFeedEvents(t *testing.T) {
 	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "a")
 	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "b")
 	admireFeedEvent(t, ctx, c, userF.feedEventIDs[2])
-	expected := []persist.DBID{userF.feedEventIDs[1], userF.feedEventIDs[0], userF.feedEventIDs[2]}
+	expected := []persist.DBID{
+		userF.feedEventIDs[2],
+		userF.feedEventIDs[0],
+		userF.feedEventIDs[1],
+	}
 
 	actual := trendingFeedEvents(t, ctx, c, 10)
 

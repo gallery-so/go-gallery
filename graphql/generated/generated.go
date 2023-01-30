@@ -7097,11 +7097,14 @@ input MoveCollectionToGalleryInput {
 }
 
 type MoveCollectionToGalleryPayload {
-  oldGallery: Gallery,
+  oldGallery: Gallery
   newGallery: Gallery
 }
 
-union MoveCollectionToGalleryPayloadOrError = MoveCollectionToGalleryPayload | ErrInvalidInput | ErrNotAuthorized
+union MoveCollectionToGalleryPayloadOrError =
+    MoveCollectionToGalleryPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -7204,7 +7207,9 @@ type Mutation {
   updateUserExperience(input: UpdateUserExperienceInput!): UpdateUserExperiencePayloadOrError
     @authRequired
 
-  moveCollectionToGallery(input: MoveCollectionToGalleryInput): MoveCollectionToGalleryPayloadOrError  @authRequired
+  moveCollectionToGallery(
+    input: MoveCollectionToGalleryInput
+  ): MoveCollectionToGalleryPayloadOrError @authRequired
 }
 
 type Subscription {
