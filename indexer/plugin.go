@@ -97,34 +97,34 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 
 // RunPluginReceiver runs a plugin receiver and will update the out map with the results of the receiver, ensuring that the most recent data is kept.
 // If the incoming channel is nil, the function will return immediately.
-func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync.WaitGroup, receiver PluginReceiver[T, V], incoming <-chan T, out map[persist.EthereumTokenIdentifiers]V) {
+func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync.WaitGroup, mu *sync.Mutex, receiver PluginReceiver[T, V], incoming <-chan T, out map[persist.EthereumTokenIdentifiers]V) {
 	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "runPluginReceiver")
 	defer tracing.FinishSpan(span)
 
 	if incoming == nil {
 		return
 	}
+
+	if out == nil {
+		panic("out map must not be nil")
+	}
+
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
 
 		for it := range incoming {
-
-			if out != nil {
+			func() {
 				processed := receiver(out[it.TokenIdentifiers()], it)
 				cur, ok := out[processed.TokenIdentifiers()]
 				if !ok || cur.OrderInfo().Less(processed.OrderInfo()) {
+					mu.Lock()
+					defer mu.Unlock()
 					out[processed.TokenIdentifiers()] = processed
 				}
-			} else {
-				out = make(map[persist.EthereumTokenIdentifiers]V)
-				cur := receiver(out[it.TokenIdentifiers()], it)
-				out[cur.TokenIdentifiers()] = cur
-			}
-
+			}()
 		}
-
 	}()
 
 }

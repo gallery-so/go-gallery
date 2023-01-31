@@ -795,13 +795,13 @@ func (i *indexer) processTokens(ctx context.Context,
 	wg := &sync.WaitGroup{}
 
 	// we won't be storing any results of this plugin
-	RunPluginReceiver(ctx, wg, refreshesPluginReceiver(ctx), refreshes, nil)
+	RunPluginReceiver(ctx, wg, &sync.Mutex{}, refreshesPluginReceiver(ctx), refreshes, map[persist.EthereumTokenIdentifiers]errForTokenAtBlockAndIndex{})
 
 	// run the receivers in parallel and return one result from each channel for a total of totalRunningPlugins (5)
-	RunPluginReceiver(ctx, wg, urisPluginReceiver, uris, urisMap)
-	RunPluginReceiver(ctx, wg, balancesPluginReceiver, balances, balancesMap)
-	RunPluginReceiver(ctx, wg, ownersPluginReceiver, owners, ownersMap)
-	RunPluginReceiver(ctx, wg, previousOwnersPluginReceiver, previousOwners, previousOwnersMap)
+	RunPluginReceiver(ctx, wg, &sync.Mutex{}, urisPluginReceiver, uris, urisMap)
+	RunPluginReceiver(ctx, wg, &sync.Mutex{}, balancesPluginReceiver, balances, balancesMap)
+	RunPluginReceiver(ctx, wg, &sync.Mutex{}, ownersPluginReceiver, owners, ownersMap)
+	RunPluginReceiver(ctx, wg, &sync.Mutex{}, previousOwnersPluginReceiver, previousOwners, previousOwnersMap)
 
 	wg.Wait()
 
