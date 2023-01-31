@@ -53,7 +53,6 @@ func (a *API) GetAuthedUserFromCode(ctx context.Context, userID persist.DBID, au
 	if err != nil {
 		return persist.SocialUserIdentifers{}, err
 	}
-	logger.For(ctx).Debugf("got access token: %+v", accessToken)
 
 	return a.getAuthedUser(ctx, accessToken.AccessToken)
 }

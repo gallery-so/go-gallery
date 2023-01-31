@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/spf13/viper"
@@ -350,8 +349,6 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 	if err != nil {
 		return err
 	}
-
-	logger.For(ctx).Debugf("inserting external socials: %s", string(insert.Bytes))
 
 	err = api.queries.AddExternalSocialToUser(ctx, db.AddExternalSocialToUserParams{
 		UserID:          userID,
