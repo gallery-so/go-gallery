@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"sort"
 	"strconv"
@@ -747,13 +746,9 @@ func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, f
 		}
 	}
 
-	curBlock, err := ethClient.BlockNumber(ctx)
-	if err != nil {
-		return tokenBalances{}, err
-	}
 	// MaxUint because there is no txIndex, this is simply the most up to date balance on the blockchain so it should always be ahead of any other information at this block
 	// CurBlock becuase the RPC functions return the current balance, not the balance of the block being processed
-	bal := tokenBalances{key, blockchainOrderInfo{blockNumber: persist.BlockNumber(curBlock), txIndex: math.MaxUint}, from, to, fromBalance, toBalance}
+	bal := tokenBalances{key, blockchainOrderInfo{blockNumber: blockNumber}, from, to, fromBalance, toBalance}
 	return bal, nil
 }
 
