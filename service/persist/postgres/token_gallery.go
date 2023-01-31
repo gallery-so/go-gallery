@@ -419,14 +419,12 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		// Defer error checking until now to keep the code above from being
 		// littered with multiline "if" statements
 		if len(errors) > 0 {
-			panic(err)
 			return time.Time{}, nil, errors[0]
 		}
 	}
 
 	upserted, err := t.queries.UpsertTokens(pCtx, params)
 	if err != nil {
-		panic(err)
 		return time.Time{}, nil, err
 	}
 

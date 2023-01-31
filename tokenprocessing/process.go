@@ -158,8 +158,6 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		return nil
 	}
 
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
-	totalUpdateTime := time.Now()
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
 		Media:       newMedia,
 		Metadata:    t.TokenMetadata,
@@ -168,12 +166,15 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		Description: persist.NullString(description),
 		LastUpdated: persist.LastUpdatedTime{},
 	}
+	totalUpdateTime := time.Now()
+	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
 	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
 		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
 		return err
 	}
 
 	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
+
 	logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTime))
 	return nil
 }
