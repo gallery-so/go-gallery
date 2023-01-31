@@ -487,7 +487,9 @@ func ToNullString(s string) sql.NullString {
 }
 
 func ToPGJSONB[T any](v T) (pgtype.JSONB, error) {
-	var j pgtype.JSONB
-	err := j.Set(v)
-	return j, err
+	marshalled, err := json.Marshal(v)
+	if err != nil {
+		return pgtype.JSONB{}, err
+	}
+	return pgtype.JSONB{Bytes: marshalled, Status: pgtype.Present}, nil
 }

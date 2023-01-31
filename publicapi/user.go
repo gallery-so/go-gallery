@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/spf13/viper"
@@ -344,11 +345,13 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 	}
 
 	insert, err := util.ToPGJSONB(map[persist.SocialProvider]interface{}{
-		res.ID.Provider: res,
+		res.ID.Provider: res.ID,
 	})
 	if err != nil {
 		return err
 	}
+
+	logger.For(ctx).Debugf("inserting external socials: %s", string(insert.Bytes))
 
 	err = api.queries.UpdateUserExternalSocialIDs(ctx, db.UpdateUserExternalSocialIDsParams{
 		UserID:          userID,
@@ -724,7 +727,7 @@ func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*mo
 
 	asMap := map[persist.SocialProvider]persist.SocialUserIdentifers{}
 	if err := socials.AssignTo(&asMap); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to assign socials to map: %w", err)
 	}
 
 	result := &model.SocialAccounts{}
