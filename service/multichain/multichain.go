@@ -569,8 +569,8 @@ func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DB
 
 	for _, provider := range d.Chains[chain] {
 
-		if refresher, ok := provider.(walletHooker); ok {
-			if err := refresher.WalletCreated(ctx, userID, walletAddress, walletType, chain); err != nil {
+		if hooker, ok := provider.(walletHooker); ok {
+			if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType, chain); err != nil {
 				return err
 			}
 		}
