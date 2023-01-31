@@ -82,8 +82,8 @@ query globalFeedQuery($first: Int) {
   }
 }
 
-query trendingFeedQuery($first: Int) {
-  trendingFeed(first: $first) {
+query trendingFeedQuery($last: Int) {
+  trendingFeed(last: $last) {
     edges {
       node {
         ... on Error {
@@ -298,6 +298,46 @@ mutation updateUserExperience($input: UpdateUserExperienceInput!) {
           type
           experienced
         }
+      }
+    }
+  }
+}
+
+mutation moveCollectionToGallery($input: MoveCollectionToGalleryInput!) {
+  moveCollectionToGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on MoveCollectionToGalleryPayload {
+      oldGallery {
+        dbid
+        collections {
+          dbid
+        }
+      }
+      newGallery {
+        dbid
+        collections {
+          dbid
+        }
+      }
+    }
+  }
+}
+
+mutation createGalleryMutation($input: CreateGalleryInput!) {
+  createGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CreateGalleryPayload {
+      gallery {
+        dbid
+        name
+        description
+        position
       }
     }
   }
