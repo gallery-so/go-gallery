@@ -153,27 +153,27 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	}
 	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTimeOfMedia))
 
-	// Only update the token with refreshed fields if the new media is servable.
-	if newMedia.IsServable() {
-		logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
-		totalUpdateTime := time.Now()
-		up := persist.TokenUpdateAllURIDerivedFieldsInput{
-			Media:       newMedia,
-			Metadata:    t.TokenMetadata,
-			TokenURI:    t.TokenURI,
-			Name:        persist.NullString(name),
-			Description: persist.NullString(description),
-			LastUpdated: persist.LastUpdatedTime{},
-		}
-		if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
-			logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
-			return err
-		}
-		logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
-	} else {
-		logger.For(ctx).Infof("Media: %s was not servable!!!", newMedia)
+	// Don't replace existing usable media if tokenprocessing failed to get new media
+	if t.Media.IsServable() && !newMedia.IsServable() {
+		return nil
 	}
 
+	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
+	totalUpdateTime := time.Now()
+	up := persist.TokenUpdateAllURIDerivedFieldsInput{
+		Media:       newMedia,
+		Metadata:    t.TokenMetadata,
+		TokenURI:    t.TokenURI,
+		Name:        persist.NullString(name),
+		Description: persist.NullString(description),
+		LastUpdated: persist.LastUpdatedTime{},
+	}
+	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
+		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
+		return err
+	}
+
+	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
 	logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTime))
 	return nil
 }
