@@ -16,13 +16,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testUser = coredb.UsersWithPii{
+var testUser = coredb.PiiUserView{
 	Username:           sql.NullString{String: "test1", Valid: true},
 	UsernameIdempotent: sql.NullString{String: "test1", Valid: true},
 	PiiEmailAddress:    persist.Email("bc@gallery.so"),
 }
 
-var testUser2 = coredb.UsersWithPii{
+var testUser2 = coredb.PiiUserView{
 	Username:           sql.NullString{String: "test2", Valid: true},
 	UsernameIdempotent: sql.NullString{String: "test2", Valid: true},
 	PiiEmailAddress:    persist.Email("bcc@gallery.so"),

@@ -68,7 +68,7 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 }
 
 // GetUserWithPII returns the current user and their associated personally identifiable information
-func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.UsersWithPii, error) {
+func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.PiiUserView, error) {
 	// Nothing to validate
 
 	userID, err := getAuthenticatedUser(ctx)
