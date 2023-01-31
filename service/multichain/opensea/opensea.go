@@ -693,7 +693,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 						TokenMetadata:   metadata,
 						Media:           med,
 						Quantity:        "1",
-						IsSpam:          util.BoolToPointer(false), // OpenSea filters spam on their side
+						IsSpam:          util.ToPointer(false), // OpenSea filters spam on their side
 					}
 				})
 			}

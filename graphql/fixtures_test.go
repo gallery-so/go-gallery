@@ -230,21 +230,21 @@ func newUserWithFeedEventsFixture(t *testing.T) userWithFeedEventsFixture {
 		Tokens:        user.tokenIDs,
 		Layout:        defaultLayout(),
 		TokenSettings: defaultTokenSettings(user.tokenIDs),
-		Caption:       util.StringToPointer("this is a caption"),
+		Caption:       util.ToPointer("this is a caption"),
 	})
 	createCollection(t, ctx, c, CreateCollectionInput{
 		GalleryId:     user.galleryID,
 		Tokens:        user.tokenIDs,
 		Layout:        defaultLayout(),
 		TokenSettings: defaultTokenSettings(user.tokenIDs),
-		Caption:       util.StringToPointer("this is a caption"),
+		Caption:       util.ToPointer("this is a caption"),
 	})
 	createCollection(t, ctx, c, CreateCollectionInput{
 		GalleryId:     user.galleryID,
 		Tokens:        user.tokenIDs,
 		Layout:        defaultLayout(),
 		TokenSettings: defaultTokenSettings(user.tokenIDs),
-		Caption:       util.StringToPointer("this is a caption"),
+		Caption:       util.ToPointer("this is a caption"),
 	})
 	feedEvents := globalFeedEvents(t, ctx, c, 3)
 	require.Len(t, feedEvents, 3)

@@ -345,7 +345,7 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 	}
 }
 
-func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) gin.HandlerFunc {
+func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ValidateWalletNFTsInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -353,9 +353,10 @@ func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractReposi
 			return
 		}
 
-		output, err := validateNFTs(c, input, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg)
+		output, err := validateNFTs(c, input, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
 		}
 		c.JSON(http.StatusOK, output)
 
@@ -363,7 +364,7 @@ func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractReposi
 }
 
 // validateNFTs will validate the NFTs for the wallet passed in when being compared with opensea
-func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (ValidateUsersNFTsOutput, error) {
+func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) (ValidateUsersNFTsOutput, error) {
 
 	currentNFTs, _, err := tokenRepository.GetByWallet(c, input.Wallet, -1, 0)
 	if err != nil {
@@ -420,7 +421,7 @@ func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenReposit
 			allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
 		}
 
-		if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, input.Wallet, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg); err != nil {
+		if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, input.Wallet, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket); err != nil {
 			logger.For(c).WithError(err).Error("failed to process unaccounted for NFTs")
 			return ValidateUsersNFTsOutput{}, err
 		}
@@ -482,101 +483,20 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 	}
 	return msgToAdd, nil
 }
-func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, address persist.EthereumAddress, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) error {
-	allTokens := make([]persist.Token, 0, len(assets))
-	cntracts := make([]persist.Contract, 0, len(assets))
-	block, err := ethcl.BlockNumber(ctx)
-	if err != nil {
-		return err
+func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, address persist.EthereumAddress, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) error {
+	errChan := make(chan error)
+	wp := workerpool.New(10)
+	for _, asset := range assets {
+		a := asset
+		wp.Submit(func() {
+			errChan <- refreshTokenMedias(ctx, UpdateTokenInput{OwnerAddress: address, TokenID: persist.TokenID(a.TokenID.ToBase16()), ContractAddress: a.Contract.ContractAddress, UpdateAll: true}, tokenRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket)
+		})
 	}
-	for _, a := range assets {
-
-		logger.For(ctx).Debugf("processing asset: %+v", a)
-
-		asURI := persist.TokenURI(a.ImageURL)
-		media := persist.Media{}
-
-		bs, err := rpc.GetDataFromURI(ctx, asURI, ipfsClient, arweaveClient)
-		if err == nil {
-			mediaType, _ := persist.SniffMediaType(bs)
-			if mediaType != persist.MediaTypeUnknown {
-				media = persist.Media{
-					MediaURL:     persist.NullString(a.ImageURL),
-					ThumbnailURL: persist.NullString(a.ImagePreviewURL),
-					MediaType:    mediaType,
-				}
-			}
+	for i := 0; i < len(assets); i++ {
+		err := <-errChan
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("failed to refresh unaccounted token media")
 		}
-
-		logger.For(ctx).Debugf("media: %+v", media)
-
-		metadata, _ := rpc.GetMetadataFromURI(ctx, persist.TokenURI(a.TokenMetadataURL).ReplaceID(persist.TokenID(a.TokenID.ToBase16())), ipfsClient, arweaveClient)
-
-		logger.For(ctx).Debugf("metadata: %+v", metadata)
-		t := persist.Token{
-			Name:            persist.NullString(validate.SanitizationPolicy.Sanitize(a.Name)),
-			Description:     persist.NullString(validate.SanitizationPolicy.Sanitize(a.Description)),
-			Chain:           persist.ChainETH,
-			TokenID:         persist.TokenID(a.TokenID.ToBase16()),
-			ContractAddress: a.Contract.ContractAddress,
-			OwnerAddress:    a.Owner.Address,
-			TokenURI:        persist.TokenURI(a.TokenMetadataURL),
-			ExternalURL:     persist.NullString(a.ExternalURL),
-			TokenMetadata:   metadata,
-			Media:           media,
-			Quantity:        "1",
-			BlockNumber:     persist.BlockNumber(block),
-			OwnershipHistory: []persist.EthereumAddressAtBlock{
-				{
-					Address: persist.ZeroAddress,
-					Block:   persist.BlockNumber(block - 1),
-				},
-			},
-		}
-		switch a.Contract.ContractSchemaName {
-		case "ERC721", "CRYPTOPUNKS":
-			t.TokenType = persist.TokenTypeERC721
-			allTokens = append(allTokens, t)
-		case "ERC1155":
-			t.TokenType = persist.TokenTypeERC1155
-			ierc1155, err := contracts.NewIERC1155Caller(t.ContractAddress.Address(), ethcl)
-			if err != nil {
-				return err
-			}
-
-			new := t
-			bal, err := ierc1155.BalanceOf(&bind.CallOpts{Context: ctx}, address.Address(), t.TokenID.BigInt())
-			if err != nil {
-				return err
-			}
-			if bal.Cmp(bigZero) > 0 {
-				new.OwnerAddress = address
-				new.Quantity = persist.HexString(bal.Text(16))
-
-				allTokens = append(allTokens, new)
-			}
-
-		default:
-			return fmt.Errorf("unsupported token type: %s", a.Contract.ContractSchemaName)
-		}
-
-		c := persist.Contract{
-			Address:     a.Contract.ContractAddress,
-			Symbol:      a.Contract.ContractSymbol,
-			Name:        a.Contract.ContractName,
-			LatestBlock: persist.BlockNumber(block),
-		}
-		cntracts = append(cntracts, c)
-	}
-
-	if err := contractRepository.BulkUpsert(ctx, cntracts); err != nil {
-		return err
-	}
-
-	logger.For(ctx).Infof("found %d new tokens", len(allTokens))
-
-	if err := tokenRepository.BulkUpsert(ctx, allTokens); err != nil {
-		return err
 	}
 
 	return nil
@@ -652,7 +572,7 @@ func processRefreshes(idxr *indexer, storageClient *storage.Client) gin.HandlerF
 						close(transferCh)
 					}()
 					go idxr.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transferCh, enabledPlugins)
-					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.balances.out, nil)
+					idxr.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, nil)
 				}
 			})
 		}
@@ -898,6 +818,12 @@ func updateMetadataFieldsForToken(pCtx context.Context, tokenID persist.TokenID,
 
 func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractAddress, ownerAddress persist.EthereumAddress, ec *ethclient.Client, tokenRepo persist.TokenRepository) (t persist.Token, err error) {
 
+	var startingToken persist.Token
+	startingTokens, err := tokenRepo.GetByTokenIdentifiers(pCtx, tokenID, contractAddress, 1, 0)
+	if err == nil && len(startingTokens) > 0 {
+		startingToken = startingTokens[0]
+	}
+
 	if handler, ok := customManualIndex[persist.EthereumAddress(contractAddress.String())]; ok {
 		handledToken, err := handler(pCtx, tokenID, ownerAddress, ec)
 		if err != nil {
@@ -906,8 +832,9 @@ func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractA
 		t = handledToken
 	} else {
 
-		t.TokenID = tokenID
-		t.ContractAddress = contractAddress
+		startingToken.TokenID = tokenID
+		startingToken.ContractAddress = contractAddress
+		startingToken.OwnerAddress = ownerAddress
 
 		var e721 *contracts.IERC721Caller
 		var e1155 *contracts.IERC1155Caller
@@ -923,17 +850,19 @@ func manuallyIndexToken(pCtx context.Context, tokenID persist.TokenID, contractA
 		owner, err := e721.OwnerOf(&bind.CallOpts{Context: pCtx}, tokenID.BigInt())
 		isERC721 := err == nil
 		if isERC721 {
-			t.TokenType = persist.TokenTypeERC721
-			t.OwnerAddress = persist.EthereumAddress(owner.String())
+			startingToken.TokenType = persist.TokenTypeERC721
+			startingToken.OwnerAddress = persist.EthereumAddress(owner.String())
 		} else {
 			bal, err := e1155.BalanceOf(&bind.CallOpts{Context: pCtx}, ownerAddress.Address(), tokenID.BigInt())
 			if err != nil {
 				return persist.Token{}, fmt.Errorf("failed to get balance or owner for token %s-%s: %s", contractAddress, tokenID, err)
 			}
-			t.TokenType = persist.TokenTypeERC1155
-			t.Quantity = persist.HexString(bal.Text(16))
-			t.OwnerAddress = ownerAddress
+			startingToken.TokenType = persist.TokenTypeERC1155
+			startingToken.Quantity = persist.HexString(bal.Text(16))
+			startingToken.OwnerAddress = ownerAddress
 		}
+
+		t = startingToken
 	}
 	if err := tokenRepo.Upsert(pCtx, t); err != nil {
 		return persist.Token{}, fmt.Errorf("failed to upsert token %s-%s: %s", contractAddress, tokenID, err)

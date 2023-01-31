@@ -52,6 +52,10 @@ type DeepRefreshMessage struct {
 	RefreshRange    persist.BlockRange      `json:"refresh_range"`
 }
 
+type ValidateNFTsMessage struct {
+	OwnerAddress persist.EthereumAddress `json:"owner_address"`
+}
+
 func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeed")
 	defer tracing.FinishSpan(span)
@@ -188,6 +192,32 @@ func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, c
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
 				Url:        fmt.Sprintf("%s/tasks/refresh", viper.GetString("INDEXER_HOST")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
+func CreateTaskForWalletValidation(ctx context.Context, message ValidateNFTsMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletValidate")
+	defer tracing.FinishSpan(span)
+
+	queue := viper.GetString("GCLOUD_WALLET_VALIDATE_QUEUE")
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/nfts/validate", viper.GetString("INDEXER_HOST")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
