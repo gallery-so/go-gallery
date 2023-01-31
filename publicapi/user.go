@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/spf13/viper"
@@ -32,14 +33,15 @@ import (
 )
 
 type UserAPI struct {
-	repos         *postgres.Repositories
-	queries       *db.Queries
-	loaders       *dataloader.Loaders
-	validator     *validator.Validate
-	ethClient     *ethclient.Client
-	ipfsClient    *shell.Shell
-	arweaveClient *goar.Client
-	storageClient *storage.Client
+	repos              *postgres.Repositories
+	queries            *db.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	ipfsClient         *shell.Shell
+	arweaveClient      *goar.Client
+	storageClient      *storage.Client
+	multichainProvider *multichain.Provider
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -296,7 +298,7 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository)
+	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository, api.multichainProvider)
 	if err != nil {
 		return err
 	}
@@ -378,7 +380,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		galleryPos = first
 	}
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository)
+	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository, api.multichainProvider)
 	if err != nil {
 		return "", "", err
 	}

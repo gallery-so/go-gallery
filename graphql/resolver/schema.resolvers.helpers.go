@@ -54,7 +54,7 @@ var nodeFetcher = model.NodeFetcher{
 
 	OnCommunity: func(ctx context.Context, contractAddress string, chain string) (*model.Community, error) {
 		if parsed, err := strconv.Atoi(chain); err == nil {
-			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.BoolToPointer(false))
+			return resolveCommunityByContractAddress(ctx, persist.NewChainAddress(persist.Address(contractAddress), persist.Chain(parsed)), util.ToPointer(false))
 		} else {
 			return nil, err
 		}
@@ -1137,7 +1137,7 @@ func feedEventToModel(event *db.FeedEvent) (*model.FeedEvent, error) {
 
 	var captionVal *string
 	if caption != nil {
-		captionVal = util.StringToPointer(caption.(string))
+		captionVal = util.ToPointer(caption.(string))
 	}
 
 	return &model.FeedEvent{
@@ -1161,7 +1161,7 @@ func eventToUserFollowedUsersFeedEventData(event *db.FeedEvent) model.FeedEventD
 	for i, userID := range event.Data.UserFollowedIDs {
 		followed[i] = &model.FollowInfo{
 			User:         &model.GalleryUser{Dbid: userID}, // remaining fields handled by dedicated resolver
-			FollowedBack: util.BoolToPointer(event.Data.UserFollowedBack[i]),
+			FollowedBack: util.ToPointer(event.Data.UserFollowedBack[i]),
 		}
 	}
 
@@ -1183,7 +1183,7 @@ func eventToCollectorsNoteAddedToTokenFeedEventData(event *db.FeedEvent) model.F
 			TokenSettings: nil,                                                   // handled by dedicated resolver
 		},
 		Action:            &event.Action,
-		NewCollectorsNote: util.StringToPointer(event.Data.TokenNewCollectorsNote),
+		NewCollectorsNote: util.ToPointer(event.Data.TokenNewCollectorsNote),
 	}
 }
 
@@ -1206,7 +1206,7 @@ func eventToCollectorsNoteAddedToCollectionFeedEventData(event *db.FeedEvent) mo
 		Owner:             &model.GalleryUser{Dbid: event.OwnerID},          // remaining fields handled by dedicated resolver
 		Collection:        &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:            &event.Action,
-		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
+		NewCollectorsNote: util.ToPointer(event.Data.CollectionNewCollectorsNote),
 	}
 }
 
@@ -1217,7 +1217,7 @@ func eventToTokensAddedToCollectionFeedEventData(event *db.FeedEvent) model.Feed
 		Collection: &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:     &event.Action,
 		NewTokens:  nil, // handled by dedicated resolver
-		IsPreFeed:  util.BoolToPointer(event.Data.CollectionIsPreFeed),
+		IsPreFeed:  util.ToPointer(event.Data.CollectionIsPreFeed),
 		HelperTokensAddedToCollectionFeedEventDataData: model.HelperTokensAddedToCollectionFeedEventDataData{
 			FeedEventID: event.ID,
 		},
@@ -1231,7 +1231,7 @@ func eventToCollectionUpdatedFeedEventData(event *db.FeedEvent) model.FeedEventD
 		Collection:        &model.Collection{Dbid: event.Data.CollectionID}, // remaining fields handled by dedicated resolver
 		Action:            &event.Action,
 		NewTokens:         nil, // handled by dedicated resolver
-		NewCollectorsNote: util.StringToPointer(event.Data.CollectionNewCollectorsNote),
+		NewCollectorsNote: util.ToPointer(event.Data.CollectionNewCollectorsNote),
 		HelperCollectionUpdatedFeedEventDataData: model.HelperCollectionUpdatedFeedEventDataData{
 			FeedEventID: event.ID,
 		},
@@ -1279,11 +1279,11 @@ func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int)
 
 		// Treat the original collection as a single section.
 		return &model.CollectionLayout{
-			Sections: []*int{util.IntToPointer(0)},
+			Sections: []*int{util.ToPointer(0)},
 			SectionLayout: []*model.CollectionSectionLayout{
 				{
-					Columns:    util.IntToPointer(layout.Columns),
-					Whitespace: util.IntToPointerSlice(layout.Whitespace),
+					Columns:    util.ToPointer(layout.Columns),
+					Whitespace: util.ToPointerSlice(layout.Whitespace),
 				},
 			},
 		}
@@ -1292,13 +1292,13 @@ func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int)
 	layouts := make([]*model.CollectionSectionLayout, 0)
 	for _, l := range layout.SectionLayout {
 		layouts = append(layouts, &model.CollectionSectionLayout{
-			Columns:    util.IntToPointer(l.Columns.Int()),
-			Whitespace: util.IntToPointerSlice(l.Whitespace),
+			Columns:    util.ToPointer(l.Columns.Int()),
+			Whitespace: util.ToPointerSlice(l.Whitespace),
 		})
 	}
 
 	return &model.CollectionLayout{
-		Sections:      util.IntToPointerSlice(layout.Sections),
+		Sections:      util.ToPointerSlice(layout.Sections),
 		SectionLayout: layouts,
 	}
 }
@@ -1455,7 +1455,7 @@ func membershipToModel(ctx context.Context, membershipTier db.Membership) *model
 		Dbid:     membershipTier.ID,
 		Name:     &membershipTier.Name.String,
 		AssetURL: &membershipTier.AssetUrl.String,
-		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
+		TokenID:  util.ToPointer(membershipTier.TokenID.String()),
 		Owners:   owners,
 	}
 }
@@ -1470,9 +1470,9 @@ func persistMembershipTierToModel(ctx context.Context, membershipTier persist.Me
 
 	return &model.MembershipTier{
 		Dbid:     membershipTier.ID,
-		Name:     util.StringToPointer(membershipTier.Name.String()),
-		AssetURL: util.StringToPointer(membershipTier.AssetURL.String()),
-		TokenID:  util.StringToPointer(membershipTier.TokenID.String()),
+		Name:     util.ToPointer(membershipTier.Name.String()),
+		AssetURL: util.ToPointer(membershipTier.AssetURL.String()),
+		TokenID:  util.ToPointer(membershipTier.TokenID.String()),
 		Owners:   owners,
 	}
 }
@@ -1480,7 +1480,7 @@ func persistMembershipTierToModel(ctx context.Context, membershipTier persist.Me
 func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *model.TokenHolder {
 	previewTokens := make([]*string, len(tokenHolder.PreviewTokens))
 	for i, token := range tokenHolder.PreviewTokens {
-		previewTokens[i] = util.StringToPointer(token.String())
+		previewTokens[i] = util.ToPointer(token.String())
 	}
 
 	return &model.TokenHolder{
@@ -1494,7 +1494,7 @@ func tokenHolderToModel(ctx context.Context, tokenHolder persist.TokenHolder) *m
 func multichainTokenHolderToModel(ctx context.Context, tokenHolder multichain.TokenHolder, contractID persist.DBID) *model.TokenHolder {
 	previewTokens := make([]*string, len(tokenHolder.PreviewTokens))
 	for i, token := range tokenHolder.PreviewTokens {
-		previewTokens[i] = util.StringToPointer(token)
+		previewTokens[i] = util.ToPointer(token)
 	}
 
 	return &model.TokenHolder{
@@ -1534,7 +1534,7 @@ func tokenToModel(ctx context.Context, token db.Token) *model.Token {
 		Name:             &token.Name.String,
 		Description:      &token.Description.String,
 		OwnedByWallets:   nil, // handled by dedicated resolver
-		TokenID:          util.StringToPointer(token.TokenID.String()),
+		TokenID:          util.ToPointer(token.TokenID.String()),
 		Quantity:         &token.Quantity.String,
 		Owner:            nil, // handled by dedicated resolver
 		OwnershipHistory: nil, // TODO: later
@@ -1571,13 +1571,13 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		LastUpdated:     &lastUpdated,
 		ContractAddress: &contractAddress,
 		CreatorAddress:  &creatorAddress,
-		Name:            util.StringToPointer(community.Name.String),
-		Description:     util.StringToPointer(community.Description.String),
-		// PreviewImage:     util.StringToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
+		Name:            util.ToPointer(community.Name.String),
+		Description:     util.ToPointer(community.Description.String),
+		// PreviewImage:     util.ToPointer(community.Pr.String()), // TODO do we still need this with the new image fields?
 		Chain:            &chain,
-		ProfileImageURL:  util.StringToPointer(community.ProfileImageUrl.String),
-		ProfileBannerURL: util.StringToPointer(community.ProfileBannerUrl.String),
-		BadgeURL:         util.StringToPointer(community.BadgeUrl.String),
+		ProfileImageURL:  util.ToPointer(community.ProfileImageUrl.String),
+		ProfileBannerURL: util.ToPointer(community.ProfileBannerUrl.String),
+		BadgeURL:         util.ToPointer(community.BadgeUrl.String),
 		Owners:           nil, // handled by dedicated resolver
 	}
 }
@@ -1638,11 +1638,11 @@ func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLS
 
 	return &model.PreviewURLSet{
 		Raw:       &preview,
-		Thumbnail: util.StringToPointer(mm.GetThumbnailImageUrl(preview)),
-		Small:     util.StringToPointer(mm.GetSmallImageUrl(preview)),
-		Medium:    util.StringToPointer(mm.GetMediumImageUrl(preview)),
-		Large:     util.StringToPointer(mm.GetLargeImageUrl(preview)),
-		SrcSet:    util.StringToPointer(mm.GetSrcSet(preview)),
+		Thumbnail: util.ToPointer(mm.GetThumbnailImageUrl(preview)),
+		Small:     util.ToPointer(mm.GetSmallImageUrl(preview)),
+		Medium:    util.ToPointer(mm.GetMediumImageUrl(preview)),
+		Large:     util.ToPointer(mm.GetLargeImageUrl(preview)),
+		SrcSet:    util.ToPointer(mm.GetSrcSet(preview)),
 	}
 }
 
@@ -1651,7 +1651,7 @@ func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
 
 	return model.ImageMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: &url,
 	}
@@ -1662,7 +1662,7 @@ func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
 
 	return model.GIFMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: &url,
 	}
@@ -1689,7 +1689,7 @@ func getVideoMedia(ctx context.Context, media persist.Media) model.VideoMedia {
 
 	return model.VideoMedia{
 		PreviewURLs:       getPreviewUrls(ctx, media),
-		MediaURL:          util.StringToPointer(media.MediaURL.String()),
+		MediaURL:          util.ToPointer(media.MediaURL.String()),
 		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &videoUrls,
 	}
@@ -1698,7 +1698,7 @@ func getVideoMedia(ctx context.Context, media persist.Media) model.VideoMedia {
 func getAudioMedia(ctx context.Context, media persist.Media) model.AudioMedia {
 	return model.AudioMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1707,7 +1707,7 @@ func getAudioMedia(ctx context.Context, media persist.Media) model.AudioMedia {
 func getTextMedia(ctx context.Context, media persist.Media) model.TextMedia {
 	return model.TextMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1716,7 +1716,7 @@ func getTextMedia(ctx context.Context, media persist.Media) model.TextMedia {
 func getPdfMedia(ctx context.Context, media persist.Media) model.PDFMedia {
 	return model.PDFMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1725,7 +1725,7 @@ func getPdfMedia(ctx context.Context, media persist.Media) model.PDFMedia {
 func getHtmlMedia(ctx context.Context, media persist.Media) model.HTMLMedia {
 	return model.HTMLMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1734,7 +1734,7 @@ func getHtmlMedia(ctx context.Context, media persist.Media) model.HTMLMedia {
 func getJsonMedia(ctx context.Context, media persist.Media) model.JSONMedia {
 	return model.JSONMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1743,7 +1743,7 @@ func getJsonMedia(ctx context.Context, media persist.Media) model.JSONMedia {
 func getGltfMedia(ctx context.Context, media persist.Media) model.GltfMedia {
 	return model.GltfMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1752,7 +1752,7 @@ func getGltfMedia(ctx context.Context, media persist.Media) model.GltfMedia {
 func getUnknownMedia(ctx context.Context, media persist.Media) model.UnknownMedia {
 	return model.UnknownMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1761,7 +1761,7 @@ func getUnknownMedia(ctx context.Context, media persist.Media) model.UnknownMedi
 func getSyncingMedia(ctx context.Context, media persist.Media) model.SyncingMedia {
 	return model.SyncingMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}
@@ -1770,7 +1770,7 @@ func getSyncingMedia(ctx context.Context, media persist.Media) model.SyncingMedi
 func getInvalidMedia(ctx context.Context, media persist.Media) model.InvalidMedia {
 	return model.InvalidMedia{
 		PreviewURLs:      getPreviewUrls(ctx, media),
-		MediaURL:         util.StringToPointer(media.MediaURL.String()),
+		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
 	}

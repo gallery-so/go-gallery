@@ -81,6 +81,7 @@ type Transfer struct {
 	// These are geth types which are useful for getting more details about a transaction.
 	TxHash    common.Hash
 	BlockHash common.Hash
+	TxIndex   uint
 }
 
 // TokenContractMetadata represents a token contract's metadata

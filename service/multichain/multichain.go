@@ -149,6 +149,11 @@ type verifier interface {
 	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
 }
 
+type walletHooker interface {
+	// WalletCreated is called when a wallet is created
+	WalletCreated(context.Context, persist.DBID, persist.Address, persist.WalletType, persist.Chain) error
+}
+
 // tokensFetcher supports fetching tokens for syncing
 type tokensFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
@@ -543,6 +548,33 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+// RunWalletCreationHooks runs hooks for when a wallet is created
+func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DBID, walletAddress persist.Address, walletType persist.WalletType, chain persist.Chain) error {
+	if _, ok := d.Chains[chain]; !ok {
+		return nil
+	}
+
+	// User doesn't exist
+	_, err := d.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// TODO check if user wallets contains wallet using new util.Contains in other PR
+
+	for _, provider := range d.Chains[chain] {
+
+		if hooker, ok := provider.(walletHooker); ok {
+			if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType, chain); err != nil {
+				return err
+			}
+		}
+
 	}
 
 	return nil

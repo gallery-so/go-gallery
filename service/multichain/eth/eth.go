@@ -458,6 +458,13 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 }
 
+// WalletCreated runs whenever a new wallet is created
+func (d *Provider) WalletCreated(ctx context.Context, wallet persist.Address, all bool) error {
+	input := task.ValidateNFTsMessage{OwnerAddress: persist.EthereumAddress(wallet.String())}
+
+	return task.CreateTaskForWalletValidation(ctx, input, d.taskClient)
+}
+
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)
 func (d *Provider) VerifySignature(pCtx context.Context,
 	pAddressStr persist.PubKey, pWalletType persist.WalletType, pNonce string, pSignatureStr string) (bool, error) {
