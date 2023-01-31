@@ -31,7 +31,14 @@ func getSqlConnectionString() string {
 		dbPort = 5432
 	}
 
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	connStr := fmt.Sprintf("host=%s port=%d user=%s dbname=%s", dbHost, dbPort, dbUser, dbName)
+
+	// Empty passwords should be omitted so they don't interfere with other parameters
+	// (e.g. "password= dbname=something" causes Postgres to ignore the dbname)
+	if dbPwd != "" {
+		connStr += fmt.Sprintf(" password=%s", dbPwd)
+	}
+
 	return connStr
 
 	// Commented out because we should be using Cloud SQL Proxy in any context where we would have supplied
