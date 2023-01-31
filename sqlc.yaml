@@ -50,6 +50,10 @@ sql:
           - column: "galleries.collections"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
 
+          # Socials
+          - column: "social_account_auth.provider"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.SocialProvider"
+
           # Collections
           - column: "collections.nfts"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"

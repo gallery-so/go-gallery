@@ -278,6 +278,18 @@ type PiiForUser struct {
 	Deleted         bool
 }
 
+type SocialAccountAuth struct {
+	ID           persist.DBID
+	Deleted      bool
+	Version      sql.NullInt32
+	CreatedAt    time.Time
+	LastUpdated  time.Time
+	UserID       persist.DBID
+	Provider     persist.SocialProvider
+	AccessToken  sql.NullString
+	RefreshToken sql.NullString
+}
+
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -323,6 +335,7 @@ type User struct {
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
+	ExternalSocials      pgtype.JSONB
 }
 
 type UserEvent struct {

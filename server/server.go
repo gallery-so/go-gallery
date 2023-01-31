@@ -188,6 +188,9 @@ func SetDefaults() {
 	viper.SetDefault("MERCH_CONTRACT_ADDRESS", "0x01f55be815fbd10b1770b008b8960931a30e7f65")
 	viper.SetDefault("ETH_PRIVATE_KEY", "")
 	viper.SetDefault("MAGIC_LINK_SECRET_KEY", "")
+	viper.SetDefault("TWITTER_CLIENT_ID", "")
+	viper.SetDefault("TWITTER_CLIENT_SECRET", "")
+	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "https://gallery.so/twitter-auth")
 
 	viper.AutomaticEnv()
 

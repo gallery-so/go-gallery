@@ -826,6 +826,23 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	return output, nil
 }
 
+func (r *mutationResolver) ConnectSocialAccount(ctx context.Context, input model.SocialAuthMechanism) (model.ConnectSocialAccountPayloadOrError, error) {
+	authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	if input.Twitter != nil {
+		authenticator := publicapi.For(ctx).Socials.NewTwitterAuthenticator(authedUserID, input.Twitter.Code)
+
+		err := publicapi.For(ctx).User.AddSocialAccountToUser(ctx, authenticator)
+		if err != nil {
+			return nil, err
+		}
+	}
+	output := &model.ConnectSocialAccountPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
 func (r *mutationResolver) FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error) {
 	err := publicapi.For(ctx).User.FollowUser(ctx, userID)
 
@@ -1594,6 +1611,10 @@ func (r *userFollowedUsersFeedEventDataResolver) Owner(ctx context.Context, obj 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	return resolveGalleryUserByUserID(ctx, userID)
+}
+
+func (r *viewerResolver) SocialAccounts(ctx context.Context, obj *model.Viewer) (*model.SocialAccounts, error) {
+	return resolveViewerSocialsByUserID(ctx, obj.UserId)
 }
 
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {

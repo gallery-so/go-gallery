@@ -8,10 +8,29 @@ import (
 	"io"
 	"strings"
 
+	"github.com/jackc/pgtype"
 	"github.com/lib/pq"
 )
 
 type Traits map[string]interface{}
+
+type ExternalSocialIDs pgtype.JSONB
+
+type SocialUserIdentifers struct {
+	Provider SocialProvider         `json:"provider,required" binding:"required"`
+	ID       string                 `json:"id,required" binding:"required"`
+	Metadata map[string]interface{} `json:"metadata"`
+}
+
+type SocialProvider string
+
+const (
+	SocialProviderTwitter SocialProvider = "twitter"
+)
+
+var AllSocialProviders = []SocialProvider{
+	SocialProviderTwitter,
+}
 
 // User represents a user with all of their addresses
 type User struct {
@@ -115,6 +134,50 @@ func (u *UserNotificationSettings) Scan(src interface{}) error {
 		return nil
 	}
 	return json.Unmarshal(src.([]uint8), u)
+}
+
+func (s SocialUserIdentifers) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+func (s *SocialUserIdentifers) Scan(src interface{}) error {
+	if src == nil {
+		*s = SocialUserIdentifers{}
+		return nil
+	}
+	return json.Unmarshal(src.([]uint8), s)
+}
+
+func (s SocialProvider) String() string {
+	return string(s)
+}
+
+func (s SocialProvider) Value() (driver.Value, error) {
+	if !s.IsValid() {
+		return nil, fmt.Errorf("invalid social provider: %s", s)
+	}
+	return s.String(), nil
+}
+
+func (s *SocialProvider) Scan(src interface{}) error {
+	if src == nil {
+		*s = SocialProvider("")
+		return nil
+	}
+	*s = SocialProvider(src.(string))
+	if !s.IsValid() {
+		return fmt.Errorf("invalid social provider: %s", s)
+	}
+	return nil
+}
+
+func (s SocialProvider) IsValid() bool {
+	switch s {
+	case SocialProviderTwitter:
+		return true
+	default:
+		return false
+	}
 }
 
 // ErrUserNotFound is returned when a user is not found

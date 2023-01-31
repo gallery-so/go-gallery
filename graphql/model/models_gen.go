@@ -51,6 +51,10 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
+type ConnectSocialAccountPayloadOrError interface {
+	IsConnectSocialAccountPayloadOrError()
+}
+
 type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
@@ -528,6 +532,12 @@ type Community struct {
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
+type ConnectSocialAccountPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (ConnectSocialAccountPayload) IsConnectSocialAccountPayloadOrError() {}
+
 type Contract struct {
 	Dbid             persist.DBID          `json:"dbid"`
 	LastUpdated      *time.Time            `json:"lastUpdated"`
@@ -785,6 +795,7 @@ func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
 func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
+func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -836,6 +847,7 @@ func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
 func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()     {}
 func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()  {}
+func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()     {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1283,6 +1295,14 @@ type SetSpamPreferencePayload struct {
 
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
+type SocialAccounts struct {
+	Twitter *TwitterSocialAccount `json:"twitter"`
+}
+
+type SocialAuthMechanism struct {
+	Twitter *TwitterAuth `json:"twitter"`
+}
+
 type SomeoneAdmiredYourFeedEventNotification struct {
 	HelperSomeoneAdmiredYourFeedEventNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
@@ -1465,6 +1485,16 @@ type TrendingUsersPayload struct {
 }
 
 func (TrendingUsersPayload) IsTrendingUsersPayloadOrError() {}
+
+type TwitterAuth struct {
+	Code string `json:"code"`
+}
+
+type TwitterSocialAccount struct {
+	SocialID string `json:"social_id"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
@@ -1754,6 +1784,7 @@ func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 type Viewer struct {
 	HelperViewerData
 	User            *GalleryUser     `json:"user"`
+	SocialAccounts  *SocialAccounts  `json:"socialAccounts"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 	Feed            *FeedConnection  `json:"feed"`
 	Email           *UserEmail       `json:"email"`

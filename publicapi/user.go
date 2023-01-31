@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/spf13/viper"
 
 	"cloud.google.com/go/storage"
@@ -317,6 +318,42 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	}
 
 	err = user.RemoveWalletsFromUser(ctx, userID, walletIDs, api.repos.UserRepository)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"authenticator": {authenticator, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUser(ctx)
+	if err != nil {
+		return err
+	}
+
+	res, err := authenticator.Authenticate(ctx)
+	if err != nil {
+		return err
+	}
+
+	insert, err := util.ToPGJSONB(map[persist.SocialProvider]interface{}{
+		res.ID.Provider: res,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.UpdateUserExternalSocialIDs(ctx, db.UpdateUserExternalSocialIDsParams{
+		UserID:          userID,
+		ExternalSocials: insert,
+	})
 	if err != nil {
 		return err
 	}
@@ -669,6 +706,44 @@ func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) 
 			Experienced: asJSON[experienceType.String()],
 		}
 	}
+	return result, nil
+}
+
+func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	socials, err := api.queries.GetExternalSocialIDsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	asMap := map[persist.SocialProvider]persist.SocialUserIdentifers{}
+	if err := socials.AssignTo(&asMap); err != nil {
+		return nil, err
+	}
+
+	result := &model.SocialAccounts{}
+
+	for _, prov := range persist.AllSocialProviders {
+		switch prov {
+		case persist.SocialProviderTwitter:
+			if val, ok := asMap[prov]; ok {
+				result.Twitter = &model.TwitterSocialAccount{
+					SocialID: val.ID,
+					Name:     val.Metadata["name"].(string),
+					Username: val.Metadata["username"].(string),
+				}
+			}
+		default:
+			return nil, fmt.Errorf("unsupported social provider: %s", prov)
+		}
+	}
+
 	return result, nil
 }
 

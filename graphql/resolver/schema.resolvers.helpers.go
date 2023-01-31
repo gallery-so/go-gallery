@@ -418,6 +418,10 @@ func resolveViewerExperiencesByUserID(ctx context.Context, userID persist.DBID) 
 	return publicapi.For(ctx).User.GetUserExperiences(ctx, userID)
 }
 
+func resolveViewerSocialsByUserID(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
+	return publicapi.For(ctx).User.GetUserSocials(ctx, userID)
+}
+
 func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {
 	token, err := publicapi.For(ctx).Token.GetTokenById(ctx, tokenID)
 

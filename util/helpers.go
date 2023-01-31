@@ -8,15 +8,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/spf13/viper"
-	"go.mozilla.org/sops/v3/decrypt"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/spf13/viper"
+	"go.mozilla.org/sops/v3/decrypt"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -478,4 +480,14 @@ func TruncateWithEllipsis(s string, length int) string {
 
 func IsNullOrEmpty(s sql.NullString) bool {
 	return !s.Valid || s.String == ""
+}
+
+func ToNullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: true}
+}
+
+func ToPGJSONB[T any](v T) (pgtype.JSONB, error) {
+	var j pgtype.JSONB
+	err := j.Set(v)
+	return j, err
 }

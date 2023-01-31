@@ -481,9 +481,20 @@ type NotificationsConnection @goEmbedHelper {
   pageInfo: PageInfo
 }
 
+type SocialAccounts {
+  twitter: TwitterSocialAccount
+}
+
+type TwitterSocialAccount {
+  social_id: String!
+  name: String!
+  username: String!
+}
+
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   id: ID!
   user: GalleryUser @goField(forceResolver: true)
+  socialAccounts: SocialAccounts @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
     @goField(forceResolver: true)
@@ -1163,6 +1174,14 @@ input MagicLinkAuth {
   token: String!
 }
 
+input SocialAuthMechanism {
+  twitter: TwitterAuth
+}
+
+input TwitterAuth {
+  code: String!
+}
+
 input DeepRefreshInput {
   chain: Chain!
 }
@@ -1671,6 +1690,15 @@ union MoveCollectionToGalleryPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
+type ConnectSocialAccountPayload {
+  viewer: Viewer
+}
+
+union ConnectSocialAccountPayloadOrError =
+    ConnectSocialAccountPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -1719,6 +1747,9 @@ type Mutation {
   ): UnsubscribeFromEmailTypePayloadOrError
   login(authMechanism: AuthMechanism!): LoginPayloadOrError
   logout: LogoutPayload
+
+  connectSocialAccount(input: SocialAuthMechanism!): ConnectSocialAccountPayloadOrError
+    @authRequired
 
   followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
