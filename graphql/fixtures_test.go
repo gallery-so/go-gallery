@@ -3,6 +3,7 @@ package graphql_test
 import (
 	"context"
 	"fmt"
+	"github.com/spf13/viper"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -75,8 +76,30 @@ func usePostgres(t *testing.T) {
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
-	err = migrate.RunMigration(postgres.NewClient(), "./db/migrations/core")
+
+	coreMigrations := "./db/migrations/core"
+	postgresUser := viper.Get("POSTGRES_USER").(string)
+
+	// Migrations up to version 54 should be run with the "postgres" user.
+	// Version 54 introduces the "gallery_migrator" role.
+	t.Setenv("POSTGRES_USER", "postgres")
+	c := postgres.NewClient()
+	err = migrate.RunMigrationToVersion(c, coreMigrations, 54)
 	require.NoError(t, err)
+	err = c.Close()
+	require.NoError(t, err)
+
+	// The "gallery_migrator" role should be used for all future migrations.
+	t.Setenv("POSTGRES_USER", "gallery_migrator")
+	c = postgres.NewClient()
+	err = migrate.RunMigration(c, coreMigrations)
+	require.NoError(t, err)
+	err = c.Close()
+	require.NoError(t, err)
+
+	// Restore the original POSTGRES_USER value
+	t.Setenv("POSTGRES_USER", postgresUser)
+
 	t.Cleanup(func() { r.Close() })
 }
 
