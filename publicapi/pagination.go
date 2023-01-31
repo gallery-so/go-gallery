@@ -29,9 +29,9 @@ var (
 	defaultCursorAfterKey = ""
 
 	// Some position that comes after any other position
-	defaultCursorBeforeScore = math.MaxInt32
+	defaultCursorBeforePositon = -1
 	// Some position that comes before any other position
-	defaultCursorAfterScore = -1
+	defaultCursorAfterPosition = math.MaxInt32
 )
 
 type PageInfo struct {
@@ -525,8 +525,8 @@ func (p *positionPaginator) decodeCursor(cursor string) (int, []persist.DBID, er
 
 func (p *positionPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		curBeforePos := defaultCursorBeforeScore
-		curAfterPos := defaultCursorAfterScore
+		curBeforePos := defaultCursorBeforePositon
+		curAfterPos := defaultCursorAfterPosition
 
 		var err error
 		var ids []persist.DBID
