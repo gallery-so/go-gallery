@@ -82,8 +82,8 @@ query globalFeedQuery($first: Int) {
   }
 }
 
-query trendingFeedQuery($first: Int) {
-  trendingFeed(first: $first) {
+query trendingFeedQuery($last: Int) {
+  trendingFeed(last: $last) {
     edges {
       node {
         ... on Error {

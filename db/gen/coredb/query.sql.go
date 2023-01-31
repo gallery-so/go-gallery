@@ -3124,8 +3124,8 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 
 const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
 select f.id, f.version, f.owner_id, f.action, f.data, f.event_time, f.event_ids, f.deleted, f.last_updated, f.created_at, f.caption from feed_events f join unnest($1::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
-  and t.pos < $2::int
-  and t.pos > $3::int
+  and t.pos > $2::int
+  and t.pos < $3::int
   order by case when $4::bool then t.pos end asc,
           case when not $4::bool then t.pos end desc
   limit $5
