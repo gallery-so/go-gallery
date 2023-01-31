@@ -191,6 +191,8 @@ alter role gallery_migrator set role to access_rw;
 ------------------------------------------------------------------------------------
 -- Transfer ownership of existing public tables to access_rw
 ------------------------------------------------------------------------------------
+alter table access owner to access_rw;
+alter table admires owner to access_rw;
 alter table collection_events owner to access_rw;
 alter table collections owner to access_rw;
 alter table comments owner to access_rw;
