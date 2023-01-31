@@ -1,6 +1,10 @@
-alter table users add column if not exists external_socials jsonb not null default '{}';
+alter table pii_for_users add column if not exists pii_external_socials jsonb not null default '{}';
+drop view if exists users_with_pii;
+create or replace view users_with_pii as
+    select users.*, pii_for_users.pii_email_address,pii_for_users.pii_external_socials from users left join pii_for_users on users.id = pii_for_users.user_id and pii_for_users.deleted = false;
 
 
+-- will later be in the pii schema
 create table if not exists social_account_auth (
     id varchar(255) not null primary key,
     deleted boolean default false not null,

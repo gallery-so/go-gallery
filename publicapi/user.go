@@ -353,7 +353,7 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 
 	logger.For(ctx).Debugf("inserting external socials: %s", string(insert.Bytes))
 
-	err = api.queries.UpdateUserExternalSocialIDs(ctx, db.UpdateUserExternalSocialIDsParams{
+	err = api.queries.AddExternalSocialToUser(ctx, db.AddExternalSocialToUserParams{
 		UserID:          userID,
 		ExternalSocials: insert,
 	})
@@ -720,7 +720,7 @@ func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*mo
 		return nil, err
 	}
 
-	socials, err := api.queries.GetExternalSocialIDsByUserID(ctx, userID)
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

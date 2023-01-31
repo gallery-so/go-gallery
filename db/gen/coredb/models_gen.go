@@ -273,9 +273,10 @@ type Notification struct {
 }
 
 type PiiForUser struct {
-	UserID          persist.DBID
-	PiiEmailAddress persist.Email
-	Deleted         bool
+	UserID             persist.DBID
+	PiiEmailAddress    persist.Email
+	Deleted            bool
+	PiiExternalSocials pgtype.JSONB
 }
 
 type SocialAccountAuth struct {
@@ -335,7 +336,6 @@ type User struct {
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
-	ExternalSocials      pgtype.JSONB
 }
 
 type UserEvent struct {
@@ -376,7 +376,9 @@ type UsersWithPii struct {
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
+	UserExperiences      pgtype.JSONB
 	PiiEmailAddress      persist.Email
+	PiiExternalSocials   pgtype.JSONB
 }
 
 type Wallet struct {
