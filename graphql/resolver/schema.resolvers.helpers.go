@@ -1210,7 +1210,7 @@ func rawEventToCollectorsNoteAddedToTokenFeedEventData(event *db.Event) model.Fe
 			TokenSettings: nil,                                                   // handled by dedicated resolver
 		},
 		Action:            &event.Action,
-		NewCollectorsNote: util.StringToPointer(event.Data.TokenCollectorsNote),
+		NewCollectorsNote: util.ToPointer(event.Data.TokenCollectorsNote),
 	}
 }
 
@@ -1258,7 +1258,7 @@ func rawEventToCollectorsNoteAddedToCollectionFeedEventData(event *db.Event) mod
 		Owner:             &model.GalleryUser{Dbid: persist.DBID(event.ActorID.String)}, // remaining fields handled by dedicated resolver
 		Collection:        &model.Collection{Dbid: event.CollectionID},                  // remaining fields handled by dedicated resolver
 		Action:            &event.Action,
-		NewCollectorsNote: util.StringToPointer(event.Data.CollectionCollectorsNote),
+		NewCollectorsNote: util.ToPointer(event.Data.CollectionCollectorsNote),
 	}
 }
 
