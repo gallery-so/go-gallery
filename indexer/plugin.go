@@ -33,14 +33,36 @@ type PluginMsg struct {
 
 // TransferPlugins are plugins that add contextual data to a transfer.
 type TransferPlugins struct {
-	uris     urisPlugin
-	balances balancesPlugin
-	owners   ownersPlugin
-	refresh  refreshPlugin
+	uris           urisPlugin
+	balances       balancesPlugin
+	owners         ownersPlugin
+	previousOwners previousOwnersPlugin
+	refresh        refreshPlugin
+}
+
+type blockchainOrderInfo struct {
+	blockNumber persist.BlockNumber
+	txIndex     uint
+}
+
+// Less returns true if the current block number and tx index are less than the other block number and tx index.
+func (b blockchainOrderInfo) Less(other blockchainOrderInfo) bool {
+	if b.blockNumber < other.blockNumber {
+		return true
+	}
+	if b.blockNumber > other.blockNumber {
+		return false
+	}
+	return b.txIndex < other.txIndex
+}
+
+type orderedBlockChainData interface {
+	TokenIdentifiers() persist.EthereumTokenIdentifiers
+	OrderInfo() blockchainOrderInfo
 }
 
 // PluginReceiver receives the results of a plugin.
-type PluginReceiver func()
+type PluginReceiver[T, V orderedBlockChainData] func(cur V, inc T) V
 
 func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Context) {
 	return tracing.StartSpan(ctx, "indexer.plugin", fmt.Sprintf("%s:%s", plugin, op))
@@ -51,14 +73,15 @@ func startSpan(ctx context.Context, plugin, op string) (*sentry.Span, context.Co
 // A plugin can be stopped by closing its `in` channel, which finishes the plugin and lets receivers know that its done.
 func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, addressFilterRepo refresh.AddressFilterRepository) TransferPlugins {
 	return TransferPlugins{
-		uris:     newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
-		balances: newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
-		owners:   newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
-		refresh:  newRefreshPlugin(sentryutil.NewSentryHubContext(ctx), addressFilterRepo),
+		uris:           newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
+		balances:       newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
+		owners:         newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
+		refresh:        newRefreshPlugin(sentryutil.NewSentryHubContext(ctx), addressFilterRepo),
+		previousOwners: newPreviousOwnersPlugin(sentryutil.NewSentryHubContext(ctx)),
 	}
 }
 
-// RunPlugins returns when all plugins have received the message.
+// RunPlugins returns when all plugins have received the message. Every plugin recieves the same message.
 func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.EthereumTokenIdentifiers, plugins []chan<- PluginMsg) {
 	span, ctx := tracing.StartSpan(ctx, "indexer.plugin", "submitMessage")
 	defer tracing.FinishSpan(span)
@@ -72,21 +95,38 @@ func RunPlugins(ctx context.Context, transfer rpc.Transfer, key persist.Ethereum
 	}
 }
 
-// ReceivePlugins blocks until all plugins have completed.
-func ReceivePlugins(ctx context.Context, wg *sync.WaitGroup, receivers []PluginReceiver) {
-	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "receivePlugins")
+// RunPluginReceiver runs a plugin receiver and will update the out map with the results of the receiver, ensuring that the most recent data is kept.
+// If the incoming channel is nil, the function will return immediately.
+func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync.WaitGroup, mu *sync.Mutex, receiver PluginReceiver[T, V], incoming <-chan T, out map[persist.EthereumTokenIdentifiers]V) {
+	span, _ := tracing.StartSpan(ctx, "indexer.plugin", "runPluginReceiver")
 	defer tracing.FinishSpan(span)
 
-	for _, receiver := range receivers {
-		go receiver()
+	if incoming == nil {
+		return
 	}
-	wg.Wait()
-}
 
-// AddReceiver adds a receiver to the list of receivers to synchronize.
-func AddReceiver(wg *sync.WaitGroup, receivers []PluginReceiver, receiver PluginReceiver) []PluginReceiver {
+	if out == nil {
+		panic("out map must not be nil")
+	}
+
 	wg.Add(1)
-	return append(receivers, receiver)
+
+	go func() {
+		defer wg.Done()
+
+		for it := range incoming {
+			func() {
+				processed := receiver(out[it.TokenIdentifiers()], it)
+				cur, ok := out[processed.TokenIdentifiers()]
+				if !ok || cur.OrderInfo().Less(processed.OrderInfo()) {
+					mu.Lock()
+					defer mu.Unlock()
+					out[processed.TokenIdentifiers()] = processed
+				}
+			}()
+		}
+	}()
+
 }
 
 // urisPlugin pulls URI information for a token.
@@ -133,6 +173,10 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 				out <- tokenURI{
 					ti:  msg.key,
 					uri: uri,
+					boi: blockchainOrderInfo{
+						blockNumber: msg.transfer.BlockNumber,
+						txIndex:     msg.transfer.TxIndex,
+					},
 				}
 
 				tracing.FinishSpan(child)
@@ -206,18 +250,12 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 // ownersPlugin retrieves ownership information for a token.
 type ownersPlugin struct {
 	in  chan PluginMsg
-	out chan ownersPluginResult
-}
-
-// ownersPluginResult is the result of running an ownersPlugin.
-type ownersPluginResult struct {
-	currentOwner  ownerAtBlock
-	previousOwner ownerAtBlock
+	out chan ownerAtBlock
 }
 
 func newOwnerPlugin(ctx context.Context) ownersPlugin {
 	in := make(chan PluginMsg)
-	out := make(chan ownersPluginResult)
+	out := make(chan ownerAtBlock)
 
 	go func() {
 		span, _ := startSpan(ctx, "ownerPlugin", "handleBatch")
@@ -233,16 +271,12 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 				child.Description = "handleMessage"
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
-					out <- ownersPluginResult{
-						currentOwner: ownerAtBlock{
-							ti:    msg.key,
-							owner: msg.transfer.To,
-							block: msg.transfer.BlockNumber,
-						},
-						previousOwner: ownerAtBlock{
-							ti:    msg.key,
-							owner: msg.transfer.From,
-							block: msg.transfer.BlockNumber,
+					out <- ownerAtBlock{
+						ti:    msg.key,
+						owner: msg.transfer.To,
+						boi: blockchainOrderInfo{
+							blockNumber: msg.transfer.BlockNumber,
+							txIndex:     msg.transfer.TxIndex,
 						},
 					}
 				}
@@ -260,15 +294,62 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 	}
 }
 
+// ownersPlugin retrieves ownership information for a token.
+type previousOwnersPlugin struct {
+	in  chan PluginMsg
+	out chan ownerAtBlock
+}
+
+func newPreviousOwnersPlugin(ctx context.Context) previousOwnersPlugin {
+	in := make(chan PluginMsg)
+	out := make(chan ownerAtBlock)
+
+	go func() {
+		span, _ := startSpan(ctx, "previousOwnerPlugin", "handleBatch")
+		defer tracing.FinishSpan(span)
+		defer close(out)
+
+		wp := workerpool.New(pluginPoolSize)
+
+		for msg := range in {
+			msg := msg
+			wp.Submit(func() {
+				child := span.StartChild("plugin.previousOwnerPlugin")
+				child.Description = "handleMessage"
+
+				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
+					out <- ownerAtBlock{
+						ti:    msg.key,
+						owner: msg.transfer.From,
+						boi: blockchainOrderInfo{
+							blockNumber: msg.transfer.BlockNumber,
+							txIndex:     msg.transfer.TxIndex,
+						},
+					}
+				}
+
+				tracing.FinishSpan(child)
+			})
+		}
+
+		wp.StopWait()
+	}()
+
+	return previousOwnersPlugin{
+		in:  in,
+		out: out,
+	}
+}
+
 // refreshPlugin stores additional data to enable deep refreshes.
 type refreshPlugin struct {
 	in  chan PluginMsg
-	out chan error
+	out chan errForTokenAtBlockAndIndex
 }
 
 func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilterRepository) refreshPlugin {
 	in := make(chan PluginMsg)
-	out := make(chan error, 1)
+	out := make(chan errForTokenAtBlockAndIndex, 1)
 
 	go func() {
 		span, _ := startSpan(ctx, "refreshPlugin", "handleBatch")
@@ -307,7 +388,7 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilt
 
 		wp.StopWait()
 
-		out <- addressFilterRepo.BulkUpsert(ctx, filters)
+		out <- errForTokenAtBlockAndIndex{err: addressFilterRepo.BulkUpsert(ctx, filters)}
 	}()
 
 	return refreshPlugin{
@@ -336,6 +417,9 @@ func balancesFromRepo(ctx context.Context, tokenRepo persist.TokenRepository, ms
 		to:      msg.transfer.To,
 		fromAmt: fromAmount,
 		toAmt:   toAmount,
-		block:   msg.transfer.BlockNumber,
+		boi: blockchainOrderInfo{
+			blockNumber: msg.transfer.BlockNumber,
+			txIndex:     msg.transfer.TxIndex,
+		},
 	}
 }

@@ -237,8 +237,8 @@ func testCreateGallery(t *testing.T) {
 	c := authedHandlerClient(t, userF.id)
 
 	response, err := createGalleryMutation(context.Background(), c, CreateGalleryInput{
-		Name:        util.StringToPointer("newGallery"),
-		Description: util.StringToPointer("this is a description"),
+		Name:        util.ToPointer("newGallery"),
+		Description: util.ToPointer("this is a description"),
 		Position:    "a1",
 	})
 
@@ -269,8 +269,8 @@ func testMoveCollection(t *testing.T) {
 	assert.NotEmpty(t, createPayload.Collection.Dbid)
 
 	createGalResp, err := createGalleryMutation(context.Background(), c, CreateGalleryInput{
-		Name:        util.StringToPointer("newGallery"),
-		Description: util.StringToPointer("this is a description"),
+		Name:        util.ToPointer("newGallery"),
+		Description: util.ToPointer("this is a description"),
 		Position:    "a1",
 	})
 
@@ -383,7 +383,11 @@ func testTrendingFeedEvents(t *testing.T) {
 	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "a")
 	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "b")
 	admireFeedEvent(t, ctx, c, userF.feedEventIDs[2])
-	expected := []persist.DBID{userF.feedEventIDs[1], userF.feedEventIDs[0], userF.feedEventIDs[2]}
+	expected := []persist.DBID{
+		userF.feedEventIDs[2],
+		userF.feedEventIDs[0],
+		userF.feedEventIDs[1],
+	}
 
 	actual := trendingFeedEvents(t, ctx, c, 10)
 

@@ -8,15 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/spf13/viper"
-	"go.mozilla.org/sops/v3/decrypt"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/spf13/viper"
+	"go.mozilla.org/sops/v3/decrypt"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -223,12 +224,6 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
-// StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
-// a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
-func StringToPointer(str string) *string {
-	return &str
-}
-
 // FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
 func FromPointer[T comparable](s *T) T {
 	if s == nil {
@@ -237,24 +232,32 @@ func FromPointer[T comparable](s *T) T {
 	return *s
 }
 
+func ToPointer[T any](s T) *T {
+	return &s
+}
+
+func ToPointerSlice[T any](s []T) []*T {
+	result := make([]*T, len(s))
+	for i, v := range s {
+		result[i] = &v
+	}
+	return result
+}
+
+func FromPointerSlice[T any](s []*T) []T {
+	result := make([]T, len(s))
+	for i, v := range s {
+		result[i] = *v
+	}
+	return result
+}
+
 func StringersToStrings[T fmt.Stringer](stringers []T) []string {
 	strings := make([]string, len(stringers))
 	for i, stringer := range stringers {
 		strings[i] = stringer.String()
 	}
 	return strings
-}
-
-// BoolToPointer returns a pointer to the parameter boolean. Useful for a boolean that would need to be assigned to a variable
-// before becoming addressable.
-func BoolToPointer(b bool) *bool {
-	return &b
-}
-
-// IntToPointer returns a pointer to the parameter integer. Useful for an integer that would need to be assigned to a variable
-// before becoming addressable.
-func IntToPointer(i int) *int {
-	return &i
 }
 
 // GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
@@ -335,15 +338,6 @@ func InByteSizeFormat(bytes uint64) string {
 	}
 
 	return fmt.Sprintf("%.2f %s", value, unit)
-}
-
-// IntToPointerSlice returns a slice to pointers of integer values.
-func IntToPointerSlice(s []int) []*int {
-	ret := make([]*int, len(s))
-	for idx, it := range s {
-		ret[idx] = IntToPointer(it)
-	}
-	return ret
 }
 
 // GetURIPath takes a uri in any form and returns just the path

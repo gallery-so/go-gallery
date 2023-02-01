@@ -375,11 +375,11 @@ func (v *__syncTokensMutationInput) GetChains() []Chain { return v.Chains }
 
 // __trendingFeedQueryInput is used internally by genqlient
 type __trendingFeedQueryInput struct {
-	First *int `json:"first"`
+	Last *int `json:"last"`
 }
 
-// GetFirst returns __trendingFeedQueryInput.First, and is useful for accessing the field via an interface.
-func (v *__trendingFeedQueryInput) GetFirst() *int { return v.First }
+// GetLast returns __trendingFeedQueryInput.Last, and is useful for accessing the field via an interface.
+func (v *__trendingFeedQueryInput) GetLast() *int { return v.Last }
 
 // __trendingUsersQueryInput is used internally by genqlient
 type __trendingUsersQueryInput struct {
@@ -5783,13 +5783,13 @@ mutation syncTokensMutation ($chains: [Chain!]) {
 func trendingFeedQuery(
 	ctx context.Context,
 	client graphql.Client,
-	first *int,
+	last *int,
 ) (*trendingFeedQueryResponse, error) {
 	req := &graphql.Request{
 		OpName: "trendingFeedQuery",
 		Query: `
-query trendingFeedQuery ($first: Int) {
-	trendingFeed(first: $first) {
+query trendingFeedQuery ($last: Int) {
+	trendingFeed(last: $last) {
 		edges {
 			node {
 				__typename
@@ -5806,7 +5806,7 @@ query trendingFeedQuery ($first: Int) {
 }
 `,
 		Variables: &__trendingFeedQueryInput{
-			First: first,
+			Last: last,
 		},
 	}
 	var err error
