@@ -3,7 +3,6 @@ package graphql_test
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/viper"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
@@ -77,28 +75,8 @@ func usePostgres(t *testing.T) {
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
 
-	coreMigrations := "./db/migrations/core"
-	postgresUser := viper.Get("POSTGRES_USER").(string)
-
-	// Migrations up to version 54 should be run with the "postgres" user.
-	// Version 54 introduces the "gallery_migrator" role.
-	t.Setenv("POSTGRES_USER", "postgres")
-	c := postgres.NewClient()
-	err = migrate.RunMigrationToVersion(c, coreMigrations, 54)
+	err = migrate.RunCoreDBMigration()
 	require.NoError(t, err)
-	err = c.Close()
-	require.NoError(t, err)
-
-	// The "gallery_migrator" role should be used for all future migrations.
-	t.Setenv("POSTGRES_USER", "gallery_migrator")
-	c = postgres.NewClient()
-	err = migrate.RunMigration(c, coreMigrations)
-	require.NoError(t, err)
-	err = c.Close()
-	require.NoError(t, err)
-
-	// Restore the original POSTGRES_USER value
-	t.Setenv("POSTGRES_USER", postgresUser)
 
 	t.Cleanup(func() { r.Close() })
 }
