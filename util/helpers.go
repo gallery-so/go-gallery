@@ -277,7 +277,8 @@ func ToPointer[T any](s T) *T {
 func ToPointerSlice[T any](s []T) []*T {
 	result := make([]*T, len(s))
 	for i, v := range s {
-		result[i] = &v
+		c := v
+		result[i] = &c
 	}
 	return result
 }
@@ -285,7 +286,8 @@ func ToPointerSlice[T any](s []T) []*T {
 func FromPointerSlice[T any](s []*T) []T {
 	result := make([]T, len(s))
 	for i, v := range s {
-		result[i] = *v
+		c := v
+		result[i] = *c
 	}
 	return result
 }
