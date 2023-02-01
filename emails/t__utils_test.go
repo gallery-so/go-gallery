@@ -54,12 +54,13 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
 	t.Cleanup(func() { r.Close() })
 
-	db := postgres.NewClient()
-	pgx := postgres.NewPgxClient()
-	err = migrate.RunMigration(db, "./db/migrations/core")
+	err = migrate.RunCoreDBMigration()
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	db := postgres.NewClient()
+	pgx := postgres.NewPgxClient()
 
 	seedNotifications(context.Background(), t, coredb.New(pgx), newRepos(db, pgx))
 
