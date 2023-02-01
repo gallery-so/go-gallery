@@ -34,7 +34,9 @@ func RunCoreDBMigration() error {
 	// The "gallery_migrator" role should be used for all future migrations.
 	client = postgres.NewClient(postgres.WithUser("gallery_migrator"))
 	err = RunMigration(client, coreMigrations)
-	if err != nil {
+
+	// Ignore ErrNoChange here, since that will happen until we add a 55th migration
+	if err != nil && err != migrate.ErrNoChange {
 		return err
 	}
 
