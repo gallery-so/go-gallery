@@ -402,8 +402,8 @@ SELECT * FROM feed_events WHERE owner_id = sqlc.arg('owner_id') AND deleted = fa
 
 -- name: PaginateTrendingFeed :many
 select f.* from feed_events f join unnest(@feed_event_ids::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
-  and t.pos < @cur_before_pos::int
-  and t.pos > @cur_after_pos::int
+  and t.pos > @cur_before_pos::int
+  and t.pos < @cur_after_pos::int
   order by case when @paging_forward::bool then t.pos end asc,
           case when not @paging_forward::bool then t.pos end desc
   limit sqlc.arg('limit');
@@ -745,7 +745,7 @@ with rollup as (
   group by e.gallery_id
 )
 select p.id from (
-	select u.id, row_number() over(order by sum(r.view_count) + coalesce(sum(v.view_count),0) desc, max(u.created_at) desc) as position
+	select u.id, row_number() over(order by sum(r.view_count) + max(coalesce(v.view_count,0)) desc, max(u.created_at) desc) as position
 	from rollup r, galleries g, users u
 	left join legacy_views v on u.id = v.user_id and v.deleted = false and v.created_at >= @window_end
 	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
@@ -765,3 +765,18 @@ select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id
 -- name: GetTrendingFeedEventIDs :many
 select feed_event_id from events where action in ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and created_at >= @window_end and feed_event_id is not null
 group by feed_event_id order by count(*) desc, max(created_at) desc limit sqlc.arg('limit');
+
+-- name: UpdateCollectionGallery :exec
+update collections set gallery_id = @gallery_id, last_updated = now() where id = @id and deleted = false;
+
+-- name: AddCollectionToGallery :exec
+update galleries set collections = array_append(collections, @collection_id), last_updated = now() where id = @gallery_id and deleted = false;
+
+-- name: RemoveCollectionFromGallery :exec
+update galleries set collections = array_remove(collections, @collection_id), last_updated = now() where id = @gallery_id and deleted = false;
+
+-- name: UserOwnsGallery :one
+select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and deleted = false);
+
+-- name: UserOwnsCollection :one
+select exists(select 1 from collections where id = $1 and owner_user_id = $2 and deleted = false);

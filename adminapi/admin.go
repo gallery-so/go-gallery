@@ -6,6 +6,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/auth"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/user"
@@ -13,13 +14,14 @@ import (
 )
 
 type AdminAPI struct {
-	repos     *postgres.Repositories
-	queries   *db.Queries
-	validator *validator.Validate
+	repos      *postgres.Repositories
+	queries    *db.Queries
+	validator  *validator.Validate
+	multichain *multichain.Provider
 }
 
-func NewAPI(repos *postgres.Repositories, queries *db.Queries, validator *validator.Validate) *AdminAPI {
-	return &AdminAPI{repos, queries, validator}
+func NewAPI(repos *postgres.Repositories, queries *db.Queries, validator *validator.Validate, mp *multichain.Provider) *AdminAPI {
+	return &AdminAPI{repos, queries, validator, mp}
 }
 
 func (api *AdminAPI) AddRolesToUser(ctx context.Context, username string, roles []*persist.Role) (*db.User, error) {
@@ -125,7 +127,7 @@ func (api *AdminAPI) AddWalletToUserUnchecked(ctx context.Context, username stri
 		}, nil
 	}
 
-	return user.AddWalletToUser(ctx, u.ID, chainAddress, authenticator{authMethod}, api.repos.UserRepository, api.repos.WalletRepository)
+	return user.AddWalletToUser(ctx, u.ID, chainAddress, authenticator{authMethod}, api.repos.UserRepository, api.repos.WalletRepository, api.multichain)
 }
 
 func requireRetoolAuthorized(ctx context.Context) {

@@ -137,6 +137,10 @@ type MerchTokensPayloadOrError interface {
 	IsMerchTokensPayloadOrError()
 }
 
+type MoveCollectionToGalleryPayloadOrError interface {
+	IsMoveCollectionToGalleryPayloadOrError()
+}
+
 type Node interface {
 	IsNode()
 }
@@ -780,6 +784,7 @@ func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
 func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
+func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -830,6 +835,7 @@ func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
 func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()     {}
+func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()  {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1148,6 +1154,18 @@ type MerchTokensPayload struct {
 }
 
 func (MerchTokensPayload) IsMerchTokensPayloadOrError() {}
+
+type MoveCollectionToGalleryInput struct {
+	SourceCollectionID persist.DBID `json:"sourceCollectionId"`
+	TargetGalleryID    persist.DBID `json:"targetGalleryId"`
+}
+
+type MoveCollectionToGalleryPayload struct {
+	OldGallery *Gallery `json:"oldGallery"`
+	NewGallery *Gallery `json:"newGallery"`
+}
+
+func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`

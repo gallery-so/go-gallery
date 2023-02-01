@@ -67,6 +67,8 @@ func testGraphQL(t *testing.T) {
 		{title: "should get trending feed events", run: testTrendingFeedEvents},
 		{title: "should delete collection in gallery update", run: testUpdateGalleryDeleteCollection},
 		{title: "should update user experiences", run: testUpdateUserExperiences},
+		{title: "should create gallery", run: testCreateGallery},
+		{title: "should move collection to new gallery", run: testMoveCollection},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -268,7 +270,7 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 
 	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
 		GalleryId: userF.galleryID,
-		Name:      util.StringToPointer("newName"),
+		Name:      util.ToPointer("newName"),
 		UpdatedCollections: []*UpdateCollectionInput{
 			{
 				Dbid:           colPay.Collection.Dbid,
@@ -315,7 +317,7 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 			},
 		},
 		Order:   []persist.DBID{colPay.Collection.Dbid, "wow"},
-		Caption: util.StringToPointer("newCaption"),
+		Caption: util.ToPointer("newCaption"),
 	})
 
 	require.NoError(t, err)
@@ -347,6 +349,65 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 			assert.Greater(t, len(ca.NewTokens), 0)
 		}
 	}
+}
+func testCreateGallery(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	response, err := createGalleryMutation(context.Background(), c, CreateGalleryInput{
+		Name:        util.ToPointer("newGallery"),
+		Description: util.ToPointer("this is a description"),
+		Position:    "a1",
+	})
+
+	require.NoError(t, err)
+	payload := (*response.CreateGallery).(*createGalleryMutationCreateGalleryCreateGalleryPayload)
+	assert.NotEmpty(t, payload.Gallery.Dbid)
+	assert.Equal(t, "newGallery", *payload.Gallery.Name)
+	assert.Equal(t, "this is a description", *payload.Gallery.Description)
+	assert.Equal(t, "a1", *payload.Gallery.Position)
+}
+
+func testMoveCollection(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	createResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
+		GalleryId:      userF.galleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.tokenIDs,
+		Layout:         defaultLayout(),
+		TokenSettings:  defaultTokenSettings(userF.tokenIDs),
+		Caption:        nil,
+	})
+
+	require.NoError(t, err)
+	createPayload := (*createResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, createPayload.Collection.Dbid)
+
+	createGalResp, err := createGalleryMutation(context.Background(), c, CreateGalleryInput{
+		Name:        util.ToPointer("newGallery"),
+		Description: util.ToPointer("this is a description"),
+		Position:    "a1",
+	})
+
+	require.NoError(t, err)
+	createGalPayload := (*createGalResp.CreateGallery).(*createGalleryMutationCreateGalleryCreateGalleryPayload)
+	assert.NotEmpty(t, createGalPayload.Gallery.Dbid)
+
+	response, err := moveCollectionToGallery(context.Background(), c, MoveCollectionToGalleryInput{
+		SourceCollectionId: createPayload.Collection.Dbid,
+		TargetGalleryId:    createGalPayload.Gallery.Dbid,
+	})
+
+	require.NoError(t, err)
+	payload := (*response.MoveCollectionToGallery).(*moveCollectionToGalleryMoveCollectionToGalleryMoveCollectionToGalleryPayload)
+	assert.NotEmpty(t, payload.OldGallery.Dbid)
+	assert.Len(t, payload.OldGallery.Collections, 0)
+	assert.NotEmpty(t, payload.NewGallery.Dbid)
+	assert.Len(t, payload.NewGallery.Collections, 1)
+
 }
 
 func testUpdateUserExperiences(t *testing.T) {
@@ -424,7 +485,7 @@ func testUpdateGalleryWithNoNameChange(t *testing.T) {
 
 	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
 		GalleryId: userF.galleryID,
-		Name:      util.StringToPointer("newName"),
+		Name:      util.ToPointer("newName"),
 	})
 
 	require.NoError(t, err)
@@ -557,7 +618,11 @@ func testTrendingFeedEvents(t *testing.T) {
 	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "a")
 	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "b")
 	admireFeedEvent(t, ctx, c, userF.feedEventIDs[2])
-	expected := []persist.DBID{userF.feedEventIDs[1], userF.feedEventIDs[0], userF.feedEventIDs[2]}
+	expected := []persist.DBID{
+		userF.feedEventIDs[2],
+		userF.feedEventIDs[0],
+		userF.feedEventIDs[1],
+	}
 
 	actual := trendingFeedEvents(t, ctx, c, 10)
 

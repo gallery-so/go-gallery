@@ -734,7 +734,7 @@ func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefr
 	}
 	return model.DeepRefreshPayload{
 		Chain:     &input.Chain,
-		Submitted: util.BoolToPointer(true),
+		Submitted: util.ToPointer(true),
 	}, nil
 }
 
@@ -1239,6 +1239,25 @@ func (r *mutationResolver) UpdateUserExperience(ctx context.Context, input model
 	}
 	return model.UpdateUserExperiencePayload{
 		Viewer: resolveViewer(ctx),
+	}, nil
+}
+
+func (r *mutationResolver) MoveCollectionToGallery(ctx context.Context, input *model.MoveCollectionToGalleryInput) (model.MoveCollectionToGalleryPayloadOrError, error) {
+	oldGalID, err := publicapi.For(ctx).Collection.UpdateCollectionGallery(ctx, input.SourceCollectionID, input.TargetGalleryID)
+	if err != nil {
+		return nil, err
+	}
+	old, err := resolveGalleryByGalleryID(ctx, oldGalID)
+	if err != nil {
+		return nil, err
+	}
+	new, err := resolveGalleryByGalleryID(ctx, input.TargetGalleryID)
+	if err != nil {
+		return nil, err
+	}
+	return model.MoveCollectionToGalleryPayload{
+		OldGallery: old,
+		NewGallery: new,
 	}, nil
 }
 
