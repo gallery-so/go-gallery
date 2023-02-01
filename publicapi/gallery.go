@@ -175,18 +175,31 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	}
 
 	if update.Name != nil || update.Description != nil {
-		events = append(events, db.Event{
+		e := db.Event{
 			ID:             persist.GenerateID(),
 			ActorID:        persist.DBIDToNullStr(userID),
 			Action:         persist.ActionGalleryInfoUpdated,
 			ResourceTypeID: persist.ResourceTypeGallery,
 			GalleryID:      update.GalleryID,
 			SubjectID:      update.GalleryID,
-			Data: persist.EventData{
-				GalleryName:        util.FromPointer(update.Name),
-				GalleryDescription: util.FromPointer(update.Description),
-			},
-		})
+		}
+
+		change := false
+
+		if update.Name != nil && *update.Name != curGal.Name {
+			e.Data.GalleryName = util.FromPointer(update.Name)
+			change = true
+		}
+
+		if update.Description != nil && *update.Description != curGal.Description {
+			e.Data.GalleryDescription = util.FromPointer(update.Description)
+			change = true
+		}
+
+		if change {
+			events = append(events, e)
+		}
+
 	}
 
 	asList := persist.DBIDList(update.Order)
@@ -211,6 +224,9 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	if update.Caption != nil && *update.Caption == "" {
+		update.Caption = nil
+	}
 	_, err = dispatchEvents(ctx, events, api.validator, update.Caption)
 	if err != nil {
 		return db.Gallery{}, err
@@ -286,8 +302,13 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 	}
 
 	for _, collection := range update {
+		curCol, err := q.GetCollectionById(ctx, collection.Dbid)
+		if err != nil {
+			return nil, err
+		}
+
 		// add event if collectors note updated
-		if collection.CollectorsNote != "" {
+		if collection.CollectorsNote != "" && collection.CollectorsNote != curCol.CollectorsNote.String {
 			events = append(events, db.Event{
 				ActorID:        persist.DBIDToNullStr(actor),
 				ResourceTypeID: persist.ResourceTypeCollection,
