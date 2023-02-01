@@ -126,7 +126,12 @@ func newSecretsClient() *secretmanager.Client {
 	options := []option.ClientOption{}
 
 	if viper.GetString("ENV") == "local" {
-		options = append(options, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
+		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+		if err != nil {
+			logger.For(nil).WithError(err).Error("error finding service key, running without secrets client")
+			return nil
+		}
+		options = append(options, option.WithCredentialsJSON(fi))
 	}
 
 	c, err := secretmanager.NewClient(context.Background(), options...)
@@ -167,7 +172,7 @@ func SetDefaults() {
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/feed-event")
+	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
 	viper.SetDefault("GCLOUD_WALLET_VALIDATE_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/wallet-validate")
 	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
@@ -176,7 +181,7 @@ func SetDefaults() {
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
-	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
 	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
@@ -188,6 +193,7 @@ func SetDefaults() {
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
 	viper.SetDefault("MERCH_CONTRACT_ADDRESS", "0x01f55be815fbd10b1770b008b8960931a30e7f65")
 	viper.SetDefault("ETH_PRIVATE_KEY", "")
+	viper.SetDefault("FEED_URL", "")
 	viper.SetDefault("MAGIC_LINK_SECRET_KEY", "")
 
 	viper.AutomaticEnv()
@@ -203,8 +209,8 @@ func SetDefaults() {
 		util.LoadEncryptedEnvFile(envFile)
 	}
 
-	util.VarNotSetTo("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {
+		util.VarNotSetTo("IMGIX_SECRET", "")
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")

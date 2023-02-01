@@ -49,6 +49,43 @@ query viewerQuery {
         experienced
       }
       user {
+        feed(first: 10) {
+          edges {
+            node {
+              ... on Error {
+                message
+              }
+              ... on FeedEvent {
+                dbid
+                caption
+                  eventData {
+                    action
+                    ... on GalleryUpdatedFeedEventData {
+                      subEventDatas {
+                        action
+                        ... on TokensAddedToCollectionFeedEventData {
+                          newTokens {
+                            token {
+                              dbid
+                              name
+                            }
+                          }
+                        }
+                        ... on CollectionCreatedFeedEventData {
+                          newTokens {
+                            token {
+                              dbid
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+              }
+            }
+          }
+        }
         username
         dbid
       }
@@ -253,6 +290,27 @@ mutation viewGalleryMutation($galleryId: DBID!) {
     ... on ViewGalleryPayload {
       gallery {
         dbid
+      }
+    }
+  }
+}
+
+mutation updateGalleryMutation($input: UpdateGalleryInput!) {
+  updateGallery(input: $input) {
+    ... on UpdateGalleryPayload {
+      gallery {
+        dbid
+        name
+        description
+        collections {
+          dbid
+          name
+          tokens {
+            token {
+              dbid
+            }
+          }
+        }
       }
     }
   }

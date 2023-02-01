@@ -305,7 +305,7 @@ func (api TokenAPI) SyncTokensAdmin(ctx context.Context, chains []persist.Chain,
 }
 
 func (api TokenAPI) SyncTokens(ctx context.Context, chains []persist.Chain) error {
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 
 	if err != nil {
 		return err
@@ -440,7 +440,7 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 	// Sanitize
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -454,12 +454,19 @@ func (api TokenAPI) UpdateTokenInfo(ctx context.Context, tokenID persist.DBID, c
 		return err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return err
+	}
+
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToToken,
 		ResourceTypeID: persist.ResourceTypeToken,
 		TokenID:        tokenID,
+		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      tokenID,
 		Data: persist.EventData{
 			TokenCollectionID:   collectionID,
@@ -478,7 +485,7 @@ func (api TokenAPI) SetSpamPreference(ctx context.Context, tokens []persist.DBID
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -499,7 +506,7 @@ func (api TokenAPI) DeepRefreshByChain(ctx context.Context, chain persist.Chain)
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}

@@ -740,6 +740,24 @@ type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
   newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
+type GalleryInfoUpdatedFeedEventData implements FeedEventData {
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  newName: String
+  newDescription: String
+  action: Action
+}
+
+type GalleryUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  gallery: Gallery @goField(forceResolver: true)
+  subEventDatas: [FeedEventData!] @goField(forceResolver: true)
+  newName: String
+  newDescription: String
+}
+
 type ErrUnknownAction implements Error {
   message: String!
 }

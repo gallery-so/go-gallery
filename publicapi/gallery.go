@@ -46,7 +46,7 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 		return db.Gallery{}, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -69,20 +69,22 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":           {update.GalleryID, "required"},
-		"name":                {update.Name, "max=200"},
-		"description":         {update.Description, "max=600"},
-		"deleted_collections": {update.DeletedCollections, "unique"},
-		"created_collections": {update.CreatedCollections, "created_collections"},
+		"name":                {update.Name, "omitempty,max=200"},
+		"description":         {update.Description, "omitempty,max=600"},
+		"deleted_collections": {update.DeletedCollections, "omitempty,unique"},
+		"created_collections": {update.CreatedCollections, "omitempty,created_collections"},
 	}); err != nil {
 		return db.Gallery{}, err
 	}
+
+	events := make([]db.Event, 0, len(update.CreatedCollections)+len(update.UpdatedCollections)+1)
 
 	curGal, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
 	if err != nil {
 		return db.Gallery{}, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -110,10 +112,12 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 	// update collections
 
 	if len(update.UpdatedCollections) > 0 {
-		err = updateCollectionsInfoAndTokens(ctx, q, update.UpdatedCollections)
+		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.GalleryID, update.UpdatedCollections)
 		if err != nil {
 			return db.Gallery{}, err
 		}
+
+		events = append(events, collEvents...)
 	}
 
 	// create collections
@@ -133,6 +137,21 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		if err != nil {
 			return db.Gallery{}, err
 		}
+
+		events = append(events, db.Event{
+			ID:             persist.GenerateID(),
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionCollectionCreated,
+			ResourceTypeID: persist.ResourceTypeCollection,
+			SubjectID:      collectionID,
+			CollectionID:   collectionID,
+			GalleryID:      update.GalleryID,
+			Data: persist.EventData{
+				CollectionTokenIDs:       c.Tokens,
+				CollectionCollectorsNote: c.CollectorsNote,
+			},
+		})
+
 		mappedIDs[c.GivenID] = collectionID
 	}
 
@@ -143,19 +162,43 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	params := db.UpdateGalleryParams{
-		GalleryID: update.GalleryID,
+	params := db.UpdateGalleryInfoParams{
+		ID: update.GalleryID,
+	}
+
+	util.SetConditionalValue(update.Name, &params.Name, &params.NameSet)
+	util.SetConditionalValue(update.Description, &params.Description, &params.DescriptionSet)
+
+	err = q.UpdateGalleryInfo(ctx, params)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
+	if update.Name != nil || update.Description != nil {
+		events = append(events, db.Event{
+			ID:             persist.GenerateID(),
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionGalleryInfoUpdated,
+			ResourceTypeID: persist.ResourceTypeGallery,
+			GalleryID:      update.GalleryID,
+			SubjectID:      update.GalleryID,
+			Data: persist.EventData{
+				GalleryName:        util.FromPointer(update.Name),
+				GalleryDescription: util.FromPointer(update.Description),
+			},
+		})
 	}
 
 	asList := persist.DBIDList(update.Order)
 
-	setConditionalValue(update.Name, &params.Name, &params.NameUpdated)
-	setConditionalValue(update.Description, &params.Description, &params.DescriptionUpdated)
-	setConditionalValue(&asList, &params.Collections, &params.CollectionsUpdated)
-
-	err = q.UpdateGallery(ctx, params)
-	if err != nil {
-		return db.Gallery{}, err
+	if len(asList) > 0 {
+		err = q.UpdateGalleryCollections(ctx, db.UpdateGalleryCollectionsParams{
+			GalleryID:   update.GalleryID,
+			Collections: asList,
+		})
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
 
 	err = tx.Commit(ctx)
@@ -168,22 +211,30 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	_, err = dispatchEvents(ctx, events, api.validator, update.Caption)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
 	return newGall, nil
 }
 
-func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update []*model.UpdateCollectionInput) error {
+func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, gallery persist.DBID, update []*model.UpdateCollectionInput) ([]db.Event, error) {
+
+	events := make([]db.Event, 0)
+
 	dbids, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Dbid.String(), nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	collectorNotes, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.CollectorsNote, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	layouts, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
@@ -200,7 +251,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 		}, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tokenSettings, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
@@ -217,21 +268,38 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 		}, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	hiddens, err := util.Map(update, func(u *model.UpdateCollectionInput) (bool, error) {
 		return u.Hidden, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	names, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Name, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	for _, collection := range update {
+		// add event if collectors note updated
+		if collection.CollectorsNote != "" {
+			events = append(events, db.Event{
+				ActorID:        persist.DBIDToNullStr(actor),
+				ResourceTypeID: persist.ResourceTypeCollection,
+				SubjectID:      collection.Dbid,
+				Action:         persist.ActionCollectorsNoteAddedToCollection,
+				CollectionID:   collection.Dbid,
+				GalleryID:      gallery,
+				Data: persist.EventData{
+					CollectionCollectorsNote: collection.CollectorsNote,
+				},
+			})
+		}
 	}
 
 	err = q.UpdateCollectionsInfo(ctx, db.UpdateCollectionsInfoParams{
@@ -243,19 +311,40 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 		Hidden:          hiddens,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, collection := range update {
+		curTokens, err := q.GetCollectionTokensByCollectionID(ctx, collection.Dbid)
+		if err != nil {
+			return nil, err
+		}
+
 		err = q.UpdateCollectionTokens(ctx, db.UpdateCollectionTokensParams{
 			ID:   collection.Dbid,
 			Nfts: collection.Tokens,
 		})
 		if err != nil {
-			return err
+			return nil, err
+		}
+
+		diff := util.Difference(curTokens, collection.Tokens)
+
+		if len(diff) > 0 {
+			events = append(events, db.Event{
+				ResourceTypeID: persist.ResourceTypeCollection,
+				SubjectID:      collection.Dbid,
+				Action:         persist.ActionTokensAddedToCollection,
+				ActorID:        persist.DBIDToNullStr(actor),
+				CollectionID:   collection.Dbid,
+				GalleryID:      gallery,
+				Data: persist.EventData{
+					CollectionTokenIDs: diff,
+				},
+			})
 		}
 	}
-	return nil
+	return events, nil
 }
 
 func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) error {
@@ -266,7 +355,7 @@ func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID)
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -306,7 +395,7 @@ func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persis
 		return nil, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 
 	if err != nil {
 		return nil, persist.ErrGalleryNotFound{ID: galleryID}
@@ -364,7 +453,7 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	previews, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
+	medias, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
 		ID:    galleryID,
 		Limit: 4,
 	})
@@ -373,16 +462,6 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	medias := make([]persist.Media, len(previews))
-	for i, preview := range previews {
-		var media persist.Media
-		err = preview.AssignTo(&media)
-		if err != nil {
-			return nil, err
-		}
-		medias[i] = media
 	}
 
 	return medias, nil
@@ -397,7 +476,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -468,7 +547,7 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 		return err
 	}
 
-	user, err := getAuthenticatedUser(ctx)
+	user, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -524,25 +603,25 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	gc := util.GinContextFromContext(ctx)
 
 	if auth.GetUserAuthedFromCtx(gc) {
-		userID, err := getAuthenticatedUser(ctx)
+		userID, err := getAuthenticatedUserID(ctx)
 		if err != nil {
 			return db.Gallery{}, err
 		}
 
-		// if gallery.OwnerUserID != userID {
-		// only view gallery if the user hasn't already viewed it in this most recent notification period
+		if gallery.OwnerUserID != userID {
+			// only view gallery if the user hasn't already viewed it in this most recent notification period
 
-		_, err = dispatchEvent(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			ResourceTypeID: persist.ResourceTypeGallery,
-			SubjectID:      galleryID,
-			Action:         persist.ActionViewedGallery,
-			GalleryID:      galleryID,
-		}, api.validator, nil)
-		if err != nil {
-			return db.Gallery{}, err
+			_, err = dispatchEvent(ctx, db.Event{
+				ActorID:        persist.DBIDToNullStr(userID),
+				ResourceTypeID: persist.ResourceTypeGallery,
+				SubjectID:      galleryID,
+				Action:         persist.ActionViewedGallery,
+				GalleryID:      galleryID,
+			}, api.validator, nil)
+			if err != nil {
+				return db.Gallery{}, err
+			}
 		}
-		// }
 	} else {
 		_, err := dispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,

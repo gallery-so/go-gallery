@@ -280,22 +280,22 @@ WHERE tokens.owner_user_id = $1 AND users.id = $1
 ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption, group_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateGalleryEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8, $9) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
@@ -315,6 +315,32 @@ with recursive activity as (
 )
 select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
+-- name: GetGalleryEventsInWindow :many
+with recursive activity as (
+    select * from events where events.id = $1 and deleted = false
+    union
+    select e.* from events e, activity a
+    where e.actor_id = a.actor_id
+        and e.action = any(@actions)
+        and e.gallery_id = @gallery_id
+        and e.created_at < a.created_at
+        and e.created_at >= a.created_at - make_interval(secs => $2)
+        and e.deleted = false
+        and e.caption is null
+        and (not @include_subject::bool or e.subject_id = a.subject_id)
+)
+select * from events where id = any(select id from activity) order by (created_at, id) asc;
+
+-- name: GetEventsInGroup :many
+select * from events where group_id = @group_id and deleted = false order by(created_at, id) asc;
+
+-- name: HasLaterGroupedEvent :one
+select exists(
+  select 1 from events where deleted = false
+  and group_id = @group_id
+  and id > @event_id
+);
+
 -- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false
@@ -330,6 +356,15 @@ select exists(
   and subject_id = $2
   and created_at > @window_start and created_at <= @window_end
 );
+
+-- name: IsActorGalleryActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and gallery_id = $2
+  and created_at > @window_start and created_at <= @window_end
+);
+
 
 -- name: IsActorSubjectActionActive :one
 select exists(
@@ -667,16 +702,16 @@ update galleries g set position = updates.position, last_updated = now() from up
 select exists(select position,count(*) from galleries where owner_user_id = $1 and deleted = false group by position having count(*) > 1);
 
 -- name: UpdateGalleryInfo :exec
-update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
+update galleries set name = case when @name_set::bool then @name else name end, description = case when @description_set::bool then @description else description end, last_updated = now() where id = @id and deleted = false;
 
--- name: UpdateGallery :exec
-update galleries set name = case when @name_updated::bool then @name else name end, description = case when @description_updated::bool then @description else description end, collections = case when @collections_updated::bool then @collections else collections end, last_updated = now() where galleries.id = @gallery_id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = cardinality(@collections);
+-- name: UpdateGalleryCollections :exec
+update galleries set collections = @collections, last_updated = now() where galleries.id = @gallery_id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = cardinality(@collections);
 
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
 -- name: GetGalleryTokenMediasByGalleryID :many
-select t.media as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
+select t.media from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
@@ -690,11 +725,17 @@ with updates as (
 )
 update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now(), version = 1 from updates where c.id = updates.id and c.deleted = false;
 
+-- name: GetCollectionTokensByCollectionID :one
+select nfts from collections where id = $1 and deleted = false;
+
 -- name: UpdateCollectionTokens :exec
 update collections set nfts = @nfts, last_updated = now() where id = @id and deleted = false;
 
 -- name: CreateCollection :one
 insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 1, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
+
+-- name: GetGalleryIDByCollectionID :one
+select gallery_id from collections where id = $1 and deleted = false;
 
 -- name: GetTrendingUserIDs :many
 with rollup as (
