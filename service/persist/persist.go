@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/jackc/pgtype"
 	"github.com/lib/pq"
 
 	"github.com/segmentio/ksuid"
@@ -367,4 +368,14 @@ func ToDBIDs[T any](them []T, convert func(T) (DBID, error)) ([]DBID, error) {
 		result[i] = d
 	}
 	return result, nil
+}
+
+func ToJSONB(v any) (pgtype.JSONB, error) {
+	byt, err := json.Marshal(v)
+	if err != nil {
+		return pgtype.JSONB{}, err
+	}
+	ret := pgtype.JSONB{}
+	err = ret.Set(byt)
+	return ret, err
 }

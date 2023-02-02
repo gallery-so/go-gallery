@@ -60,8 +60,12 @@ func testGraphQL(t *testing.T) {
 		{title: "should sync tokens", run: testSyncTokens},
 		{title: "should create a collection", run: testCreateCollection},
 		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp},
+		{title: "update gallery and create a feed event with a caption", run: testUpdateGalleryWithCaption},
+		{title: "update gallery and ensure name still gets set when not sent in update", run: testUpdateGalleryWithNoNameChange},
+		{title: "update gallery with a new collection", run: testUpdateGalleryWithNewCollection},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
 		{title: "should get trending feed events", run: testTrendingFeedEvents},
+		{title: "should delete collection in gallery update", run: testUpdateGalleryDeleteCollection},
 		{title: "should update user experiences", run: testUpdateUserExperiences},
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
@@ -232,6 +236,120 @@ func testCreateCollection(t *testing.T) {
 	assert.Len(t, payload.Collection.Tokens, len(userF.tokenIDs))
 }
 
+func testUpdateGalleryWithCaption(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	colResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
+		GalleryId:      userF.galleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.tokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
+				{
+					Columns:    0,
+					Whitespace: []int{},
+				},
+			},
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.tokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
+	})
+
+	require.NoError(t, err)
+	colPay := (*colResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, colPay.Collection.Dbid)
+	assert.Len(t, colPay.Collection.Tokens, 1)
+
+	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId: userF.galleryID,
+		Name:      util.ToPointer("newName"),
+		UpdatedCollections: []*UpdateCollectionInput{
+			{
+				Dbid:           colPay.Collection.Dbid,
+				Tokens:         userF.tokenIDs[:2],
+				Name:           "yes",
+				CollectorsNote: "no",
+				Layout: CollectionLayoutInput{
+					Sections: []int{0},
+					SectionLayout: []CollectionSectionLayoutInput{
+						{
+							Columns:    0,
+							Whitespace: []int{},
+						},
+					},
+				},
+				TokenSettings: []CollectionTokenSettingsInput{
+					{
+						TokenId:    userF.tokenIDs[0],
+						RenderLive: false,
+					},
+				}},
+		},
+		CreatedCollections: []*CreateCollectionInGalleryInput{
+			{
+				GivenID:        "wow",
+				Tokens:         userF.tokenIDs[:3],
+				CollectorsNote: "this is a note",
+				Name:           "newCollection",
+				Layout: CollectionLayoutInput{
+					Sections: []int{0},
+					SectionLayout: []CollectionSectionLayoutInput{
+						{
+							Columns:    3,
+							Whitespace: []int{},
+						},
+					},
+				},
+				TokenSettings: []CollectionTokenSettingsInput{
+					{
+						TokenId:    userF.tokenIDs[0],
+						RenderLive: false,
+					},
+				},
+			},
+		},
+		Order:   []persist.DBID{colPay.Collection.Dbid, "wow"},
+		Caption: util.ToPointer("newCaption"),
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, response.UpdateGallery)
+	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	if !ok {
+		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		t.Fatal(err)
+	}
+	assert.NotEmpty(t, payload.Gallery.Name)
+	vResp, err := viewerQuery(context.Background(), c)
+	require.NoError(t, err)
+
+	vPayload := (*vResp.Viewer).(*viewerQueryViewer)
+	node := vPayload.User.Feed.Edges[0].Node
+	assert.NotNil(t, node)
+	feedEvent := (*node).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+	assert.Equal(t, "newCaption", *feedEvent.Caption)
+	edata := *(*feedEvent.EventData).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData)
+	assert.EqualValues(t, persist.ActionGalleryUpdated, *edata.Action)
+	for _, c := range edata.SubEventDatas {
+		ac := c.GetAction()
+		if persist.Action(*ac) == persist.ActionCollectionCreated {
+			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData)
+			assert.Greater(t, len(ca.NewTokens), 0)
+		}
+		if persist.Action(*ac) == persist.ActionTokensAddedToCollection {
+			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
+			assert.Greater(t, len(ca.NewTokens), 0)
+		}
+	}
+}
 func testCreateGallery(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.id)
@@ -311,6 +429,123 @@ func testUpdateUserExperiences(t *testing.T) {
 			assert.True(t, experience.Experienced)
 		}
 	}
+}
+
+func testUpdateGalleryDeleteCollection(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	colResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
+		GalleryId:      userF.galleryID,
+		Name:           "newCollection",
+		CollectorsNote: "this is a note",
+		Tokens:         userF.tokenIDs[:1],
+		Layout: CollectionLayoutInput{
+			Sections: []int{0},
+			SectionLayout: []CollectionSectionLayoutInput{
+				{
+					Columns:    0,
+					Whitespace: []int{},
+				},
+			},
+		},
+		TokenSettings: []CollectionTokenSettingsInput{
+			{
+				TokenId:    userF.tokenIDs[0],
+				RenderLive: false,
+			},
+		},
+		Caption: nil,
+	})
+
+	require.NoError(t, err)
+	colPay := (*colResp.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
+	assert.NotEmpty(t, colPay.Collection.Dbid)
+	assert.Len(t, colPay.Collection.Tokens, 1)
+
+	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId:          userF.galleryID,
+		DeletedCollections: []persist.DBID{colPay.Collection.Dbid},
+		Order:              []persist.DBID{},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, response.UpdateGallery)
+	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	if !ok {
+		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		t.Fatal(err)
+	}
+	assert.Len(t, payload.Gallery.Collections, 0)
+}
+
+func testUpdateGalleryWithNoNameChange(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId: userF.galleryID,
+		Name:      util.ToPointer("newName"),
+	})
+
+	require.NoError(t, err)
+	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	if !ok {
+		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		t.Fatal(err)
+	}
+	assert.NotEmpty(t, payload.Gallery.Name)
+
+	response, err = updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId: userF.galleryID,
+	})
+
+	require.NoError(t, err)
+	payload, ok = (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	if !ok {
+		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		t.Fatal(err)
+	}
+	assert.NotEmpty(t, payload.Gallery.Name)
+}
+
+func testUpdateGalleryWithNewCollection(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	c := authedHandlerClient(t, userF.id)
+
+	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId: userF.galleryID,
+
+		CreatedCollections: []*CreateCollectionInGalleryInput{
+			{
+				Name:           "yay",
+				CollectorsNote: "this is a note",
+				Tokens:         userF.tokenIDs[:1],
+				Hidden:         false,
+				Layout: CollectionLayoutInput{
+					Sections: []int{0},
+					SectionLayout: []CollectionSectionLayoutInput{
+						{
+							Columns:    1,
+							Whitespace: []int{},
+						},
+					},
+				},
+				TokenSettings: []CollectionTokenSettingsInput{},
+				GivenID:       "wow",
+			},
+		},
+		Order: []persist.DBID{"wow"},
+	})
+
+	require.NoError(t, err)
+	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	if !ok {
+		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		t.Fatal(err)
+	}
+	assert.Len(t, payload.Gallery.Collections, 1)
+	assert.Len(t, payload.Gallery.Collections[0].Tokens, 1)
 }
 
 func testViewsAreRolledUp(t *testing.T) {
@@ -569,21 +804,22 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 }
 
 // defaultHandler returns a backend GraphQL http.Handler
-func defaultHandler() http.Handler {
+func defaultHandler(t *testing.T) http.Handler {
 	c := server.ClientInit(context.Background())
 	p := server.NewMultichainProvider(c)
 	handler := server.CoreInit(c, p)
+	t.Cleanup(c.Close)
 	return handler
 }
 
 // defaultHandlerClient returns a GraphQL client attached to a backend GraphQL handler
 func defaultHandlerClient(t *testing.T) *handlerClient {
-	return customHandlerClient(t, defaultHandler())
+	return customHandlerClient(t, defaultHandler(t))
 }
 
 // authedHandlerClient returns a GraphQL client with an authenticated JWT
 func authedHandlerClient(t *testing.T, userID persist.DBID) *handlerClient {
-	return customHandlerClient(t, defaultHandler(), withJWTOpt(t, userID))
+	return customHandlerClient(t, defaultHandler(t), withJWTOpt(t, userID))
 }
 
 // customHandlerClient configures the client with the provided HTTP handler and client options

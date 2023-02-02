@@ -102,6 +102,8 @@ sql:
             go_type: "database/sql.NullString"
           - column: "events.actor_id"
             go_type: "database/sql.NullString"
+          - column: "events.group_id"
+            go_type: "database/sql.NullString"
 
           # Comments
           - column: "comments.reply_to"
@@ -169,3 +171,5 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenIDList"
           - column: "*.token_hex"
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
+          - column: "*.previews"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"

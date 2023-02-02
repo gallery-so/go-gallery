@@ -55,14 +55,17 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
-	t.Cleanup(func() { r.Close() })
 
 	db := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
-	err = migrate.RunMigration(db, "./db/migrations/indexer")
+	migrate, err := migrate.RunMigration(db, "./db/migrations/indexer")
 	if err != nil {
 		t.Fatalf("failed to seed db: %s", err)
 	}
+	t.Cleanup(func() {
+		migrate.Close()
+		r.Close()
+	})
 
 	return assert.New(t), db, pgx
 }

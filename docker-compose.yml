@@ -40,15 +40,20 @@ services:
       - POSTGRES_DB=postgres
   task-emulator:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
+    ports:
+      - "8123:8123"
     expose:
       - "8123"
+    ports:
+      - "8123:8123"
     command: [
       "-host", "0.0.0.0",
       "-port", "8123",
       "-queue", "projects/gallery-local/locations/here/queues/feedbot",
       "-queue", "projects/gallery-local/locations/here/queues/feed-event",
       "-queue", "projects/gallery-local/locations/here/queues/token-processing",
-      "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes"
+      "-queue", "projects/gallery-local/locations/here/queues/indexer-refreshes",
+      "-queue", "projects/gallery-local/locations/here/queues/wallet-validate",
     ]
   pubsub-emulator:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators

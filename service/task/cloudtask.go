@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -31,10 +32,8 @@ type FeedbotMessage struct {
 }
 
 type TokenProcessingUserMessage struct {
-	UserID            persist.DBID  `json:"user_id" binding:"required"`
-	Chain             persist.Chain `json:"chain"`
-	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
-	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
+	UserID   persist.DBID   `json:"user_id" binding:"required"`
+	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
@@ -125,10 +124,7 @@ func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUs
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
 	defer tracing.FinishSpan(span)
 
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"User ID": message.UserID,
-		"Chain":   message.Chain,
-	})
+	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
 
 	queue := viper.GetString("TOKEN_PROCESSING_QUEUE")
 	task := &taskspb.Task{
@@ -254,9 +250,14 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 				option.WithoutAuthentication(),
 			)
 		} else {
+			fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
+				return nil
+			}
 			copts = append(
 				copts,
-				option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")),
+				option.WithCredentialsJSON(fi),
 			)
 		}
 	}

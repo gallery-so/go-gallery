@@ -108,7 +108,7 @@ func For(ctx context.Context) *PublicAPI {
 	return gc.Value(apiContextKey).(*PublicAPI)
 }
 
-func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
+func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
 	gc := util.GinContextFromContext(ctx)
 	authError := auth.GetAuthErrorFromCtx(gc)
 
@@ -128,10 +128,35 @@ func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, cap
 
 	if caption != nil {
 		evt.Caption = persist.StrToNullStr(caption)
-		return event.DispatchImmediate(ctx, evt)
+		return event.DispatchImmediate(ctx, []db.Event{evt})
 	}
 
 	go pushEvent(ctx, evt)
+	return nil, nil
+}
+
+func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
+	groupID := persist.GenerateID()
+	for i, evt := range evts {
+		if err := v.Struct(evt); err != nil {
+			return nil, err
+		}
+		evt.GroupID = persist.DBIDToNullStr(groupID)
+		evts[i] = evt
+	}
+
+	if caption != nil {
+		for i, evt := range evts {
+			evt.Caption = persist.StrToNullStr(caption)
+			evts[i] = evt
+		}
+		return event.DispatchImmediate(ctx, evts)
+	}
+
+	for _, evt := range evts {
+		go pushEvent(ctx, evt)
+	}
 	return nil, nil
 }
 
@@ -142,14 +167,5 @@ func pushEvent(ctx context.Context, evt db.Event) {
 	if err := event.DispatchDelayed(ctx, evt); err != nil {
 		logger.For(ctx).Error(err)
 		sentryutil.ReportError(ctx, err)
-	}
-}
-
-func setConditionalValue[T any](value *T, param *T, conditional *bool) {
-	if value != nil {
-		*param = *value
-		*conditional = true
-	} else {
-		*conditional = false
 	}
 }
