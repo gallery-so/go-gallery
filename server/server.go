@@ -72,6 +72,11 @@ type Clients struct {
 	SecretClient    *secretmanager.Client
 	PubSubClient    *pubsub.Client
 	MagicLinkClient *magicclient.API
+	closeFunc       func()
+}
+
+func (c *Clients) Close() {
+	c.closeFunc()
 }
 
 func ClientInit(ctx context.Context) *Clients {
@@ -81,7 +86,7 @@ func ClientInit(ctx context.Context) *Clients {
 		Repos:           postgres.NewRepositories(pq, pgx),
 		Queries:         db.New(pgx),
 		HTTPClient:      &http.Client{Timeout: 10 * time.Minute},
-		EthClient:       newEthClient(),
+		EthClient:       rpc.NewEthClient(),
 		IPFSClient:      rpc.NewIPFSShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
 		StorageClient:   media.NewStorageClient(ctx),
@@ -89,6 +94,10 @@ func ClientInit(ctx context.Context) *Clients {
 		SecretClient:    newSecretsClient(),
 		PubSubClient:    gcp.NewClient(ctx),
 		MagicLinkClient: auth.NewMagicLinkClient(),
+		closeFunc: func() {
+			pq.Close()
+			pgx.Close()
+		},
 	}
 }
 
@@ -160,7 +169,7 @@ func SetDefaults() {
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("PREMIUM_CONTRACT_ADDRESS", "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698=[0,1,2,3,4,5,6,7,8]")
-	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("RPC_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
@@ -218,14 +227,6 @@ func SetDefaults() {
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 	}
-}
-
-func newEthClient() *ethclient.Client {
-	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
-	if err != nil {
-		panic(err)
-	}
-	return client
 }
 
 func initSentry() {

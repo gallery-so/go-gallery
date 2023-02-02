@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net"
 
@@ -254,17 +253,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 	}
 
 	layouts, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
-		b, err := json.Marshal(modelToTokenLayout(u.Layout))
-		if err != nil {
-			return pgtype.JSONB{
-				Status: pgtype.Null,
-			}, err
-		}
-
-		return pgtype.JSONB{
-			Bytes:  b,
-			Status: pgtype.Present,
-		}, nil
+		return persist.ToJSONB(modelToTokenLayout(u.Layout))
 	})
 	if err != nil {
 		return nil, err
@@ -272,16 +261,7 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, g
 
 	tokenSettings, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		settings := modelToTokenSettings(u.TokenSettings)
-		b, err := json.Marshal(settings)
-		if err != nil {
-			return pgtype.JSONB{
-				Status: pgtype.Null,
-			}, err
-		}
-		return pgtype.JSONB{
-			Bytes:  b,
-			Status: pgtype.Present,
-		}, nil
+		return persist.ToJSONB(settings)
 	})
 	if err != nil {
 		return nil, err
