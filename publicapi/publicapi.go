@@ -136,18 +136,26 @@ func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, cap
 }
 
 func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
+
+	if len(evts) == 0 {
+		return nil, nil
+	}
+
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
-	groupID := persist.GenerateID()
 	for i, evt := range evts {
+
 		if err := v.Struct(evt); err != nil {
 			return nil, err
 		}
-		evt.GroupID = persist.DBIDToNullStr(groupID)
 		evts[i] = evt
 	}
 
 	if caption != nil {
+
+		groupID := persist.GenerateID()
+		logger.For(ctx).Infof("dispatching events immediately with caption %s and group id %s", *caption, groupID)
 		for i, evt := range evts {
+			evt.GroupID = persist.DBIDToNullStr(groupID)
 			evt.Caption = persist.StrToNullStr(caption)
 			evts[i] = evt
 		}

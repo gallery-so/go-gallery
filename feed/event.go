@@ -6,6 +6,7 @@ import (
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -35,7 +36,7 @@ var (
 		persist.ActionCollectorsNoteAddedToCollection: actorGallerySegment,
 		persist.ActionTokensAddedToCollection:         actorGallerySegment,
 		persist.ActionCollectionUpdated:               actorSubjectSegment,
-		persist.ActionGalleryUpdated:                  actorSubjectActionSegment,
+		persist.ActionGalleryUpdated:                  actorGallerySegment,
 	}
 
 	// Feed events in this group can contain a collection collector's note
@@ -173,6 +174,8 @@ func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, erro
 		return false, err
 	}
 
+	logger.For(ctx).Infof("event %s still editing: %t", event.ID, stillEditing)
+
 	return !stillEditing, nil
 }
 
@@ -236,10 +239,15 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 		return nil, err
 	}
 
+	if len(events) == 0 {
+		return nil, nil
+	}
+
 	merged := mergeGalleryEvents(events)
 	if len(merged.eventIDs) == 0 {
 		return nil, nil
 	}
+
 	return b.feedRepo.Add(ctx, db.FeedEvent{
 		ID:        persist.GenerateID(),
 		OwnerID:   merged.actorID,
