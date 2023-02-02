@@ -404,8 +404,8 @@ SELECT * FROM feed_events WHERE owner_id = sqlc.arg('owner_id') AND deleted = fa
 select f.* from feed_events f join unnest(@feed_event_ids::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
   and t.pos > @cur_before_pos::int
   and t.pos < @cur_after_pos::int
-  order by case when @paging_forward::bool then t.pos end asc,
-          case when not @paging_forward::bool then t.pos end desc
+  order by case when @paging_forward::bool then t.pos end desc,
+          case when not @paging_forward::bool then t.pos end asc
   limit sqlc.arg('limit');
 
 -- name: GetEventByIdBatch :batchone

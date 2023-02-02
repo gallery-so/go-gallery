@@ -72,6 +72,11 @@ type Clients struct {
 	SecretClient    *secretmanager.Client
 	PubSubClient    *pubsub.Client
 	MagicLinkClient *magicclient.API
+	closeFunc       func()
+}
+
+func (c *Clients) Close() {
+	c.closeFunc()
 }
 
 func ClientInit(ctx context.Context) *Clients {
@@ -89,6 +94,10 @@ func ClientInit(ctx context.Context) *Clients {
 		SecretClient:    newSecretsClient(),
 		PubSubClient:    gcp.NewClient(ctx),
 		MagicLinkClient: auth.NewMagicLinkClient(),
+		closeFunc: func() {
+			pq.Close()
+			pgx.Close()
+		},
 	}
 }
 

@@ -9,26 +9,21 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
-func RunMigration(client *sql.DB, file string) error {
+func RunMigration(client *sql.DB, file string) (*migrate.Migrate, error) {
 	dir, err := util.FindFile(file, 3)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	d, err := pgdriver.WithInstance(client, &pgdriver.Config{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m, err := migrate.NewWithDatabaseInstance("file://"+dir, "postgres", d)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = m.Up()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return m, m.Up()
 }
