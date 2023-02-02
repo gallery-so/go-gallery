@@ -59,6 +59,8 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event db.Event) (*d
 		Data:           event.Data,
 		GroupID:        event.GroupID,
 		Caption:        event.Caption,
+		GalleryID:      event.GalleryID,
+		CollectionID:   event.CollectionID,
 	})
 	return &event, err
 }
@@ -73,6 +75,7 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 		Data:           event.Data,
 		Caption:        event.Caption,
 		GroupID:        event.GroupID,
+		GalleryID:      event.GalleryID,
 	})
 	return &event, err
 }

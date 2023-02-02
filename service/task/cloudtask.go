@@ -63,13 +63,16 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 		"Event ID": message.ID,
 	})
 
+	url := fmt.Sprintf("%s/tasks/feed-event", viper.GetString("FEED_URL"))
+	logger.For(ctx).Infof("creating task for feed event %s, scheduling on %s, sending to %s", message.ID, scheduleOn, url)
+
 	queue := viper.GetString("GCLOUD_FEED_QUEUE")
 	task := &taskspb.Task{
 		ScheduleTime: timestamppb.New(scheduleOn),
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/tasks/feed-event", viper.GetString("FEED_URL")),
+				Url:        url,
 				Headers: map[string]string{
 					"Content-type":  "application/json",
 					"sentry-trace":  span.TraceID.String(),

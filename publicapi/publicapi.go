@@ -151,7 +151,9 @@ func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate,
 	}
 
 	if caption != nil {
+
 		groupID := persist.GenerateID()
+		logger.For(ctx).Infof("dispatching events immediately with caption %s and group id %s", *caption, groupID)
 		for i, evt := range evts {
 			evt.GroupID = persist.DBIDToNullStr(groupID)
 			evt.Caption = persist.StrToNullStr(caption)
