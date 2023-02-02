@@ -3,10 +3,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgtype"
@@ -330,45 +328,34 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		return time.Time{}, []persist.TokenGallery{}, nil
 	}
 
-	appendBool := func(dest *[]bool, src *bool, errs *[]error) {
-		if src == nil {
-			*dest = append(*dest, false)
-			return
+	appendWalletList := func(dest *[]string, src []persist.Wallet, startIndices, endIndices *[]int32) {
+		items := make([]persist.DBID, len(src))
+		for i, wallet := range src {
+			items[i] = wallet.ID
 		}
-		*dest = append(*dest, *src)
+		appendDBIDList(dest, items, startIndices, endIndices)
 	}
 
-	appendJSONB := func(dest *[]pgtype.JSONB, src any, errs *[]error) {
-		jsonb, err := persist.ToJSONB(src)
-		if err != nil {
-			*errs = append(*errs, err)
-			return
-		}
-		*dest = append(*dest, jsonb)
-	}
-
-	appendAddressAtBlockArray := func(dest *[]string, src []persist.AddressAtBlock, delim string, errs *[]error) {
-		valuers := make([]driver.Valuer, len(src))
+	appendAddressAtBlock := func(dest *[]pgtype.JSONB, src []persist.AddressAtBlock, startIndices, endIndices *[]int32, errs *[]error) {
+		items := make([]any, len(src))
 		for i, item := range src {
-			valuers[i] = item
+			items[i] = item
 		}
-		appendArrayType[[]byte](dest, valuers, delim, errs)
+		appendJSONBList(dest, items, startIndices, endIndices, errs)
 	}
 
-	appendWalletArray := func(dest *[]string, src []persist.Wallet, delim string, errs *[]error) {
-		valuers := make([]driver.Valuer, len(src))
-		for i, item := range src {
-			valuers[i] = item
-		}
-		appendArrayType[string](dest, valuers, delim, errs)
-	}
-
+	// addIDIfMissing is used because sqlc was unable to bind arrays of our own custom types
+	// i.e. an array of persist.DBIDs instead of an array of strings. A zero-valued persist.DBID
+	// generates a new ID on insert, but instead we need to generate an ID beforehand.
 	addIDIfMissing := func(t *persist.TokenGallery) {
 		if t.ID == persist.DBID("") {
 			(*t).ID = persist.GenerateID()
 		}
 	}
 
+	// addTimesIfMissing is required because sqlc was unable to bind arrays of our own custom types
+	// i.e. an array of persist.CreationTime instead of an array of time.Time. A zero-valued persist.CreationTime
+	// uses the current time as the column value, but instead we need to manually add a time to the struct.
 	addTimesIfMissing := func(t *persist.TokenGallery, ts time.Time) {
 		if t.CreationTime.Time().IsZero() {
 			(*t).CreationTime = persist.CreationTime(ts)
@@ -382,7 +369,7 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 	}
 
 	tokens = t.dedupeTokens(tokens)
-	params := db.UpsertTokensParams{Delim: "|"}
+	params := db.UpsertTokensParams{}
 	now := time.Now()
 
 	var errors []error
@@ -403,12 +390,12 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.TokenType = append(params.TokenType, t.TokenType.String())
 		params.TokenID = append(params.TokenID, t.TokenID.String())
 		params.Quantity = append(params.Quantity, t.Quantity.String())
-		appendAddressAtBlockArray(&params.OwnershipHistorySerialized, t.OwnershipHistory, params.Delim, &errors)
+		appendAddressAtBlock(&params.OwnershipHistory, t.OwnershipHistory, &params.OwnershipHistoryStartIdx, &params.OwnershipHistoryEndIdx, &errors)
 		appendJSONB(&params.TokenMetadata, t.TokenMetadata, &errors)
 		params.ExternalUrl = append(params.ExternalUrl, t.ExternalURL.String())
 		params.BlockNumber = append(params.BlockNumber, t.BlockNumber.BigInt().Int64())
 		params.OwnerUserID = append(params.OwnerUserID, t.OwnerUserID.String())
-		appendWalletArray(&params.OwnedByWalletsSerialized, t.OwnedByWallets, params.Delim, &errors)
+		appendWalletList(&params.OwnedByWallets, t.OwnedByWallets, &params.OwnedByWalletsStartIdx, &params.OwnedByWalletsEndIdx)
 		params.Chain = append(params.Chain, int32(t.Chain))
 		params.Contract = append(params.Contract, t.Contract.String())
 		appendBool(&params.IsUserMarkedSpam, t.IsUserMarkedSpam, &errors)
@@ -428,29 +415,61 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		return time.Time{}, nil, err
 	}
 
-	// Update tokens with the existing creation time and ID if the token already exists
+	// Update tokens with the existing data if the token already exists.
 	for i := range tokens {
 		t := &tokens[i]
 		(*t).ID = upserted[i].ID
 		(*t).CreationTime = persist.CreationTime(upserted[i].CreatedAt)
 		(*t).LastUpdated = persist.LastUpdatedTime(upserted[i].LastUpdated)
 		(*t).LastSynced = persist.LastUpdatedTime(upserted[i].LastSynced)
+		(*t).Media = upserted[i].Media
 	}
 
 	return now, tokens, nil
 }
 
-func appendArrayType[T string | []byte](dest *[]string, src []driver.Valuer, delim string, errs *[]error) {
-	valued := make([]string, len(src))
-	for i, item := range src {
-		v, err := item.Value()
-		if err != nil {
-			*errs = append(*errs, err)
+func appendIndices(startIndices *[]int32, endIndices *[]int32, entryLength int) {
+	// Postgres uses 1-based indexing
+	startIndex := int32(1)
+	if len(*endIndices) > 0 {
+		startIndex = (*endIndices)[len(*endIndices)-1] + 1
+	}
+	*startIndices = append(*startIndices, startIndex)
+	*endIndices = append(*endIndices, startIndex+int32(entryLength)-1)
+}
+
+func appendBool(dest *[]bool, src *bool, errs *[]error) {
+	if src == nil {
+		*dest = append(*dest, false)
+		return
+	}
+	*dest = append(*dest, *src)
+}
+
+func appendJSONB(dest *[]pgtype.JSONB, src any, errs *[]error) error {
+	jsonb, err := persist.ToJSONB(src)
+	if err != nil {
+		*errs = append(*errs, err)
+		return err
+	}
+	*dest = append(*dest, jsonb)
+	return nil
+}
+
+func appendDBIDList(dest *[]string, src []persist.DBID, startIndices, endIndices *[]int32) {
+	for _, id := range src {
+		*dest = append(*dest, id.String())
+	}
+	appendIndices(startIndices, endIndices, len(src))
+}
+
+func appendJSONBList(dest *[]pgtype.JSONB, src []any, startIndices, endIndices *[]int32, errs *[]error) {
+	for _, item := range src {
+		if err := appendJSONB(dest, item, errs); err != nil {
 			return
 		}
-		valued[i] = string(v.(T))
 	}
-	*dest = append(*dest, strings.Join(valued, delim))
+	appendIndices(startIndices, endIndices, len(src))
 }
 
 func (t *TokenGalleryRepository) excludeZeroQuantityTokens(pCtx context.Context, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {

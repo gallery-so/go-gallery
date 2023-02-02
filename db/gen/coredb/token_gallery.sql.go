@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
-	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 const upsertTokens = `-- name: UpsertTokens :many
@@ -54,12 +53,12 @@ insert into tokens
     , token_type
     , token_id
     , quantity
-    , string_to_array(ownership_history_serialized, $1)::jsonb[] as ownership_history
+    , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
     , token_metadata
     , external_url
     , block_number
     , owner_user_id
-    , string_to_array(owned_by_wallets_serialized, $1)::varchar[] as owned_by_wallets
+    , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
     , chain
     , contract
     , is_user_marked_spam
@@ -68,30 +67,34 @@ insert into tokens
     , token_uri
   from (
     select
-      unnest($2::varchar[]) as id
-      , unnest($3::boolean[]) as deleted
-      , unnest($4::int[]) as version
-      , unnest($5::timestamptz[]) as created_at
-      , unnest($6::timestamptz[]) as last_updated
-      , unnest($7::varchar[]) as name
-      , unnest($8::varchar[]) as description
-      , unnest($9::varchar[]) as collectors_note
-      , unnest($10::jsonb[]) as media
-      , unnest($11::varchar[]) as token_type
-      , unnest($12::varchar[]) as token_id
-      , unnest($13::varchar[]) as quantity
-      , unnest($14::varchar[]) as ownership_history_serialized
-      , unnest($15::jsonb[]) as token_metadata
-      , unnest($16::varchar[]) as external_url
-      , unnest($17::bigint[]) as block_number
-      , unnest($18::varchar[]) as owner_user_id
-      , unnest($19::varchar[]) as owned_by_wallets_serialized
-      , unnest($20::int[]) as chain
-      , unnest($21::varchar[]) as contract
-      , unnest($22::bool[]) as is_user_marked_spam
-      , unnest($23::bool[]) as is_provider_marked_spam
-      , unnest($24::timestamptz[]) as last_synced
-      , unnest($25::varchar[]) as token_uri
+      unnest($1::varchar[]) as id
+      , unnest($2::boolean[]) as deleted
+      , unnest($3::int[]) as version
+      , unnest($4::timestamptz[]) as created_at
+      , unnest($5::timestamptz[]) as last_updated
+      , unnest($6::varchar[]) as name
+      , unnest($7::varchar[]) as description
+      , unnest($8::varchar[]) as collectors_note
+      , unnest($9::jsonb[]) as media
+      , unnest($10::varchar[]) as token_type
+      , unnest($11::varchar[]) as token_id
+      , unnest($12::varchar[]) as quantity
+      , $13::jsonb[] as ownership_history
+      , unnest($14::int[]) as ownership_history_start_idx
+      , unnest($15::int[]) as ownership_history_end_idx
+      , unnest($16::jsonb[]) as token_metadata
+      , unnest($17::varchar[]) as external_url
+      , unnest($18::bigint[]) as block_number
+      , unnest($19::varchar[]) as owner_user_id
+      , $20::varchar[] as owned_by_wallets
+      , unnest($21::int[]) as owned_by_wallets_start_idx
+      , unnest($22::int[]) as owned_by_wallets_end_idx
+      , unnest($23::int[]) as chain
+      , unnest($24::varchar[]) as contract
+      , unnest($25::bool[]) as is_user_marked_spam
+      , unnest($26::bool[]) as is_provider_marked_spam
+      , unnest($27::timestamptz[]) as last_synced
+      , unnest($28::varchar[]) as token_uri
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
@@ -114,47 +117,42 @@ do update set
   , is_user_marked_spam = tokens.is_user_marked_spam
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
-returning id, created_at, last_updated, last_synced
+returning id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced
 `
 
 type UpsertTokensParams struct {
-	Delim                      string
-	ID                         []string
-	Deleted                    []bool
-	Version                    []int32
-	CreatedAt                  []time.Time
-	LastUpdated                []time.Time
-	Name                       []string
-	Description                []string
-	CollectorsNote             []string
-	Media                      []pgtype.JSONB
-	TokenType                  []string
-	TokenID                    []string
-	Quantity                   []string
-	OwnershipHistorySerialized []string
-	TokenMetadata              []pgtype.JSONB
-	ExternalUrl                []string
-	BlockNumber                []int64
-	OwnerUserID                []string
-	OwnedByWalletsSerialized   []string
-	Chain                      []int32
-	Contract                   []string
-	IsUserMarkedSpam           []bool
-	IsProviderMarkedSpam       []bool
-	LastSynced                 []time.Time
-	TokenUri                   []string
+	ID                       []string
+	Deleted                  []bool
+	Version                  []int32
+	CreatedAt                []time.Time
+	LastUpdated              []time.Time
+	Name                     []string
+	Description              []string
+	CollectorsNote           []string
+	Media                    []pgtype.JSONB
+	TokenType                []string
+	TokenID                  []string
+	Quantity                 []string
+	OwnershipHistory         []pgtype.JSONB
+	OwnershipHistoryStartIdx []int32
+	OwnershipHistoryEndIdx   []int32
+	TokenMetadata            []pgtype.JSONB
+	ExternalUrl              []string
+	BlockNumber              []int64
+	OwnerUserID              []string
+	OwnedByWallets           []string
+	OwnedByWalletsStartIdx   []int32
+	OwnedByWalletsEndIdx     []int32
+	Chain                    []int32
+	Contract                 []string
+	IsUserMarkedSpam         []bool
+	IsProviderMarkedSpam     []bool
+	LastSynced               []time.Time
+	TokenUri                 []string
 }
 
-type UpsertTokensRow struct {
-	ID          persist.DBID
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	LastSynced  time.Time
-}
-
-func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]UpsertTokensRow, error) {
+func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]Token, error) {
 	rows, err := q.db.Query(ctx, upsertTokens,
-		arg.Delim,
 		arg.ID,
 		arg.Deleted,
 		arg.Version,
@@ -167,12 +165,16 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 		arg.TokenType,
 		arg.TokenID,
 		arg.Quantity,
-		arg.OwnershipHistorySerialized,
+		arg.OwnershipHistory,
+		arg.OwnershipHistoryStartIdx,
+		arg.OwnershipHistoryEndIdx,
 		arg.TokenMetadata,
 		arg.ExternalUrl,
 		arg.BlockNumber,
 		arg.OwnerUserID,
-		arg.OwnedByWalletsSerialized,
+		arg.OwnedByWallets,
+		arg.OwnedByWalletsStartIdx,
+		arg.OwnedByWalletsEndIdx,
 		arg.Chain,
 		arg.Contract,
 		arg.IsUserMarkedSpam,
@@ -184,13 +186,33 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]U
 		return nil, err
 	}
 	defer rows.Close()
-	var items []UpsertTokensRow
+	var items []Token
 	for rows.Next() {
-		var i UpsertTokensRow
+		var i Token
 		if err := rows.Scan(
 			&i.ID,
+			&i.Deleted,
+			&i.Version,
 			&i.CreatedAt,
 			&i.LastUpdated,
+			&i.Name,
+			&i.Description,
+			&i.CollectorsNote,
+			&i.Media,
+			&i.TokenUri,
+			&i.TokenType,
+			&i.TokenID,
+			&i.Quantity,
+			&i.OwnershipHistory,
+			&i.TokenMetadata,
+			&i.ExternalUrl,
+			&i.BlockNumber,
+			&i.OwnerUserID,
+			&i.OwnedByWallets,
+			&i.Chain,
+			&i.Contract,
+			&i.IsUserMarkedSpam,
+			&i.IsProviderMarkedSpam,
 			&i.LastSynced,
 		); err != nil {
 			return nil, err

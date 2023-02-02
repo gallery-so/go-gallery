@@ -394,8 +394,9 @@ outer:
 	tokenIDsToProcess := make([]persist.DBID, 0)
 
 	for _, token := range upsertedTokens {
-		// Only process new tokens
-		if token.CreationTime.Time() == token.LastUpdated.Time() {
+		// Only process net new tokens based on the creation and update time.
+		// Also process existing tokens that may not have had valid media returned on the last sync.
+		if (token.CreationTime.Time() == token.LastUpdated.Time()) || !token.Media.IsServable() {
 			tokenIDsToProcess = append(tokenIDsToProcess, token.ID)
 		}
 	}

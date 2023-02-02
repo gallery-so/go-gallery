@@ -39,12 +39,12 @@ insert into tokens
     , token_type
     , token_id
     , quantity
-    , string_to_array(ownership_history_serialized, @delim)::jsonb[] as ownership_history
+    , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
     , token_metadata
     , external_url
     , block_number
     , owner_user_id
-    , string_to_array(owned_by_wallets_serialized, @delim)::varchar[] as owned_by_wallets
+    , owned_by_wallets[owned_by_wallets_start_idx::int:owned_by_wallets_end_idx::int]
     , chain
     , contract
     , is_user_marked_spam
@@ -65,12 +65,16 @@ insert into tokens
       , unnest(@token_type::varchar[]) as token_type
       , unnest(@token_id::varchar[]) as token_id
       , unnest(@quantity::varchar[]) as quantity
-      , unnest(@ownership_history_serialized::varchar[]) as ownership_history_serialized
+      , @ownership_history::jsonb[] as ownership_history
+      , unnest(@ownership_history_start_idx::int[]) as ownership_history_start_idx
+      , unnest(@ownership_history_end_idx::int[]) as ownership_history_end_idx
       , unnest(@token_metadata::jsonb[]) as token_metadata
       , unnest(@external_url::varchar[]) as external_url
       , unnest(@block_number::bigint[]) as block_number
       , unnest(@owner_user_id::varchar[]) as owner_user_id
-      , unnest(@owned_by_wallets_serialized::varchar[]) as owned_by_wallets_serialized
+      , @owned_by_wallets::varchar[] as owned_by_wallets
+      , unnest(@owned_by_wallets_start_idx::int[]) as owned_by_wallets_start_idx
+      , unnest(@owned_by_wallets_end_idx::int[]) as owned_by_wallets_end_idx
       , unnest(@chain::int[]) as chain
       , unnest(@contract::varchar[]) as contract
       , unnest(@is_user_marked_spam::bool[]) as is_user_marked_spam
@@ -99,4 +103,4 @@ do update set
   , is_user_marked_spam = tokens.is_user_marked_spam
   , is_provider_marked_spam = excluded.is_provider_marked_spam
   , last_synced = greatest(excluded.last_synced,tokens.last_synced)
-returning id, created_at, last_updated, last_synced;
+returning *;
