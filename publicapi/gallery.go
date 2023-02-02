@@ -5,14 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net"
 
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/auth"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
@@ -67,13 +65,6 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 }
 
 func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGalleryInput) (db.Gallery, error) {
-
-	marshalledInput, err := json.MarshalIndent(update, "", "  ")
-	if err != nil {
-		return db.Gallery{}, err
-	}
-
-	logger.For(ctx).Info("UpdateGallery", "input", string(marshalledInput))
 
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":           {update.GalleryID, "required"},
