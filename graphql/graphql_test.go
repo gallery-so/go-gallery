@@ -804,21 +804,22 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 }
 
 // defaultHandler returns a backend GraphQL http.Handler
-func defaultHandler() http.Handler {
+func defaultHandler(t *testing.T) http.Handler {
 	c := server.ClientInit(context.Background())
 	p := server.NewMultichainProvider(c)
 	handler := server.CoreInit(c, p)
+	t.Cleanup(c.Close)
 	return handler
 }
 
 // defaultHandlerClient returns a GraphQL client attached to a backend GraphQL handler
 func defaultHandlerClient(t *testing.T) *handlerClient {
-	return customHandlerClient(t, defaultHandler())
+	return customHandlerClient(t, defaultHandler(t))
 }
 
 // authedHandlerClient returns a GraphQL client with an authenticated JWT
 func authedHandlerClient(t *testing.T, userID persist.DBID) *handlerClient {
-	return customHandlerClient(t, defaultHandler(), withJWTOpt(t, userID))
+	return customHandlerClient(t, defaultHandler(t), withJWTOpt(t, userID))
 }
 
 // customHandlerClient configures the client with the provided HTTP handler and client options

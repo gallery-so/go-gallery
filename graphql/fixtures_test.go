@@ -75,9 +75,12 @@ func usePostgres(t *testing.T) {
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
-	err = migrate.RunMigration(postgres.NewClient(), "./db/migrations/core")
+	migrate, err := migrate.RunMigration(postgres.NewClient(), "./db/migrations/core")
 	require.NoError(t, err)
-	t.Cleanup(func() { r.Close() })
+	t.Cleanup(func() {
+		migrate.Close()
+		r.Close()
+	})
 }
 
 // useRedis starts a running Redis Docker container and stops the instance
@@ -150,7 +153,7 @@ type serverFixture struct {
 // newServerFixture starts a new HTTP server for end-to-end tests
 func newServerFixture(t *testing.T) serverFixture {
 	t.Helper()
-	server := httptest.NewServer(defaultHandler())
+	server := httptest.NewServer(defaultHandler(t))
 	t.Cleanup(func() { server.Close() })
 	return serverFixture{server}
 }
