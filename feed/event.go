@@ -236,6 +236,10 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 		return nil, err
 	}
 
+	if len(events) == 0 {
+		return nil, nil
+	}
+
 	merged := mergeGalleryEvents(events)
 	if len(merged.eventIDs) == 0 {
 		return nil, nil

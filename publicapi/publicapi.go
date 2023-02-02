@@ -140,10 +140,10 @@ func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate,
 	if len(evts) == 0 {
 		return nil, nil
 	}
-	groupID := persist.GenerateID()
+
 	ctx = sentryutil.NewSentryHubGinContext(ctx)
 	for i, evt := range evts {
-		evt.GroupID = persist.DBIDToNullStr(groupID)
+
 		if err := v.Struct(evt); err != nil {
 			return nil, err
 		}
@@ -151,9 +151,9 @@ func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate,
 	}
 
 	if caption != nil {
-
+		groupID := persist.GenerateID()
 		for i, evt := range evts {
-
+			evt.GroupID = persist.DBIDToNullStr(groupID)
 			evt.Caption = persist.StrToNullStr(caption)
 			evts[i] = evt
 		}
