@@ -108,17 +108,6 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	// update collections
-
-	if len(update.UpdatedCollections) > 0 {
-		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.GalleryID, update.UpdatedCollections)
-		if err != nil {
-			return db.Gallery{}, err
-		}
-
-		events = append(events, collEvents...)
-	}
-
 	// create collections
 	mappedIDs := make(map[persist.DBID]persist.DBID)
 	for _, c := range update.CreatedCollections {
@@ -152,6 +141,17 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		})
 
 		mappedIDs[c.GivenID] = collectionID
+	}
+
+	// update collections
+
+	if len(update.UpdatedCollections) > 0 {
+		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.GalleryID, update.UpdatedCollections)
+		if err != nil {
+			return db.Gallery{}, err
+		}
+
+		events = append(events, collEvents...)
 	}
 
 	// order collections
