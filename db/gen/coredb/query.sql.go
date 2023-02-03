@@ -829,24 +829,16 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 }
 
 const getAllTimeTrendingUserIDs = `-- name: GetAllTimeTrendingUserIDs :many
-with gallery_views as (
-  select gallery_id, count(*)
-  from events
-  where action = 'ViewedGallery'
-  group by gallery_id
-)
-
 select users.id
 from events, galleries, users
-left join legacy_views on users.id = legacy_views.user_id
+left join legacy_views on users.id = legacy_views.user_id and legacy_views.deleted = false
 where action = 'ViewedGallery'
   and events.gallery_id = galleries.id
   and users.id = galleries.owner_user_id
   and galleries.deleted = false
   and users.deleted = false
-  and legacy_views.deleted = false
 group by users.id
-order by row_number() over(order by count(events.id) + max(legacy_views.view_count) desc, max(users.created_at) desc)
+order by row_number() over(order by count(events.id) + coalesce(max(legacy_views.view_count), 0) desc, max(users.created_at) desc) asc
 limit $1
 `
 
@@ -3233,7 +3225,7 @@ where viewers.gallery_id = galleries.id
 	and galleries.deleted = false
   and users.id = edit_events.actor_id
 group by users.id
-order by row_number() over(order by sum(viewers.viewer_count) desc, max(users.created_at) desc)
+order by row_number() over(order by sum(viewers.viewer_count) desc, max(users.created_at) desc) asc
 limit $1
 `
 
