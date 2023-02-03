@@ -81,6 +81,10 @@ func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, 
 	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
+func (r *collectionTokenResolver) Collection(ctx context.Context, obj *model.CollectionToken) (*model.Collection, error) {
+	return resolveCollectionByCollectionID(ctx, obj.HelperCollectionTokenData.CollectionId)
+}
+
 func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error) {
 	return resolveTokenSettingsByIDs(ctx, obj.TokenId, obj.CollectionId)
 }
@@ -1484,12 +1488,9 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 		tokenIDs[i] = token.Dbid
 	}
 
-	tokens, errors := publicapi.For(ctx).Token.GetTokensByTokenIDs(ctx, tokenIDs)
-
-	for _, err := range errors {
-		if err != nil {
-			return nil, err
-		}
+	tokens, err := publicapi.For(ctx).Token.GetTokensByIDs(ctx, tokenIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	return tokensToModel(ctx, tokens), nil

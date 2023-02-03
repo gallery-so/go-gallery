@@ -364,23 +364,7 @@ func resolveCollectionTokenByID(ctx context.Context, tokenID persist.DBID, colle
 	if err != nil {
 		return nil, err
 	}
-
-	collection, err := resolveCollectionByCollectionID(ctx, collectionID)
-	if err != nil {
-		return nil, err
-	}
-
-	collectionToken := &model.CollectionToken{
-		HelperCollectionTokenData: model.HelperCollectionTokenData{
-			TokenId:      tokenID,
-			CollectionId: collectionID,
-		},
-		Token:         token,
-		Collection:    collection,
-		TokenSettings: nil, // handled by dedicated resolver
-	}
-
-	return collectionToken, nil
+	return tokenCollectionToModel(ctx, token, collectionID), nil
 }
 
 func resolveGalleryByGalleryID(ctx context.Context, galleryID persist.DBID) (*model.Gallery, error) {
@@ -931,26 +915,23 @@ func resolveFeedEventDataByEventID(ctx context.Context, eventID persist.DBID) (m
 }
 
 func resolveCollectionTokensByTokenIDs(ctx context.Context, collectionID persist.DBID, tokenIDs persist.DBIDList) ([]*model.CollectionToken, error) {
-
-	tokens, errs := publicapi.For(ctx).Token.GetTokensByTokenIDs(ctx, tokenIDs)
-	if errs != nil {
-		for _, err := range errs {
-			if err != nil {
-				return nil, fmt.Errorf("error resolving tokens: %v", errs)
-			}
-		}
+	tokens, err := publicapi.For(ctx).Token.GetTokensByIDs(ctx, tokenIDs)
+	if err != nil {
+		return nil, err
 	}
 
-	newTokens := make([]*model.CollectionToken, len(tokens))
+	newTokens := make([]*model.CollectionToken, len(tokenIDs))
 
-	for i, tkn := range tokens {
-		token, err := resolveCollectionTokenByID(ctx, tkn.ID, collectionID)
+	tokenIDToPosition := make(map[persist.DBID]int)
+	for i, tokenID := range tokenIDs {
+		tokenIDToPosition[tokenID] = i
+	}
 
-		if err != nil {
-			return nil, err
-		}
-
-		newTokens[i] = token
+	// Fill in the data for tokens that still exist.
+	// Tokens that have since been deleted will be nil.
+	for _, t := range tokens {
+		token := tokenToModel(ctx, t)
+		newTokens[tokenIDToPosition[t.ID]] = tokenCollectionToModel(ctx, token, collectionID)
 	}
 
 	return newTokens, nil
@@ -1676,6 +1657,18 @@ func tokensToModel(ctx context.Context, token []db.Token) []*model.Token {
 		res[i] = tokenToModel(ctx, token)
 	}
 	return res
+}
+
+func tokenCollectionToModel(ctx context.Context, token *model.Token, collectionID persist.DBID) *model.CollectionToken {
+	return &model.CollectionToken{
+		HelperCollectionTokenData: model.HelperCollectionTokenData{
+			TokenId:      token.Dbid,
+			CollectionId: collectionID,
+		},
+		Token:         token,
+		Collection:    nil, // handled by dedicated resolver
+		TokenSettings: nil, // handled by dedicated resolver
+	}
 }
 
 func communityToModel(ctx context.Context, community db.Contract, forceRefresh *bool) *model.Community {

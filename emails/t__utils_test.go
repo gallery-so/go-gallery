@@ -146,6 +146,7 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   testGallery.Collections[0],
+		GalleryID:      gallery.ID,
 	})
 
 	if err != nil {
