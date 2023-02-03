@@ -179,8 +179,12 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	return tokens, pageInfo, nil
 }
 
-func (api TokenAPI) GetTokensByTokenIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, []error) {
-	return api.loaders.TokenByTokenID.LoadAll(tokenIDs)
+func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {
+	ids := make([]string, len(tokenIDs))
+	for i, t := range tokenIDs {
+		ids[i] = t.String()
+	}
+	return api.queries.GetTokensByIDs(ctx, ids)
 }
 
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.

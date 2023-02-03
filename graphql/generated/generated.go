@@ -1096,6 +1096,7 @@ type CollectionCreatedFeedEventDataResolver interface {
 	NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error)
 }
 type CollectionTokenResolver interface {
+	Collection(ctx context.Context, obj *model.CollectionToken) (*model.Collection, error)
 	TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error)
 }
 type CollectionUpdatedFeedEventDataResolver interface {
@@ -5886,7 +5887,7 @@ type OwnerAtBlock {
 type CollectionToken implements Node @goEmbedHelper @goGqlId(fields: ["tokenId", "collectionId"]) {
   id: ID!
   token: Token
-  collection: Collection
+  collection: Collection @goField(forceResolver: true)
   tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
 }
 
@@ -10724,14 +10725,14 @@ func (ec *executionContext) _CollectionToken_collection(ctx context.Context, fie
 		Object:     "CollectionToken",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Collection, nil
+		return ec.resolvers.CollectionToken().Collection(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -34053,12 +34054,22 @@ func (ec *executionContext) _CollectionToken(ctx context.Context, sel ast.Select
 			out.Values[i] = innerFunc(ctx)
 
 		case "collection":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionToken_collection(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionToken_collection(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "tokenSettings":
 			field := field
 

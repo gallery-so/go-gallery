@@ -716,6 +716,9 @@ select t.media from tokens t, collections c, galleries g where g.id = $1 and c.i
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
 
+-- name: GetTokensByIDs :many
+select * from tokens join unnest(@token_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
+
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
 
