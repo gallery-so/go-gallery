@@ -6382,6 +6382,7 @@ union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
 union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
 
 enum ReportWindow {
+  LAST_5_DAYS
   LAST_7_DAYS
   ALL_TIME
 }

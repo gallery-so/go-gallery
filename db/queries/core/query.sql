@@ -740,21 +740,51 @@ insert into collections (id, version, name, collectors_note, owner_user_id, gall
 -- name: GetGalleryIDByCollectionID :one
 select gallery_id from collections where id = $1 and deleted = false;
 
--- name: GetTrendingUserIDs :many
-with rollup as (
-  select e.gallery_id, count(*) view_count
-  from events e
-  where action = 'ViewedGallery' and e.created_at >= @window_end
-  group by e.gallery_id
+-- name: GetAllTimeTrendingUserIDs :many
+with gallery_views as (
+  select gallery_id, count(*)
+  from events
+  where action = 'ViewedGallery'
+  group by gallery_id
 )
-select p.id from (
-	select u.id, row_number() over(order by sum(r.view_count) + max(coalesce(v.view_count,0)) desc, max(u.created_at) desc) as position
-	from rollup r, galleries g, users u
-	left join legacy_views v on u.id = v.user_id and v.deleted = false and v.created_at >= @window_end
-	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
-	group by u.id
-) p
-where position <= @size::int;
+
+-- name: GetAllTimeTrendingUserIDs :many
+select users.id
+from events, galleries, users
+left join legacy_views on users.id = legacy_views.user_id
+where action = 'ViewedGallery'
+  and events.gallery_id = galleries.id
+  and users.id = galleries.owner_user_id
+  and galleries.deleted = false
+  and users.deleted = false
+  and legacy_views.deleted = false
+group by users.id
+order by row_number() over(order by count(events.id) + max(legacy_views.view_count) desc, max(users.created_at) desc)
+limit $1;
+
+-- name: GetWindowedTrendingUserIDs :many
+with viewers as (
+  select gallery_id, count(distinct coalesce(actor_id, external_id)) viewer_count
+  from events
+  where action = 'ViewedGallery' and events.created_at >= @window_end
+  group by gallery_id
+),
+edit_events as (
+  select actor_id
+  from events
+  where action in ('CollectionCreated', 'CollectorsNoteAddedToCollection', 'CollectorsNoteAddedToToken', 'TokensAddedToCollection') and created_at >= @window_end
+  group by actor_id
+)
+select users.id
+from viewers, galleries, users, edit_events
+where viewers.gallery_id = galleries.id
+	and galleries.owner_user_id = users.id
+	and users.deleted = false
+	and galleries.deleted = false
+  and users.id = edit_events.actor_id
+group by users.id
+order by row_number() over(order by sum(viewers.viewer_count) desc, max(users.created_at) desc)
+limit $1;
 
 -- name: GetUserExperiencesByUserID :one
 select user_experiences from users where id = $1;
