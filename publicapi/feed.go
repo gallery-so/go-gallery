@@ -316,9 +316,12 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
 	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-		return api.queries.GetTrendingUserIDs(ctx, db.GetTrendingUserIDsParams{
+		if report.Name == "ALL_TIME" {
+			return api.queries.GetAllTimeTrendingUserIDs(ctx, 24)
+		}
+		return api.queries.GetWindowedTrendingUserIDs(ctx, db.GetWindowedTrendingUserIDsParams{
 			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
-			Size:      24,
+			Limit:     24,
 		})
 	}
 

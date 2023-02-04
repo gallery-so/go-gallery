@@ -142,6 +142,7 @@ type Window struct {
 }
 
 var (
+	lastFiveDaysWindow  = Window{5 * 24 * time.Hour, "LAST_5_DAYS"}
 	lastSevenDaysWindow = Window{7 * 24 * time.Hour, "LAST_7_DAYS"}
 	allTimeWindow       = Window{1<<63 - 1, "ALL_TIME"}
 )
@@ -152,6 +153,8 @@ func (w *Window) UnmarshalGQL(v interface{}) error {
 		return fmt.Errorf("Window must be a string")
 	}
 	switch window {
+	case lastFiveDaysWindow.Name:
+		*w = lastFiveDaysWindow
 	case lastSevenDaysWindow.Name:
 		*w = lastSevenDaysWindow
 	case allTimeWindow.Name:
@@ -164,6 +167,8 @@ func (w *Window) UnmarshalGQL(v interface{}) error {
 
 func (w Window) MarshalGQL(wt io.Writer) {
 	switch {
+	case w == lastFiveDaysWindow:
+		wt.Write([]byte(fmt.Sprintf(`"%s"`, lastFiveDaysWindow.Name)))
 	case w == lastSevenDaysWindow:
 		wt.Write([]byte(fmt.Sprintf(`"%s"`, lastSevenDaysWindow.Name)))
 	case w == allTimeWindow:

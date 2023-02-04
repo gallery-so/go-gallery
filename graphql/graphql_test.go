@@ -566,21 +566,27 @@ func testViewsAreRolledUp(t *testing.T) {
 
 func testTrendingUsers(t *testing.T) {
 	serverF := newServerFixture(t)
-	bob := newUserFixture(t)
-	alice := newUserFixture(t)
-	dave := newUserFixture(t)
+	bob := newUserWithFeedEventsFixture(t)
+	alice := newUserWithFeedEventsFixture(t)
+	dave := newUserWithFeedEventsFixture(t)
 	ctx := context.Background()
-	c := defaultServerClient(t, serverF.server.URL)
+	var c *serverClient
 	// view bob a few times
 	for i := 0; i < 5; i++ {
+		viewer := newUserFixture(t)
+		c = authedServerClient(t, serverF.server.URL, viewer.id)
 		viewGallery(t, ctx, c, bob.galleryID)
 	}
 	// view alice a few times
 	for i := 0; i < 3; i++ {
+		viewer := newUserFixture(t)
+		c = authedServerClient(t, serverF.server.URL, viewer.id)
 		viewGallery(t, ctx, c, alice.galleryID)
 	}
 	// view dave a few times
 	for i := 0; i < 1; i++ {
+		viewer := newUserFixture(t)
+		c = authedServerClient(t, serverF.server.URL, viewer.id)
 		viewGallery(t, ctx, c, dave.galleryID)
 	}
 	expected := []persist.DBID{bob.id, alice.id, dave.id}
@@ -594,6 +600,11 @@ func testTrendingUsers(t *testing.T) {
 		}
 		return actual
 	}
+
+	t.Run("should pull the last 5 days", func(t *testing.T) {
+		actual := getTrending(t, "LAST_5_DAYS")
+		assert.EqualValues(t, expected, actual)
+	})
 
 	t.Run("should pull the last 7 days", func(t *testing.T) {
 		actual := getTrending(t, "LAST_7_DAYS")

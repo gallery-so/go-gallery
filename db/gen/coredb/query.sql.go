@@ -828,6 +828,40 @@ func (q *Queries) GetAdmiresByAdmireIDs(ctx context.Context, admireIds persist.D
 	return items, nil
 }
 
+const getAllTimeTrendingUserIDs = `-- name: GetAllTimeTrendingUserIDs :many
+select users.id
+from events, galleries, users
+left join legacy_views on users.id = legacy_views.user_id and legacy_views.deleted = false
+where action = 'ViewedGallery'
+  and events.gallery_id = galleries.id
+  and users.id = galleries.owner_user_id
+  and galleries.deleted = false
+  and users.deleted = false
+group by users.id
+order by row_number() over(order by count(events.id) + coalesce(max(legacy_views.view_count), 0) desc, max(users.created_at) desc) asc
+limit $1
+`
+
+func (q *Queries) GetAllTimeTrendingUserIDs(ctx context.Context, limit int32) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getAllTimeTrendingUserIDs, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCollectionById = `-- name: GetCollectionById :one
 SELECT id, deleted, owner_user_id, nfts, version, last_updated, created_at, hidden, collectors_note, name, layout, token_settings, gallery_id FROM collections WHERE id = $1 AND deleted = false
 `
@@ -2372,48 +2406,6 @@ func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFe
 	return items, nil
 }
 
-const getTrendingUserIDs = `-- name: GetTrendingUserIDs :many
-with rollup as (
-  select e.gallery_id, count(*) view_count
-  from events e
-  where action = 'ViewedGallery' and e.created_at >= $1
-  group by e.gallery_id
-)
-select p.id from (
-	select u.id, row_number() over(order by sum(r.view_count) + max(coalesce(v.view_count,0)) desc, max(u.created_at) desc) as position
-	from rollup r, galleries g, users u
-	left join legacy_views v on u.id = v.user_id and v.deleted = false and v.created_at >= $1
-	where r.gallery_id = g.id and g.owner_user_id = u.id and u.deleted = false and g.deleted = false
-	group by u.id
-) p
-where position <= $2::int
-`
-
-type GetTrendingUserIDsParams struct {
-	WindowEnd time.Time
-	Size      int32
-}
-
-func (q *Queries) GetTrendingUserIDs(ctx context.Context, arg GetTrendingUserIDsParams) ([]persist.DBID, error) {
-	rows, err := q.db.Query(ctx, getTrendingUserIDs, arg.WindowEnd, arg.Size)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []persist.DBID
-	for rows.Next() {
-		var id persist.DBID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTrendingUsersByIDs = `-- name: GetTrendingUsersByIDs :many
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
 `
@@ -3205,6 +3197,56 @@ func (q *Queries) GetWalletsByUserID(ctx context.Context, id persist.DBID) ([]Wa
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getWindowedTrendingUserIDs = `-- name: GetWindowedTrendingUserIDs :many
+with viewers as (
+  select gallery_id, count(distinct coalesce(actor_id, external_id)) viewer_count
+  from events
+  where action = 'ViewedGallery' and events.created_at >= $2
+  group by gallery_id
+),
+edit_events as (
+  select actor_id
+  from events
+  where action in ('CollectionCreated', 'CollectorsNoteAddedToCollection', 'CollectorsNoteAddedToToken', 'TokensAddedToCollection') and created_at >= $2
+  group by actor_id
+)
+select users.id
+from viewers, galleries, users, edit_events
+where viewers.gallery_id = galleries.id
+	and galleries.owner_user_id = users.id
+	and users.deleted = false
+	and galleries.deleted = false
+  and users.id = edit_events.actor_id
+group by users.id
+order by row_number() over(order by sum(viewers.viewer_count) desc, max(users.created_at) desc) asc
+limit $1
+`
+
+type GetWindowedTrendingUserIDsParams struct {
+	Limit     int32
+	WindowEnd time.Time
+}
+
+func (q *Queries) GetWindowedTrendingUserIDs(ctx context.Context, arg GetWindowedTrendingUserIDsParams) ([]persist.DBID, error) {
+	rows, err := q.db.Query(ctx, getWindowedTrendingUserIDs, arg.Limit, arg.WindowEnd)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []persist.DBID
+	for rows.Next() {
+		var id persist.DBID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
