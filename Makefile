@@ -395,7 +395,7 @@ confirm-dev-migrate:
 	if [ "$$prompt" != "development" ]; then exit 1; fi
 
 migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
-	@migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_MIGRATION_USER):$(POSTGRES_MIGRATION_PASSWORD)z@localhost:6643/$(POSTGRES_DB)?sslmode=disable" up
+	@migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_MIGRATION_USER):$(POSTGRES_MIGRATION_PASSWORD)@localhost:6643/$(POSTGRES_DB)?sslmode=disable" up
 
 confirm-prod-migrate:
 	@prompt=$(shell bash -c 'read -p "Are you sure you want to apply migrations to the production DB? Type \"production\" to confirm: " prompt; echo $$prompt'); \
