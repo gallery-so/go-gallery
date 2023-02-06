@@ -183,6 +183,7 @@ func newEventSender(queries *db.Queries) eventSender {
 		registry: map[sendType]registedActions{
 			delayedKey:   {},
 			immediateKey: {},
+			groupKey:     {},
 		},
 		queries:   queries,
 		eventRepo: postgres.EventRepository{Queries: queries},
