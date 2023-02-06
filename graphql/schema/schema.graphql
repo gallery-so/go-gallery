@@ -1641,7 +1641,6 @@ type UpdateGalleryPayload {
 
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
-
 input PublishGalleryInput {
   galleryId: DBID!
   editID: String!
@@ -1662,7 +1661,6 @@ union UpdatePrimaryWalletPayloadOrError =
     UpdatePrimaryWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-
 
 input AdminAddWalletInput {
   username: String!
