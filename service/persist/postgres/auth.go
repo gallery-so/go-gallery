@@ -24,17 +24,6 @@ type NonceRepository struct {
 	createStmt            *sql.Stmt
 }
 
-// NewLoginRepository creates a new postgres repository for interacting with user login attempts
-func NewLoginRepository(db *sql.DB, queries *db.Queries) *LoginRepository {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	createStmt, err := db.PrepareContext(ctx, `INSERT INTO login_attempts (ID,USER_EXISTS,ADDRESS,VERSION,NONCE_VALUE,REQUEST_HEADERS,REQUEST_HOST_ADDRESS,SIGNATURE,SIGNATURE_VALID) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ID`)
-	checkNoErr(err)
-
-	return &LoginRepository{db: db, queries: queries, createStmt: createStmt}
-}
-
 // NewNonceRepository creates a new postgres repository for interacting with user nonces
 func NewNonceRepository(db *sql.DB, queries *db.Queries) *NonceRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
