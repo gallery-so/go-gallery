@@ -804,3 +804,6 @@ select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and d
 
 -- name: UserOwnsCollection :one
 select exists(select 1 from collections where id = $1 and owner_user_id = $2 and deleted = false);
+
+-- name: UpdateEventCaptionByGroup :exec
+update events set caption = @caption where group_id = @group_id and deleted = false;

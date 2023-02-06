@@ -1620,6 +1620,7 @@ input UpdateGalleryInput {
   name: String
   description: String
 
+  # leaving caption around for a bit for backwards compatibility
   caption: String
 
   deletedCollections: [DBID!]
@@ -1628,11 +1629,30 @@ input UpdateGalleryInput {
   createdCollections: [CreateCollectionInGalleryInput]
 
   order: [DBID!]
+
+  # generated on the frontend
+  # will be String! in the future, not required for temp backwards compatibility
+  editID: String
 }
 
 type UpdateGalleryPayload {
   gallery: Gallery
 }
+
+union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
+
+
+input PublishGalleryInput {
+  galleryId: DBID!
+  editID: String!
+  caption: String
+}
+
+type PublishGalleryPayload {
+  gallery: Gallery
+}
+
+union PublishGalleryPayloadOrError = PublishGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
 type UpdatePrimaryWalletPayload {
   viewer: Viewer
@@ -1643,7 +1663,6 @@ union UpdatePrimaryWalletPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
-union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
 input AdminAddWalletInput {
   username: String!
@@ -1754,6 +1773,7 @@ type Mutation {
   viewGallery(galleryId: DBID!): ViewGalleryPayloadOrError
 
   updateGallery(input: UpdateGalleryInput!): UpdateGalleryPayloadOrError @authRequired
+  publishGallery(input: PublishGalleryInput!): PublishGalleryPayloadOrError @authRequired
 
   createGallery(input: CreateGalleryInput!): CreateGalleryPayloadOrError @authRequired
   updateGalleryHidden(input: UpdateGalleryHiddenInput!): UpdateGalleryHiddenPayloadOrError

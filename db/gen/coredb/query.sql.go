@@ -3546,6 +3546,20 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 	return err
 }
 
+const updateEventCaptionByGroup = `-- name: UpdateEventCaptionByGroup :exec
+update events set caption = $1 where group_id = $2 and deleted = false
+`
+
+type UpdateEventCaptionByGroupParams struct {
+	Caption sql.NullString
+	GroupID sql.NullString
+}
+
+func (q *Queries) UpdateEventCaptionByGroup(ctx context.Context, arg UpdateEventCaptionByGroupParams) error {
+	_, err := q.db.Exec(ctx, updateEventCaptionByGroup, arg.Caption, arg.GroupID)
+	return err
+}
+
 const updateGalleryCollections = `-- name: UpdateGalleryCollections :exec
 update galleries set collections = $1, last_updated = now() where galleries.id = $2 and galleries.deleted = false and (select count(*) from collections c where c.id = any($1) and c.gallery_id = $2 and c.deleted = false) = cardinality($1)
 `

@@ -281,6 +281,7 @@ func (v *MoveCollectionToGalleryInput) GetTargetGalleryId() persist.DBID { retur
 type ReportWindow string
 
 const (
+	ReportWindowLast5Days ReportWindow = "LAST_5_DAYS"
 	ReportWindowLast7Days ReportWindow = "LAST_7_DAYS"
 	ReportWindowAllTime   ReportWindow = "ALL_TIME"
 )
@@ -334,6 +335,7 @@ type UpdateGalleryInput struct {
 	UpdatedCollections []*UpdateCollectionInput          `json:"updatedCollections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
 	Order              []persist.DBID                    `json:"order"`
+	EditID             *string                           `json:"editID"`
 }
 
 // GetGalleryId returns UpdateGalleryInput.GalleryId, and is useful for accessing the field via an interface.
@@ -363,6 +365,9 @@ func (v *UpdateGalleryInput) GetCreatedCollections() []*CreateCollectionInGaller
 
 // GetOrder returns UpdateGalleryInput.Order, and is useful for accessing the field via an interface.
 func (v *UpdateGalleryInput) GetOrder() []persist.DBID { return v.Order }
+
+// GetEditID returns UpdateGalleryInput.EditID, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetEditID() *string { return v.EditID }
 
 type UpdateUserExperienceInput struct {
 	ExperienceType UserExperienceType `json:"experienceType"`

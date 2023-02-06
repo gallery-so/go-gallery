@@ -971,6 +971,22 @@ func (r *mutationResolver) UpdateGallery(ctx context.Context, input model.Update
 	return output, nil
 }
 
+func (r *mutationResolver) PublishGallery(ctx context.Context, input model.PublishGalleryInput) (model.PublishGalleryPayloadOrError, error) {
+	err := publicapi.For(ctx).Gallery.PublishGallery(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	gal, err := resolveGalleryByGalleryID(ctx, input.GalleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.PublishGalleryPayload{
+		Gallery: gal,
+	}, nil
+}
+
 func (r *mutationResolver) CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error) {
 	gallery, err := publicapi.For(ctx).Gallery.CreateGallery(ctx, input.Name, input.Description, input.Position)
 	if err != nil {
