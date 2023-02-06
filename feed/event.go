@@ -140,8 +140,7 @@ func (b *EventBuilder) NewFeedEventFromGroup(ctx context.Context, groupID string
 }
 
 func (b *EventBuilder) createGroupedFeedEventFromEvents(ctx context.Context, events []db.Event, action persist.Action) (*db.FeedEvent, error) {
-
-	if eventGroups[action] == persist.ActionGalleryUpdated {
+	if action == persist.ActionGalleryUpdated {
 		return b.createGalleryUpdatedFeedEventFromEvents(ctx, events)
 	}
 	return nil, errUnhandledGroupedEvent

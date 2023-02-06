@@ -60,7 +60,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should sync tokens", run: testSyncTokens},
 		{title: "should create a collection", run: testCreateCollection},
 		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp},
-		{title: "update gallery and create a feed event with a caption", run: testUpdateGalleryWithCaption},
+		{title: "update gallery and create a feed event", run: testUpdateGalleryWithPublish},
 		{title: "update gallery and ensure name still gets set when not sent in update", run: testUpdateGalleryWithNoNameChange},
 		{title: "update gallery with a new collection", run: testUpdateGalleryWithNewCollection},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
@@ -236,7 +236,7 @@ func testCreateCollection(t *testing.T) {
 	assert.Len(t, payload.Collection.Tokens, len(userF.tokenIDs))
 }
 
-func testUpdateGalleryWithCaption(t *testing.T) {
+func testUpdateGalleryWithPublish(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.id)
 
@@ -268,7 +268,7 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 	assert.NotEmpty(t, colPay.Collection.Dbid)
 	assert.Len(t, colPay.Collection.Tokens, 1)
 
-	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+	updateReponse, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
 		GalleryId: userF.galleryID,
 		Name:      util.ToPointer("newName"),
 		UpdatedCollections: []*UpdateCollectionInput{
@@ -316,18 +316,28 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 				},
 			},
 		},
-		Order:   []persist.DBID{colPay.Collection.Dbid, "wow"},
-		Caption: util.ToPointer("newCaption"),
+		Order:  []persist.DBID{colPay.Collection.Dbid, "wow"},
+		EditID: util.ToPointer("edit_id"),
 	})
 
 	require.NoError(t, err)
-	require.NotNil(t, response.UpdateGallery)
-	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	require.NotNil(t, updateReponse.UpdateGallery)
+	updatePayload, ok := (*updateReponse.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
 	if !ok {
-		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		err := (*updateReponse.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
 		t.Fatal(err)
 	}
-	assert.NotEmpty(t, payload.Gallery.Name)
+	assert.NotEmpty(t, updatePayload.Gallery.Name)
+
+	// publish
+	publishResponse, err := publishGalleryMutation(context.Background(), c, PublishGalleryInput{
+		GalleryId: userF.galleryID,
+		EditID:    "edit_id",
+		Caption:   util.ToPointer("newCaption"),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, publishResponse.PublishGallery)
+
 	vResp, err := viewerQuery(context.Background(), c)
 	require.NoError(t, err)
 
@@ -350,6 +360,7 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 		}
 	}
 }
+
 func testCreateGallery(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.id)
