@@ -15,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
@@ -75,12 +74,11 @@ func usePostgres(t *testing.T) {
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
-	migrate, err := migrate.RunMigration(postgres.NewClient(), "./db/migrations/core")
+
+	err = migrate.RunCoreDBMigration()
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		migrate.Close()
-		r.Close()
-	})
+
+	t.Cleanup(func() { r.Close() })
 }
 
 // useRedis starts a running Redis Docker container and stops the instance

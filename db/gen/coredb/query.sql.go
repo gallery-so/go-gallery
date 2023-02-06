@@ -2717,12 +2717,12 @@ func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUns
 }
 
 const getUserWithPIIByID = `-- name: GetUserWithPIIByID :one
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from users_with_pii where id = $1 and deleted = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from pii.user_view where id = $1 and deleted = false
 `
 
-func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (UsersWithPii, error) {
+func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (PiiUserView, error) {
 	row := q.db.QueryRow(ctx, getUserWithPIIByID, userID)
-	var i UsersWithPii
+	var i PiiUserView
 	err := row.Scan(
 		&i.ID,
 		&i.Deleted,
@@ -2880,7 +2880,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 }
 
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from users_with_pii
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
     and (created_at, id) < ($3, $4)
@@ -2901,7 +2901,7 @@ type GetUsersWithEmailNotificationsOnParams struct {
 }
 
 // TODO: Does not appear to be used
-func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetUsersWithEmailNotificationsOnParams) ([]UsersWithPii, error) {
+func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetUsersWithEmailNotificationsOnParams) ([]PiiUserView, error) {
 	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOn,
 		arg.EmailVerified,
 		arg.Limit,
@@ -2915,9 +2915,9 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 		return nil, err
 	}
 	defer rows.Close()
-	var items []UsersWithPii
+	var items []PiiUserView
 	for rows.Next() {
-		var i UsersWithPii
+		var i PiiUserView
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
@@ -2948,7 +2948,7 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 }
 
 const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from users_with_pii
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and (email_unsubscriptions->>$3::varchar = 'false' or email_unsubscriptions->>$3::varchar is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
@@ -2971,7 +2971,7 @@ type GetUsersWithEmailNotificationsOnForEmailTypeParams struct {
 }
 
 // for some reason this query will not allow me to use @tags for $1
-func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Context, arg GetUsersWithEmailNotificationsOnForEmailTypeParams) ([]UsersWithPii, error) {
+func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Context, arg GetUsersWithEmailNotificationsOnForEmailTypeParams) ([]PiiUserView, error) {
 	rows, err := q.db.Query(ctx, getUsersWithEmailNotificationsOnForEmailType,
 		arg.EmailVerified,
 		arg.Limit,
@@ -2986,9 +2986,9 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 		return nil, err
 	}
 	defer rows.Close()
-	var items []UsersWithPii
+	var items []PiiUserView
 	for rows.Next() {
-		var i UsersWithPii
+		var i PiiUserView
 		if err := rows.Scan(
 			&i.ID,
 			&i.Deleted,
@@ -3666,7 +3666,7 @@ func (q *Queries) UpdateNotificationSettingsByID(ctx context.Context, arg Update
 
 const updateUserEmail = `-- name: UpdateUserEmail :exec
 with upsert_pii as (
-    insert into pii_for_users (user_id, pii_email_address) values ($1, $2)
+    insert into pii.for_users (user_id, pii_email_address) values ($1, $2)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
 ),
 

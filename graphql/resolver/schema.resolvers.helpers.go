@@ -553,7 +553,7 @@ func resolveViewerEmail(ctx context.Context) *model.UserEmail {
 	return userWithPIIToEmailModel(userWithPII)
 }
 
-func userWithPIIToEmailModel(user *db.UsersWithPii) *model.UserEmail {
+func userWithPIIToEmailModel(user *db.PiiUserView) *model.UserEmail {
 
 	return &model.UserEmail{
 		Email:              &user.PiiEmailAddress,
