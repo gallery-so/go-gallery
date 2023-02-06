@@ -1,5 +1,5 @@
-drop table access;
-drop table collection_events;
-drop table features;
-drop table nft_events;
-drop table user_events;
+drop table if exists access;
+drop table if exists collection_events;
+drop table if exists features;
+drop table if exists nft_events;
+drop table if exists user_events;
