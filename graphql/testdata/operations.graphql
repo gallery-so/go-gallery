@@ -79,6 +79,11 @@ query viewerQuery {
                             }
                           }
                         }
+
+                        ... on GalleryInfoUpdatedFeedEventData {
+                          newName
+                          newDescription
+                        }
                       }
                     }
                   }

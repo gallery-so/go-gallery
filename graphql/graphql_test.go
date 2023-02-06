@@ -329,6 +329,15 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	}
 	assert.NotEmpty(t, updatePayload.Gallery.Name)
 
+	update2Reponse, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId:   userF.galleryID,
+		Description: util.ToPointer("newDesc"),
+		EditID:      util.ToPointer("edit_id"),
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, update2Reponse.UpdateGallery)
+
 	// publish
 	publishResponse, err := publishGalleryMutation(context.Background(), c, PublishGalleryInput{
 		GalleryId: userF.galleryID,
@@ -348,6 +357,10 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	assert.Equal(t, "newCaption", *feedEvent.Caption)
 	edata := *(*feedEvent.EventData).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData)
 	assert.EqualValues(t, persist.ActionGalleryUpdated, *edata.Action)
+
+	nameIncluded := false
+	descIncluded := false
+
 	for _, c := range edata.SubEventDatas {
 		ac := c.GetAction()
 		if persist.Action(*ac) == persist.ActionCollectionCreated {
@@ -358,7 +371,21 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
 			assert.Greater(t, len(ca.NewTokens), 0)
 		}
+		if persist.Action(*ac) == persist.ActionGalleryInfoUpdated {
+			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData)
+			if ca.NewDescription != nil {
+				assert.Equal(t, "newDesc", *ca.NewDescription)
+				descIncluded = true
+			}
+			if ca.NewName != nil {
+				assert.Equal(t, "newName", *ca.NewName)
+				nameIncluded = true
+			}
+		}
 	}
+
+	assert.True(t, nameIncluded)
+	assert.True(t, descIncluded)
 }
 
 func testCreateGallery(t *testing.T) {

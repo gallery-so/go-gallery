@@ -135,8 +135,12 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			c.caption = &event.Caption.String
 		}
 		if event.Action == persist.ActionGalleryInfoUpdated {
-			c.galleryName = event.Data.GalleryName
-			c.galleryDescription = event.Data.GalleryDescription
+			if event.Data.GalleryName != "" {
+				c.galleryName = event.Data.GalleryName
+			}
+			if event.Data.GalleryDescription != "" {
+				c.galleryDescription = event.Data.GalleryDescription
+			}
 			continue
 		} else if event.Action == persist.ActionCollectorsNoteAddedToToken {
 			if c.tokenCollectorsNotes == nil {

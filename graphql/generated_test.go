@@ -6618,8 +6618,10 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData includes the requested fields of the GraphQL type GalleryInfoUpdatedFeedEventData.
 type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData struct {
-	Typename *string `json:"__typename"`
-	Action   *Action `json:"action"`
+	Typename       *string `json:"__typename"`
+	Action         *Action `json:"action"`
+	NewName        *string `json:"newName"`
+	NewDescription *string `json:"newDescription"`
 }
 
 // GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData.Typename, and is useful for accessing the field via an interface.
@@ -6630,6 +6632,16 @@ func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeed
 // GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData.Action, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData) GetAction() *Action {
 	return v.Action
+}
+
+// GetNewName returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData.NewName, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData) GetNewName() *string {
+	return v.NewName
+}
+
+// GetNewDescription returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData.NewDescription, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData) GetNewDescription() *string {
+	return v.NewDescription
 }
 
 // viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData includes the requested fields of the GraphQL type GalleryUpdatedFeedEventData.
@@ -7947,6 +7959,10 @@ query viewerQuery {
 														name
 													}
 												}
+											}
+											... on GalleryInfoUpdatedFeedEventData {
+												newName
+												newDescription
 											}
 										}
 									}
