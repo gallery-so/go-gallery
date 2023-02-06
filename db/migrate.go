@@ -10,41 +10,39 @@ import (
 )
 
 // RunCoreDBMigration should always be used to migrate the core backend database.
-// Because the "gallery_migrator" role was introduced in the 54th migration step,
+// Because the "gallery_migrator" role was introduced in the 56th migration step,
 // migrations must be done in two passes (using the default "postgres" role for
-// the first 54 migrations, and the "gallery_migrator" role for all subsequent
+// the first 56 migrations, and the "gallery_migrator" role for all subsequent
 // migrations).
 func RunCoreDBMigration() error {
 	coreMigrations := "./db/migrations/core"
 
-	// Migrations up to version 54 should be run with the "postgres" user.
-	// Version 54 introduces the "gallery_migrator" role.
+	// Migrations up to version 56 should be run with the "postgres" user.
+	// Version 56 introduces the "gallery_migrator" role.
 	client := postgres.NewClient(postgres.WithUser("postgres"))
 
-	err := RunMigrationToVersion(client, coreMigrations, 54)
+	m, err := RunMigrationToVersion(client, coreMigrations, 56)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = client.Close()
-	if err != nil {
-		return nil, err
-	}
+	m.Close()
 
 	// The "gallery_migrator" role should be used for all future migrations.
 	client = postgres.NewClient(postgres.WithUser("gallery_migrator"))
-	err = RunMigration(client, coreMigrations)
+	m, err = RunMigration(client, coreMigrations)
 
-	// Ignore ErrNoChange here, since that will happen until we add a 55th migration
+	// Ignore ErrNoChange here, since that will happen until we add a 57th migration
 	if err != nil && err != migrate.ErrNoChange {
 		return err
 	}
 
-	return client.Close()
+	m.Close()
+	return nil
 }
 
 // RunMigration runs all migrations in the specified directory
-func RunMigration(client *sql.DB, file string) error {
+func RunMigration(client *sql.DB, file string) (*migrate.Migrate, error) {
 	m, err := newMigrateInstance(client, file)
 	if err != nil {
 		return nil, err
@@ -55,18 +53,13 @@ func RunMigration(client *sql.DB, file string) error {
 
 // RunMigrationToVersion runs migrations in the specified directory, up to (and including) the
 // specified migration version number
-func RunMigrationToVersion(client *sql.DB, file string, toVersion uint) error {
+func RunMigrationToVersion(client *sql.DB, file string, toVersion uint) (*migrate.Migrate, error) {
 	m, err := newMigrateInstance(client, file)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = m.Migrate(toVersion)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return m, m.Migrate(toVersion)
 }
 
 func newMigrateInstance(client *sql.DB, file string) (*migrate.Migrate, error) {

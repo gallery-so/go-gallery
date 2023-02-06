@@ -387,7 +387,7 @@ migrate-local-indexerdb:
 	migrate -path ./db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
 
 migrate-local-coredb:
-	migrate -path ./db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" goto 54
+	migrate -path ./db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" goto 56
 	migrate -path ./db/migrations/core -database "postgresql://gallery_migrator@localhost:5432/postgres?sslmode=disable" up
 
 confirm-dev-migrate:
