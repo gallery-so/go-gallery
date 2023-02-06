@@ -73,7 +73,7 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.PiiUserView, error) {
 	// Nothing to validate
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -313,7 +313,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -389,7 +389,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	// Sanitize
 	bio = validate.SanitizationPolicy.Sanitize(bio)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -410,7 +410,7 @@ func (api UserAPI) UpdateUserPrimaryWallet(ctx context.Context, primaryWalletID 
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -453,7 +453,7 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -481,7 +481,7 @@ func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, sett
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -494,7 +494,7 @@ func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, sett
 
 func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -515,7 +515,7 @@ func (api UserAPI) UpdateUserNotificationSettings(ctx context.Context, notificat
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -586,7 +586,7 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
-	curUserID, err := getAuthenticatedUser(ctx)
+	curUserID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -620,7 +620,7 @@ func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error 
 		return err
 	}
 
-	curUserID, err := getAuthenticatedUser(ctx)
+	curUserID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -682,7 +682,7 @@ func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType mode
 		return err
 	}
 
-	curUserID, err := getAuthenticatedUser(ctx)
+	curUserID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}

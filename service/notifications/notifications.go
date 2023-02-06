@@ -60,8 +60,12 @@ func New(queries *db.Queries, pub *pubsub.Client, lock *redislock.Client) *Notif
 	updated := map[persist.DBID]chan db.Notification{}
 
 	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher, UserNewNotifications: new, UserUpdatedNotifications: updated, pubSub: pub}
-	go notificationHandlers.receiveNewNotificationsFromPubSub()
-	go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
+	if pub != nil {
+		go notificationHandlers.receiveNewNotificationsFromPubSub()
+		go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
+	} else {
+		logger.For(nil).Warn("pubsub not configured, notifications will not be received")
+	}
 	return notificationHandlers
 }
 

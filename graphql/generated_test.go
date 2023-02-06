@@ -11,6 +11,17 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
+type Action string
+
+const (
+	ActionUsercreated                     Action = "UserCreated"
+	ActionUserfollowedusers               Action = "UserFollowedUsers"
+	ActionCollectorsnoteaddedtotoken      Action = "CollectorsNoteAddedtoToken"
+	ActionCollectioncreated               Action = "CollectionCreated"
+	ActionCollectorsnoteaddedtocollection Action = "CollectorsNoteAddedToCollection"
+	ActionTokensaddedtocollection         Action = "TokensAddedToCollection"
+)
+
 type AuthMechanism struct {
 	Eoa        *EoaAuth        `json:"eoa"`
 	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
@@ -97,6 +108,39 @@ func (v *CollectionTokenSettingsInput) GetTokenId() persist.DBID { return v.Toke
 
 // GetRenderLive returns CollectionTokenSettingsInput.RenderLive, and is useful for accessing the field via an interface.
 func (v *CollectionTokenSettingsInput) GetRenderLive() bool { return v.RenderLive }
+
+type CreateCollectionInGalleryInput struct {
+	Name           string                         `json:"name"`
+	CollectorsNote string                         `json:"collectorsNote"`
+	Tokens         []persist.DBID                 `json:"tokens"`
+	Layout         CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []CollectionTokenSettingsInput `json:"tokenSettings"`
+	Hidden         bool                           `json:"hidden"`
+	GivenID        persist.DBID                   `json:"givenID"`
+}
+
+// GetName returns CreateCollectionInGalleryInput.Name, and is useful for accessing the field via an interface.
+func (v *CreateCollectionInGalleryInput) GetName() string { return v.Name }
+
+// GetCollectorsNote returns CreateCollectionInGalleryInput.CollectorsNote, and is useful for accessing the field via an interface.
+func (v *CreateCollectionInGalleryInput) GetCollectorsNote() string { return v.CollectorsNote }
+
+// GetTokens returns CreateCollectionInGalleryInput.Tokens, and is useful for accessing the field via an interface.
+func (v *CreateCollectionInGalleryInput) GetTokens() []persist.DBID { return v.Tokens }
+
+// GetLayout returns CreateCollectionInGalleryInput.Layout, and is useful for accessing the field via an interface.
+func (v *CreateCollectionInGalleryInput) GetLayout() CollectionLayoutInput { return v.Layout }
+
+// GetTokenSettings returns CreateCollectionInGalleryInput.TokenSettings, and is useful for accessing the field via an interface.
+func (v *CreateCollectionInGalleryInput) GetTokenSettings() []CollectionTokenSettingsInput {
+	return v.TokenSettings
+}
+
+// GetHidden returns CreateCollectionInGalleryInput.Hidden, and is useful for accessing the field via an interface.
+func (v *CreateCollectionInGalleryInput) GetHidden() bool { return v.Hidden }
+
+// GetGivenID returns CreateCollectionInGalleryInput.GivenID, and is useful for accessing the field via an interface.
+func (v *CreateCollectionInGalleryInput) GetGivenID() persist.DBID { return v.GivenID }
 
 type CreateCollectionInput struct {
 	GalleryId      persist.DBID                   `json:"galleryId"`
@@ -248,6 +292,78 @@ type TrendingUsersInput struct {
 // GetReport returns TrendingUsersInput.Report, and is useful for accessing the field via an interface.
 func (v *TrendingUsersInput) GetReport() ReportWindow { return v.Report }
 
+type UpdateCollectionInput struct {
+	Dbid           persist.DBID                   `json:"dbid"`
+	Name           string                         `json:"name"`
+	CollectorsNote string                         `json:"collectorsNote"`
+	Tokens         []persist.DBID                 `json:"tokens"`
+	Layout         CollectionLayoutInput          `json:"layout"`
+	TokenSettings  []CollectionTokenSettingsInput `json:"tokenSettings"`
+	Hidden         bool                           `json:"hidden"`
+}
+
+// GetDbid returns UpdateCollectionInput.Dbid, and is useful for accessing the field via an interface.
+func (v *UpdateCollectionInput) GetDbid() persist.DBID { return v.Dbid }
+
+// GetName returns UpdateCollectionInput.Name, and is useful for accessing the field via an interface.
+func (v *UpdateCollectionInput) GetName() string { return v.Name }
+
+// GetCollectorsNote returns UpdateCollectionInput.CollectorsNote, and is useful for accessing the field via an interface.
+func (v *UpdateCollectionInput) GetCollectorsNote() string { return v.CollectorsNote }
+
+// GetTokens returns UpdateCollectionInput.Tokens, and is useful for accessing the field via an interface.
+func (v *UpdateCollectionInput) GetTokens() []persist.DBID { return v.Tokens }
+
+// GetLayout returns UpdateCollectionInput.Layout, and is useful for accessing the field via an interface.
+func (v *UpdateCollectionInput) GetLayout() CollectionLayoutInput { return v.Layout }
+
+// GetTokenSettings returns UpdateCollectionInput.TokenSettings, and is useful for accessing the field via an interface.
+func (v *UpdateCollectionInput) GetTokenSettings() []CollectionTokenSettingsInput {
+	return v.TokenSettings
+}
+
+// GetHidden returns UpdateCollectionInput.Hidden, and is useful for accessing the field via an interface.
+func (v *UpdateCollectionInput) GetHidden() bool { return v.Hidden }
+
+type UpdateGalleryInput struct {
+	GalleryId          persist.DBID                      `json:"galleryId"`
+	Name               *string                           `json:"name"`
+	Description        *string                           `json:"description"`
+	Caption            *string                           `json:"caption"`
+	DeletedCollections []persist.DBID                    `json:"deletedCollections"`
+	UpdatedCollections []*UpdateCollectionInput          `json:"updatedCollections"`
+	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
+	Order              []persist.DBID                    `json:"order"`
+}
+
+// GetGalleryId returns UpdateGalleryInput.GalleryId, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetGalleryId() persist.DBID { return v.GalleryId }
+
+// GetName returns UpdateGalleryInput.Name, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetName() *string { return v.Name }
+
+// GetDescription returns UpdateGalleryInput.Description, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetDescription() *string { return v.Description }
+
+// GetCaption returns UpdateGalleryInput.Caption, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetCaption() *string { return v.Caption }
+
+// GetDeletedCollections returns UpdateGalleryInput.DeletedCollections, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetDeletedCollections() []persist.DBID { return v.DeletedCollections }
+
+// GetUpdatedCollections returns UpdateGalleryInput.UpdatedCollections, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetUpdatedCollections() []*UpdateCollectionInput {
+	return v.UpdatedCollections
+}
+
+// GetCreatedCollections returns UpdateGalleryInput.CreatedCollections, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetCreatedCollections() []*CreateCollectionInGalleryInput {
+	return v.CreatedCollections
+}
+
+// GetOrder returns UpdateGalleryInput.Order, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetOrder() []persist.DBID { return v.Order }
+
 type UpdateUserExperienceInput struct {
 	ExperienceType UserExperienceType `json:"experienceType"`
 	Experienced    bool               `json:"experienced"`
@@ -388,6 +504,14 @@ type __trendingUsersQueryInput struct {
 
 // GetInput returns __trendingUsersQueryInput.Input, and is useful for accessing the field via an interface.
 func (v *__trendingUsersQueryInput) GetInput() TrendingUsersInput { return v.Input }
+
+// __updateGalleryMutationInput is used internally by genqlient
+type __updateGalleryMutationInput struct {
+	Input UpdateGalleryInput `json:"input"`
+}
+
+// GetInput returns __updateGalleryMutationInput.Input, and is useful for accessing the field via an interface.
+func (v *__updateGalleryMutationInput) GetInput() UpdateGalleryInput { return v.Input }
 
 // __updateUserExperienceInput is used internally by genqlient
 type __updateUserExperienceInput struct {
@@ -3965,6 +4089,271 @@ func (v *trendingUsersQueryTrendingUsersTrendingUsersPayloadUsersGalleryUser) Ge
 	return v.Dbid
 }
 
+// updateGalleryMutationResponse is returned by updateGalleryMutation on success.
+type updateGalleryMutationResponse struct {
+	UpdateGallery *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError `json:"-"`
+}
+
+// GetUpdateGallery returns updateGalleryMutationResponse.UpdateGallery, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationResponse) GetUpdateGallery() *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError {
+	return v.UpdateGallery
+}
+
+func (v *updateGalleryMutationResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*updateGalleryMutationResponse
+		UpdateGallery json.RawMessage `json:"updateGallery"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.updateGalleryMutationResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.UpdateGallery
+		src := firstPass.UpdateGallery
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError)
+			err = __unmarshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal updateGalleryMutationResponse.UpdateGallery: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalupdateGalleryMutationResponse struct {
+	UpdateGallery json.RawMessage `json:"updateGallery"`
+}
+
+func (v *updateGalleryMutationResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *updateGalleryMutationResponse) __premarshalJSON() (*__premarshalupdateGalleryMutationResponse, error) {
+	var retval __premarshalupdateGalleryMutationResponse
+
+	{
+
+		dst := &retval.UpdateGallery
+		src := v.UpdateGallery
+		if src != nil {
+			var err error
+			*dst, err = __marshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal updateGalleryMutationResponse.UpdateGallery: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// updateGalleryMutationUpdateGalleryErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type updateGalleryMutationUpdateGalleryErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+}
+
+// GetTypename returns updateGalleryMutationUpdateGalleryErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryErrInvalidInput) GetTypename() *string { return v.Typename }
+
+// updateGalleryMutationUpdateGalleryErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type updateGalleryMutationUpdateGalleryErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+}
+
+// GetTypename returns updateGalleryMutationUpdateGalleryErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryErrNotAuthorized) GetTypename() *string { return v.Typename }
+
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayload includes the requested fields of the GraphQL type UpdateGalleryPayload.
+type updateGalleryMutationUpdateGalleryUpdateGalleryPayload struct {
+	Typename *string                                                        `json:"__typename"`
+	Gallery  *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery `json:"gallery"`
+}
+
+// GetTypename returns updateGalleryMutationUpdateGalleryUpdateGalleryPayload.Typename, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetGallery returns updateGalleryMutationUpdateGalleryUpdateGalleryPayload.Gallery, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayload) GetGallery() *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery {
+	return v.Gallery
+}
+
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery includes the requested fields of the GraphQL type Gallery.
+type updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery struct {
+	Dbid        persist.DBID                                                                          `json:"dbid"`
+	Name        *string                                                                               `json:"name"`
+	Description *string                                                                               `json:"description"`
+	Collections []*updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection `json:"collections"`
+}
+
+// GetDbid returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery.Dbid, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetName returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery.Name, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery) GetName() *string {
+	return v.Name
+}
+
+// GetDescription returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery.Description, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery) GetDescription() *string {
+	return v.Description
+}
+
+// GetCollections returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery.Collections, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGallery) GetCollections() []*updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection {
+	return v.Collections
+}
+
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection includes the requested fields of the GraphQL type Collection.
+type updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection struct {
+	Dbid   persist.DBID                                                                                               `json:"dbid"`
+	Name   *string                                                                                                    `json:"name"`
+	Tokens []*updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionToken `json:"tokens"`
+}
+
+// GetDbid returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection.Dbid, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetName returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection.Name, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection) GetName() *string {
+	return v.Name
+}
+
+// GetTokens returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection.Tokens, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollection) GetTokens() []*updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionToken {
+	return v.Tokens
+}
+
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionToken includes the requested fields of the GraphQL type CollectionToken.
+type updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionToken struct {
+	Token *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionTokenToken `json:"token"`
+}
+
+// GetToken returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionToken.Token, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionToken) GetToken() *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionTokenToken {
+	return v.Token
+}
+
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionTokenToken includes the requested fields of the GraphQL type Token.
+type updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionTokenToken struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionTokenToken.Dbid, and is useful for accessing the field via an interface.
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadGalleryCollectionsCollectionTokensCollectionTokenToken) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError includes the requested fields of the GraphQL interface UpdateGalleryPayloadOrError.
+//
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError is implemented by the following types:
+// updateGalleryMutationUpdateGalleryUpdateGalleryPayload
+// updateGalleryMutationUpdateGalleryErrInvalidInput
+// updateGalleryMutationUpdateGalleryErrNotAuthorized
+type updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError interface {
+	implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *updateGalleryMutationUpdateGalleryUpdateGalleryPayload) implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError() {
+}
+func (v *updateGalleryMutationUpdateGalleryErrInvalidInput) implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError() {
+}
+func (v *updateGalleryMutationUpdateGalleryErrNotAuthorized) implementsGraphQLInterfaceupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError() {
+}
+
+func __unmarshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(b []byte, v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "UpdateGalleryPayload":
+		*v = new(updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(updateGalleryMutationUpdateGalleryErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(updateGalleryMutationUpdateGalleryErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing UpdateGalleryPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(v *updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *updateGalleryMutationUpdateGalleryUpdateGalleryPayload:
+		typename = "UpdateGalleryPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateGalleryMutationUpdateGalleryUpdateGalleryPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateGalleryMutationUpdateGalleryErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateGalleryMutationUpdateGalleryErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateGalleryMutationUpdateGalleryErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateGalleryMutationUpdateGalleryErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for updateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError: "%T"`, v)
+	}
+}
+
 // updateUserExperienceResponse is returned by updateUserExperience on success.
 type updateUserExperienceResponse struct {
 	UpdateUserExperience *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError `json:"-"`
@@ -5116,8 +5505,14 @@ func (v *viewerQueryViewerUserExperiencesUserExperience) GetExperienced() bool {
 
 // viewerQueryViewerUserGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type viewerQueryViewerUserGalleryUser struct {
-	Username *string      `json:"username"`
-	Dbid     persist.DBID `json:"dbid"`
+	Feed     *viewerQueryViewerUserGalleryUserFeedFeedConnection `json:"feed"`
+	Username *string                                             `json:"username"`
+	Dbid     persist.DBID                                        `json:"dbid"`
+}
+
+// GetFeed returns viewerQueryViewerUserGalleryUser.Feed, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUser) GetFeed() *viewerQueryViewerUserGalleryUserFeedFeedConnection {
+	return v.Feed
 }
 
 // GetUsername returns viewerQueryViewerUserGalleryUser.Username, and is useful for accessing the field via an interface.
@@ -5125,6 +5520,1107 @@ func (v *viewerQueryViewerUserGalleryUser) GetUsername() *string { return v.User
 
 // GetDbid returns viewerQueryViewerUserGalleryUser.Dbid, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerUserGalleryUser) GetDbid() persist.DBID { return v.Dbid }
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnection includes the requested fields of the GraphQL type FeedConnection.
+type viewerQueryViewerUserGalleryUserFeedFeedConnection struct {
+	Edges []*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge `json:"edges"`
+}
+
+// GetEdges returns viewerQueryViewerUserGalleryUserFeedFeedConnection.Edges, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnection) GetEdges() []*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge {
+	return v.Edges
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge includes the requested fields of the GraphQL type FeedEdge.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge struct {
+	Node *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError `json:"-"`
+}
+
+// GetNode returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) GetNode() *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError {
+	return v.Node
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge
+		Node json.RawMessage `json:"node"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.Node
+		src := firstPass.Node
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError)
+			err = __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge struct {
+	Node json.RawMessage `json:"node"`
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge) __premarshalJSON() (*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge, error) {
+	var retval __premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge
+
+	{
+
+		dst := &retval.Node
+		src := v.Node
+		if src != nil {
+			var err error
+			*dst, err = __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdge.Node: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound includes the requested fields of the GraphQL type ErrFeedEventNotFound.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound.Message, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) GetMessage() string {
+	return v.Message
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction includes the requested fields of the GraphQL type ErrUnknownAction.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction.Message, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) GetMessage() string {
+	return v.Message
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent includes the requested fields of the GraphQL type FeedEvent.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
+	Typename  *string                                                                                             `json:"__typename"`
+	Dbid      persist.DBID                                                                                        `json:"dbid"`
+	Caption   *string                                                                                             `json:"caption"`
+	EventData *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData `json:"-"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetTypename() *string {
+	return v.Typename
+}
+
+// GetDbid returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Dbid, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetCaption returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.Caption, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetCaption() *string {
+	return v.Caption
+}
+
+// GetEventData returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.EventData, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) GetEventData() *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData {
+	return v.EventData
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+		EventData json.RawMessage `json:"eventData"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.EventData
+		src := firstPass.EventData
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData)
+			err = __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.EventData: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent struct {
+	Typename *string `json:"__typename"`
+
+	Dbid persist.DBID `json:"dbid"`
+
+	Caption *string `json:"caption"`
+
+	EventData json.RawMessage `json:"eventData"`
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) __premarshalJSON() (*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent, error) {
+	var retval __premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+
+	retval.Typename = v.Typename
+	retval.Dbid = v.Dbid
+	retval.Caption = v.Caption
+	{
+
+		dst := &retval.EventData
+		src := v.EventData
+		if src != nil {
+			var err error
+			*dst, err = __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent.EventData: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData includes the requested fields of the GraphQL type CollectionCreatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData includes the requested fields of the GraphQL type CollectionUpdatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData includes the requested fields of the GraphQL type CollectorsNoteAddedToCollectionFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData includes the requested fields of the GraphQL type CollectorsNoteAddedToTokenFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData includes the requested fields of the GraphQL interface FeedEventData.
+//
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData is implemented by the following types:
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData interface {
+	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+	// GetAction returns the interface-field "action" from its implementation.
+	GetAction() *Action
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData() {
+}
+
+func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "UserCreatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "UserFollowedUsersFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectorsNoteAddedToTokenFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectionCreatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectorsNoteAddedToCollectionFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "TokensAddedToCollectionFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectionUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "GalleryInfoUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "GalleryUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing FeedEventData.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData(v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData:
+		typename = "UserCreatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData:
+		typename = "UserFollowedUsersFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData:
+		typename = "CollectorsNoteAddedToTokenFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToTokenFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData:
+		typename = "CollectionCreatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData:
+		typename = "CollectorsNoteAddedToCollectionFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectorsNoteAddedToCollectionFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData:
+		typename = "TokensAddedToCollectionFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData:
+		typename = "CollectionUpdatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataCollectionUpdatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData:
+		typename = "GalleryInfoUpdatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData:
+		typename = "GalleryUpdatedFeedEventData"
+
+		premarshaled, err := v.__premarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		result := struct {
+			TypeName string `json:"__typename"`
+			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData
+		}{typename, premarshaled}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataFeedEventData: "%T"`, v)
+	}
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData includes the requested fields of the GraphQL type GalleryInfoUpdatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryInfoUpdatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData includes the requested fields of the GraphQL type GalleryUpdatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData struct {
+	Typename      *string                                                                                                                                      `json:"__typename"`
+	Action        *Action                                                                                                                                      `json:"action"`
+	SubEventDatas []viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData `json:"-"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// GetSubEventDatas returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.SubEventDatas, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) GetSubEventDatas() []viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData {
+	return v.SubEventDatas
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData
+		SubEventDatas []json.RawMessage `json:"subEventDatas"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.SubEventDatas
+		src := firstPass.SubEventDatas
+		*dst = make(
+			[]viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			if len(src) != 0 && string(src) != "null" {
+				err = __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData(
+					src, dst)
+				if err != nil {
+					return fmt.Errorf(
+						"Unable to unmarshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.SubEventDatas: %w", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+
+	Action *Action `json:"action"`
+
+	SubEventDatas []json.RawMessage `json:"subEventDatas"`
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData) __premarshalJSON() (*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData, error) {
+	var retval __premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData
+
+	retval.Typename = v.Typename
+	retval.Action = v.Action
+	{
+
+		dst := &retval.SubEventDatas
+		src := v.SubEventDatas
+		*dst = make(
+			[]json.RawMessage,
+			len(src))
+		for i, src := range src {
+			dst := &(*dst)[i]
+			var err error
+			*dst, err = __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData(
+				&src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData.SubEventDatas: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData includes the requested fields of the GraphQL type CollectionCreatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData struct {
+	Typename  *string                                                                                                                                                                                `json:"__typename"`
+	Action    *Action                                                                                                                                                                                `json:"action"`
+	NewTokens []*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionToken `json:"newTokens"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// GetNewTokens returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData.NewTokens, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData) GetNewTokens() []*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionToken {
+	return v.NewTokens
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionToken includes the requested fields of the GraphQL type CollectionToken.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionToken struct {
+	Token *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken `json:"token"`
+}
+
+// GetToken returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionToken.Token, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionToken) GetToken() *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken {
+	return v.Token
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken includes the requested fields of the GraphQL type Token.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken struct {
+	Dbid persist.DBID `json:"dbid"`
+	Name *string      `json:"name"`
+}
+
+// GetDbid returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken.Dbid, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetName returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken.Name, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventDataNewTokensCollectionTokenToken) GetName() *string {
+	return v.Name
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData includes the requested fields of the GraphQL type CollectionUpdatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData includes the requested fields of the GraphQL type CollectorsNoteAddedToCollectionFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData includes the requested fields of the GraphQL type CollectorsNoteAddedToTokenFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData includes the requested fields of the GraphQL interface FeedEventData.
+//
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData is implemented by the following types:
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData interface {
+	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+	// GetAction returns the interface-field "action" from its implementation.
+	GetAction() *Action
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData() {
+}
+
+func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "UserCreatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "UserFollowedUsersFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectorsNoteAddedToTokenFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectionCreatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectorsNoteAddedToCollectionFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "TokensAddedToCollectionFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "CollectionUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "GalleryInfoUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "GalleryUpdatedFeedEventData":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing FeedEventData.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData(v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData:
+		typename = "UserCreatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData:
+		typename = "UserFollowedUsersFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData:
+		typename = "CollectorsNoteAddedToTokenFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToTokenFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData:
+		typename = "CollectionCreatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionCreatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData:
+		typename = "CollectorsNoteAddedToCollectionFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectorsNoteAddedToCollectionFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData:
+		typename = "TokensAddedToCollectionFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData:
+		typename = "CollectionUpdatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasCollectionUpdatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData:
+		typename = "GalleryInfoUpdatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData:
+		typename = "GalleryUpdatedFeedEventData"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasFeedEventData: "%T"`, v)
+	}
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData includes the requested fields of the GraphQL type GalleryInfoUpdatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData includes the requested fields of the GraphQL type GalleryUpdatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryUpdatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData includes the requested fields of the GraphQL type TokensAddedToCollectionFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData struct {
+	Typename  *string                                                                                                                                                                                      `json:"__typename"`
+	Action    *Action                                                                                                                                                                                      `json:"action"`
+	NewTokens []*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionToken `json:"newTokens"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// GetNewTokens returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData.NewTokens, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData) GetNewTokens() []*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionToken {
+	return v.NewTokens
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionToken includes the requested fields of the GraphQL type CollectionToken.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionToken struct {
+	Token *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken `json:"token"`
+}
+
+// GetToken returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionToken.Token, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionToken) GetToken() *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken {
+	return v.Token
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken includes the requested fields of the GraphQL type Token.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken struct {
+	Dbid persist.DBID `json:"dbid"`
+	Name *string      `json:"name"`
+}
+
+// GetDbid returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken.Dbid, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken) GetDbid() persist.DBID {
+	return v.Dbid
+}
+
+// GetName returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken.Name, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventDataNewTokensCollectionTokenToken) GetName() *string {
+	return v.Name
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData includes the requested fields of the GraphQL type UserCreatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserCreatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData includes the requested fields of the GraphQL type UserFollowedUsersFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasUserFollowedUsersFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData includes the requested fields of the GraphQL type TokensAddedToCollectionFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataTokensAddedToCollectionFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData includes the requested fields of the GraphQL type UserCreatedFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserCreatedFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData includes the requested fields of the GraphQL type UserFollowedUsersFeedEventData.
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData struct {
+	Typename *string `json:"__typename"`
+	Action   *Action `json:"action"`
+}
+
+// GetTypename returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData.Typename, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData) GetTypename() *string {
+	return v.Typename
+}
+
+// GetAction returns viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData.Action, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataUserFollowedUsersFeedEventData) GetAction() *Action {
+	return v.Action
+}
+
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError includes the requested fields of the GraphQL interface FeedEventOrError.
+//
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError is implemented by the following types:
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+// viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+type viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError interface {
+	implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+func (v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction) implementsGraphQLInterfaceviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError() {
+}
+
+func __unmarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(b []byte, v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "FeedEvent":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent)
+		return json.Unmarshal(b, *v)
+	case "ErrFeedEventNotFound":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound)
+		return json.Unmarshal(b, *v)
+	case "ErrUnknownAction":
+		*v = new(viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing FeedEventOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError(v *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent:
+		typename = "FeedEvent"
+
+		premarshaled, err := v.__premarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		result := struct {
+			TypeName string `json:"__typename"`
+			*__premarshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEvent
+		}{typename, premarshaled}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound:
+		typename = "ErrFeedEventNotFound"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrFeedEventNotFound
+		}{typename, v}
+		return json.Marshal(result)
+	case *viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction:
+		typename = "ErrUnknownAction"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeErrUnknownAction
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventOrError: "%T"`, v)
+	}
+}
 
 // viewerQueryViewerViewerOrError includes the requested fields of the GraphQL interface ViewerOrError.
 //
@@ -5860,6 +7356,54 @@ query trendingUsersQuery ($input: TrendingUsersInput!) {
 	return &data, err
 }
 
+func updateGalleryMutation(
+	ctx context.Context,
+	client graphql.Client,
+	input UpdateGalleryInput,
+) (*updateGalleryMutationResponse, error) {
+	req := &graphql.Request{
+		OpName: "updateGalleryMutation",
+		Query: `
+mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
+	updateGallery(input: $input) {
+		__typename
+		... on UpdateGalleryPayload {
+			gallery {
+				dbid
+				name
+				description
+				collections {
+					dbid
+					name
+					tokens {
+						token {
+							dbid
+						}
+					}
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__updateGalleryMutationInput{
+			Input: input,
+		},
+	}
+	var err error
+
+	var data updateGalleryMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 func updateUserExperience(
 	ctx context.Context,
 	client graphql.Client,
@@ -6085,6 +7629,46 @@ query viewerQuery {
 				experienced
 			}
 			user {
+				feed(first: 10) {
+					edges {
+						node {
+							__typename
+							... on Error {
+								message
+							}
+							... on FeedEvent {
+								dbid
+								caption
+								eventData {
+									__typename
+									action
+									... on GalleryUpdatedFeedEventData {
+										subEventDatas {
+											__typename
+											action
+											... on TokensAddedToCollectionFeedEventData {
+												newTokens {
+													token {
+														dbid
+														name
+													}
+												}
+											}
+											... on CollectionCreatedFeedEventData {
+												newTokens {
+													token {
+														dbid
+														name
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 				username
 				dbid
 			}

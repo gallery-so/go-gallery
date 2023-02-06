@@ -151,7 +151,7 @@ type serverFixture struct {
 // newServerFixture starts a new HTTP server for end-to-end tests
 func newServerFixture(t *testing.T) serverFixture {
 	t.Helper()
-	server := httptest.NewServer(defaultHandler())
+	server := httptest.NewServer(defaultHandler(t))
 	t.Cleanup(func() { server.Close() })
 	return serverFixture{server}
 }

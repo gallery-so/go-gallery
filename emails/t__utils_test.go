@@ -52,12 +52,14 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
-	t.Cleanup(func() { r.Close() })
 
 	err = migrate.RunCoreDBMigration()
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		r.Close()
+	})
 
 	db := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
@@ -145,6 +147,7 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   testGallery.Collections[0],
+		GalleryID:      gallery.ID,
 	})
 
 	if err != nil {

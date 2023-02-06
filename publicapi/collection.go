@@ -138,7 +138,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	name = validate.SanitizationPolicy.Sanitize(strings.TrimSpace(name))
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -180,6 +180,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: createdCollection.Nfts, CollectionCollectorsNote: collectorsNote},
 	}, api.validator, caption)
@@ -198,7 +199,7 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -225,7 +226,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	name = validate.SanitizationPolicy.Sanitize(name)
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -240,12 +241,18 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		return err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return err
+	}
+
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
 	}, api.validator, nil)
@@ -286,7 +293,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return nil, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -308,12 +315,18 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return nil, err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Send event
 	return dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
 		Caption:        persist.StrToNullStr(caption),
@@ -328,7 +341,7 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -353,7 +366,7 @@ func (api CollectionAPI) UpdateCollectionGallery(ctx context.Context, collection
 		return "", err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return "", err
 	}

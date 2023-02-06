@@ -38,7 +38,12 @@ func NewClient(ctx context.Context) *pubsub.Client {
 				option.WithoutAuthentication(),
 			)
 		} else {
-			options = append(options, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
+			fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("failed to find service key, running without pubsub client")
+				return nil
+			}
+			options = append(options, option.WithCredentialsJSON(fi))
 		}
 	}
 

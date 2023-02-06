@@ -48,7 +48,7 @@ func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action pe
 	return err
 }
 
-func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
+func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
@@ -64,8 +64,24 @@ func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (
 	return &event, nil
 }
 
+func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*db.Event, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"eventID": {eventID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	event, err := api.queries.GetEvent(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
 func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -300,9 +316,12 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
 	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-		return api.queries.GetTrendingUserIDs(ctx, db.GetTrendingUserIDsParams{
+		if report.Name == "ALL_TIME" {
+			return api.queries.GetAllTimeTrendingUserIDs(ctx, 24)
+		}
+		return api.queries.GetWindowedTrendingUserIDs(ctx, db.GetWindowedTrendingUserIDsParams{
 			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
-			Size:      24,
+			Limit:     24,
 		})
 	}
 

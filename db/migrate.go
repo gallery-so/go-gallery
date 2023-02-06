@@ -23,12 +23,12 @@ func RunCoreDBMigration() error {
 
 	err := RunMigrationToVersion(client, coreMigrations, 54)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = client.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// The "gallery_migrator" role should be used for all future migrations.
@@ -47,15 +47,10 @@ func RunCoreDBMigration() error {
 func RunMigration(client *sql.DB, file string) error {
 	m, err := newMigrateInstance(client, file)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = m.Up()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return m, m.Up()
 }
 
 // RunMigrationToVersion runs migrations in the specified directory, up to (and including) the
