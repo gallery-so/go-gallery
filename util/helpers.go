@@ -225,6 +225,44 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
+func Contains[T comparable](s []T, str T) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Difference will take in 2 arrays and return the elements that exist in the second array but are not in the first
+func Difference[T comparable](old []T, new []T) []T {
+	var added []T
+	for _, v := range new {
+		if !Contains(old, v) {
+			added = append(added, v)
+		}
+	}
+	return added
+}
+
+func SetConditionalValue[T any](value *T, param *T, conditional *bool) {
+	if value != nil {
+		*param = *value
+		*conditional = true
+	} else {
+		*conditional = false
+	}
+}
+
+// StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
+func StringToPointerIfNotEmpty(str string) *string {
+	if str == "" {
+		return nil
+	}
+	return &str
+}
+
 // FromPointer returns the value of a pointer, or the zero value of the pointer's type if the pointer is nil.
 func FromPointer[T comparable](s *T) T {
 	if s == nil {
@@ -240,7 +278,8 @@ func ToPointer[T any](s T) *T {
 func ToPointerSlice[T any](s []T) []*T {
 	result := make([]*T, len(s))
 	for i, v := range s {
-		result[i] = &v
+		c := v
+		result[i] = &c
 	}
 	return result
 }
@@ -248,7 +287,8 @@ func ToPointerSlice[T any](s []T) []*T {
 func FromPointerSlice[T any](s []*T) []T {
 	result := make([]T, len(s))
 	for i, v := range s {
-		result[i] = *v
+		c := v
+		result[i] = *c
 	}
 	return result
 }
@@ -308,6 +348,15 @@ func MustFindFile(f string) string {
 		panic(err)
 	}
 	return f
+}
+
+// MustFindFile panics if the file is not found up to the default search depth.
+func MustFindFileOrError(f string) (string, error) {
+	f, err := FindFile(f, 5)
+	if err != nil {
+		return "", err
+	}
+	return f, nil
 }
 
 // InByteSizeFormat converts a number of bytes to a human-readable string
@@ -399,6 +448,21 @@ func LoadEncryptedServiceKey(filePath string) []byte {
 	}
 
 	return serviceKey
+}
+
+// LoadEncryptedServiceKeyOrError loads an encrypted service key JSON file from disk or errors
+func LoadEncryptedServiceKeyOrError(filePath string) ([]byte, error) {
+	path, err := MustFindFileOrError(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceKey, err := decrypt.File(path, "json")
+	if err != nil {
+		return nil, fmt.Errorf("error decrypting service key: %s\n", err)
+	}
+
+	return serviceKey, nil
 }
 
 // InDocker returns true if the service is running as a container.

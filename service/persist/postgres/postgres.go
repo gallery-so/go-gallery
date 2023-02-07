@@ -21,17 +21,28 @@ import (
 	"github.com/spf13/viper"
 )
 
-func getSqlConnectionString() string {
-	dbUser := viper.GetString("POSTGRES_USER")
-	dbPwd := viper.GetString("POSTGRES_PASSWORD")
-	dbName := viper.GetString("POSTGRES_DB")
-	dbHost := viper.GetString("POSTGRES_HOST")
-	dbPort := viper.GetInt("POSTGRES_PORT")
-	if dbPort == 0 {
-		dbPort = 5432
+type connectionParams struct {
+	user     string
+	password string
+	dbname   string
+	host     string
+	port     int
+}
+
+func (c *connectionParams) toConnectionString() string {
+	port := c.port
+	if port == 0 {
+		port = 5432
 	}
 
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", dbHost, dbPort, dbUser, dbPwd, dbName)
+	connStr := fmt.Sprintf("user=%s dbname=%s host=%s port=%d", c.user, c.dbname, c.host, port)
+
+	// Empty passwords should be omitted so they don't interfere with other parameters
+	// (e.g. "password= dbname=something" causes Postgres to ignore the dbname)
+	if c.password != "" {
+		connStr += fmt.Sprintf(" password=%s", c.password)
+	}
+
 	return connStr
 
 	// Commented out because we should be using Cloud SQL Proxy in any context where we would have supplied
@@ -62,11 +73,59 @@ func getSqlConnectionString() string {
 	//panic(fmt.Errorf("POSTGRES_SERVER_CA, POSTGRES_CLIENT_KEY, and POSTGRES_CLIENT_CERT must be set together (all must have values or all must be empty)"))
 }
 
+func newConnectionParamsFromEnv() connectionParams {
+	return connectionParams{
+		user:     viper.GetString("POSTGRES_USER"),
+		password: viper.GetString("POSTGRES_PASSWORD"),
+		dbname:   viper.GetString("POSTGRES_DB"),
+		host:     viper.GetString("POSTGRES_HOST"),
+		port:     viper.GetInt("POSTGRES_PORT"),
+	}
+}
+
+type ConnectionOption func(params *connectionParams)
+
+func WithUser(user string) ConnectionOption {
+	return func(params *connectionParams) {
+		params.user = user
+	}
+}
+
+func WithPassword(password string) ConnectionOption {
+	return func(params *connectionParams) {
+		params.password = password
+	}
+}
+
+func WithDBName(dbname string) ConnectionOption {
+	return func(params *connectionParams) {
+		params.dbname = dbname
+	}
+}
+
+func WithHost(host string) ConnectionOption {
+	return func(params *connectionParams) {
+		params.host = host
+	}
+}
+
+func WithPort(port int) ConnectionOption {
+	return func(params *connectionParams) {
+		params.port = port
+	}
+}
+
 // NewClient creates a new postgres client
-func NewClient() *sql.DB {
+func NewClient(opts ...ConnectionOption) *sql.DB {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	db, err := sql.Open("pgx", getSqlConnectionString())
+
+	params := newConnectionParamsFromEnv()
+	for _, opt := range opts {
+		opt(&params)
+	}
+
+	db, err := sql.Open("pgx", params.toConnectionString())
 	if err != nil {
 		logger.For(nil).WithError(err).Fatal("could not open database connection")
 		panic(err)
@@ -82,10 +141,15 @@ func NewClient() *sql.DB {
 }
 
 // NewPgxClient creates a new postgres client via pgx
-func NewPgxClient() *pgxpool.Pool {
+func NewPgxClient(opts ...ConnectionOption) *pgxpool.Pool {
 	ctx := context.Background()
 
-	config, err := pgxpool.ParseConfig(getSqlConnectionString())
+	params := newConnectionParamsFromEnv()
+	for _, opt := range opts {
+		opt(&params)
+	}
+
+	config, err := pgxpool.ParseConfig(params.toConnectionString())
 	if err != nil {
 		logger.For(nil).WithError(err).Fatal("could not parse pgx connection string")
 		panic(err)

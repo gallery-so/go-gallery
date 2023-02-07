@@ -160,7 +160,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	defer func() {
 		logger.For(c).Infof("sent %d emails", emailsSent.Load())
 	}()
-	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.UsersWithPii) error {
+	return runForUsersWithNotificationsOnForEmailType(c, persist.EmailTypeNotifications, queries, func(u coredb.PiiUserView) error {
 
 		response, err := sendNotificationEmailToUser(c, u, u.PiiEmailAddress, queries, s, 10, 5, sendRealEmails)
 		if err != nil {
@@ -178,7 +178,7 @@ func sendNotificationEmailsToAllUsers(c context.Context, queries *coredb.Queries
 	})
 }
 
-func sendNotificationEmailToUser(c context.Context, u coredb.UsersWithPii, emailRecipient persist.Email, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
+func sendNotificationEmailToUser(c context.Context, u coredb.PiiUserView, emailRecipient persist.Email, queries *coredb.Queries, s *sendgrid.Client, searchLimit int32, resultLimit int, sendRealEmail bool) (*rest.Response, error) {
 
 	// generate notification data for user
 	notifs, err := queries.GetRecentUnseenNotifications(c, coredb.GetRecentUnseenNotificationsParams{
@@ -375,7 +375,7 @@ func notifToTemplateData(ctx context.Context, queries *coredb.Queries, n coredb.
 	}
 }
 
-func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.UsersWithPii) error) error {
+func runForUsersWithNotificationsOnForEmailType(ctx context.Context, emailType persist.EmailType, queries *coredb.Queries, fn func(u coredb.PiiUserView) error) error {
 	errGroup := new(errgroup.Group)
 	var lastID persist.DBID
 	var lastCreatedAt time.Time

@@ -15,7 +15,6 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
@@ -75,8 +74,10 @@ func usePostgres(t *testing.T) {
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
-	err = migrate.RunMigration(postgres.NewClient(), "./db/migrations/core")
+
+	err = migrate.RunCoreDBMigration()
 	require.NoError(t, err)
+
 	t.Cleanup(func() { r.Close() })
 }
 
@@ -150,7 +151,7 @@ type serverFixture struct {
 // newServerFixture starts a new HTTP server for end-to-end tests
 func newServerFixture(t *testing.T) serverFixture {
 	t.Helper()
-	server := httptest.NewServer(defaultHandler())
+	server := httptest.NewServer(defaultHandler(t))
 	t.Cleanup(func() { server.Close() })
 	return serverFixture{server}
 }

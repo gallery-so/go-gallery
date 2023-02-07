@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -48,7 +50,7 @@ func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action pe
 	return err
 }
 
-func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
+func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"feedEventID": {feedEventID, "required"},
@@ -64,8 +66,24 @@ func (api FeedAPI) GetEventById(ctx context.Context, feedEventID persist.DBID) (
 	return &event, nil
 }
 
+func (api FeedAPI) GetRawEventById(ctx context.Context, eventID persist.DBID) (*db.Event, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"eventID": {eventID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	event, err := api.queries.GetEvent(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
 func (api FeedAPI) PaginatePersonalFeed(ctx context.Context, before *string, after *string, first *int, last *int) ([]db.FeedEvent, PageInfo, error) {
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, err
 	}
@@ -224,6 +242,9 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		trendingIDs []persist.DBID
 		paginator   = positionPaginator{}
 		lookup      = make(map[persist.DBID]int)
+		// lambda determines how quickly the score decreases over time. A larger value (i.e. a smaller denominator) has a faster decay rate.
+		lambda     = float64(1) / 200000
+		reportSize = 100
 	)
 
 	// If a cursor is provided, we can skip querying the cache
@@ -237,10 +258,31 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		}
 	} else {
 		calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-			return api.queries.GetTrendingFeedEventIDs(ctx, db.GetTrendingFeedEventIDsParams{
-				WindowEnd: time.Now().Add(-time.Duration(72 * time.Hour)),
-				Limit:     100,
+			trendData, err := api.queries.GetTrendingFeedEventIDs(ctx, time.Now().Add(-time.Duration(72*time.Hour)))
+			if err != nil {
+				return nil, err
+			}
+
+			// Compute a new score for each event by weighting the current score by its relative age
+			scores := make(map[persist.DBID]float64)
+			now := time.Now()
+			for _, event := range trendData {
+				eventAge := now.Sub(event.CreatedAt).Seconds()
+				score := float64(event.Count) * math.Pow(math.E, (-lambda*eventAge))
+				// Invert the score so that events are in descending order (in terms of absolute value) below
+				scores[event.ID] = -score
+			}
+
+			sort.Slice(trendData, func(i, j int) bool {
+				return scores[trendData[i].ID] < scores[trendData[j].ID]
 			})
+
+			trendingIDs := make([]persist.DBID, 0)
+			for i := 0; i < len(trendData) && i < reportSize; i++ {
+				trendingIDs = append(trendingIDs, trendData[i].ID)
+			}
+
+			return trendingIDs, nil
 		}
 
 		t := trender{
@@ -300,9 +342,12 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 
 func (api FeedAPI) TrendingUsers(ctx context.Context, report model.Window) ([]db.User, error) {
 	calcFunc := func(ctx context.Context) ([]persist.DBID, error) {
-		return api.queries.GetTrendingUserIDs(ctx, db.GetTrendingUserIDsParams{
+		if report.Name == "ALL_TIME" {
+			return api.queries.GetAllTimeTrendingUserIDs(ctx, 24)
+		}
+		return api.queries.GetWindowedTrendingUserIDs(ctx, db.GetWindowedTrendingUserIDsParams{
 			WindowEnd: time.Now().Add(-time.Duration(report.Duration)),
-			Size:      24,
+			Limit:     24,
 		})
 	}
 

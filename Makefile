@@ -387,21 +387,22 @@ migrate-local-indexerdb:
 	migrate -path ./db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
 
 migrate-local-coredb:
-	migrate -path ./db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" up
+	migrate -path ./db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" goto 56
+	migrate -path ./db/migrations/core -database "postgresql://gallery_migrator@localhost:5432/postgres?sslmode=disable" up
 
 confirm-dev-migrate:
 	@prompt=$(shell bash -c 'read -p "Are you sure you want to apply migrations to the dev DB? Type \"development\" to confirm: " prompt; echo $$prompt'); \
 	if [ "$$prompt" != "development" ]; then exit 1; fi
 
 migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
-	migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:6643/$(POSTGRES_DB)?sslmode=disable" up
+	@migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_MIGRATION_USER):$(POSTGRES_MIGRATION_PASSWORD)@localhost:6643/$(POSTGRES_DB)?sslmode=disable" up
 
 confirm-prod-migrate:
 	@prompt=$(shell bash -c 'read -p "Are you sure you want to apply migrations to the production DB? Type \"production\" to confirm: " prompt; echo $$prompt'); \
 	if [ "$$prompt" != "production" ]; then exit 1; fi
 
 migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
-	migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:6543/$(POSTGRES_DB)?sslmode=disable" up
+	@migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_MIGRATION_USER):$(POSTGRES_MIGRATION_PASSWORD)@localhost:6543/$(POSTGRES_DB)?sslmode=disable" up
 
 
 #----------------------------------------------------------------

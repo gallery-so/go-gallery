@@ -338,7 +338,7 @@ type OwnerAtBlock {
 type CollectionToken implements Node @goEmbedHelper @goGqlId(fields: ["tokenId", "collectionId"]) {
   id: ID!
   token: Token
-  collection: Collection
+  collection: Collection @goField(forceResolver: true)
   tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
 }
 
@@ -751,6 +751,24 @@ type CollectionUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
   newTokens: [CollectionToken] @goField(forceResolver: true)
 }
 
+type GalleryInfoUpdatedFeedEventData implements FeedEventData {
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  newName: String
+  newDescription: String
+  action: Action
+}
+
+type GalleryUpdatedFeedEventData implements FeedEventData @goEmbedHelper {
+  eventTime: Time
+  owner: GalleryUser @goField(forceResolver: true)
+  action: Action
+  gallery: Gallery @goField(forceResolver: true)
+  subEventDatas: [FeedEventData!] @goField(forceResolver: true)
+  newName: String
+  newDescription: String
+}
+
 type ErrUnknownAction implements Error {
   message: String!
 }
@@ -826,6 +844,7 @@ union GalleryByIdPayloadOrError = Gallery | ErrGalleryNotFound
 union ViewerGalleryByIdPayloadOrError = ViewerGallery | ErrGalleryNotFound
 
 enum ReportWindow {
+  LAST_5_DAYS
   LAST_7_DAYS
   ALL_TIME
 }

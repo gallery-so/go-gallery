@@ -98,7 +98,7 @@ func processAddresses(addresses <-chan persist.Address, wg *sync.WaitGroup) {
 func setDefaults() {
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
-	viper.SetDefault("POSTGRES_USER", "postgres")
+	viper.SetDefault("POSTGRES_USER", "gallery_backend")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("INDEXER_HOST", "http://localhost:4000")

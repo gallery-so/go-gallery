@@ -15,6 +15,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -255,7 +256,15 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 			panic(err)
 		}
 		i.lastSyncedChunk = recentDBBlock.Uint64()
-		i.lastSyncedChunk -= (i.lastSyncedChunk % blocksPerLogsCall) + (blocksPerLogsCall * defaultWorkerPoolSize)
+
+		safeSub, overflowed := math.SafeSub(i.lastSyncedChunk, (i.lastSyncedChunk%blocksPerLogsCall)+(blocksPerLogsCall*defaultWorkerPoolSize))
+
+		if overflowed {
+			i.lastSyncedChunk = 0
+		} else {
+			i.lastSyncedChunk = safeSub
+		}
+
 	}
 
 	if maxBlock != nil {

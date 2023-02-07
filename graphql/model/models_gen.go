@@ -998,10 +998,33 @@ type Gallery struct {
 func (Gallery) IsNode()                      {}
 func (Gallery) IsGalleryByIDPayloadOrError() {}
 
+type GalleryInfoUpdatedFeedEventData struct {
+	EventTime      *time.Time      `json:"eventTime"`
+	Owner          *GalleryUser    `json:"owner"`
+	NewName        *string         `json:"newName"`
+	NewDescription *string         `json:"newDescription"`
+	Action         *persist.Action `json:"action"`
+}
+
+func (GalleryInfoUpdatedFeedEventData) IsFeedEventData() {}
+
 type GalleryPositionInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
 	Position  string       `json:"position"`
 }
+
+type GalleryUpdatedFeedEventData struct {
+	HelperGalleryUpdatedFeedEventDataData
+	EventTime      *time.Time      `json:"eventTime"`
+	Owner          *GalleryUser    `json:"owner"`
+	Action         *persist.Action `json:"action"`
+	Gallery        *Gallery        `json:"gallery"`
+	SubEventDatas  []FeedEventData `json:"subEventDatas"`
+	NewName        *string         `json:"newName"`
+	NewDescription *string         `json:"newDescription"`
+}
+
+func (GalleryUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryUser struct {
 	HelperGalleryUserData

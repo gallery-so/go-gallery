@@ -72,6 +72,11 @@ type Clients struct {
 	SecretClient    *secretmanager.Client
 	PubSubClient    *pubsub.Client
 	MagicLinkClient *magicclient.API
+	closeFunc       func()
+}
+
+func (c *Clients) Close() {
+	c.closeFunc()
 }
 
 func ClientInit(ctx context.Context) *Clients {
@@ -81,7 +86,7 @@ func ClientInit(ctx context.Context) *Clients {
 		Repos:           postgres.NewRepositories(pq, pgx),
 		Queries:         db.New(pgx),
 		HTTPClient:      &http.Client{Timeout: 10 * time.Minute},
-		EthClient:       newEthClient(),
+		EthClient:       rpc.NewEthClient(),
 		IPFSClient:      rpc.NewIPFSShell(),
 		ArweaveClient:   rpc.NewArweaveClient(),
 		StorageClient:   media.NewStorageClient(ctx),
@@ -89,6 +94,10 @@ func ClientInit(ctx context.Context) *Clients {
 		SecretClient:    newSecretsClient(),
 		PubSubClient:    gcp.NewClient(ctx),
 		MagicLinkClient: auth.NewMagicLinkClient(),
+		closeFunc: func() {
+			pq.Close()
+			pgx.Close()
+		},
 	}
 }
 
@@ -126,7 +135,12 @@ func newSecretsClient() *secretmanager.Client {
 	options := []option.ClientOption{}
 
 	if viper.GetString("ENV") == "local" {
-		options = append(options, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
+		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+		if err != nil {
+			logger.For(nil).WithError(err).Error("error finding service key, running without secrets client")
+			return nil
+		}
+		options = append(options, option.WithCredentialsJSON(fi))
 	}
 
 	c, err := secretmanager.NewClient(context.Background(), options...)
@@ -145,7 +159,7 @@ func SetDefaults() {
 	viper.SetDefault("PORT", 4000)
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
-	viper.SetDefault("POSTGRES_USER", "postgres")
+	viper.SetDefault("POSTGRES_USER", "gallery_backend")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("IPFS_URL", "https://gallery.infura-ipfs.io")
@@ -155,7 +169,7 @@ func SetDefaults() {
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
 	viper.SetDefault("REDIS_URL", "localhost:6379")
 	viper.SetDefault("PREMIUM_CONTRACT_ADDRESS", "0xe01569ca9b39e55bc7c0dfa09f05fa15cb4c7698=[0,1,2,3,4,5,6,7,8]")
-	viper.SetDefault("CONTRACT_INTERACTION_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
+	viper.SetDefault("RPC_URL", "https://eth-goerli.g.alchemy.com/v2/_2u--i79yarLYdOT4Bgydqa0dBceVRLD")
 	viper.SetDefault("ADMIN_PASS", "TEST_ADMIN_PASS")
 	viper.SetDefault("MIXPANEL_TOKEN", "")
 	viper.SetDefault("MIXPANEL_API_URL", "https://api.mixpanel.com/track")
@@ -167,16 +181,16 @@ func SetDefaults() {
 	viper.SetDefault("SNAPSHOT_BUCKET", "gallery-dev-322005.appspot.com")
 	viper.SetDefault("TASK_QUEUE_HOST", "")
 	viper.SetDefault("SENTRY_DSN", "")
-	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/feed-event")
+	viper.SetDefault("GCLOUD_FEED_QUEUE", "projects/gallery-local/locations/here/queues/feed-event")
 	viper.SetDefault("GCLOUD_WALLET_VALIDATE_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/wallet-validate")
-	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 5)
+	viper.SetDefault("GCLOUD_FEED_BUFFER_SECS", 20)
 	viper.SetDefault("FEED_SECRET", "feed-secret")
 	viper.SetDefault("TOKEN_PROCESSING_URL", "http://localhost:6500")
 	viper.SetDefault("TEZOS_API_URL", "https://api.tzkt.io")
 	viper.SetDefault("POAP_API_KEY", "")
 	viper.SetDefault("POAP_AUTH_TOKEN", "")
 	viper.SetDefault("GAE_VERSION", "")
-	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-dev-322005/locations/us-west2/queues/dev-token-processing")
+	viper.SetDefault("TOKEN_PROCESSING_QUEUE", "projects/gallery-local/locations/here/queues/token-processing")
 	viper.SetDefault("GOOGLE_CLOUD_PROJECT", "gallery-dev-322005")
 	viper.SetDefault("PUBSUB_EMULATOR_HOST", "")
 	viper.SetDefault("PUBSUB_TOPIC_NEW_NOTIFICATIONS", "dev-new-notifications")
@@ -188,6 +202,7 @@ func SetDefaults() {
 	viper.SetDefault("BACKEND_SECRET", "BACKEND_SECRET")
 	viper.SetDefault("MERCH_CONTRACT_ADDRESS", "0x01f55be815fbd10b1770b008b8960931a30e7f65")
 	viper.SetDefault("ETH_PRIVATE_KEY", "")
+	viper.SetDefault("FEED_URL", "")
 	viper.SetDefault("MAGIC_LINK_SECRET_KEY", "")
 	viper.SetDefault("TWITTER_CLIENT_ID", "")
 	viper.SetDefault("TWITTER_CLIENT_SECRET", "")
@@ -206,8 +221,8 @@ func SetDefaults() {
 		util.LoadEncryptedEnvFile(envFile)
 	}
 
-	util.VarNotSetTo("IMGIX_SECRET", "")
 	if viper.GetString("ENV") != "local" {
+		util.VarNotSetTo("IMGIX_SECRET", "")
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("GAE_VERSION", "")
@@ -215,14 +230,6 @@ func SetDefaults() {
 		util.VarNotSetTo("RETOOL_AUTH_TOKEN", "TEST_TOKEN")
 		util.VarNotSetTo("BACKEND_SECRET", "BACKEND_SECRET")
 	}
-}
-
-func newEthClient() *ethclient.Client {
-	client, err := ethclient.Dial(viper.GetString("CONTRACT_INTERACTION_URL"))
-	if err != nil {
-		panic(err)
-	}
-	return client
 }
 
 func initSentry() {
