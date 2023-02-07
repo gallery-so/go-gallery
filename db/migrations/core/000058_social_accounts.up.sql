@@ -1,3 +1,5 @@
+set role to access_rw_pii;
+
 alter table pii.for_users add column if not exists pii_external_socials jsonb not null default '{}';
 
 drop view if exists pii.user_view;
