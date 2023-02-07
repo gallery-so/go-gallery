@@ -710,7 +710,6 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 	}
 
 	// Otherwise wait for the second reply
-	logger.For(pCtx).WithError(reply.(error)).Error("failed to fetch data from IPFS service, waiting for second")
 	reply = <-responseCh
 	if result, ok := reply.(io.ReadCloser); ok {
 		return result, nil
