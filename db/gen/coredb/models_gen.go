@@ -214,6 +214,18 @@ type PiiForUser struct {
 	PiiExternalSocials pgtype.JSONB
 }
 
+type PiiSocialAccountAuth struct {
+	ID           persist.DBID
+	Deleted      bool
+	Version      sql.NullInt32
+	CreatedAt    time.Time
+	LastUpdated  time.Time
+	UserID       persist.DBID
+	Provider     persist.SocialProvider
+	AccessToken  sql.NullString
+	RefreshToken sql.NullString
+}
+
 type PiiUserView struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -234,18 +246,6 @@ type PiiUserView struct {
 	UserExperiences      pgtype.JSONB
 	PiiEmailAddress      persist.Email
 	PiiExternalSocials   pgtype.JSONB
-}
-
-type SocialAccountAuth struct {
-	ID           persist.DBID
-	Deleted      bool
-	Version      sql.NullInt32
-	CreatedAt    time.Time
-	LastUpdated  time.Time
-	UserID       persist.DBID
-	Provider     persist.SocialProvider
-	AccessToken  sql.NullString
-	RefreshToken sql.NullString
 }
 
 type Token struct {

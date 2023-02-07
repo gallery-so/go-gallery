@@ -3795,7 +3795,7 @@ func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUs
 }
 
 const upsertSocialMediaOAuth = `-- name: UpsertSocialMediaOAuth :exec
-insert into social_account_auth (id, user_id, provider, access_token, refresh_token) values ($1, $2, $3, $4, $5) on conflict (user_id, provider) do update set access_token = $4, refresh_token = $5
+insert into pii.social_account_auth (id, user_id, provider, access_token, refresh_token) values ($1, $2, $3, $4, $5) on conflict (user_id, provider) do update set access_token = $4, refresh_token = $5
 `
 
 type UpsertSocialMediaOAuthParams struct {

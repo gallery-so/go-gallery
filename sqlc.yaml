@@ -51,7 +51,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
 
           # Socials
-          - column: "social_account_auth.provider"
+          - column: "pii.social_account_auth.provider"
             go_type: "github.com/mikeydub/go-gallery/service/persist.SocialProvider"
 
           # Collections

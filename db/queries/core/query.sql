@@ -808,10 +808,10 @@ select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and d
 select exists(select 1 from collections where id = $1 and owner_user_id = $2 and deleted = false);
 
 -- GetSocialMediaAuthByUserID :one
-select * from social_account_auth where user_id = $1 and provider = $2 and deleted = false;
+select * from pii.social_account_auth where user_id = $1 and provider = $2 and deleted = false;
 
 -- name: UpsertSocialMediaOAuth :exec
-insert into social_account_auth (id, user_id, provider, access_token, refresh_token) values (@id, @user_id, @provider, @access_token, @refresh_token) on conflict (user_id, provider) do update set access_token = @access_token, refresh_token = @refresh_token;
+insert into pii.social_account_auth (id, user_id, provider, access_token, refresh_token) values (@id, @user_id, @provider, @access_token, @refresh_token) on conflict (user_id, provider) do update set access_token = @access_token, refresh_token = @refresh_token;
 
 -- name: AddExternalSocialToUser :exec
 insert into pii.for_users (user_id, pii_external_socials) values (@user_id, @external_socials) on conflict (user_id) do update set pii_external_socials = pii_for_users.pii_external_socials || @external_socials;
