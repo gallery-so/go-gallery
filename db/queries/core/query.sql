@@ -787,8 +787,10 @@ update users set user_experiences = user_experiences || @experience where id = @
 select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
 -- name: GetTrendingFeedEventIDs :many
-select feed_event_id from events where action in ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and created_at >= @window_end and feed_event_id is not null
-group by feed_event_id order by count(*) desc, max(created_at) desc limit sqlc.arg('limit');
+select feed_events.id, feed_events.created_at, count(*)
+from events as interactions, feed_events
+where interactions.action IN ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and interactions.created_at >= @window_end and interactions.feed_event_id is not null and interactions.feed_event_id = feed_events.id
+group by feed_events.id, feed_events.created_at;
 
 -- name: UpdateCollectionGallery :exec
 update collections set gallery_id = @gallery_id, last_updated = now() where id = @id and deleted = false;
