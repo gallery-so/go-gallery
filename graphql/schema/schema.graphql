@@ -337,7 +337,7 @@ type OwnerAtBlock {
 
 type CollectionToken implements Node @goEmbedHelper @goGqlId(fields: ["tokenId", "collectionId"]) {
   id: ID!
-  token: Token
+  token: Token @goField(forceResolver: true)
   collection: Collection @goField(forceResolver: true)
   tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
 }
@@ -702,7 +702,7 @@ type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
   eventTime: Time
   owner: GalleryUser @goField(forceResolver: true)
   action: Action
-  token: CollectionToken @goField(forceResolver: true)
+  token: Token @goField(forceResolver: true)
   newCollectorsNote: String
 }
 

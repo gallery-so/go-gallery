@@ -1101,6 +1101,7 @@ type CollectionCreatedFeedEventDataResolver interface {
 	NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error)
 }
 type CollectionTokenResolver interface {
+	Token(ctx context.Context, obj *model.CollectionToken) (*model.Token, error)
 	Collection(ctx context.Context, obj *model.CollectionToken) (*model.Collection, error)
 	TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error)
 }
@@ -1119,7 +1120,7 @@ type CollectorsNoteAddedToCollectionFeedEventDataResolver interface {
 type CollectorsNoteAddedToTokenFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.GalleryUser, error)
 
-	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error)
+	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.Token, error)
 }
 type CommentResolver interface {
 	ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error)
@@ -5911,7 +5912,7 @@ type OwnerAtBlock {
 
 type CollectionToken implements Node @goEmbedHelper @goGqlId(fields: ["tokenId", "collectionId"]) {
   id: ID!
-  token: Token
+  token: Token @goField(forceResolver: true)
   collection: Collection @goField(forceResolver: true)
   tokenSettings: CollectionTokenSettings @goField(forceResolver: true)
 }
@@ -6276,7 +6277,7 @@ type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
   eventTime: Time
   owner: GalleryUser @goField(forceResolver: true)
   action: Action
-  token: CollectionToken @goField(forceResolver: true)
+  token: Token @goField(forceResolver: true)
   newCollectorsNote: String
 }
 
@@ -7215,7 +7216,6 @@ type UpdateGalleryPayload {
 
 union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | ErrNotAuthorized
 
-
 input PublishGalleryInput {
   galleryId: DBID!
   editID: String!
@@ -7236,7 +7236,6 @@ union UpdatePrimaryWalletPayloadOrError =
     UpdatePrimaryWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-
 
 input AdminAddWalletInput {
   username: String!
@@ -10754,14 +10753,14 @@ func (ec *executionContext) _CollectionToken_token(ctx context.Context, field gr
 		Object:     "CollectionToken",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Token, nil
+		return ec.resolvers.CollectionToken().Token(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -11346,9 +11345,9 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_token(ctx c
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.CollectionToken)
+	res := resTmp.(*model.Token)
 	fc.Result = res
-	return ec.marshalOCollectionToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
+	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEventData) (ret graphql.Marshaler) {
@@ -34276,12 +34275,22 @@ func (ec *executionContext) _CollectionToken(ctx context.Context, sel ast.Select
 				atomic.AddUint32(&invalids, 1)
 			}
 		case "token":
+			field := field
+
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._CollectionToken_token(ctx, field, obj)
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._CollectionToken_token(ctx, field, obj)
+				return res
 			}
 
-			out.Values[i] = innerFunc(ctx)
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
 
+			})
 		case "collection":
 			field := field
 

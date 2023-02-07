@@ -482,11 +482,11 @@ type CollectorsNoteAddedToCollectionFeedEventData struct {
 func (CollectorsNoteAddedToCollectionFeedEventData) IsFeedEventData() {}
 
 type CollectorsNoteAddedToTokenFeedEventData struct {
-	EventTime         *time.Time       `json:"eventTime"`
-	Owner             *GalleryUser     `json:"owner"`
-	Action            *persist.Action  `json:"action"`
-	Token             *CollectionToken `json:"token"`
-	NewCollectorsNote *string          `json:"newCollectorsNote"`
+	EventTime         *time.Time      `json:"eventTime"`
+	Owner             *GalleryUser    `json:"owner"`
+	Action            *persist.Action `json:"action"`
+	Token             *Token          `json:"token"`
+	NewCollectorsNote *string         `json:"newCollectorsNote"`
 }
 
 func (CollectorsNoteAddedToTokenFeedEventData) IsFeedEventData() {}

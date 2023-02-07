@@ -81,6 +81,10 @@ func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, 
 	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
+func (r *collectionTokenResolver) Token(ctx context.Context, obj *model.CollectionToken) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.HelperCollectionTokenData.TokenId)
+}
+
 func (r *collectionTokenResolver) Collection(ctx context.Context, obj *model.CollectionToken) (*model.Collection, error) {
 	return resolveCollectionByCollectionID(ctx, obj.HelperCollectionTokenData.CollectionId)
 }
@@ -113,8 +117,8 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Owner(ctx context.Cont
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error) {
-	return resolveCollectionTokenByID(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
+func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.Token.Dbid)
 }
 
 func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error) {
