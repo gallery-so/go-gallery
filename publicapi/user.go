@@ -327,7 +327,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	return nil
 }
 
-func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator) error {
+func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator, display bool) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"authenticator": {authenticator, "required"},
@@ -345,16 +345,16 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 		return err
 	}
 
-	insert, err := util.ToPGJSONB(map[persist.SocialProvider]interface{}{
-		res.ID.Provider: res.ID,
-	})
-	if err != nil {
-		return err
-	}
-
 	err = api.queries.AddExternalSocialToUser(ctx, db.AddExternalSocialToUserParams{
-		UserID:          userID,
-		ExternalSocials: insert,
+		UserID: userID,
+		ExternalSocials: persist.ExternalSocials{
+			res.Provider: persist.SocialUserIdentifers{
+				Provider: res.Provider,
+				ID:       res.ID,
+				Display:  display,
+				Metadata: res.Metadata,
+			},
+		},
 	})
 	if err != nil {
 		return err
@@ -724,18 +724,15 @@ func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*mo
 		return nil, err
 	}
 
-	asMap := map[persist.SocialProvider]persist.SocialUserIdentifers{}
-	if err := socials.AssignTo(&asMap); err != nil {
-		return nil, fmt.Errorf("failed to assign socials to map: %w", err)
-	}
-
 	result := &model.SocialAccounts{}
 
 	for _, prov := range persist.AllSocialProviders {
 		switch prov {
 		case persist.SocialProviderTwitter:
-			if val, ok := asMap[prov]; ok {
+			if val, ok := socials[prov]; ok {
 				result.Twitter = &model.TwitterSocialAccount{
+					Type:     prov,
+					Display:  val.Display,
 					SocialID: val.ID,
 					Name:     val.Metadata["name"].(string),
 					Username: val.Metadata["username"].(string),
@@ -747,6 +744,21 @@ func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*mo
 	}
 
 	return result, nil
+}
+
+func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, userID persist.DBID, socialType persist.SocialProvider, displayed bool) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID":     {userID, "required"},
+		"socialType": {socialType, "required"},
+	}); err != nil {
+		return err
+	}
+
+	return api.queries.UpdateUserSocialAccountDisplayed(ctx, db.UpdateUserSocialAccountDisplayedParams{
+		SocialID:  util.ToNullString(socialType.String()),
+		Displayed: displayed,
+	})
 }
 
 func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType model.UserExperienceType, value bool) error {

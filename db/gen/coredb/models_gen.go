@@ -211,7 +211,7 @@ type PiiForUser struct {
 	UserID             persist.DBID
 	PiiEmailAddress    persist.Email
 	Deleted            bool
-	PiiExternalSocials pgtype.JSONB
+	PiiExternalSocials persist.ExternalSocials
 }
 
 type PiiSocialAccountAuth struct {
@@ -245,7 +245,7 @@ type PiiUserView struct {
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
 	PiiEmailAddress      persist.Email
-	PiiExternalSocials   pgtype.JSONB
+	PiiExternalSocials   persist.ExternalSocials
 }
 
 type Token struct {

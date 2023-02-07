@@ -9,6 +9,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/debugtools"
 	emailService "github.com/mikeydub/go-gallery/emails"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -846,17 +847,40 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	return output, nil
 }
 
-func (r *mutationResolver) ConnectSocialAccount(ctx context.Context, input model.SocialAuthMechanism) (model.ConnectSocialAccountPayloadOrError, error) {
+func (r *mutationResolver) ConnectSocialAccount(ctx context.Context, input model.SocialAuthMechanism, display bool) (model.ConnectSocialAccountPayloadOrError, error) {
 	authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	if input.Twitter != nil {
 		authenticator := publicapi.For(ctx).Socials.NewTwitterAuthenticator(authedUserID, input.Twitter.Code)
 
-		err := publicapi.For(ctx).User.AddSocialAccountToUser(ctx, authenticator)
+		err := publicapi.For(ctx).User.AddSocialAccountToUser(ctx, authenticator, display)
 		if err != nil {
 			return nil, err
 		}
+	} else if input.Debug != nil {
+		authenticator := debugtools.NewDebugSocialAuthenticator(input.Debug.Provider, input.Debug.ID, map[string]interface{}{"username": input.Debug.Username})
+
+		err := publicapi.For(ctx).User.AddSocialAccountToUser(ctx, authenticator, display)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("invalid social auth mechanism: %T", input)
 	}
 	output := &model.ConnectSocialAccountPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error) {
+	authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+	err := publicapi.For(ctx).User.UpdateUserSocialDisplayed(ctx, authedUserID, input.Type, input.Displayed)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateSocialAccountDisplayedPayload{
 		Viewer: resolveViewer(ctx),
 	}
 

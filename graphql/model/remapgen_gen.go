@@ -233,6 +233,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"SocialAccount": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SocialAccount)
+		return obj, ok
+	},
+
 	"SyncTokensForUsernamePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SyncTokensForUsernamePayloadOrError)
 		return obj, ok
@@ -320,6 +325,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"UpdatePrimaryWalletPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UpdatePrimaryWalletPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateSocialAccountDisplayedPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateSocialAccountDisplayedPayloadOrError)
 		return obj, ok
 	},
 

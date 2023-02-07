@@ -8,6 +8,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/socialauth"
 )
 
 type DebugAuthenticator struct {
@@ -23,5 +24,19 @@ func NewDebugAuthenticator(user *persist.User, chainAddresses []persist.ChainAdd
 	return DebugAuthenticator{
 		User:           user,
 		ChainAddresses: chainAddresses,
+	}
+}
+
+type DebugSocialAuthenticator struct {
+	Provider persist.SocialProvider
+	ID       string
+	Metadata map[string]interface{}
+}
+
+func NewDebugSocialAuthenticator(provider persist.SocialProvider, id string, metadata map[string]interface{}) socialauth.Authenticator {
+	return DebugSocialAuthenticator{
+		Provider: provider,
+		ID:       id,
+		Metadata: metadata,
 	}
 }

@@ -36,6 +36,12 @@ type API struct {
 	queries    *coredb.Queries
 }
 
+type TwitterIdentifiers struct {
+	ID       string
+	Username string
+	Name     string
+}
+
 func NewAPI(queries *coredb.Queries) *API {
 	httpClient := &http.Client{}
 	httpClient.Transport = tracing.NewTracingTransport(http.DefaultTransport, false)
@@ -47,11 +53,11 @@ func NewAPI(queries *coredb.Queries) *API {
 }
 
 // GetAuthedUserFromCode creates a new twitter API client with an auth code
-func (a *API) GetAuthedUserFromCode(ctx context.Context, userID persist.DBID, authCode string) (persist.SocialUserIdentifers, error) {
+func (a *API) GetAuthedUserFromCode(ctx context.Context, userID persist.DBID, authCode string) (TwitterIdentifiers, error) {
 
 	accessToken, err := a.generateAuthTokenFromCode(ctx, userID, authCode)
 	if err != nil {
-		return persist.SocialUserIdentifers{}, err
+		return TwitterIdentifiers{}, err
 	}
 
 	return a.getAuthedUser(ctx, accessToken.AccessToken)
@@ -111,37 +117,34 @@ func (a *API) generateAuthTokenFromCode(ctx context.Context, userID persist.DBID
 	return accessToken, nil
 }
 
-func (a *API) getAuthedUser(ctx context.Context, accessToken string) (persist.SocialUserIdentifers, error) {
+func (a *API) getAuthedUser(ctx context.Context, accessToken string) (TwitterIdentifiers, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.twitter.com/2/users/me", nil)
 	if err != nil {
-		return persist.SocialUserIdentifers{}, err
+		return TwitterIdentifiers{}, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+accessToken)
 
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
-		return persist.SocialUserIdentifers{}, fmt.Errorf("failed to get user me: %w", err)
+		return TwitterIdentifiers{}, fmt.Errorf("failed to get user me: %w", err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		err = util.GetErrFromResp(resp)
-		return persist.SocialUserIdentifers{}, fmt.Errorf("failed to get user me: %s", err)
+		return TwitterIdentifiers{}, fmt.Errorf("failed to get user me: %s", err)
 	}
 
 	var userMe GetUserMeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&userMe); err != nil {
-		return persist.SocialUserIdentifers{}, err
+		return TwitterIdentifiers{}, err
 	}
 
-	return persist.SocialUserIdentifers{
-		Provider: persist.SocialProviderTwitter,
+	return TwitterIdentifiers{
 		ID:       userMe.Data.ID,
-		Metadata: map[string]interface{}{
-			"username": userMe.Data.Username,
-			"name":     userMe.Data.Name,
-		},
+		Username: userMe.Data.Username,
+		Name:     userMe.Data.Name,
 	}, nil
 }

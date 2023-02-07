@@ -9,7 +9,9 @@ import (
 )
 
 type SocialAuthResult struct {
-	ID persist.SocialUserIdentifers
+	Provider persist.SocialProvider `json:"provider,required" binding:"required"`
+	ID       string                 `json:"id,required" binding:"required"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 type Authenticator interface {
@@ -32,6 +34,11 @@ func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResu
 	}
 
 	return &SocialAuthResult{
-		ID: ids,
+		Provider: persist.SocialProviderTwitter,
+		ID:       ids.ID,
+		Metadata: map[string]interface{}{
+			"username": ids.Username,
+			"name":     ids.Name,
+		},
 	}, nil
 }

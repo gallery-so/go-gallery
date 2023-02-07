@@ -34,7 +34,7 @@ insert into pii.for_users (user_id, pii_external_socials) values ($1, $2) on con
 
 type AddExternalSocialToUserParams struct {
 	UserID          persist.DBID
-	ExternalSocials pgtype.JSONB
+	ExternalSocials persist.ExternalSocials
 }
 
 func (q *Queries) AddExternalSocialToUser(ctx context.Context, arg AddExternalSocialToUserParams) error {
@@ -1885,9 +1885,9 @@ const getSocialsByUserID = `-- name: GetSocialsByUserID :one
 select pii_external_socials from pii.user_view where id = $1
 `
 
-func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (pgtype.JSONB, error) {
+func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (persist.ExternalSocials, error) {
 	row := q.db.QueryRow(ctx, getSocialsByUserID, id)
-	var pii_external_socials pgtype.JSONB
+	var pii_external_socials persist.ExternalSocials
 	err := row.Scan(&pii_external_socials)
 	return pii_external_socials, err
 }
@@ -3777,6 +3777,21 @@ type UpdateUserPrimaryWalletParams struct {
 
 func (q *Queries) UpdateUserPrimaryWallet(ctx context.Context, arg UpdateUserPrimaryWalletParams) error {
 	_, err := q.db.Exec(ctx, updateUserPrimaryWallet, arg.WalletID, arg.UserID)
+	return err
+}
+
+const updateUserSocialAccountDisplayed = `-- name: UpdateUserSocialAccountDisplayed :exec
+update pii.for_users set pii_external_socials = jsonb_set(pii_external_socials, '{' || $1 || '}', '{"displayed": ' || $2::bool || '}'::jsonb) where user_id = $3
+`
+
+type UpdateUserSocialAccountDisplayedParams struct {
+	SocialID  sql.NullString
+	Displayed bool
+	UserID    persist.DBID
+}
+
+func (q *Queries) UpdateUserSocialAccountDisplayed(ctx context.Context, arg UpdateUserSocialAccountDisplayedParams) error {
+	_, err := q.db.Exec(ctx, updateUserSocialAccountDisplayed, arg.SocialID, arg.Displayed, arg.UserID)
 	return err
 }
 

@@ -8,17 +8,17 @@ import (
 	"io"
 	"strings"
 
-	"github.com/jackc/pgtype"
 	"github.com/lib/pq"
 )
 
 type Traits map[string]interface{}
 
-type ExternalSocialIDs pgtype.JSONB
+type ExternalSocials map[SocialProvider]SocialUserIdentifers
 
 type SocialUserIdentifers struct {
 	Provider SocialProvider         `json:"provider,required" binding:"required"`
 	ID       string                 `json:"id,required" binding:"required"`
+	Display  bool                   `json:"display"`
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
@@ -26,6 +26,7 @@ type SocialProvider string
 
 const (
 	SocialProviderTwitter SocialProvider = "twitter"
+	SocialProviderDebug   SocialProvider = "debug"
 )
 
 var AllSocialProviders = []SocialProvider{

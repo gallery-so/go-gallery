@@ -281,6 +281,7 @@ func (v *MoveCollectionToGalleryInput) GetTargetGalleryId() persist.DBID { retur
 type ReportWindow string
 
 const (
+	ReportWindowLast5Days ReportWindow = "LAST_5_DAYS"
 	ReportWindowLast7Days ReportWindow = "LAST_7_DAYS"
 	ReportWindowAllTime   ReportWindow = "ALL_TIME"
 )

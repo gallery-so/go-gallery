@@ -818,3 +818,6 @@ insert into pii.for_users (user_id, pii_external_socials) values (@user_id, @ext
 
 -- name: GetSocialsByUserID :one
 select pii_external_socials from pii.user_view where id = $1;
+
+-- name: UpdateUserSocialAccountDisplayed :exec
+update pii.for_users set pii_external_socials = jsonb_set(pii_external_socials, '{' || @social_id || '}', '{"displayed": ' || @displayed::bool || '}'::jsonb) where user_id = @user_id;

@@ -14,6 +14,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/spf13/viper"
 )
 
@@ -43,5 +44,18 @@ func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 		Addresses: wallets,
 	}
 
+	return &authResult, nil
+}
+
+func (d DebugSocialAuthenticator) Authenticate(ctx context.Context) (*socialauth.SocialAuthResult, error) {
+	if viper.GetString("ENV") != "local" {
+		return nil, errors.New("DebugSocialAuthenticator may only be used in a local environment")
+	}
+
+	authResult := socialauth.SocialAuthResult{
+		Provider: d.Provider,
+		ID:       d.ID,
+		Metadata: d.Metadata,
+	}
 	return &authResult, nil
 }

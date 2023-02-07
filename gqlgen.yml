@@ -82,6 +82,9 @@ models:
   InteractionType:
     model:
       - github.com/mikeydub/go-gallery/service/persist.InteractionType
+  SocialAccountType:
+    model:
+      - github.com/mikeydub/go-gallery/service/persist.SocialProvider
   ID:
     model:
       - github.com/mikeydub/go-gallery/graphql/model.GqlID
