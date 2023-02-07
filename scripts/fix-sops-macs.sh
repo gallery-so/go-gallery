@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-find . -name '*.yaml' | while read -r file;
+find . -name '*' | while read -r file;
 do
     sops -d "$file" >/dev/null 2>&1 && rc=$? || rc=$?
     # In case of MAC mismatch, then MAC is regenerated
