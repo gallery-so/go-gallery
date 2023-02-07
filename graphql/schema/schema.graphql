@@ -1800,10 +1800,13 @@ type Mutation {
   login(authMechanism: AuthMechanism!): LoginPayloadOrError
   logout: LogoutPayload
 
-  connectSocialAccount(input: SocialAuthMechanism!, display: Boolean! = true): ConnectSocialAccountPayloadOrError
-    @authRequired
-  updateSocialAccountDisplayed(input: UpdateSocialAccountDisplayedInput!): UpdateSocialAccountDisplayedPayloadOrError
-    @authRequired
+  connectSocialAccount(
+    input: SocialAuthMechanism!
+    display: Boolean! = true
+  ): ConnectSocialAccountPayloadOrError @authRequired
+  updateSocialAccountDisplayed(
+    input: UpdateSocialAccountDisplayedInput!
+  ): UpdateSocialAccountDisplayedPayloadOrError @authRequired
 
   followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
