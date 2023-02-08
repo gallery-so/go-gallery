@@ -122,6 +122,8 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
           - column: "feed_events.data"
             go_type: "github.com/mikeydub/go-gallery/service/persist.FeedEventData"
+          - column: "feed_events.group_id"
+            go_type: "database/sql.NullString"
 
           # Feed Blocklist
           - column: "feed_blocklist.user_id"

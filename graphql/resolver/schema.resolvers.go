@@ -82,6 +82,10 @@ func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, 
 	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
+func (r *collectionTokenResolver) Token(ctx context.Context, obj *model.CollectionToken) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.HelperCollectionTokenData.TokenId)
+}
+
 func (r *collectionTokenResolver) Collection(ctx context.Context, obj *model.CollectionToken) (*model.Collection, error) {
 	return resolveCollectionByCollectionID(ctx, obj.HelperCollectionTokenData.CollectionId)
 }
@@ -1014,6 +1018,22 @@ func (r *mutationResolver) UpdateGallery(ctx context.Context, input model.Update
 		Gallery: galleryToModel(ctx, res),
 	}
 	return output, nil
+}
+
+func (r *mutationResolver) PublishGallery(ctx context.Context, input model.PublishGalleryInput) (model.PublishGalleryPayloadOrError, error) {
+	err := publicapi.For(ctx).Gallery.PublishGallery(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	gal, err := resolveGalleryByGalleryID(ctx, input.GalleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.PublishGalleryPayload{
+		Gallery: gal,
+	}, nil
 }
 
 func (r *mutationResolver) CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error) {

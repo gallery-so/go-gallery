@@ -452,7 +452,7 @@ func (q *Queries) CreateCommentNotification(ctx context.Context, arg CreateComme
 }
 
 const createFeedEvent = `-- name: CreateFeedEvent :one
-INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id
 `
 
 type CreateFeedEventParams struct {
@@ -462,6 +462,7 @@ type CreateFeedEventParams struct {
 	Data      persist.FeedEventData
 	EventTime time.Time
 	EventIds  persist.DBIDList
+	GroupID   sql.NullString
 	Caption   sql.NullString
 }
 
@@ -473,6 +474,7 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 		arg.Data,
 		arg.EventTime,
 		arg.EventIds,
+		arg.GroupID,
 		arg.Caption,
 	)
 	var i FeedEvent
@@ -488,6 +490,7 @@ func (q *Queries) CreateFeedEvent(ctx context.Context, arg CreateFeedEventParams
 		&i.LastUpdated,
 		&i.CreatedAt,
 		&i.Caption,
+		&i.GroupID,
 	)
 	return i, err
 }
@@ -1326,7 +1329,7 @@ func (q *Queries) GetEventsInWindow(ctx context.Context, arg GetEventsInWindowPa
 }
 
 const getFeedEventByID = `-- name: GetFeedEventByID :one
-SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption FROM feed_events WHERE id = $1 AND deleted = false
+SELECT id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id FROM feed_events WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetFeedEventByID(ctx context.Context, id persist.DBID) (FeedEvent, error) {
@@ -1344,6 +1347,7 @@ func (q *Queries) GetFeedEventByID(ctx context.Context, id persist.DBID) (FeedEv
 		&i.LastUpdated,
 		&i.CreatedAt,
 		&i.Caption,
+		&i.GroupID,
 	)
 	return i, err
 }
@@ -1543,7 +1547,7 @@ func (q *Queries) GetGalleryTokenMediasByGalleryID(ctx context.Context, arg GetG
 }
 
 const getLastFeedEventForCollection = `-- name: GetLastFeedEventForCollection :one
-select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
+select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id from feed_events where deleted = false
     and owner_id = $1
     and action = any($3)
     and data ->> 'collection_id' = $4
@@ -1579,12 +1583,13 @@ func (q *Queries) GetLastFeedEventForCollection(ctx context.Context, arg GetLast
 		&i.LastUpdated,
 		&i.CreatedAt,
 		&i.Caption,
+		&i.GroupID,
 	)
 	return i, err
 }
 
 const getLastFeedEventForToken = `-- name: GetLastFeedEventForToken :one
-select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
+select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id from feed_events where deleted = false
     and owner_id = $1
     and action = any($3)
     and data ->> 'token_id' = $4::varchar
@@ -1620,12 +1625,13 @@ func (q *Queries) GetLastFeedEventForToken(ctx context.Context, arg GetLastFeedE
 		&i.LastUpdated,
 		&i.CreatedAt,
 		&i.Caption,
+		&i.GroupID,
 	)
 	return i, err
 }
 
 const getLastFeedEventForUser = `-- name: GetLastFeedEventForUser :one
-select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption from feed_events where deleted = false
+select id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id from feed_events where deleted = false
     and owner_id = $1
     and action = any($3)
     and event_time < $2
@@ -1654,6 +1660,7 @@ func (q *Queries) GetLastFeedEventForUser(ctx context.Context, arg GetLastFeedEv
 		&i.LastUpdated,
 		&i.CreatedAt,
 		&i.Caption,
+		&i.GroupID,
 	)
 	return i, err
 }
@@ -3423,6 +3430,20 @@ func (q *Queries) IsActorSubjectActive(ctx context.Context, arg IsActorSubjectAc
 	return exists, err
 }
 
+const isFeedEventExistsForGroup = `-- name: IsFeedEventExistsForGroup :one
+SELECT exists(
+  SELECT 1 FROM feed_events WHERE deleted = false
+  AND group_id = $1
+)
+`
+
+func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.NullString) (bool, error) {
+	row := q.db.QueryRow(ctx, isFeedEventExistsForGroup, groupID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
 SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false)
 `
@@ -3440,7 +3461,7 @@ func (q *Queries) IsFeedUserActionBlocked(ctx context.Context, arg IsFeedUserAct
 }
 
 const paginateTrendingFeed = `-- name: PaginateTrendingFeed :many
-select f.id, f.version, f.owner_id, f.action, f.data, f.event_time, f.event_ids, f.deleted, f.last_updated, f.created_at, f.caption from feed_events f join unnest($1::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
+select f.id, f.version, f.owner_id, f.action, f.data, f.event_time, f.event_ids, f.deleted, f.last_updated, f.created_at, f.caption, f.group_id from feed_events f join unnest($1::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
   and t.pos > $2::int
   and t.pos < $3::int
   order by case when $4::bool then t.pos end desc,
@@ -3483,6 +3504,7 @@ func (q *Queries) PaginateTrendingFeed(ctx context.Context, arg PaginateTrending
 			&i.LastUpdated,
 			&i.CreatedAt,
 			&i.Caption,
+			&i.GroupID,
 		); err != nil {
 			return nil, err
 		}
@@ -3578,6 +3600,44 @@ func (q *Queries) UpdateCollectionsInfo(ctx context.Context, arg UpdateCollectio
 		arg.Hidden,
 	)
 	return err
+}
+
+const updateEventCaptionByGroup = `-- name: UpdateEventCaptionByGroup :exec
+update events set caption = $1 where group_id = $2 and deleted = false
+`
+
+type UpdateEventCaptionByGroupParams struct {
+	Caption sql.NullString
+	GroupID sql.NullString
+}
+
+func (q *Queries) UpdateEventCaptionByGroup(ctx context.Context, arg UpdateEventCaptionByGroupParams) error {
+	_, err := q.db.Exec(ctx, updateEventCaptionByGroup, arg.Caption, arg.GroupID)
+	return err
+}
+
+const updateFeedEventCaptionByGroup = `-- name: UpdateFeedEventCaptionByGroup :one
+UPDATE feed_events SET caption = (select caption from events where events.group_id = $1) WHERE group_id = $1 AND deleted = false returning id, version, owner_id, action, data, event_time, event_ids, deleted, last_updated, created_at, caption, group_id
+`
+
+func (q *Queries) UpdateFeedEventCaptionByGroup(ctx context.Context, groupID sql.NullString) (FeedEvent, error) {
+	row := q.db.QueryRow(ctx, updateFeedEventCaptionByGroup, groupID)
+	var i FeedEvent
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.OwnerID,
+		&i.Action,
+		&i.Data,
+		&i.EventTime,
+		&i.EventIds,
+		&i.Deleted,
+		&i.LastUpdated,
+		&i.CreatedAt,
+		&i.Caption,
+		&i.GroupID,
+	)
+	return i, err
 }
 
 const updateGalleryCollections = `-- name: UpdateGalleryCollections :exec

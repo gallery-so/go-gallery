@@ -60,7 +60,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should sync tokens", run: testSyncTokens},
 		{title: "should create a collection", run: testCreateCollection},
 		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp},
-		{title: "update gallery and create a feed event with a caption", run: testUpdateGalleryWithCaption},
+		{title: "update gallery and create a feed event", run: testUpdateGalleryWithPublish},
 		{title: "update gallery and ensure name still gets set when not sent in update", run: testUpdateGalleryWithNoNameChange},
 		{title: "update gallery with a new collection", run: testUpdateGalleryWithNewCollection},
 		{title: "should get trending users", run: testTrendingUsers, fixtures: []fixture{usePostgres, useRedis}},
@@ -237,7 +237,7 @@ func testCreateCollection(t *testing.T) {
 	assert.Len(t, payload.Collection.Tokens, len(userF.tokenIDs))
 }
 
-func testUpdateGalleryWithCaption(t *testing.T) {
+func testUpdateGalleryWithPublish(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.id)
 
@@ -246,22 +246,9 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
 		Tokens:         userF.tokenIDs[:1],
-		Layout: CollectionLayoutInput{
-			Sections: []int{0},
-			SectionLayout: []CollectionSectionLayoutInput{
-				{
-					Columns:    0,
-					Whitespace: []int{},
-				},
-			},
-		},
-		TokenSettings: []CollectionTokenSettingsInput{
-			{
-				TokenId:    userF.tokenIDs[0],
-				RenderLive: false,
-			},
-		},
-		Caption: nil,
+		Layout:         defaultLayout(),
+		TokenSettings:  defaultTokenSettings(userF.tokenIDs[:1]),
+		Caption:        nil,
 	})
 
 	require.NoError(t, err)
@@ -269,7 +256,7 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 	assert.NotEmpty(t, colPay.Collection.Dbid)
 	assert.Len(t, colPay.Collection.Tokens, 1)
 
-	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+	updateReponse, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
 		GalleryId: userF.galleryID,
 		Name:      util.ToPointer("newName"),
 		UpdatedCollections: []*UpdateCollectionInput{
@@ -287,12 +274,8 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 						},
 					},
 				},
-				TokenSettings: []CollectionTokenSettingsInput{
-					{
-						TokenId:    userF.tokenIDs[0],
-						RenderLive: false,
-					},
-				}},
+				TokenSettings: defaultTokenSettings(userF.tokenIDs[:2]),
+			},
 		},
 		CreatedCollections: []*CreateCollectionInGalleryInput{
 			{
@@ -309,26 +292,40 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 						},
 					},
 				},
-				TokenSettings: []CollectionTokenSettingsInput{
-					{
-						TokenId:    userF.tokenIDs[0],
-						RenderLive: false,
-					},
-				},
+				TokenSettings: defaultTokenSettings(userF.tokenIDs[:3]),
 			},
 		},
-		Order:   []persist.DBID{colPay.Collection.Dbid, "wow"},
-		Caption: util.ToPointer("newCaption"),
+		Order:  []persist.DBID{colPay.Collection.Dbid, "wow"},
+		EditId: util.ToPointer("edit_id"),
 	})
 
 	require.NoError(t, err)
-	require.NotNil(t, response.UpdateGallery)
-	payload, ok := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
+	require.NotNil(t, updateReponse.UpdateGallery)
+	updatePayload, ok := (*updateReponse.UpdateGallery).(*updateGalleryMutationUpdateGalleryUpdateGalleryPayload)
 	if !ok {
-		err := (*response.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
+		err := (*updateReponse.UpdateGallery).(*updateGalleryMutationUpdateGalleryErrInvalidInput)
 		t.Fatal(err)
 	}
-	assert.NotEmpty(t, payload.Gallery.Name)
+	assert.NotEmpty(t, updatePayload.Gallery.Name)
+
+	update2Reponse, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
+		GalleryId:   userF.galleryID,
+		Description: util.ToPointer("newDesc"),
+		EditId:      util.ToPointer("edit_id"),
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, update2Reponse.UpdateGallery)
+
+	// publish
+	publishResponse, err := publishGalleryMutation(context.Background(), c, PublishGalleryInput{
+		GalleryId: userF.galleryID,
+		EditId:    "edit_id",
+		Caption:   util.ToPointer("newCaption"),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, publishResponse.PublishGallery)
+
 	vResp, err := viewerQuery(context.Background(), c)
 	require.NoError(t, err)
 
@@ -339,6 +336,10 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 	assert.Equal(t, "newCaption", *feedEvent.Caption)
 	edata := *(*feedEvent.EventData).(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventData)
 	assert.EqualValues(t, persist.ActionGalleryUpdated, *edata.Action)
+
+	nameIncluded := false
+	descIncluded := false
+
 	for _, c := range edata.SubEventDatas {
 		ac := c.GetAction()
 		if persist.Action(*ac) == persist.ActionCollectionCreated {
@@ -349,8 +350,23 @@ func testUpdateGalleryWithCaption(t *testing.T) {
 			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasTokensAddedToCollectionFeedEventData)
 			assert.Greater(t, len(ca.NewTokens), 0)
 		}
+		if persist.Action(*ac) == persist.ActionGalleryInfoUpdated {
+			ca := c.(*viewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNodeFeedEventEventDataGalleryUpdatedFeedEventDataSubEventDatasGalleryInfoUpdatedFeedEventData)
+			if ca.NewDescription != nil {
+				assert.Equal(t, "newDesc", *ca.NewDescription)
+				descIncluded = true
+			}
+			if ca.NewName != nil {
+				assert.Equal(t, "newName", *ca.NewName)
+				nameIncluded = true
+			}
+		}
 	}
+
+	assert.True(t, nameIncluded)
+	assert.True(t, descIncluded)
 }
+
 func testCreateGallery(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
 	c := authedHandlerClient(t, userF.id)

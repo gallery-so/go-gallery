@@ -183,6 +183,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"PublishGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PublishGalleryPayloadOrError)
+		return obj, ok
+	},
+
 	"RedeemMerchPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RedeemMerchPayloadOrError)
 		return obj, ok

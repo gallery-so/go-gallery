@@ -54,6 +54,8 @@ query viewerQuery {
         experienced
       }
       user {
+        username
+        dbid
         socialAccounts {
           twitter {
             username
@@ -89,6 +91,10 @@ query viewerQuery {
                           }
                         }
                       }
+                      ... on GalleryInfoUpdatedFeedEventData {
+                        newName
+                        newDescription
+                      }
                     }
                   }
                 }
@@ -96,8 +102,6 @@ query viewerQuery {
             }
           }
         }
-        username
-        dbid
       }
     }
   }
@@ -321,6 +325,19 @@ mutation updateGalleryMutation($input: UpdateGalleryInput!) {
             }
           }
         }
+      }
+    }
+  }
+}
+mutation publishGalleryMutation($input: PublishGalleryInput!) {
+  publishGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on PublishGalleryPayload {
+      gallery {
+        dbid
       }
     }
   }

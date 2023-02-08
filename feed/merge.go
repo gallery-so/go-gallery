@@ -1,9 +1,11 @@
 package feed
 
 import (
+	"context"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -112,10 +114,11 @@ type combinedGalleryEvent struct {
 	eventIDs                  []persist.DBID
 	newCollections            []persist.DBID
 	collectionCollectorsNotes map[persist.DBID]string
-	tokenCollectorsNotes      map[persist.DBID]string
+	tokenCollectorsNotes      map[persist.DBID]map[persist.DBID]string
 	tokensAdded               map[persist.DBID]persist.DBIDList
 	galleryName               string
 	galleryDescription        string
+	groupID                   *string
 	caption                   *string
 }
 
@@ -124,6 +127,12 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 	// first group collection events by coll id
 	collectionEvents := make(map[persist.DBID][]db.Event)
 	for _, event := range eventsAsc {
+		if event.GroupID.Valid {
+			if c.groupID != nil && *c.groupID != event.GroupID.String {
+				logger.For(context.Background()).Errorf("group id mismatch: %s != %s", *c.groupID, event.GroupID.String)
+			}
+			c.groupID = &event.GroupID.String
+		}
 		c.eventTime = event.CreatedAt
 		if c.actorID == "" {
 			c.actorID = persist.DBID(event.ActorID.String)
@@ -135,14 +144,21 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			c.caption = &event.Caption.String
 		}
 		if event.Action == persist.ActionGalleryInfoUpdated {
-			c.galleryName = event.Data.GalleryName
-			c.galleryDescription = event.Data.GalleryDescription
+			if event.Data.GalleryName != nil {
+				c.galleryName = *event.Data.GalleryName
+			}
+			if event.Data.GalleryDescription != nil {
+				c.galleryDescription = *event.Data.GalleryDescription
+			}
 			continue
 		} else if event.Action == persist.ActionCollectorsNoteAddedToToken {
 			if c.tokenCollectorsNotes == nil {
-				c.tokenCollectorsNotes = make(map[persist.DBID]string)
+				c.tokenCollectorsNotes = make(map[persist.DBID]map[persist.DBID]string)
+				c.tokenCollectorsNotes[event.CollectionID] = make(map[persist.DBID]string)
+			} else if c.tokenCollectorsNotes[event.CollectionID] == nil {
+				c.tokenCollectorsNotes[event.CollectionID] = make(map[persist.DBID]string)
 			}
-			c.tokenCollectorsNotes[event.CollectionID] = event.Data.TokenCollectorsNote
+			c.tokenCollectorsNotes[event.CollectionID][event.TokenID] = event.Data.TokenCollectorsNote
 			continue
 		}
 
