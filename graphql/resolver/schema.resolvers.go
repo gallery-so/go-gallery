@@ -326,6 +326,10 @@ func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser)
 	return roles, nil
 }
 
+func (r *galleryUserResolver) SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error) {
+	return resolveUserSocialsByUserID(ctx, obj.Dbid)
+}
+
 func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
 	return resolveTokensByUserID(ctx, obj.Dbid)
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/socialauth"
@@ -724,19 +725,36 @@ func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*mo
 		return nil, err
 	}
 
+	// If the user is not logged in or is not the same user, hide the socials that are not public
+	if !api.IsUserLoggedIn(ctx) || api.GetLoggedInUserId(ctx) != userID {
+		for prov, social := range socials {
+			if !social.Display {
+				delete(socials, prov)
+			}
+		}
+	}
+
 	result := &model.SocialAccounts{}
 
 	for _, prov := range persist.AllSocialProviders {
 		switch prov {
 		case persist.SocialProviderTwitter:
 			if val, ok := socials[prov]; ok {
-				result.Twitter = &model.TwitterSocialAccount{
+				logger.For(ctx).Infof("found twitter social account: %+v", val)
+				t := &model.TwitterSocialAccount{
 					Type:     prov,
 					Display:  val.Display,
 					SocialID: val.ID,
-					Name:     val.Metadata["name"].(string),
-					Username: val.Metadata["username"].(string),
 				}
+				name, ok := val.Metadata["name"].(string)
+				if ok {
+					t.Name = name
+				}
+				username, ok := val.Metadata["username"].(string)
+				if ok {
+					t.Username = username
+				}
+				result.Twitter = t
 			}
 		default:
 			return nil, fmt.Errorf("unsupported social provider: %s", prov)
@@ -755,9 +773,23 @@ func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, userID persist
 		return err
 	}
 
-	return api.queries.UpdateUserSocialAccountDisplayed(ctx, db.UpdateUserSocialAccountDisplayedParams{
-		SocialID:  util.ToNullString(socialType.String()),
-		Displayed: displayed,
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	social, ok := socials[socialType]
+	if !ok {
+		return fmt.Errorf("social account not found for user %d and provider %s", userID, socialType)
+	}
+
+	social.Display = displayed
+
+	socials[socialType] = social
+
+	return api.queries.UpdateUserSocials(ctx, db.UpdateUserSocialsParams{
+		ExternalSocials: socials,
+		UserID:          userID,
 	})
 }
 

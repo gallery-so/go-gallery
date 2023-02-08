@@ -25,8 +25,7 @@ type SocialUserIdentifers struct {
 type SocialProvider string
 
 const (
-	SocialProviderTwitter SocialProvider = "twitter"
-	SocialProviderDebug   SocialProvider = "debug"
+	SocialProviderTwitter SocialProvider = "Twitter"
 )
 
 var AllSocialProviders = []SocialProvider{

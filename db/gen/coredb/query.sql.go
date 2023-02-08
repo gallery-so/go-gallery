@@ -29,7 +29,7 @@ func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionT
 }
 
 const addExternalSocialToUser = `-- name: AddExternalSocialToUser :exec
-insert into pii.for_users (user_id, pii_external_socials) values ($1, $2) on conflict (user_id) do update set pii_external_socials = pii_for_users.pii_external_socials || $2
+insert into pii.for_users (user_id, pii_external_socials) values ($1, $2) on conflict (user_id) do update set pii_external_socials = for_users.pii_external_socials || $2
 `
 
 type AddExternalSocialToUserParams struct {
@@ -3780,18 +3780,17 @@ func (q *Queries) UpdateUserPrimaryWallet(ctx context.Context, arg UpdateUserPri
 	return err
 }
 
-const updateUserSocialAccountDisplayed = `-- name: UpdateUserSocialAccountDisplayed :exec
-update pii.for_users set pii_external_socials = jsonb_set(pii_external_socials, '{' || $1 || '}', '{"displayed": ' || $2::bool || '}'::jsonb) where user_id = $3
+const updateUserSocials = `-- name: UpdateUserSocials :exec
+update pii.for_users set pii_external_socials = $1 where user_id = $2
 `
 
-type UpdateUserSocialAccountDisplayedParams struct {
-	SocialID  sql.NullString
-	Displayed bool
-	UserID    persist.DBID
+type UpdateUserSocialsParams struct {
+	ExternalSocials persist.ExternalSocials
+	UserID          persist.DBID
 }
 
-func (q *Queries) UpdateUserSocialAccountDisplayed(ctx context.Context, arg UpdateUserSocialAccountDisplayedParams) error {
-	_, err := q.db.Exec(ctx, updateUserSocialAccountDisplayed, arg.SocialID, arg.Displayed, arg.UserID)
+func (q *Queries) UpdateUserSocials(ctx context.Context, arg UpdateUserSocialsParams) error {
+	_, err := q.db.Exec(ctx, updateUserSocials, arg.ExternalSocials, arg.UserID)
 	return err
 }
 

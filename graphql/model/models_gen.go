@@ -1050,6 +1050,7 @@ type GalleryUser struct {
 	Traits              *string         `json:"traits"`
 	Universal           *bool           `json:"universal"`
 	Roles               []*persist.Role `json:"roles"`
+	SocialAccounts      *SocialAccounts `json:"socialAccounts"`
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
@@ -1335,7 +1336,7 @@ type SetSpamPreferencePayload struct {
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
 type SocialAccounts struct {
-	Twitter SocialAccount `json:"twitter"`
+	Twitter *TwitterSocialAccount `json:"twitter"`
 }
 
 type SocialAuthMechanism struct {

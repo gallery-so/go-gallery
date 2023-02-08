@@ -21,7 +21,7 @@ jobs:
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
-          gotestsum --junitfile /tmp/test-reports/integration-tests.xml -- -race -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
+          gotestsum --junitfile /tmp/test-reports/integration-tests.xml -- -tags=debug_tools -race -run TestIntegrationTest ./server/... -args -chain ethereum -chainID 1
       - name: "Run indexer tests"
         run: |
           mkdir -p /tmp/test-reports
@@ -48,7 +48,7 @@ jobs:
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
-          gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -short ./...
+          gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -tags=debug_tools -short ./...
   lint:
     runs-on: ubuntu-latest
     steps:
