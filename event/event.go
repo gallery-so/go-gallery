@@ -296,12 +296,14 @@ type groupHandler interface {
 
 // feedHandler handles events for consumption as feed events.
 type feedHandler struct {
+	queries      *db.Queries
 	eventBuilder *feed.EventBuilder
 	tc           *cloudtasks.Client
 }
 
 func newFeedHandler(queries *db.Queries, taskClient *cloudtasks.Client) feedHandler {
 	return feedHandler{
+		queries:      queries,
 		eventBuilder: feed.NewEventBuilder(queries),
 		tc:           taskClient,
 	}
@@ -328,6 +330,14 @@ func (h feedHandler) handleImmediate(ctx context.Context, persistedEvent db.Even
 
 // handleGrouped processes a group of events into a single feed event.
 func (h feedHandler) handleGroup(ctx context.Context, groupID string, action persist.Action) (interface{}, error) {
+
+	existsForGroup, err := h.queries.IsFeedEventExistsForGroup(ctx, persist.StrToNullStr(&groupID))
+	if err != nil {
+		return nil, err
+	}
+	if existsForGroup {
+		return h.queries.UpdateFeedEventCaptionByGroup(ctx, persist.StrToNullStr(&groupID))
+	}
 
 	feedEvent, err := h.eventBuilder.NewFeedEventFromGroup(ctx, groupID, action)
 	if err != nil {

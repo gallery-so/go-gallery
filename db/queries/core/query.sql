@@ -412,7 +412,16 @@ select f.* from feed_events f join unnest(@feed_event_ids::text[]) with ordinali
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
 -- name: CreateFeedEvent :one
-INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
+
+-- name: IsFeedEventExistsForGroup :one
+SELECT exists(
+  SELECT 1 FROM feed_events WHERE deleted = false
+  AND group_id = $1
+);
+
+-- name: UpdateFeedEventCaptionByGroup :one
+UPDATE feed_events SET caption = (select caption from events where events.group_id = $1) WHERE group_id = $1 AND deleted = false returning *;
 
 -- name: GetLastFeedEventForUser :one
 select * from feed_events where deleted = false

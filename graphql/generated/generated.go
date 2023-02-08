@@ -7207,7 +7207,7 @@ input UpdateGalleryInput {
 
   # generated on the frontend
   # will be String! in the future, not required for temp backwards compatibility
-  editID: String
+  editId: String
 }
 
 type UpdateGalleryPayload {
@@ -7218,7 +7218,7 @@ union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | Err
 
 input PublishGalleryInput {
   galleryId: DBID!
-  editID: String!
+  editId: String!
   caption: String
 }
 
@@ -30097,10 +30097,10 @@ func (ec *executionContext) unmarshalInputPublishGalleryInput(ctx context.Contex
 			if err != nil {
 				return it, err
 			}
-		case "editID":
+		case "editId":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("editID"))
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("editId"))
 			it.EditID, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
@@ -30675,10 +30675,10 @@ func (ec *executionContext) unmarshalInputUpdateGalleryInput(ctx context.Context
 			if err != nil {
 				return it, err
 			}
-		case "editID":
+		case "editId":
 			var err error
 
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("editID"))
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("editId"))
 			it.EditID, err = ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err

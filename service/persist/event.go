@@ -38,8 +38,8 @@ type EventData struct {
 	TokenCollectionID                   DBID              `json:"token_collection_id"`
 	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`
 	CollectionCollectorsNote            string            `json:"collection_collectors_note"`
-	GalleryName                         string            `json:"gallery_name"`
-	GalleryDescription                  string            `json:"gallery_description"`
+	GalleryName                         *string           `json:"gallery_name"`
+	GalleryDescription                  *string           `json:"gallery_description"`
 	GalleryNewCollectionCollectorsNotes map[DBID]string   `json:"gallery_new_collection_collectors_notes"`
 	GalleryNewTokenIDs                  map[DBID]DBIDList `json:"gallery_new_token_ids"`
 	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`

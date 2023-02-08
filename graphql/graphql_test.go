@@ -245,22 +245,9 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
 		Tokens:         userF.tokenIDs[:1],
-		Layout: CollectionLayoutInput{
-			Sections: []int{0},
-			SectionLayout: []CollectionSectionLayoutInput{
-				{
-					Columns:    0,
-					Whitespace: []int{},
-				},
-			},
-		},
-		TokenSettings: []CollectionTokenSettingsInput{
-			{
-				TokenId:    userF.tokenIDs[0],
-				RenderLive: false,
-			},
-		},
-		Caption: nil,
+		Layout:         defaultLayout(),
+		TokenSettings:  defaultTokenSettings(userF.tokenIDs[:1]),
+		Caption:        nil,
 	})
 
 	require.NoError(t, err)
@@ -286,12 +273,8 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 						},
 					},
 				},
-				TokenSettings: []CollectionTokenSettingsInput{
-					{
-						TokenId:    userF.tokenIDs[0],
-						RenderLive: false,
-					},
-				}},
+				TokenSettings: defaultTokenSettings(userF.tokenIDs[:2]),
+			},
 		},
 		CreatedCollections: []*CreateCollectionInGalleryInput{
 			{
@@ -308,16 +291,11 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 						},
 					},
 				},
-				TokenSettings: []CollectionTokenSettingsInput{
-					{
-						TokenId:    userF.tokenIDs[0],
-						RenderLive: false,
-					},
-				},
+				TokenSettings: defaultTokenSettings(userF.tokenIDs[:3]),
 			},
 		},
 		Order:  []persist.DBID{colPay.Collection.Dbid, "wow"},
-		EditID: util.ToPointer("edit_id"),
+		EditId: util.ToPointer("edit_id"),
 	})
 
 	require.NoError(t, err)
@@ -332,7 +310,7 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	update2Reponse, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
 		GalleryId:   userF.galleryID,
 		Description: util.ToPointer("newDesc"),
-		EditID:      util.ToPointer("edit_id"),
+		EditId:      util.ToPointer("edit_id"),
 	})
 
 	require.NoError(t, err)
@@ -341,7 +319,7 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	// publish
 	publishResponse, err := publishGalleryMutation(context.Background(), c, PublishGalleryInput{
 		GalleryId: userF.galleryID,
-		EditID:    "edit_id",
+		EditId:    "edit_id",
 		Caption:   util.ToPointer("newCaption"),
 	})
 	require.NoError(t, err)

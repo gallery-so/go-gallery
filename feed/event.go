@@ -260,6 +260,7 @@ func (b *EventBuilder) createGalleryUpdatedFeedEventFromEvents(ctx context.Conte
 		EventTime: merged.eventTime,
 		EventIds:  merged.eventIDs,
 		Caption:   persist.StrToNullStr(merged.caption),
+		GroupID:   persist.StrToNullStr(merged.groupID),
 		Data: persist.FeedEventData{
 			GalleryID:                           merged.galleryID,
 			GalleryName:                         merged.galleryName,

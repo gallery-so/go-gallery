@@ -160,6 +160,7 @@ type FeedEvent struct {
 	LastUpdated time.Time
 	CreatedAt   time.Time
 	Caption     sql.NullString
+	GroupID     sql.NullString
 }
 
 type Follow struct {

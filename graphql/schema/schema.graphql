@@ -1632,7 +1632,7 @@ input UpdateGalleryInput {
 
   # generated on the frontend
   # will be String! in the future, not required for temp backwards compatibility
-  editID: String
+  editId: String
 }
 
 type UpdateGalleryPayload {
@@ -1643,7 +1643,7 @@ union UpdateGalleryPayloadOrError = UpdateGalleryPayload | ErrInvalidInput | Err
 
 input PublishGalleryInput {
   galleryId: DBID!
-  editID: String!
+  editId: String!
   caption: String
 }
 

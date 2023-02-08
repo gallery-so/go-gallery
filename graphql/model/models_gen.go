@@ -1245,7 +1245,7 @@ type PreviewURLSet struct {
 
 type PublishGalleryInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
-	EditID    string       `json:"editID"`
+	EditID    string       `json:"editId"`
 	Caption   *string      `json:"caption"`
 }
 
@@ -1653,7 +1653,7 @@ type UpdateGalleryInput struct {
 	UpdatedCollections []*UpdateCollectionInput          `json:"updatedCollections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
 	Order              []persist.DBID                    `json:"order"`
-	EditID             *string                           `json:"editID"`
+	EditID             *string                           `json:"editId"`
 }
 
 type UpdateGalleryOrderInput struct {

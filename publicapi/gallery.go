@@ -186,12 +186,12 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		change := false
 
 		if update.Name != nil && *update.Name != curGal.Name {
-			e.Data.GalleryName = util.FromPointer(update.Name)
+			e.Data.GalleryName = update.Name
 			change = true
 		}
 
 		if update.Description != nil && *update.Description != curGal.Description {
-			e.Data.GalleryDescription = util.FromPointer(update.Description)
+			e.Data.GalleryDescription = update.Description
 			change = true
 		}
 

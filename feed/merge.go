@@ -1,9 +1,11 @@
 package feed
 
 import (
+	"context"
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -116,6 +118,7 @@ type combinedGalleryEvent struct {
 	tokensAdded               map[persist.DBID]persist.DBIDList
 	galleryName               string
 	galleryDescription        string
+	groupID                   *string
 	caption                   *string
 }
 
@@ -124,6 +127,12 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 	// first group collection events by coll id
 	collectionEvents := make(map[persist.DBID][]db.Event)
 	for _, event := range eventsAsc {
+		if event.GroupID.Valid {
+			if c.groupID != nil && *c.groupID != event.GroupID.String {
+				logger.For(context.Background()).Errorf("group id mismatch: %s != %s", *c.groupID, event.GroupID.String)
+			}
+			c.groupID = &event.GroupID.String
+		}
 		c.eventTime = event.CreatedAt
 		if c.actorID == "" {
 			c.actorID = persist.DBID(event.ActorID.String)
@@ -135,11 +144,11 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			c.caption = &event.Caption.String
 		}
 		if event.Action == persist.ActionGalleryInfoUpdated {
-			if event.Data.GalleryName != "" {
-				c.galleryName = event.Data.GalleryName
+			if event.Data.GalleryName != nil {
+				c.galleryName = *event.Data.GalleryName
 			}
-			if event.Data.GalleryDescription != "" {
-				c.galleryDescription = event.Data.GalleryDescription
+			if event.Data.GalleryDescription != nil {
+				c.galleryDescription = *event.Data.GalleryDescription
 			}
 			continue
 		} else if event.Action == persist.ActionCollectorsNoteAddedToToken {

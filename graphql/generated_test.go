@@ -280,15 +280,15 @@ func (v *MoveCollectionToGalleryInput) GetTargetGalleryId() persist.DBID { retur
 
 type PublishGalleryInput struct {
 	GalleryId persist.DBID `json:"galleryId"`
-	EditID    string       `json:"editID"`
+	EditId    string       `json:"editId"`
 	Caption   *string      `json:"caption"`
 }
 
 // GetGalleryId returns PublishGalleryInput.GalleryId, and is useful for accessing the field via an interface.
 func (v *PublishGalleryInput) GetGalleryId() persist.DBID { return v.GalleryId }
 
-// GetEditID returns PublishGalleryInput.EditID, and is useful for accessing the field via an interface.
-func (v *PublishGalleryInput) GetEditID() string { return v.EditID }
+// GetEditId returns PublishGalleryInput.EditId, and is useful for accessing the field via an interface.
+func (v *PublishGalleryInput) GetEditId() string { return v.EditId }
 
 // GetCaption returns PublishGalleryInput.Caption, and is useful for accessing the field via an interface.
 func (v *PublishGalleryInput) GetCaption() *string { return v.Caption }
@@ -350,7 +350,7 @@ type UpdateGalleryInput struct {
 	UpdatedCollections []*UpdateCollectionInput          `json:"updatedCollections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
 	Order              []persist.DBID                    `json:"order"`
-	EditID             *string                           `json:"editID"`
+	EditId             *string                           `json:"editId"`
 }
 
 // GetGalleryId returns UpdateGalleryInput.GalleryId, and is useful for accessing the field via an interface.
@@ -381,8 +381,8 @@ func (v *UpdateGalleryInput) GetCreatedCollections() []*CreateCollectionInGaller
 // GetOrder returns UpdateGalleryInput.Order, and is useful for accessing the field via an interface.
 func (v *UpdateGalleryInput) GetOrder() []persist.DBID { return v.Order }
 
-// GetEditID returns UpdateGalleryInput.EditID, and is useful for accessing the field via an interface.
-func (v *UpdateGalleryInput) GetEditID() *string { return v.EditID }
+// GetEditId returns UpdateGalleryInput.EditId, and is useful for accessing the field via an interface.
+func (v *UpdateGalleryInput) GetEditId() *string { return v.EditId }
 
 type UpdateUserExperienceInput struct {
 	ExperienceType UserExperienceType `json:"experienceType"`
