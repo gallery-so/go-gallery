@@ -1171,7 +1171,7 @@ func feedEventToCollectorsNoteAddedToTokenFeedEventData(event *db.FeedEvent) mod
 	return model.CollectorsNoteAddedToTokenFeedEventData{
 		EventTime:         &event.EventTime,
 		Owner:             &model.GalleryUser{Dbid: event.OwnerID}, // remaining fields handled by dedicated resolver
-		Token:             &model.Token{Dbid: event.Data.TokenID},
+		Token:             &model.CollectionToken{Token: &model.Token{Dbid: event.Data.TokenID}, Collection: &model.Collection{Dbid: event.Data.TokenCollectionID}},
 		Action:            &event.Action,
 		NewCollectorsNote: util.ToPointer(event.Data.TokenNewCollectorsNote),
 	}
@@ -1181,7 +1181,7 @@ func rawEventToCollectorsNoteAddedToTokenFeedEventData(event *db.Event) model.Fe
 	return model.CollectorsNoteAddedToTokenFeedEventData{
 		EventTime:         &event.CreatedAt,
 		Owner:             &model.GalleryUser{Dbid: persist.DBID(event.ActorID.String)}, // remaining fields handled by dedicated resolver
-		Token:             &model.Token{Dbid: event.TokenID},
+		Token:             &model.CollectionToken{Token: &model.Token{Dbid: event.TokenID}, Collection: &model.Collection{Dbid: event.CollectionID}},
 		Action:            &event.Action,
 		NewCollectorsNote: util.ToPointer(event.Data.TokenCollectorsNote),
 	}
@@ -1379,14 +1379,16 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 	}
 
 	if event.Data.GalleryNewTokenCollectorsNotes != nil && len(event.Data.GalleryNewTokenCollectorsNotes) > 0 {
-		for tokenID, collectorsNote := range event.Data.GalleryNewTokenCollectorsNotes {
-			result = append(result, model.CollectorsNoteAddedToTokenFeedEventData{
-				EventTime:         &event.CreatedAt,
-				Owner:             &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)}, // remaining fields handled by dedicated resolver
-				Token:             &model.Token{Dbid: tokenID},                           // remaining fields handled by dedicated resolver
-				Action:            util.ToPointer(persist.ActionCollectorsNoteAddedToToken),
-				NewCollectorsNote: util.StringToPointerIfNotEmpty(collectorsNote),
-			})
+		for collectionID, newNotes := range event.Data.GalleryNewTokenCollectorsNotes {
+			for tokenID, note := range newNotes {
+				result = append(result, model.CollectorsNoteAddedToTokenFeedEventData{
+					EventTime:         &event.CreatedAt,
+					Owner:             &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)},                                                         // remaining fields handled by dedicated resolver
+					Token:             &model.CollectionToken{Token: &model.Token{Dbid: tokenID}, Collection: &model.Collection{Dbid: collectionID}}, // remaining fields handled by dedicated resolver
+					Action:            util.ToPointer(persist.ActionCollectorsNoteAddedToToken),
+					NewCollectorsNote: util.StringToPointerIfNotEmpty(note),
+				})
+			}
 		}
 	}
 

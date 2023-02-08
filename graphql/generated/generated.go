@@ -1120,7 +1120,7 @@ type CollectorsNoteAddedToCollectionFeedEventDataResolver interface {
 type CollectorsNoteAddedToTokenFeedEventDataResolver interface {
 	Owner(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.GalleryUser, error)
 
-	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.Token, error)
+	Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error)
 }
 type CommentResolver interface {
 	ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error)
@@ -6277,7 +6277,7 @@ type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
   eventTime: Time
   owner: GalleryUser @goField(forceResolver: true)
   action: Action
-  token: Token @goField(forceResolver: true)
+  token: CollectionToken @goField(forceResolver: true)
   newCollectorsNote: String
 }
 
@@ -11345,9 +11345,9 @@ func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_token(ctx c
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.Token)
+	res := resTmp.(*model.CollectionToken)
 	fc.Result = res
-	return ec.marshalOToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
+	return ec.marshalOCollectionToken2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCollectionToken(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CollectorsNoteAddedToTokenFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectorsNoteAddedToTokenFeedEventData) (ret graphql.Marshaler) {

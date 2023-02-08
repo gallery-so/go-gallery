@@ -702,7 +702,7 @@ type CollectorsNoteAddedToTokenFeedEventData implements FeedEventData {
   eventTime: Time
   owner: GalleryUser @goField(forceResolver: true)
   action: Action
-  token: Token @goField(forceResolver: true)
+  token: CollectionToken @goField(forceResolver: true)
   newCollectorsNote: String
 }
 

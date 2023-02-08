@@ -117,8 +117,8 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Owner(ctx context.Cont
 	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
 }
 
-func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.Token, error) {
-	return resolveTokenByTokenID(ctx, obj.Token.Dbid)
+func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error) {
+	return resolveCollectionTokenByID(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
 }
 
 func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error) {

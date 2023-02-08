@@ -112,7 +112,7 @@ type combinedGalleryEvent struct {
 	eventIDs                  []persist.DBID
 	newCollections            []persist.DBID
 	collectionCollectorsNotes map[persist.DBID]string
-	tokenCollectorsNotes      map[persist.DBID]string
+	tokenCollectorsNotes      map[persist.DBID]map[persist.DBID]string
 	tokensAdded               map[persist.DBID]persist.DBIDList
 	galleryName               string
 	galleryDescription        string
@@ -144,9 +144,12 @@ func (c *combinedGalleryEvent) merge(eventsAsc []db.Event) *combinedGalleryEvent
 			continue
 		} else if event.Action == persist.ActionCollectorsNoteAddedToToken {
 			if c.tokenCollectorsNotes == nil {
-				c.tokenCollectorsNotes = make(map[persist.DBID]string)
+				c.tokenCollectorsNotes = make(map[persist.DBID]map[persist.DBID]string)
+				c.tokenCollectorsNotes[event.CollectionID] = make(map[persist.DBID]string)
+			} else if c.tokenCollectorsNotes[event.CollectionID] == nil {
+				c.tokenCollectorsNotes[event.CollectionID] = make(map[persist.DBID]string)
 			}
-			c.tokenCollectorsNotes[event.CollectionID] = event.Data.TokenCollectorsNote
+			c.tokenCollectorsNotes[event.CollectionID][event.TokenID] = event.Data.TokenCollectorsNote
 			continue
 		}
 
