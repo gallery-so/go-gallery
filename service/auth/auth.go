@@ -83,6 +83,8 @@ var ErrSignatureInvalid = errors.New("signature invalid")
 
 var ErrInvalidMagicLink = errors.New("invalid magic link")
 
+var ErrUserNotFound = errors.New("no user found")
+
 // LoginInput is the input to the login pipeline
 type LoginInput struct {
 	Signature  string             `json:"signature" binding:"signature"`
@@ -263,7 +265,11 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 
 	user, err := e.UserRepo.GetByEmail(pCtx, persist.Email(info.Email))
 	if err != nil {
-		return nil, err
+		if _, ok := err.(persist.ErrUserNotFound); !ok {
+			return nil, err
+		}
+		return nil, ErrUserNotFound
+
 	}
 
 	return &AuthResult{

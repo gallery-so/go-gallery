@@ -2384,28 +2384,31 @@ func (q *Queries) GetTokensByWalletIds(ctx context.Context, ownedByWallets persi
 }
 
 const getTrendingFeedEventIDs = `-- name: GetTrendingFeedEventIDs :many
-select feed_event_id from events where action in ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and created_at >= $1 and feed_event_id is not null
-group by feed_event_id order by count(*) desc, max(created_at) desc limit $2
+select feed_events.id, feed_events.created_at, count(*)
+from events as interactions, feed_events
+where interactions.action IN ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and interactions.created_at >= $1 and interactions.feed_event_id is not null and interactions.feed_event_id = feed_events.id
+group by feed_events.id, feed_events.created_at
 `
 
-type GetTrendingFeedEventIDsParams struct {
-	WindowEnd time.Time
-	Limit     int32
+type GetTrendingFeedEventIDsRow struct {
+	ID        persist.DBID
+	CreatedAt time.Time
+	Count     int64
 }
 
-func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, arg GetTrendingFeedEventIDsParams) ([]persist.DBID, error) {
-	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs, arg.WindowEnd, arg.Limit)
+func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, windowEnd time.Time) ([]GetTrendingFeedEventIDsRow, error) {
+	rows, err := q.db.Query(ctx, getTrendingFeedEventIDs, windowEnd)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []persist.DBID
+	var items []GetTrendingFeedEventIDsRow
 	for rows.Next() {
-		var feed_event_id persist.DBID
-		if err := rows.Scan(&feed_event_id); err != nil {
+		var i GetTrendingFeedEventIDsRow
+		if err := rows.Scan(&i.ID, &i.CreatedAt, &i.Count); err != nil {
 			return nil, err
 		}
-		items = append(items, feed_event_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
