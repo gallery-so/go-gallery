@@ -154,6 +154,10 @@ type PreverifyEmailPayloadOrError interface {
 	IsPreverifyEmailPayloadOrError()
 }
 
+type PublishGalleryPayloadOrError interface {
+	IsPublishGalleryPayloadOrError()
+}
+
 type RedeemMerchPayloadOrError interface {
 	IsRedeemMerchPayloadOrError()
 }
@@ -781,8 +785,9 @@ func (ErrInvalidInput) IsUpdateGalleryHiddenPayloadOrError()             {}
 func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
 func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
-func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
+func (ErrInvalidInput) IsPublishGalleryPayloadOrError()                  {}
+func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
 func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
 
@@ -831,8 +836,9 @@ func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()      {}
 func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
 func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
-func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
+func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()           {}
+func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
 func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()     {}
 func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()  {}
@@ -1237,6 +1243,18 @@ type PreviewURLSet struct {
 	SrcSet    *string `json:"srcSet"`
 }
 
+type PublishGalleryInput struct {
+	GalleryID persist.DBID `json:"galleryId"`
+	EditID    string       `json:"editId"`
+	Caption   *string      `json:"caption"`
+}
+
+type PublishGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (PublishGalleryPayload) IsPublishGalleryPayloadOrError() {}
+
 type RedeemMerchInput struct {
 	TokenIds   []string              `json:"tokenIds"`
 	Address    *persist.ChainAddress `json:"address"`
@@ -1635,6 +1653,7 @@ type UpdateGalleryInput struct {
 	UpdatedCollections []*UpdateCollectionInput          `json:"updatedCollections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
 	Order              []persist.DBID                    `json:"order"`
+	EditID             *string                           `json:"editId"`
 }
 
 type UpdateGalleryOrderInput struct {

@@ -79,6 +79,11 @@ query viewerQuery {
                             }
                           }
                         }
+
+                        ... on GalleryInfoUpdatedFeedEventData {
+                          newName
+                          newDescription
+                        }
                       }
                     }
                   }
@@ -311,6 +316,19 @@ mutation updateGalleryMutation($input: UpdateGalleryInput!) {
             }
           }
         }
+      }
+    }
+  }
+}
+mutation publishGalleryMutation($input: PublishGalleryInput!) {
+  publishGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on PublishGalleryPayload {
+      gallery {
+        dbid
       }
     }
   }

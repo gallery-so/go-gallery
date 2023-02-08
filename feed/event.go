@@ -30,13 +30,7 @@ var (
 
 var (
 	eventSegments = map[persist.Action]segment{
-		persist.ActionUserFollowedUsers:               actorActionSegment,
-		persist.ActionCollectorsNoteAddedToToken:      actorGallerySegment,
-		persist.ActionCollectionCreated:               actorGallerySegment,
-		persist.ActionCollectorsNoteAddedToCollection: actorGallerySegment,
-		persist.ActionTokensAddedToCollection:         actorGallerySegment,
-		persist.ActionCollectionUpdated:               actorSubjectSegment,
-		persist.ActionGalleryUpdated:                  actorGallerySegment,
+		persist.ActionUserFollowedUsers: actorActionSegment,
 	}
 
 	// Feed events in this group can contain a collection collector's note
@@ -82,21 +76,17 @@ type EventBuilder struct {
 	eventRepo         *postgres.EventRepository
 	feedRepo          *postgres.FeedRepository
 	feedBlocklistRepo *postgres.FeedBlocklistRepository
-	// skipCooldown, if enabled, will disregard the requisite "cooldown"
-	// period of an incoming event.
-	skipCooldown bool
 	// windowSize is used to determine if a user is still editing and is ignored if
 	// skipCooldown is enabled.
 	windowSize time.Duration
 }
 
-func NewEventBuilder(queries *db.Queries, skipCooldown bool) *EventBuilder {
+func NewEventBuilder(queries *db.Queries) *EventBuilder {
 	return &EventBuilder{
 		queries:           queries,
 		eventRepo:         &postgres.EventRepository{Queries: queries},
 		feedRepo:          &postgres.FeedRepository{Queries: queries},
 		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
-		skipCooldown:      skipCooldown,
 		windowSize:        viper.GetDuration("FEED_WINDOW_SIZE") * time.Second,
 	}
 }
@@ -110,12 +100,12 @@ func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.Fe
 		return nil, err
 	}
 
-	return b.NewFeedEventFromEvent(ctx, event, false)
+	return b.NewFeedEventFromEvent(ctx, event)
 }
 
-func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event, isImmediate bool) (*db.FeedEvent, error) {
+func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 
-	if isImmediate {
+	if event.GroupID.String != "" {
 		// if the event is being dispatched immediately, ensure that it is not supposed to be group with other events that are being dispatched immediately
 		wait, err := b.queries.HasLaterGroupedEvent(ctx, db.HasLaterGroupedEventParams{
 			GroupID: event.GroupID,
@@ -127,10 +117,9 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 		if wait {
 			return nil, nil
 		}
-
 	}
 
-	if useEvent, err := b.useEvent(ctx, event); err != nil || !useEvent {
+	if can, err := b.canEvent(ctx, event); err != nil || !can {
 		return nil, err
 	}
 	_, groupable := eventGroups[event.Action]
@@ -138,10 +127,26 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 	if event.Caption.String != "" || !groupable {
 		return b.createFeedEvent(ctx, event)
 	}
-	return b.createGroupedFeedEvent(ctx, event)
+	return b.createGroupedFeedEventFromEvent(ctx, event)
 }
 
-func (b *EventBuilder) createGroupedFeedEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
+func (b *EventBuilder) NewFeedEventFromGroup(ctx context.Context, groupID string, action persist.Action) (*db.FeedEvent, error) {
+	events, err := b.eventRepo.Queries.GetEventsInGroup(ctx, persist.StrToNullStr(&groupID))
+	if err != nil {
+		return nil, err
+	}
+
+	return b.createGroupedFeedEventFromEvents(ctx, events, action)
+}
+
+func (b *EventBuilder) createGroupedFeedEventFromEvents(ctx context.Context, events []db.Event, action persist.Action) (*db.FeedEvent, error) {
+	if action == persist.ActionGalleryUpdated {
+		return b.createGalleryUpdatedFeedEventFromEvents(ctx, events)
+	}
+	return nil, errUnhandledGroupedEvent
+}
+
+func (b *EventBuilder) createGroupedFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 	if eventGroups[event.Action] == persist.ActionGalleryUpdated {
 		return b.createGalleryUpdatedFeedEvent(ctx, event)
 	}
@@ -159,14 +164,10 @@ func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db
 	}
 }
 
-func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, error) {
+func (b *EventBuilder) canEvent(ctx context.Context, event db.Event) (bool, error) {
 	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, persist.NullStrToDBID(event.ActorID), event.Action)
 	if err != nil || blocked {
 		return false, err
-	}
-
-	if b.skipCooldown {
-		return true, nil
 	}
 
 	stillEditing, err := b.isStillEditing(ctx, event)
@@ -178,7 +179,6 @@ func (b *EventBuilder) useEvent(ctx context.Context, event db.Event) (bool, erro
 
 	return !stillEditing, nil
 }
-
 func (b *EventBuilder) isStillEditing(ctx context.Context, event db.Event) (bool, error) {
 	switch getSegment(event.Action) {
 	case actorActionSegment:
@@ -239,6 +239,11 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 		return nil, err
 	}
 
+	return b.createGalleryUpdatedFeedEventFromEvents(ctx, events)
+
+}
+
+func (b *EventBuilder) createGalleryUpdatedFeedEventFromEvents(ctx context.Context, events []db.Event) (*db.FeedEvent, error) {
 	if len(events) == 0 {
 		return nil, nil
 	}
@@ -255,6 +260,7 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 		EventTime: merged.eventTime,
 		EventIds:  merged.eventIDs,
 		Caption:   persist.StrToNullStr(merged.caption),
+		GroupID:   persist.StrToNullStr(merged.groupID),
 		Data: persist.FeedEventData{
 			GalleryID:                           merged.galleryID,
 			GalleryName:                         merged.galleryName,
@@ -265,7 +271,6 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 			GalleryNewTokenCollectorsNotes:      merged.tokenCollectorsNotes,
 		},
 	})
-
 }
 
 // getAddedTokens returns the new tokens that were added since the last published feed event.
