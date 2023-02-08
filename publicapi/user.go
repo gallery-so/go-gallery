@@ -780,7 +780,7 @@ func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, userID persist
 
 	social, ok := socials[socialType]
 	if !ok {
-		return fmt.Errorf("social account not found for user %d and provider %s", userID, socialType)
+		return fmt.Errorf("social account not found for user %s and provider %s", userID, socialType)
 	}
 
 	social.Display = displayed
