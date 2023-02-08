@@ -25,9 +25,10 @@ type AccessTokenResponse struct {
 
 type GetUserMeResponse struct {
 	Data struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		Username string `json:"username"`
+		ID              string `json:"id"`
+		Name            string `json:"name"`
+		Username        string `json:"username"`
+		ProfileImageURL string `json:"profile_image_url"`
 	} `json:"data"`
 }
 
@@ -37,9 +38,10 @@ type API struct {
 }
 
 type TwitterIdentifiers struct {
-	ID       string
-	Username string
-	Name     string
+	ID              string
+	Username        string
+	Name            string
+	ProfileImageURL string
 }
 
 func NewAPI(queries *coredb.Queries) *API {
@@ -118,7 +120,7 @@ func (a *API) generateAuthTokenFromCode(ctx context.Context, userID persist.DBID
 }
 
 func (a *API) getAuthedUser(ctx context.Context, accessToken string) (TwitterIdentifiers, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.twitter.com/2/users/me", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.twitter.com/2/users/me?user.fields=profile_image_url", nil)
 	if err != nil {
 		return TwitterIdentifiers{}, err
 	}
@@ -143,8 +145,9 @@ func (a *API) getAuthedUser(ctx context.Context, accessToken string) (TwitterIde
 	}
 
 	return TwitterIdentifiers{
-		ID:       userMe.Data.ID,
-		Username: userMe.Data.Username,
-		Name:     userMe.Data.Name,
+		ID:              userMe.Data.ID,
+		Username:        userMe.Data.Username,
+		ProfileImageURL: userMe.Data.ProfileImageURL,
+		Name:            userMe.Data.Name,
 	}, nil
 }

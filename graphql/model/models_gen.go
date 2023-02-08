@@ -1532,11 +1532,12 @@ type TwitterAuth struct {
 }
 
 type TwitterSocialAccount struct {
-	Type     persist.SocialProvider `json:"type"`
-	SocialID string                 `json:"social_id"`
-	Name     string                 `json:"name"`
-	Username string                 `json:"username"`
-	Display  bool                   `json:"display"`
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Display         bool                   `json:"display"`
 }
 
 func (TwitterSocialAccount) IsSocialAccount() {}

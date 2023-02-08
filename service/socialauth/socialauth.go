@@ -37,8 +37,9 @@ func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResu
 		Provider: persist.SocialProviderTwitter,
 		ID:       ids.ID,
 		Metadata: map[string]interface{}{
-			"username": ids.Username,
-			"name":     ids.Name,
+			"username":          ids.Username,
+			"name":              ids.Name,
+			"profile_image_url": ids.ProfileImageURL,
 		},
 	}, nil
 }

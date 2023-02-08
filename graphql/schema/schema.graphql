@@ -501,6 +501,7 @@ type TwitterSocialAccount implements SocialAccount {
   social_id: String!
   name: String!
   username: String!
+  profileImageURL: String!
   display: Boolean!
 }
 

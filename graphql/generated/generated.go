@@ -927,11 +927,12 @@ type ComplexityRoot struct {
 	}
 
 	TwitterSocialAccount struct {
-		Display  func(childComplexity int) int
-		Name     func(childComplexity int) int
-		SocialID func(childComplexity int) int
-		Type     func(childComplexity int) int
-		Username func(childComplexity int) int
+		Display         func(childComplexity int) int
+		Name            func(childComplexity int) int
+		ProfileImageURL func(childComplexity int) int
+		SocialID        func(childComplexity int) int
+		Type            func(childComplexity int) int
+		Username        func(childComplexity int) int
 	}
 
 	UnfollowUserPayload struct {
@@ -5088,6 +5089,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TwitterSocialAccount.Name(childComplexity), true
 
+	case "TwitterSocialAccount.profileImageURL":
+		if e.complexity.TwitterSocialAccount.ProfileImageURL == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.ProfileImageURL(childComplexity), true
+
 	case "TwitterSocialAccount.social_id":
 		if e.complexity.TwitterSocialAccount.SocialID == nil {
 			break
@@ -6172,6 +6180,7 @@ type TwitterSocialAccount implements SocialAccount {
   social_id: String!
   name: String!
   username: String!
+  profileImageURL: String!
   display: Boolean!
 }
 
@@ -26344,6 +26353,41 @@ func (ec *executionContext) _TwitterSocialAccount_username(ctx context.Context, 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TwitterSocialAccount_profileImageURL(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _TwitterSocialAccount_display(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -41312,6 +41356,16 @@ func (ec *executionContext) _TwitterSocialAccount(ctx context.Context, sel ast.S
 		case "username":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._TwitterSocialAccount_username(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "profileImageURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TwitterSocialAccount_profileImageURL(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)

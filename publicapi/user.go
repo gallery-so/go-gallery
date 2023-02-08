@@ -346,7 +346,7 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 		return err
 	}
 
-	err = api.queries.AddExternalSocialToUser(ctx, db.AddExternalSocialToUserParams{
+	return api.queries.AddExternalSocialToUser(ctx, db.AddExternalSocialToUserParams{
 		UserID: userID,
 		ExternalSocials: persist.ExternalSocials{
 			res.Provider: persist.SocialUserIdentifers{
@@ -357,11 +357,6 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 			},
 		},
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
@@ -753,6 +748,10 @@ func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*mo
 				username, ok := val.Metadata["username"].(string)
 				if ok {
 					t.Username = username
+				}
+				profile, ok := val.Metadata["profile_image_url"].(string)
+				if ok {
+					t.ProfileImageURL = profile
 				}
 				result.Twitter = t
 			}
