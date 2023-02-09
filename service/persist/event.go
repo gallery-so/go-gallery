@@ -47,25 +47,26 @@ type EventData struct {
 }
 
 type FeedEventData struct {
-	UserBio                                  string                   `json:"user_bio"`
-	UserFollowedIDs                          DBIDList                 `json:"user_followed_ids"`
-	UserFollowedBack                         []bool                   `json:"user_followed_back"`
-	TokenID                                  DBID                     `json:"token_id"`
-	TokenCollectionID                        DBID                     `json:"token_collection_id"`
-	TokenGalleryID                           DBID                     `json:"token_gallery_id"`
-	TokenNewCollectorsNote                   string                   `json:"token_new_collectors_note"`
-	CollectionID                             DBID                     `json:"collection_id"`
-	CollectionGalleryID                      DBID                     `json:"collection_gallery_id"`
-	CollectionTokenIDs                       DBIDList                 `json:"collection_token_ids"`
-	CollectionNewCollectorsNote              string                   `json:"collection_new_collectors_note"`
-	CollectionIsPreFeed                      bool                     `json:"collection_is_pre_feed"`
-	CollectionIsNew                          bool                     `json:"collection_is_new"`
-	GalleryID                                DBID                     `json:"gallery_id"`
-	GalleryName                              string                   `json:"gallery_name"`
-	GalleryDescription                       string                   `json:"gallery_description"`
-	GalleryNewCollectionCollectorsNotes      map[DBID]string          `json:"gallery_new_collection_collectors_notes"`
-	GalleryNewCollectionTokenIDs             map[DBID]DBIDList        `json:"gallery_new_token_ids"`
-	GalleryNewCollections                    DBIDList                 `json:"gallery_new_collections"`
+	UserBio                             string            `json:"user_bio"`
+	UserFollowedIDs                     DBIDList          `json:"user_followed_ids"`
+	UserFollowedBack                    []bool            `json:"user_followed_back"`
+	TokenID                             DBID              `json:"token_id"`
+	TokenCollectionID                   DBID              `json:"token_collection_id"`
+	TokenGalleryID                      DBID              `json:"token_gallery_id"`
+	TokenNewCollectorsNote              string            `json:"token_new_collectors_note"`
+	CollectionID                        DBID              `json:"collection_id"`
+	CollectionGalleryID                 DBID              `json:"collection_gallery_id"`
+	CollectionTokenIDs                  DBIDList          `json:"collection_token_ids"`
+	CollectionNewCollectorsNote         string            `json:"collection_new_collectors_note"`
+	CollectionIsPreFeed                 bool              `json:"collection_is_pre_feed"`
+	CollectionIsNew                     bool              `json:"collection_is_new"`
+	GalleryID                           DBID              `json:"gallery_id"`
+	GalleryName                         string            `json:"gallery_name"`
+	GalleryDescription                  string            `json:"gallery_description"`
+	GalleryNewCollectionCollectorsNotes map[DBID]string   `json:"gallery_new_collection_collectors_notes"`
+	GalleryNewCollectionTokenIDs        map[DBID]DBIDList `json:"gallery_new_token_ids"`
+	GalleryNewCollections               DBIDList          `json:"gallery_new_collections"`
+	// this field should never be used again and should be replaced with its collection equivalent
 	GalleryNewTokenCollectorsNotes           map[DBID]string          `json:"gallery_new_token_collectors_notes"`
 	GalleryNewCollectionTokenCollectorsNotes map[DBID]map[DBID]string `json:"gallery_new_collection_token_collectors_notes"`
 }
