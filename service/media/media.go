@@ -20,6 +20,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
@@ -32,6 +33,7 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/qmuntal/gltf"
 	"github.com/spf13/viper"
+	htransport "google.golang.org/api/transport/http"
 )
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
@@ -77,7 +79,8 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 }
 
 func NewStorageClient(ctx context.Context) *storage.Client {
-	opts := []option.ClientOption{}
+	opts := append([]option.ClientOption{}, option.WithScopes([]string{storage.ScopeFullControl}...))
+
 	if viper.GetString("ENV") == "local" {
 		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
 		if err != nil {
@@ -87,7 +90,18 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 		opts = append(opts, option.WithCredentialsJSON(fi))
 	}
 
-	storageClient, err := storage.NewClient(ctx, opts...)
+	transport, err := htransport.NewTransport(ctx, tracing.NewTracingTransport(http.DefaultTransport, false), opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	client, _, err := htransport.NewClient(ctx)
+	if err != nil {
+		panic(err)
+	}
+	client.Transport = transport
+
+	storageClient, err := storage.NewClient(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		panic(err)
 	}
