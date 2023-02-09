@@ -707,7 +707,7 @@ func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) 
 	return result, nil
 }
 
-func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
+func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},

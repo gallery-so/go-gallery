@@ -421,11 +421,11 @@ func resolveViewerExperiencesByUserID(ctx context.Context, userID persist.DBID) 
 }
 
 func resolveViewerSocialsByUserID(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
-	return publicapi.For(ctx).User.GetUserSocials(ctx, userID)
+	return publicapi.For(ctx).User.GetSocials(ctx, userID)
 }
 
 func resolveUserSocialsByUserID(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
-	return publicapi.For(ctx).User.GetUserSocials(ctx, userID)
+	return publicapi.For(ctx).User.GetDisplayedSocials(ctx, userID)
 }
 
 func resolveTokenByTokenID(ctx context.Context, tokenID persist.DBID) (*model.Token, error) {
