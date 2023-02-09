@@ -19,7 +19,6 @@ services:
     command: >
       --address=0.0.0.0 --credentials-file=/config
       '${SQL_CONNECTION_NAME_PROD_DB}?port=6543'
-      '${SQL_CONNECTION_NAME_PROD_DB_REPLICA}?port=6544'
       '${SQL_CONNECTION_NAME_PROD_ETH_INDEXER}?port=6545'
 
   cloud-sql-proxy-dev:

@@ -104,13 +104,15 @@ func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *
 			return
 		}
 
-		t, err := tokenRepo.GetByFullIdentifiers(c, input.TokenID, input.ContractAddress, input.Chain, user.ID)
+		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": user.ID})
+
+		t, err := tokenRepo.GetByFullIdentifiers(ctx, input.TokenID, input.ContractAddress, input.Chain, user.ID)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
 		}
 
-		err = processToken(c, key, t, input.ContractAddress, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+		err = processToken(ctx, key, t, input.ContractAddress, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -122,7 +124,9 @@ func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *
 
 func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
 	ctx := logger.NewContextWithFields(c, logrus.Fields{
+		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
+		"contractDBID":    t.Contract,
 		"contractAddress": contractAddress,
 		"chain":           t.Chain,
 	})
@@ -130,7 +134,6 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d", key, contractAddress, t.TokenID, t.Chain)
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
 	name, description := media.FindNameAndDescription(ctx, t.TokenMetadata)
@@ -151,7 +154,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 			MediaType: persist.MediaTypeUnknown,
 		}
 	}
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTimeOfMedia))
+	logger.For(ctx).Infof("processing media took %s", time.Since(totalTimeOfMedia))
 
 	// Don't replace existing usable media if tokenprocessing failed to get new media
 	if t.Media.IsServable() && !newMedia.IsServable() {
@@ -166,16 +169,12 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		Description: persist.NullString(description),
 		LastUpdated: persist.LastUpdatedTime{},
 	}
-	totalUpdateTime := time.Now()
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Updating Token", key, contractAddress, t.TokenID, t.Chain)
 	if err := tokenRepo.UpdateByTokenIdentifiersUnsafe(ctx, t.TokenID, contractAddress, t.Chain, up); err != nil {
 		logger.For(ctx).Errorf("error updating media for %s-%s-%d: %s", t.TokenID, contractAddress, t.Chain, err)
 		return err
 	}
 
-	logger.For(ctx).Infof("Processing Media: %s - Processing Token: %s-%s-%d - Update Took: %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalUpdateTime))
-
-	logger.For(ctx).Infof("Processing Media: %s - Finished Processing Token: %s-%s-%d | Took %s", key, contractAddress, t.TokenID, t.Chain, time.Since(totalTime))
+	logger.For(ctx).Infof("total processing took %s", time.Since(totalTime))
 	return nil
 }
 
