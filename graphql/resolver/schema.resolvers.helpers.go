@@ -19,6 +19,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
+	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/mikeydub/go-gallery/debugtools"
@@ -198,6 +199,23 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 			return nil, err
 		}
 		return authApi.NewMagicLinkAuthenticator(*t), nil
+	}
+
+	return nil, errNoAuthMechanismFound
+}
+
+// authMechanismToAuthenticator takes a GraphQL AuthMechanism and returns an Authenticator that can be used for auth
+func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m model.SocialAuthMechanism) (socialauth.Authenticator, error) {
+
+	if debugtools.Enabled {
+		if viper.GetString("ENV") == "local" && m.Debug != nil {
+			return debugtools.NewDebugSocialAuthenticator(m.Debug.Provider, m.Debug.ID, map[string]interface{}{"username": m.Debug.Username}), nil
+		}
+	}
+
+	if m.Twitter != nil {
+		authedUserID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
+		return publicapi.For(ctx).Social.NewTwitterAuthenticator(authedUserID, m.Twitter.Code), nil
 	}
 
 	return nil, errNoAuthMechanismFound

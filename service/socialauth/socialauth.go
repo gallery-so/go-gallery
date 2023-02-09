@@ -6,6 +6,7 @@ import (
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/twitter"
+	"github.com/mikeydub/go-gallery/util"
 )
 
 type SocialAuthResult struct {
@@ -28,7 +29,18 @@ type TwitterAuthenticator struct {
 func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
 	tAPI := twitter.NewAPI(a.Queries)
 
-	ids, err := tAPI.GetAuthedUserFromCode(ctx, a.UserID, a.AuthCode)
+	ids, access, err := tAPI.GetAuthedUserFromCode(ctx, a.UserID, a.AuthCode)
+	if err != nil {
+		return nil, err
+	}
+
+	err = a.Queries.UpsertSocialOAuth(ctx, coredb.UpsertSocialOAuthParams{
+		ID:           persist.GenerateID(),
+		UserID:       a.UserID,
+		Provider:     persist.SocialProviderTwitter,
+		AccessToken:  util.ToNullString(access.AccessToken),
+		RefreshToken: util.ToNullString(access.RefreshToken),
+	})
 	if err != nil {
 		return nil, err
 	}

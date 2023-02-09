@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
@@ -55,14 +54,18 @@ func NewAPI(queries *coredb.Queries) *API {
 }
 
 // GetAuthedUserFromCode creates a new twitter API client with an auth code
-func (a *API) GetAuthedUserFromCode(ctx context.Context, userID persist.DBID, authCode string) (TwitterIdentifiers, error) {
+func (a *API) GetAuthedUserFromCode(ctx context.Context, userID persist.DBID, authCode string) (TwitterIdentifiers, AccessTokenResponse, error) {
 
 	accessToken, err := a.generateAuthTokenFromCode(ctx, userID, authCode)
 	if err != nil {
-		return TwitterIdentifiers{}, err
+		return TwitterIdentifiers{}, AccessTokenResponse{}, err
 	}
 
-	return a.getAuthedUser(ctx, accessToken.AccessToken)
+	tids, err := a.getAuthedUser(ctx, accessToken.AccessToken)
+	if err != nil {
+		return TwitterIdentifiers{}, AccessTokenResponse{}, err
+	}
+	return tids, accessToken, nil
 }
 
 func (a *API) generateAuthTokenFromCode(ctx context.Context, userID persist.DBID, authCode string) (AccessTokenResponse, error) {
@@ -73,8 +76,6 @@ func (a *API) generateAuthTokenFromCode(ctx context.Context, userID persist.DBID
 	q.Set("redirect_uri", viper.GetString("TWITTER_AUTH_REDIRECT_URI"))
 	q.Set("code_verifier", "challenge")
 	encoded := q.Encode()
-
-	logger.For(ctx).Debugf("encoded: %s", encoded)
 
 	accessReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.twitter.com/2/oauth2/token", strings.NewReader(encoded))
 	if err != nil {
@@ -106,16 +107,6 @@ func (a *API) generateAuthTokenFromCode(ctx context.Context, userID persist.DBID
 		return AccessTokenResponse{}, err
 	}
 
-	err = a.queries.UpsertSocialMediaOAuth(ctx, coredb.UpsertSocialMediaOAuthParams{
-		ID:           persist.GenerateID(),
-		UserID:       userID,
-		Provider:     persist.SocialProviderTwitter,
-		AccessToken:  util.ToNullString(accessToken.AccessToken),
-		RefreshToken: util.ToNullString(accessToken.RefreshToken),
-	})
-	if err != nil {
-		return AccessTokenResponse{}, err
-	}
 	return accessToken, nil
 }
 

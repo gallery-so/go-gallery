@@ -346,10 +346,10 @@ func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator soc
 		return err
 	}
 
-	return api.queries.AddExternalSocialToUser(ctx, db.AddExternalSocialToUserParams{
+	return api.queries.AddSocialToUser(ctx, db.AddSocialToUserParams{
 		UserID: userID,
-		ExternalSocials: persist.ExternalSocials{
-			res.Provider: persist.SocialUserIdentifers{
+		Socials: persist.Socials{
+			res.Provider: persist.SocialUserIdentifiers{
 				Provider: res.Provider,
 				ID:       res.ID,
 				Display:  display,
@@ -720,55 +720,99 @@ func (api UserAPI) GetUserSocials(ctx context.Context, userID persist.DBID) (*mo
 		return nil, err
 	}
 
-	// If the user is not logged in or is not the same user, hide the socials that are not public
-	if !api.IsUserLoggedIn(ctx) || api.GetLoggedInUserId(ctx) != userID {
-		for prov, social := range socials {
-			if !social.Display {
-				delete(socials, prov)
-			}
-		}
-	}
-
 	result := &model.SocialAccounts{}
 
-	for _, prov := range persist.AllSocialProviders {
+	for prov, social := range socials {
 		switch prov {
 		case persist.SocialProviderTwitter:
-			if val, ok := socials[prov]; ok {
-				logger.For(ctx).Infof("found twitter social account: %+v", val)
-				t := &model.TwitterSocialAccount{
-					Type:     prov,
-					Display:  val.Display,
-					SocialID: val.ID,
-				}
-				name, ok := val.Metadata["name"].(string)
-				if ok {
-					t.Name = name
-				}
-				username, ok := val.Metadata["username"].(string)
-				if ok {
-					t.Username = username
-				}
-				profile, ok := val.Metadata["profile_image_url"].(string)
-				if ok {
-					t.ProfileImageURL = profile
-				}
-				result.Twitter = t
+			logger.For(ctx).Infof("found twitter social account: %+v", social)
+			t := &model.TwitterSocialAccount{
+				Type:     prov,
+				Display:  social.Display,
+				SocialID: social.ID,
 			}
+			name, ok := social.Metadata["name"].(string)
+			if ok {
+				t.Name = name
+			}
+			username, ok := social.Metadata["username"].(string)
+			if ok {
+				t.Username = username
+			}
+			profile, ok := social.Metadata["profile_image_url"].(string)
+			if ok {
+				t.ProfileImageURL = profile
+			}
+			result.Twitter = t
 		default:
-			return nil, fmt.Errorf("unsupported social provider: %s", prov)
+			return nil, fmt.Errorf("unknown social provider %s", prov)
 		}
 	}
 
 	return result, nil
 }
 
-func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, userID persist.DBID, socialType persist.SocialProvider, displayed bool) error {
+func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
-		"userID":     {userID, "required"},
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for prov, social := range socials {
+		if !social.Display {
+			delete(socials, prov)
+		}
+	}
+
+	result := &model.SocialAccounts{}
+
+	for prov, social := range socials {
+		switch prov {
+		case persist.SocialProviderTwitter:
+			logger.For(ctx).Infof("found twitter social account: %+v", social)
+			t := &model.TwitterSocialAccount{
+				Type:     prov,
+				Display:  social.Display,
+				SocialID: social.ID,
+			}
+			name, ok := social.Metadata["name"].(string)
+			if ok {
+				t.Name = name
+			}
+			username, ok := social.Metadata["username"].(string)
+			if ok {
+				t.Username = username
+			}
+			profile, ok := social.Metadata["profile_image_url"].(string)
+			if ok {
+				t.ProfileImageURL = profile
+			}
+			result.Twitter = t
+		default:
+			return nil, fmt.Errorf("unknown social provider %s", prov)
+		}
+	}
+
+	return result, nil
+}
+
+func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType persist.SocialProvider, displayed bool) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"socialType": {socialType, "required"},
 	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
 		return err
 	}
 
@@ -787,8 +831,8 @@ func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, userID persist
 	socials[socialType] = social
 
 	return api.queries.UpdateUserSocials(ctx, db.UpdateUserSocialsParams{
-		ExternalSocials: socials,
-		UserID:          userID,
+		Socials: socials,
+		UserID:  userID,
 	})
 }
 

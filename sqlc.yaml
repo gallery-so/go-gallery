@@ -46,14 +46,14 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.EmailVerificationStatus"
           - column: "*.user*.featured_gallery"
             go_type: "*github.com/mikeydub/go-gallery/service/persist.DBID"
-          - column: "*.user*.pii_external_socials"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.ExternalSocials"
+          - column: "*.user*.pii_socials"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Socials"
           # Galleries
           - column: "galleries.collections"
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBIDList"
 
           # Socials
-          - column: "pii.social_account_auth.provider"
+          - column: "pii.socials_auth.provider"
             go_type: "github.com/mikeydub/go-gallery/service/persist.SocialProvider"
 
           # Collections
@@ -182,7 +182,7 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.TokenID"
           - column: "*.previews"
             go_type: "github.com/mikeydub/go-gallery/service/persist.NullString"
-          - column: "*.*.external_socials"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.ExternalSocials"
-          - column: "*.*.pii_external_socials"
-            go_type: "github.com/mikeydub/go-gallery/service/persist.ExternalSocials"
+          - column: "*.*.*socials"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Socials"
+          - column: "*.*.pii_socials"
+            go_type: "github.com/mikeydub/go-gallery/service/persist.Socials"

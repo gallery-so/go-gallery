@@ -13,9 +13,9 @@ import (
 
 type Traits map[string]interface{}
 
-type ExternalSocials map[SocialProvider]SocialUserIdentifers
+type Socials map[SocialProvider]SocialUserIdentifiers
 
-type SocialUserIdentifers struct {
+type SocialUserIdentifiers struct {
 	Provider SocialProvider         `json:"provider,required" binding:"required"`
 	ID       string                 `json:"id,required" binding:"required"`
 	Display  bool                   `json:"display"`
@@ -136,13 +136,13 @@ func (u *UserNotificationSettings) Scan(src interface{}) error {
 	return json.Unmarshal(src.([]uint8), u)
 }
 
-func (s SocialUserIdentifers) Value() (driver.Value, error) {
+func (s SocialUserIdentifiers) Value() (driver.Value, error) {
 	return json.Marshal(s)
 }
 
-func (s *SocialUserIdentifers) Scan(src interface{}) error {
+func (s *SocialUserIdentifiers) Scan(src interface{}) error {
 	if src == nil {
-		*s = SocialUserIdentifers{}
+		*s = SocialUserIdentifiers{}
 		return nil
 	}
 	return json.Unmarshal(src.([]uint8), s)

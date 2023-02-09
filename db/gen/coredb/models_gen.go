@@ -209,13 +209,13 @@ type Notification struct {
 }
 
 type PiiForUser struct {
-	UserID             persist.DBID
-	PiiEmailAddress    persist.Email
-	Deleted            bool
-	PiiExternalSocials persist.ExternalSocials
+	UserID          persist.DBID
+	PiiEmailAddress persist.Email
+	Deleted         bool
+	PiiSocials      persist.Socials
 }
 
-type PiiSocialAccountAuth struct {
+type PiiSocialsAuth struct {
 	ID           persist.DBID
 	Deleted      bool
 	Version      sql.NullInt32
@@ -246,7 +246,7 @@ type PiiUserView struct {
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
 	PiiEmailAddress      persist.Email
-	PiiExternalSocials   persist.ExternalSocials
+	PiiSocials           persist.Socials
 }
 
 type Token struct {

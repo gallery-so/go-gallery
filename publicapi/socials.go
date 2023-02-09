@@ -9,14 +9,14 @@ import (
 	"github.com/mikeydub/go-gallery/service/socialauth"
 )
 
-type SocialsAPI struct {
+type SocialAPI struct {
 	repos     *postgres.Repositories
 	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
 }
 
-func (s *SocialsAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string) *socialauth.TwitterAuthenticator {
+func (s *SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string) *socialauth.TwitterAuthenticator {
 	return &socialauth.TwitterAuthenticator{
 		AuthCode: authCode,
 		UserID:   userID,
