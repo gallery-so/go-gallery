@@ -137,8 +137,8 @@ type MerchTokensPayloadOrError interface {
 	IsMerchTokensPayloadOrError()
 }
 
-type MintCardToWalletPayloadOrError interface {
-	IsMintCardToWalletPayloadOrError()
+type MintPremiumCardToWalletPayloadOrError interface {
+	IsMintPremiumCardToWalletPayloadOrError()
 }
 
 type MoveCollectionToGalleryPayloadOrError interface {
@@ -794,7 +794,7 @@ func (ErrInvalidInput) IsPublishGalleryPayloadOrError()                  {}
 func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
 func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
-func (ErrInvalidInput) IsMintCardToWalletPayloadOrError()                {}
+func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -847,7 +847,7 @@ func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
 func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()     {}
 func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()  {}
-func (ErrNotAuthorized) IsMintCardToWalletPayloadOrError()         {}
+func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()  {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1167,16 +1167,16 @@ type MerchTokensPayload struct {
 
 func (MerchTokensPayload) IsMerchTokensPayloadOrError() {}
 
-type MintCardToWalletInput struct {
+type MintPremiumCardToWalletInput struct {
 	TokenID         string            `json:"tokenId"`
 	WalletAddresses []persist.Address `json:"walletAddresses"`
 }
 
-type MintCardToWalletPayload struct {
+type MintPremiumCardToWalletPayload struct {
 	Tx string `json:"tx"`
 }
 
-func (MintCardToWalletPayload) IsMintCardToWalletPayloadOrError() {}
+func (MintPremiumCardToWalletPayload) IsMintPremiumCardToWalletPayloadOrError() {}
 
 type MoveCollectionToGalleryInput struct {
 	SourceCollectionID persist.DBID `json:"sourceCollectionId"`

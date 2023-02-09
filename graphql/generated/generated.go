@@ -591,7 +591,7 @@ type ComplexityRoot struct {
 		Tokens func(childComplexity int) int
 	}
 
-	MintCardToWalletPayload struct {
+	MintPremiumCardToWalletPayload struct {
 		Tx func(childComplexity int) int
 	}
 
@@ -618,7 +618,7 @@ type ComplexityRoot struct {
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
 		Logout                          func(childComplexity int) int
-		MintCardToWallet                func(childComplexity int, input model.MintCardToWalletInput) int
+		MintPremiumCardToWallet         func(childComplexity int, input model.MintPremiumCardToWalletInput) int
 		MoveCollectionToGallery         func(childComplexity int, input *model.MoveCollectionToGalleryInput) int
 		PreverifyEmail                  func(childComplexity int, input model.PreverifyEmailInput) int
 		PublishGallery                  func(childComplexity int, input model.PublishGalleryInput) int
@@ -1236,7 +1236,7 @@ type MutationResolver interface {
 	RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error)
 	SyncTokensForUsername(ctx context.Context, username string, chains []persist.Chain) (model.SyncTokensForUsernamePayloadOrError, error)
 	BanUserFromFeed(ctx context.Context, username string, action string) (model.BanUserFromFeedPayloadOrError, error)
-	MintCardToWallet(ctx context.Context, input model.MintCardToWalletInput) (model.MintCardToWalletPayloadOrError, error)
+	MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error)
 	UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error)
 	UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error)
 	UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error)
@@ -3184,12 +3184,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MerchTokensPayload.Tokens(childComplexity), true
 
-	case "MintCardToWalletPayload.tx":
-		if e.complexity.MintCardToWalletPayload.Tx == nil {
+	case "MintPremiumCardToWalletPayload.tx":
+		if e.complexity.MintPremiumCardToWalletPayload.Tx == nil {
 			break
 		}
 
-		return e.complexity.MintCardToWalletPayload.Tx(childComplexity), true
+		return e.complexity.MintPremiumCardToWalletPayload.Tx(childComplexity), true
 
 	case "MoveCollectionToGalleryPayload.newGallery":
 		if e.complexity.MoveCollectionToGalleryPayload.NewGallery == nil {
@@ -3399,17 +3399,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.Logout(childComplexity), true
 
-	case "Mutation.mintCardToWallet":
-		if e.complexity.Mutation.MintCardToWallet == nil {
+	case "Mutation.mintPremiumCardToWallet":
+		if e.complexity.Mutation.MintPremiumCardToWallet == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_mintCardToWallet_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_mintPremiumCardToWallet_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.MintCardToWallet(childComplexity, args["input"].(model.MintCardToWalletInput)), true
+		return e.complexity.Mutation.MintPremiumCardToWallet(childComplexity, args["input"].(model.MintPremiumCardToWalletInput)), true
 
 	case "Mutation.moveCollectionToGallery":
 		if e.complexity.Mutation.MoveCollectionToGallery == nil {
@@ -7307,17 +7307,17 @@ union MoveCollectionToGalleryPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
-input MintCardToWalletInput {
+input MintPremiumCardToWalletInput {
   tokenId: String!
   walletAddresses: [Address!]
 }
 
-type MintCardToWalletPayload {
+type MintPremiumCardToWalletPayload {
   tx: String!
 }
 
-union MintCardToWalletPayloadOrError =
-    MintCardToWalletPayload
+union MintPremiumCardToWalletPayloadOrError =
+    MintPremiumCardToWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
 
@@ -7414,7 +7414,7 @@ type Mutation {
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
     @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
-  mintCardToWallet(input: MintCardToWalletInput!): MintCardToWalletPayloadOrError @retoolAuth
+  mintPremiumCardToWallet(input: MintPremiumCardToWalletInput!): MintPremiumCardToWalletPayloadOrError @retoolAuth
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
@@ -8045,13 +8045,13 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_mintCardToWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_mintPremiumCardToWallet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.MintCardToWalletInput
+	var arg0 model.MintPremiumCardToWalletInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNMintCardToWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintCardToWalletInput(ctx, tmp)
+		arg0, err = ec.unmarshalNMintPremiumCardToWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintPremiumCardToWalletInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -17653,7 +17653,7 @@ func (ec *executionContext) _MerchTokensPayload_tokens(ctx context.Context, fiel
 	return ec.marshalOMerchToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMerchTokenᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _MintCardToWalletPayload_tx(ctx context.Context, field graphql.CollectedField, obj *model.MintCardToWalletPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _MintPremiumCardToWalletPayload_tx(ctx context.Context, field graphql.CollectedField, obj *model.MintPremiumCardToWalletPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -17661,7 +17661,7 @@ func (ec *executionContext) _MintCardToWalletPayload_tx(ctx context.Context, fie
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "MintCardToWalletPayload",
+		Object:     "MintPremiumCardToWalletPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -20382,7 +20382,7 @@ func (ec *executionContext) _Mutation_banUserFromFeed(ctx context.Context, field
 	return ec.marshalOBanUserFromFeedPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐBanUserFromFeedPayloadOrError(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_mintCardToWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_mintPremiumCardToWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -20399,7 +20399,7 @@ func (ec *executionContext) _Mutation_mintCardToWallet(ctx context.Context, fiel
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_mintCardToWallet_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_mintPremiumCardToWallet_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -20408,7 +20408,7 @@ func (ec *executionContext) _Mutation_mintCardToWallet(ctx context.Context, fiel
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().MintCardToWallet(rctx, args["input"].(model.MintCardToWalletInput))
+			return ec.resolvers.Mutation().MintPremiumCardToWallet(rctx, args["input"].(model.MintPremiumCardToWalletInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.RetoolAuth == nil {
@@ -20424,10 +20424,10 @@ func (ec *executionContext) _Mutation_mintCardToWallet(ctx context.Context, fiel
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(model.MintCardToWalletPayloadOrError); ok {
+		if data, ok := tmp.(model.MintPremiumCardToWalletPayloadOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.MintCardToWalletPayloadOrError`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.MintPremiumCardToWalletPayloadOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -20436,9 +20436,9 @@ func (ec *executionContext) _Mutation_mintCardToWallet(ctx context.Context, fiel
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(model.MintCardToWalletPayloadOrError)
+	res := resTmp.(model.MintPremiumCardToWalletPayloadOrError)
 	fc.Result = res
-	return ec.marshalOMintCardToWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintCardToWalletPayloadOrError(ctx, field.Selections, res)
+	return ec.marshalOMintPremiumCardToWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintPremiumCardToWalletPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_uploadPersistedQueries(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -30129,8 +30129,8 @@ func (ec *executionContext) unmarshalInputMagicLinkAuth(ctx context.Context, obj
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputMintCardToWalletInput(ctx context.Context, obj interface{}) (model.MintCardToWalletInput, error) {
-	var it model.MintCardToWalletInput
+func (ec *executionContext) unmarshalInputMintPremiumCardToWalletInput(ctx context.Context, obj interface{}) (model.MintPremiumCardToWalletInput, error) {
+	var it model.MintPremiumCardToWalletInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -32287,17 +32287,17 @@ func (ec *executionContext) _MerchTokensPayloadOrError(ctx context.Context, sel 
 	}
 }
 
-func (ec *executionContext) _MintCardToWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.MintCardToWalletPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) _MintPremiumCardToWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.MintPremiumCardToWalletPayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.MintCardToWalletPayload:
-		return ec._MintCardToWalletPayload(ctx, sel, &obj)
-	case *model.MintCardToWalletPayload:
+	case model.MintPremiumCardToWalletPayload:
+		return ec._MintPremiumCardToWalletPayload(ctx, sel, &obj)
+	case *model.MintPremiumCardToWalletPayload:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._MintCardToWalletPayload(ctx, sel, obj)
+		return ec._MintPremiumCardToWalletPayload(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -35835,7 +35835,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "MintCardToWalletPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "MintPremiumCardToWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -35948,7 +35948,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "MintCardToWalletPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "MintPremiumCardToWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -37907,19 +37907,19 @@ func (ec *executionContext) _MerchTokensPayload(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var mintCardToWalletPayloadImplementors = []string{"MintCardToWalletPayload", "MintCardToWalletPayloadOrError"}
+var mintPremiumCardToWalletPayloadImplementors = []string{"MintPremiumCardToWalletPayload", "MintPremiumCardToWalletPayloadOrError"}
 
-func (ec *executionContext) _MintCardToWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.MintCardToWalletPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, mintCardToWalletPayloadImplementors)
+func (ec *executionContext) _MintPremiumCardToWalletPayload(ctx context.Context, sel ast.SelectionSet, obj *model.MintPremiumCardToWalletPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mintPremiumCardToWalletPayloadImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("MintCardToWalletPayload")
+			out.Values[i] = graphql.MarshalString("MintPremiumCardToWalletPayload")
 		case "tx":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._MintCardToWalletPayload_tx(ctx, field, obj)
+				return ec._MintPremiumCardToWalletPayload_tx(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -38335,9 +38335,9 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
 
-		case "mintCardToWallet":
+		case "mintPremiumCardToWallet":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_mintCardToWallet(ctx, field)
+				return ec._Mutation_mintPremiumCardToWallet(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -42935,8 +42935,8 @@ func (ec *executionContext) marshalNMerchType2githubᚗcomᚋmikeydubᚋgoᚑgal
 	return v
 }
 
-func (ec *executionContext) unmarshalNMintCardToWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintCardToWalletInput(ctx context.Context, v interface{}) (model.MintCardToWalletInput, error) {
-	res, err := ec.unmarshalInputMintCardToWalletInput(ctx, v)
+func (ec *executionContext) unmarshalNMintPremiumCardToWalletInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintPremiumCardToWalletInput(ctx context.Context, v interface{}) (model.MintPremiumCardToWalletInput, error) {
+	res, err := ec.unmarshalInputMintPremiumCardToWalletInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -45096,11 +45096,11 @@ func (ec *executionContext) marshalOMerchTokensPayloadOrError2githubᚗcomᚋmik
 	return ec._MerchTokensPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOMintCardToWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintCardToWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.MintCardToWalletPayloadOrError) graphql.Marshaler {
+func (ec *executionContext) marshalOMintPremiumCardToWalletPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMintPremiumCardToWalletPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.MintPremiumCardToWalletPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._MintCardToWalletPayloadOrError(ctx, sel, v)
+	return ec._MintPremiumCardToWalletPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOMoveCollectionToGalleryInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMoveCollectionToGalleryInput(ctx context.Context, v interface{}) (*model.MoveCollectionToGalleryInput, error) {

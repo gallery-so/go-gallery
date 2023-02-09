@@ -28,7 +28,7 @@ type CardAPI struct {
 	secrets            *secretmanager.Client
 }
 
-func (api *CardAPI) MintPremiumCardToWallet(ctx context.Context, input model.MintCardToWalletInput) (string, error) {
+func (api *CardAPI) MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (string, error) {
 
 	cardAddress := viper.GetString("CARDS_CONTRACT_ADDRESS")
 
