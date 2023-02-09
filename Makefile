@@ -404,6 +404,8 @@ confirm-prod-migrate:
 migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
 	@migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_MIGRATION_USER):$(POSTGRES_MIGRATION_PASSWORD)@localhost:6543/$(POSTGRES_DB)?sslmode=disable" up
 
+fix-sops-macs:
+	@cd secrets; ../scripts/fix-sops-macs.sh
 
 #----------------------------------------------------------------
 # End of targets
