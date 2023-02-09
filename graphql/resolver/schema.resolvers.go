@@ -1234,6 +1234,15 @@ func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string,
 	return model.BanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
 }
 
+func (r *mutationResolver) MintCardToWallet(ctx context.Context, input model.MintCardToWalletInput) (model.MintCardToWalletPayloadOrError, error) {
+	tx, err := publicapi.For(ctx).Card.MintPremiumCardToWallet(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.MintCardToWalletPayload{Tx: tx}, nil
+}
+
 func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
 	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
 

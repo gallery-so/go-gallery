@@ -57,6 +57,7 @@ type PublicAPI struct {
 	Interaction   *InteractionAPI
 	Admin         *admin.AdminAPI
 	Merch         *MerchAPI
+	Card          *CardAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
@@ -84,6 +85,7 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
 		Admin:         admin.NewAPI(repos, queries, validator, multichainProvider),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
+		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }
 
