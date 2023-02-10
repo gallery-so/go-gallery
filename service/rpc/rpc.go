@@ -610,7 +610,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		if err != nil {
 			return err
 		}
-		return json.Unmarshal(bs, into)
+		return json.Unmarshal(util.RemoveBOM(bs), into)
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
