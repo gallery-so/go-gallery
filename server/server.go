@@ -204,6 +204,7 @@ func SetDefaults() {
 	viper.SetDefault("ETH_PRIVATE_KEY", "")
 	viper.SetDefault("FEED_URL", "")
 	viper.SetDefault("MAGIC_LINK_SECRET_KEY", "")
+	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 
 	viper.AutomaticEnv()
 
