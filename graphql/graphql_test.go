@@ -237,8 +237,9 @@ func testCreateCollection(t *testing.T) {
 }
 
 func testUpdateGalleryWithPublish(t *testing.T) {
+	serverF := newServerFixture(t)
 	userF := newUserWithTokensFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedServerClient(t, serverF.server.URL, userF.id)
 
 	colResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
 		GalleryId:      userF.galleryID,
