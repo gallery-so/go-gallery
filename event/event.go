@@ -344,12 +344,14 @@ func (h feedHandler) handleGroup(ctx context.Context, groupID string, action per
 		return nil, err
 	}
 
-	// Send event to feedbot
-	err = task.CreateTaskForFeedbot(ctx,
-		time.Now(), task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc,
-	)
-	if err != nil {
-		logger.For(ctx).Errorf("failed to create task for feedbot: %s", err.Error())
+	if feedEvent != nil {
+		// Send event to feedbot
+		err = task.CreateTaskForFeedbot(ctx,
+			time.Now(), task.FeedbotMessage{FeedEventID: feedEvent.ID, Action: feedEvent.Action}, h.tc,
+		)
+		if err != nil {
+			logger.For(ctx).Errorf("failed to create task for feedbot: %s", err.Error())
+		}
 	}
 	return feedEvent, nil
 }
