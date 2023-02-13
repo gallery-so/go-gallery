@@ -141,6 +141,10 @@ type MerchTokensPayloadOrError interface {
 	IsMerchTokensPayloadOrError()
 }
 
+type MintPremiumCardToWalletPayloadOrError interface {
+	IsMintPremiumCardToWalletPayloadOrError()
+}
+
 type MoveCollectionToGalleryPayloadOrError interface {
 	IsMoveCollectionToGalleryPayloadOrError()
 }
@@ -816,6 +820,7 @@ func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
 func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
 func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
+func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -870,6 +875,7 @@ func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()         {}
 func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()      {}
 func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
+func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1189,6 +1195,17 @@ type MerchTokensPayload struct {
 }
 
 func (MerchTokensPayload) IsMerchTokensPayloadOrError() {}
+
+type MintPremiumCardToWalletInput struct {
+	TokenID         string            `json:"tokenId"`
+	WalletAddresses []persist.Address `json:"walletAddresses"`
+}
+
+type MintPremiumCardToWalletPayload struct {
+	Tx string `json:"tx"`
+}
+
+func (MintPremiumCardToWalletPayload) IsMintPremiumCardToWalletPayloadOrError() {}
 
 type MoveCollectionToGalleryInput struct {
 	SourceCollectionID persist.DBID `json:"sourceCollectionId"`

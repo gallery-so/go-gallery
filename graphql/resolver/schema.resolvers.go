@@ -871,7 +871,6 @@ func (r *mutationResolver) ConnectSocialAccount(ctx context.Context, input model
 }
 
 func (r *mutationResolver) UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error) {
-
 	err := publicapi.For(ctx).User.UpdateUserSocialDisplayed(ctx, input.Type, input.Displayed)
 	if err != nil {
 		return nil, err
@@ -1266,6 +1265,15 @@ func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string,
 	}
 
 	return model.BanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
+}
+
+func (r *mutationResolver) MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error) {
+	tx, err := publicapi.For(ctx).Card.MintPremiumCardToWallet(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.MintPremiumCardToWalletPayload{Tx: tx}, nil
 }
 
 func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {

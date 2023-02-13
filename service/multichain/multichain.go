@@ -640,12 +640,11 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}); err != nil {
 					return err
 				}
-				if !token.Media.IsServable() {
-					image, anim := ti.Chain.BaseKeywords()
-					err = p.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, image, anim)
-					if err != nil {
-						return err
-					}
+
+				image, anim := ti.Chain.BaseKeywords()
+				err = p.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, image, anim)
+				if err != nil {
+					return err
 				}
 
 				if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{

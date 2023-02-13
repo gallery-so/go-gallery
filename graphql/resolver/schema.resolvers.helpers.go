@@ -1404,8 +1404,8 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 		}
 	}
 
-	if event.Data.GalleryNewTokenCollectorsNotes != nil && len(event.Data.GalleryNewTokenCollectorsNotes) > 0 {
-		for collectionID, newNotes := range event.Data.GalleryNewTokenCollectorsNotes {
+	if event.Data.GalleryNewCollectionTokenCollectorsNotes != nil && len(event.Data.GalleryNewCollectionTokenCollectorsNotes) > 0 {
+		for collectionID, newNotes := range event.Data.GalleryNewCollectionTokenCollectorsNotes {
 			for tokenID, note := range newNotes {
 				result = append(result, model.CollectorsNoteAddedToTokenFeedEventData{
 					EventTime: &event.CreatedAt,

@@ -262,13 +262,13 @@ func (b *EventBuilder) createGalleryUpdatedFeedEventFromEvents(ctx context.Conte
 		Caption:   persist.StrToNullStr(merged.caption),
 		GroupID:   persist.StrToNullStr(merged.groupID),
 		Data: persist.FeedEventData{
-			GalleryID:                           merged.galleryID,
-			GalleryName:                         merged.galleryName,
-			GalleryDescription:                  merged.galleryDescription,
-			GalleryNewCollections:               merged.newCollections,
-			GalleryNewCollectionTokenIDs:        merged.tokensAdded,
-			GalleryNewCollectionCollectorsNotes: merged.collectionCollectorsNotes,
-			GalleryNewTokenCollectorsNotes:      merged.tokenCollectorsNotes,
+			GalleryID:                                merged.galleryID,
+			GalleryName:                              merged.galleryName,
+			GalleryDescription:                       merged.galleryDescription,
+			GalleryNewCollections:                    merged.newCollections,
+			GalleryNewCollectionTokenIDs:             merged.tokensAdded,
+			GalleryNewCollectionCollectorsNotes:      merged.collectionCollectorsNotes,
+			GalleryNewCollectionTokenCollectorsNotes: merged.tokenCollectorsNotes,
 		},
 	})
 }

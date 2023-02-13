@@ -163,6 +163,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"MintPremiumCardToWalletPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(MintPremiumCardToWalletPayloadOrError)
+		return obj, ok
+	},
+
 	"MoveCollectionToGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(MoveCollectionToGalleryPayloadOrError)
 		return obj, ok
