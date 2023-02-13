@@ -243,7 +243,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		paginator   = positionPaginator{}
 		lookup      = make(map[persist.DBID]int)
 		// lambda determines how quickly the score decreases over time. A larger value (i.e. a smaller denominator) has a faster decay rate.
-		lambda     = float64(1) / 200000
+		lambda     = float64(1) / 100000
 		reportSize = 100
 	)
 
@@ -288,7 +288,7 @@ func (api FeedAPI) PaginateTrendingFeed(ctx context.Context, before *string, aft
 		t := trender{
 			Cache:    api.cache,
 			Key:      "trending.feedEvents",
-			TTL:      time.Hour,
+			TTL:      time.Minute * 10,
 			CalcFunc: calcFunc,
 		}
 		if err = t.load(ctx, &trendingIDs); err != nil {
