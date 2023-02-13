@@ -509,6 +509,12 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   id: ID!
   user: GalleryUser @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)
+  socialConnections(
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): SocialConnectionsConnection @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
     @goField(forceResolver: true)
@@ -811,6 +817,29 @@ type FeedEdge {
 
 type FeedConnection {
   edges: [FeedEdge]
+  pageInfo: PageInfo!
+}
+
+type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"]) {
+  id: ID!
+  currentlyFollowing: Boolean!
+  
+  socialId: String!
+  socialType: SocialAccountType!
+  displayName: String!
+  socialUsername: String!
+  profileImage: String!
+}
+
+union SocialConnectionsOrError = SocialConnection | ErrInvalidInput
+
+type SocialConnectionsEdge {
+  node: SocialConnectionsOrError
+  cursor: String
+}
+
+type SocialConnectionsConnection {
+  edges: [SocialConnectionsEdge]
   pageInfo: PageInfo!
 }
 

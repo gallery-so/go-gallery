@@ -1,0 +1,1 @@
+create table social_connections (social_id varchar, follower_user_id varchar, followee_user_id varchar, social_username varchar, social_display_name varchar, social_profile_image varchar, already_followed boolean);

@@ -210,6 +210,10 @@ type SocialAccount interface {
 	IsSocialAccount()
 }
 
+type SocialConnectionsOrError interface {
+	IsSocialConnectionsOrError()
+}
+
 type SyncTokensForUsernamePayloadOrError interface {
 	IsSyncTokensForUsernamePayloadOrError()
 }
@@ -778,6 +782,7 @@ func (ErrInvalidInput) IsUserByIDOrError()                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                          {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
+func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
@@ -1379,6 +1384,28 @@ type SocialAuthMechanism struct {
 	Debug   *DebugSocialAuth `json:"debug"`
 }
 
+type SocialConnection struct {
+	CurrentlyFollowing bool                   `json:"currentlyFollowing"`
+	SocialID           string                 `json:"socialId"`
+	SocialType         persist.SocialProvider `json:"socialType"`
+	DisplayName        string                 `json:"displayName"`
+	SocialUsername     string                 `json:"socialUsername"`
+	ProfileImage       string                 `json:"profileImage"`
+}
+
+func (SocialConnection) IsNode()                     {}
+func (SocialConnection) IsSocialConnectionsOrError() {}
+
+type SocialConnectionsConnection struct {
+	Edges    []*SocialConnectionsEdge `json:"edges"`
+	PageInfo *PageInfo                `json:"pageInfo"`
+}
+
+type SocialConnectionsEdge struct {
+	Node   SocialConnectionsOrError `json:"node"`
+	Cursor *string                  `json:"cursor"`
+}
+
 type SomeoneAdmiredYourFeedEventNotification struct {
 	HelperSomeoneAdmiredYourFeedEventNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
@@ -1876,11 +1903,12 @@ func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
 	HelperViewerData
-	User            *GalleryUser     `json:"user"`
-	SocialAccounts  *SocialAccounts  `json:"socialAccounts"`
-	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
-	Feed            *FeedConnection  `json:"feed"`
-	Email           *UserEmail       `json:"email"`
+	User              *GalleryUser                 `json:"user"`
+	SocialAccounts    *SocialAccounts              `json:"socialAccounts"`
+	SocialConnections *SocialConnectionsConnection `json:"socialConnections"`
+	ViewerGalleries   []*ViewerGallery             `json:"viewerGalleries"`
+	Feed              *FeedConnection              `json:"feed"`
+	Email             *UserEmail                   `json:"email"`
 	// Returns a list of notifications in reverse chronological order.
 	// Seen notifications come after unseen notifications
 	Notifications        *NotificationsConnection `json:"notifications"`

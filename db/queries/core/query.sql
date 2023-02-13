@@ -816,7 +816,7 @@ select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and d
 -- name: UserOwnsCollection :one
 select exists(select 1 from collections where id = $1 and owner_user_id = $2 and deleted = false);
 
--- GetSocialAuthByUserID :one
+-- name: GetSocialAuthByUserID :one
 select * from pii.socials_auth where user_id = $1 and provider = $2 and deleted = false;
 
 -- name: UpsertSocialOAuth :exec
@@ -833,3 +833,20 @@ update pii.for_users set pii_socials = @socials where user_id = @user_id;
 
 -- name: UpdateEventCaptionByGroup :exec
 update events set caption = @caption where group_id = @group_id and deleted = false;
+
+-- name: CreateSocialConnectionsTempTable :exec
+create temporary table social_connections as (select unnest(@social_ids::varchar[]), @user_id, for_users.id, unnest(@social_usernames::varchar[]), unnest(@social_displaynames::varchar[]), unnest(@social_profile_images::varchar[]), false from pii.for_users where for_users.pii_socials->>@social_provider->>'id' = social_connections.social_id);
+
+-- name: UpdateAlreadyFollowed :exec
+update social_connections set already_followed = true from follows where social_connections.follower_user_id = follows.follower_id and social_connections.followee_user_id = follows.followee_id;
+
+-- name: GetSocialConnections :many
+select social_connections.* from social_connections join users on social_connections.followee_user_id = users.id 
+where users.deleted = false and social_connections.follower_user_id = does_follows.follower_user_id and social_connections.followee_user_id = does_follows.followee_user_id
+    and case when @only_following::bool then does_follows.does_follow else true end
+    and (social_connections.already_followed,users.created_at,users.id) < (@cur_before_following, @cur_before_time::timestamptz, @cur_before_id)
+    and (social_connections.already_followed,users.created_at,users.id) > (@cur_after_following, @cur_after_time::timestamptz, @cur_after_id)
+    order by case when @paging_forward::bool then (social_connections.already_followed,users.created_at,users.id) end asc,
+             case when not @paging_forward::bool then (social_connections.already_followed,users.created_at,users.id) end desc
+    limit $1;
+

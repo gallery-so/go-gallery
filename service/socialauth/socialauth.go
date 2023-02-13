@@ -29,7 +29,7 @@ type TwitterAuthenticator struct {
 func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
 	tAPI := twitter.NewAPI(a.Queries)
 
-	ids, access, err := tAPI.GetAuthedUserFromCode(ctx, a.UserID, a.AuthCode)
+	ids, access, err := tAPI.GetAuthedUserFromCode(ctx, a.AuthCode)
 	if err != nil {
 		return nil, err
 	}

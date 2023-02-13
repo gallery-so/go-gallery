@@ -3,17 +3,20 @@ package twitter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
+
+const maxFollowingReturn = 1000
 
 type AccessTokenResponse struct {
 	TokenType    string `json:"token_type"`
@@ -23,25 +26,36 @@ type AccessTokenResponse struct {
 }
 
 type GetUserMeResponse struct {
-	Data struct {
-		ID              string `json:"id"`
-		Name            string `json:"name"`
-		Username        string `json:"username"`
-		ProfileImageURL string `json:"profile_image_url"`
-	} `json:"data"`
+	Data TwitterIdentifiers `json:"data"`
+}
+
+type GetUserFollowingResponse struct {
+	Data []TwitterIdentifiers `json:"data"`
+	Meta struct {
+		ResultCount int    `json:"result_count"`
+		NextToken   string `json:"next_token"`
+	}
 }
 
 type API struct {
 	httpClient *http.Client
 	queries    *coredb.Queries
+
+	isAuthed    bool
+	accessCode  string
+	refreshCode string
+	TIDs        TwitterIdentifiers
 }
 
 type TwitterIdentifiers struct {
-	ID              string
-	Username        string
-	Name            string
-	ProfileImageURL string
+	ID              string `json:"id"`
+	Username        string `json:"username"`
+	Name            string `json:"name"`
+	ProfileImageURL string `json:"profile_image_url"`
 }
+
+var errUnauthed = errors.New("unauthorized")
+var errAPINotAuthed = errors.New("api not authorized")
 
 func NewAPI(queries *coredb.Queries) *API {
 	httpClient := &http.Client{}
@@ -54,9 +68,9 @@ func NewAPI(queries *coredb.Queries) *API {
 }
 
 // GetAuthedUserFromCode creates a new twitter API client with an auth code
-func (a *API) GetAuthedUserFromCode(ctx context.Context, userID persist.DBID, authCode string) (TwitterIdentifiers, AccessTokenResponse, error) {
+func (a *API) GetAuthedUserFromCode(ctx context.Context, authCode string) (TwitterIdentifiers, AccessTokenResponse, error) {
 
-	accessToken, err := a.generateAuthTokenFromCode(ctx, userID, authCode)
+	accessToken, err := a.generateAuthTokenFromCode(ctx, authCode)
 	if err != nil {
 		return TwitterIdentifiers{}, AccessTokenResponse{}, err
 	}
@@ -68,7 +82,7 @@ func (a *API) GetAuthedUserFromCode(ctx context.Context, userID persist.DBID, au
 	return tids, accessToken, nil
 }
 
-func (a *API) generateAuthTokenFromCode(ctx context.Context, userID persist.DBID, authCode string) (AccessTokenResponse, error) {
+func (a *API) generateAuthTokenFromCode(ctx context.Context, authCode string) (AccessTokenResponse, error) {
 
 	q := url.Values{}
 	q.Set("code", authCode)
@@ -99,6 +113,49 @@ func (a *API) generateAuthTokenFromCode(ctx context.Context, userID persist.DBID
 
 	if accessResp.StatusCode != http.StatusOK {
 		err = util.GetErrFromResp(accessResp)
+		return AccessTokenResponse{}, fmt.Errorf("failed to get access token, returned status: %s", err)
+	}
+
+	var accessToken AccessTokenResponse
+	if err := json.NewDecoder(accessResp.Body).Decode(&accessToken); err != nil {
+		return AccessTokenResponse{}, err
+	}
+
+	return accessToken, nil
+}
+
+func (a *API) generateAuthTokenFromRefresh(ctx context.Context, refreshToken string) (AccessTokenResponse, error) {
+
+	q := url.Values{}
+	q.Set("refresh_token", refreshToken)
+	q.Set("grant_type", "refresh_token")
+	encoded := q.Encode()
+
+	accessReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.twitter.com/2/oauth2/token", strings.NewReader(encoded))
+	if err != nil {
+		return AccessTokenResponse{}, fmt.Errorf("failed to create access token request: %w", err)
+	}
+
+	accessReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	accessReq.Header.Set("Content-Length", fmt.Sprintf("%d", len(encoded)))
+	accessReq.Header.Set("Accept", "*/*")
+
+	accessReq.SetBasicAuth(viper.GetString("TWITTER_CLIENT_ID"), viper.GetString("TWITTER_CLIENT_SECRET"))
+
+	accessResp, err := http.DefaultClient.Do(accessReq)
+	if err != nil {
+		err = util.GetErrFromResp(accessResp)
+		return AccessTokenResponse{}, fmt.Errorf("failed to get access token: %s", err)
+
+	}
+
+	defer accessResp.Body.Close()
+
+	if accessResp.StatusCode != http.StatusOK {
+		err = util.GetErrFromResp(accessResp)
+		if accessResp.StatusCode == http.StatusUnauthorized {
+			return AccessTokenResponse{}, errUnauthed
+		}
 		return AccessTokenResponse{}, fmt.Errorf("failed to get access token, returned status: %s", err)
 	}
 
@@ -141,4 +198,71 @@ func (a *API) getAuthedUser(ctx context.Context, accessToken string) (TwitterIde
 		ProfileImageURL: userMe.Data.ProfileImageURL,
 		Name:            userMe.Data.Name,
 	}, nil
+}
+
+// WithAuth establishes the API with an access token and refresh token, if the passed in access token is invalid, it will attempt to refresh it
+// and optionally return the new access token and refresh token
+func (a *API) WithAuth(ctx context.Context, accessToken string, refreshToken string) (*API, *AccessTokenResponse, error) {
+
+	a.isAuthed = true
+
+	user, err := a.getAuthedUser(ctx, accessToken)
+	if err != nil {
+		if err == errUnauthed {
+			newAtr, err := a.generateAuthTokenFromRefresh(ctx, refreshToken)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			a.accessCode = newAtr.AccessToken
+			a.refreshCode = newAtr.RefreshToken
+			user, err = a.getAuthedUser(ctx, newAtr.AccessToken)
+			if err != nil {
+				return nil, nil, err
+			}
+			a.TIDs = user
+			return a, &newAtr, nil
+		}
+		return nil, nil, err
+	}
+
+	a.TIDs = user
+	a.accessCode = accessToken
+	a.refreshCode = refreshToken
+
+	return a, nil, nil
+}
+
+func (a *API) GetFollowing(ctx context.Context) ([]TwitterIdentifiers, error) {
+	if !a.isAuthed {
+		return nil, errAPINotAuthed
+	}
+
+	url := "https://api.twitter.com/2/users/" + a.TIDs.ID + "/following?user.fields=profile_image_url&max_results=" + strconv.Itoa(maxFollowingReturn)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", "Bearer "+a.accessCode)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get following: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = util.GetErrFromResp(resp)
+		return nil, fmt.Errorf("failed to get following: %s", err)
+	}
+
+	var following GetUserFollowingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&following); err != nil {
+		return nil, err
+	}
+
+	return following.Data, nil
+
 }

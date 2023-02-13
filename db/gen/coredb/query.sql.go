@@ -1888,6 +1888,93 @@ func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecen
 	return items, nil
 }
 
+const getSocialAuthByUserID = `-- name: GetSocialAuthByUserID :one
+select id, deleted, version, created_at, last_updated, user_id, provider, access_token, refresh_token from pii.socials_auth where user_id = $1 and provider = $2 and deleted = false
+`
+
+type GetSocialAuthByUserIDParams struct {
+	UserID   persist.DBID
+	Provider persist.SocialProvider
+}
+
+func (q *Queries) GetSocialAuthByUserID(ctx context.Context, arg GetSocialAuthByUserIDParams) (PiiSocialsAuth, error) {
+	row := q.db.QueryRow(ctx, getSocialAuthByUserID, arg.UserID, arg.Provider)
+	var i PiiSocialsAuth
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.UserID,
+		&i.Provider,
+		&i.AccessToken,
+		&i.RefreshToken,
+	)
+	return i, err
+}
+
+const getSocialConnections = `-- name: GetSocialConnections :many
+select social_connections.social_id, social_connections.follower_user_id, social_connections.followee_user_id, social_connections.social_username, social_connections.social_display_name, social_connections.social_profile_image, social_connections.already_followed from social_connections join users on social_connections.followee_user_id = users.id 
+where users.deleted = false and social_connections.follower_user_id = does_follows.follower_user_id and social_connections.followee_user_id = does_follows.followee_user_id
+    and case when $2::bool then does_follows.does_follow else true end
+    and (social_connections.already_followed,users.created_at,users.id) < ($3, $4::timestamptz, $5)
+    and (social_connections.already_followed,users.created_at,users.id) > ($6, $7::timestamptz, $8)
+    order by case when $9::bool then (social_connections.already_followed,users.created_at,users.id) end asc,
+             case when not $9::bool then (social_connections.already_followed,users.created_at,users.id) end desc
+    limit $1
+`
+
+type GetSocialConnectionsParams struct {
+	Limit              int32
+	OnlyFollowing      bool
+	CurBeforeFollowing sql.NullBool
+	CurBeforeTime      time.Time
+	CurBeforeID        persist.DBID
+	CurAfterFollowing  sql.NullBool
+	CurAfterTime       time.Time
+	CurAfterID         persist.DBID
+	PagingForward      bool
+}
+
+func (q *Queries) GetSocialConnections(ctx context.Context, arg GetSocialConnectionsParams) ([]SocialConnection, error) {
+	rows, err := q.db.Query(ctx, getSocialConnections,
+		arg.Limit,
+		arg.OnlyFollowing,
+		arg.CurBeforeFollowing,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterFollowing,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SocialConnection
+	for rows.Next() {
+		var i SocialConnection
+		if err := rows.Scan(
+			&i.SocialID,
+			&i.FollowerUserID,
+			&i.FolloweeUserID,
+			&i.SocialUsername,
+			&i.SocialDisplayName,
+			&i.SocialProfileImage,
+			&i.AlreadyFollowed,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSocialsByUserID = `-- name: GetSocialsByUserID :one
 select pii_socials from pii.user_view where id = $1
 `
@@ -3543,6 +3630,15 @@ type RemoveCollectionFromGalleryParams struct {
 
 func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCollectionFromGalleryParams) error {
 	_, err := q.db.Exec(ctx, removeCollectionFromGallery, arg.CollectionID, arg.GalleryID)
+	return err
+}
+
+const updateAlreadyFollowed = `-- name: UpdateAlreadyFollowed :exec
+update social_connections set already_followed = true from follows where social_connections.follower_user_id = follows.follower_id and social_connections.followee_user_id = follows.followee_id
+`
+
+func (q *Queries) UpdateAlreadyFollowed(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, updateAlreadyFollowed)
 	return err
 }
 

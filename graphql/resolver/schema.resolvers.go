@@ -1679,6 +1679,10 @@ func (r *viewerResolver) SocialAccounts(ctx context.Context, obj *model.Viewer) 
 	return resolveViewerSocialsByUserID(ctx, obj.UserId)
 }
 
+func (r *viewerResolver) SocialConnections(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	galleries, err := resolveGalleriesByUserID(ctx, userID)
