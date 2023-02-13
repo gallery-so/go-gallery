@@ -74,11 +74,9 @@ func coreInitServer() *gin.Engine {
 
 	go autoSendNotificationEmails(queries, sendgridClient, pub)
 
-	lim := func(seconds float32) *middleware.KeyRateLimiter {
-		return middleware.NewKeyRateLimiter(1, time.Second*time.Duration(seconds), redis.NewClient(redis.EmailRateLimiterDB))
-	}
+	redisClient := redis.NewClient(redis.EmailRateLimiterDB)
 
-	return handlersInitServer(router, loaders, queries, sendgridClient, lim)
+	return handlersInitServer(router, loaders, queries, sendgridClient, redisClient)
 }
 
 func setDefaults() {
