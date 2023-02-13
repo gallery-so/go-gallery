@@ -232,6 +232,21 @@ func (v *DebugAuth) GetUserId() *persist.DBID { return v.UserId }
 // GetChainAddresses returns DebugAuth.ChainAddresses, and is useful for accessing the field via an interface.
 func (v *DebugAuth) GetChainAddresses() []ChainAddressInput { return v.ChainAddresses }
 
+type DebugSocialAuth struct {
+	Provider SocialAccountType `json:"provider"`
+	Id       string            `json:"id"`
+	Username string            `json:"username"`
+}
+
+// GetProvider returns DebugSocialAuth.Provider, and is useful for accessing the field via an interface.
+func (v *DebugSocialAuth) GetProvider() SocialAccountType { return v.Provider }
+
+// GetId returns DebugSocialAuth.Id, and is useful for accessing the field via an interface.
+func (v *DebugSocialAuth) GetId() string { return v.Id }
+
+// GetUsername returns DebugSocialAuth.Username, and is useful for accessing the field via an interface.
+func (v *DebugSocialAuth) GetUsername() string { return v.Username }
+
 type EoaAuth struct {
 	ChainPubKey ChainPubKeyInput `json:"chainPubKey"`
 	Nonce       string           `json:"nonce"`
@@ -301,12 +316,36 @@ const (
 	ReportWindowAllTime   ReportWindow = "ALL_TIME"
 )
 
+type SocialAccountType string
+
+const (
+	SocialAccountTypeTwitter SocialAccountType = "Twitter"
+)
+
+type SocialAuthMechanism struct {
+	Twitter *TwitterAuth     `json:"twitter"`
+	Debug   *DebugSocialAuth `json:"debug"`
+}
+
+// GetTwitter returns SocialAuthMechanism.Twitter, and is useful for accessing the field via an interface.
+func (v *SocialAuthMechanism) GetTwitter() *TwitterAuth { return v.Twitter }
+
+// GetDebug returns SocialAuthMechanism.Debug, and is useful for accessing the field via an interface.
+func (v *SocialAuthMechanism) GetDebug() *DebugSocialAuth { return v.Debug }
+
 type TrendingUsersInput struct {
 	Report ReportWindow `json:"report"`
 }
 
 // GetReport returns TrendingUsersInput.Report, and is useful for accessing the field via an interface.
 func (v *TrendingUsersInput) GetReport() ReportWindow { return v.Report }
+
+type TwitterAuth struct {
+	Code string `json:"code"`
+}
+
+// GetCode returns TwitterAuth.Code, and is useful for accessing the field via an interface.
+func (v *TwitterAuth) GetCode() string { return v.Code }
 
 type UpdateCollectionInput struct {
 	Dbid           persist.DBID                   `json:"dbid"`
@@ -384,6 +423,17 @@ func (v *UpdateGalleryInput) GetOrder() []persist.DBID { return v.Order }
 // GetEditId returns UpdateGalleryInput.EditId, and is useful for accessing the field via an interface.
 func (v *UpdateGalleryInput) GetEditId() *string { return v.EditId }
 
+type UpdateSocialAccountDisplayedInput struct {
+	Type      SocialAccountType `json:"type"`
+	Displayed bool              `json:"displayed"`
+}
+
+// GetType returns UpdateSocialAccountDisplayedInput.Type, and is useful for accessing the field via an interface.
+func (v *UpdateSocialAccountDisplayedInput) GetType() SocialAccountType { return v.Type }
+
+// GetDisplayed returns UpdateSocialAccountDisplayedInput.Displayed, and is useful for accessing the field via an interface.
+func (v *UpdateSocialAccountDisplayedInput) GetDisplayed() bool { return v.Displayed }
+
 type UpdateUserExperienceInput struct {
 	ExperienceType UserExperienceType `json:"experienceType"`
 	Experienced    bool               `json:"experienced"`
@@ -432,6 +482,18 @@ func (v *__commentOnFeedEventMutationInput) GetFeedEventId() persist.DBID { retu
 
 // GetComment returns __commentOnFeedEventMutationInput.Comment, and is useful for accessing the field via an interface.
 func (v *__commentOnFeedEventMutationInput) GetComment() string { return v.Comment }
+
+// __connectSocialAccountInput is used internally by genqlient
+type __connectSocialAccountInput struct {
+	Auth    SocialAuthMechanism `json:"auth"`
+	Display bool                `json:"display"`
+}
+
+// GetAuth returns __connectSocialAccountInput.Auth, and is useful for accessing the field via an interface.
+func (v *__connectSocialAccountInput) GetAuth() SocialAuthMechanism { return v.Auth }
+
+// GetDisplay returns __connectSocialAccountInput.Display, and is useful for accessing the field via an interface.
+func (v *__connectSocialAccountInput) GetDisplay() bool { return v.Display }
 
 // __createCollectionMutationInput is used internally by genqlient
 type __createCollectionMutationInput struct {
@@ -540,6 +602,16 @@ type __updateGalleryMutationInput struct {
 
 // GetInput returns __updateGalleryMutationInput.Input, and is useful for accessing the field via an interface.
 func (v *__updateGalleryMutationInput) GetInput() UpdateGalleryInput { return v.Input }
+
+// __updateSocialAccountDisplayedInput is used internally by genqlient
+type __updateSocialAccountDisplayedInput struct {
+	Input UpdateSocialAccountDisplayedInput `json:"input"`
+}
+
+// GetInput returns __updateSocialAccountDisplayedInput.Input, and is useful for accessing the field via an interface.
+func (v *__updateSocialAccountDisplayedInput) GetInput() UpdateSocialAccountDisplayedInput {
+	return v.Input
+}
 
 // __updateUserExperienceInput is used internally by genqlient
 type __updateUserExperienceInput struct {
@@ -1420,6 +1492,253 @@ func (v *commentOnFeedEventMutationResponse) __premarshalJSON() (*__premarshalco
 			if err != nil {
 				return nil, fmt.Errorf(
 					"Unable to marshal commentOnFeedEventMutationResponse.CommentOnFeedEvent: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// connectSocialAccountConnectSocialAccountConnectSocialAccountPayload includes the requested fields of the GraphQL type ConnectSocialAccountPayload.
+type connectSocialAccountConnectSocialAccountConnectSocialAccountPayload struct {
+	Typename *string                                                                    `json:"__typename"`
+	Viewer   *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewer `json:"viewer"`
+}
+
+// GetTypename returns connectSocialAccountConnectSocialAccountConnectSocialAccountPayload.Typename, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetViewer returns connectSocialAccountConnectSocialAccountConnectSocialAccountPayload.Viewer, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayload) GetViewer() *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewer {
+	return v.Viewer
+}
+
+// connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError includes the requested fields of the GraphQL interface ConnectSocialAccountPayloadOrError.
+//
+// connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError is implemented by the following types:
+// connectSocialAccountConnectSocialAccountConnectSocialAccountPayload
+// connectSocialAccountConnectSocialAccountErrInvalidInput
+// connectSocialAccountConnectSocialAccountErrNotAuthorized
+type connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError interface {
+	implementsGraphQLInterfaceconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayload) implementsGraphQLInterfaceconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError() {
+}
+func (v *connectSocialAccountConnectSocialAccountErrInvalidInput) implementsGraphQLInterfaceconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError() {
+}
+func (v *connectSocialAccountConnectSocialAccountErrNotAuthorized) implementsGraphQLInterfaceconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError() {
+}
+
+func __unmarshalconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError(b []byte, v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ConnectSocialAccountPayload":
+		*v = new(connectSocialAccountConnectSocialAccountConnectSocialAccountPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(connectSocialAccountConnectSocialAccountErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(connectSocialAccountConnectSocialAccountErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing ConnectSocialAccountPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError(v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *connectSocialAccountConnectSocialAccountConnectSocialAccountPayload:
+		typename = "ConnectSocialAccountPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*connectSocialAccountConnectSocialAccountConnectSocialAccountPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *connectSocialAccountConnectSocialAccountErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*connectSocialAccountConnectSocialAccountErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *connectSocialAccountConnectSocialAccountErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*connectSocialAccountConnectSocialAccountErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError: "%T"`, v)
+	}
+}
+
+// connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewer includes the requested fields of the GraphQL type Viewer.
+type connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewer struct {
+	SocialAccounts *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccounts `json:"socialAccounts"`
+}
+
+// GetSocialAccounts returns connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewer.SocialAccounts, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewer) GetSocialAccounts() *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccounts {
+	return v.SocialAccounts
+}
+
+// connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccounts includes the requested fields of the GraphQL type SocialAccounts.
+type connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccounts struct {
+	Twitter *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount `json:"twitter"`
+}
+
+// GetTwitter returns connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccounts.Twitter, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccounts) GetTwitter() *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount {
+	return v.Twitter
+}
+
+// connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount includes the requested fields of the GraphQL type TwitterSocialAccount.
+type connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount struct {
+	Username string `json:"username"`
+	Display  bool   `json:"display"`
+}
+
+// GetUsername returns connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount.Username, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount) GetUsername() string {
+	return v.Username
+}
+
+// GetDisplay returns connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount.Display, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount) GetDisplay() bool {
+	return v.Display
+}
+
+// connectSocialAccountConnectSocialAccountErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type connectSocialAccountConnectSocialAccountErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns connectSocialAccountConnectSocialAccountErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns connectSocialAccountConnectSocialAccountErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// connectSocialAccountConnectSocialAccountErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type connectSocialAccountConnectSocialAccountErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns connectSocialAccountConnectSocialAccountErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountErrNotAuthorized) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns connectSocialAccountConnectSocialAccountErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountConnectSocialAccountErrNotAuthorized) GetMessage() string {
+	return v.Message
+}
+
+// connectSocialAccountResponse is returned by connectSocialAccount on success.
+type connectSocialAccountResponse struct {
+	ConnectSocialAccount *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError `json:"-"`
+}
+
+// GetConnectSocialAccount returns connectSocialAccountResponse.ConnectSocialAccount, and is useful for accessing the field via an interface.
+func (v *connectSocialAccountResponse) GetConnectSocialAccount() *connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError {
+	return v.ConnectSocialAccount
+}
+
+func (v *connectSocialAccountResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*connectSocialAccountResponse
+		ConnectSocialAccount json.RawMessage `json:"connectSocialAccount"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.connectSocialAccountResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.ConnectSocialAccount
+		src := firstPass.ConnectSocialAccount
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(connectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError)
+			err = __unmarshalconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal connectSocialAccountResponse.ConnectSocialAccount: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalconnectSocialAccountResponse struct {
+	ConnectSocialAccount json.RawMessage `json:"connectSocialAccount"`
+}
+
+func (v *connectSocialAccountResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *connectSocialAccountResponse) __premarshalJSON() (*__premarshalconnectSocialAccountResponse, error) {
+	var retval __premarshalconnectSocialAccountResponse
+
+	{
+
+		dst := &retval.ConnectSocialAccount
+		src := v.ConnectSocialAccount
+		if src != nil {
+			var err error
+			*dst, err = __marshalconnectSocialAccountConnectSocialAccountConnectSocialAccountPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal connectSocialAccountResponse.ConnectSocialAccount: %w", err)
 			}
 		}
 	}
@@ -4599,6 +4918,253 @@ func __marshalupdateGalleryMutationUpdateGalleryUpdateGalleryPayloadOrError(v *u
 	}
 }
 
+// updateSocialAccountDisplayedResponse is returned by updateSocialAccountDisplayed on success.
+type updateSocialAccountDisplayedResponse struct {
+	UpdateSocialAccountDisplayed *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError `json:"-"`
+}
+
+// GetUpdateSocialAccountDisplayed returns updateSocialAccountDisplayedResponse.UpdateSocialAccountDisplayed, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedResponse) GetUpdateSocialAccountDisplayed() *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError {
+	return v.UpdateSocialAccountDisplayed
+}
+
+func (v *updateSocialAccountDisplayedResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*updateSocialAccountDisplayedResponse
+		UpdateSocialAccountDisplayed json.RawMessage `json:"updateSocialAccountDisplayed"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.updateSocialAccountDisplayedResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.UpdateSocialAccountDisplayed
+		src := firstPass.UpdateSocialAccountDisplayed
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError)
+			err = __unmarshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal updateSocialAccountDisplayedResponse.UpdateSocialAccountDisplayed: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalupdateSocialAccountDisplayedResponse struct {
+	UpdateSocialAccountDisplayed json.RawMessage `json:"updateSocialAccountDisplayed"`
+}
+
+func (v *updateSocialAccountDisplayedResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *updateSocialAccountDisplayedResponse) __premarshalJSON() (*__premarshalupdateSocialAccountDisplayedResponse, error) {
+	var retval __premarshalupdateSocialAccountDisplayedResponse
+
+	{
+
+		dst := &retval.UpdateSocialAccountDisplayed
+		src := v.UpdateSocialAccountDisplayed
+		if src != nil {
+			var err error
+			*dst, err = __marshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal updateSocialAccountDisplayedResponse.UpdateSocialAccountDisplayed: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized) GetMessage() string {
+	return v.Message
+}
+
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload includes the requested fields of the GraphQL type UpdateSocialAccountDisplayedPayload.
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload struct {
+	Typename *string                                                                                            `json:"__typename"`
+	Viewer   *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewer `json:"viewer"`
+}
+
+// GetTypename returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload.Typename, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetViewer returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload.Viewer, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload) GetViewer() *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewer {
+	return v.Viewer
+}
+
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError includes the requested fields of the GraphQL interface UpdateSocialAccountDisplayedPayloadOrError.
+//
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError is implemented by the following types:
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError interface {
+	implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
+}
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
+}
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
+}
+
+func __unmarshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError(b []byte, v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "UpdateSocialAccountDisplayedPayload":
+		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing UpdateSocialAccountDisplayedPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError(v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload:
+		typename = "UpdateSocialAccountDisplayedPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError: "%T"`, v)
+	}
+}
+
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewer includes the requested fields of the GraphQL type Viewer.
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewer struct {
+	SocialAccounts *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccounts `json:"socialAccounts"`
+}
+
+// GetSocialAccounts returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewer.SocialAccounts, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewer) GetSocialAccounts() *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccounts {
+	return v.SocialAccounts
+}
+
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccounts includes the requested fields of the GraphQL type SocialAccounts.
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccounts struct {
+	Twitter *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount `json:"twitter"`
+}
+
+// GetTwitter returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccounts.Twitter, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccounts) GetTwitter() *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount {
+	return v.Twitter
+}
+
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount includes the requested fields of the GraphQL type TwitterSocialAccount.
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount struct {
+	Username string `json:"username"`
+	Display  bool   `json:"display"`
+}
+
+// GetUsername returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount.Username, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount) GetUsername() string {
+	return v.Username
+}
+
+// GetDisplay returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount.Display, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadViewerSocialAccountsTwitterTwitterSocialAccount) GetDisplay() bool {
+	return v.Display
+}
+
 // updateUserExperienceResponse is returned by updateUserExperience on success.
 type updateUserExperienceResponse struct {
 	UpdateUserExperience *updateUserExperienceUpdateUserExperienceUpdateUserExperiencePayloadOrError `json:"-"`
@@ -5141,9 +5707,10 @@ func (v *userByIdQueryUserByIdErrUserNotFound) GetMessage() string { return v.Me
 
 // userByIdQueryUserByIdGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type userByIdQueryUserByIdGalleryUser struct {
-	Typename *string      `json:"__typename"`
-	Username *string      `json:"username"`
-	Dbid     persist.DBID `json:"dbid"`
+	Typename       *string                                         `json:"__typename"`
+	Username       *string                                         `json:"username"`
+	Dbid           persist.DBID                                    `json:"dbid"`
+	SocialAccounts *userByIdQueryUserByIdGalleryUserSocialAccounts `json:"socialAccounts"`
 }
 
 // GetTypename returns userByIdQueryUserByIdGalleryUser.Typename, and is useful for accessing the field via an interface.
@@ -5154,6 +5721,31 @@ func (v *userByIdQueryUserByIdGalleryUser) GetUsername() *string { return v.User
 
 // GetDbid returns userByIdQueryUserByIdGalleryUser.Dbid, and is useful for accessing the field via an interface.
 func (v *userByIdQueryUserByIdGalleryUser) GetDbid() persist.DBID { return v.Dbid }
+
+// GetSocialAccounts returns userByIdQueryUserByIdGalleryUser.SocialAccounts, and is useful for accessing the field via an interface.
+func (v *userByIdQueryUserByIdGalleryUser) GetSocialAccounts() *userByIdQueryUserByIdGalleryUserSocialAccounts {
+	return v.SocialAccounts
+}
+
+// userByIdQueryUserByIdGalleryUserSocialAccounts includes the requested fields of the GraphQL type SocialAccounts.
+type userByIdQueryUserByIdGalleryUserSocialAccounts struct {
+	Twitter *userByIdQueryUserByIdGalleryUserSocialAccountsTwitterTwitterSocialAccount `json:"twitter"`
+}
+
+// GetTwitter returns userByIdQueryUserByIdGalleryUserSocialAccounts.Twitter, and is useful for accessing the field via an interface.
+func (v *userByIdQueryUserByIdGalleryUserSocialAccounts) GetTwitter() *userByIdQueryUserByIdGalleryUserSocialAccountsTwitterTwitterSocialAccount {
+	return v.Twitter
+}
+
+// userByIdQueryUserByIdGalleryUserSocialAccountsTwitterTwitterSocialAccount includes the requested fields of the GraphQL type TwitterSocialAccount.
+type userByIdQueryUserByIdGalleryUserSocialAccountsTwitterTwitterSocialAccount struct {
+	Username string `json:"username"`
+}
+
+// GetUsername returns userByIdQueryUserByIdGalleryUserSocialAccountsTwitterTwitterSocialAccount.Username, and is useful for accessing the field via an interface.
+func (v *userByIdQueryUserByIdGalleryUserSocialAccountsTwitterTwitterSocialAccount) GetUsername() string {
+	return v.Username
+}
 
 // userByIdQueryUserByIdUserByIdOrError includes the requested fields of the GraphQL interface UserByIdOrError.
 //
@@ -5750,14 +6342,10 @@ func (v *viewerQueryViewerUserExperiencesUserExperience) GetExperienced() bool {
 
 // viewerQueryViewerUserGalleryUser includes the requested fields of the GraphQL type GalleryUser.
 type viewerQueryViewerUserGalleryUser struct {
-	Feed     *viewerQueryViewerUserGalleryUserFeedFeedConnection `json:"feed"`
-	Username *string                                             `json:"username"`
-	Dbid     persist.DBID                                        `json:"dbid"`
-}
-
-// GetFeed returns viewerQueryViewerUserGalleryUser.Feed, and is useful for accessing the field via an interface.
-func (v *viewerQueryViewerUserGalleryUser) GetFeed() *viewerQueryViewerUserGalleryUserFeedFeedConnection {
-	return v.Feed
+	Username       *string                                             `json:"username"`
+	Dbid           persist.DBID                                        `json:"dbid"`
+	SocialAccounts *viewerQueryViewerUserGalleryUserSocialAccounts     `json:"socialAccounts"`
+	Feed           *viewerQueryViewerUserGalleryUserFeedFeedConnection `json:"feed"`
 }
 
 // GetUsername returns viewerQueryViewerUserGalleryUser.Username, and is useful for accessing the field via an interface.
@@ -5765,6 +6353,16 @@ func (v *viewerQueryViewerUserGalleryUser) GetUsername() *string { return v.User
 
 // GetDbid returns viewerQueryViewerUserGalleryUser.Dbid, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerUserGalleryUser) GetDbid() persist.DBID { return v.Dbid }
+
+// GetSocialAccounts returns viewerQueryViewerUserGalleryUser.SocialAccounts, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUser) GetSocialAccounts() *viewerQueryViewerUserGalleryUserSocialAccounts {
+	return v.SocialAccounts
+}
+
+// GetFeed returns viewerQueryViewerUserGalleryUser.Feed, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUser) GetFeed() *viewerQueryViewerUserGalleryUserFeedFeedConnection {
+	return v.Feed
+}
 
 // viewerQueryViewerUserGalleryUserFeedFeedConnection includes the requested fields of the GraphQL type FeedConnection.
 type viewerQueryViewerUserGalleryUserFeedFeedConnection struct {
@@ -6879,6 +7477,26 @@ func __marshalviewerQueryViewerUserGalleryUserFeedFeedConnectionEdgesFeedEdgeNod
 	}
 }
 
+// viewerQueryViewerUserGalleryUserSocialAccounts includes the requested fields of the GraphQL type SocialAccounts.
+type viewerQueryViewerUserGalleryUserSocialAccounts struct {
+	Twitter *viewerQueryViewerUserGalleryUserSocialAccountsTwitterTwitterSocialAccount `json:"twitter"`
+}
+
+// GetTwitter returns viewerQueryViewerUserGalleryUserSocialAccounts.Twitter, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserSocialAccounts) GetTwitter() *viewerQueryViewerUserGalleryUserSocialAccountsTwitterTwitterSocialAccount {
+	return v.Twitter
+}
+
+// viewerQueryViewerUserGalleryUserSocialAccountsTwitterTwitterSocialAccount includes the requested fields of the GraphQL type TwitterSocialAccount.
+type viewerQueryViewerUserGalleryUserSocialAccountsTwitterTwitterSocialAccount struct {
+	Username string `json:"username"`
+}
+
+// GetUsername returns viewerQueryViewerUserGalleryUserSocialAccountsTwitterTwitterSocialAccount.Username, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerUserGalleryUserSocialAccountsTwitterTwitterSocialAccount) GetUsername() string {
+	return v.Username
+}
+
 // viewerQueryViewerViewerOrError includes the requested fields of the GraphQL interface ViewerOrError.
 //
 // viewerQueryViewerViewerOrError is implemented by the following types:
@@ -7075,6 +7693,54 @@ mutation commentOnFeedEventMutation ($feedEventId: DBID!, $comment: String!) {
 	var err error
 
 	var data commentOnFeedEventMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+func connectSocialAccount(
+	ctx context.Context,
+	client graphql.Client,
+	auth SocialAuthMechanism,
+	display bool,
+) (*connectSocialAccountResponse, error) {
+	req := &graphql.Request{
+		OpName: "connectSocialAccount",
+		Query: `
+mutation connectSocialAccount ($auth: SocialAuthMechanism!, $display: Boolean!) {
+	connectSocialAccount(input: $auth, display: $display) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on ConnectSocialAccountPayload {
+			viewer {
+				socialAccounts {
+					twitter {
+						username
+						display
+					}
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__connectSocialAccountInput{
+			Auth:    auth,
+			Display: display,
+		},
+	}
+	var err error
+
+	var data connectSocialAccountResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(
@@ -7702,6 +8368,52 @@ mutation updateGalleryMutation ($input: UpdateGalleryInput!) {
 	return &data, err
 }
 
+func updateSocialAccountDisplayed(
+	ctx context.Context,
+	client graphql.Client,
+	input UpdateSocialAccountDisplayedInput,
+) (*updateSocialAccountDisplayedResponse, error) {
+	req := &graphql.Request{
+		OpName: "updateSocialAccountDisplayed",
+		Query: `
+mutation updateSocialAccountDisplayed ($input: UpdateSocialAccountDisplayedInput!) {
+	updateSocialAccountDisplayed(input: $input) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on UpdateSocialAccountDisplayedPayload {
+			viewer {
+				socialAccounts {
+					twitter {
+						username
+						display
+					}
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__updateSocialAccountDisplayedInput{
+			Input: input,
+		},
+	}
+	var err error
+
+	var data updateSocialAccountDisplayedResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
 func updateUserExperience(
 	ctx context.Context,
 	client graphql.Client,
@@ -7804,6 +8516,11 @@ query userByIdQuery ($id: DBID!) {
 		... on GalleryUser {
 			username
 			dbid
+			socialAccounts {
+				twitter {
+					username
+				}
+			}
 		}
 	}
 }
@@ -7927,6 +8644,13 @@ query viewerQuery {
 				experienced
 			}
 			user {
+				username
+				dbid
+				socialAccounts {
+					twitter {
+						username
+					}
+				}
 				feed(first: 10) {
 					edges {
 						node {
@@ -7971,8 +8695,6 @@ query viewerQuery {
 						}
 					}
 				}
-				username
-				dbid
 			}
 		}
 	}

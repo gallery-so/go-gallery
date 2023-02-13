@@ -254,6 +254,10 @@ type ComplexityRoot struct {
 		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 	}
 
+	ConnectSocialAccountPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	Contract struct {
 		BadgeURL         func(childComplexity int) int
 		Chain            func(childComplexity int) int
@@ -503,6 +507,7 @@ type ComplexityRoot struct {
 		IsAuthenticatedUser func(childComplexity int) int
 		PrimaryWallet       func(childComplexity int) int
 		Roles               func(childComplexity int) int
+		SocialAccounts      func(childComplexity int) int
 		Tokens              func(childComplexity int) int
 		TokensByChain       func(childComplexity int, chain persist.Chain) int
 		Traits              func(childComplexity int) int
@@ -608,6 +613,7 @@ type ComplexityRoot struct {
 		BanUserFromFeed                 func(childComplexity int, username string, action string) int
 		ClearAllNotifications           func(childComplexity int) int
 		CommentOnFeedEvent              func(childComplexity int, feedEventID persist.DBID, replyToID *persist.DBID, comment string) int
+		ConnectSocialAccount            func(childComplexity int, input model.SocialAuthMechanism, display bool) int
 		CreateCollection                func(childComplexity int, input model.CreateCollectionInput) int
 		CreateGallery                   func(childComplexity int, input model.CreateGalleryInput) int
 		CreateUser                      func(childComplexity int, authMechanism model.AuthMechanism, input model.CreateUserInput) int
@@ -649,6 +655,7 @@ type ComplexityRoot struct {
 		UpdateGalleryOrder              func(childComplexity int, input model.UpdateGalleryOrderInput) int
 		UpdateNotificationSettings      func(childComplexity int, settings *model.NotificationSettingsInput) int
 		UpdatePrimaryWallet             func(childComplexity int, walletID persist.DBID) int
+		UpdateSocialAccountDisplayed    func(childComplexity int, input model.UpdateSocialAccountDisplayedInput) int
 		UpdateTokenInfo                 func(childComplexity int, input model.UpdateTokenInfoInput) int
 		UpdateUserExperience            func(childComplexity int, input model.UpdateUserExperienceInput) int
 		UpdateUserInfo                  func(childComplexity int, input model.UpdateUserInfoInput) int
@@ -776,6 +783,10 @@ type ComplexityRoot struct {
 
 	SetSpamPreferencePayload struct {
 		Tokens func(childComplexity int) int
+	}
+
+	SocialAccounts struct {
+		Twitter func(childComplexity int) int
 	}
 
 	SomeoneAdmiredYourFeedEventNotification struct {
@@ -925,6 +936,15 @@ type ComplexityRoot struct {
 		Users func(childComplexity int) int
 	}
 
+	TwitterSocialAccount struct {
+		Display         func(childComplexity int) int
+		Name            func(childComplexity int) int
+		ProfileImageURL func(childComplexity int) int
+		SocialID        func(childComplexity int) int
+		Type            func(childComplexity int) int
+		Username        func(childComplexity int) int
+	}
+
 	UnfollowUserPayload struct {
 		User   func(childComplexity int) int
 		Viewer func(childComplexity int) int
@@ -987,6 +1007,10 @@ type ComplexityRoot struct {
 	}
 
 	UpdatePrimaryWalletPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
+	UpdateSocialAccountDisplayedPayload struct {
 		Viewer func(childComplexity int) int
 	}
 
@@ -1068,6 +1092,7 @@ type ComplexityRoot struct {
 		ID                   func(childComplexity int) int
 		NotificationSettings func(childComplexity int) int
 		Notifications        func(childComplexity int, before *string, after *string, first *int, last *int) int
+		SocialAccounts       func(childComplexity int) int
 		User                 func(childComplexity int) int
 		UserExperiences      func(childComplexity int) int
 		ViewerGalleries      func(childComplexity int) int
@@ -1174,6 +1199,7 @@ type GalleryUpdatedFeedEventDataResolver interface {
 }
 type GalleryUserResolver interface {
 	Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error)
+	SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error)
 	Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error)
 	TokensByChain(ctx context.Context, obj *model.GalleryUser, chain persist.Chain) (*model.ChainTokens, error)
 	Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error)
@@ -1211,6 +1237,8 @@ type MutationResolver interface {
 	UnsubscribeFromEmailType(ctx context.Context, input model.UnsubscribeFromEmailTypeInput) (model.UnsubscribeFromEmailTypePayloadOrError, error)
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
+	ConnectSocialAccount(ctx context.Context, input model.SocialAuthMechanism, display bool) (model.ConnectSocialAccountPayloadOrError, error)
+	UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
 	AdmireFeedEvent(ctx context.Context, feedEventID persist.DBID) (model.AdmireFeedEventPayloadOrError, error)
@@ -1331,6 +1359,7 @@ type UserFollowedUsersFeedEventDataResolver interface {
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error)
+	SocialAccounts(ctx context.Context, obj *model.Viewer) (*model.SocialAccounts, error)
 	ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error)
 	Feed(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.FeedConnection, error)
 	Email(ctx context.Context, obj *model.Viewer) (*model.UserEmail, error)
@@ -2017,6 +2046,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Community.TokensInCommunity(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool)), true
+
+	case "ConnectSocialAccountPayload.viewer":
+		if e.complexity.ConnectSocialAccountPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.ConnectSocialAccountPayload.Viewer(childComplexity), true
 
 	case "Contract.badgeURL":
 		if e.complexity.Contract.BadgeURL == nil {
@@ -2850,6 +2886,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GalleryUser.Roles(childComplexity), true
 
+	case "GalleryUser.socialAccounts":
+		if e.complexity.GalleryUser.SocialAccounts == nil {
+			break
+		}
+
+		return e.complexity.GalleryUser.SocialAccounts(childComplexity), true
+
 	case "GalleryUser.tokens":
 		if e.complexity.GalleryUser.Tokens == nil {
 			break
@@ -3283,6 +3326,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CommentOnFeedEvent(childComplexity, args["feedEventId"].(persist.DBID), args["replyToID"].(*persist.DBID), args["comment"].(string)), true
+
+	case "Mutation.connectSocialAccount":
+		if e.complexity.Mutation.ConnectSocialAccount == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_connectSocialAccount_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ConnectSocialAccount(childComplexity, args["input"].(model.SocialAuthMechanism), args["display"].(bool)), true
 
 	case "Mutation.createCollection":
 		if e.complexity.Mutation.CreateCollection == nil {
@@ -3765,6 +3820,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdatePrimaryWallet(childComplexity, args["walletID"].(persist.DBID)), true
+
+	case "Mutation.updateSocialAccountDisplayed":
+		if e.complexity.Mutation.UpdateSocialAccountDisplayed == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateSocialAccountDisplayed_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateSocialAccountDisplayed(childComplexity, args["input"].(model.UpdateSocialAccountDisplayedInput)), true
 
 	case "Mutation.updateTokenInfo":
 		if e.complexity.Mutation.UpdateTokenInfo == nil {
@@ -4380,6 +4447,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SetSpamPreferencePayload.Tokens(childComplexity), true
+
+	case "SocialAccounts.twitter":
+		if e.complexity.SocialAccounts.Twitter == nil {
+			break
+		}
+
+		return e.complexity.SocialAccounts.Twitter(childComplexity), true
 
 	case "SomeoneAdmiredYourFeedEventNotification.admirers":
 		if e.complexity.SomeoneAdmiredYourFeedEventNotification.Admirers == nil {
@@ -5052,6 +5126,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TrendingUsersPayload.Users(childComplexity), true
 
+	case "TwitterSocialAccount.display":
+		if e.complexity.TwitterSocialAccount.Display == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.Display(childComplexity), true
+
+	case "TwitterSocialAccount.name":
+		if e.complexity.TwitterSocialAccount.Name == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.Name(childComplexity), true
+
+	case "TwitterSocialAccount.profileImageURL":
+		if e.complexity.TwitterSocialAccount.ProfileImageURL == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.ProfileImageURL(childComplexity), true
+
+	case "TwitterSocialAccount.social_id":
+		if e.complexity.TwitterSocialAccount.SocialID == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.SocialID(childComplexity), true
+
+	case "TwitterSocialAccount.type":
+		if e.complexity.TwitterSocialAccount.Type == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.Type(childComplexity), true
+
+	case "TwitterSocialAccount.username":
+		if e.complexity.TwitterSocialAccount.Username == nil {
+			break
+		}
+
+		return e.complexity.TwitterSocialAccount.Username(childComplexity), true
+
 	case "UnfollowUserPayload.user":
 		if e.complexity.UnfollowUserPayload.User == nil {
 			break
@@ -5191,6 +5307,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.UpdatePrimaryWalletPayload.Viewer(childComplexity), true
+
+	case "UpdateSocialAccountDisplayedPayload.viewer":
+		if e.complexity.UpdateSocialAccountDisplayedPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.UpdateSocialAccountDisplayedPayload.Viewer(childComplexity), true
 
 	case "UpdateTokenInfoPayload.token":
 		if e.complexity.UpdateTokenInfoPayload.Token == nil {
@@ -5447,6 +5570,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Viewer.Notifications(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Viewer.socialAccounts":
+		if e.complexity.Viewer.SocialAccounts == nil {
+			break
+		}
+
+		return e.complexity.Viewer.SocialAccounts(childComplexity), true
+
 	case "Viewer.user":
 		if e.complexity.Viewer.User == nil {
 			break
@@ -5669,6 +5799,7 @@ type GalleryUser implements Node @goEmbedHelper {
   traits: String
   universal: Boolean
   roles: [Role] @goField(forceResolver: true)
+  socialAccounts: SocialAccounts @goField(forceResolver: true)
 
   # Returns all tokens owned by this user. Useful for retrieving all tokens without any duplicates,
   # as opposed to retrieving user -> wallets -> tokens, which would contain duplicates for any token
@@ -6081,9 +6212,33 @@ type NotificationsConnection @goEmbedHelper {
   pageInfo: PageInfo
 }
 
+enum SocialAccountType {
+  Twitter
+}
+
+interface SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  display: Boolean!
+}
+
+type SocialAccounts {
+  twitter: TwitterSocialAccount
+}
+
+type TwitterSocialAccount implements SocialAccount {
+  type: SocialAccountType!
+  social_id: String!
+  name: String!
+  username: String!
+  profileImageURL: String!
+  display: Boolean!
+}
+
 type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   id: ID!
   user: GalleryUser @goField(forceResolver: true)
+  socialAccounts: SocialAccounts @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
     @goField(forceResolver: true)
@@ -6782,6 +6937,21 @@ input MagicLinkAuth {
   token: String!
 }
 
+input SocialAuthMechanism {
+  twitter: TwitterAuth
+  debug: DebugSocialAuth
+}
+
+input TwitterAuth {
+  code: String!
+}
+
+input DebugSocialAuth {
+  provider: SocialAccountType!
+  id: String!
+  username: String!
+}
+
 input DeepRefreshInput {
   chain: Chain!
 }
@@ -7307,6 +7477,29 @@ union MoveCollectionToGalleryPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
+type ConnectSocialAccountPayload {
+  viewer: Viewer
+}
+
+union ConnectSocialAccountPayloadOrError =
+    ConnectSocialAccountPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
+input UpdateSocialAccountDisplayedInput {
+  type: SocialAccountType!
+  displayed: Boolean!
+}
+
+type UpdateSocialAccountDisplayedPayload {
+  viewer: Viewer
+}
+
+union UpdateSocialAccountDisplayedPayloadOrError =
+    UpdateSocialAccountDisplayedPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 input MintPremiumCardToWalletInput {
   tokenId: String!
   walletAddresses: [Address!]
@@ -7320,7 +7513,6 @@ union MintPremiumCardToWalletPayloadOrError =
     MintPremiumCardToWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-
 
 type Mutation {
   # User Mutations
@@ -7371,6 +7563,14 @@ type Mutation {
   login(authMechanism: AuthMechanism!): LoginPayloadOrError
   logout: LogoutPayload
 
+  connectSocialAccount(
+    input: SocialAuthMechanism!
+    display: Boolean! = true
+  ): ConnectSocialAccountPayloadOrError @authRequired
+  updateSocialAccountDisplayed(
+    input: UpdateSocialAccountDisplayedInput!
+  ): UpdateSocialAccountDisplayedPayloadOrError @authRequired
+
   followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 
@@ -7414,7 +7614,9 @@ type Mutation {
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
     @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
-  mintPremiumCardToWallet(input: MintPremiumCardToWalletInput!): MintPremiumCardToWalletPayloadOrError @retoolAuth
+  mintPremiumCardToWallet(
+    input: MintPremiumCardToWalletInput!
+  ): MintPremiumCardToWalletPayloadOrError @retoolAuth
 
   # Gallery Frontend Deploy Persisted Queries
   uploadPersistedQueries(input: UploadPersistedQueriesInput): UploadPersistedQueriesPayloadOrError
@@ -7898,6 +8100,30 @@ func (ec *executionContext) field_Mutation_commentOnFeedEvent_args(ctx context.C
 		}
 	}
 	args["comment"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_connectSocialAccount_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.SocialAuthMechanism
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNSocialAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialAuthMechanism(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	var arg1 bool
+	if tmp, ok := rawArgs["display"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("display"))
+		arg1, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["display"] = arg1
 	return args, nil
 }
 
@@ -8510,6 +8736,21 @@ func (ec *executionContext) field_Mutation_updatePrimaryWallet_args(ctx context.
 		}
 	}
 	args["walletID"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateSocialAccountDisplayed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UpdateSocialAccountDisplayedInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUpdateSocialAccountDisplayedInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateSocialAccountDisplayedInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -12264,6 +12505,38 @@ func (ec *executionContext) _Community_owners(ctx context.Context, field graphql
 	return ec.marshalOTokenHoldersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTokenHoldersConnection(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ConnectSocialAccountPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.ConnectSocialAccountPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ConnectSocialAccountPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Contract_id(ctx context.Context, field graphql.CollectedField, obj *model.Contract) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -15954,6 +16227,38 @@ func (ec *executionContext) _GalleryUser_roles(ctx context.Context, field graphq
 	return ec.marshalORole2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐRole(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _GalleryUser_socialAccounts(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "GalleryUser",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.GalleryUser().SocialAccounts(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.SocialAccounts)
+	fc.Result = res
+	return ec.marshalOSocialAccounts2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialAccounts(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _GalleryUser_tokens(ctx context.Context, field graphql.CollectedField, obj *model.GalleryUser) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -18992,6 +19297,124 @@ func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.
 	res := resTmp.(*model.LogoutPayload)
 	fc.Result = res
 	return ec.marshalOLogoutPayload2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐLogoutPayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_connectSocialAccount(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_connectSocialAccount_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ConnectSocialAccount(rctx, args["input"].(model.SocialAuthMechanism), args["display"].(bool))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.ConnectSocialAccountPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.ConnectSocialAccountPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.ConnectSocialAccountPayloadOrError)
+	fc.Result = res
+	return ec.marshalOConnectSocialAccountPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConnectSocialAccountPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Mutation_updateSocialAccountDisplayed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_updateSocialAccountDisplayed_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateSocialAccountDisplayed(rctx, args["input"].(model.UpdateSocialAccountDisplayedInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.UpdateSocialAccountDisplayedPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.UpdateSocialAccountDisplayedPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateSocialAccountDisplayedPayloadOrError)
+	fc.Result = res
+	return ec.marshalOUpdateSocialAccountDisplayedPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateSocialAccountDisplayedPayloadOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_followUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -22990,6 +23413,38 @@ func (ec *executionContext) _SetSpamPreferencePayload_tokens(ctx context.Context
 	return ec.marshalOToken2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐToken(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _SocialAccounts_twitter(ctx context.Context, field graphql.CollectedField, obj *model.SocialAccounts) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "SocialAccounts",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Twitter, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TwitterSocialAccount)
+	fc.Result = res
+	return ec.marshalOTwitterSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTwitterSocialAccount(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification_id(ctx context.Context, field graphql.CollectedField, obj *model.SomeoneAdmiredYourFeedEventNotification) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -26059,6 +26514,216 @@ func (ec *executionContext) _TrendingUsersPayload_users(ctx context.Context, fie
 	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserᚄ(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TwitterSocialAccount_type(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Type, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.SocialProvider)
+	fc.Result = res
+	return ec.marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TwitterSocialAccount_social_id(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SocialID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TwitterSocialAccount_name(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TwitterSocialAccount_username(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Username, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TwitterSocialAccount_profileImageURL(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProfileImageURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TwitterSocialAccount_display(ctx context.Context, field graphql.CollectedField, obj *model.TwitterSocialAccount) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TwitterSocialAccount",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Display, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _UnfollowUserPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UnfollowUserPayload) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -26676,6 +27341,38 @@ func (ec *executionContext) _UpdatePrimaryWalletPayload_viewer(ctx context.Conte
 	}()
 	fc := &graphql.FieldContext{
 		Object:     "UpdatePrimaryWalletPayload",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _UpdateSocialAccountDisplayedPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.UpdateSocialAccountDisplayedPayload) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "UpdateSocialAccountDisplayedPayload",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -27736,6 +28433,38 @@ func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.Coll
 	res := resTmp.(*model.GalleryUser)
 	fc.Result = res
 	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Viewer_socialAccounts(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Viewer().SocialAccounts(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.SocialAccounts)
+	fc.Result = res
+	return ec.marshalOSocialAccounts2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialAccounts(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Viewer_viewerGalleries(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
@@ -29982,6 +30711,45 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputDebugSocialAuth(ctx context.Context, obj interface{}) (model.DebugSocialAuth, error) {
+	var it model.DebugSocialAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "provider":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("provider"))
+			it.Provider, err = ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "id":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			it.ID, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "username":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+			it.Username, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputDeepRefreshInput(ctx context.Context, obj interface{}) (model.DeepRefreshInput, error) {
 	var it model.DeepRefreshInput
 	asMap := map[string]interface{}{}
@@ -30378,6 +31146,37 @@ func (ec *executionContext) unmarshalInputSetSpamPreferenceInput(ctx context.Con
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputSocialAuthMechanism(ctx context.Context, obj interface{}) (model.SocialAuthMechanism, error) {
+	var it model.SocialAuthMechanism
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "twitter":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("twitter"))
+			it.Twitter, err = ec.unmarshalOTwitterAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTwitterAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "debug":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debug"))
+			it.Debug, err = ec.unmarshalODebugSocialAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugSocialAuth(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputTrendingUsersInput(ctx context.Context, obj interface{}) (model.TrendingUsersInput, error) {
 	var it model.TrendingUsersInput
 	asMap := map[string]interface{}{}
@@ -30392,6 +31191,29 @@ func (ec *executionContext) unmarshalInputTrendingUsersInput(ctx context.Context
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("report"))
 			it.Report, err = ec.unmarshalNReportWindow2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐWindow(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTwitterAuth(ctx context.Context, obj interface{}) (model.TwitterAuth, error) {
+	var it model.TwitterAuth
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "code":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("code"))
+			it.Code, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -30893,6 +31715,37 @@ func (ec *executionContext) unmarshalInputUpdateGalleryOrderInput(ctx context.Co
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUpdateSocialAccountDisplayedInput(ctx context.Context, obj interface{}) (model.UpdateSocialAccountDisplayedInput, error) {
+	var it model.UpdateSocialAccountDisplayedInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	for k, v := range asMap {
+		switch k {
+		case "type":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			it.Type, err = ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "displayed":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("displayed"))
+			it.Displayed, err = ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateTokenInfoInput(ctx context.Context, obj interface{}) (model.UpdateTokenInfoInput, error) {
 	var it model.UpdateTokenInfoInput
 	asMap := map[string]interface{}{}
@@ -31367,6 +32220,36 @@ func (ec *executionContext) _CommunityByAddressOrError(ctx context.Context, sel 
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _ConnectSocialAccountPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.ConnectSocialAccountPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.ConnectSocialAccountPayload:
+		return ec._ConnectSocialAccountPayload(ctx, sel, &obj)
+	case *model.ConnectSocialAccountPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ConnectSocialAccountPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -32908,6 +33791,22 @@ func (ec *executionContext) _SetSpamPreferencePayloadOrError(ctx context.Context
 	}
 }
 
+func (ec *executionContext) _SocialAccount(ctx context.Context, sel ast.SelectionSet, obj model.SocialAccount) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.TwitterSocialAccount:
+		return ec._TwitterSocialAccount(ctx, sel, &obj)
+	case *model.TwitterSocialAccount:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._TwitterSocialAccount(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _SyncTokensForUsernamePayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.SyncTokensForUsernamePayloadOrError) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -33394,6 +34293,36 @@ func (ec *executionContext) _UpdatePrimaryWalletPayloadOrError(ctx context.Conte
 			return graphql.Null
 		}
 		return ec._UpdatePrimaryWalletPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _UpdateSocialAccountDisplayedPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.UpdateSocialAccountDisplayedPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.UpdateSocialAccountDisplayedPayload:
+		return ec._UpdateSocialAccountDisplayedPayload(ctx, sel, &obj)
+	case *model.UpdateSocialAccountDisplayedPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._UpdateSocialAccountDisplayedPayload(ctx, sel, obj)
 	case model.ErrInvalidInput:
 		return ec._ErrInvalidInput(ctx, sel, &obj)
 	case *model.ErrInvalidInput:
@@ -35140,6 +36069,34 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var connectSocialAccountPayloadImplementors = []string{"ConnectSocialAccountPayload", "ConnectSocialAccountPayloadOrError"}
+
+func (ec *executionContext) _ConnectSocialAccountPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ConnectSocialAccountPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, connectSocialAccountPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConnectSocialAccountPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._ConnectSocialAccountPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var contractImplementors = []string{"Contract", "Node"}
 
 func (ec *executionContext) _Contract(ctx context.Context, sel ast.SelectionSet, obj *model.Contract) graphql.Marshaler {
@@ -35835,7 +36792,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "MintPremiumCardToWalletPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -35948,7 +36905,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "MintPremiumCardToWalletPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -37138,6 +38095,23 @@ func (ec *executionContext) _GalleryUser(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
+		case "socialAccounts":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._GalleryUser_socialAccounts(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "tokens":
 			field := field
 
@@ -38156,6 +39130,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "logout":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_logout(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "connectSocialAccount":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_connectSocialAccount(ctx, field)
+			}
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
+
+		case "updateSocialAccountDisplayed":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateSocialAccountDisplayed(ctx, field)
 			}
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, innerFunc)
@@ -39598,6 +40586,34 @@ func (ec *executionContext) _SetSpamPreferencePayload(ctx context.Context, sel a
 	return out
 }
 
+var socialAccountsImplementors = []string{"SocialAccounts"}
+
+func (ec *executionContext) _SocialAccounts(ctx context.Context, sel ast.SelectionSet, obj *model.SocialAccounts) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, socialAccountsImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SocialAccounts")
+		case "twitter":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._SocialAccounts_twitter(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var someoneAdmiredYourFeedEventNotificationImplementors = []string{"SomeoneAdmiredYourFeedEventNotification", "Notification", "Node", "GroupedNotification"}
 
 func (ec *executionContext) _SomeoneAdmiredYourFeedEventNotification(ctx context.Context, sel ast.SelectionSet, obj *model.SomeoneAdmiredYourFeedEventNotification) graphql.Marshaler {
@@ -40819,6 +41835,87 @@ func (ec *executionContext) _TrendingUsersPayload(ctx context.Context, sel ast.S
 	return out
 }
 
+var twitterSocialAccountImplementors = []string{"TwitterSocialAccount", "SocialAccount"}
+
+func (ec *executionContext) _TwitterSocialAccount(ctx context.Context, sel ast.SelectionSet, obj *model.TwitterSocialAccount) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, twitterSocialAccountImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TwitterSocialAccount")
+		case "type":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TwitterSocialAccount_type(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "social_id":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TwitterSocialAccount_social_id(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "name":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TwitterSocialAccount_name(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "username":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TwitterSocialAccount_username(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "profileImageURL":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TwitterSocialAccount_profileImageURL(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "display":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._TwitterSocialAccount_display(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var unfollowUserPayloadImplementors = []string{"UnfollowUserPayload", "UnfollowUserPayloadOrError"}
 
 func (ec *executionContext) _UnfollowUserPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UnfollowUserPayload) graphql.Marshaler {
@@ -41279,6 +42376,34 @@ func (ec *executionContext) _UpdatePrimaryWalletPayload(ctx context.Context, sel
 		case "viewer":
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._UpdatePrimaryWalletPayload_viewer(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var updateSocialAccountDisplayedPayloadImplementors = []string{"UpdateSocialAccountDisplayedPayload", "UpdateSocialAccountDisplayedPayloadOrError"}
+
+func (ec *executionContext) _UpdateSocialAccountDisplayedPayload(ctx context.Context, sel ast.SelectionSet, obj *model.UpdateSocialAccountDisplayedPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, updateSocialAccountDisplayedPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UpdateSocialAccountDisplayedPayload")
+		case "viewer":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._UpdateSocialAccountDisplayedPayload_viewer(ctx, field, obj)
 			}
 
 			out.Values[i] = innerFunc(ctx)
@@ -41860,6 +42985,23 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Viewer_user(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "socialAccounts":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_socialAccounts(ctx, field, obj)
 				return res
 			}
 
@@ -43016,6 +44158,27 @@ func (ec *executionContext) unmarshalNSetSpamPreferenceInput2githubᚗcomᚋmike
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx context.Context, v interface{}) (persist.SocialProvider, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := persist.SocialProvider(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx context.Context, sel ast.SelectionSet, v persist.SocialProvider) graphql.Marshaler {
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNSocialAuthMechanism2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialAuthMechanism(ctx context.Context, v interface{}) (model.SocialAuthMechanism, error) {
+	res, err := ec.unmarshalInputSocialAuthMechanism(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -43120,6 +44283,11 @@ func (ec *executionContext) unmarshalNUpdateGalleryInput2githubᚗcomᚋmikeydub
 
 func (ec *executionContext) unmarshalNUpdateGalleryOrderInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateGalleryOrderInput(ctx context.Context, v interface{}) (model.UpdateGalleryOrderInput, error) {
 	res, err := ec.unmarshalInputUpdateGalleryOrderInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateSocialAccountDisplayedInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateSocialAccountDisplayedInput(ctx context.Context, v interface{}) (model.UpdateSocialAccountDisplayedInput, error) {
+	res, err := ec.unmarshalInputUpdateSocialAccountDisplayedInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -44023,6 +45191,13 @@ func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmik
 	return ec._CommunityByAddressOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOConnectSocialAccountPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConnectSocialAccountPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ConnectSocialAccountPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ConnectSocialAccountPayloadOrError(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOContract2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐContract(ctx context.Context, sel ast.SelectionSet, v *model.Contract) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -44139,6 +45314,14 @@ func (ec *executionContext) unmarshalODebugAuth2ᚖgithubᚗcomᚋmikeydubᚋgo�
 		return nil, nil
 	}
 	res, err := ec.unmarshalInputDebugAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalODebugSocialAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDebugSocialAuth(ctx context.Context, v interface{}) (*model.DebugSocialAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputDebugSocialAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -45518,6 +46701,13 @@ func (ec *executionContext) marshalOSetSpamPreferencePayloadOrError2githubᚗcom
 	return ec._SetSpamPreferencePayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOSocialAccounts2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialAccounts(ctx context.Context, sel ast.SelectionSet, v *model.SocialAccounts) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SocialAccounts(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalOString2ᚕᚖstring(ctx context.Context, v interface{}) ([]*string, error) {
 	if v == nil {
 		return nil, nil
@@ -45832,6 +47022,21 @@ func (ec *executionContext) marshalOTrendingUsersPayloadOrError2githubᚗcomᚋm
 	return ec._TrendingUsersPayloadOrError(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalOTwitterAuth2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTwitterAuth(ctx context.Context, v interface{}) (*model.TwitterAuth, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputTwitterAuth(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOTwitterSocialAccount2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐTwitterSocialAccount(ctx context.Context, sel ast.SelectionSet, v *model.TwitterSocialAccount) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TwitterSocialAccount(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOUnfollowUserPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUnfollowUserPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UnfollowUserPayloadOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -45956,6 +47161,13 @@ func (ec *executionContext) marshalOUpdatePrimaryWalletPayloadOrError2githubᚗc
 		return graphql.Null
 	}
 	return ec._UpdatePrimaryWalletPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUpdateSocialAccountDisplayedPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateSocialAccountDisplayedPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateSocialAccountDisplayedPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UpdateSocialAccountDisplayedPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUpdateTokenInfoPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUpdateTokenInfoPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.UpdateTokenInfoPayloadOrError) graphql.Marshaler {

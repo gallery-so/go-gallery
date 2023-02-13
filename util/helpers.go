@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgtype"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/spf13/viper"
 	"go.mozilla.org/sops/v3/decrypt"
@@ -536,4 +537,16 @@ func TruncateWithEllipsis(s string, length int) string {
 
 func IsNullOrEmpty(s sql.NullString) bool {
 	return !s.Valid || s.String == ""
+}
+
+func ToNullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: true}
+}
+
+func ToPGJSONB[T any](v T) (pgtype.JSONB, error) {
+	marshalled, err := json.Marshal(v)
+	if err != nil {
+		return pgtype.JSONB{}, err
+	}
+	return pgtype.JSONB{Bytes: marshalled, Status: pgtype.Present}, nil
 }

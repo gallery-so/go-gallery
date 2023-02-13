@@ -329,6 +329,10 @@ func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser)
 	return roles, nil
 }
 
+func (r *galleryUserResolver) SocialAccounts(ctx context.Context, obj *model.GalleryUser) (*model.SocialAccounts, error) {
+	return resolveUserSocialsByUserID(ctx, obj.Dbid)
+}
+
 func (r *galleryUserResolver) Tokens(ctx context.Context, obj *model.GalleryUser) ([]*model.Token, error) {
 	return resolveTokensByUserID(ctx, obj.Dbid)
 }
@@ -844,6 +848,35 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 	publicapi.For(ctx).Auth.Logout(ctx)
 
 	output := &model.LogoutPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) ConnectSocialAccount(ctx context.Context, input model.SocialAuthMechanism, display bool) (model.ConnectSocialAccountPayloadOrError, error) {
+	authenticator, err := r.socialAuthMechanismToAuthenticator(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	err = publicapi.For(ctx).User.AddSocialAccountToUser(ctx, authenticator, display)
+	if err != nil {
+		return nil, err
+	}
+	output := &model.ConnectSocialAccountPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
+func (r *mutationResolver) UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateUserSocialDisplayed(ctx, input.Type, input.Displayed)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.UpdateSocialAccountDisplayedPayload{
 		Viewer: resolveViewer(ctx),
 	}
 
@@ -1640,6 +1673,10 @@ func (r *userFollowedUsersFeedEventDataResolver) Owner(ctx context.Context, obj 
 func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.GalleryUser, error) {
 	userID := publicapi.For(ctx).User.GetLoggedInUserId(ctx)
 	return resolveGalleryUserByUserID(ctx, userID)
+}
+
+func (r *viewerResolver) SocialAccounts(ctx context.Context, obj *model.Viewer) (*model.SocialAccounts, error) {
+	return resolveViewerSocialsByUserID(ctx, obj.UserId)
 }
 
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {

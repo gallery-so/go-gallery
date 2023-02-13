@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/spf13/viper"
 
 	"cloud.google.com/go/storage"
@@ -324,6 +326,37 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 	}
 
 	return nil
+}
+
+func (api UserAPI) AddSocialAccountToUser(ctx context.Context, authenticator socialauth.Authenticator, display bool) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"authenticator": {authenticator, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	res, err := authenticator.Authenticate(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.queries.AddSocialToUser(ctx, db.AddSocialToUserParams{
+		UserID: userID,
+		Socials: persist.Socials{
+			res.Provider: persist.SocialUserIdentifiers{
+				Provider: res.Provider,
+				ID:       res.ID,
+				Display:  display,
+				Metadata: res.Metadata,
+			},
+		},
+	})
 }
 
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
@@ -672,6 +705,135 @@ func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) 
 		}
 	}
 	return result, nil
+}
+
+func (api UserAPI) GetSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &model.SocialAccounts{}
+
+	for prov, social := range socials {
+		switch prov {
+		case persist.SocialProviderTwitter:
+			logger.For(ctx).Infof("found twitter social account: %+v", social)
+			t := &model.TwitterSocialAccount{
+				Type:     prov,
+				Display:  social.Display,
+				SocialID: social.ID,
+			}
+			name, ok := social.Metadata["name"].(string)
+			if ok {
+				t.Name = name
+			}
+			username, ok := social.Metadata["username"].(string)
+			if ok {
+				t.Username = username
+			}
+			profile, ok := social.Metadata["profile_image_url"].(string)
+			if ok {
+				t.ProfileImageURL = profile
+			}
+			result.Twitter = t
+		default:
+			return nil, fmt.Errorf("unknown social provider %s", prov)
+		}
+	}
+
+	return result, nil
+}
+
+func (api UserAPI) GetDisplayedSocials(ctx context.Context, userID persist.DBID) (*model.SocialAccounts, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for prov, social := range socials {
+		if !social.Display {
+			delete(socials, prov)
+		}
+	}
+
+	result := &model.SocialAccounts{}
+
+	for prov, social := range socials {
+		switch prov {
+		case persist.SocialProviderTwitter:
+			logger.For(ctx).Infof("found twitter social account: %+v", social)
+			t := &model.TwitterSocialAccount{
+				Type:     prov,
+				Display:  social.Display,
+				SocialID: social.ID,
+			}
+			name, ok := social.Metadata["name"].(string)
+			if ok {
+				t.Name = name
+			}
+			username, ok := social.Metadata["username"].(string)
+			if ok {
+				t.Username = username
+			}
+			profile, ok := social.Metadata["profile_image_url"].(string)
+			if ok {
+				t.ProfileImageURL = profile
+			}
+			result.Twitter = t
+		default:
+			return nil, fmt.Errorf("unknown social provider %s", prov)
+		}
+	}
+
+	return result, nil
+}
+
+func (api UserAPI) UpdateUserSocialDisplayed(ctx context.Context, socialType persist.SocialProvider, displayed bool) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"socialType": {socialType, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	socials, err := api.queries.GetSocialsByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	social, ok := socials[socialType]
+	if !ok {
+		return fmt.Errorf("social account not found for user %s and provider %s", userID, socialType)
+	}
+
+	social.Display = displayed
+
+	socials[socialType] = social
+
+	return api.queries.UpdateUserSocials(ctx, db.UpdateUserSocialsParams{
+		Socials: socials,
+		UserID:  userID,
+	})
 }
 
 func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType model.UserExperienceType, value bool) error {

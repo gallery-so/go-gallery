@@ -20,6 +20,11 @@ query userByIdQuery($id: DBID!) {
     ... on GalleryUser {
       username
       dbid
+      socialAccounts {
+        twitter {
+          username
+        }
+      }
     }
   }
 }
@@ -49,6 +54,13 @@ query viewerQuery {
         experienced
       }
       user {
+        username
+        dbid
+        socialAccounts {
+          twitter {
+            username
+          }
+        }
         feed(first: 10) {
           edges {
             node {
@@ -58,41 +70,38 @@ query viewerQuery {
               ... on FeedEvent {
                 dbid
                 caption
-                  eventData {
-                    action
-                    ... on GalleryUpdatedFeedEventData {
-                      subEventDatas {
-                        action
-                        ... on TokensAddedToCollectionFeedEventData {
-                          newTokens {
-                            token {
-                              dbid
-                              name
-                            }
+                eventData {
+                  action
+                  ... on GalleryUpdatedFeedEventData {
+                    subEventDatas {
+                      action
+                      ... on TokensAddedToCollectionFeedEventData {
+                        newTokens {
+                          token {
+                            dbid
+                            name
                           }
                         }
-                        ... on CollectionCreatedFeedEventData {
-                          newTokens {
-                            token {
-                              dbid
-                              name
-                            }
+                      }
+                      ... on CollectionCreatedFeedEventData {
+                        newTokens {
+                          token {
+                            dbid
+                            name
                           }
                         }
-
-                        ... on GalleryInfoUpdatedFeedEventData {
-                          newName
-                          newDescription
-                        }
+                      }
+                      ... on GalleryInfoUpdatedFeedEventData {
+                        newName
+                        newDescription
                       }
                     }
                   }
+                }
               }
             }
           }
         }
-        username
-        dbid
       }
     }
   }
@@ -414,6 +423,44 @@ mutation createGalleryMutation($input: CreateGalleryInput!) {
         name
         description
         position
+      }
+    }
+  }
+}
+
+mutation connectSocialAccount($auth: SocialAuthMechanism!, $display: Boolean!) {
+  connectSocialAccount(input: $auth, display: $display) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on ConnectSocialAccountPayload {
+      viewer {
+        socialAccounts {
+          twitter {
+            username
+            display
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation updateSocialAccountDisplayed($input: UpdateSocialAccountDisplayedInput!) {
+  updateSocialAccountDisplayed(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on UpdateSocialAccountDisplayedPayload {
+      viewer {
+        socialAccounts {
+          twitter {
+            username
+            display
+          }
+        }
       }
     }
   }

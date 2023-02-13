@@ -69,6 +69,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should update user experiences", run: testUpdateUserExperiences},
 		{title: "should create gallery", run: testCreateGallery},
 		{title: "should move collection to new gallery", run: testMoveCollection},
+		{title: "should connect social account", run: testConnectSocialAccount},
 	}
 	for _, test := range tests {
 		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
@@ -445,6 +446,47 @@ func testUpdateUserExperiences(t *testing.T) {
 			assert.True(t, experience.Experienced)
 		}
 	}
+}
+
+func testConnectSocialAccount(t *testing.T) {
+	userF := newUserFixture(t)
+	c := authedHandlerClient(t, userF.id)
+	dc := defaultHandlerClient(t)
+
+	connectResp, err := connectSocialAccount(context.Background(), c, SocialAuthMechanism{
+		Debug: &DebugSocialAuth{
+			Provider: SocialAccountTypeTwitter,
+			Id:       "123",
+			Username: "test",
+		},
+	}, true)
+	require.NoError(t, err)
+
+	payload := (*connectResp.ConnectSocialAccount).(*connectSocialAccountConnectSocialAccountConnectSocialAccountPayload)
+	assert.Equal(t, payload.Viewer.SocialAccounts.Twitter.Username, "test")
+	assert.True(t, payload.Viewer.SocialAccounts.Twitter.Display)
+
+	viewerResp, err := viewerQuery(context.Background(), c)
+	require.NoError(t, err)
+	viewerPayload := (*viewerResp.Viewer).(*viewerQueryViewer)
+	assert.Equal(t, viewerPayload.User.SocialAccounts.Twitter.Username, "test")
+
+	updateDisplayedResp, err := updateSocialAccountDisplayed(context.Background(), c, UpdateSocialAccountDisplayedInput{
+		Type:      SocialAccountTypeTwitter,
+		Displayed: false,
+	})
+
+	require.NoError(t, err)
+
+	updateDisplayedPayload := (*updateDisplayedResp.UpdateSocialAccountDisplayed).(*updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload)
+	assert.Equal(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Username, "test")
+	assert.False(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Display)
+
+	userResp, err := userByIdQuery(context.Background(), dc, userF.id)
+	require.NoError(t, err)
+	userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
+	assert.Nil(t, userPayload.SocialAccounts.Twitter)
+
 }
 
 func testUpdateGalleryDeleteCollection(t *testing.T) {

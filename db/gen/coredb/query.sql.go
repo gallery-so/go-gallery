@@ -28,6 +28,20 @@ func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionT
 	return err
 }
 
+const addSocialToUser = `-- name: AddSocialToUser :exec
+insert into pii.for_users (user_id, pii_socials) values ($1, $2) on conflict (user_id) where deleted = false do update set pii_socials = for_users.pii_socials || $2
+`
+
+type AddSocialToUserParams struct {
+	UserID  persist.DBID
+	Socials persist.Socials
+}
+
+func (q *Queries) AddSocialToUser(ctx context.Context, arg AddSocialToUserParams) error {
+	_, err := q.db.Exec(ctx, addSocialToUser, arg.UserID, arg.Socials)
+	return err
+}
+
 const addUserRoles = `-- name: AddUserRoles :exec
 insert into user_roles (id, user_id, role, created_at, last_updated)
 select unnest($2::varchar[]), $1, unnest($3::varchar[]), now(), now()
@@ -1874,6 +1888,17 @@ func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecen
 	return items, nil
 }
 
+const getSocialsByUserID = `-- name: GetSocialsByUserID :one
+select pii_socials from pii.user_view where id = $1
+`
+
+func (q *Queries) GetSocialsByUserID(ctx context.Context, id persist.DBID) (persist.Socials, error) {
+	row := q.db.QueryRow(ctx, getSocialsByUserID, id)
+	var pii_socials persist.Socials
+	err := row.Scan(&pii_socials)
+	return pii_socials, err
+}
+
 const getTokenById = `-- name: GetTokenById :one
 SELECT id, deleted, version, created_at, last_updated, name, description, collectors_note, media, token_uri, token_type, token_id, quantity, ownership_history, token_metadata, external_url, block_number, owner_user_id, owned_by_wallets, chain, contract, is_user_marked_spam, is_provider_marked_spam, last_synced FROM tokens WHERE id = $1 AND deleted = false
 `
@@ -2727,7 +2752,7 @@ func (q *Queries) GetUserUnseenNotifications(ctx context.Context, arg GetUserUns
 }
 
 const getUserWithPIIByID = `-- name: GetUserWithPIIByID :one
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from pii.user_view where id = $1 and deleted = false
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view where id = $1 and deleted = false
 `
 
 func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (PiiUserView, error) {
@@ -2750,7 +2775,9 @@ func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (
 		&i.EmailUnsubscriptions,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
+		&i.UserExperiences,
 		&i.PiiEmailAddress,
+		&i.PiiSocials,
 	)
 	return i, err
 }
@@ -2890,7 +2917,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 }
 
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from pii.user_view
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
     and (created_at, id) < ($3, $4)
@@ -2945,7 +2972,9 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
+			&i.UserExperiences,
 			&i.PiiEmailAddress,
+			&i.PiiSocials,
 		); err != nil {
 			return nil, err
 		}
@@ -2958,7 +2987,7 @@ func (q *Queries) GetUsersWithEmailNotificationsOn(ctx context.Context, arg GetU
 }
 
 const getUsersWithEmailNotificationsOnForEmailType = `-- name: GetUsersWithEmailNotificationsOnForEmailType :many
-select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, pii_email_address from pii.user_view
+select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and (email_unsubscriptions->>$3::varchar = 'false' or email_unsubscriptions->>$3::varchar is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
@@ -3016,7 +3045,9 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 			&i.EmailUnsubscriptions,
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
+			&i.UserExperiences,
 			&i.PiiEmailAddress,
+			&i.PiiSocials,
 		); err != nil {
 			return nil, err
 		}
@@ -3809,6 +3840,20 @@ func (q *Queries) UpdateUserPrimaryWallet(ctx context.Context, arg UpdateUserPri
 	return err
 }
 
+const updateUserSocials = `-- name: UpdateUserSocials :exec
+update pii.for_users set pii_socials = $1 where user_id = $2
+`
+
+type UpdateUserSocialsParams struct {
+	Socials persist.Socials
+	UserID  persist.DBID
+}
+
+func (q *Queries) UpdateUserSocials(ctx context.Context, arg UpdateUserSocialsParams) error {
+	_, err := q.db.Exec(ctx, updateUserSocials, arg.Socials, arg.UserID)
+	return err
+}
+
 const updateUserVerificationStatus = `-- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1
 `
@@ -3820,6 +3865,29 @@ type UpdateUserVerificationStatusParams struct {
 
 func (q *Queries) UpdateUserVerificationStatus(ctx context.Context, arg UpdateUserVerificationStatusParams) error {
 	_, err := q.db.Exec(ctx, updateUserVerificationStatus, arg.ID, arg.EmailVerified)
+	return err
+}
+
+const upsertSocialOAuth = `-- name: UpsertSocialOAuth :exec
+insert into pii.socials_auth (id, user_id, provider, access_token, refresh_token) values ($1, $2, $3, $4, $5) on conflict (user_id, provider) where deleted = false do update set access_token = $4, refresh_token = $5, last_updated = now()
+`
+
+type UpsertSocialOAuthParams struct {
+	ID           persist.DBID
+	UserID       persist.DBID
+	Provider     persist.SocialProvider
+	AccessToken  sql.NullString
+	RefreshToken sql.NullString
+}
+
+func (q *Queries) UpsertSocialOAuth(ctx context.Context, arg UpsertSocialOAuthParams) error {
+	_, err := q.db.Exec(ctx, upsertSocialOAuth,
+		arg.ID,
+		arg.UserID,
+		arg.Provider,
+		arg.AccessToken,
+		arg.RefreshToken,
+	)
 	return err
 }
 

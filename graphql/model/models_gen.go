@@ -51,6 +51,10 @@ type CommunityByAddressOrError interface {
 	IsCommunityByAddressOrError()
 }
 
+type ConnectSocialAccountPayloadOrError interface {
+	IsConnectSocialAccountPayloadOrError()
+}
+
 type CreateCollectionPayloadOrError interface {
 	IsCreateCollectionPayloadOrError()
 }
@@ -202,6 +206,10 @@ type SetSpamPreferencePayloadOrError interface {
 	IsSetSpamPreferencePayloadOrError()
 }
 
+type SocialAccount interface {
+	IsSocialAccount()
+}
+
 type SyncTokensForUsernamePayloadOrError interface {
 	IsSyncTokensForUsernamePayloadOrError()
 }
@@ -272,6 +280,10 @@ type UpdateGalleryPayloadOrError interface {
 
 type UpdatePrimaryWalletPayloadOrError interface {
 	IsUpdatePrimaryWalletPayloadOrError()
+}
+
+type UpdateSocialAccountDisplayedPayloadOrError interface {
+	IsUpdateSocialAccountDisplayedPayloadOrError()
 }
 
 type UpdateTokenInfoPayloadOrError interface {
@@ -536,6 +548,12 @@ type Community struct {
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
+type ConnectSocialAccountPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (ConnectSocialAccountPayload) IsConnectSocialAccountPayloadOrError() {}
+
 type Contract struct {
 	Dbid             persist.DBID          `json:"dbid"`
 	LastUpdated      *time.Time            `json:"lastUpdated"`
@@ -610,6 +628,12 @@ type DebugAuth struct {
 	AsUsername     *string                 `json:"asUsername"`
 	UserID         *persist.DBID           `json:"userId"`
 	ChainAddresses []*persist.ChainAddress `json:"chainAddresses"`
+}
+
+type DebugSocialAuth struct {
+	Provider persist.SocialProvider `json:"provider"`
+	ID       string                 `json:"id"`
+	Username string                 `json:"username"`
 }
 
 type DeepRefreshInput struct {
@@ -794,6 +818,8 @@ func (ErrInvalidInput) IsPublishGalleryPayloadOrError()                  {}
 func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
 func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
 func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
+func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
+func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 
 type ErrInvalidToken struct {
@@ -815,39 +841,41 @@ type ErrNotAuthorized struct {
 	Cause   AuthorizationError `json:"cause"`
 }
 
-func (ErrNotAuthorized) IsViewerOrError()                          {}
-func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()         {}
-func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()         {}
-func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()     {}
-func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()   {}
-func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()   {}
-func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError() {}
-func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()          {}
-func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()        {}
-func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()            {}
-func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()        {}
-func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()           {}
-func (ErrNotAuthorized) IsSyncTokensPayloadOrError()               {}
-func (ErrNotAuthorized) IsError()                                  {}
-func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()              {}
-func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()           {}
-func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()      {}
-func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()   {}
-func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()    {}
-func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()          {}
-func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()            {}
-func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()        {}
-func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()      {}
-func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
-func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
-func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
-func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
-func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()           {}
-func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
-func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
-func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()     {}
-func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()  {}
-func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()  {}
+func (ErrNotAuthorized) IsViewerOrError()                              {}
+func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()             {}
+func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()             {}
+func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()         {}
+func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()       {}
+func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()       {}
+func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError()     {}
+func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()              {}
+func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()            {}
+func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()                {}
+func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()            {}
+func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
+func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
+func (ErrNotAuthorized) IsError()                                      {}
+func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()                  {}
+func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
+func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
+func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
+func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()        {}
+func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()              {}
+func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                {}
+func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()            {}
+func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()          {}
+func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()                {}
+func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()           {}
+func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()        {}
+func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()                {}
+func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()               {}
+func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()          {}
+func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()               {}
+func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()         {}
+func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()      {}
+func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()         {}
+func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
+func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1034,6 +1062,7 @@ type GalleryUser struct {
 	Traits              *string         `json:"traits"`
 	Universal           *bool           `json:"universal"`
 	Roles               []*persist.Role `json:"roles"`
+	SocialAccounts      *SocialAccounts `json:"socialAccounts"`
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
@@ -1341,6 +1370,15 @@ type SetSpamPreferencePayload struct {
 
 func (SetSpamPreferencePayload) IsSetSpamPreferencePayloadOrError() {}
 
+type SocialAccounts struct {
+	Twitter *TwitterSocialAccount `json:"twitter"`
+}
+
+type SocialAuthMechanism struct {
+	Twitter *TwitterAuth     `json:"twitter"`
+	Debug   *DebugSocialAuth `json:"debug"`
+}
+
 type SomeoneAdmiredYourFeedEventNotification struct {
 	HelperSomeoneAdmiredYourFeedEventNotificationData
 	Dbid         persist.DBID                      `json:"dbid"`
@@ -1524,6 +1562,21 @@ type TrendingUsersPayload struct {
 
 func (TrendingUsersPayload) IsTrendingUsersPayloadOrError() {}
 
+type TwitterAuth struct {
+	Code string `json:"code"`
+}
+
+type TwitterSocialAccount struct {
+	Type            persist.SocialProvider `json:"type"`
+	SocialID        string                 `json:"social_id"`
+	Name            string                 `json:"name"`
+	Username        string                 `json:"username"`
+	ProfileImageURL string                 `json:"profileImageURL"`
+	Display         bool                   `json:"display"`
+}
+
+func (TwitterSocialAccount) IsSocialAccount() {}
+
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
 	User   *GalleryUser `json:"user"`
@@ -1695,6 +1748,17 @@ type UpdatePrimaryWalletPayload struct {
 
 func (UpdatePrimaryWalletPayload) IsUpdatePrimaryWalletPayloadOrError() {}
 
+type UpdateSocialAccountDisplayedInput struct {
+	Type      persist.SocialProvider `json:"type"`
+	Displayed bool                   `json:"displayed"`
+}
+
+type UpdateSocialAccountDisplayedPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateSocialAccountDisplayedPayload) IsUpdateSocialAccountDisplayedPayloadOrError() {}
+
 type UpdateTokenInfoInput struct {
 	TokenID        persist.DBID  `json:"tokenId"`
 	CollectorsNote string        `json:"collectorsNote"`
@@ -1813,6 +1877,7 @@ func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 type Viewer struct {
 	HelperViewerData
 	User            *GalleryUser     `json:"user"`
+	SocialAccounts  *SocialAccounts  `json:"socialAccounts"`
 	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
 	Feed            *FeedConnection  `json:"feed"`
 	Email           *UserEmail       `json:"email"`

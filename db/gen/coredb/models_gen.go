@@ -12,18 +12,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-type Access struct {
-	ID                  persist.DBID
-	Deleted             bool
-	Version             sql.NullInt32
-	CreatedAt           time.Time
-	LastUpdated         time.Time
-	UserID              persist.DBID
-	MostRecentBlock     sql.NullInt64
-	RequiredTokensOwned pgtype.JSONB
-	IsAdmin             sql.NullBool
-}
-
 type Admire struct {
 	ID          persist.DBID
 	Version     int32
@@ -48,18 +36,6 @@ type Collection struct {
 	Layout         persist.TokenLayout
 	TokenSettings  map[persist.DBID]persist.CollectionTokenSettings
 	GalleryID      persist.DBID
-}
-
-type CollectionEvent struct {
-	ID           persist.DBID
-	UserID       persist.DBID
-	CollectionID persist.DBID
-	Version      sql.NullInt32
-	EventCode    sql.NullInt32
-	CreatedAt    time.Time
-	LastUpdated  time.Time
-	Data         pgtype.JSONB
-	Sent         sql.NullBool
 }
 
 type Comment struct {
@@ -124,21 +100,6 @@ type Event struct {
 	GroupID        sql.NullString
 }
 
-type Feature struct {
-	ID                  persist.DBID
-	Deleted             bool
-	Version             sql.NullInt32
-	LastUpdated         time.Time
-	CreatedAt           time.Time
-	RequiredToken       sql.NullString
-	RequiredAmount      sql.NullInt64
-	TokenType           sql.NullString
-	Name                sql.NullString
-	IsEnabled           sql.NullBool
-	AdminOnly           sql.NullBool
-	ForceEnabledUserIds persist.DBIDList
-}
-
 type FeedBlocklist struct {
 	ID          persist.DBID
 	UserID      persist.DBID
@@ -194,21 +155,6 @@ type LegacyView struct {
 	Deleted     sql.NullBool
 }
 
-type LoginAttempt struct {
-	ID                 persist.DBID
-	Deleted            bool
-	Version            sql.NullInt32
-	CreatedAt          time.Time
-	LastUpdated        time.Time
-	Address            persist.Address
-	RequestHostAddress persist.Address
-	UserExists         sql.NullBool
-	Signature          sql.NullString
-	SignatureValid     sql.NullBool
-	RequestHeaders     pgtype.JSONB
-	NonceValue         sql.NullString
-}
-
 type Membership struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -231,18 +177,6 @@ type Merch struct {
 	ObjectType   int32
 	DiscountCode sql.NullString
 	Redeemed     bool
-}
-
-type NftEvent struct {
-	ID          persist.DBID
-	UserID      persist.DBID
-	NftID       persist.DBID
-	Version     sql.NullInt32
-	EventCode   sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Data        pgtype.JSONB
-	Sent        sql.NullBool
 }
 
 type Nonce struct {
@@ -278,6 +212,19 @@ type PiiForUser struct {
 	UserID          persist.DBID
 	PiiEmailAddress persist.Email
 	Deleted         bool
+	PiiSocials      persist.Socials
+}
+
+type PiiSocialsAuth struct {
+	ID           persist.DBID
+	Deleted      bool
+	Version      sql.NullInt32
+	CreatedAt    time.Time
+	LastUpdated  time.Time
+	UserID       persist.DBID
+	Provider     persist.SocialProvider
+	AccessToken  sql.NullString
+	RefreshToken sql.NullString
 }
 
 type PiiUserView struct {
@@ -297,7 +244,9 @@ type PiiUserView struct {
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
+	UserExperiences      pgtype.JSONB
 	PiiEmailAddress      persist.Email
+	PiiSocials           persist.Socials
 }
 
 type Token struct {
@@ -345,17 +294,6 @@ type User struct {
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
-}
-
-type UserEvent struct {
-	ID          persist.DBID
-	UserID      persist.DBID
-	Version     sql.NullInt32
-	EventCode   sql.NullInt32
-	CreatedAt   time.Time
-	LastUpdated time.Time
-	Data        pgtype.JSONB
-	Sent        sql.NullBool
 }
 
 type UserRole struct {
