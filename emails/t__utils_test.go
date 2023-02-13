@@ -3,6 +3,7 @@ package emails
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,17 +13,16 @@ import (
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
-	"github.com/ory/dockertest"
 	"github.com/stretchr/testify/assert"
 )
 
-var testUser = coredb.UsersWithPii{
+var testUser = coredb.PiiUserView{
 	Username:           sql.NullString{String: "test1", Valid: true},
 	UsernameIdempotent: sql.NullString{String: "test1", Valid: true},
 	PiiEmailAddress:    persist.Email("bc@gallery.so"),
 }
 
-var testUser2 = coredb.UsersWithPii{
+var testUser2 = coredb.PiiUserView{
 	Username:           sql.NullString{String: "test2", Valid: true},
 	UsernameIdempotent: sql.NullString{String: "test2", Valid: true},
 	PiiEmailAddress:    persist.Email("bcc@gallery.so"),
@@ -44,25 +44,25 @@ var comment coredb.Comment
 
 func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	setDefaults()
-	pg, pgUnpatch := docker.InitPostgres()
+	r, err := docker.StartPostgres()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
+	t.Setenv("POSTGRES_HOST", hostAndPort[0])
+	t.Setenv("POSTGRES_PORT", hostAndPort[1])
+
+	err = migrate.RunCoreDBMigration()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		r.Close()
+	})
 
 	db := postgres.NewClient()
 	pgx := postgres.NewPgxClient()
-	err := migrate.RunMigration(db, "./db/migrations/core")
-	if err != nil {
-		t.Fatalf("failed to seed db: %s", err)
-	}
-
-	t.Cleanup(func() {
-		defer db.Close()
-		defer pgUnpatch()
-		defer pgx.Close()
-		for _, r := range []*dockertest.Resource{pg} {
-			if err := r.Close(); err != nil {
-				t.Fatalf("could not purge resource: %s", err)
-			}
-		}
-	})
 
 	seedNotifications(context.Background(), t, coredb.New(pgx), newRepos(db, pgx))
 
@@ -147,6 +147,7 @@ func seedNotifications(ctx context.Context, t *testing.T, q *coredb.Queries, rep
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   testGallery.Collections[0],
+		GalleryID:      gallery.ID,
 	})
 
 	if err != nil {

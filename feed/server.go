@@ -24,7 +24,7 @@ func handleEvent(queries *db.Queries, taskClient *cloudtasks.Client) gin.Handler
 			return
 		}
 
-		builder := NewEventBuilder(queries, false)
+		builder := NewEventBuilder(queries)
 		event, err := builder.NewFeedEventFromTask(c.Request.Context(), message)
 
 		if err != nil {

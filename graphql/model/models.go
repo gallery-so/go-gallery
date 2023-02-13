@@ -2,6 +2,8 @@ package model
 
 import (
 	"fmt"
+	"io"
+	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -47,11 +49,13 @@ type HelperCommunityData struct {
 }
 
 type HelperTokensAddedToCollectionFeedEventDataData struct {
-	FeedEventID persist.DBID
+	TokenIDs     persist.DBIDList
+	CollectionID persist.DBID
 }
 
 type HelperCollectionCreatedFeedEventDataData struct {
-	FeedEventID persist.DBID
+	TokenIDs     persist.DBIDList
+	CollectionID persist.DBID
 }
 
 type HelperGroupNotificationUsersConnectionData struct {
@@ -97,9 +101,21 @@ type HelperNotificationsConnectionData struct {
 }
 
 type HelperCollectionUpdatedFeedEventDataData struct {
+	TokenIDs     persist.DBIDList
+	CollectionID persist.DBID
+}
+
+type HelperGalleryUpdatedFeedEventDataData struct {
 	FeedEventID persist.DBID
 }
 
+type HelperGalleryCollectionUpdateData struct {
+	CollectionID persist.DBID
+}
+
+type HelperGalleryTokenUpdateData struct {
+	TokenID persist.DBID
+}
 type HelperUserEmailData struct {
 	UserId persist.DBID
 }
@@ -118,4 +134,46 @@ type ErrInvalidIDType struct {
 
 func (e ErrInvalidIDType) Error() string {
 	return fmt.Sprintf("no fetch method found for ID type '%s'", e.typeName)
+}
+
+type Window struct {
+	time.Duration
+	Name string
+}
+
+var (
+	lastFiveDaysWindow  = Window{5 * 24 * time.Hour, "LAST_5_DAYS"}
+	lastSevenDaysWindow = Window{7 * 24 * time.Hour, "LAST_7_DAYS"}
+	allTimeWindow       = Window{1<<63 - 1, "ALL_TIME"}
+)
+
+func (w *Window) UnmarshalGQL(v interface{}) error {
+	window, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("Window must be a string")
+	}
+	switch window {
+	case lastFiveDaysWindow.Name:
+		*w = lastFiveDaysWindow
+	case lastSevenDaysWindow.Name:
+		*w = lastSevenDaysWindow
+	case allTimeWindow.Name:
+		*w = allTimeWindow
+	default:
+		panic(fmt.Sprintf("unknown window: %s", window))
+	}
+	return nil
+}
+
+func (w Window) MarshalGQL(wt io.Writer) {
+	switch {
+	case w == lastFiveDaysWindow:
+		wt.Write([]byte(fmt.Sprintf(`"%s"`, lastFiveDaysWindow.Name)))
+	case w == lastSevenDaysWindow:
+		wt.Write([]byte(fmt.Sprintf(`"%s"`, lastSevenDaysWindow.Name)))
+	case w == allTimeWindow:
+		wt.Write([]byte(fmt.Sprintf(`"%s"`, allTimeWindow.Name)))
+	default:
+		panic(fmt.Sprintf("unknown window: %v", w))
+	}
 }

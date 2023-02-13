@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/spf13/viper"
+	"go.mozilla.org/sops/v3/decrypt"
 )
 
 // DefaultSearchDepth represents the maximum amount of nested maps (aka recursions) that can be searched
@@ -222,9 +224,41 @@ func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	return result
 }
 
-// StringToPointer simply returns a pointer to the parameter string. It's useful for taking the address of a string concatenation,
-// a function that returns a string, or any other string that would otherwise need to be assigned to a variable before becoming addressable.
-func StringToPointer(str string) *string {
+func Contains[T comparable](s []T, str T) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Difference will take in 2 arrays and return the elements that exist in the second array but are not in the first
+func Difference[T comparable](old []T, new []T) []T {
+	var added []T
+	for _, v := range new {
+		if !Contains(old, v) {
+			added = append(added, v)
+		}
+	}
+	return added
+}
+
+func SetConditionalValue[T any](value *T, param *T, conditional *bool) {
+	if value != nil {
+		*param = *value
+		*conditional = true
+	} else {
+		*conditional = false
+	}
+}
+
+// StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
+func StringToPointerIfNotEmpty(str string) *string {
+	if str == "" {
+		return nil
+	}
 	return &str
 }
 
@@ -236,24 +270,34 @@ func FromPointer[T comparable](s *T) T {
 	return *s
 }
 
+func ToPointer[T any](s T) *T {
+	return &s
+}
+
+func ToPointerSlice[T any](s []T) []*T {
+	result := make([]*T, len(s))
+	for i, v := range s {
+		c := v
+		result[i] = &c
+	}
+	return result
+}
+
+func FromPointerSlice[T any](s []*T) []T {
+	result := make([]T, len(s))
+	for i, v := range s {
+		c := v
+		result[i] = *c
+	}
+	return result
+}
+
 func StringersToStrings[T fmt.Stringer](stringers []T) []string {
 	strings := make([]string, len(stringers))
 	for i, stringer := range stringers {
 		strings[i] = stringer.String()
 	}
 	return strings
-}
-
-// BoolToPointer returns a pointer to the parameter boolean. Useful for a boolean that would need to be assigned to a variable
-// before becoming addressable.
-func BoolToPointer(b bool) *bool {
-	return &b
-}
-
-// IntToPointer returns a pointer to the parameter integer. Useful for an integer that would need to be assigned to a variable
-// before becoming addressable.
-func IntToPointer(i int) *int {
-	return &i
 }
 
 // GinContextFromContext retrieves a gin.Context previously stored in the request context via the GinContextToContext middleware,
@@ -296,6 +340,24 @@ func FindFile(f string, searchDepth int) (string, error) {
 	return "", fmt.Errorf("could not find file '%s' in path", f)
 }
 
+// MustFindFile panics if the file is not found up to the default search depth.
+func MustFindFile(f string) string {
+	f, err := FindFile(f, 5)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
+// MustFindFile panics if the file is not found up to the default search depth.
+func MustFindFileOrError(f string) (string, error) {
+	f, err := FindFile(f, 5)
+	if err != nil {
+		return "", err
+	}
+	return f, nil
+}
+
 // InByteSizeFormat converts a number of bytes to a human-readable string
 // using SI units (kB, MB, GB, TB, PB, EB, ZB, YB)
 func InByteSizeFormat(bytes uint64) string {
@@ -325,15 +387,6 @@ func InByteSizeFormat(bytes uint64) string {
 	}
 
 	return fmt.Sprintf("%.2f %s", value, unit)
-}
-
-// IntToPointerSlice returns a slice to pointers of integer values.
-func IntToPointerSlice(s []int) []*int {
-	ret := make([]*int, len(s))
-	for idx, it := range s {
-		ret[idx] = IntToPointer(it)
-	}
-	return ret
 }
 
 // GetURIPath takes a uri in any form and returns just the path
@@ -384,6 +437,33 @@ func VarNotSetTo(envVar, emptyVal string) {
 	}
 }
 
+// LoadEncryptedServiceKey loads an encrypted service key JSON file from disk
+func LoadEncryptedServiceKey(filePath string) []byte {
+	path := MustFindFile(filePath)
+
+	serviceKey, err := decrypt.File(path, "json")
+	if err != nil {
+		panic(fmt.Sprintf("error decrypting service key: %s\n", err))
+	}
+
+	return serviceKey
+}
+
+// LoadEncryptedServiceKeyOrError loads an encrypted service key JSON file from disk or errors
+func LoadEncryptedServiceKeyOrError(filePath string) ([]byte, error) {
+	path, err := MustFindFileOrError(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceKey, err := decrypt.File(path, "json")
+	if err != nil {
+		return nil, fmt.Errorf("error decrypting service key: %s\n", err)
+	}
+
+	return serviceKey, nil
+}
+
 // InDocker returns true if the service is running as a container.
 func InDocker() bool {
 	if _, err := os.Stat("/.dockerenv"); err == nil {
@@ -394,41 +474,56 @@ func InDocker() bool {
 
 // ResolveEnvFile finds the appropriate env file to use for the service.
 func ResolveEnvFile(service string, env string) string {
+	if env != "local" && env != "dev" && env != "prod" {
+		env = "local"
+	}
+
+	secretsDir := filepath.Join("secrets", env, "local")
+
 	format := "app-%s-%s.yaml"
 	if InDocker() {
-		return fmt.Sprintf(format, "docker", service)
+		return filepath.Join(secretsDir, fmt.Sprintf(format, "docker", service))
 	}
 
-	switch env {
-	case "local":
-		return fmt.Sprintf(format, "local", service)
-	case "dev":
-		return fmt.Sprintf(format, "dev", service)
-	case "prod":
-		return fmt.Sprintf(format, "prod", service)
-	}
-
-	return fmt.Sprintf("app-local-%s.yaml", service)
+	return filepath.Join(secretsDir, fmt.Sprintf(format, env, service))
 }
 
-// LoadEnvFile configures the environment with the configured input file.
-func LoadEnvFile(fileName string) {
+// LoadEncryptedEnvFile configures the environment with the configured input file.
+func LoadEncryptedEnvFile(filePath string) {
 	if viper.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
 
 	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	filePath := filepath.Join("_local", fileName)
 	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
-	path, err := FindFile(filePath, 5)
+	path := MustFindFile(filePath)
+
+	config, err := decrypt.File(path, "yaml")
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("error decrypting config file: %s\n", err))
 	}
+
+	viper.SetConfigType("yaml")
+	if err := viper.ReadConfig(bytes.NewBuffer(config)); err != nil {
+		panic(fmt.Sprintf("error reading viper config: %s\n", err))
+	}
+}
+
+// LoadEnvFile configures the environment with the configured input file.
+func LoadEnvFile(filePath string) {
+	if viper.GetString("ENV") != "local" {
+		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+		return
+	}
+
+	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
+	logger.For(nil).Infof("configuring environment with settings from %s", filePath)
+	path := MustFindFile(filePath)
 
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
+		panic(fmt.Sprintf("error reading viper config: %s\n", err))
 	}
 }
 

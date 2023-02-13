@@ -149,6 +149,11 @@ type verifier interface {
 	VerifySignature(ctx context.Context, pubKey persist.PubKey, walletType persist.WalletType, nonce string, sig string) (bool, error)
 }
 
+type walletHooker interface {
+	// WalletCreated is called when a wallet is created
+	WalletCreated(context.Context, persist.DBID, persist.Address, persist.WalletType, persist.Chain) error
+}
+
 // tokensFetcher supports fetching tokens for syncing
 type tokensFetcher interface {
 	GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit int, offset int) ([]ChainAgnosticToken, []ChainAgnosticContract, error)
@@ -202,20 +207,13 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 		contractRefresher:     true,
 	},
 	persist.ChainTezos: {
-		nameResolver:          false,
-		verifier:              false,
 		tokensFetcher:         true,
 		tokenRefresher:        true,
 		tokenFetcherRefresher: true,
-		contractRefresher:     false,
 	},
 	persist.ChainPOAP: {
-		nameResolver:          true,
-		verifier:              false,
-		tokensFetcher:         true,
-		tokenRefresher:        false,
-		tokenFetcherRefresher: false,
-		contractRefresher:     false,
+		nameResolver:  true,
+		tokensFetcher: true,
 	},
 }
 
@@ -241,31 +239,43 @@ func validateProviders(ctx context.Context, providers []interface{}) map[persist
 	}
 
 	for chain, providers := range chains {
+		requirements, ok := chainValidation[chain]
+		if !ok {
+			logger.For(ctx).Warnf("chain=%d has no provider validation", chain)
+			continue
+		}
+
 		hasImplementor := validation{}
+
 		for _, p := range providers {
 			if _, ok := p.(nameResolver); ok {
 				hasImplementor.nameResolver = true
+				requirements.nameResolver = true
 			}
 			if _, ok := p.(verifier); ok {
 				hasImplementor.verifier = true
+				requirements.verifier = true
 			}
 			if _, ok := p.(tokensFetcher); ok {
 				hasImplementor.tokensFetcher = true
+				requirements.tokensFetcher = true
 			}
 			if _, ok := p.(tokenRefresher); ok {
 				hasImplementor.tokenRefresher = true
+				requirements.tokenRefresher = true
 			}
 			if _, ok := p.(tokenFetcherRefresher); ok {
 				hasImplementor.tokenFetcherRefresher = true
+				requirements.tokenFetcherRefresher = true
 			}
 			if _, ok := p.(contractRefresher); ok {
 				hasImplementor.contractRefresher = true
+				requirements.contractRefresher = true
 			}
 		}
-		if requires, ok := chainValidation[chain]; !ok {
-			logger.For(ctx).Warnf("chain=%d has no provider validation", chain)
-		} else if hasImplementor != requires {
-			panic(fmt.Sprintf("chain=%d is got=%+v;want=%+v", chain, hasImplementor, requires))
+
+		if hasImplementor != requirements {
+			panic(fmt.Sprintf("chain=%d;got=%+v;want=%+v", chain, hasImplementor, requirements))
 		}
 	}
 
@@ -375,30 +385,33 @@ outer:
 	if err != nil {
 		return err
 	}
-	_, err = p.upsertTokens(ctx, allTokens, addressToContract, user, chains, false)
+
+	upsertedTokens, err := p.upsertTokens(ctx, allTokens, addressToContract, user, chains, false)
 	if err != nil {
 		return err
 	}
 
-	for _, chain := range chains {
-		image, anim := chain.BaseKeywords()
-		err = p.processMedialessTokens(ctx, userID, chain, image, anim)
-		if err != nil {
-			logger.For(ctx).Errorf("error processing medialess tokens for user %s: %s", user.Username, err)
-			return err
-		}
+	tokenIDsToProcess := make([]persist.DBID, 0)
 
+	for _, token := range upsertedTokens {
+		// Only process net new tokens based on the creation and update time.
+		// Also process existing tokens that may not have had valid media returned on the last sync.
+		if (token.CreationTime.Time() == token.LastUpdated.Time()) || !token.Media.IsServable() {
+			tokenIDsToProcess = append(tokenIDsToProcess, token.ID)
+		}
 	}
 
-	return nil
+	return p.processMedialessTokens(ctx, userID, tokenIDsToProcess)
 }
 
-func (p *Provider) processMedialessTokens(ctx context.Context, userID persist.DBID, chain persist.Chain, imageKeywords, animationKeywords []string) error {
+func (p *Provider) processMedialessTokens(ctx context.Context, userID persist.DBID, tokenIDs []persist.DBID) error {
+	if len(tokenIDs) == 0 {
+		return nil
+	}
+
 	processMediaInput := task.TokenProcessingUserMessage{
-		UserID:            userID,
-		Chain:             chain,
-		ImageKeywords:     imageKeywords,
-		AnimationKeywords: animationKeywords,
+		UserID:   userID,
+		TokenIDs: tokenIDs,
 	}
 	return task.CreateTaskForTokenProcessing(ctx, processMediaInput, p.TasksClient)
 }
@@ -548,6 +561,33 @@ func (d *Provider) DeepRefreshByChain(ctx context.Context, userID persist.DBID, 
 	return nil
 }
 
+// RunWalletCreationHooks runs hooks for when a wallet is created
+func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DBID, walletAddress persist.Address, walletType persist.WalletType, chain persist.Chain) error {
+	if _, ok := d.Chains[chain]; !ok {
+		return nil
+	}
+
+	// User doesn't exist
+	_, err := d.Repos.UserRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// TODO check if user wallets contains wallet using new util.Contains in other PR
+
+	for _, provider := range d.Chains[chain] {
+
+		if hooker, ok := provider.(walletHooker); ok {
+			if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType, chain); err != nil {
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
+
 // VerifySignature verifies a signature for a wallet address
 func (p *Provider) VerifySignature(ctx context.Context, pSig string, pNonce string, pChainAddress persist.ChainPubKey, pWalletType persist.WalletType) (bool, error) {
 	providers, ok := p.Chains[pChainAddress.Chain()]
@@ -600,12 +640,11 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}); err != nil {
 					return err
 				}
-				if !token.Media.IsServable() {
-					image, anim := ti.Chain.BaseKeywords()
-					err = p.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, image, anim)
-					if err != nil {
-						return err
-					}
+
+				image, anim := ti.Chain.BaseKeywords()
+				err = p.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, token.OwnerAddress, image, anim)
+				if err != nil {
+					return err
 				}
 
 				if err := p.Repos.ContractRepository.UpsertByAddress(ctx, ti.ContractAddress, ti.Chain, persist.ContractGallery{
@@ -964,10 +1003,11 @@ func (p *Provider) upsertTokens(ctx context.Context, allTokens []chainTokens, ad
 		return nil, err
 	}
 
-	if err := p.Repos.TokenRepository.BulkUpsertByOwnerUserID(ctx, user.ID, chains, newTokens, skipDelete); err != nil {
+	persistedTokens, err := p.Repos.TokenRepository.BulkUpsertByOwnerUserID(ctx, user.ID, chains, newTokens, skipDelete)
+	if err != nil {
 		return nil, fmt.Errorf("error upserting tokens: %s", err)
 	}
-	return newTokens, nil
+	return persistedTokens, nil
 }
 
 func (p *Provider) prepareTokensOfContractForUser(ctx context.Context, allTokens []chainTokens, addressesToContracts map[string]persist.DBID, user persist.User, timeStamp time.Time) ([]persist.TokenGallery, error) {

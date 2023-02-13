@@ -19,6 +19,10 @@ type AddUserWalletPayloadOrError interface {
 	IsAddUserWalletPayloadOrError()
 }
 
+type AdminAddWalletPayloadOrError interface {
+	IsAdminAddWalletPayloadOrError()
+}
+
 type AdmireFeedEventPayloadOrError interface {
 	IsAdmireFeedEventPayloadOrError()
 }
@@ -91,6 +95,10 @@ type FollowUserPayloadOrError interface {
 	IsFollowUserPayloadOrError()
 }
 
+type GalleryByIDPayloadOrError interface {
+	IsGalleryByIDPayloadOrError()
+}
+
 type GalleryUserOrAddress interface {
 	IsGalleryUserOrAddress()
 }
@@ -129,6 +137,14 @@ type MerchTokensPayloadOrError interface {
 	IsMerchTokensPayloadOrError()
 }
 
+type MintPremiumCardToWalletPayloadOrError interface {
+	IsMintPremiumCardToWalletPayloadOrError()
+}
+
+type MoveCollectionToGalleryPayloadOrError interface {
+	IsMoveCollectionToGalleryPayloadOrError()
+}
+
 type Node interface {
 	IsNode()
 }
@@ -140,6 +156,10 @@ type Notification interface {
 
 type PreverifyEmailPayloadOrError interface {
 	IsPreverifyEmailPayloadOrError()
+}
+
+type PublishGalleryPayloadOrError interface {
+	IsPublishGalleryPayloadOrError()
 }
 
 type RedeemMerchPayloadOrError interface {
@@ -194,6 +214,10 @@ type TokenByIDOrError interface {
 	IsTokenByIDOrError()
 }
 
+type TrendingUsersPayloadOrError interface {
+	IsTrendingUsersPayloadOrError()
+}
+
 type UnfollowUserPayloadOrError interface {
 	IsUnfollowUserPayloadOrError()
 }
@@ -246,8 +270,16 @@ type UpdateGalleryPayloadOrError interface {
 	IsUpdateGalleryPayloadOrError()
 }
 
+type UpdatePrimaryWalletPayloadOrError interface {
+	IsUpdatePrimaryWalletPayloadOrError()
+}
+
 type UpdateTokenInfoPayloadOrError interface {
 	IsUpdateTokenInfoPayloadOrError()
+}
+
+type UpdateUserExperiencePayloadOrError interface {
+	IsUpdateUserExperiencePayloadOrError()
 }
 
 type UpdateUserInfoPayloadOrError interface {
@@ -278,6 +310,10 @@ type ViewGalleryPayloadOrError interface {
 	IsViewGalleryPayloadOrError()
 }
 
+type ViewerGalleryByIDPayloadOrError interface {
+	IsViewerGalleryByIDPayloadOrError()
+}
+
 type ViewerOrError interface {
 	IsViewerOrError()
 }
@@ -287,6 +323,18 @@ type AddUserWalletPayload struct {
 }
 
 func (AddUserWalletPayload) IsAddUserWalletPayloadOrError() {}
+
+type AdminAddWalletInput struct {
+	Username     string                `json:"username"`
+	ChainAddress *persist.ChainAddress `json:"chainAddress"`
+	WalletType   persist.WalletType    `json:"walletType"`
+}
+
+type AdminAddWalletPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (AdminAddWalletPayload) IsAdminAddWalletPayloadOrError() {}
 
 type Admire struct {
 	Dbid         persist.DBID `json:"dbid"`
@@ -320,6 +368,7 @@ type AuthMechanism struct {
 	Eoa        *EoaAuth        `json:"eoa"`
 	GnosisSafe *GnosisSafeAuth `json:"gnosisSafe"`
 	Debug      *DebugAuth      `json:"debug"`
+	MagicLink  *MagicLinkAuth  `json:"magicLink"`
 }
 
 type AuthNonce struct {
@@ -607,8 +656,9 @@ type ErrAddressOwnedByUser struct {
 	Message string `json:"message"`
 }
 
-func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError() {}
-func (ErrAddressOwnedByUser) IsError()                       {}
+func (ErrAddressOwnedByUser) IsAddUserWalletPayloadOrError()  {}
+func (ErrAddressOwnedByUser) IsError()                        {}
+func (ErrAddressOwnedByUser) IsAdminAddWalletPayloadOrError() {}
 
 type ErrAdmireAlreadyExists struct {
 	Message string `json:"message"`
@@ -685,6 +735,14 @@ func (ErrFeedEventNotFound) IsRemoveAdmirePayloadOrError()       {}
 func (ErrFeedEventNotFound) IsCommentOnFeedEventPayloadOrError() {}
 func (ErrFeedEventNotFound) IsRemoveCommentPayloadOrError()      {}
 
+type ErrGalleryNotFound struct {
+	Message string `json:"message"`
+}
+
+func (ErrGalleryNotFound) IsError()                           {}
+func (ErrGalleryNotFound) IsGalleryByIDPayloadOrError()       {}
+func (ErrGalleryNotFound) IsViewerGalleryByIDPayloadOrError() {}
+
 type ErrInvalidInput struct {
 	Message    string   `json:"message"`
 	Parameters []string `json:"parameters"`
@@ -732,6 +790,11 @@ func (ErrInvalidInput) IsDeleteGalleryPayloadOrError()                   {}
 func (ErrInvalidInput) IsUpdateGalleryOrderPayloadOrError()              {}
 func (ErrInvalidInput) IsUpdateFeaturedGalleryPayloadOrError()           {}
 func (ErrInvalidInput) IsUpdateGalleryPayloadOrError()                   {}
+func (ErrInvalidInput) IsPublishGalleryPayloadOrError()                  {}
+func (ErrInvalidInput) IsUpdatePrimaryWalletPayloadOrError()             {}
+func (ErrInvalidInput) IsUpdateUserExperiencePayloadOrError()            {}
+func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
+func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -779,6 +842,12 @@ func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()       {}
 func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()    {}
 func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()            {}
+func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()           {}
+func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()      {}
+func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()           {}
+func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()     {}
+func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()  {}
+func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()  {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -818,13 +887,14 @@ type ErrUserNotFound struct {
 	Message string `json:"message"`
 }
 
-func (ErrUserNotFound) IsUserByUsernameOrError()      {}
-func (ErrUserNotFound) IsUserByIDOrError()            {}
-func (ErrUserNotFound) IsUserByAddressOrError()       {}
-func (ErrUserNotFound) IsError()                      {}
-func (ErrUserNotFound) IsLoginPayloadOrError()        {}
-func (ErrUserNotFound) IsFollowUserPayloadOrError()   {}
-func (ErrUserNotFound) IsUnfollowUserPayloadOrError() {}
+func (ErrUserNotFound) IsUserByUsernameOrError()        {}
+func (ErrUserNotFound) IsUserByIDOrError()              {}
+func (ErrUserNotFound) IsUserByAddressOrError()         {}
+func (ErrUserNotFound) IsError()                        {}
+func (ErrUserNotFound) IsLoginPayloadOrError()          {}
+func (ErrUserNotFound) IsFollowUserPayloadOrError()     {}
+func (ErrUserNotFound) IsUnfollowUserPayloadOrError()   {}
+func (ErrUserNotFound) IsAdminAddWalletPayloadOrError() {}
 
 type ErrUsernameNotAvailable struct {
 	Message string `json:"message"`
@@ -915,22 +985,46 @@ func (GIFMedia) IsMediaSubtype() {}
 func (GIFMedia) IsMedia()        {}
 
 type Gallery struct {
-	Dbid          persist.DBID  `json:"dbid"`
-	Name          *string       `json:"name"`
-	Description   *string       `json:"description"`
-	Position      *string       `json:"position"`
-	Hidden        *bool         `json:"hidden"`
-	TokenPreviews []*string     `json:"tokenPreviews"`
-	Owner         *GalleryUser  `json:"owner"`
-	Collections   []*Collection `json:"collections"`
+	Dbid          persist.DBID     `json:"dbid"`
+	Name          *string          `json:"name"`
+	Description   *string          `json:"description"`
+	Position      *string          `json:"position"`
+	Hidden        *bool            `json:"hidden"`
+	TokenPreviews []*PreviewURLSet `json:"tokenPreviews"`
+	Owner         *GalleryUser     `json:"owner"`
+	Collections   []*Collection    `json:"collections"`
 }
 
-func (Gallery) IsNode() {}
+func (Gallery) IsNode()                      {}
+func (Gallery) IsGalleryByIDPayloadOrError() {}
+
+type GalleryInfoUpdatedFeedEventData struct {
+	EventTime      *time.Time      `json:"eventTime"`
+	Owner          *GalleryUser    `json:"owner"`
+	NewName        *string         `json:"newName"`
+	NewDescription *string         `json:"newDescription"`
+	Action         *persist.Action `json:"action"`
+}
+
+func (GalleryInfoUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryPositionInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
 	Position  string       `json:"position"`
 }
+
+type GalleryUpdatedFeedEventData struct {
+	HelperGalleryUpdatedFeedEventDataData
+	EventTime      *time.Time      `json:"eventTime"`
+	Owner          *GalleryUser    `json:"owner"`
+	Action         *persist.Action `json:"action"`
+	Gallery        *Gallery        `json:"gallery"`
+	SubEventDatas  []FeedEventData `json:"subEventDatas"`
+	NewName        *string         `json:"newName"`
+	NewDescription *string         `json:"newDescription"`
+}
+
+func (GalleryUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryUser struct {
 	HelperGalleryUserData
@@ -943,6 +1037,7 @@ type GalleryUser struct {
 	Tokens              []*Token        `json:"tokens"`
 	TokensByChain       *ChainTokens    `json:"tokensByChain"`
 	Wallets             []*Wallet       `json:"wallets"`
+	PrimaryWallet       *Wallet         `json:"primaryWallet"`
 	FeaturedGallery     *Gallery        `json:"featuredGallery"`
 	Galleries           []*Gallery      `json:"galleries"`
 	Badges              []*Badge        `json:"badges"`
@@ -1038,6 +1133,10 @@ type LogoutPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
 
+type MagicLinkAuth struct {
+	Token string `json:"token"`
+}
+
 type MembershipTier struct {
 	Dbid     persist.DBID   `json:"dbid"`
 	Name     *string        `json:"name"`
@@ -1067,6 +1166,29 @@ type MerchTokensPayload struct {
 }
 
 func (MerchTokensPayload) IsMerchTokensPayloadOrError() {}
+
+type MintPremiumCardToWalletInput struct {
+	TokenID         string            `json:"tokenId"`
+	WalletAddresses []persist.Address `json:"walletAddresses"`
+}
+
+type MintPremiumCardToWalletPayload struct {
+	Tx string `json:"tx"`
+}
+
+func (MintPremiumCardToWalletPayload) IsMintPremiumCardToWalletPayloadOrError() {}
+
+type MoveCollectionToGalleryInput struct {
+	SourceCollectionID persist.DBID `json:"sourceCollectionId"`
+	TargetGalleryID    persist.DBID `json:"targetGalleryId"`
+}
+
+type MoveCollectionToGalleryPayload struct {
+	OldGallery *Gallery `json:"oldGallery"`
+	NewGallery *Gallery `json:"newGallery"`
+}
+
+func (MoveCollectionToGalleryPayload) IsMoveCollectionToGalleryPayloadOrError() {}
 
 type NotificationEdge struct {
 	Node   Notification `json:"node"`
@@ -1137,6 +1259,18 @@ type PreviewURLSet struct {
 	Large     *string `json:"large"`
 	SrcSet    *string `json:"srcSet"`
 }
+
+type PublishGalleryInput struct {
+	GalleryID persist.DBID `json:"galleryId"`
+	EditID    string       `json:"editId"`
+	Caption   *string      `json:"caption"`
+}
+
+type PublishGalleryPayload struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
+func (PublishGalleryPayload) IsPublishGalleryPayloadOrError() {}
 
 type RedeemMerchInput struct {
 	TokenIds   []string              `json:"tokenIds"`
@@ -1380,6 +1514,16 @@ type TokensConnection struct {
 	PageInfo *PageInfo    `json:"pageInfo"`
 }
 
+type TrendingUsersInput struct {
+	Report Window `json:"report"`
+}
+
+type TrendingUsersPayload struct {
+	Users []*GalleryUser `json:"users"`
+}
+
+func (TrendingUsersPayload) IsTrendingUsersPayloadOrError() {}
+
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
 	User   *GalleryUser `json:"user"`
@@ -1523,9 +1667,10 @@ type UpdateGalleryInput struct {
 	Description        *string                           `json:"description"`
 	Caption            *string                           `json:"caption"`
 	DeletedCollections []persist.DBID                    `json:"deletedCollections"`
-	UpdateCollections  []*UpdateCollectionInput          `json:"updateCollections"`
+	UpdatedCollections []*UpdateCollectionInput          `json:"updatedCollections"`
 	CreatedCollections []*CreateCollectionInGalleryInput `json:"createdCollections"`
 	Order              []persist.DBID                    `json:"order"`
+	EditID             *string                           `json:"editId"`
 }
 
 type UpdateGalleryOrderInput struct {
@@ -1544,6 +1689,12 @@ type UpdateGalleryPayload struct {
 
 func (UpdateGalleryPayload) IsUpdateGalleryPayloadOrError() {}
 
+type UpdatePrimaryWalletPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdatePrimaryWalletPayload) IsUpdatePrimaryWalletPayloadOrError() {}
+
 type UpdateTokenInfoInput struct {
 	TokenID        persist.DBID  `json:"tokenId"`
 	CollectorsNote string        `json:"collectorsNote"`
@@ -1555,6 +1706,17 @@ type UpdateTokenInfoPayload struct {
 }
 
 func (UpdateTokenInfoPayload) IsUpdateTokenInfoPayloadOrError() {}
+
+type UpdateUserExperienceInput struct {
+	ExperienceType UserExperienceType `json:"experienceType"`
+	Experienced    bool               `json:"experienced"`
+}
+
+type UpdateUserExperiencePayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (UpdateUserExperiencePayload) IsUpdateUserExperiencePayloadOrError() {}
 
 type UpdateUserInfoInput struct {
 	Username string `json:"username"`
@@ -1594,6 +1756,11 @@ type UserEmail struct {
 	Email                     *persist.Email                   `json:"email"`
 	VerificationStatus        *persist.EmailVerificationStatus `json:"verificationStatus"`
 	EmailNotificationSettings *EmailNotificationSettings       `json:"emailNotificationSettings"`
+}
+
+type UserExperience struct {
+	Type        UserExperienceType `json:"type"`
+	Experienced bool               `json:"experienced"`
 }
 
 type UserFollowedUsersFeedEventData struct {
@@ -1653,6 +1820,7 @@ type Viewer struct {
 	// Seen notifications come after unseen notifications
 	Notifications        *NotificationsConnection `json:"notifications"`
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
+	UserExperiences      []*UserExperience        `json:"userExperiences"`
 }
 
 func (Viewer) IsNode()          {}
@@ -1661,6 +1829,8 @@ func (Viewer) IsViewerOrError() {}
 type ViewerGallery struct {
 	Gallery *Gallery `json:"gallery"`
 }
+
+func (ViewerGallery) IsViewerGalleryByIDPayloadOrError() {}
 
 type Wallet struct {
 	Dbid         persist.DBID          `json:"dbid"`
@@ -1840,5 +2010,44 @@ func (e *TokenType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e TokenType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type UserExperienceType string
+
+const (
+	UserExperienceTypeMultiGalleryAnnouncement UserExperienceType = "MultiGalleryAnnouncement"
+)
+
+var AllUserExperienceType = []UserExperienceType{
+	UserExperienceTypeMultiGalleryAnnouncement,
+}
+
+func (e UserExperienceType) IsValid() bool {
+	switch e {
+	case UserExperienceTypeMultiGalleryAnnouncement:
+		return true
+	}
+	return false
+}
+
+func (e UserExperienceType) String() string {
+	return string(e)
+}
+
+func (e *UserExperienceType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = UserExperienceType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid UserExperienceType", str)
+	}
+	return nil
+}
+
+func (e UserExperienceType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

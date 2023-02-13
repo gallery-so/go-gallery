@@ -1,0 +1,420 @@
+query userByUsernameQuery($user: String!) {
+  userByUsername(username: $user) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on GalleryUser {
+      username
+      dbid
+    }
+  }
+}
+
+query userByIdQuery($id: DBID!) {
+  userById(id: $id) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on GalleryUser {
+      username
+      dbid
+    }
+  }
+}
+
+query userByAddressQuery($input: ChainAddressInput!) {
+  userByAddress(chainAddress: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on GalleryUser {
+      username
+      dbid
+    }
+  }
+}
+
+query viewerQuery {
+  viewer {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on Viewer {
+      userExperiences {
+        type
+        experienced
+      }
+      user {
+        feed(first: 10) {
+          edges {
+            node {
+              ... on Error {
+                message
+              }
+              ... on FeedEvent {
+                dbid
+                caption
+                  eventData {
+                    action
+                    ... on GalleryUpdatedFeedEventData {
+                      subEventDatas {
+                        action
+                        ... on TokensAddedToCollectionFeedEventData {
+                          newTokens {
+                            token {
+                              dbid
+                              name
+                            }
+                          }
+                        }
+                        ... on CollectionCreatedFeedEventData {
+                          newTokens {
+                            token {
+                              dbid
+                              name
+                            }
+                          }
+                        }
+
+                        ... on GalleryInfoUpdatedFeedEventData {
+                          newName
+                          newDescription
+                        }
+                      }
+                    }
+                  }
+              }
+            }
+          }
+        }
+        username
+        dbid
+      }
+    }
+  }
+}
+
+query trendingUsersQuery($input: TrendingUsersInput!) {
+  trendingUsers(input: $input) {
+    ... on TrendingUsersPayload {
+      users {
+        dbid
+      }
+    }
+  }
+}
+
+query globalFeedQuery($first: Int) {
+  globalFeed(first: $first) {
+    edges {
+      node {
+        ... on Error {
+          __typename
+          message
+        }
+        ... on FeedEvent {
+          dbid
+        }
+      }
+    }
+  }
+}
+
+query trendingFeedQuery($last: Int) {
+  trendingFeed(last: $last) {
+    edges {
+      node {
+        ... on Error {
+          __typename
+          message
+        }
+        ... on FeedEvent {
+          dbid
+        }
+      }
+    }
+  }
+}
+
+mutation createUserMutation($authMechanism: AuthMechanism!, $input: CreateUserInput!) {
+  createUser(authMechanism: $authMechanism, input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CreateUserPayload {
+      viewer {
+        user {
+          username
+          dbid
+          bio
+          galleries {
+            dbid
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation getAuthNonceMutation($input: ChainAddressInput!) {
+  getAuthNonce(chainAddress: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AuthNonce {
+      nonce
+      userExists
+    }
+  }
+}
+
+mutation loginMutation($authMechanism: AuthMechanism!) {
+  login(authMechanism: $authMechanism) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on LoginPayload {
+      viewer {
+        user {
+          username
+          dbid
+        }
+      }
+    }
+  }
+}
+
+mutation logoutMutation {
+  logout {
+    viewer {
+      user {
+        username
+        dbid
+      }
+    }
+  }
+}
+
+mutation addUserWalletMutation($chainAddress: ChainAddressInput!, $authMechanism: AuthMechanism!) {
+  addUserWallet(chainAddress: $chainAddress, authMechanism: $authMechanism) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AddUserWalletPayload {
+      viewer {
+        user {
+          wallets {
+            dbid
+            chainAddress {
+              address
+              chain
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation removeUserWalletsMutation($walletIds: [DBID!]!) {
+  removeUserWallets(walletIds: $walletIds) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on RemoveUserWalletsPayload {
+      viewer {
+        user {
+          wallets {
+            dbid
+            chainAddress {
+              address
+              chain
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation syncTokensMutation($chains: [Chain!]) {
+  syncTokens(chains: $chains) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on SyncTokensPayload {
+      viewer {
+        user {
+          tokens {
+            chain
+            dbid
+            tokenId
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation createCollectionMutation($input: CreateCollectionInput!) {
+  createCollection(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CreateCollectionPayload {
+      collection {
+        dbid
+        name
+        tokens {
+          token {
+            dbid
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation viewGalleryMutation($galleryId: DBID!) {
+  viewGallery(galleryId: $galleryId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on ViewGalleryPayload {
+      gallery {
+        dbid
+      }
+    }
+  }
+}
+
+mutation updateGalleryMutation($input: UpdateGalleryInput!) {
+  updateGallery(input: $input) {
+    ... on UpdateGalleryPayload {
+      gallery {
+        dbid
+        name
+        description
+        collections {
+          dbid
+          name
+          tokens {
+            token {
+              dbid
+            }
+          }
+        }
+      }
+    }
+  }
+}
+mutation publishGalleryMutation($input: PublishGalleryInput!) {
+  publishGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on PublishGalleryPayload {
+      gallery {
+        dbid
+      }
+    }
+  }
+}
+
+mutation admireFeedEventMutation($feedEventId: DBID!) {
+  admireFeedEvent(feedEventId: $feedEventId) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on AdmireFeedEventPayload {
+      feedEvent {
+        dbid
+      }
+    }
+  }
+}
+
+mutation commentOnFeedEventMutation($feedEventId: DBID!, $comment: String!) {
+  commentOnFeedEvent(feedEventId: $feedEventId, comment: $comment) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CommentOnFeedEventPayload {
+      feedEvent {
+        dbid
+      }
+    }
+  }
+}
+
+mutation updateUserExperience($input: UpdateUserExperienceInput!) {
+  updateUserExperience(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on UpdateUserExperiencePayload {
+      viewer {
+        userExperiences {
+          type
+          experienced
+        }
+      }
+    }
+  }
+}
+
+mutation moveCollectionToGallery($input: MoveCollectionToGalleryInput!) {
+  moveCollectionToGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on MoveCollectionToGalleryPayload {
+      oldGallery {
+        dbid
+        collections {
+          dbid
+        }
+      }
+      newGallery {
+        dbid
+        collections {
+          dbid
+        }
+      }
+    }
+  }
+}
+
+mutation createGalleryMutation($input: CreateGalleryInput!) {
+  createGallery(input: $input) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on CreateGalleryPayload {
+      gallery {
+        dbid
+        name
+        description
+        position
+      }
+    }
+  }
+}

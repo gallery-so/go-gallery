@@ -5,16 +5,15 @@ import (
 	"crypto/sha256"
 	"encoding"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net"
-	"strings"
 
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 	"github.com/spf13/viper"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -38,7 +37,7 @@ type GalleryAPI struct {
 
 func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *string, position string) (db.Gallery, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"name":        {name, "max=200"},
 		"description": {description, "max=600"},
 		"position":    {position, "required"},
@@ -46,7 +45,7 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 		return db.Gallery{}, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -67,22 +66,24 @@ func (api GalleryAPI) CreateGallery(ctx context.Context, name, description *stri
 
 func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGalleryInput) (db.Gallery, error) {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":           {update.GalleryID, "required"},
-		"name":                {update.Name, "max=200"},
-		"description":         {update.Description, "max=600"},
-		"deleted_collections": {update.DeletedCollections, "unique"},
-		"created_collections": {update.CreatedCollections, "created_collections"},
+		"name":                {update.Name, "omitempty,max=200"},
+		"description":         {update.Description, "omitempty,max=600"},
+		"deleted_collections": {update.DeletedCollections, "omitempty,unique"},
+		"created_collections": {update.CreatedCollections, "omitempty,created_collections"},
 	}); err != nil {
 		return db.Gallery{}, err
 	}
+
+	events := make([]db.Event, 0, len(update.CreatedCollections)+len(update.UpdatedCollections)+1)
 
 	curGal, err := api.loaders.GalleryByGalleryID.Load(update.GalleryID)
 	if err != nil {
 		return db.Gallery{}, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return db.Gallery{}, err
 	}
@@ -107,15 +108,6 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	// update collections
-
-	if len(update.UpdateCollections) > 0 {
-		err = updateCollectionsInfoAndTokens(ctx, q, update.UpdateCollections)
-		if err != nil {
-			return db.Gallery{}, err
-		}
-	}
-
 	// create collections
 	mappedIDs := make(map[persist.DBID]persist.DBID)
 	for _, c := range update.CreatedCollections {
@@ -133,7 +125,33 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		if err != nil {
 			return db.Gallery{}, err
 		}
+
+		events = append(events, db.Event{
+			ID:             persist.GenerateID(),
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionCollectionCreated,
+			ResourceTypeID: persist.ResourceTypeCollection,
+			SubjectID:      collectionID,
+			CollectionID:   collectionID,
+			GalleryID:      update.GalleryID,
+			Data: persist.EventData{
+				CollectionTokenIDs:       c.Tokens,
+				CollectionCollectorsNote: c.CollectorsNote,
+			},
+		})
+
 		mappedIDs[c.GivenID] = collectionID
+	}
+
+	// update collections
+
+	if len(update.UpdatedCollections) > 0 {
+		collEvents, err := updateCollectionsInfoAndTokens(ctx, q, userID, update.GalleryID, update.UpdatedCollections)
+		if err != nil {
+			return db.Gallery{}, err
+		}
+
+		events = append(events, collEvents...)
 	}
 
 	// order collections
@@ -143,14 +161,56 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		}
 	}
 
-	err = q.UpdateGallery(ctx, db.UpdateGalleryParams{
-		ID:          update.GalleryID,
-		Name:        util.FromPointer(update.Name),
-		Description: util.FromPointer(update.Description),
-		Collections: update.Order,
-	})
+	params := db.UpdateGalleryInfoParams{
+		ID: update.GalleryID,
+	}
+
+	util.SetConditionalValue(update.Name, &params.Name, &params.NameSet)
+	util.SetConditionalValue(update.Description, &params.Description, &params.DescriptionSet)
+
+	err = q.UpdateGalleryInfo(ctx, params)
 	if err != nil {
 		return db.Gallery{}, err
+	}
+
+	if update.Name != nil || update.Description != nil {
+		e := db.Event{
+			ID:             persist.GenerateID(),
+			ActorID:        persist.DBIDToNullStr(userID),
+			Action:         persist.ActionGalleryInfoUpdated,
+			ResourceTypeID: persist.ResourceTypeGallery,
+			GalleryID:      update.GalleryID,
+			SubjectID:      update.GalleryID,
+		}
+
+		change := false
+
+		if update.Name != nil && *update.Name != curGal.Name {
+			e.Data.GalleryName = update.Name
+			change = true
+		}
+
+		if update.Description != nil && *update.Description != curGal.Description {
+			e.Data.GalleryDescription = update.Description
+			change = true
+		}
+
+		if change {
+			events = append(events, e)
+		}
+
+	}
+
+	asList := persist.DBIDList(update.Order)
+
+	if len(asList) > 0 {
+		err = q.UpdateGalleryCollections(ctx, db.UpdateGalleryCollectionsParams{
+			GalleryID:   update.GalleryID,
+			Collections: asList,
+		})
+		if err != nil {
+			return db.Gallery{}, err
+		}
 	}
 
 	err = tx.Commit(ctx)
@@ -163,70 +223,100 @@ func (api GalleryAPI) UpdateGallery(ctx context.Context, update model.UpdateGall
 		return db.Gallery{}, err
 	}
 
+	if update.Caption != nil && *update.Caption == "" {
+		update.Caption = nil
+	}
+	_, err = dispatchEvents(ctx, events, api.validator, update.EditID, nil)
+	if err != nil {
+		return db.Gallery{}, err
+	}
+
 	return newGall, nil
 }
 
-func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update []*model.UpdateCollectionInput) error {
+func (api GalleryAPI) PublishGallery(ctx context.Context, update model.PublishGalleryInput) error {
+
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"galleryID": {update.GalleryID, "required"},
+		"editID":    {update.EditID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	_, err := publishEventGroup(ctx, update.EditID, persist.ActionGalleryUpdated, update.Caption)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, actor, gallery persist.DBID, update []*model.UpdateCollectionInput) ([]db.Event, error) {
+
+	events := make([]db.Event, 0)
+
 	dbids, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Dbid.String(), nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	collectorNotes, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.CollectorsNote, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	layouts, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
-		b, err := json.Marshal(modelToTokenLayout(u.Layout))
-		if err != nil {
-			return pgtype.JSONB{
-				Status: pgtype.Null,
-			}, err
-		}
-
-		return pgtype.JSONB{
-			Bytes:  b,
-			Status: pgtype.Present,
-		}, nil
+		return persist.ToJSONB(modelToTokenLayout(u.Layout))
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tokenSettings, err := util.Map(update, func(u *model.UpdateCollectionInput) (pgtype.JSONB, error) {
 		settings := modelToTokenSettings(u.TokenSettings)
-		b, err := json.Marshal(settings)
-		if err != nil {
-			return pgtype.JSONB{
-				Status: pgtype.Null,
-			}, err
-		}
-		return pgtype.JSONB{
-			Bytes:  b,
-			Status: pgtype.Present,
-		}, nil
+		return persist.ToJSONB(settings)
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	hiddens, err := util.Map(update, func(u *model.UpdateCollectionInput) (bool, error) {
 		return u.Hidden, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	names, err := util.Map(update, func(u *model.UpdateCollectionInput) (string, error) {
 		return u.Name, nil
 	})
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	for _, collection := range update {
+		curCol, err := q.GetCollectionById(ctx, collection.Dbid)
+		if err != nil {
+			return nil, err
+		}
+
+		// add event if collectors note updated
+		if collection.CollectorsNote != "" && collection.CollectorsNote != curCol.CollectorsNote.String {
+			events = append(events, db.Event{
+				ActorID:        persist.DBIDToNullStr(actor),
+				ResourceTypeID: persist.ResourceTypeCollection,
+				SubjectID:      collection.Dbid,
+				Action:         persist.ActionCollectorsNoteAddedToCollection,
+				CollectionID:   collection.Dbid,
+				GalleryID:      gallery,
+				Data: persist.EventData{
+					CollectionCollectorsNote: collection.CollectorsNote,
+				},
+			})
+		}
 	}
 
 	err = q.UpdateCollectionsInfo(ctx, db.UpdateCollectionsInfoParams{
@@ -238,30 +328,51 @@ func updateCollectionsInfoAndTokens(ctx context.Context, q *db.Queries, update [
 		Hidden:          hiddens,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, collection := range update {
+		curTokens, err := q.GetCollectionTokensByCollectionID(ctx, collection.Dbid)
+		if err != nil {
+			return nil, err
+		}
+
 		err = q.UpdateCollectionTokens(ctx, db.UpdateCollectionTokensParams{
 			ID:   collection.Dbid,
 			Nfts: collection.Tokens,
 		})
 		if err != nil {
-			return err
+			return nil, err
+		}
+
+		diff := util.Difference(curTokens, collection.Tokens)
+
+		if len(diff) > 0 {
+			events = append(events, db.Event{
+				ResourceTypeID: persist.ResourceTypeCollection,
+				SubjectID:      collection.Dbid,
+				Action:         persist.ActionTokensAddedToCollection,
+				ActorID:        persist.DBIDToNullStr(actor),
+				CollectionID:   collection.Dbid,
+				GalleryID:      gallery,
+				Data: persist.EventData{
+					CollectionTokenIDs: diff,
+				},
+			})
 		}
 	}
-	return nil
+	return events, nil
 }
 
 func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID) error {
 
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -279,7 +390,7 @@ func (api GalleryAPI) DeleteGallery(ctx context.Context, galleryID persist.DBID)
 
 func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return nil, err
@@ -293,9 +404,35 @@ func (api GalleryAPI) GetGalleryById(ctx context.Context, galleryID persist.DBID
 	return &gallery, nil
 }
 
+func (api GalleryAPI) GetViewerGalleryById(ctx context.Context, galleryID persist.DBID) (*db.Gallery, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"galleryID": {galleryID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+
+	if err != nil {
+		return nil, persist.ErrGalleryNotFound{ID: galleryID}
+	}
+
+	gallery, err := api.loaders.GalleryByGalleryID.Load(galleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	if userID != gallery.OwnerUserID {
+		return nil, persist.ErrGalleryNotFound{ID: galleryID}
+	}
+
+	return &gallery, nil
+}
+
 func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID persist.DBID) (*db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return nil, err
@@ -311,7 +448,7 @@ func (api GalleryAPI) GetGalleryByCollectionId(ctx context.Context, collectionID
 
 func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.DBID) ([]db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -325,15 +462,18 @@ func (api GalleryAPI) GetGalleriesByUserId(ctx context.Context, userID persist.D
 	return galleries, nil
 }
 
-func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]string, error) {
+func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID persist.DBID) ([]persist.Media, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return nil, err
 	}
 
-	previews, err := api.queries.GetGalleryTokenPreviewsByID(ctx, galleryID)
+	medias, err := api.queries.GetGalleryTokenMediasByGalleryID(ctx, db.GetGalleryTokenMediasByGalleryIDParams{
+		ID:    galleryID,
+		Limit: 4,
+	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -341,19 +481,19 @@ func (api GalleryAPI) GetTokenPreviewsByGalleryID(ctx context.Context, galleryID
 		return nil, err
 	}
 
-	return previews, nil
+	return medias, nil
 }
 
 func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID persist.DBID, collections []persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":   {galleryID, "required"},
 		"collections": {collections, fmt.Sprintf("required,unique,max=%d", maxCollectionsPerGallery)},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -370,7 +510,7 @@ func (api GalleryAPI) UpdateGalleryCollections(ctx context.Context, galleryID pe
 
 func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.DBID, name, description *string) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID":   {galleryID, "required"},
 		"name":        {name, "max=200"},
 		"description": {description, "max=600"},
@@ -399,7 +539,7 @@ func (api GalleryAPI) UpdateGalleryInfo(ctx context.Context, galleryID persist.D
 
 func (api GalleryAPI) UpdateGalleryHidden(ctx context.Context, galleryID persist.DBID, hidden bool) (coredb.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return db.Gallery{}, err
@@ -418,9 +558,14 @@ func (api GalleryAPI) UpdateGalleryHidden(ctx context.Context, galleryID persist
 
 func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*model.GalleryPositionInput) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"positions": {positions, "required,min=1"},
 	}); err != nil {
+		return err
+	}
+
+	user, err := getAuthenticatedUserID(ctx)
+	if err != nil {
 		return err
 	}
 
@@ -431,20 +576,37 @@ func (api GalleryAPI) UpdateGalleryPositions(ctx context.Context, positions []*m
 		pos[i] = position.Position
 	}
 
-	err := api.queries.UpdateGalleryPositions(ctx, db.UpdateGalleryPositionsParams{
-		GalleryIds: ids,
-		Positions:  pos,
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	q := api.queries.WithTx(tx)
+
+	err = q.UpdateGalleryPositions(ctx, db.UpdateGalleryPositionsParams{
+		GalleryIds:  ids,
+		Positions:   pos,
+		OwnerUserID: user,
 	})
 	if err != nil {
 		return err
 	}
 
-	return nil
+	areDuplicates, err := q.UserHasDuplicateGalleryPositions(ctx, user)
+	if err != nil {
+		return err
+	}
+	if areDuplicates {
+		return fmt.Errorf("gallery positions are not unique for user %s", user)
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (db.Gallery, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return db.Gallery{}, err
@@ -458,25 +620,25 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 	gc := util.GinContextFromContext(ctx)
 
 	if auth.GetUserAuthedFromCtx(gc) {
-		userID, err := getAuthenticatedUser(ctx)
+		userID, err := getAuthenticatedUserID(ctx)
 		if err != nil {
 			return db.Gallery{}, err
 		}
 
-		// if gallery.OwnerUserID != userID {
-		// only view gallery if the user hasn't already viewed it in this most recent notification period
+		if gallery.OwnerUserID != userID {
+			// only view gallery if the user hasn't already viewed it in this most recent notification period
 
-		_, err = dispatchEvent(ctx, db.Event{
-			ActorID:        persist.DBIDToNullStr(userID),
-			ResourceTypeID: persist.ResourceTypeGallery,
-			SubjectID:      galleryID,
-			Action:         persist.ActionViewedGallery,
-			GalleryID:      galleryID,
-		}, api.validator, nil)
-		if err != nil {
-			return db.Gallery{}, err
+			_, err = dispatchEvent(ctx, db.Event{
+				ActorID:        persist.DBIDToNullStr(userID),
+				ResourceTypeID: persist.ResourceTypeGallery,
+				SubjectID:      galleryID,
+				Action:         persist.ActionViewedGallery,
+				GalleryID:      galleryID,
+			}, api.validator, nil)
+			if err != nil {
+				return db.Gallery{}, err
+			}
 		}
-		// }
 	} else {
 		_, err := dispatchEvent(ctx, db.Event{
 			ResourceTypeID: persist.ResourceTypeGallery,
@@ -495,54 +657,14 @@ func (api GalleryAPI) ViewGallery(ctx context.Context, galleryID persist.DBID) (
 
 func getExternalID(ctx context.Context) *string {
 	gc := util.GinContextFromContext(ctx)
-
-	// It's possible that there are multiple X-Forwaded-For
-	// headers in the request so we first combine it into a single slice.
-	forwarded := make([]string, 0)
-	for _, header := range gc.Request.Header["X-Forwarded-For"] {
-		header = strings.ReplaceAll(header, " ", "")
-		proxied := strings.Split(header, ",")
-		forwarded = append(forwarded, proxied...)
+	if ip := net.ParseIP(gc.ClientIP()); ip != nil && !ip.IsPrivate() {
+		hash := sha256.New()
+		hash.Write([]byte(viper.GetString("BACKEND_SECRET") + ip.String()))
+		res, _ := hash.(encoding.BinaryMarshaler).MarshalBinary()
+		externalID := base64.StdEncoding.EncodeToString(res)
+		return &externalID
 	}
-
-	// Find the first valid, non-private IP that is
-	// closest to the client from left to right.
-	for _, address := range forwarded {
-		if ip := net.ParseIP(address); ip != nil && !IsPrivate(ip) {
-			hash := sha256.New()
-			hash.Write([]byte(viper.GetString("BACKEND_SECRET") + ip.String()))
-			res, _ := hash.(encoding.BinaryMarshaler).MarshalBinary()
-			externalID := base64.StdEncoding.EncodeToString(res)
-			return &externalID
-		}
-	}
-
 	return nil
-}
-
-// The below code is modified from the IsPrivate() method of the 'net' standard library package
-// available in go versions > 1.17.
-//
-// TODO: Remove when backend is upgraded from 1.16 in favor of ip.IsPrivate()
-//
-// IsPrivate reports whether ip is a private address, according to
-// RFC 1918 (IPv4 addresses) and RFC 4193 (IPv6 addresses).
-func IsPrivate(ip net.IP) bool {
-	if ip4 := ip.To4(); ip4 != nil {
-		// Following RFC 1918, Section 3. Private Address Space which says:
-		//   The Internet Assigned Numbers Authority (IANA) has reserved the
-		//   following three blocks of the IP address space for private internets:
-		//     10.0.0.0        -   10.255.255.255  (10/8 prefix)
-		//     172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
-		//     192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
-		return ip4[0] == 10 ||
-			(ip4[0] == 172 && ip4[1]&0xf0 == 16) ||
-			(ip4[0] == 192 && ip4[1] == 168)
-	}
-	// Following RFC 4193, Section 8. IANA Considerations which says:
-	//   The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
-	IPv6Len := 16
-	return len(ip) == IPv6Len && ip[0]&0xfe == 0xfc
 }
 
 func modelToTokenLayout(u *model.CollectionLayoutInput) persist.TokenLayout {

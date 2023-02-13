@@ -4,11 +4,12 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - name: Dump GitHub context
-        run: echo "$GITHUB_CONTEXT"
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
       - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
@@ -17,29 +18,6 @@ jobs:
         run: |
           go mod download
           go install gotest.tools/gotestsum@v1.8.2
-      - name: "Update apt"
-        run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
-      - name: "ls"
-        run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip secrets"
-        run: echo "A" | unzip _deploy.zip -d _deploy
-      - name: "Decrypt local"
-        run: keybase decrypt -i _encrypted_local -o _local.zip
-      - name: "Unzip local"
-        run: echo "A" | unzip _local.zip -d _local
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
@@ -50,12 +28,15 @@ jobs:
           gotestsum --junitfile /tmp/test-reports/indexer-integration-tests.xml -- -race ./indexer/...
   unit:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_CREDENTIALS: ${{ secrets.GCP_DEV_CREDENTIALS }}
     steps:
-      - name: Dump GitHub context
-        run: echo "$GITHUB_CONTEXT"
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
       - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
@@ -64,30 +45,19 @@ jobs:
         run: |
           go mod download
           go install gotest.tools/gotestsum@v1.8.2
-      - name: "Update apt"
-        run: sudo apt-get update
-      - name: "Download Keybase"
-        run: curl --remote-name https://prerelease.keybase.io/keybase_amd64.deb
-      - name: "Install Keybase"
-        run: sudo apt-get install ./keybase_amd64.deb unzip
-      - name: "Run keybase globally"
-        run: run_keybase -g
-      - name: "Oneshot Keybase"
-        run: keybase oneshot
-        env:
-          KEYBASE_USERNAME: ${{secrets.KEYBASE_USERNAME}}
-          KEYBASE_PAPERKEY: ${{secrets.KEYBASE_PAPER_KEY}}
-      - name: "ls"
-        run: ls
-      - name: "Decrypt secrets"
-        run: keybase decrypt -i _encrypted_deploy -o _deploy.zip
-      - name: "Unzip secrets"
-        run: echo "A" | unzip _deploy.zip -d _deploy
-      - name: "Decrypt local"
-        run: keybase decrypt -i _encrypted_local -o _local.zip
-      - name: "Unzip local"
-        run: echo "A" | unzip _local.zip -d _local
       - name: Test
         run: |
           mkdir -p /tmp/test-reports
           gotestsum --junitfile /tmp/test-reports/unit-tests.xml -- -short ./...
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+      - name: Install Dependencies
+        run: yarn install
+      - name: Enforce GraphQL Format
+        run: yarn prettier --check graphql/schema/schema.graphql

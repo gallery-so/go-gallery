@@ -2,7 +2,6 @@ package tezos
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -20,11 +19,7 @@ func setupTest(t *testing.T) *assert.Assertions {
 }
 
 func newStorageClient(ctx context.Context) *storage.Client {
-	fi, err := util.FindFile("_deploy/service-key-dev.json", 4)
-	if err != nil {
-		panic(err)
-	}
-	stg, err := storage.NewClient(ctx, option.WithCredentialsFile(fi))
+	stg, err := storage.NewClient(ctx, option.WithCredentialsJSON(util.LoadEncryptedServiceKey("secrets/dev/service-key-dev.json")))
 	if err != nil {
 		panic(err)
 	}
@@ -45,15 +40,6 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	// Tests can run from directories deeper in the source tree, so we need to search parent directories to find this config file
-	path, err := util.FindFile("_local/app-local-backend.yaml", 5)
-	if err != nil {
-		panic(err)
-	}
-
-	viper.SetConfigFile(path)
-	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("error reading viper config: %s\nmake sure your _local directory is decrypted and up-to-date", err))
-	}
-
+	envFile := util.ResolveEnvFile("backend", "local")
+	util.LoadEncryptedEnvFile(envFile)
 }

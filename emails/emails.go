@@ -61,7 +61,7 @@ func coreInitServer() *gin.Engine {
 	var pub *pubsub.Client
 	var err error
 	if viper.GetString("ENV") == "local" {
-		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsFile("./_deploy/service-key-dev.json"))
+		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
 		if err != nil {
 			panic(err)
 		}
@@ -85,7 +85,7 @@ func setDefaults() {
 	viper.SetDefault("ENV", "local")
 	viper.SetDefault("POSTGRES_HOST", "0.0.0.0")
 	viper.SetDefault("POSTGRES_PORT", 5432)
-	viper.SetDefault("POSTGRES_USER", "postgres")
+	viper.SetDefault("POSTGRES_USER", "gallery_backend")
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("ALLOWED_ORIGINS", "http://localhost:3000")
@@ -95,7 +95,7 @@ func setDefaults() {
 	viper.SetDefault("SENDGRID_API_KEY", "")
 	viper.SetDefault("SENDGRID_VALIDATION_KEY", "")
 	viper.SetDefault("FROM_EMAIL", "test@gallery.so")
-	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "c63e40ab-5049-4ce1-9d14-8742a3c5c1a8")
+	viper.SetDefault("SENDGRID_DEFAULT_LIST_ID", "865cea98-bf23-4ca3-a8d7-2dc9ea29951b")
 	viper.SetDefault("SENDGRID_NOTIFICATIONS_TEMPLATE_ID", "d-6135d8f36e9946979b0dcf1800363ab4")
 	viper.SetDefault("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-b575d54dc86d40fdbf67b3119589475a")
 	viper.SetDefault("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", 20676)
@@ -113,7 +113,7 @@ func setDefaults() {
 			fi = os.Args[1]
 		}
 		envFile := util.ResolveEnvFile("emails", fi)
-		util.LoadEnvFile(envFile)
+		util.LoadEncryptedEnvFile(envFile)
 	}
 
 	if viper.GetString("ENV") != "local" {

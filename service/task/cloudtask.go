@@ -8,8 +8,10 @@ import (
 	"time"
 
 	gcptasks "cloud.google.com/go/cloudtasks/apiv2"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
@@ -30,10 +32,8 @@ type FeedbotMessage struct {
 }
 
 type TokenProcessingUserMessage struct {
-	UserID            persist.DBID  `json:"user_id" binding:"required"`
-	Chain             persist.Chain `json:"chain"`
-	ImageKeywords     []string      `json:"image_keywords" binding:"required"`
-	AnimationKeywords []string      `json:"animation_keywords" binding:"required"`
+	UserID   persist.DBID   `json:"user_id" binding:"required"`
+	TokenIDs []persist.DBID `json:"token_ids" binding:"required"`
 }
 
 type TokenProcessingContractTokensMessage struct {
@@ -51,6 +51,10 @@ type DeepRefreshMessage struct {
 	RefreshRange    persist.BlockRange      `json:"refresh_range"`
 }
 
+type ValidateNFTsMessage struct {
+	OwnerAddress persist.EthereumAddress `json:"owner_address"`
+}
+
 func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForFeed")
 	defer tracing.FinishSpan(span)
@@ -59,13 +63,16 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 		"Event ID": message.ID,
 	})
 
+	url := fmt.Sprintf("%s/tasks/feed-event", viper.GetString("FEED_URL"))
+	logger.For(ctx).Infof("creating task for feed event %s, scheduling on %s, sending to %s", message.ID, scheduleOn, url)
+
 	queue := viper.GetString("GCLOUD_FEED_QUEUE")
 	task := &taskspb.Task{
 		ScheduleTime: timestamppb.New(scheduleOn),
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/tasks/feed-event", viper.GetString("FEED_URL")),
+				Url:        url,
 				Headers: map[string]string{
 					"Content-type":  "application/json",
 					"sentry-trace":  span.TraceID.String(),
@@ -120,10 +127,7 @@ func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUs
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
 	defer tracing.FinishSpan(span)
 
-	tracing.AddEventDataToSpan(span, map[string]interface{}{
-		"User ID": message.UserID,
-		"Chain":   message.Chain,
-	})
+	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
 
 	queue := viper.GetString("TOKEN_PROCESSING_QUEUE")
 	task := &taskspb.Task{
@@ -203,6 +207,32 @@ func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, c
 	return submitHttpTask(ctx, client, queue, task, body)
 }
 
+func CreateTaskForWalletValidation(ctx context.Context, message ValidateNFTsMessage, client *gcptasks.Client) error {
+	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletValidate")
+	defer tracing.FinishSpan(span)
+
+	queue := viper.GetString("GCLOUD_WALLET_VALIDATE_QUEUE")
+	task := &taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				HttpMethod: taskspb.HttpMethod_POST,
+				Url:        fmt.Sprintf("%s/nfts/validate", viper.GetString("INDEXER_HOST")),
+				Headers: map[string]string{
+					"Content-type": "application/json",
+					"sentry-trace": span.TraceID.String(),
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return submitHttpTask(ctx, client, queue, task, body)
+}
+
 // NewClient returns a new task client with tracing enabled.
 func NewClient(ctx context.Context) *gcptasks.Client {
 	trace := tracing.NewTracingInterceptor(true)
@@ -215,17 +245,22 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 	// Configure the client depending on whether or not
 	// the cloud task emulator is used.
 	if viper.GetString("ENV") == "local" {
-		if viper.GetString("TASK_QUEUE_HOST") != "" {
+		if host := viper.GetString("TASK_QUEUE_HOST"); host != "" {
 			copts = append(
 				copts,
-				option.WithEndpoint(viper.GetString("TASK_QUEUE_HOST")),
+				option.WithEndpoint(host),
 				option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 				option.WithoutAuthentication(),
 			)
 		} else {
+			fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
+			if err != nil {
+				logger.For(ctx).WithError(err).Error("failed to find service key, running without task client")
+				return nil
+			}
 			copts = append(
 				copts,
-				option.WithCredentialsFile("./_deploy/service-key-dev.json"),
+				option.WithCredentialsJSON(fi),
 			)
 		}
 	}

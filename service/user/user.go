@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
@@ -21,7 +22,8 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 )
 
-var errUserCannotRemoveAllAddresses = errors.New("user does not have enough addresses to remove")
+var errUserCannotRemoveAllWallets = errors.New("user does not have enough wallets to remove")
+var errUserCannotRemovePrimaryWallet = errors.New("cannot remove primary wallet address")
 var errMustResolveENS = errors.New("ENS username must resolve to owner address")
 
 // GetUserInput is the input for the user get pipeline
@@ -84,7 +86,7 @@ type MergeUsersInput struct {
 
 // CreateUser creates a new user
 func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string, userRepo *postgres.UserRepository,
-	galleryRepo *postgres.GalleryRepository) (userID persist.DBID, galleryID persist.DBID, err error) {
+	galleryRepo *postgres.GalleryRepository, mp *multichain.Provider) (userID persist.DBID, galleryID persist.DBID, err error) {
 	gc := util.GinContextFromContext(pCtx)
 
 	authResult, err := authenticator.Authenticate(pCtx)
@@ -112,6 +114,11 @@ func CreateUser(pCtx context.Context, authenticator auth.Authenticator, username
 	}
 
 	userID, err = userRepo.Create(pCtx, user)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = mp.RunWalletCreationHooks(pCtx, userID, wallet.ChainAddress.Address(), wallet.WalletType, wallet.ChainAddress.Chain())
 	if err != nil {
 		return "", "", err
 	}
@@ -147,8 +154,14 @@ func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletID
 		return err
 	}
 
+	for _, walletID := range pWalletIDs {
+		if user.PrimaryWalletID.String() == walletID.String() {
+			return errUserCannotRemovePrimaryWallet
+		}
+	}
+
 	if len(user.Wallets) <= len(pWalletIDs) {
-		return errUserCannotRemoveAllAddresses
+		return errUserCannotRemoveAllWallets
 	}
 	for _, walletID := range pWalletIDs {
 		if err := userRepo.RemoveWallet(pCtx, pUserID, walletID); err != nil {
@@ -161,7 +174,7 @@ func RemoveWalletsFromUser(pCtx context.Context, pUserID persist.DBID, pWalletID
 
 // AddWalletToUser adds a single wallet to a user in the DB because a signature needs to be provided and validated per address
 func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress persist.ChainAddress, addressAuth auth.Authenticator,
-	userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository) error {
+	userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, mp *multichain.Provider) error {
 
 	authResult, err := addressAuth.Authenticate(pCtx)
 	if err != nil {
@@ -181,7 +194,7 @@ func AddWalletToUser(pCtx context.Context, pUserID persist.DBID, pChainAddress p
 		return err
 	}
 
-	return nil
+	return mp.RunWalletCreationHooks(pCtx, pUserID, authenticatedAddress.ChainAddress.Address(), authenticatedAddress.WalletType, authenticatedAddress.ChainAddress.Chain())
 }
 
 // RemoveAddressesFromUserToken removes any amount of addresses from a user in the DB
@@ -194,7 +207,7 @@ func RemoveAddressesFromUserToken(pCtx context.Context, pUserID persist.DBID, pI
 	}
 
 	if len(user.Wallets) <= len(pInput.Addresses) {
-		return errUserCannotRemoveAllAddresses
+		return errUserCannotRemoveAllWallets
 	}
 
 	return nil

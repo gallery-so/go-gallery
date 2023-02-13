@@ -81,6 +81,7 @@ type Transfer struct {
 	// These are geth types which are useful for getting more details about a transaction.
 	TxHash    common.Hash
 	BlockHash common.Hash
+	TxIndex   uint
 }
 
 // TokenContractMetadata represents a token contract's metadata
@@ -202,7 +203,7 @@ func newHTTPClientForRPC(continueTrace bool, spanOptions ...sentry.SpanOption) *
 	}
 
 	// walk every file in the tls directory and add them to the cert pool
-	filepath.WalkDir("_deploy/root-certs", func(path string, d fs.DirEntry, err error) error {
+	filepath.WalkDir("root-certs", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -609,7 +610,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		if err != nil {
 			return err
 		}
-		return json.Unmarshal(bs, into)
+		return json.Unmarshal(util.RemoveBOM(bs), into)
 	case persist.URITypeArweave:
 		path := strings.ReplaceAll(asString, "arweave://", "")
 		path = strings.ReplaceAll(path, "ar://", "")
@@ -709,7 +710,6 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 	}
 
 	// Otherwise wait for the second reply
-	logger.For(pCtx).WithError(reply.(error)).Error("failed to fetch data from IPFS service, waiting for second")
 	reply = <-responseCh
 	if result, ok := reply.(io.ReadCloser); ok {
 		return result, nil

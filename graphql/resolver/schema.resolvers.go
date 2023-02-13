@@ -17,6 +17,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 func (r *admireResolver) Admirer(ctx context.Context, obj *model.Admire) (*model.GalleryUser, error) {
@@ -77,7 +78,15 @@ func (r *collectionCreatedFeedEventDataResolver) Collection(ctx context.Context,
 }
 
 func (r *collectionCreatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionCreatedFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
+	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
+}
+
+func (r *collectionTokenResolver) Token(ctx context.Context, obj *model.CollectionToken) (*model.Token, error) {
+	return resolveTokenByTokenID(ctx, obj.HelperCollectionTokenData.TokenId)
+}
+
+func (r *collectionTokenResolver) Collection(ctx context.Context, obj *model.CollectionToken) (*model.Collection, error) {
+	return resolveCollectionByCollectionID(ctx, obj.HelperCollectionTokenData.CollectionId)
 }
 
 func (r *collectionTokenResolver) TokenSettings(ctx context.Context, obj *model.CollectionToken) (*model.CollectionTokenSettings, error) {
@@ -93,7 +102,7 @@ func (r *collectionUpdatedFeedEventDataResolver) Collection(ctx context.Context,
 }
 
 func (r *collectionUpdatedFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.CollectionUpdatedFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
+	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
 func (r *collectorsNoteAddedToCollectionFeedEventDataResolver) Owner(ctx context.Context, obj *model.CollectorsNoteAddedToCollectionFeedEventData) (*model.GalleryUser, error) {
@@ -109,7 +118,7 @@ func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Owner(ctx context.Cont
 }
 
 func (r *collectorsNoteAddedToTokenFeedEventDataResolver) Token(ctx context.Context, obj *model.CollectorsNoteAddedToTokenFeedEventData) (*model.CollectionToken, error) {
-	return resolveCollectionTokenByIDs(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
+	return resolveCollectionTokenByID(ctx, obj.Token.Token.Dbid, obj.Token.Collection.Dbid)
 }
 
 func (r *commentResolver) ReplyTo(ctx context.Context, obj *model.Comment) (*model.Comment, error) {
@@ -271,7 +280,7 @@ func (r *followUserPayloadResolver) User(ctx context.Context, obj *model.FollowU
 	return resolveGalleryUserByUserID(ctx, obj.User.Dbid)
 }
 
-func (r *galleryResolver) TokenPreviews(ctx context.Context, obj *model.Gallery) ([]*string, error) {
+func (r *galleryResolver) TokenPreviews(ctx context.Context, obj *model.Gallery) ([]*model.PreviewURLSet, error) {
 	return resolveTokenPreviewsByGalleryID(ctx, obj.Dbid)
 }
 
@@ -289,8 +298,24 @@ func (r *galleryResolver) Collections(ctx context.Context, obj *model.Gallery) (
 	return resolveCollectionsByGalleryID(ctx, obj.Dbid)
 }
 
+func (r *galleryInfoUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.GalleryInfoUpdatedFeedEventData) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
+}
+
+func (r *galleryUpdatedFeedEventDataResolver) Owner(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.Owner.Dbid)
+}
+
+func (r *galleryUpdatedFeedEventDataResolver) Gallery(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) (*model.Gallery, error) {
+	return resolveGalleryByGalleryID(ctx, obj.Gallery.Dbid)
+}
+
+func (r *galleryUpdatedFeedEventDataResolver) SubEventDatas(ctx context.Context, obj *model.GalleryUpdatedFeedEventData) ([]model.FeedEventData, error) {
+	return resolveSubEventDatasByFeedEventID(ctx, obj.FeedEventID)
+}
+
 func (r *galleryUserResolver) Roles(ctx context.Context, obj *model.GalleryUser) ([]*persist.Role, error) {
-	dbRoles, err := publicapi.For(ctx).Admin.GetUserRolesByUserID(ctx, obj.Dbid)
+	dbRoles, err := publicapi.For(ctx).User.GetUserRolesByUserID(ctx, obj.Dbid)
 	if err != nil {
 		return nil, err
 	}
@@ -322,6 +347,10 @@ func (r *galleryUserResolver) TokensByChain(ctx context.Context, obj *model.Gall
 
 func (r *galleryUserResolver) Wallets(ctx context.Context, obj *model.GalleryUser) ([]*model.Wallet, error) {
 	return resolveWalletsByUserID(ctx, obj.Dbid)
+}
+
+func (r *galleryUserResolver) PrimaryWallet(ctx context.Context, obj *model.GalleryUser) (*model.Wallet, error) {
+	return resolvePrimaryWalletByUserID(ctx, obj.HelperGalleryUserData.UserID)
 }
 
 func (r *galleryUserResolver) FeaturedGallery(ctx context.Context, obj *model.GalleryUser) (*model.Gallery, error) {
@@ -713,7 +742,7 @@ func (r *mutationResolver) DeepRefresh(ctx context.Context, input model.DeepRefr
 	}
 	return model.DeepRefreshPayload{
 		Chain:     &input.Chain,
-		Submitted: util.BoolToPointer(true),
+		Submitted: util.ToPointer(true),
 	}, nil
 }
 
@@ -946,6 +975,22 @@ func (r *mutationResolver) UpdateGallery(ctx context.Context, input model.Update
 	return output, nil
 }
 
+func (r *mutationResolver) PublishGallery(ctx context.Context, input model.PublishGalleryInput) (model.PublishGalleryPayloadOrError, error) {
+	err := publicapi.For(ctx).Gallery.PublishGallery(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	gal, err := resolveGalleryByGalleryID(ctx, input.GalleryID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.PublishGalleryPayload{
+		Gallery: gal,
+	}, nil
+}
+
 func (r *mutationResolver) CreateGallery(ctx context.Context, input model.CreateGalleryInput) (model.CreateGalleryPayloadOrError, error) {
 	gallery, err := publicapi.For(ctx).Gallery.CreateGallery(ctx, input.Name, input.Description, input.Position)
 	if err != nil {
@@ -1124,6 +1169,20 @@ func (r *mutationResolver) AddRolesToUser(ctx context.Context, username string, 
 	return userToModel(ctx, *user), nil
 }
 
+func (r *mutationResolver) AddWalletToUserUnchecked(ctx context.Context, input model.AdminAddWalletInput) (model.AdminAddWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).Admin.AddWalletToUserUnchecked(ctx, input.Username, *input.ChainAddress, input.WalletType)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, input.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.AdminAddWalletPayload{User: userToModel(ctx, *user)}, nil
+}
+
 func (r *mutationResolver) RevokeRolesFromUser(ctx context.Context, username string, roles []*persist.Role) (model.RevokeRolesFromUserPayloadOrError, error) {
 	user, err := publicapi.For(ctx).Admin.RemoveRolesFromUser(ctx, username, roles)
 
@@ -1175,6 +1234,15 @@ func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string,
 	return model.BanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
 }
 
+func (r *mutationResolver) MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error) {
+	tx, err := publicapi.For(ctx).Card.MintPremiumCardToWallet(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.MintPremiumCardToWalletPayload{Tx: tx}, nil
+}
+
 func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *model.UploadPersistedQueriesInput) (model.UploadPersistedQueriesPayloadOrError, error) {
 	err := publicapi.For(ctx).APQ.UploadPersistedQueries(ctx, *input.PersistedQueries)
 
@@ -1185,6 +1253,45 @@ func (r *mutationResolver) UploadPersistedQueries(ctx context.Context, input *mo
 	message := "Persisted queries uploaded successfully"
 
 	return model.UploadPersistedQueriesPayload{Message: &message}, nil
+}
+
+func (r *mutationResolver) UpdatePrimaryWallet(ctx context.Context, walletID persist.DBID) (model.UpdatePrimaryWalletPayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateUserPrimaryWallet(ctx, walletID)
+	if err != nil {
+		return nil, err
+	}
+	return model.UpdatePrimaryWalletPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+}
+
+func (r *mutationResolver) UpdateUserExperience(ctx context.Context, input model.UpdateUserExperienceInput) (model.UpdateUserExperiencePayloadOrError, error) {
+	err := publicapi.For(ctx).User.UpdateUserExperience(ctx, input.ExperienceType, input.Experienced)
+	if err != nil {
+		return nil, err
+	}
+	return model.UpdateUserExperiencePayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+}
+
+func (r *mutationResolver) MoveCollectionToGallery(ctx context.Context, input *model.MoveCollectionToGalleryInput) (model.MoveCollectionToGalleryPayloadOrError, error) {
+	oldGalID, err := publicapi.For(ctx).Collection.UpdateCollectionGallery(ctx, input.SourceCollectionID, input.TargetGalleryID)
+	if err != nil {
+		return nil, err
+	}
+	old, err := resolveGalleryByGalleryID(ctx, oldGalID)
+	if err != nil {
+		return nil, err
+	}
+	new, err := resolveGalleryByGalleryID(ctx, input.TargetGalleryID)
+	if err != nil {
+		return nil, err
+	}
+	return model.MoveCollectionToGalleryPayload{
+		OldGallery: old,
+		NewGallery: new,
+	}, nil
 }
 
 func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error) {
@@ -1252,7 +1359,7 @@ func (r *queryResolver) CollectionsByIds(ctx context.Context, ids []persist.DBID
 			models[i] = collections[i]
 		} else if notFoundErr, ok := err.(persist.ErrCollectionNotFoundByID); ok {
 			models[i] = model.ErrCollectionNotFound{Message: notFoundErr.Error()}
-		} else if validationErr, ok := err.(publicapi.ErrInvalidInput); ok {
+		} else if validationErr, ok := err.(validate.ErrInvalidInput); ok {
 			models[i] = model.ErrInvalidInput{Message: validationErr.Error(), Parameters: validationErr.Parameters, Reasons: validationErr.Reasons}
 		} else {
 			// Unhandled error -- add it to the unhandled error stack, but don't fail the whole operation
@@ -1270,7 +1377,7 @@ func (r *queryResolver) TokenByID(ctx context.Context, id persist.DBID) (model.T
 }
 
 func (r *queryResolver) CollectionTokenByID(ctx context.Context, tokenID persist.DBID, collectionID persist.DBID) (model.CollectionTokenByIDOrError, error) {
-	return resolveCollectionTokenByIDs(ctx, tokenID, collectionID)
+	return resolveCollectionTokenByID(ctx, tokenID, collectionID)
 }
 
 func (r *queryResolver) CommunityByAddress(ctx context.Context, communityAddress persist.ChainAddress, forceRefresh *bool) (model.CommunityByAddressOrError, error) {
@@ -1309,6 +1416,23 @@ func (r *queryResolver) GlobalFeed(ctx context.Context, before *string, after *s
 	}, nil
 }
 
+func (r *queryResolver) TrendingFeed(ctx context.Context, before *string, after *string, first *int, last *int) (*model.FeedConnection, error) {
+	events, pageInfo, err := publicapi.For(ctx).Feed.PaginateTrendingFeed(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges, err := eventsToFeedEdges(events)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.FeedConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 func (r *queryResolver) FeedEventByID(ctx context.Context, id persist.DBID) (model.FeedEventByIDOrError, error) {
 	return resolveFeedEventByEventID(ctx, id)
 }
@@ -1323,6 +1447,40 @@ func (r *queryResolver) GetMerchTokens(ctx context.Context, wallet persist.Addre
 		Tokens: tokens,
 	}
 	return output, nil
+}
+
+func (r *queryResolver) GalleryByID(ctx context.Context, id persist.DBID) (model.GalleryByIDPayloadOrError, error) {
+	gallery, err := resolveGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return gallery, nil
+}
+
+func (r *queryResolver) ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error) {
+	gallery, err := resolveViewerGalleryByGalleryID(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return gallery, nil
+}
+
+func (r *queryResolver) TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error) {
+	users, err := publicapi.For(ctx).Feed.TrendingUsers(ctx, input.Report)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.GalleryUser, len(users))
+	for i, u := range users {
+		result[i] = userToModel(ctx, u)
+	}
+
+	return model.TrendingUsersPayload{Users: result}, nil
 }
 
 func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
@@ -1359,12 +1517,9 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 		tokenIDs[i] = token.Dbid
 	}
 
-	tokens, errors := publicapi.For(ctx).Token.GetTokensByTokenIDs(ctx, tokenIDs)
-
-	for _, err := range errors {
-		if err != nil {
-			return nil, err
-		}
+	tokens, err := publicapi.For(ctx).Token.GetTokensByIDs(ctx, tokenIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	return tokensToModel(ctx, tokens), nil
@@ -1460,7 +1615,7 @@ func (r *tokensAddedToCollectionFeedEventDataResolver) Collection(ctx context.Co
 }
 
 func (r *tokensAddedToCollectionFeedEventDataResolver) NewTokens(ctx context.Context, obj *model.TokensAddedToCollectionFeedEventData) ([]*model.CollectionToken, error) {
-	return resolveNewTokensByEventID(ctx, obj.FeedEventID)
+	return resolveCollectionTokensByTokenIDs(ctx, obj.CollectionID, obj.TokenIDs)
 }
 
 func (r *unfollowUserPayloadResolver) User(ctx context.Context, obj *model.UnfollowUserPayload) (*model.GalleryUser, error) {
@@ -1532,6 +1687,10 @@ func (r *viewerResolver) Notifications(ctx context.Context, obj *model.Viewer, b
 
 func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error) {
 	return resolveViewerNotificationSettings(ctx)
+}
+
+func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error) {
+	return resolveViewerExperiencesByUserID(ctx, obj.UserId)
 }
 
 func (r *walletResolver) Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error) {
@@ -1619,6 +1778,16 @@ func (r *Resolver) FollowUserPayload() generated.FollowUserPayloadResolver {
 
 // Gallery returns generated.GalleryResolver implementation.
 func (r *Resolver) Gallery() generated.GalleryResolver { return &galleryResolver{r} }
+
+// GalleryInfoUpdatedFeedEventData returns generated.GalleryInfoUpdatedFeedEventDataResolver implementation.
+func (r *Resolver) GalleryInfoUpdatedFeedEventData() generated.GalleryInfoUpdatedFeedEventDataResolver {
+	return &galleryInfoUpdatedFeedEventDataResolver{r}
+}
+
+// GalleryUpdatedFeedEventData returns generated.GalleryUpdatedFeedEventDataResolver implementation.
+func (r *Resolver) GalleryUpdatedFeedEventData() generated.GalleryUpdatedFeedEventDataResolver {
+	return &galleryUpdatedFeedEventDataResolver{r}
+}
 
 // GalleryUser returns generated.GalleryUserResolver implementation.
 func (r *Resolver) GalleryUser() generated.GalleryUserResolver { return &galleryUserResolver{r} }
@@ -1738,6 +1907,8 @@ type feedEventResolver struct{ *Resolver }
 type followInfoResolver struct{ *Resolver }
 type followUserPayloadResolver struct{ *Resolver }
 type galleryResolver struct{ *Resolver }
+type galleryInfoUpdatedFeedEventDataResolver struct{ *Resolver }
+type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }

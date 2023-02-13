@@ -3,18 +3,21 @@ package notifications
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/bsm/redislock"
 	"github.com/gin-gonic/gin"
+	"github.com/googleapis/gax-go/v2/apierror"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc/codes"
 )
 
 type lockKey struct {
@@ -57,8 +60,12 @@ func New(queries *db.Queries, pub *pubsub.Client, lock *redislock.Client) *Notif
 	updated := map[persist.DBID]chan db.Notification{}
 
 	notificationHandlers := &NotificationHandlers{Notifications: &notifDispatcher, UserNewNotifications: new, UserUpdatedNotifications: updated, pubSub: pub}
-	go notificationHandlers.receiveNewNotificationsFromPubSub()
-	go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
+	if pub != nil {
+		go notificationHandlers.receiveNewNotificationsFromPubSub()
+		go notificationHandlers.receiveUpdatedNotificationsFromPubSub()
+	} else {
+		logger.For(nil).Warn("pubsub not configured, notifications will not be received")
+	}
 	return notificationHandlers
 }
 
@@ -258,10 +265,24 @@ func (h viewedNotificationHandler) Handle(ctx context.Context, notif db.Notifica
 	return insertAndPublishNotif(ctx, notif, h.queries, h.pubSub)
 }
 
+// subscribe returns a subscription to the given topic
+func (n *NotificationHandlers) subscribe(ctx context.Context, topic, name string) (*pubsub.Subscription, error) {
+	sub, err := createSubscription(ctx, n.pubSub, topic, name)
+	if err == nil {
+		return sub, nil
+	}
+
+	if errTopicMissing(err) {
+		if _, err := n.pubSub.CreateTopic(ctx, topic); err != nil {
+			return nil, err
+		}
+	}
+
+	return createSubscription(ctx, n.pubSub, topic, name)
+}
+
 func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
-	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("new-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
-		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS")),
-	})
+	sub, err := n.subscribe(context.Background(), viper.GetString("PUBSUB_TOPIC_NEW_NOTIFICATIONS"), fmt.Sprintf("new-notifications-%s", persist.GenerateID()))
 	if err != nil {
 		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
 		panic(err)
@@ -302,9 +323,7 @@ func (n *NotificationHandlers) receiveNewNotificationsFromPubSub() {
 }
 
 func (n *NotificationHandlers) receiveUpdatedNotificationsFromPubSub() {
-	sub, err := n.pubSub.CreateSubscription(context.Background(), fmt.Sprintf("updated-notifications-%s", persist.GenerateID()), pubsub.SubscriptionConfig{
-		Topic: n.pubSub.Topic(viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS")),
-	})
+	sub, err := n.subscribe(context.Background(), viper.GetString("PUBSUB_TOPIC_UPDATED_NOTIFICATIONS"), fmt.Sprintf("updated-notifications-%s", persist.GenerateID()))
 	if err != nil {
 		logger.For(nil).Errorf("error creating updated notifications subscription: %s", err)
 		panic(err)
@@ -461,4 +480,19 @@ func addNotification(ctx context.Context, notif db.Notification, queries *db.Que
 
 func (l lockKey) String() string {
 	return fmt.Sprintf("%s:%s", l.ownerID, l.action)
+}
+
+func errTopicMissing(err error) bool {
+	var aErr *apierror.APIError
+	if ok := errors.As(err, &aErr); ok && aErr.GRPCStatus().Code() == codes.NotFound {
+		return true
+	}
+	return false
+}
+
+func createSubscription(ctx context.Context, client *pubsub.Client, topic, name string) (*pubsub.Subscription, error) {
+	return client.CreateSubscription(ctx, name, pubsub.SubscriptionConfig{
+		Topic:            client.Topic(topic),
+		ExpirationPolicy: time.Hour * 24 * 3,
+	})
 }

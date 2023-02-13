@@ -404,7 +404,7 @@ func loadGalleryByGalleryId(q *db.Queries) func(context.Context, []persist.DBID)
 			errors[i] = err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrGalleryNotFoundByID{ID: galleryIds[i]}
+				errors[i] = persist.ErrGalleryNotFound{ID: galleryIds[i]}
 			}
 		})
 
@@ -425,7 +425,7 @@ func loadGalleryByCollectionId(q *db.Queries) func(context.Context, []persist.DB
 			errors[i] = err
 
 			if errors[i] == pgx.ErrNoRows {
-				errors[i] = persist.ErrGalleryNotFoundByCollectionID{ID: collectionIds[i]}
+				errors[i] = persist.ErrGalleryNotFound{CollectionID: collectionIds[i]}
 			}
 		})
 

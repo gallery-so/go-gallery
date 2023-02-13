@@ -2,7 +2,7 @@
 SELECT * FROM users WHERE id = $1 AND deleted = false;
 
 -- name: GetUserWithPIIByID :one
-select * from users_with_pii where id = @user_id and deleted = false;
+select * from pii.user_view where id = @user_id and deleted = false;
 
 -- name: GetUserByIdBatch :batchone
 SELECT * FROM users WHERE id = $1 AND deleted = false;
@@ -280,22 +280,22 @@ WHERE tokens.owner_user_id = $1 AND users.id = $1
 ORDER BY tokens.created_at DESC, tokens.name DESC, tokens.id DESC;
 
 -- name: CreateUserEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, user_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *;
 
 -- name: CreateTokenEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $5, $6) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, token_id, subject_id, data, group_id, caption, gallery_id, collection_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10) RETURNING *;
 
 -- name: CreateCollectionEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, collection_id, subject_id, data, caption, group_id, gallery_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateGalleryEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id) VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, gallery_id, subject_id, data, external_id, group_id, caption) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING *;
 
 -- name: CreateAdmireEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, admire_id, feed_event_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8, $9) RETURNING *;
 
 -- name: CreateCommentEvent :one
-INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data) VALUES ($1, $2, $3, $4, $5, $6, $5, $7) RETURNING *;
+INSERT INTO events (id, actor_id, action, resource_type_id, comment_id, feed_event_id, subject_id, data, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $5, $7, $8, $9) RETURNING *;
 
 -- name: GetEvent :one
 SELECT * FROM events WHERE id = $1 AND deleted = false;
@@ -315,6 +315,32 @@ with recursive activity as (
 )
 select * from events where id = any(select id from activity) order by (created_at, id) asc;
 
+-- name: GetGalleryEventsInWindow :many
+with recursive activity as (
+    select * from events where events.id = $1 and deleted = false
+    union
+    select e.* from events e, activity a
+    where e.actor_id = a.actor_id
+        and e.action = any(@actions)
+        and e.gallery_id = @gallery_id
+        and e.created_at < a.created_at
+        and e.created_at >= a.created_at - make_interval(secs => $2)
+        and e.deleted = false
+        and e.caption is null
+        and (not @include_subject::bool or e.subject_id = a.subject_id)
+)
+select * from events where id = any(select id from activity) order by (created_at, id) asc;
+
+-- name: GetEventsInGroup :many
+select * from events where group_id = @group_id and deleted = false order by(created_at, id) asc;
+
+-- name: HasLaterGroupedEvent :one
+select exists(
+  select 1 from events where deleted = false
+  and group_id = @group_id
+  and id > @event_id
+);
+
 -- name: IsActorActionActive :one
 select exists(
   select 1 from events where deleted = false
@@ -330,6 +356,15 @@ select exists(
   and subject_id = $2
   and created_at > @window_start and created_at <= @window_end
 );
+
+-- name: IsActorGalleryActive :one
+select exists(
+  select 1 from events where deleted = false
+  and actor_id = $1
+  and gallery_id = $2
+  and created_at > @window_start and created_at <= @window_end
+);
+
 
 -- name: IsActorSubjectActionActive :one
 select exists(
@@ -365,11 +400,28 @@ SELECT * FROM feed_events WHERE owner_id = sqlc.arg('owner_id') AND deleted = fa
             CASE WHEN NOT sqlc.arg('paging_forward')::bool THEN (event_time, id) END DESC
     LIMIT sqlc.arg('limit');
 
+-- name: PaginateTrendingFeed :many
+select f.* from feed_events f join unnest(@feed_event_ids::text[]) with ordinality t(id, pos) using(id) where f.deleted = false
+  and t.pos > @cur_before_pos::int
+  and t.pos < @cur_after_pos::int
+  order by case when @paging_forward::bool then t.pos end desc,
+          case when not @paging_forward::bool then t.pos end asc
+  limit sqlc.arg('limit');
+
 -- name: GetEventByIdBatch :batchone
 SELECT * FROM feed_events WHERE id = $1 AND deleted = false;
 
 -- name: CreateFeedEvent :one
-INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, caption) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO feed_events (id, owner_id, action, data, event_time, event_ids, group_id, caption) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
+
+-- name: IsFeedEventExistsForGroup :one
+SELECT exists(
+  SELECT 1 FROM feed_events WHERE deleted = false
+  AND group_id = $1
+);
+
+-- name: UpdateFeedEventCaptionByGroup :one
+UPDATE feed_events SET caption = (select caption from events where events.group_id = $1) WHERE group_id = $1 AND deleted = false returning *;
 
 -- name: GetLastFeedEventForUser :one
 select * from feed_events where deleted = false
@@ -552,7 +604,7 @@ SELECT * FROM admires WHERE actor_id = $1 AND feed_event_id = $2 AND deleted = f
 
 -- for some reason this query will not allow me to use @tags for $1
 -- name: GetUsersWithEmailNotificationsOnForEmailType :many
-select * from users_with_pii
+select * from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and (email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar = 'false' or email_unsubscriptions->>sqlc.arg(email_unsubscription)::varchar is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
@@ -564,7 +616,7 @@ select * from users_with_pii
 
 -- name: GetUsersWithEmailNotificationsOn :many
 -- TODO: Does not appear to be used
-select * from users_with_pii
+select * from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
     and deleted = false and pii_email_address is not null and email_verified = $1
     and (created_at, id) < (@cur_before_time, @cur_before_id)
@@ -587,7 +639,7 @@ UPDATE users SET email_verified = $2 WHERE id = $1;
 
 -- name: UpdateUserEmail :exec
 with upsert_pii as (
-    insert into pii_for_users (user_id, pii_email_address) values (@user_id, @email_address)
+    insert into pii.for_users (user_id, pii_email_address) values (@user_id, @email_address)
         on conflict (user_id) do update set pii_email_address = excluded.pii_email_address
 ),
 
@@ -600,6 +652,11 @@ update users set email_verified = 0 where users.id = @user_id;
 
 -- name: UpdateUserEmailUnsubscriptions :exec
 UPDATE users SET email_unsubscriptions = $2 WHERE id = $1;
+
+-- name: UpdateUserPrimaryWallet :exec
+update users set primary_wallet_id = @wallet_id from wallets
+    where users.id = @user_id and wallets.id = @wallet_id
+    and wallets.id = any(users.wallets) and wallets.deleted = false;
 
 -- name: GetUsersByChainAddresses :many
 select users.*,wallets.address from users, wallets where wallets.address = ANY(@addresses::varchar[]) AND wallets.chain = @chain::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false;
@@ -620,7 +677,15 @@ select role from user_roles where user_id = $1 and deleted = false
 union
 select role from (
   select
-    case when exists(select 1 from tokens where owner_user_id = $1 and token_id = any(@membership_token_ids::varchar[]) and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false) and deleted = false)
+    case when exists(
+      select 1
+      from tokens
+      where owner_user_id = $1
+        and token_id = any(@membership_token_ids::varchar[])
+        and contract = (select id from contracts where address = @membership_address and contracts.chain = @chain and contracts.deleted = false)
+        and exists(select 1 from users where id = $1 and email_verified = 1 and deleted = false)
+        and deleted = false
+      )
       then @granted_membership_role else null end as role
 ) r where role is not null;
 
@@ -640,22 +705,28 @@ update galleries set hidden = @hidden, last_updated = now() where id = @id and d
 with updates as (
     select unnest(@gallery_ids::text[]) as id, unnest(@positions::text[]) as position
 )
-update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false;
+update galleries g set position = updates.position, last_updated = now() from updates where g.id = updates.id and deleted = false and g.owner_user_id = @owner_user_id;
+
+-- name: UserHasDuplicateGalleryPositions :one
+select exists(select position,count(*) from galleries where owner_user_id = $1 and deleted = false group by position having count(*) > 1);
 
 -- name: UpdateGalleryInfo :exec
-update galleries set name = @name, description = @description, last_updated = now() where id = @id and deleted = false;
+update galleries set name = case when @name_set::bool then @name else name end, description = case when @description_set::bool then @description else description end, last_updated = now() where id = @id and deleted = false;
 
--- name: UpdateGallery :exec
-update galleries set name = @name, description = @description, collections = @collections, last_updated = now() where galleries.id = @id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = coalesce(array_length(@collections, 1), 0);
+-- name: UpdateGalleryCollections :exec
+update galleries set collections = @collections, last_updated = now() where galleries.id = @gallery_id and galleries.deleted = false and (select count(*) from collections c where c.id = any(@collections) and c.gallery_id = @gallery_id and c.deleted = false) = cardinality(@collections);
 
 -- name: UpdateUserFeaturedGallery :exec
 update users set featured_gallery = @gallery_id, last_updated = now() from galleries where users.id = @user_id and galleries.id = @gallery_id and galleries.owner_user_id = @user_id and galleries.deleted = false;
 
--- name: GetGalleryTokenPreviewsByID :many
-select (t.media->>'thumbnail_url')::varchar as previews from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and length(t.media->>'thumbnail_url'::varchar) > 0 order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit 3;
+-- name: GetGalleryTokenMediasByGalleryID :many
+select t.media from tokens t, collections c, galleries g where g.id = $1 and c.id = any(g.collections) and t.id = any(c.nfts) and t.deleted = false and g.deleted = false and c.deleted = false and (length(t.media->>'thumbnail_url'::varchar) > 0 or length(t.media->>'media_url'::varchar) > 0) order by array_position(g.collections, c.id),array_position(c.nfts, t.id) limit $2;
 
 -- name: GetTokenByTokenIdentifiers :one
 select * from tokens where tokens.token_id = @token_hex and contract = (select contracts.id from contracts where contracts.address = @contract_address) and tokens.chain = @chain and tokens.deleted = false;
+
+-- name: GetTokensByIDs :many
+select * from tokens join unnest(@token_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
 
 -- name: DeleteCollections :exec
 update collections set deleted = true, last_updated = now() where id = any(@ids::varchar[]);
@@ -664,10 +735,86 @@ update collections set deleted = true, last_updated = now() where id = any(@ids:
 with updates as (
     select unnest(@ids::varchar[]) as id, unnest(@names::varchar[]) as name, unnest(@collectors_notes::varchar[]) as collectors_note, unnest(@layouts::jsonb[]) as layout, unnest(@token_settings::jsonb[]) as token_settings, unnest(@hidden::bool[]) as hidden
 )
-update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now() from updates where c.id = updates.id and c.deleted = false;
+update collections c set collectors_note = updates.collectors_note, layout = updates.layout, token_settings = updates.token_settings, hidden = updates.hidden, name = updates.name, last_updated = now(), version = 1 from updates where c.id = updates.id and c.deleted = false;
+
+-- name: GetCollectionTokensByCollectionID :one
+select nfts from collections where id = $1 and deleted = false;
 
 -- name: UpdateCollectionTokens :exec
 update collections set nfts = @nfts, last_updated = now() where id = @id and deleted = false;
 
 -- name: CreateCollection :one
-insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 0, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) on conflict (id) do update set version = excluded.version, name = excluded.name, collectors_note = excluded.collectors_note, owner_user_id = excluded.owner_user_id, gallery_id = excluded.gallery_id, layout = excluded.layout, nfts = excluded.nfts, hidden = excluded.hidden, token_settings = excluded.token_settings, last_updated = excluded.last_updated returning id;
+insert into collections (id, version, name, collectors_note, owner_user_id, gallery_id, layout, nfts, hidden, token_settings, created_at, last_updated) values (@id, 1, @name, @collectors_note, @owner_user_id, @gallery_id, @layout, @nfts, @hidden, @token_settings, now(), now()) returning id;
+
+-- name: GetGalleryIDByCollectionID :one
+select gallery_id from collections where id = $1 and deleted = false;
+
+-- name: GetAllTimeTrendingUserIDs :many
+select users.id
+from events, galleries, users
+left join legacy_views on users.id = legacy_views.user_id and legacy_views.deleted = false
+where action = 'ViewedGallery'
+  and events.gallery_id = galleries.id
+  and users.id = galleries.owner_user_id
+  and galleries.deleted = false
+  and users.deleted = false
+group by users.id
+order by row_number() over(order by count(events.id) + coalesce(max(legacy_views.view_count), 0) desc, max(users.created_at) desc) asc
+limit $1;
+
+-- name: GetWindowedTrendingUserIDs :many
+with viewers as (
+  select gallery_id, count(distinct coalesce(actor_id, external_id)) viewer_count
+  from events
+  where action = 'ViewedGallery' and events.created_at >= @window_end
+  group by gallery_id
+),
+edit_events as (
+  select actor_id
+  from events
+  where action in ('CollectionCreated', 'CollectorsNoteAddedToCollection', 'CollectorsNoteAddedToToken', 'TokensAddedToCollection') and created_at >= @window_end
+  group by actor_id
+)
+select users.id
+from viewers, galleries, users, edit_events
+where viewers.gallery_id = galleries.id
+	and galleries.owner_user_id = users.id
+	and users.deleted = false
+	and galleries.deleted = false
+  and users.id = edit_events.actor_id
+group by users.id
+order by row_number() over(order by sum(viewers.viewer_count) desc, max(users.created_at) desc) asc
+limit $1;
+
+-- name: GetUserExperiencesByUserID :one
+select user_experiences from users where id = $1;
+
+-- name: UpdateUserExperience :exec
+update users set user_experiences = user_experiences || @experience where id = @user_id;
+
+-- name: GetTrendingUsersByIDs :many
+select users.* from users join unnest(@user_ids::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc;
+
+-- name: GetTrendingFeedEventIDs :many
+select feed_events.id, feed_events.created_at, count(*)
+from events as interactions, feed_events
+where interactions.action IN ('CommentedOnFeedEvent', 'AdmiredFeedEvent') and interactions.created_at >= @window_end and interactions.feed_event_id is not null and interactions.feed_event_id = feed_events.id
+group by feed_events.id, feed_events.created_at;
+
+-- name: UpdateCollectionGallery :exec
+update collections set gallery_id = @gallery_id, last_updated = now() where id = @id and deleted = false;
+
+-- name: AddCollectionToGallery :exec
+update galleries set collections = array_append(collections, @collection_id), last_updated = now() where id = @gallery_id and deleted = false;
+
+-- name: RemoveCollectionFromGallery :exec
+update galleries set collections = array_remove(collections, @collection_id), last_updated = now() where id = @gallery_id and deleted = false;
+
+-- name: UserOwnsGallery :one
+select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and deleted = false);
+
+-- name: UserOwnsCollection :one
+select exists(select 1 from collections where id = $1 and owner_user_id = $2 and deleted = false);
+
+-- name: UpdateEventCaptionByGroup :exec
+update events set caption = @caption where group_id = @group_id and deleted = false;

@@ -1,0 +1,17 @@
+name: deployer-sandbox
+on:
+  workflow_dispatch:
+env:
+  CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+jobs:
+  deploy-sandbox-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install build deps"
+        uses: ./.github/actions/build-deps
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          gcp-credentials-json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+      - name: "Deploy"
+        run: make deploy-sandbox-backend

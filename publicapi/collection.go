@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/mikeydub/go-gallery/validate"
 )
 
 const (
@@ -31,7 +31,7 @@ type CollectionAPI struct {
 
 func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID persist.DBID) (*db.Collection, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (api CollectionAPI) GetCollectionById(ctx context.Context, collectionID per
 func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs []persist.DBID) ([]*db.Collection, []error) {
 	collectionThunk := func(collectionID persist.DBID) func() (db.Collection, error) {
 		// Validate
-		if err := validateFields(api.validator, validationMap{
+		if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 			"collectionID": {collectionID, "required"},
 		}); err != nil {
 			return func() (db.Collection, error) { return db.Collection{}, err }
@@ -85,7 +85,7 @@ func (api CollectionAPI) GetCollectionsByIds(ctx context.Context, collectionIDs 
 
 func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryID persist.DBID) ([]db.Collection, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (api CollectionAPI) GetCollectionsByGalleryId(ctx context.Context, galleryI
 }
 
 func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist.DBID, name string, collectorsNote string, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.Collection, *db.FeedEvent, error) {
-	fieldsToValidate := validationMap{
+	fieldsToValidate := validate.ValidationMap{
 		"galleryID":      {galleryID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
@@ -112,13 +112,13 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = valWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		fieldsToValidate["caption"] = validate.ValWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}
 
 	// Validate
-	if err := validateFields(api.validator, fieldsToValidate); err != nil {
+	if err := validate.ValidateFields(api.validator, fieldsToValidate); err != nil {
 		return nil, nil, err
 	}
 
@@ -138,7 +138,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 	name = validate.SanitizationPolicy.Sanitize(strings.TrimSpace(name))
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -180,6 +180,7 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 		Action:         persist.ActionCollectionCreated,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: createdCollection.Nfts, CollectionCollectorsNote: collectorsNote},
 	}, api.validator, caption)
@@ -192,13 +193,13 @@ func (api CollectionAPI) CreateCollection(ctx context.Context, galleryID persist
 
 func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -213,7 +214,7 @@ func (api CollectionAPI) DeleteCollection(ctx context.Context, collectionID pers
 
 func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID persist.DBID, name string, collectorsNote string) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID":   {collectionID, "required"},
 		"name":           {name, "collection_name"},
 		"collectorsNote": {collectorsNote, "collection_note"},
@@ -225,7 +226,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 	name = validate.SanitizationPolicy.Sanitize(name)
 	collectorsNote = validate.SanitizationPolicy.Sanitize(collectorsNote)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -240,12 +241,18 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 		return err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return err
+	}
+
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionCollectorsNoteAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionCollectorsNote: collectorsNote},
 	}, api.validator, nil)
@@ -254,7 +261,7 @@ func (api CollectionAPI) UpdateCollectionInfo(ctx context.Context, collectionID 
 }
 
 func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionID persist.DBID, tokens []persist.DBID, layout persist.TokenLayout, tokenSettings map[persist.DBID]persist.CollectionTokenSettings, caption *string) (*db.FeedEvent, error) {
-	fieldsToValidate := validationMap{
+	fieldsToValidate := validate.ValidationMap{
 		"collectionID": {collectionID, "required"},
 		"tokens":       {tokens, fmt.Sprintf("required,unique,min=1,max=%d", maxTokensPerCollection)},
 		"sections":     {layout.Sections, fmt.Sprintf("unique,sorted_asc,lte=%d,min=1,max=%d,len=%d,dive,gte=0,lte=%d", len(tokens), maxSectionsPerCollection, len(layout.SectionLayout), len(tokens)-1)},
@@ -264,13 +271,13 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 	var trimmedCaption string
 	if caption != nil {
 		trimmedCaption = strings.TrimSpace(*caption)
-		fieldsToValidate["caption"] = valWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
+		fieldsToValidate["caption"] = validate.ValWithTags{trimmedCaption, fmt.Sprintf("required,caption")}
 		cleaned := validate.SanitizationPolicy.Sanitize(trimmedCaption)
 		caption = &cleaned
 	}
 
 	// Validate
-	if err := validateFields(api.validator, fieldsToValidate); err != nil {
+	if err := validate.ValidateFields(api.validator, fieldsToValidate); err != nil {
 		return nil, err
 	}
 
@@ -286,7 +293,7 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return nil, err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -308,12 +315,18 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 		return nil, err
 	}
 
+	galleryID, err := api.queries.GetGalleryIDByCollectionID(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Send event
 	return dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
 		Action:         persist.ActionTokensAddedToCollection,
 		ResourceTypeID: persist.ResourceTypeCollection,
 		CollectionID:   collectionID,
+		GalleryID:      galleryID,
 		SubjectID:      collectionID,
 		Data:           persist.EventData{CollectionTokenIDs: tokens},
 		Caption:        persist.StrToNullStr(caption),
@@ -322,13 +335,13 @@ func (api CollectionAPI) UpdateCollectionTokens(ctx context.Context, collectionI
 
 func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionID persist.DBID, hidden bool) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"collectionID": {collectionID, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -341,4 +354,80 @@ func (api CollectionAPI) UpdateCollectionHidden(ctx context.Context, collectionI
 	}
 
 	return nil
+}
+
+// UpdateCollectionGallery updates the gallery of a collection and returns the ID of the old gallery.
+func (api CollectionAPI) UpdateCollectionGallery(ctx context.Context, collectionID, galleryID persist.DBID) (persist.DBID, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"collectionID": {collectionID, "required"},
+		"galleryID":    {galleryID, "required"},
+	}); err != nil {
+		return "", err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// check ownership
+	if ownsCollection, err := api.queries.UserOwnsCollection(ctx, db.UserOwnsCollectionParams{
+		ID:          collectionID,
+		OwnerUserID: userID,
+	}); err != nil {
+		return "", err
+	} else if !ownsCollection {
+		return "", fmt.Errorf("user does not own collection: %s", collectionID)
+	}
+
+	if ownsGallery, err := api.queries.UserOwnsGallery(ctx, db.UserOwnsGalleryParams{
+		ID:          galleryID,
+		OwnerUserID: userID,
+	}); err != nil {
+		return "", err
+	} else if !ownsGallery {
+		return "", fmt.Errorf("user does not own gallery: %s", galleryID)
+	}
+
+	tx, err := api.repos.BeginTx(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	defer tx.Rollback(ctx)
+
+	q := api.queries.WithTx(tx)
+
+	curCol, err := q.GetCollectionById(ctx, collectionID)
+	if err != nil {
+		return "", err
+	}
+
+	if err := q.UpdateCollectionGallery(ctx, db.UpdateCollectionGalleryParams{
+		GalleryID: galleryID,
+		ID:        collectionID,
+	}); err != nil {
+		return "", err
+	}
+
+	if err := q.AddCollectionToGallery(ctx, db.AddCollectionToGalleryParams{
+		GalleryID:    galleryID,
+		CollectionID: collectionID,
+	}); err != nil {
+		return "", err
+	}
+
+	if err := q.RemoveCollectionFromGallery(ctx, db.RemoveCollectionFromGalleryParams{
+		GalleryID:    curCol.GalleryID,
+		CollectionID: collectionID,
+	}); err != nil {
+		return "", err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+
+	return curCol.GalleryID, nil
 }

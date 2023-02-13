@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/imgix/imgix-go/v2"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
@@ -68,7 +68,9 @@ func newWidthParam(width int) imgix.IxParam {
 func NewMediaMapper() *MediaMapper {
 	token := viper.GetString("IMGIX_SECRET")
 	if token == "" {
-		panic(errors.New("IMGIX_SECRET must be set in order to generate image URLs"))
+		// panic(errors.New("IMGIX_SECRET must be set in order to generate image URLs"))
+		logger.For(nil).Error("IMGIX_SECRET must be set in order to generate image URLs")
+		return nil
 	}
 
 	urlBuilder := imgix.NewURLBuilder(assetDomain, imgix.WithToken(token), imgix.WithLibParam(false))

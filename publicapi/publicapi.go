@@ -3,11 +3,13 @@ package publicapi
 import (
 	"context"
 	"errors"
-	"fmt"
 
+	magicclient "github.com/magiclabs/magic-admin-go/client"
+	admin "github.com/mikeydub/go-gallery/adminapi"
 	"github.com/mikeydub/go-gallery/graphql/apq"
 
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -53,15 +55,15 @@ type PublicAPI struct {
 	Feed          *FeedAPI
 	Notifications *NotificationsAPI
 	Interaction   *InteractionAPI
-	Admin         *AdminAPI
+	Admin         *admin.AdminAPI
 	Merch         *MerchAPI
+	Card          *CardAPI
 }
 
 func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell,
-	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache) *PublicAPI {
-
+	arweaveClient *goar.Client, storageClient *storage.Client, multichainProvider *multichain.Provider, taskClient *gcptasks.Client, throttler *throttle.Locker, secrets *secretmanager.Client, apq *apq.APQCache, feedCache *redis.Cache, magicClient *magicclient.API) *PublicAPI {
 	loaders := dataloader.NewLoaders(ctx, queries, disableDataloaderCaching)
-	validator := newValidator()
+	validator := validate.WithCustomValidators()
 
 	return &PublicAPI{
 		repos:     repos,
@@ -70,19 +72,20 @@ func New(ctx context.Context, disableDataloaderCaching bool, repos *postgres.Rep
 		validator: validator,
 		APQ:       apq,
 
-		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider},
+		Auth:          &AuthAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multiChainProvider: multichainProvider, magicLinkClient: magicClient},
 		Collection:    &CollectionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Gallery:       &GalleryAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
-		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient},
+		User:          &UserAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, ipfsClient: ipfsClient, arweaveClient: arweaveClient, storageClient: storageClient, multichainProvider: multichainProvider},
 		Contract:      &ContractAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, taskClient: taskClient},
 		Token:         &TokenAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, throttler: throttler},
 		Wallet:        &WalletAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider},
 		Misc:          &MiscAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, storageClient: storageClient},
-		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
+		Feed:          &FeedAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, cache: feedCache},
 		Interaction:   &InteractionAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient},
 		Notifications: &NotificationsAPI{queries: queries, loaders: loaders, validator: validator},
-		Admin:         &AdminAPI{queries: queries, loaders: loaders, validator: validator},
+		Admin:         admin.NewAPI(repos, queries, validator, multichainProvider),
 		Merch:         &MerchAPI{repos: repos, queries: queries, loaders: loaders, validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
+		Card:          &CardAPI{validator: validator, ethClient: ethClient, multichainProvider: multichainProvider, secrets: secrets},
 	}
 }
 
@@ -107,13 +110,7 @@ func For(ctx context.Context) *PublicAPI {
 	return gc.Value(apiContextKey).(*PublicAPI)
 }
 
-func newValidator() *validator.Validate {
-	v := validator.New()
-	validate.RegisterCustomValidators(v)
-	return v
-}
-
-func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
+func getAuthenticatedUserID(ctx context.Context) (persist.DBID, error) {
 	gc := util.GinContextFromContext(ctx)
 	authError := auth.GetAuthErrorFromCtx(gc)
 
@@ -125,50 +122,8 @@ func getAuthenticatedUser(ctx context.Context) (persist.DBID, error) {
 	return userID, nil
 }
 
-type valWithTags struct {
-	value interface{}
-	tag   string
-}
-
-type validationMap map[string]valWithTags
-
-func validateFields(validator *validator.Validate, fields validationMap) error {
-	validationErr := ErrInvalidInput{}
-	foundErrors := false
-
-	for k, v := range fields {
-		err := validator.Var(v.value, v.tag)
-		if err != nil {
-			foundErrors = true
-			validationErr.Append(k, err.Error())
-		}
-	}
-
-	if foundErrors {
-		return validationErr
-	}
-
-	return nil
-}
-
-type ErrInvalidInput struct {
-	Parameters []string
-	Reasons    []string
-}
-
-func (e *ErrInvalidInput) Append(parameter string, reason string) {
-	e.Parameters = append(e.Parameters, parameter)
-	e.Reasons = append(e.Reasons, reason)
-}
-
-func (e ErrInvalidInput) Error() string {
-	str := "invalid input:\n"
-
-	for i := range e.Parameters {
-		str += fmt.Sprintf("    parameter: %s, reason: %s\n", e.Parameters[i], e.Reasons[i])
-	}
-
-	return str
+func publishEventGroup(ctx context.Context, groupID string, action persist.Action, caption *string) (*db.FeedEvent, error) {
+	return event.DispatchGroup(sentryutil.NewSentryHubGinContext(ctx), groupID, action, caption)
 }
 
 func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, caption *string) (*db.FeedEvent, error) {
@@ -179,10 +134,39 @@ func dispatchEvent(ctx context.Context, evt db.Event, v *validator.Validate, cap
 
 	if caption != nil {
 		evt.Caption = persist.StrToNullStr(caption)
-		return event.DispatchImmediate(ctx, evt)
+		return event.DispatchImmediate(ctx, []db.Event{evt})
 	}
 
 	go pushEvent(ctx, evt)
+	return nil, nil
+}
+
+func dispatchEvents(ctx context.Context, evts []db.Event, v *validator.Validate, editID *string, caption *string) (*db.FeedEvent, error) {
+
+	if len(evts) == 0 {
+		return nil, nil
+	}
+
+	ctx = sentryutil.NewSentryHubGinContext(ctx)
+	for i, evt := range evts {
+		evt.GroupID = persist.StrToNullStr(editID)
+		if err := v.Struct(evt); err != nil {
+			return nil, err
+		}
+		evts[i] = evt
+	}
+
+	if caption != nil {
+		for i, evt := range evts {
+			evt.Caption = persist.StrToNullStr(caption)
+			evts[i] = evt
+		}
+		return event.DispatchImmediate(ctx, evts)
+	}
+
+	for _, evt := range evts {
+		go pushEvent(ctx, evt)
+	}
 	return nil, nil
 }
 

@@ -2,10 +2,15 @@ package publicapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/spf13/viper"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -14,6 +19,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
+	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/membership"
@@ -26,14 +32,15 @@ import (
 )
 
 type UserAPI struct {
-	repos         *postgres.Repositories
-	queries       *db.Queries
-	loaders       *dataloader.Loaders
-	validator     *validator.Validate
-	ethClient     *ethclient.Client
-	ipfsClient    *shell.Shell
-	arweaveClient *goar.Client
-	storageClient *storage.Client
+	repos              *postgres.Repositories
+	queries            *db.Queries
+	loaders            *dataloader.Loaders
+	validator          *validator.Validate
+	ethClient          *ethclient.Client
+	ipfsClient         *shell.Shell
+	arweaveClient      *goar.Client
+	storageClient      *storage.Client
+	multichainProvider *multichain.Provider
 }
 
 func (api UserAPI) GetLoggedInUserId(ctx context.Context) persist.DBID {
@@ -48,7 +55,7 @@ func (api UserAPI) IsUserLoggedIn(ctx context.Context) bool {
 
 func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -63,10 +70,10 @@ func (api UserAPI) GetUserById(ctx context.Context, userID persist.DBID) (*db.Us
 }
 
 // GetUserWithPII returns the current user and their associated personally identifiable information
-func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.UsersWithPii, error) {
+func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.PiiUserView, error) {
 	// Nothing to validate
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +88,7 @@ func (api UserAPI) GetUserWithPII(ctx context.Context) (*db.UsersWithPii, error)
 
 func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userIDs": {userIDs, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -145,7 +152,7 @@ func (api UserAPI) GetUsersByIDs(ctx context.Context, userIDs []persist.DBID, be
 
 func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username": {username, "required"},
 	}); err != nil {
 		return nil, err
@@ -161,7 +168,7 @@ func (api UserAPI) GetUserByUsername(ctx context.Context, username string) (*db.
 
 func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.ChainAddress) (*db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"chainAddress": {chainAddress, "required"},
 	}); err != nil {
 		return nil, err
@@ -181,7 +188,7 @@ func (api UserAPI) GetUserByAddress(ctx context.Context, chainAddress persist.Ch
 
 func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"trait": {trait, "required"},
 	}); err != nil {
 		return nil, err
@@ -195,9 +202,33 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 	return users, nil
 }
 
+func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
+	address, tokenIDs := parseAddressTokens(viper.GetString("PREMIUM_CONTRACT_ADDRESS"))
+	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
+		UserID:                userID,
+		MembershipAddress:     persist.Address(address),
+		MembershipTokenIds:    tokenIDs,
+		GrantedMembershipRole: persist.RoleEarlyAccess, // Role granted if user carries a matching token
+		Chain:                 persist.ChainETH,
+	})
+}
+
+// parseAddressTokens returns a contract and tokens from a string encoded as '<address>=[<tokenID>,<tokenID>,...<tokenID>]'.
+// It's helpful for parsing contract and tokens passed as environment variables.
+func parseAddressTokens(s string) (string, []string) {
+	addressTokens := strings.Split(s, "=")
+	if len(addressTokens) != 2 {
+		panic("invalid address tokens format")
+	}
+	address, tokens := addressTokens[0], addressTokens[1]
+	tokens = strings.TrimLeft(tokens, "[")
+	tokens = strings.TrimRight(tokens, "]")
+	return address, strings.Split(tokens, ",")
+}
+
 func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) ([]db.User, PageInfo, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"role": {role, "required,role"},
 	}); err != nil {
 		return nil, PageInfo{}, err
@@ -254,19 +285,19 @@ func (api UserAPI) PaginateUsersWithRole(ctx context.Context, role persist.Role,
 
 func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.ChainAddress, authenticator auth.Authenticator) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"chainAddress":  {chainAddress, "required"},
 		"authenticator": {authenticator, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository)
+	err = user.AddWalletToUser(ctx, userID, chainAddress, authenticator, api.repos.UserRepository, api.repos.WalletRepository, api.multichainProvider)
 	if err != nil {
 		return err
 	}
@@ -276,13 +307,13 @@ func (api UserAPI) AddWalletToUser(ctx context.Context, chainAddress persist.Cha
 
 func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"walletIDs": {walletIDs, "required,unique,dive,required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -297,7 +328,7 @@ func (api UserAPI) RemoveWalletsFromUser(ctx context.Context, walletIDs []persis
 
 func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authenticator, username string, email *persist.Email, bio, galleryName, galleryDesc, galleryPos string) (userID persist.DBID, galleryID persist.DBID, err error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username": {username, "required,username"},
 		"bio":      {bio, "bio"},
 	}); err != nil {
@@ -312,7 +343,12 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		galleryPos = first
 	}
 
-	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository)
+	userID, galleryID, err = user.CreateUser(ctx, authenticator, username, email, bio, galleryName, galleryDesc, galleryPos, api.repos.UserRepository, api.repos.GalleryRepository, api.multichainProvider)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = api.queries.UpdateUserFeaturedGallery(ctx, db.UpdateUserFeaturedGalleryParams{GalleryID: galleryID, UserID: userID})
 	if err != nil {
 		return "", "", err
 	}
@@ -343,7 +379,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 
 func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio string) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"username": {username, "required,username"},
 		"bio":      {bio, "bio"},
 	}); err != nil {
@@ -353,7 +389,7 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	// Sanitize
 	bio = validate.SanitizationPolicy.Sanitize(bio)
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -366,15 +402,36 @@ func (api UserAPI) UpdateUserInfo(ctx context.Context, username string, bio stri
 	return nil
 }
 
+func (api UserAPI) UpdateUserPrimaryWallet(ctx context.Context, primaryWalletID persist.DBID) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"primaryWalletID": {primaryWalletID, "required"},
+	}); err != nil {
+		return err
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = api.queries.UpdateUserPrimaryWallet(ctx, db.UpdateUserPrimaryWalletParams{WalletID: primaryWalletID, UserID: userID})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"galleryID": {galleryID, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -390,13 +447,13 @@ func (api UserAPI) UpdateFeaturedGallery(ctx context.Context, galleryID persist.
 
 func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"email": {email, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -418,13 +475,13 @@ func (api UserAPI) UpdateUserEmail(ctx context.Context, email persist.Email) err
 
 func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, settings persist.EmailUnsubscriptions) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"settings": {settings, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -437,7 +494,7 @@ func (api UserAPI) UpdateUserEmailNotificationSettings(ctx context.Context, sett
 
 func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -452,13 +509,13 @@ func (api UserAPI) ResendEmailVerification(ctx context.Context) error {
 
 func (api UserAPI) UpdateUserNotificationSettings(ctx context.Context, notificationSettings persist.UserNotificationSettings) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"notification_settings": {notificationSettings, "required"},
 	}); err != nil {
 		return err
 	}
 
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -473,7 +530,7 @@ func (api UserAPI) GetMembershipTiers(ctx context.Context, forceRefresh bool) ([
 
 func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID persist.DBID) (*db.Membership, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"membershipID": {membershipID, "required"},
 	}); err != nil {
 		return nil, err
@@ -489,7 +546,7 @@ func (api UserAPI) GetMembershipByMembershipId(ctx context.Context, membershipID
 
 func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -509,7 +566,7 @@ func (api UserAPI) GetFollowersByUserId(ctx context.Context, userID persist.DBID
 
 func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID) ([]db.User, error) {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, err
@@ -529,12 +586,12 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
-	curUserID, err := getAuthenticatedUser(ctx)
+	curUserID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, fmt.Sprintf("required,ne=%s", curUserID)},
 	}); err != nil {
 		return err
@@ -557,13 +614,13 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return err
 	}
 
-	curUserID, err := getAuthenticatedUser(ctx)
+	curUserID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -586,5 +643,64 @@ func dispatchFollowEventToFeed(ctx context.Context, api UserAPI, curUserID persi
 		UserID:         curUserID,
 		SubjectID:      followedUserID,
 		Data:           persist.EventData{UserFollowedBack: followedBack, UserRefollowed: refollowed},
+	})
+}
+
+func (api UserAPI) GetUserExperiences(ctx context.Context, userID persist.DBID) ([]*model.UserExperience, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	experiences, err := api.queries.GetUserExperiencesByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	asJSON := map[string]bool{}
+	if err := experiences.AssignTo(&asJSON); err != nil {
+		return nil, err
+	}
+
+	result := make([]*model.UserExperience, len(model.AllUserExperienceType))
+	for i, experienceType := range model.AllUserExperienceType {
+		result[i] = &model.UserExperience{
+			Type:        experienceType,
+			Experienced: asJSON[experienceType.String()],
+		}
+	}
+	return result, nil
+}
+
+func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType model.UserExperienceType, value bool) error {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"experienceType": {experienceType, "required"},
+	}); err != nil {
+		return err
+	}
+
+	curUserID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	in := map[string]interface{}{
+		experienceType.String(): value,
+	}
+
+	marshalled, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+
+	return api.queries.UpdateUserExperience(ctx, db.UpdateUserExperienceParams{
+		Experience: pgtype.JSONB{
+			Bytes:  marshalled,
+			Status: pgtype.Present,
+		},
+		UserID: curUserID,
 	})
 }

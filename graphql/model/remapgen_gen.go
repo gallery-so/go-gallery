@@ -13,6 +13,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"AdminAddWalletPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(AdminAddWalletPayloadOrError)
+		return obj, ok
+	},
+
 	"AdmireFeedEventPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(AdmireFeedEventPayloadOrError)
 		return obj, ok
@@ -103,6 +108,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"GalleryByIdPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(GalleryByIDPayloadOrError)
+		return obj, ok
+	},
+
 	"GalleryUserOrAddress": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(GalleryUserOrAddress)
 		return obj, ok
@@ -148,6 +158,16 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"MintPremiumCardToWalletPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(MintPremiumCardToWalletPayloadOrError)
+		return obj, ok
+	},
+
+	"MoveCollectionToGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(MoveCollectionToGalleryPayloadOrError)
+		return obj, ok
+	},
+
 	"Node": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Node)
 		return obj, ok
@@ -160,6 +180,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"PreverifyEmailPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(PreverifyEmailPayloadOrError)
+		return obj, ok
+	},
+
+	"PublishGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(PublishGalleryPayloadOrError)
 		return obj, ok
 	},
 
@@ -228,6 +253,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"TrendingUsersPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(TrendingUsersPayloadOrError)
+		return obj, ok
+	},
+
 	"UnfollowUserPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UnfollowUserPayloadOrError)
 		return obj, ok
@@ -293,8 +323,18 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UpdatePrimaryWalletPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdatePrimaryWalletPayloadOrError)
+		return obj, ok
+	},
+
 	"UpdateTokenInfoPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UpdateTokenInfoPayloadOrError)
+		return obj, ok
+	},
+
+	"UpdateUserExperiencePayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UpdateUserExperiencePayloadOrError)
 		return obj, ok
 	},
 
@@ -330,6 +370,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"ViewGalleryPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(ViewGalleryPayloadOrError)
+		return obj, ok
+	},
+
+	"ViewerGalleryByIdPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(ViewerGalleryByIDPayloadOrError)
 		return obj, ok
 	},
 

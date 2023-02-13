@@ -124,64 +124,6 @@ This is available for live environments:
 ```bash
 $ curl api.gallery.so/alive
 ```
-
-## Testing services via Cloud Tasks
-
-We use [aertje/cloud-tasks-emulator](https://github.com/aertje/cloud-tasks-emulator) to emulate running Cloud Tasks locally. The emulator is added as a submodule to the repo.
-
-See [targeting services](https://github.com/aertje/cloud-tasks-emulator#targeting-services) for more info on the setup. A typical local setup looks something like below:
-
-```
-+-----------+
-|     ui    |
-|  (:3000)  |
-+-----|-----+
-      |
-      |
-      |
-+-----V-----+     +-------------+     +-----------+        +------------+
-|   server  ------> cloud tasks ------>   nginx   --------->   feed     |
-|  (:4000)  |     |   (:8123)   |     |  (:8080)  |        |  (:4124)   |
-+-----------+     +-------------+     +-----|-----+        +------------+
-                                            |
-                                            |              +------------+
-                                            +-------------->  feedbot   |
-                                            |              |  (:4123)   |
-                                            |              +------------+
-                                            |
-                                            |              +-------------------+
-                                            +-------------->  mediaprocessing  |
-                                            |              |      (:6500)      |
-                                            |              +-------------------+
-                                            |
-                                            |              +---------------+
-                                            +-------------->  indexer-api  |
-                                                           |    (:6000)    |
-                                                           +---------------+
-```
-
-To get started:
-
-```bash
-# If first time pulling down the submodule
-git submodule update --init --recursive
-
-# To update the submodule afterwards
-git pull --recurse-submodules
-```
-
-After pulling the repo, start the services you're interested in running:
-
-```bash
-# Start the cloud task emulator and docker dependencies
-make cloud-tasks
-
-# Start each of the services needed in separate sessions
-go run cmd/feed/main.go    # Start the feed
-go run cmd/feedbot/main.go # Start the feedbot
-
-# Start the backend
-go run cmd/server/main.go
 ```
 
 ## Testing
@@ -198,10 +140,9 @@ Run all tests in subdirectory (e.g. /server):
 $ go test ./server/...
 ```
 
-Run a specific test by passing the name as an option:
-
+Run a specific test by passing including the `-run` flag. The example will run GraphQL tests under the `TestMain` suite that start with "should get trending".
 ```bash
-go test -run {testName}
+go test -run=TestMain/"test GraphQL"/"should get trending" ./graphql
 ```
 
 Add `-v` for detailed logs.

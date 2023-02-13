@@ -16,58 +16,114 @@ import (
 )
 
 var bannedUsernames = map[string]bool{
-	"password":      true,
-	"auth":          true,
-	"welcome":       true,
-	"edit":          true,
-	"404":           true,
-	"nuke":          true,
-	"account":       true,
-	"settings":      true,
-	"artists":       true,
-	"artist":        true,
-	"collections":   true,
-	"collection":    true,
-	"community":     true,
-	"nft":           true,
-	"members":       true,
-	"nfts":          true,
-	"bookmarks":     true,
-	"messages":      true,
-	"guestbook":     true,
-	"notifications": true,
-	"explore":       true,
-	"analytics":     true,
-	"gallery":       true,
-	"investors":     true,
-	"team":          true,
-	"faq":           true,
-	"info":          true,
 	"about":         true,
+	"account":       true,
+	"analytics":     true,
+	"artist":        true,
+	"artists":       true,
+	"auth":          true,
+	"bookmarks":     true,
+	"careers":       true,
+	"chain":         true,
+	"collection":    true,
+	"collections":   true,
+	"community":     true,
 	"contact":       true,
-	"terms":         true,
-	"privacy":       true,
-	"help":          true,
-	"support":       true,
+	"edit":          true,
+	"explore":       true,
+	"faq":           true,
+	"featured":      true,
 	"feed":          true,
 	"feeds":         true,
-	"membership":    true,
-	"careers":       true,
-	"maintenance":   true,
+	"gallery":       true,
+	"guestbook":     true,
+	"help":          true,
 	"home":          true,
-	"shop":          true,
-	"chain":         true,
+	"info":          true,
+	"investors":     true,
+	"latest":        true,
+	"maintenance":   true,
+	"members":       true,
+	"membership":    true,
+	"messages":      true,
+	"nft":           true,
+	"nfts":          true,
+	"notifications": true,
+	"nuke":          true,
+	"password":      true,
+	"privacy":       true,
 	"profile":       true,
-	"verify":        true,
-	"universal":     true,
 	"search":        true,
+	"settings":      true,
+	"shop":          true,
+	"support":       true,
+	"team":          true,
+	"terms":         true,
+	"trending":      true,
+	"universal":     true,
 	"unsubscribe":   true,
+	"verify":        true,
+	"welcome":       true,
+	"404":           true,
 }
 
 var alphanumericUnderscoresPeriodsRegex = regexp.MustCompile("^[\\w.]*$")
 
 // SanitizationPolicy is a policy for sanitizing user input
 var SanitizationPolicy = bluemonday.UGCPolicy()
+
+func WithCustomValidators() *validator.Validate {
+	v := validator.New()
+	RegisterCustomValidators(v)
+	return v
+}
+
+type ValWithTags struct {
+	Value interface{}
+	Tag   string
+}
+
+type ValidationMap map[string]ValWithTags
+
+// ValidateFields validates input fields based on a set of predefined validation tags
+func ValidateFields(validator *validator.Validate, fields ValidationMap) error {
+	validationErr := ErrInvalidInput{}
+	foundErrors := false
+
+	for k, v := range fields {
+		err := validator.Var(v.Value, v.Tag)
+		if err != nil {
+			foundErrors = true
+			validationErr.Append(k, err.Error())
+		}
+	}
+
+	if foundErrors {
+		return validationErr
+	}
+
+	return nil
+}
+
+type ErrInvalidInput struct {
+	Parameters []string
+	Reasons    []string
+}
+
+func (e *ErrInvalidInput) Append(parameter string, reason string) {
+	e.Parameters = append(e.Parameters, parameter)
+	e.Reasons = append(e.Reasons, reason)
+}
+
+func (e ErrInvalidInput) Error() string {
+	str := "invalid input:\n"
+
+	for i := range e.Parameters {
+		str += fmt.Sprintf("    parameter: %s, reason: %s\n", e.Parameters[i], e.Reasons[i])
+	}
+
+	return str
+}
 
 func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("eth_addr", EthValidator)

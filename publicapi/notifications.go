@@ -9,6 +9,7 @@ import (
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/validate"
 )
 
 type NotificationsAPI struct {
@@ -18,13 +19,13 @@ type NotificationsAPI struct {
 }
 
 func (api NotificationsAPI) GetViewerNotifications(ctx context.Context, before, after *string, first *int, last *int) ([]db.Notification, PageInfo, int, error) {
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, PageInfo{}, 0, err
 	}
 
 	// Validate
-	if err := validateFields(api.validator, validationMap{
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
 		"userID": {userID, "required"},
 	}); err != nil {
 		return nil, PageInfo{}, 0, err
@@ -103,7 +104,7 @@ func (api NotificationsAPI) GetByID(ctx context.Context, id persist.DBID) (db.No
 }
 
 func (api NotificationsAPI) ClearUserNotifications(ctx context.Context) ([]db.Notification, error) {
-	userID, err := getAuthenticatedUser(ctx)
+	userID, err := getAuthenticatedUserID(ctx)
 	if err != nil {
 		return nil, err
 	}

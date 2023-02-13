@@ -121,6 +121,7 @@ type Event struct {
 	FeedEventID    persist.DBID
 	ExternalID     sql.NullString
 	Caption        sql.NullString
+	GroupID        sql.NullString
 }
 
 type Feature struct {
@@ -159,6 +160,7 @@ type FeedEvent struct {
 	LastUpdated time.Time
 	CreatedAt   time.Time
 	Caption     sql.NullString
+	GroupID     sql.NullString
 }
 
 type Follow struct {
@@ -182,6 +184,14 @@ type Gallery struct {
 	Description string
 	Hidden      bool
 	Position    string
+}
+
+type LegacyView struct {
+	UserID      persist.DBID
+	ViewCount   sql.NullInt32
+	LastUpdated time.Time
+	CreatedAt   time.Time
+	Deleted     sql.NullBool
 }
 
 type LoginAttempt struct {
@@ -270,6 +280,26 @@ type PiiForUser struct {
 	Deleted         bool
 }
 
+type PiiUserView struct {
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	Universal            bool
+	NotificationSettings persist.UserNotificationSettings
+	EmailVerified        persist.EmailVerificationStatus
+	EmailUnsubscriptions persist.EmailUnsubscriptions
+	FeaturedGallery      *persist.DBID
+	PrimaryWalletID      persist.DBID
+	PiiEmailAddress      persist.Email
+}
+
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -313,6 +343,8 @@ type User struct {
 	EmailVerified        persist.EmailVerificationStatus
 	EmailUnsubscriptions persist.EmailUnsubscriptions
 	FeaturedGallery      *persist.DBID
+	PrimaryWalletID      persist.DBID
+	UserExperiences      pgtype.JSONB
 }
 
 type UserEvent struct {
@@ -334,24 +366,6 @@ type UserRole struct {
 	Deleted     bool
 	CreatedAt   time.Time
 	LastUpdated time.Time
-}
-
-type UsersWithPii struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	LastUpdated          time.Time
-	CreatedAt            time.Time
-	Username             sql.NullString
-	UsernameIdempotent   sql.NullString
-	Wallets              persist.WalletList
-	Bio                  sql.NullString
-	Traits               pgtype.JSONB
-	Universal            bool
-	NotificationSettings persist.UserNotificationSettings
-	EmailVerified        persist.EmailVerificationStatus
-	EmailUnsubscriptions persist.EmailUnsubscriptions
-	PiiEmailAddress      persist.Email
 }
 
 type Wallet struct {

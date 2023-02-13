@@ -314,6 +314,9 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	}
 
 	m, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
 
 	buf := bytes.NewBuffer(m)
 
@@ -328,7 +331,6 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-
 		return util.GetErrFromResp(res)
 	}
 
@@ -456,6 +458,13 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 	return nil
 
+}
+
+// WalletCreated runs whenever a new wallet is created
+func (d *Provider) WalletCreated(ctx context.Context, wallet persist.Address, all bool) error {
+	input := task.ValidateNFTsMessage{OwnerAddress: persist.EthereumAddress(wallet.String())}
+
+	return task.CreateTaskForWalletValidation(ctx, input, d.taskClient)
 }
 
 // VerifySignature will verify a signature using all available methods (eth_sign and personal_sign)

@@ -14,13 +14,12 @@ import (
 )
 
 var (
-	port           uint64
-	fromBlock      uint64
-	toBlock        uint64
-	enableRPC      bool
-	quietLogs      bool
-	serviceKeyFile string
-	manualEnv      string
+	port      uint64
+	fromBlock uint64
+	toBlock   uint64
+	enableRPC bool
+	quietLogs bool
+	manualEnv string
 )
 
 func init() {
@@ -44,12 +43,6 @@ var rootCmd = &cobra.Command{
 	Long: `An NFT indexer lovingly built by your friends at Gallery.
                 Source code is available at https://github.com/gallery-so/go-gallery.`,
 	Args: func(cmd *cobra.Command, args []string) error {
-		switch manualEnv {
-		case "local", "dev":
-			serviceKeyFile = "./_deploy/service-key-dev.json"
-		case "prod":
-			serviceKeyFile = "./_deploy/service-key.json"
-		}
 		indexer.LoadConfigFile("indexer", manualEnv)
 		indexer.ValidateEnv()
 
@@ -89,12 +82,6 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Run the indexer server",
 	Args: func(cmd *cobra.Command, args []string) error {
-		switch manualEnv {
-		case "local", "dev":
-			serviceKeyFile = "./_deploy/service-key-dev.json"
-		case "prod":
-			serviceKeyFile = "./_deploy/service-key.json"
-		}
 		indexer.LoadConfigFile("indexer-server", manualEnv)
 		indexer.ValidateEnv()
 
@@ -103,7 +90,7 @@ var serverCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		defer sentryutil.RecoverAndRaise(nil)
 
-		indexer.InitServer(serviceKeyFile, quietLogs, enableRPC)
+		indexer.InitServer(quietLogs, enableRPC)
 		if appengine.IsAppEngine() {
 			logger.For(nil).Info("Running in App Engine Mode")
 			appengine.Main()

@@ -43,6 +43,8 @@ func (r *EventRepository) AddUserEvent(ctx context.Context, event db.Event) (*db
 		ResourceTypeID: event.ResourceTypeID,
 		UserID:         event.SubjectID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
 	})
 	return &event, err
 }
@@ -55,6 +57,10 @@ func (r *EventRepository) AddTokenEvent(ctx context.Context, event db.Event) (*d
 		ResourceTypeID: event.ResourceTypeID,
 		TokenID:        event.SubjectID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
+		GalleryID:      event.GalleryID,
+		CollectionID:   event.CollectionID,
 	})
 	return &event, err
 }
@@ -68,6 +74,8 @@ func (r *EventRepository) AddCollectionEvent(ctx context.Context, event db.Event
 		CollectionID:   event.SubjectID,
 		Data:           event.Data,
 		Caption:        event.Caption,
+		GroupID:        event.GroupID,
+		GalleryID:      event.GalleryID,
 	})
 	return &event, err
 }
@@ -81,6 +89,8 @@ func (r *EventRepository) AddAdmireEvent(ctx context.Context, event db.Event) (*
 		AdmireID:       event.AdmireID,
 		FeedEventID:    event.FeedEventID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
 	})
 	return &event, err
 }
@@ -94,6 +104,8 @@ func (r *EventRepository) AddCommentEvent(ctx context.Context, event db.Event) (
 		CommentID:      event.CommentID,
 		FeedEventID:    event.FeedEventID,
 		Data:           event.Data,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
 	})
 	return &event, err
 }
@@ -104,9 +116,11 @@ func (r *EventRepository) AddGalleryEvent(ctx context.Context, event db.Event) (
 		ActorID:        event.ActorID,
 		Action:         event.Action,
 		ResourceTypeID: event.ResourceTypeID,
-		GalleryID:      event.SubjectID,
+		GalleryID:      event.GalleryID,
 		Data:           event.Data,
 		ExternalID:     event.ExternalID,
+		GroupID:        event.GroupID,
+		Caption:        event.Caption,
 	})
 	return &event, err
 }
@@ -129,6 +143,15 @@ func (r *EventRepository) IsActorSubjectActive(ctx context.Context, event db.Eve
 	})
 }
 
+func (r *EventRepository) IsActorGalleryActive(ctx context.Context, event db.Event, windowSize time.Duration) (bool, error) {
+	return r.Queries.IsActorGalleryActive(ctx, db.IsActorGalleryActiveParams{
+		ActorID:     event.ActorID,
+		GalleryID:   event.GalleryID,
+		WindowStart: event.CreatedAt,
+		WindowEnd:   event.CreatedAt.Add(windowSize),
+	})
+}
+
 func (r *EventRepository) IsActorSubjectActionActive(ctx context.Context, event db.Event, actions persist.ActionList, windowSize time.Duration) (bool, error) {
 	return r.Queries.IsActorSubjectActionActive(ctx, db.IsActorSubjectActionActiveParams{
 		ActorID:     event.ActorID,
@@ -146,5 +169,16 @@ func (r *EventRepository) EventsInWindow(ctx context.Context, eventID persist.DB
 		Secs:           float64(windowSeconds),
 		Actions:        actions,
 		IncludeSubject: includeSubject,
+	})
+}
+
+// EventsInWindow returns events belonging to the same window of activity as the given eventID.
+func (r *EventRepository) EventsInWindowForGallery(ctx context.Context, eventID, galleryID persist.DBID, windowSeconds int, actions persist.ActionList, includeSubject bool) ([]db.Event, error) {
+	return r.Queries.GetGalleryEventsInWindow(ctx, db.GetGalleryEventsInWindowParams{
+		ID:             eventID,
+		Secs:           float64(windowSeconds),
+		Actions:        actions,
+		IncludeSubject: includeSubject,
+		GalleryID:      galleryID,
 	})
 }
