@@ -60,8 +60,8 @@ type TwitterIdentifiers struct {
 	ProfileImageURL string `json:"profile_image_url"`
 }
 
-var errUnauthed = errors.New("unauthorized")
-var errAPINotAuthed = errors.New("api not authorized")
+var errUnauthed = errors.New("unauthorized to use twitter API")
+var errAPINotAuthed = errors.New("not authenticated with twitter, use (*API).WithAuth to authenticate")
 
 func NewAPI(queries *coredb.Queries, redis *redis.Cache) *API {
 	httpClient := &http.Client{}
