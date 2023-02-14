@@ -9,14 +9,19 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
 
 const maxFollowingReturn = 1000
+
+// 1 week for following to last in cache
+var followingTTL = time.Hour * 24 * 7
 
 type AccessTokenResponse struct {
 	TokenType    string `json:"token_type"`
@@ -40,6 +45,7 @@ type GetUserFollowingResponse struct {
 type API struct {
 	httpClient *http.Client
 	queries    *coredb.Queries
+	redis      *redis.Cache
 
 	isAuthed    bool
 	accessCode  string
@@ -57,13 +63,14 @@ type TwitterIdentifiers struct {
 var errUnauthed = errors.New("unauthorized")
 var errAPINotAuthed = errors.New("api not authorized")
 
-func NewAPI(queries *coredb.Queries) *API {
+func NewAPI(queries *coredb.Queries, redis *redis.Cache) *API {
 	httpClient := &http.Client{}
 	httpClient.Transport = tracing.NewTracingTransport(http.DefaultTransport, false)
 
 	return &API{
 		httpClient: httpClient,
 		queries:    queries,
+		redis:      redis,
 	}
 }
 
@@ -238,7 +245,18 @@ func (a *API) GetFollowing(ctx context.Context) ([]TwitterIdentifiers, error) {
 		return nil, errAPINotAuthed
 	}
 
+	redisPath := fmt.Sprintf("twitter-%s-following", a.TIDs.ID)
+
 	var following []TwitterIdentifiers
+
+	bs, err := a.redis.Get(ctx, redisPath)
+	if err == nil && len(bs) > 0 {
+		if err := json.Unmarshal(bs, &following); err != nil {
+			return nil, err
+		}
+		return following, nil
+	}
+
 	nextToken := ""
 
 	// get maxFollowingReturn * 10 users (10k)
@@ -277,6 +295,15 @@ func (a *API) GetFollowing(ctx context.Context) ([]TwitterIdentifiers, error) {
 		}
 
 		nextToken = fresp.Meta.NextToken
+	}
+
+	bs, err = json.Marshal(following)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.redis.Set(ctx, redisPath, bs, followingTTL); err != nil {
+		return nil, err
 	}
 
 	return following, nil

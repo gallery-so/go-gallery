@@ -834,6 +834,8 @@ update pii.for_users set pii_socials = @socials where user_id = @user_id;
 -- name: UpdateEventCaptionByGroup :exec
 update events set caption = @caption where group_id = @group_id and deleted = false;
 
+-- this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
+-- it will also go and search for whether the specified user follows any of the users returned
 -- name: GetSocialConnections :many
 select s.*, user_view.id as user_id, user_view.created_at as user_created_at, coalesce(f.followee, '') = @user_id as already_following
 from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernames::varchar[]) as social_username, unnest(@social_displaynames::varchar[]) as social_displayname, unnest(@social_profile_images::varchar[]) as social_profile_image) as s 

@@ -127,8 +127,9 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	lock := redis.NewLockClient(redis.NotificationLockDB)
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 	feedCache := redis.NewCache(redis.FeedDB)
+	socialCache := redis.NewCache(redis.SocialDB)
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, c.MagicLinkClient)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient)
 }
 
 func newSecretsClient() *secretmanager.Client {

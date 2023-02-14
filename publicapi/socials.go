@@ -12,6 +12,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/util"
@@ -20,6 +21,7 @@ import (
 
 type SocialAPI struct {
 	repos     *postgres.Repositories
+	redis     *redis.Cache
 	queries   *db.Queries
 	loaders   *dataloader.Loaders
 	validator *validator.Validate
@@ -30,6 +32,7 @@ func (s SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string)
 		AuthCode: authCode,
 		UserID:   userID,
 		Queries:  s.queries,
+		Redis:    s.redis,
 	}
 }
 
@@ -176,7 +179,7 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 		return nil, err
 	}
 
-	tapi, newSocials, err := twitter.NewAPI(api.queries).WithAuth(ctx, socialAuth.AccessToken.String, socialAuth.RefreshToken.String)
+	tapi, newSocials, err := twitter.NewAPI(api.queries, api.redis).WithAuth(ctx, socialAuth.AccessToken.String, socialAuth.RefreshToken.String)
 	if err != nil {
 		return nil, err
 	}

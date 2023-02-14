@@ -5,6 +5,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/util"
 )
@@ -21,13 +22,14 @@ type Authenticator interface {
 
 type TwitterAuthenticator struct {
 	Queries *coredb.Queries
+	Redis   *redis.Cache
 
 	UserID   persist.DBID
 	AuthCode string
 }
 
 func (a TwitterAuthenticator) Authenticate(ctx context.Context) (*SocialAuthResult, error) {
-	tAPI := twitter.NewAPI(a.Queries)
+	tAPI := twitter.NewAPI(a.Queries, a.Redis)
 
 	ids, access, err := tAPI.GetAuthedUserFromCode(ctx, a.AuthCode)
 	if err != nil {
