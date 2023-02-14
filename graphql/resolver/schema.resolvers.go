@@ -1536,6 +1536,23 @@ func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, befo
 	}, nil
 }
 
+func (r *queryResolver) SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, onlyUnfollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error) {
+	connections, pageInfo, err := publicapi.For(ctx).Social.GetConnectionsPaginate(ctx, socialAccountType, before, after, first, last, onlyUnfollowing)
+	if err != nil {
+		return nil, err
+	}
+	edges, _ := util.Map(connections, func(c model.SocialConnection) (*model.SocialConnectionsEdge, error) {
+		return &model.SocialConnectionsEdge{
+			Node:   c,
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}, nil
+	})
+	return &model.SocialConnectionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
 }
@@ -1556,6 +1573,10 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 	}
 
 	return tokensToModel(ctx, tokens), nil
+}
+
+func (r *socialConnectionResolver) GalleryUser(ctx context.Context, obj *model.SocialConnection) (*model.GalleryUser, error) {
+	return resolveGalleryUserByUserID(ctx, obj.UserID)
 }
 
 func (r *someoneAdmiredYourFeedEventNotificationResolver) FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error) {
@@ -1677,10 +1698,6 @@ func (r *viewerResolver) User(ctx context.Context, obj *model.Viewer) (*model.Ga
 
 func (r *viewerResolver) SocialAccounts(ctx context.Context, obj *model.Viewer) (*model.SocialAccounts, error) {
 	return resolveViewerSocialsByUserID(ctx, obj.UserId)
-}
-
-func (r *viewerResolver) SocialConnections(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error) {
-	panic(fmt.Errorf("not implemented"))
 }
 
 func (r *viewerResolver) ViewerGalleries(ctx context.Context, obj *model.Viewer) ([]*model.ViewerGallery, error) {
@@ -1857,6 +1874,11 @@ func (r *Resolver) SetSpamPreferencePayload() generated.SetSpamPreferencePayload
 	return &setSpamPreferencePayloadResolver{r}
 }
 
+// SocialConnection returns generated.SocialConnectionResolver implementation.
+func (r *Resolver) SocialConnection() generated.SocialConnectionResolver {
+	return &socialConnectionResolver{r}
+}
+
 // SomeoneAdmiredYourFeedEventNotification returns generated.SomeoneAdmiredYourFeedEventNotificationResolver implementation.
 func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAdmiredYourFeedEventNotificationResolver {
 	return &someoneAdmiredYourFeedEventNotificationResolver{r}
@@ -1957,6 +1979,7 @@ type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }
 type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
+type socialConnectionResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }

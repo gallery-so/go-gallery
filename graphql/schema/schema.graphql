@@ -509,12 +509,6 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   id: ID!
   user: GalleryUser @goField(forceResolver: true)
   socialAccounts: SocialAccounts @goField(forceResolver: true)
-  socialConnections(
-    before: String
-    after: String
-    first: Int
-    last: Int
-  ): SocialConnectionsConnection @goField(forceResolver: true)
   viewerGalleries: [ViewerGallery] @goField(forceResolver: true)
   feed(before: String, after: String, first: Int, last: Int): FeedConnection
     @goField(forceResolver: true)
@@ -820,10 +814,13 @@ type FeedConnection {
   pageInfo: PageInfo!
 }
 
-type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"]) {
+
+type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"]) @goEmbedHelper{
   id: ID!
-  currentlyFollowing: Boolean!
+
+  galleryUser: GalleryUser @goField(forceResolver: true)
   
+  currentlyFollowing: Boolean!
   socialId: String!
   socialType: SocialAccountType!
   displayName: String!
@@ -933,6 +930,15 @@ type Query {
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
     @retoolAuth
+
+  socialConnections(
+    socialAccountType: SocialAccountType!
+    onlyUnfollowing: Boolean
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 }
 
 input CollectionLayoutInput {

@@ -1385,6 +1385,8 @@ type SocialAuthMechanism struct {
 }
 
 type SocialConnection struct {
+	HelperSocialConnectionData
+	GalleryUser        *GalleryUser           `json:"galleryUser"`
 	CurrentlyFollowing bool                   `json:"currentlyFollowing"`
 	SocialID           string                 `json:"socialId"`
 	SocialType         persist.SocialProvider `json:"socialType"`
@@ -1903,12 +1905,11 @@ func (ViewGalleryPayload) IsViewGalleryPayloadOrError() {}
 
 type Viewer struct {
 	HelperViewerData
-	User              *GalleryUser                 `json:"user"`
-	SocialAccounts    *SocialAccounts              `json:"socialAccounts"`
-	SocialConnections *SocialConnectionsConnection `json:"socialConnections"`
-	ViewerGalleries   []*ViewerGallery             `json:"viewerGalleries"`
-	Feed              *FeedConnection              `json:"feed"`
-	Email             *UserEmail                   `json:"email"`
+	User            *GalleryUser     `json:"user"`
+	SocialAccounts  *SocialAccounts  `json:"socialAccounts"`
+	ViewerGalleries []*ViewerGallery `json:"viewerGalleries"`
+	Feed            *FeedConnection  `json:"feed"`
+	Email           *UserEmail       `json:"email"`
 	// Returns a list of notifications in reverse chronological order.
 	// Seen notifications come after unseen notifications
 	Notifications        *NotificationsConnection `json:"notifications"`

@@ -238,31 +238,47 @@ func (a *API) GetFollowing(ctx context.Context) ([]TwitterIdentifiers, error) {
 		return nil, errAPINotAuthed
 	}
 
-	url := "https://api.twitter.com/2/users/" + a.TIDs.ID + "/following?user.fields=profile_image_url&max_results=" + strconv.Itoa(maxFollowingReturn)
+	var following []TwitterIdentifiers
+	nextToken := ""
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	// get maxFollowingReturn * 10 users (10k)
+	for i := 0; i < 10; i++ {
+		url := "https://api.twitter.com/2/users/" + a.TIDs.ID + "/following?user.fields=profile_image_url&max_results=" + strconv.Itoa(maxFollowingReturn)
+		if nextToken != "" {
+			url += "&pagination_token=" + nextToken
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Add("Authorization", "Bearer "+a.accessCode)
+
+		resp, err := a.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get following: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			err = util.GetErrFromResp(resp)
+			return nil, fmt.Errorf("failed to get following: %s", err)
+		}
+
+		var fresp GetUserFollowingResponse
+		if err := json.NewDecoder(resp.Body).Decode(&fresp); err != nil {
+			return nil, fmt.Errorf("failed to decode following: %w", err)
+		}
+
+		following = append(following, fresp.Data...)
+
+		if fresp.Meta.NextToken == "" || fresp.Meta.ResultCount < maxFollowingReturn {
+			break
+		}
+
+		nextToken = fresp.Meta.NextToken
 	}
 
-	req.Header.Add("Authorization", "Bearer "+a.accessCode)
-
-	resp, err := a.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get following: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		err = util.GetErrFromResp(resp)
-		return nil, fmt.Errorf("failed to get following: %s", err)
-	}
-
-	var following GetUserFollowingResponse
-	if err := json.NewDecoder(resp.Body).Decode(&following); err != nil {
-		return nil, err
-	}
-
-	return following.Data, nil
+	return following, nil
 
 }

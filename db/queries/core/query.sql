@@ -834,19 +834,24 @@ update pii.for_users set pii_socials = @socials where user_id = @user_id;
 -- name: UpdateEventCaptionByGroup :exec
 update events set caption = @caption where group_id = @group_id and deleted = false;
 
--- name: CreateSocialConnectionsTempTable :exec
-create temporary table social_connections as (select unnest(@social_ids::varchar[]), @user_id, for_users.id, unnest(@social_usernames::varchar[]), unnest(@social_displaynames::varchar[]), unnest(@social_profile_images::varchar[]), false from pii.for_users where for_users.pii_socials->>@social_provider->>'id' = social_connections.social_id);
-
--- name: UpdateAlreadyFollowed :exec
-update social_connections set already_followed = true from follows where social_connections.follower_user_id = follows.follower_id and social_connections.followee_user_id = follows.followee_id;
-
 -- name: GetSocialConnections :many
-select social_connections.* from social_connections join users on social_connections.followee_user_id = users.id 
-where users.deleted = false and social_connections.follower_user_id = does_follows.follower_user_id and social_connections.followee_user_id = does_follows.followee_user_id
-    and case when @only_following::bool then does_follows.does_follow else true end
-    and (social_connections.already_followed,users.created_at,users.id) < (@cur_before_following, @cur_before_time::timestamptz, @cur_before_id)
-    and (social_connections.already_followed,users.created_at,users.id) > (@cur_after_following, @cur_after_time::timestamptz, @cur_after_id)
-    order by case when @paging_forward::bool then (social_connections.already_followed,users.created_at,users.id) end asc,
-             case when not @paging_forward::bool then (social_connections.already_followed,users.created_at,users.id) end desc
-    limit $1;
+select s.*, user_view.id as user_id, user_view.created_at as user_created_at, coalesce(f.followee, '') = @user_id as already_following
+from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernames::varchar[]) as social_username, unnest(@social_displaynames::varchar[]) as social_displayname, unnest(@social_profile_images::varchar[]) as social_profile_image) as s 
+inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id 
+left outer join follows f on f.followee = user_view.id
+where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end 
+and case when @only_unfollowing::bool then not f.followee = @user_id else true end
+    and (coalesce(f.followee, '') = @user_id,user_view.created_at,user_view.id) < (@cur_before_following::bool, @cur_before_time::timestamptz, @cur_before_id)
+    and (coalesce(f.followee, '') = @user_id,user_view.created_at,user_view.id) > (@cur_after_following::bool, @cur_after_time::timestamptz, @cur_after_id)
+    order by case when @paging_forward::bool then (coalesce(f.followee, '') = @user_id ,user_view.created_at,user_view.id) end asc,
+             case when not @paging_forward::bool then (coalesce(f.followee, '') = @user_id,user_view.created_at,user_view.id) end desc
+    limit $2;
+
+-- name: CountSocialConnections :one
+select count(*) from (select user_view.id as user_id from (select unnest(@social_ids::varchar[]) as social_id) as s 
+inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id 
+left outer join follows f on f.followee = user_view.id
+where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end 
+and case when @only_unfollowing::bool then not f.followee = @user_id else true end) as t;
+
 

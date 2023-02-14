@@ -249,16 +249,6 @@ type PiiUserView struct {
 	PiiSocials           persist.Socials
 }
 
-type SocialConnection struct {
-	SocialID           persist.DBID
-	FollowerUserID     persist.DBID
-	FolloweeUserID     persist.DBID
-	SocialUsername     sql.NullString
-	SocialDisplayName  sql.NullString
-	SocialProfileImage sql.NullString
-	AlreadyFollowed    sql.NullBool
-}
-
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
