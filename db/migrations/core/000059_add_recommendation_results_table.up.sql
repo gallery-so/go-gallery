@@ -3,7 +3,7 @@ create table if not exists recommendation_results (
   version int default 0,
   user_id character varying(255) references users (id),
   recommended_user_id character varying(255) references users (id),
-  recommended_count integer not null default 1,
+  recommended_count integer,
   created_at timestamp with time zone default current_timestamp not null,
   last_updated timestamp with time zone default current_timestamp not null,
   deleted boolean default false not null,

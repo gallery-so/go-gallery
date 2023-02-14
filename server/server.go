@@ -9,6 +9,7 @@ import (
 
 	"github.com/everFinance/goar"
 	sentry "github.com/getsentry/sentry-go"
+	"github.com/gin-contrib/pprof"
 	shell "github.com/ipfs/go-ipfs-api"
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/mikeydub/go-gallery/util"
@@ -57,7 +58,7 @@ func Init() {
 	c := ClientInit(context.Background())
 	provider := NewMultichainProvider(c)
 	router := CoreInit(c, provider)
-
+	pprof.Register(router)
 	http.Handle("/", router)
 }
 
@@ -130,7 +131,7 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	feedCache := redis.NewCache(redis.FeedDB)
 
 	recommender := recommend.NewRecommender(c.Queries)
-	go recommender.Run(context.Background(), time.NewTicker(time.Hour))
+	recommender.Run(context.Background(), time.NewTicker(time.Hour))
 
 	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, c.MagicLinkClient, recommender)
 }

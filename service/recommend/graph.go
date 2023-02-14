@@ -8,10 +8,8 @@ import (
 	"github.com/mikeydub/go-gallery/service/tracing"
 )
 
-type adjacencyList map[persist.DBID][]persist.DBID
-
 type graph struct {
-	Neighbors adjacencyList `json:"neighbors"`
+	Neighbors map[persist.DBID][]persist.DBID
 	Metadata  graphMetadata `json:"metadata"`
 }
 
@@ -31,7 +29,7 @@ func generateGraph(ctx context.Context, queries *db.Queries) (*graph, error) {
 		return nil, err
 	}
 
-	neighbors := adjacencyList{}
+	neighbors := map[persist.DBID][]persist.DBID{}
 
 	// Store additional metadata which gets used in the algorithm
 	// for calculating node weights

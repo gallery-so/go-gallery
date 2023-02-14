@@ -7,30 +7,31 @@ package coredb
 
 import (
 	"context"
-	"time"
 
 	"github.com/mikeydub/go-gallery/service/persist"
 )
 
 const getFollowEdgesByUserID = `-- name: GetFollowEdgesByUserID :many
-select f.followee, f.last_updated from follows f where f.follower = $1 and f.deleted = false
+select id, follower, followee, deleted, created_at, last_updated from follows f where f.follower = $1 and f.deleted = false
 `
 
-type GetFollowEdgesByUserIDRow struct {
-	Followee    persist.DBID
-	LastUpdated time.Time
-}
-
-func (q *Queries) GetFollowEdgesByUserID(ctx context.Context, follower persist.DBID) ([]GetFollowEdgesByUserIDRow, error) {
+func (q *Queries) GetFollowEdgesByUserID(ctx context.Context, follower persist.DBID) ([]Follow, error) {
 	rows, err := q.db.Query(ctx, getFollowEdgesByUserID, follower)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetFollowEdgesByUserIDRow
+	var items []Follow
 	for rows.Next() {
-		var i GetFollowEdgesByUserIDRow
-		if err := rows.Scan(&i.Followee, &i.LastUpdated); err != nil {
+		var i Follow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Follower,
+			&i.Followee,
+			&i.Deleted,
+			&i.CreatedAt,
+			&i.LastUpdated,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -122,15 +123,17 @@ insert into recommendation_results
   id
   , user_id
   , recommended_user_id
+  , recommended_count
 ) (
   select
     unnest($1::varchar[])
     , unnest($2::varchar[])
     , unnest($3::varchar[])
+    , unnest($4::int[])
 )
 on conflict (user_id, recommended_user_id, version) where deleted = false
 do update set
-  recommended_count = recommendation_results.recommended_count + 1,
+  recommended_count = recommendation_results.recommended_count + excluded.recommended_count,
   last_updated = now()
 `
 
@@ -138,9 +141,15 @@ type UpdatedRecommendationResultsParams struct {
 	ID                []string
 	UserID            []string
 	RecommendedUserID []string
+	RecommendedCount  []int32
 }
 
 func (q *Queries) UpdatedRecommendationResults(ctx context.Context, arg UpdatedRecommendationResultsParams) error {
-	_, err := q.db.Exec(ctx, updatedRecommendationResults, arg.ID, arg.UserID, arg.RecommendedUserID)
+	_, err := q.db.Exec(ctx, updatedRecommendationResults,
+		arg.ID,
+		arg.UserID,
+		arg.RecommendedUserID,
+		arg.RecommendedCount,
+	)
 	return err
 }

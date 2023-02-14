@@ -894,20 +894,12 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 			return nil, PageInfo{}, err
 		}
 
-		following, err := api.queries.GetFollowEdgesByUserID(ctx, curUserID)
+		follows, err := api.queries.GetFollowEdgesByUserID(ctx, curUserID)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
 
-		followingIDs := make([]persist.DBID, len(following))
-		followedTimes := make([]time.Time, len(following))
-
-		for i, follow := range following {
-			followingIDs[i] = follow.Followee
-			followedTimes[i] = follow.LastUpdated
-		}
-
-		userIDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, followingIDs, followedTimes)
+		userIDs, err = recommend.For(ctx).RecommendFromFollowingShuffled(ctx, curUserID, follows)
 		if err != nil {
 			return nil, PageInfo{}, err
 		}
@@ -917,7 +909,8 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 	idsAsString := make([]string, len(userIDs))
 
 	for i, id := range userIDs {
-		positionLookup[id] = i
+		// Postgres uses 1-based indexing
+		positionLookup[id] = i + 1
 		idsAsString[i] = id.String()
 	}
 

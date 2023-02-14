@@ -28,10 +28,10 @@ const restartRate float64 = 0.25
 const nP = 500
 const nV = 20
 
-// visits keeps the of times a node has been visisted
+// visits keeps the number of times a node is visited in a walk
 type visits map[persist.DBID]int
 
-func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryNodes []queryNode) ([]persist.DBID, error) {
+func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryNodes []queryNode, rng *rand.Rand) ([]persist.DBID, error) {
 	span, ctx := tracing.StartSpan(ctx, "recommend", "walk")
 	defer tracing.FinishSpan(span)
 
@@ -47,11 +47,11 @@ func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryN
 		currentEdges[node.ID] = true
 	}
 
-	queryNodes = weightedSample(queryNodes)
+	queryNodes = weightedSample(queryNodes, rng)
 	steps := allocateSteps(ctx, r, queryNodes)
 
 	for _, node := range queryNodes {
-		walks[node] = walk(ctx, r, currentEdges, originID, node, steps[node.ID])
+		walks[node] = walk(ctx, r, currentEdges, originID, node, steps[node.ID], rng)
 	}
 
 	for _, walk := range walks {
@@ -81,24 +81,24 @@ func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryN
 }
 
 // walk performs a random walk starting from startNode
-func walk(ctx context.Context, r *Recommender, currentEdges map[persist.DBID]bool, originID persist.DBID, startNode queryNode, steps int) visits {
+func walk(ctx context.Context, r *Recommender, currentEdges map[persist.DBID]bool, originID persist.DBID, startNode queryNode, steps int, rng *rand.Rand) visits {
 	v := make(visits)
 	currentID := startNode.ID
 	for i, threshold := 0, 0; i < steps && threshold < nP; i++ {
-		// Restart the walk if there aren't neighbors adjacent to node
 		nodeNeighbors := r.readNeighbors(ctx, currentID)
+
+		// Restart the walk if there aren't neighbors adjacent to node
 		if len(nodeNeighbors) == 0 {
 			currentID = startNode.ID
 			continue
 		}
 
-		// Select a neighbor from a node at random. In the future, we could bias neighbor selection
-		// to achieve more personalized results.
-		neighborPos := rand.Intn(len(nodeNeighbors))
-		currentID = nodeNeighbors[neighborPos]
+		// Select a neighbor from a node at random.
+		// In the future, we could bias neighbor selection to achieve more personalized results.
+		currentID = nodeNeighbors[rng.Intn(len(nodeNeighbors))]
 
-		// Only count the visit if the selected node is not a node the node
-		// is already connected to and not the node we are finding suggestions for.
+		// Only count the visit if it is not an existing edge and is not the node
+		// we are finding suggestions for.
 		if _, isNeighbor := currentEdges[currentID]; !isNeighbor && currentID != originID {
 			v[currentID]++
 			if v[currentID] >= nV {
@@ -107,7 +107,7 @@ func walk(ctx context.Context, r *Recommender, currentEdges map[persist.DBID]boo
 		}
 
 		// Randomly restart the walk so walks don't stray too far
-		if rand.Float64() < restartRate {
+		if rng.Float64() < restartRate {
 			currentID = startNode.ID
 		}
 	}
@@ -126,7 +126,7 @@ func allocateSteps(ctx context.Context, r *Recommender, nodes []queryNode) map[p
 	queryNodes := make(map[persist.DBID]int)
 	scaleFactors := make([]int, len(nodes))
 	totalFactors := 0
-	metadata := r.readGraphMetadata(ctx)
+	metadata := r.readMetadata(ctx)
 
 	for i, n := range nodes {
 		indegree := 1 // Node "follows" themself
@@ -146,16 +146,17 @@ func allocateSteps(ctx context.Context, r *Recommender, nodes []queryNode) map[p
 	return queryNodes
 }
 
-// weightedSample returns a sample of queryNodes, where the probability of a node
-// being selected is proportional to its weight.
-func weightedSample(nodes []queryNode) []queryNode {
-	keys := make([]float64, len(nodes))
-	for i, node := range nodes {
-		keys[i] = math.Pow(rand.Float64(), (1 / float64(node.Weight)))
+// weightedSample returns a sample of queryNodes, where the probability of selecting
+// a node is proportional to its weight. This uses a seemingly magic algorithm called A-Res:
+// https://en.wikipedia.org/wiki/Reservoir_sampling#Algorithm_A-Res
+func weightedSample(nodes []queryNode, rng *rand.Rand) []queryNode {
+	keys := make(map[queryNode]float64)
+	for _, node := range nodes {
+		keys[node] = math.Pow(rng.Float64(), (1 / float64(node.Weight)))
 	}
 
 	sort.Slice(nodes, func(i, j int) bool {
-		return keys[i] > keys[j]
+		return keys[nodes[i]] > keys[nodes[j]]
 	})
 
 	return nodes[:totalWalks]

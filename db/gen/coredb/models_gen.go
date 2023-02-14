@@ -254,7 +254,7 @@ type RecommendationResult struct {
 	Version           sql.NullInt32
 	UserID            persist.DBID
 	RecommendedUserID persist.DBID
-	RecommendedCount  int32
+	RecommendedCount  sql.NullInt32
 	CreatedAt         time.Time
 	LastUpdated       time.Time
 	Deleted           bool
