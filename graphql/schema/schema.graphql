@@ -814,12 +814,11 @@ type FeedConnection {
   pageInfo: PageInfo!
 }
 
-
-type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"]) @goEmbedHelper{
+type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"]) @goEmbedHelper {
   id: ID!
 
   galleryUser: GalleryUser @goField(forceResolver: true)
-  
+
   currentlyFollowing: Boolean!
   socialId: String!
   socialType: SocialAccountType!
