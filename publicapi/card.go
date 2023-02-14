@@ -30,7 +30,7 @@ type CardAPI struct {
 
 func (api *CardAPI) MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (string, error) {
 
-	cardAddress := viper.GetString("CARDS_CONTRACT_ADDRESS")
+	cardAddress := viper.GetString("PREMIUM_CONTRACT_ADDRESS")
 
 	cards, err := contracts.NewPremiumCards(common.HexToAddress(cardAddress), api.ethClient)
 	if err != nil {
