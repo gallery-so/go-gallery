@@ -154,6 +154,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
+  blurhash: String
+  aspectRatio: Float
 }
 
 type VideoURLSet {
