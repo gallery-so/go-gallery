@@ -9,7 +9,6 @@ import (
 
 	"github.com/everFinance/goar"
 	sentry "github.com/getsentry/sentry-go"
-	"github.com/gin-contrib/pprof"
 	shell "github.com/ipfs/go-ipfs-api"
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/mikeydub/go-gallery/util"
@@ -58,7 +57,6 @@ func Init() {
 	c := ClientInit(context.Background())
 	provider := NewMultichainProvider(c)
 	router := CoreInit(c, provider)
-	pprof.Register(router)
 	http.Handle("/", router)
 }
 
