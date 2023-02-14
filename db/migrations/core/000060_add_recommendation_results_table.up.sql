@@ -1,3 +1,5 @@
+set role to access_rw;
+
 create table if not exists recommendation_results (
   id character varying(255) primary key,
   version int default 0,
@@ -20,5 +22,4 @@ create materialized view top_recommended_users as (
   group by recommended_user_id
   order by frequency desc, last_updated desc
   limit 100
-)
-with data;
+);
