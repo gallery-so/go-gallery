@@ -709,12 +709,14 @@ type ComplexityRoot struct {
 	}
 
 	PreviewURLSet struct {
-		Large     func(childComplexity int) int
-		Medium    func(childComplexity int) int
-		Raw       func(childComplexity int) int
-		Small     func(childComplexity int) int
-		SrcSet    func(childComplexity int) int
-		Thumbnail func(childComplexity int) int
+		AspectRatio func(childComplexity int) int
+		Blurhash    func(childComplexity int) int
+		Large       func(childComplexity int) int
+		Medium      func(childComplexity int) int
+		Raw         func(childComplexity int) int
+		Small       func(childComplexity int) int
+		SrcSet      func(childComplexity int) int
+		Thumbnail   func(childComplexity int) int
 	}
 
 	PublishGalleryPayload struct {
@@ -4066,6 +4068,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreverifyEmailPayload.Result(childComplexity), true
 
+	case "PreviewURLSet.aspectRatio":
+		if e.complexity.PreviewURLSet.AspectRatio == nil {
+			break
+		}
+
+		return e.complexity.PreviewURLSet.AspectRatio(childComplexity), true
+
+	case "PreviewURLSet.blurhash":
+		if e.complexity.PreviewURLSet.Blurhash == nil {
+			break
+		}
+
+		return e.complexity.PreviewURLSet.Blurhash(childComplexity), true
+
 	case "PreviewURLSet.large":
 		if e.complexity.PreviewURLSet.Large == nil {
 			break
@@ -5884,6 +5900,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
+  blurhash: String
+  aspectRatio: Float
 }
 
 type VideoURLSet {
@@ -22047,6 +22065,70 @@ func (ec *executionContext) _PreviewURLSet_srcSet(ctx context.Context, field gra
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PreviewURLSet_blurhash(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PreviewURLSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Blurhash, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _PreviewURLSet_aspectRatio(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "PreviewURLSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AspectRatio, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _PublishGalleryPayload_gallery(ctx context.Context, field graphql.CollectedField, obj *model.PublishGalleryPayload) (ret graphql.Marshaler) {
@@ -39760,6 +39842,20 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 
 			out.Values[i] = innerFunc(ctx)
 
+		case "blurhash":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PreviewURLSet_blurhash(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
+		case "aspectRatio":
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._PreviewURLSet_aspectRatio(ctx, field, obj)
+			}
+
+			out.Values[i] = innerFunc(ctx)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -45694,6 +45790,22 @@ func (ec *executionContext) marshalOFeedEventOrError2githubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._FeedEventOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v interface{}) (*float64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := graphql.MarshalFloatContext(*v)
+	return graphql.WrapContextMarshaler(ctx, res)
 }
 
 func (ec *executionContext) marshalOFollowInfo2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowInfo(ctx context.Context, sel ast.SelectionSet, v []*model.FollowInfo) graphql.Marshaler {
