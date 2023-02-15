@@ -1942,7 +1942,7 @@ func (q *Queries) GetSocialAuthByUserID(ctx context.Context, arg GetSocialAuthBy
 }
 
 const getSocialConnections = `-- name: GetSocialConnections :many
-select s.social_id, s.social_username, s.social_displayname, s.social_profile_image, user_view.id as user_id, user_view.created_at as user_created_at, f.id is not null as already_following
+select s.social_id, s.social_username, s.social_displayname, s.social_profile_image, user_view.id as user_id, user_view.created_at as user_created_at, (f.id is not null)::bool as already_following
 from (select unnest($3::varchar[]) as social_id, unnest($4::varchar[]) as social_username, unnest($5::varchar[]) as social_displayname, unnest($6::varchar[]) as social_profile_image) as s
     inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id and user_view.deleted = false
     left outer join follows f on f.follower = $7 and f.followee = user_view.id and f.deleted = false
@@ -1979,7 +1979,7 @@ type GetSocialConnectionsRow struct {
 	SocialProfileImage interface{}
 	UserID             persist.DBID
 	UserCreatedAt      time.Time
-	AlreadyFollowing   interface{}
+	AlreadyFollowing   bool
 }
 
 // this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
