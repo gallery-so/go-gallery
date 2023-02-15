@@ -84,6 +84,8 @@ $(DEPLOY)-$(PROD)-feedbot         : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(PROD)-tokenprocessing : SERVICE_FILE := tokenprocessing-env.yaml
 $(DEPLOY)-$(PROD)-emails          : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(PROD)-routing-rules   : SERVICE_FILE := dispatch.yaml
+$(DEPLOY)-$(DEV)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
+$(DEPLOY)-$(PROD)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
 
 # Service to Sentry project mapping
 $(DEPLOY)-%-backend               : SENTRY_PROJECT := gallery-backend
@@ -152,6 +154,16 @@ $(DEPLOY)-%-feedbot                    : MEMORY         := $(FEEDBOT_MEMORY)
 $(DEPLOY)-%-feedbot                    : CONCURRENCY    := $(FEEDBOT_CONCURRENCY)
 $(DEPLOY)-$(DEV)-feedbot               : SERVICE        := feedbot-dev
 $(DEPLOY)-$(PROD)-feedbot              : SERVICE        := feedbot
+$(DEPLOY)-%-graphql-gateway                    : REPO           := graphql-gateway
+$(DEPLOY)-$(DEV)-graphql-gateway               : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(DEV)/Dockerfile
+$(DEPLOY)-$(PROD)-graphql-gateway              : DOCKER_FILE    := $(DOCKER_DIR)/graphql-gateway/$(PROD)/Dockerfile
+$(DEPLOY)-%-graphql-gateway                    : PORT           := 8000
+$(DEPLOY)-%-graphql-gateway                    : TIMEOUT        := $(GRAPHQL_GATEWAY_TIMEOUT)
+$(DEPLOY)-%-graphql-gateway                    : CPU            := $(GRAPHQL_GATEWAY_CPU)
+$(DEPLOY)-%-graphql-gateway                    : MEMORY         := $(GRAPHQL_GATEWAY_MEMORY)
+$(DEPLOY)-%-graphql-gateway                    : CONCURRENCY    := $(GRAPHQL_GATEWAY_CONCURRENCY)
+$(DEPLOY)-$(DEV)-graphql-gateway               : SERVICE        := graphql-gateway-dev
+$(DEPLOY)-$(PROD)-graphql-gateway              : SERVICE        := graphql-gateway
 
 # Service name mappings
 $(PROMOTE)-%-backend                   : SERVICE := default
@@ -280,6 +292,7 @@ $(DEPLOY)-$(DEV)-admin            : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(DEV)-feed             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed
 $(DEPLOY)-$(DEV)-feedbot          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
 $(DEPLOY)-$(DEV)-routing-rules    : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(DEV)-graphql-gateway   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 
 # SANDBOX deployments
 $(DEPLOY)-$(SANDBOX)-backend      : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-backend _$(RELEASE)-backend # go server that uses dev upstream services
@@ -294,6 +307,7 @@ $(DEPLOY)-$(PROD)-feed            : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-fee
 $(DEPLOY)-$(PROD)-feedbot         : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feedbot _$(RELEASE)-feedbot
 $(DEPLOY)-$(PROD)-admin           : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(PROD)-routing-rules   : _set-project-$(ENV) _$(DEPLOY)-routing-rules
+$(DEPLOY)-$(PROD)-graphql-gateway : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-graphql-gateway
 
 # PROD promotions. Running these targets will migrate traffic to the specified version.
 # Example usage:
