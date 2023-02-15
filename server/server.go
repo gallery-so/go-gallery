@@ -206,7 +206,7 @@ func SetDefaults() {
 	viper.SetDefault("MAGIC_LINK_SECRET_KEY", "")
 	viper.SetDefault("TWITTER_CLIENT_ID", "")
 	viper.SetDefault("TWITTER_CLIENT_SECRET", "")
-	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "https://gallery.so/auth/twitter")
+	viper.SetDefault("TWITTER_AUTH_REDIRECT_URI", "http://localhost:3000/auth/twitter")
 	viper.SetDefault("GCLOUD_FEEDBOT_TASK_QUEUE", "projects/gallery-local/locations/here/queues/feedbot")
 
 	viper.AutomaticEnv()
