@@ -384,6 +384,15 @@ format-graphql:
 	yarn prettier --write graphql/schema/schema.graphql
 	yarn prettier --write graphql/testdata/operations.graphql;
 
+start-local-graphql-gateway:
+	docker-compose -f docker/graphql-gateway/docker-compose.yml up -d graphql-gateway-local
+
+start-dev-graphql-gateway:
+	docker-compose -f docker/graphql-gateway/docker-compose.yml up -d graphql-gateway-dev
+
+start-prod-graphql-gateway:
+	docker-compose -f docker/graphql-gateway/docker-compose.yml up -d graphql-gateway-prod
+
 # Listing targets as dependencies doesn't pull in target-specific secrets, so we need to
 # invoke $(MAKE) here to read appropriate secrets for each target.
 start-sql-proxy:
