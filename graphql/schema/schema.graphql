@@ -1,5 +1,3 @@
-directive @entityResolver(multi: Boolean) on OBJECT
-
 # Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
@@ -684,7 +682,7 @@ interface FeedEventData {
   action: Action
 }
 
-type FeedEvent implements Node @key(fields: "dbid") @entityResolver(multi: true) {
+type FeedEvent implements Node @key(fields: "dbid") {
   id: ID!
   dbid: DBID!
 
