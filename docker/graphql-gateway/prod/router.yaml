@@ -1,6 +1,7 @@
 cors:
   allow_credentials: true
   origins:
+    - "https://gallery.so"
     - http://localhost:3000
 
 supergraph:
