@@ -139,10 +139,7 @@ func (u *MediaMapper) GetSrcSet(sourceUrl string) string {
 }
 
 func (u *MediaMapper) GetBlurhash(sourceUrl string) *string {
-	token := viper.GetString("IMGIX_SECRET")
-
-	urlBuilder := imgix.NewURLBuilder(assetDomain, imgix.WithToken(token), imgix.WithLibParam(false))
-	url := urlBuilder.CreateURL(sourceUrl, imgix.Param("fm", "blurhash"))
+	url := u.urlBuilder.CreateURL(sourceUrl, imgix.Param("fm", "blurhash"))
 
 	req, err := http.NewRequestWithContext(context.Background(), "GET", url, bytes.NewBuffer([]byte{}))
 	req.Header.Set("Accept", "*/*")
@@ -170,10 +167,7 @@ func (u *MediaMapper) GetBlurhash(sourceUrl string) *string {
 }
 
 func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
-	token := viper.GetString("IMGIX_SECRET")
-
-	urlBuilder := imgix.NewURLBuilder(assetDomain, imgix.WithToken(token), imgix.WithLibParam(false))
-	url := urlBuilder.CreateURL(sourceUrl, buildParams(getDefaultParams(), imgix.Param("fm", "json"))...)
+	url := u.urlBuilder.CreateURL(sourceUrl, buildParams(getDefaultParams(), imgix.Param("fm", "json"))...)
 
 	rawResponse, err := http.Get(url)
 
