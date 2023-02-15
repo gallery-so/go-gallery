@@ -1,3 +1,9 @@
+"""
+Any field decorated with the @experimental directive should not be used in production.
+It will not conform to our rules around breaking changes.
+"""
+directive @experimental on FIELD_DEFINITION
+
 # Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
@@ -154,8 +160,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
-  blurhash: String
-  aspectRatio: Float
+  blurhash: String @experimental
+  aspectRatio: Float @experimental
 }
 
 type VideoURLSet {
