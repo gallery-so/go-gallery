@@ -170,7 +170,7 @@ func (u *MediaMapper) GetBlurhash(sourceUrl string) *string {
 	return &responseString
 }
 
-func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float32 {
+func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
 	token := viper.GetString("IMGIX_SECRET")
 
 	urlBuilder := imgix.NewURLBuilder(assetDomain, imgix.WithToken(token), imgix.WithLibParam(false))
@@ -187,8 +187,8 @@ func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float32 {
 	}
 
 	type ImgixJsonResponse struct {
-		PixelWidth  float32
-		PixelHeight float32
+		PixelWidth  float64
+		PixelHeight float64
 	}
 
 	var imgixJsonResponse ImgixJsonResponse
