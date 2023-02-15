@@ -956,6 +956,7 @@ type FeedEvent struct {
 func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
+func (FeedEvent) IsEntity()               {}
 
 type FeedEventAdmireEdge struct {
 	Node   *Admire    `json:"node"`

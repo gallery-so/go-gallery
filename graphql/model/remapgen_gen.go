@@ -397,6 +397,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		obj, ok := object.(ViewerOrError)
 		return obj, ok
 	},
+
+	//"_Entity": func(object interface{}) (interface{}, bool) {
+	//	obj, ok := object.(Entity)
+	//	return obj, ok
+	//},
 }
 
 func ConvertToModelType(object interface{}, gqlTypeName string) (objectAsType interface{}, ok bool) {
