@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  graphql-gateway-local:
+    build:
+      context: ../../
+      dockerfile: ./docker/graphql-gateway/local/Dockerfile
+    ports:
+      - "8000:8000"
+
+  graphql-gateway-prod:
+    build:
+      context: ../../
+      dockerfile: ./docker/graphql-gateway/prod/Dockerfile
+    ports:
+      - "8000:8000"
+
+  graphql-gateway-dev:
+    build:
+      context: ../../
+      dockerfile: ./docker/graphql-gateway/dev/Dockerfile
+    ports:
+      - "8000:8000"
