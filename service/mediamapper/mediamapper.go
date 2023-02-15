@@ -189,8 +189,12 @@ func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
 
 	json.Unmarshal(rseponseBytes, &imgixJsonResponse)
 
-	aspectRatio := imgixJsonResponse.PixelWidth / imgixJsonResponse.PixelHeight
+	// Make sure we handle the case where there is no image to make sure we don't get infinity
+	if imgixJsonResponse.PixelHeight == 0 || imgixJsonResponse.PixelWidth == 0 {
+		return nil
+	}
 
+	aspectRatio := imgixJsonResponse.PixelWidth / imgixJsonResponse.PixelHeight
 	return &aspectRatio
 }
 
