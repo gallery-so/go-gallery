@@ -17,13 +17,13 @@ import (
 // totalWalks determines how many walks are started
 const totalWalks = 10
 
-// walkLength is the maximum path length for each walk
-const walkLength = 200000
+// walkSteps is the maximum number steps that can be taken for each walk
+const walkSteps = 200000
 
-// restartRate is the probabilty that a walk restarts from the beginning
-const restartRate float64 = 0.25
+// The max number degrees away from the start node before a walk resets
+const maxDepth = 10
 
-// nP and nV controls the early stopping condition. A walk terminates when the
+// nP and nV controls the early stopping condition. A walk can terminate when the
 // nPth ranked node is visited nV times.
 const nP = 500
 const nV = 20
@@ -80,38 +80,43 @@ func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryN
 	return scored, nil
 }
 
+type edge [2]persist.DBID
+
 // walk performs a random walk starting from startNode
 func walk(ctx context.Context, r *Recommender, currentEdges map[persist.DBID]bool, originID persist.DBID, startNode queryNode, steps int, rng *rand.Rand) visits {
 	v := make(visits)
 	currentID := startNode.ID
+	seenEdges := make(map[*edge]bool, 2048)
+	depth := 0
 	for i, threshold := 0, 0; i < steps && threshold < nP; i++ {
 		nodeNeighbors := r.readNeighbors(ctx, currentID)
-
-		// Restart the walk if there aren't neighbors adjacent to node
+		// Restart the walk if there aren't any more neighbors adjacent to node
 		if len(nodeNeighbors) == 0 {
 			currentID = startNode.ID
 			continue
 		}
-
 		// Select a neighbor from a node at random.
-		// In the future, we could bias neighbor selection to achieve more personalized results.
-		currentID = nodeNeighbors[rng.Intn(len(nodeNeighbors))]
-
-		// Only count the visit if it is not an existing edge and is not the node
-		// we are finding suggestions for.
-		if _, isNeighbor := currentEdges[currentID]; !isNeighbor && currentID != originID {
-			v[currentID]++
-			if v[currentID] >= nV {
-				threshold++
+		e := edge{currentID, nodeNeighbors[rng.Intn(len(nodeNeighbors))]}
+		currentID = e[1]
+		// Only consider edges that haven't been traversed yet, otherwise we would be
+		// favoring nodes that are part of a cycle
+		if _, seen := seenEdges[&e]; !seen {
+			seenEdges[&e] = true
+			// If the edge was already used, don't count it as a new visit.
+			// Also, if the node picked is the originID, then skip it.
+			if _, exists := currentEdges[currentID]; !exists && currentID != originID {
+				v[currentID]++
 			}
 		}
-
-		// Randomly restart the walk so walks don't stray too far
-		if rng.Float64() < restartRate {
+		if v[currentID] >= nV {
+			threshold++
+		}
+		depth++
+		if depth > maxDepth {
 			currentID = startNode.ID
+			depth = 0
 		}
 	}
-
 	return v
 }
 
@@ -140,7 +145,7 @@ func allocateSteps(ctx context.Context, r *Recommender, nodes []queryNode) map[p
 	}
 
 	for i, node := range nodes {
-		queryNodes[node.ID] = (node.Weight * walkLength * scaleFactors[i]) / totalFactors
+		queryNodes[node.ID] = (node.Weight * walkSteps * scaleFactors[i]) / totalFactors
 	}
 
 	return queryNodes
