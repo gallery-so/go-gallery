@@ -106,7 +106,6 @@ func getDefaultParams() []imgix.IxParam {
 	return []imgix.IxParam{
 		imgix.Param("auto", "format", "compress"),
 		imgix.Param("fit", "max"),
-		imgix.Param("fm", "json"),
 	}
 }
 
@@ -174,7 +173,7 @@ func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
 	token := viper.GetString("IMGIX_SECRET")
 
 	urlBuilder := imgix.NewURLBuilder(assetDomain, imgix.WithToken(token), imgix.WithLibParam(false))
-	url := urlBuilder.CreateURL(sourceUrl, buildParams(getDefaultParams(), newWidthParam(smallWidth))...)
+	url := urlBuilder.CreateURL(sourceUrl, buildParams(getDefaultParams(), imgix.Param("fm", "json"))...)
 
 	rawResponse, err := http.Get(url)
 
