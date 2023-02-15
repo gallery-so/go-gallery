@@ -1358,6 +1358,14 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 
 	if event.Data.GalleryNewCollections != nil && len(event.Data.GalleryNewCollections) > 0 {
 		for _, collectionID := range event.Data.GalleryNewCollections {
+			var collectorsNote *string
+			if note, ok := event.Data.GalleryNewCollectionCollectorsNotes[collectionID]; ok {
+				collectorsNote = &note
+			}
+			handledNew[collectionID] = true
+			if collectorsNote == nil && (event.Data.GalleryNewCollectionTokenIDs[collectionID] == nil || len(event.Data.GalleryNewCollectionTokenIDs[collectionID]) == 0) {
+				continue
+			}
 			result = append(result, model.CollectionCreatedFeedEventData{
 				EventTime:  &event.CreatedAt,
 				Owner:      &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)}, // remaining fields handled by dedicated resolver
@@ -1369,7 +1377,7 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 					TokenIDs:     event.Data.GalleryNewCollectionTokenIDs[collectionID],
 				},
 			})
-			handledNew[collectionID] = true
+
 		}
 	}
 
