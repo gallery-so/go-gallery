@@ -1362,6 +1362,7 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 			if note, ok := event.Data.GalleryNewCollectionCollectorsNotes[collectionID]; ok {
 				collectorsNote = &note
 			}
+			handledNew[collectionID] = true
 			if collectorsNote == nil && (event.Data.GalleryNewCollectionTokenIDs[collectionID] == nil || len(event.Data.GalleryNewCollectionTokenIDs[collectionID]) == 0) {
 				continue
 			}
@@ -1377,7 +1378,7 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 					TokenIDs:     event.Data.GalleryNewCollectionTokenIDs[collectionID],
 				},
 			})
-			handledNew[collectionID] = true
+
 		}
 	}
 
