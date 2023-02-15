@@ -1362,6 +1362,9 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 			if note, ok := event.Data.GalleryNewCollectionCollectorsNotes[collectionID]; ok {
 				collectorsNote = &note
 			}
+			if collectorsNote == nil && (event.Data.GalleryNewCollectionTokenIDs[collectionID] == nil || len(event.Data.GalleryNewCollectionTokenIDs[collectionID]) == 0) {
+				continue
+			}
 			result = append(result, model.CollectionCreatedFeedEventData{
 				EventTime:         &event.CreatedAt,
 				Owner:             &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)}, // remaining fields handled by dedicated resolver
