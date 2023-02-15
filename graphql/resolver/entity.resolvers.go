@@ -6,6 +6,7 @@ package graphql
 
 import (
 	"context"
+
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/persist"
