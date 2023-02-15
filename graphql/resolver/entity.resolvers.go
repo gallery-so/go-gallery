@@ -8,22 +8,12 @@ import (
 	"context"
 	"github.com/mikeydub/go-gallery/graphql/generated"
 	"github.com/mikeydub/go-gallery/graphql/model"
+	"github.com/mikeydub/go-gallery/service/persist"
 )
 
-// FindManyFeedEventByDbids is the resolver for the findManyFeedEventByDbids field.
-func (r *entityResolver) FindManyFeedEventByDbids(ctx context.Context, reps []*model.FeedEventByDbidsInput) ([]*model.FeedEvent, error) {
-	var events []*model.FeedEvent
-	for index, _ := range reps {
-		event, err := resolveFeedEventByEventID(ctx, reps[index].Dbid)
-
-		if err != nil {
-			return nil, err
-		}
-
-		events = append(events, event)
-	}
-
-	return events, nil
+// FindFeedEventByDbid is the resolver for the findFeedEventByDbid field.
+func (r *entityResolver) FindFeedEventByDbid(ctx context.Context, dbid persist.DBID) (*model.FeedEvent, error) {
+	return resolveFeedEventByEventID(ctx, dbid)
 }
 
 // Entity returns generated.EntityResolver implementation.
