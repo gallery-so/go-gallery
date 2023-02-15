@@ -1,4 +1,9 @@
+cors:
+  allow_credentials: true
+  origins:
+    - http://localhost:3000
+
 supergraph:
   # The socket address and port to listen on.
   # Note that this must be quoted to avoid interpretation as an array in YAML.
-  listen: '0.0.0.0:4000'
+  listen: '0.0.0.0:8000'
