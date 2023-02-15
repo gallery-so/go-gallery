@@ -1,6 +1,7 @@
 package remapgen
 
 import (
+	_ "embed"
 	"path"
 	"sort"
 	"syscall"
@@ -10,6 +11,9 @@ import (
 	"github.com/99designs/gqlgen/plugin"
 	"github.com/vektah/gqlparser/v2/ast"
 )
+
+//go:embed remapgen.gotpl
+var template string
 
 const outputFileName = "remapgen_gen.go"
 
@@ -52,6 +56,7 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 	sort.Strings(types)
 
 	return templates.Render(templates.Options{
+		Template:    template,
 		PackageName: m.modelPackage,
 		Filename:    m.outputFilePath,
 		Data: &ConfigMutateTemplateData{
