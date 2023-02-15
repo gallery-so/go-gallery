@@ -28,17 +28,17 @@ func For(ctx context.Context) *Recommender {
 }
 
 type Recommender struct {
-	recommendFromFollowsFunc func(context.Context, persist.DBID, []db.Follow) ([]persist.DBID, error)
-	loadFunc                 func(context.Context)
-	saveResultFunc           func(ctx context.Context, userID persist.DBID, recommendedIDs []persist.DBID) error
-	bootstrapFunc            func(ctx context.Context) ([]persist.DBID, error)
-	saveCh                   chan saveMsg
+	RecommendFunc  func(context.Context, persist.DBID, []db.Follow) ([]persist.DBID, error)
+	LoadFunc       func(context.Context)
+	SaveResultFunc func(ctx context.Context, userID persist.DBID, recommendedIDs []persist.DBID) error
+	BootstrapFunc  func(ctx context.Context) ([]persist.DBID, error)
+	saveCh         chan saveMsg
 }
 
 func NewRecommender(queries *db.Queries) *Recommender {
 	r := &Recommender{}
 
-	r.loadFunc = func(ctx context.Context) {
+	r.LoadFunc = func(ctx context.Context) {
 		g, err := generateGraph(ctx, queries)
 		if err != nil {
 			panic(err)
@@ -49,7 +49,7 @@ func NewRecommender(queries *db.Queries) *Recommender {
 		}
 	}
 
-	r.saveResultFunc = func(ctx context.Context, userID persist.DBID, recommendedIDs []persist.DBID) error {
+	r.SaveResultFunc = func(ctx context.Context, userID persist.DBID, recommendedIDs []persist.DBID) error {
 		params := db.UpdatedRecommendationResultsParams{}
 		for _, id := range recommendedIDs {
 			params.ID = append(params.ID, persist.GenerateID().String())
@@ -60,7 +60,7 @@ func NewRecommender(queries *db.Queries) *Recommender {
 		return queries.UpdatedRecommendationResults(ctx, params)
 	}
 
-	r.bootstrapFunc = func(ctx context.Context) ([]persist.DBID, error) {
+	r.BootstrapFunc = func(ctx context.Context) ([]persist.DBID, error) {
 		recommendedIDs, err := queries.GetTopRecommendedUserIDs(ctx)
 		if err != nil {
 			return nil, err
@@ -69,7 +69,7 @@ func NewRecommender(queries *db.Queries) *Recommender {
 		return recommendedIDs, nil
 	}
 
-	r.recommendFromFollowsFunc = func(ctx context.Context, userID persist.DBID, follows []db.Follow) ([]persist.DBID, error) {
+	r.RecommendFunc = func(ctx context.Context, userID persist.DBID, follows []db.Follow) ([]persist.DBID, error) {
 		var latestFollow time.Time
 		queryNodes := make([]queryNode, len(follows))
 
@@ -122,10 +122,10 @@ func (r *Recommender) RecommendFromFollowingShuffled(ctx context.Context, userID
 // UsersFromFollowing suggest users based on a given user's follows sorted in descending order.
 func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist.DBID, follows []db.Follow) ([]persist.DBID, error) {
 	if len(follows) == 0 {
-		return r.bootstrapFunc(ctx)
+		return r.BootstrapFunc(ctx)
 	}
 
-	recommendedIDs, err := r.recommendFromFollowsFunc(ctx, userID, follows)
+	recommendedIDs, err := r.RecommendFunc(ctx, userID, follows)
 	if err != nil {
 		return nil, err
 	}
@@ -136,16 +136,15 @@ func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist
 }
 
 // Run is the main event loop that manages access to the currently loaded graph
-// and routines that can be completed
 func (r *Recommender) Run(ctx context.Context, ticker *time.Ticker) {
-	r.loadFunc(ctx)
+	r.LoadFunc(ctx)
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				r.loadFunc(ctx)
+				r.LoadFunc(ctx)
 			case msg := <-r.saveCh:
-				if err := r.saveResultFunc(ctx, msg.nodeID, msg.recommendedIDs); err != nil {
+				if err := r.SaveResultFunc(ctx, msg.nodeID, msg.recommendedIDs); err != nil {
 					logger.For(ctx).Errorf("failed to save recommendation: %s", err)
 				}
 			}
@@ -176,11 +175,17 @@ func (r *Recommender) readMetadata(ctx context.Context) graphMetadata {
 
 // shuffle shuffles IDs within partitions so that results are in a similar order.
 func shuffle(ids []persist.DBID) {
-	partitionSize := 10
-	partition := make([]persist.DBID, partitionSize)
-	for i := 0; i < len(ids); i += partitionSize {
-		partition = ids[i : i+partitionSize]
-		rand.Shuffle(partitionSize, func(i, j int) { partition[i], partition[j] = partition[j], partition[i] })
-		copy(ids[i:i+partitionSize], partition)
-	}
+	return
+	// partitionSize := 10
+
+	// for len(ids) < partitionSize {
+	// 	partitionSize /= 2
+	// }
+
+	// partition := make([]persist.DBID, partitionSize)
+	// for i := 0; i < len(ids); i += partitionSize {
+	// 	partition = ids[i : i+partitionSize]
+	// 	rand.Shuffle(partitionSize, func(i, j int) { partition[i], partition[j] = partition[j], partition[i] })
+	// 	copy(ids[i:i+partitionSize], partition)
+	// }
 }

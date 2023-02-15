@@ -102,7 +102,7 @@ func walk(ctx context.Context, r *Recommender, currentEdges map[persist.DBID]boo
 		// favoring nodes that are part of a cycle
 		if _, seen := seenEdges[&e]; !seen {
 			seenEdges[&e] = true
-			// If the edge was already used, don't count it as a new visit.
+			// If , don't count it as a new visit.
 			// Also, if the node picked is the originID, then skip it.
 			if _, exists := currentEdges[currentID]; !exists && currentID != originID {
 				v[currentID]++

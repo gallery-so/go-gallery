@@ -6302,6 +6302,7 @@ func (v *viewerQueryResponse) __premarshalJSON() (*__premarshalviewerQueryRespon
 type viewerQueryViewer struct {
 	Typename        *string                                          `json:"__typename"`
 	UserExperiences []viewerQueryViewerUserExperiencesUserExperience `json:"userExperiences"`
+	SuggestedUsers  *viewerQueryViewerSuggestedUsersUsersConnection  `json:"suggestedUsers"`
 	User            *viewerQueryViewerUserGalleryUser                `json:"user"`
 }
 
@@ -6311,6 +6312,11 @@ func (v *viewerQueryViewer) GetTypename() *string { return v.Typename }
 // GetUserExperiences returns viewerQueryViewer.UserExperiences, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewer) GetUserExperiences() []viewerQueryViewerUserExperiencesUserExperience {
 	return v.UserExperiences
+}
+
+// GetSuggestedUsers returns viewerQueryViewer.SuggestedUsers, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewer) GetSuggestedUsers() *viewerQueryViewerSuggestedUsersUsersConnection {
+	return v.SuggestedUsers
 }
 
 // GetUser returns viewerQueryViewer.User, and is useful for accessing the field via an interface.
@@ -6327,6 +6333,36 @@ func (v *viewerQueryViewerErrNotAuthorized) GetTypename() *string { return v.Typ
 
 // GetMessage returns viewerQueryViewerErrNotAuthorized.Message, and is useful for accessing the field via an interface.
 func (v *viewerQueryViewerErrNotAuthorized) GetMessage() string { return v.Message }
+
+// viewerQueryViewerSuggestedUsersUsersConnection includes the requested fields of the GraphQL type UsersConnection.
+type viewerQueryViewerSuggestedUsersUsersConnection struct {
+	Edges []*viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdge `json:"edges"`
+}
+
+// GetEdges returns viewerQueryViewerSuggestedUsersUsersConnection.Edges, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerSuggestedUsersUsersConnection) GetEdges() []*viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdge {
+	return v.Edges
+}
+
+// viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdge includes the requested fields of the GraphQL type UserEdge.
+type viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdge struct {
+	Node *viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdgeNodeGalleryUser `json:"node"`
+}
+
+// GetNode returns viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdge.Node, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdge) GetNode() *viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdgeNodeGalleryUser {
+	return v.Node
+}
+
+// viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdgeNodeGalleryUser includes the requested fields of the GraphQL type GalleryUser.
+type viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdgeNodeGalleryUser struct {
+	Dbid persist.DBID `json:"dbid"`
+}
+
+// GetDbid returns viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdgeNodeGalleryUser.Dbid, and is useful for accessing the field via an interface.
+func (v *viewerQueryViewerSuggestedUsersUsersConnectionEdgesUserEdgeNodeGalleryUser) GetDbid() persist.DBID {
+	return v.Dbid
+}
 
 // viewerQueryViewerUserExperiencesUserExperience includes the requested fields of the GraphQL type UserExperience.
 type viewerQueryViewerUserExperiencesUserExperience struct {
@@ -8642,6 +8678,13 @@ query viewerQuery {
 			userExperiences {
 				type
 				experienced
+			}
+			suggestedUsers(last: 5) {
+				edges {
+					node {
+						dbid
+					}
+				}
 			}
 			user {
 				username

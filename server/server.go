@@ -56,7 +56,8 @@ func Init() {
 
 	c := ClientInit(context.Background())
 	provider := NewMultichainProvider(c)
-	router := CoreInit(c, provider)
+	recommender := recommend.NewRecommender(c.Queries)
+	router := CoreInit(c, provider, recommender)
 	http.Handle("/", router)
 }
 
@@ -103,7 +104,7 @@ func ClientInit(ctx context.Context) *Clients {
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
+func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.Recommender) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
@@ -128,7 +129,6 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 	feedCache := redis.NewCache(redis.FeedDB)
 
-	recommender := recommend.NewRecommender(c.Queries)
 	recommender.Run(context.Background(), time.NewTicker(time.Hour))
 
 	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, c.MagicLinkClient, recommender)
