@@ -8,9 +8,10 @@ exec:
   package: generated
 
 # Uncomment to enable federation
-# federation:
-#   filename: graph/generated/federation.go
-#   package: generated
+federation:
+ filename: graphql/generated/federation.go
+ package: generated
+ version: 2
 
 # Where should any generated models go?
 model:
