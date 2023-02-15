@@ -427,11 +427,12 @@ func (Collection) IsCollectionByIDOrError() {}
 
 type CollectionCreatedFeedEventData struct {
 	HelperCollectionCreatedFeedEventDataData
-	EventTime  *time.Time         `json:"eventTime"`
-	Owner      *GalleryUser       `json:"owner"`
-	Action     *persist.Action    `json:"action"`
-	Collection *Collection        `json:"collection"`
-	NewTokens  []*CollectionToken `json:"newTokens"`
+	EventTime         *time.Time         `json:"eventTime"`
+	Owner             *GalleryUser       `json:"owner"`
+	Action            *persist.Action    `json:"action"`
+	Collection        *Collection        `json:"collection"`
+	NewTokens         []*CollectionToken `json:"newTokens"`
+	NewCollectorsNote *string            `json:"newCollectorsNote"`
 }
 
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}

@@ -167,11 +167,12 @@ type ComplexityRoot struct {
 	}
 
 	CollectionCreatedFeedEventData struct {
-		Action     func(childComplexity int) int
-		Collection func(childComplexity int) int
-		EventTime  func(childComplexity int) int
-		NewTokens  func(childComplexity int) int
-		Owner      func(childComplexity int) int
+		Action            func(childComplexity int) int
+		Collection        func(childComplexity int) int
+		EventTime         func(childComplexity int) int
+		NewCollectorsNote func(childComplexity int) int
+		NewTokens         func(childComplexity int) int
+		Owner             func(childComplexity int) int
 	}
 
 	CollectionLayout struct {
@@ -1672,6 +1673,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionCreatedFeedEventData.EventTime(childComplexity), true
+
+	case "CollectionCreatedFeedEventData.newCollectorsNote":
+		if e.complexity.CollectionCreatedFeedEventData.NewCollectorsNote == nil {
+			break
+		}
+
+		return e.complexity.CollectionCreatedFeedEventData.NewCollectorsNote(childComplexity), true
 
 	case "CollectionCreatedFeedEventData.newTokens":
 		if e.complexity.CollectionCreatedFeedEventData.NewTokens == nil {
@@ -6517,6 +6525,7 @@ type CollectionCreatedFeedEventData implements FeedEventData @goEmbedHelper {
   action: Action
   collection: Collection @goField(forceResolver: true)
   newTokens: [CollectionToken] @goField(forceResolver: true)
+  newCollectorsNote: String
 }
 
 type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
@@ -11678,6 +11687,47 @@ func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_newToken
 				return ec.fieldContext_CollectionToken_tokenSettings(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CollectionToken", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CollectionCreatedFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField, obj *model.CollectionCreatedFeedEventData) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CollectionCreatedFeedEventData_newCollectorsNote(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewCollectorsNote, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CollectionCreatedFeedEventData_newCollectorsNote(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CollectionCreatedFeedEventData",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -45003,6 +45053,10 @@ func (ec *executionContext) _CollectionCreatedFeedEventData(ctx context.Context,
 				return innerFunc(ctx)
 
 			})
+		case "newCollectorsNote":
+
+			out.Values[i] = ec._CollectionCreatedFeedEventData_newCollectorsNote(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

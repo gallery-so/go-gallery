@@ -737,6 +737,7 @@ type CollectionCreatedFeedEventData implements FeedEventData @goEmbedHelper {
   action: Action
   collection: Collection @goField(forceResolver: true)
   newTokens: [CollectionToken] @goField(forceResolver: true)
+  newCollectorsNote: String
 }
 
 type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
