@@ -64,12 +64,13 @@ services:
       "-c",
       "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local"
     ]
+
   graphql-gateway:
     build:
       context: ./
       dockerfile: ./docker/graphql-gateway/Dockerfile
     ports:
-      - "8000:4000"
+      - "8000:8000"
   # Uncomment if you want to run tokenprocessing locally as a container
   # tokenprocessing:
   #   build:
