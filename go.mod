@@ -9,7 +9,7 @@ require (
 	cloud.google.com/go/pubsub v1.28.0
 	cloud.google.com/go/secretmanager v1.9.0
 	cloud.google.com/go/storage v1.27.0
-	github.com/99designs/gqlgen v0.17.4
+	github.com/99designs/gqlgen v0.17.24
 	github.com/Khan/genqlient v0.5.0
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b
 	github.com/asottile/dockerfile v3.1.0+incompatible
@@ -50,7 +50,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.8.1
-	github.com/vektah/gqlparser/v2 v2.4.5
+	github.com/vektah/gqlparser/v2 v2.5.1
 	golang.org/x/crypto v0.6.0
 	golang.org/x/exp v0.0.0-20221217163422-3c43f8badb15
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030
@@ -187,7 +187,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
-	github.com/mitchellh/mapstructure v1.4.3 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/buildkit v0.10.6 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

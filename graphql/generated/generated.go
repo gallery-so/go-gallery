@@ -5707,6 +5707,54 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e}
+	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputAdminAddWalletInput,
+		ec.unmarshalInputAuthMechanism,
+		ec.unmarshalInputChainAddressInput,
+		ec.unmarshalInputChainPubKeyInput,
+		ec.unmarshalInputCollectionLayoutInput,
+		ec.unmarshalInputCollectionSectionLayoutInput,
+		ec.unmarshalInputCollectionTokenSettingsInput,
+		ec.unmarshalInputCreateCollectionInGalleryInput,
+		ec.unmarshalInputCreateCollectionInput,
+		ec.unmarshalInputCreateGalleryInput,
+		ec.unmarshalInputCreateUserInput,
+		ec.unmarshalInputDebugAuth,
+		ec.unmarshalInputDebugSocialAuth,
+		ec.unmarshalInputDeepRefreshInput,
+		ec.unmarshalInputEoaAuth,
+		ec.unmarshalInputGalleryPositionInput,
+		ec.unmarshalInputGnosisSafeAuth,
+		ec.unmarshalInputMagicLinkAuth,
+		ec.unmarshalInputMintPremiumCardToWalletInput,
+		ec.unmarshalInputMoveCollectionToGalleryInput,
+		ec.unmarshalInputNotificationSettingsInput,
+		ec.unmarshalInputPreverifyEmailInput,
+		ec.unmarshalInputPublishGalleryInput,
+		ec.unmarshalInputRedeemMerchInput,
+		ec.unmarshalInputSetSpamPreferenceInput,
+		ec.unmarshalInputSocialAuthMechanism,
+		ec.unmarshalInputTrendingUsersInput,
+		ec.unmarshalInputTwitterAuth,
+		ec.unmarshalInputUnsubscribeFromEmailTypeInput,
+		ec.unmarshalInputUpdateCollectionHiddenInput,
+		ec.unmarshalInputUpdateCollectionInfoInput,
+		ec.unmarshalInputUpdateCollectionInput,
+		ec.unmarshalInputUpdateCollectionTokensInput,
+		ec.unmarshalInputUpdateEmailInput,
+		ec.unmarshalInputUpdateEmailNotificationSettingsInput,
+		ec.unmarshalInputUpdateGalleryCollectionsInput,
+		ec.unmarshalInputUpdateGalleryHiddenInput,
+		ec.unmarshalInputUpdateGalleryInfoInput,
+		ec.unmarshalInputUpdateGalleryInput,
+		ec.unmarshalInputUpdateGalleryOrderInput,
+		ec.unmarshalInputUpdateSocialAccountDisplayedInput,
+		ec.unmarshalInputUpdateTokenInfoInput,
+		ec.unmarshalInputUpdateUserExperienceInput,
+		ec.unmarshalInputUpdateUserInfoInput,
+		ec.unmarshalInputUploadPersistedQueriesInput,
+		ec.unmarshalInputVerifyEmailInput,
+	)
 	first := true
 
 	switch rc.Operation.Operation {
@@ -5716,6 +5764,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				return nil
 			}
 			first = false
+			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Query(ctx, rc.Operation.SelectionSet)
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
@@ -5730,6 +5779,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				return nil
 			}
 			first = false
+			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Mutation(ctx, rc.Operation.SelectionSet)
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
@@ -5781,7 +5831,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "graphql/schema/schema.graphql", Input: `# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
+	{Name: "../schema/schema.graphql", Input: `# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
   forceResolver: Boolean
@@ -7690,23 +7740,23 @@ type Subscription {
   notificationUpdated: Notification
 }
 `, BuiltIn: false},
-	{Name: "federation/directives.graphql", Input: `
+	{Name: "../../federation/directives.graphql", Input: `
 	scalar _Any
 	scalar _FieldSet
-	
+
 	directive @external on FIELD_DEFINITION
 	directive @requires(fields: _FieldSet!) on FIELD_DEFINITION
 	directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
 	directive @extends on OBJECT | INTERFACE
 
-	directive @key(fields: _FieldSet!, resolvable: Boolean) repeatable on OBJECT | INTERFACE
+	directive @key(fields: _FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
 	directive @link(import: [String!], url: String!) repeatable on SCHEMA
 	directive @shareable on OBJECT | FIELD_DEFINITION
-	directive @tag repeatable on OBJECT | FIELD_DEFINITION | INTERFACE | UNION
+	directive @tag(name: String!) repeatable on FIELD_DEFINITION | INTERFACE | OBJECT | UNION | ARGUMENT_DEFINITION | SCALAR | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
 	directive @override(from: String!) on FIELD_DEFINITION
 	directive @inaccessible on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
 `, BuiltIn: true},
-	{Name: "federation/entity.graphql", Input: `
+	{Name: "../../federation/entity.graphql", Input: `
 # a union of all types that use the @key directive
 union _Entity = FeedEvent
 
@@ -15449,7 +15499,6 @@ func (ec *executionContext) _Entity_findFeedEventByDbid(ctx context.Context, fie
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		if !graphql.HasFieldError(ctx, fc) {
@@ -22531,7 +22580,6 @@ func (ec *executionContext) _Mutation_addUserWallet(ctx context.Context, field g
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -22603,7 +22651,6 @@ func (ec *executionContext) _Mutation_removeUserWallets(ctx context.Context, fie
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -22675,7 +22722,6 @@ func (ec *executionContext) _Mutation_updateUserInfo(ctx context.Context, field 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -22747,7 +22793,6 @@ func (ec *executionContext) _Mutation_updateGalleryCollections(ctx context.Conte
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -22819,7 +22864,6 @@ func (ec *executionContext) _Mutation_createCollection(ctx context.Context, fiel
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -22891,7 +22935,6 @@ func (ec *executionContext) _Mutation_deleteCollection(ctx context.Context, fiel
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -22963,7 +23006,6 @@ func (ec *executionContext) _Mutation_updateCollectionInfo(ctx context.Context, 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23035,7 +23077,6 @@ func (ec *executionContext) _Mutation_updateCollectionTokens(ctx context.Context
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23107,7 +23148,6 @@ func (ec *executionContext) _Mutation_updateCollectionHidden(ctx context.Context
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23179,7 +23219,6 @@ func (ec *executionContext) _Mutation_updateTokenInfo(ctx context.Context, field
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23251,7 +23290,6 @@ func (ec *executionContext) _Mutation_setSpamPreference(ctx context.Context, fie
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23323,7 +23361,6 @@ func (ec *executionContext) _Mutation_syncTokens(ctx context.Context, field grap
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23375,7 +23412,6 @@ func (ec *executionContext) _Mutation_refreshToken(ctx context.Context, field gr
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23427,7 +23463,6 @@ func (ec *executionContext) _Mutation_refreshCollection(ctx context.Context, fie
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23479,7 +23514,6 @@ func (ec *executionContext) _Mutation_refreshContract(ctx context.Context, field
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23551,7 +23585,6 @@ func (ec *executionContext) _Mutation_deepRefresh(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23603,7 +23636,6 @@ func (ec *executionContext) _Mutation_getAuthNonce(ctx context.Context, field gr
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23655,7 +23687,6 @@ func (ec *executionContext) _Mutation_createUser(ctx context.Context, field grap
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23727,7 +23758,6 @@ func (ec *executionContext) _Mutation_updateEmail(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23799,7 +23829,6 @@ func (ec *executionContext) _Mutation_resendVerificationEmail(ctx context.Contex
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23860,7 +23889,6 @@ func (ec *executionContext) _Mutation_updateEmailNotificationSettings(ctx contex
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23912,7 +23940,6 @@ func (ec *executionContext) _Mutation_unsubscribeFromEmailType(ctx context.Conte
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -23964,7 +23991,6 @@ func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.C
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24016,7 +24042,6 @@ func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24081,7 +24106,6 @@ func (ec *executionContext) _Mutation_connectSocialAccount(ctx context.Context, 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24153,7 +24177,6 @@ func (ec *executionContext) _Mutation_updateSocialAccountDisplayed(ctx context.C
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24225,7 +24248,6 @@ func (ec *executionContext) _Mutation_followUser(ctx context.Context, field grap
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24297,7 +24319,6 @@ func (ec *executionContext) _Mutation_unfollowUser(ctx context.Context, field gr
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24369,7 +24390,6 @@ func (ec *executionContext) _Mutation_admireFeedEvent(ctx context.Context, field
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24441,7 +24461,6 @@ func (ec *executionContext) _Mutation_removeAdmire(ctx context.Context, field gr
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24513,7 +24532,6 @@ func (ec *executionContext) _Mutation_commentOnFeedEvent(ctx context.Context, fi
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24585,7 +24603,6 @@ func (ec *executionContext) _Mutation_removeComment(ctx context.Context, field g
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24637,7 +24654,6 @@ func (ec *executionContext) _Mutation_viewGallery(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24709,7 +24725,6 @@ func (ec *executionContext) _Mutation_updateGallery(ctx context.Context, field g
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24781,7 +24796,6 @@ func (ec *executionContext) _Mutation_publishGallery(ctx context.Context, field 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24853,7 +24867,6 @@ func (ec *executionContext) _Mutation_createGallery(ctx context.Context, field g
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24925,7 +24938,6 @@ func (ec *executionContext) _Mutation_updateGalleryHidden(ctx context.Context, f
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -24997,7 +25009,6 @@ func (ec *executionContext) _Mutation_deleteGallery(ctx context.Context, field g
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25069,7 +25080,6 @@ func (ec *executionContext) _Mutation_updateGalleryOrder(ctx context.Context, fi
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25141,7 +25151,6 @@ func (ec *executionContext) _Mutation_updateGalleryInfo(ctx context.Context, fie
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25213,7 +25222,6 @@ func (ec *executionContext) _Mutation_updateFeaturedGallery(ctx context.Context,
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25285,7 +25293,6 @@ func (ec *executionContext) _Mutation_clearAllNotifications(ctx context.Context,
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25330,7 +25337,6 @@ func (ec *executionContext) _Mutation_updateNotificationSettings(ctx context.Con
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25392,7 +25398,6 @@ func (ec *executionContext) _Mutation_preverifyEmail(ctx context.Context, field 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25444,7 +25449,6 @@ func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25516,7 +25520,6 @@ func (ec *executionContext) _Mutation_redeemMerch(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25588,7 +25591,6 @@ func (ec *executionContext) _Mutation_addRolesToUser(ctx context.Context, field 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25660,7 +25662,6 @@ func (ec *executionContext) _Mutation_addWalletToUserUnchecked(ctx context.Conte
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25732,7 +25733,6 @@ func (ec *executionContext) _Mutation_revokeRolesFromUser(ctx context.Context, f
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25804,7 +25804,6 @@ func (ec *executionContext) _Mutation_syncTokensForUsername(ctx context.Context,
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25876,7 +25875,6 @@ func (ec *executionContext) _Mutation_banUserFromFeed(ctx context.Context, field
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -25948,7 +25946,6 @@ func (ec *executionContext) _Mutation_mintPremiumCardToWallet(ctx context.Contex
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -26020,7 +26017,6 @@ func (ec *executionContext) _Mutation_uploadPersistedQueries(ctx context.Context
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -26092,7 +26088,6 @@ func (ec *executionContext) _Mutation_updatePrimaryWallet(ctx context.Context, f
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -26164,7 +26159,6 @@ func (ec *executionContext) _Mutation_updateUserExperience(ctx context.Context, 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -26236,7 +26230,6 @@ func (ec *executionContext) _Mutation_moveCollectionToGallery(ctx context.Contex
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -27593,7 +27586,6 @@ func (ec *executionContext) _Query_node(ctx context.Context, field graphql.Colle
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -27665,7 +27657,6 @@ func (ec *executionContext) _Query_viewer(ctx context.Context, field graphql.Col
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -27706,7 +27697,6 @@ func (ec *executionContext) _Query_userByUsername(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -27758,7 +27748,6 @@ func (ec *executionContext) _Query_userById(ctx context.Context, field graphql.C
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -27810,7 +27799,6 @@ func (ec *executionContext) _Query_userByAddress(ctx context.Context, field grap
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -27862,7 +27850,6 @@ func (ec *executionContext) _Query_usersWithTrait(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -27954,7 +27941,6 @@ func (ec *executionContext) _Query_membershipTiers(ctx context.Context, field gr
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28020,7 +28006,6 @@ func (ec *executionContext) _Query_collectionById(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28072,7 +28057,6 @@ func (ec *executionContext) _Query_collectionsByIds(ctx context.Context, field g
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28124,7 +28108,6 @@ func (ec *executionContext) _Query_tokenById(ctx context.Context, field graphql.
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28176,7 +28159,6 @@ func (ec *executionContext) _Query_collectionTokenById(ctx context.Context, fiel
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28228,7 +28210,6 @@ func (ec *executionContext) _Query_communityByAddress(ctx context.Context, field
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28280,7 +28261,6 @@ func (ec *executionContext) _Query_generalAllowlist(ctx context.Context, field g
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28327,7 +28307,6 @@ func (ec *executionContext) _Query_galleryOfTheWeekWinners(ctx context.Context, 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28408,7 +28387,6 @@ func (ec *executionContext) _Query_globalFeed(ctx context.Context, field graphql
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28466,7 +28444,6 @@ func (ec *executionContext) _Query_trendingFeed(ctx context.Context, field graph
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28524,7 +28501,6 @@ func (ec *executionContext) _Query_feedEventById(ctx context.Context, field grap
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28576,7 +28552,6 @@ func (ec *executionContext) _Query_getMerchTokens(ctx context.Context, field gra
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28628,7 +28603,6 @@ func (ec *executionContext) _Query_galleryById(ctx context.Context, field graphq
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28680,7 +28654,6 @@ func (ec *executionContext) _Query_viewerGalleryById(ctx context.Context, field 
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28732,7 +28705,6 @@ func (ec *executionContext) _Query_trendingUsers(ctx context.Context, field grap
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28804,7 +28776,6 @@ func (ec *executionContext) _Query_usersByRole(ctx context.Context, field graphq
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -28862,7 +28833,6 @@ func (ec *executionContext) _Query__entities(ctx context.Context, field graphql.
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		if !graphql.HasFieldError(ctx, fc) {
@@ -28917,7 +28887,6 @@ func (ec *executionContext) _Query__service(ctx context.Context, field graphql.C
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		if !graphql.HasFieldError(ctx, fc) {
@@ -28965,7 +28934,6 @@ func (ec *executionContext) _Query___type(ctx context.Context, field graphql.Col
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -29039,7 +29007,6 @@ func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.C
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return graphql.Null
 	}
 	if resTmp == nil {
 		return graphql.Null
@@ -31647,23 +31614,26 @@ func (ec *executionContext) _Subscription_newNotification(ctx context.Context, f
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return nil
 	}
 	if resTmp == nil {
 		return nil
 	}
 	return func(ctx context.Context) graphql.Marshaler {
-		res, ok := <-resTmp.(<-chan model.Notification)
-		if !ok {
+		select {
+		case res, ok := <-resTmp.(<-chan model.Notification):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalONotification2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNotification(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
 			return nil
 		}
-		return graphql.WriterFunc(func(w io.Writer) {
-			w.Write([]byte{'{'})
-			graphql.MarshalString(field.Alias).MarshalGQL(w)
-			w.Write([]byte{':'})
-			ec.marshalONotification2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNotification(ctx, field.Selections, res).MarshalGQL(w)
-			w.Write([]byte{'}'})
-		})
 	}
 }
 
@@ -31698,23 +31668,26 @@ func (ec *executionContext) _Subscription_notificationUpdated(ctx context.Contex
 	})
 	if err != nil {
 		ec.Error(ctx, err)
-		return nil
 	}
 	if resTmp == nil {
 		return nil
 	}
 	return func(ctx context.Context) graphql.Marshaler {
-		res, ok := <-resTmp.(<-chan model.Notification)
-		if !ok {
+		select {
+		case res, ok := <-resTmp.(<-chan model.Notification):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalONotification2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNotification(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
 			return nil
 		}
-		return graphql.WriterFunc(func(w io.Writer) {
-			w.Write([]byte{'{'})
-			graphql.MarshalString(field.Alias).MarshalGQL(w)
-			w.Write([]byte{':'})
-			ec.marshalONotification2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐNotification(ctx, field.Selections, res).MarshalGQL(w)
-			w.Write([]byte{'}'})
-		})
 	}
 }
 
@@ -40016,7 +39989,12 @@ func (ec *executionContext) unmarshalInputAdminAddWalletInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"username", "chainAddress", "walletType"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "username":
 			var err error
@@ -40055,7 +40033,12 @@ func (ec *executionContext) unmarshalInputAuthMechanism(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"eoa", "gnosisSafe", "debug", "magicLink"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "eoa":
 			var err error
@@ -40124,7 +40107,12 @@ func (ec *executionContext) unmarshalInputChainAddressInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"address", "chain"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "address":
 			var err error
@@ -40161,7 +40149,12 @@ func (ec *executionContext) unmarshalInputChainPubKeyInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"pubKey", "chain"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "pubKey":
 			var err error
@@ -40198,7 +40191,12 @@ func (ec *executionContext) unmarshalInputCollectionLayoutInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"sections", "sectionLayout"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "sections":
 			var err error
@@ -40229,7 +40227,12 @@ func (ec *executionContext) unmarshalInputCollectionSectionLayoutInput(ctx conte
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"columns", "whitespace"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "columns":
 			var err error
@@ -40260,7 +40263,12 @@ func (ec *executionContext) unmarshalInputCollectionTokenSettingsInput(ctx conte
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"tokenId", "renderLive"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "tokenId":
 			var err error
@@ -40291,7 +40299,12 @@ func (ec *executionContext) unmarshalInputCreateCollectionInGalleryInput(ctx con
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"name", "collectorsNote", "tokens", "layout", "tokenSettings", "hidden", "givenID"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "name":
 			var err error
@@ -40362,7 +40375,12 @@ func (ec *executionContext) unmarshalInputCreateCollectionInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"galleryId", "name", "collectorsNote", "tokens", "layout", "tokenSettings", "caption"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "galleryId":
 			var err error
@@ -40433,7 +40451,12 @@ func (ec *executionContext) unmarshalInputCreateGalleryInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"name", "description", "position"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "name":
 			var err error
@@ -40472,7 +40495,12 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"username", "bio", "email", "galleryName", "galleryDescription", "galleryPosition"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "username":
 			var err error
@@ -40535,7 +40563,12 @@ func (ec *executionContext) unmarshalInputDebugAuth(ctx context.Context, obj int
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"asUsername", "userId", "chainAddresses"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "asUsername":
 			var err error
@@ -40638,7 +40671,12 @@ func (ec *executionContext) unmarshalInputDebugSocialAuth(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"provider", "id", "username"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "provider":
 			var err error
@@ -40677,7 +40715,12 @@ func (ec *executionContext) unmarshalInputDeepRefreshInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"chain"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "chain":
 			var err error
@@ -40700,7 +40743,12 @@ func (ec *executionContext) unmarshalInputEoaAuth(ctx context.Context, obj inter
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"chainPubKey", "nonce", "signature"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "chainPubKey":
 			var err error
@@ -40739,7 +40787,12 @@ func (ec *executionContext) unmarshalInputGalleryPositionInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"galleryId", "position"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "galleryId":
 			var err error
@@ -40770,7 +40823,12 @@ func (ec *executionContext) unmarshalInputGnosisSafeAuth(ctx context.Context, ob
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"address", "nonce"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "address":
 			var err error
@@ -40801,7 +40859,12 @@ func (ec *executionContext) unmarshalInputMagicLinkAuth(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "token":
 			var err error
@@ -40824,7 +40887,12 @@ func (ec *executionContext) unmarshalInputMintPremiumCardToWalletInput(ctx conte
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"tokenId", "walletAddresses"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "tokenId":
 			var err error
@@ -40855,7 +40923,12 @@ func (ec *executionContext) unmarshalInputMoveCollectionToGalleryInput(ctx conte
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"sourceCollectionId", "targetGalleryId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "sourceCollectionId":
 			var err error
@@ -40886,7 +40959,12 @@ func (ec *executionContext) unmarshalInputNotificationSettingsInput(ctx context.
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"someoneFollowedYou", "someoneAdmiredYourUpdate", "someoneCommentedOnYourUpdate", "someoneViewedYourGallery"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "someoneFollowedYou":
 			var err error
@@ -40933,7 +41011,12 @@ func (ec *executionContext) unmarshalInputPreverifyEmailInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"email"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "email":
 			var err error
@@ -40956,7 +41039,12 @@ func (ec *executionContext) unmarshalInputPublishGalleryInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"galleryId", "editId", "caption"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "galleryId":
 			var err error
@@ -40995,7 +41083,12 @@ func (ec *executionContext) unmarshalInputRedeemMerchInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"tokenIds", "address", "walletType", "signature"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "tokenIds":
 			var err error
@@ -41042,7 +41135,12 @@ func (ec *executionContext) unmarshalInputSetSpamPreferenceInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"tokens", "isSpam"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "tokens":
 			var err error
@@ -41073,7 +41171,12 @@ func (ec *executionContext) unmarshalInputSocialAuthMechanism(ctx context.Contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"twitter", "debug"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "twitter":
 			var err error
@@ -41104,7 +41207,12 @@ func (ec *executionContext) unmarshalInputTrendingUsersInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"report"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "report":
 			var err error
@@ -41127,7 +41235,12 @@ func (ec *executionContext) unmarshalInputTwitterAuth(ctx context.Context, obj i
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"code"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "code":
 			var err error
@@ -41150,7 +41263,12 @@ func (ec *executionContext) unmarshalInputUnsubscribeFromEmailTypeInput(ctx cont
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"type", "token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "type":
 			var err error
@@ -41181,7 +41299,12 @@ func (ec *executionContext) unmarshalInputUpdateCollectionHiddenInput(ctx contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"collectionId", "hidden"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "collectionId":
 			var err error
@@ -41212,7 +41335,12 @@ func (ec *executionContext) unmarshalInputUpdateCollectionInfoInput(ctx context.
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"collectionId", "name", "collectorsNote"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "collectionId":
 			var err error
@@ -41251,7 +41379,12 @@ func (ec *executionContext) unmarshalInputUpdateCollectionInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"dbid", "name", "collectorsNote", "tokens", "layout", "tokenSettings", "hidden"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "dbid":
 			var err error
@@ -41322,7 +41455,12 @@ func (ec *executionContext) unmarshalInputUpdateCollectionTokensInput(ctx contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"collectionId", "tokens", "layout", "tokenSettings", "caption"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "collectionId":
 			var err error
@@ -41377,7 +41515,12 @@ func (ec *executionContext) unmarshalInputUpdateEmailInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"email"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "email":
 			var err error
@@ -41400,7 +41543,12 @@ func (ec *executionContext) unmarshalInputUpdateEmailNotificationSettingsInput(c
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"unsubscribedFromAll", "unsubscribedFromNotifications"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "unsubscribedFromAll":
 			var err error
@@ -41431,7 +41579,12 @@ func (ec *executionContext) unmarshalInputUpdateGalleryCollectionsInput(ctx cont
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"galleryId", "collections"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "galleryId":
 			var err error
@@ -41462,7 +41615,12 @@ func (ec *executionContext) unmarshalInputUpdateGalleryHiddenInput(ctx context.C
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"id", "hidden"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "id":
 			var err error
@@ -41493,7 +41651,12 @@ func (ec *executionContext) unmarshalInputUpdateGalleryInfoInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"id", "name", "description"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "id":
 			var err error
@@ -41532,7 +41695,12 @@ func (ec *executionContext) unmarshalInputUpdateGalleryInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"galleryId", "name", "description", "caption", "deletedCollections", "updatedCollections", "createdCollections", "order", "editId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "galleryId":
 			var err error
@@ -41619,7 +41787,12 @@ func (ec *executionContext) unmarshalInputUpdateGalleryOrderInput(ctx context.Co
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"positions"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "positions":
 			var err error
@@ -41642,7 +41815,12 @@ func (ec *executionContext) unmarshalInputUpdateSocialAccountDisplayedInput(ctx 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"type", "displayed"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "type":
 			var err error
@@ -41673,7 +41851,12 @@ func (ec *executionContext) unmarshalInputUpdateTokenInfoInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"tokenId", "collectorsNote", "collectionId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "tokenId":
 			var err error
@@ -41712,7 +41895,12 @@ func (ec *executionContext) unmarshalInputUpdateUserExperienceInput(ctx context.
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"experienceType", "experienced"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "experienceType":
 			var err error
@@ -41743,7 +41931,12 @@ func (ec *executionContext) unmarshalInputUpdateUserInfoInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"username", "bio"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "username":
 			var err error
@@ -41774,7 +41967,12 @@ func (ec *executionContext) unmarshalInputUploadPersistedQueriesInput(ctx contex
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"persistedQueries"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "persistedQueries":
 			var err error
@@ -41797,7 +41995,12 @@ func (ec *executionContext) unmarshalInputVerifyEmailInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"token"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "token":
 			var err error
@@ -46157,7 +46360,6 @@ func (ec *executionContext) _Entity(ctx context.Context, sel ast.SelectionSet) g
 	})
 
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
 	for i, field := range fields {
 		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
 			Object: field.Name,
@@ -46177,9 +46379,6 @@ func (ec *executionContext) _Entity(ctx context.Context, sel ast.SelectionSet) g
 					}
 				}()
 				res = ec._Entity_findFeedEventByDbid(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
 				return res
 			}
 
@@ -46195,9 +46394,6 @@ func (ec *executionContext) _Entity(ctx context.Context, sel ast.SelectionSet) g
 		}
 	}
 	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
 	return out
 }
 
@@ -48327,7 +48523,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	})
 
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
 	for i, field := range fields {
 		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
 			Object: field.Name,
@@ -48678,9 +48873,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		}
 	}
 	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
 	return out
 }
 
@@ -49036,7 +49228,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	})
 
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
 	for i, field := range fields {
 		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
 			Object: field.Name,
@@ -49496,9 +49687,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query__entities(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
 				return res
 			}
 
@@ -49519,9 +49707,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query__service(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
 				return res
 			}
 
@@ -49549,9 +49734,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		}
 	}
 	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
 	return out
 }
 
@@ -52758,7 +52940,7 @@ func (ec *executionContext) marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgo�
 func (ec *executionContext) unmarshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx context.Context, v interface{}) (model.GqlID, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := model.GqlID(tmp)
-	return res, graphql.ErrorOnPath(ctx, err)
+	return model.GqlID(res), graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNID2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGqlID(ctx context.Context, sel ast.SelectionSet, v model.GqlID) graphql.Marshaler {
