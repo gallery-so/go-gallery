@@ -2,8 +2,8 @@ FROM node:18-bullseye
 
 WORKDIR /workspace
 
-RUN curl -sSL https://rover.apollo.local/nix/v0.11.1 | sh
-RUN curl -sSL https://router.apollo.local/download/nix/latest | sh
+RUN curl -sSL https://rover.apollo.dev/nix/v0.11.1 | sh
+RUN curl -sSL https://router.apollo.dev/download/nix/latest | sh
 
 ADD graphql/schema/schema.graphql .
 ADD docker/graphql-gateway/dev/supergraph.yaml .
