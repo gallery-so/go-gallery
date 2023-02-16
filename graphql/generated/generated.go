@@ -60,6 +60,7 @@ type ResolverRoot interface {
 	GalleryUser() GalleryUserResolver
 	Mutation() MutationResolver
 	OwnerAtBlock() OwnerAtBlockResolver
+	PreviewURLSet() PreviewURLSetResolver
 	Query() QueryResolver
 	RemoveAdmirePayload() RemoveAdmirePayloadResolver
 	RemoveCommentPayload() RemoveCommentPayloadResolver
@@ -1276,6 +1277,10 @@ type MutationResolver interface {
 }
 type OwnerAtBlockResolver interface {
 	Owner(ctx context.Context, obj *model.OwnerAtBlock) (model.GalleryUserOrAddress, error)
+}
+type PreviewURLSetResolver interface {
+	Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error)
+	AspectRatio(ctx context.Context, obj *model.PreviewURLSet) (*float64, error)
 }
 type QueryResolver interface {
 	Node(ctx context.Context, id model.GqlID) (model.Node, error)
@@ -5965,8 +5970,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
-  blurhash: String @experimental
-  aspectRatio: Float @experimental
+  blurhash: String @experimental @goField(forceResolver: true)
+  aspectRatio: Float @experimental @goField(forceResolver: true)
 }
 
 type VideoURLSet {
@@ -27441,7 +27446,7 @@ func (ec *executionContext) _PreviewURLSet_blurhash(ctx context.Context, field g
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return obj.Blurhash, nil
+			return ec.resolvers.PreviewURLSet().Blurhash(rctx, obj)
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Experimental == nil {
@@ -27478,8 +27483,8 @@ func (ec *executionContext) fieldContext_PreviewURLSet_blurhash(ctx context.Cont
 	fc = &graphql.FieldContext{
 		Object:     "PreviewURLSet",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -27502,7 +27507,7 @@ func (ec *executionContext) _PreviewURLSet_aspectRatio(ctx context.Context, fiel
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return obj.AspectRatio, nil
+			return ec.resolvers.PreviewURLSet().AspectRatio(rctx, obj)
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Experimental == nil {
@@ -27539,8 +27544,8 @@ func (ec *executionContext) fieldContext_PreviewURLSet_aspectRatio(ctx context.C
 	fc = &graphql.FieldContext{
 		Object:     "PreviewURLSet",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Float does not have child fields")
 		},
@@ -49041,13 +49046,39 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 			out.Values[i] = ec._PreviewURLSet_srcSet(ctx, field, obj)
 
 		case "blurhash":
+			field := field
 
-			out.Values[i] = ec._PreviewURLSet_blurhash(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._PreviewURLSet_blurhash(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "aspectRatio":
+			field := field
 
-			out.Values[i] = ec._PreviewURLSet_aspectRatio(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._PreviewURLSet_aspectRatio(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
