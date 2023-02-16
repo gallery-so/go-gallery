@@ -1,4 +1,4 @@
-set role to access_rw;
+-- set role to access_rw;
 
 create table if not exists recommendation_results (
   id character varying(255) primary key,
@@ -23,3 +23,5 @@ create materialized view top_recommended_users as (
   order by frequency desc, last_updated desc
   limit 100
 );
+
+create unique index top_recommender_users_pk_idx on top_recommended_users (recommended_user_id);
