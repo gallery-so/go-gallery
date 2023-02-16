@@ -6,8 +6,7 @@ schema:
 exec:
   filename: graphql/generated/generated.go
   package: generated
-
-# Uncomment to enable federation
+  
 federation:
  filename: graphql/generated/federation.go
  package: generated
