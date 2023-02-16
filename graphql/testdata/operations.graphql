@@ -54,12 +54,12 @@ query viewerQuery {
         experienced
       }
       suggestedUsers(last: 5) {
-				edges {
-					node {
-						dbid
-					}
-				}
-			}
+        edges {
+          node {
+            dbid
+          }
+        }
+      }
       user {
         username
         dbid

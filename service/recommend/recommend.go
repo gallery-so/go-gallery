@@ -175,17 +175,11 @@ func (r *Recommender) readMetadata(ctx context.Context) graphMetadata {
 
 // shuffle shuffles IDs within partitions so that results are in a similar order.
 func shuffle(ids []persist.DBID) {
-	return
-	// partitionSize := 10
-
-	// for len(ids) < partitionSize {
-	// 	partitionSize /= 2
-	// }
-
-	// partition := make([]persist.DBID, partitionSize)
-	// for i := 0; i < len(ids); i += partitionSize {
-	// 	partition = ids[i : i+partitionSize]
-	// 	rand.Shuffle(partitionSize, func(i, j int) { partition[i], partition[j] = partition[j], partition[i] })
-	// 	copy(ids[i:i+partitionSize], partition)
-	// }
+	partitionSize := 10
+	partition := make([]persist.DBID, partitionSize)
+	for i := 0; i < len(ids); i += partitionSize {
+		partition = ids[i : i+partitionSize]
+		rand.Shuffle(partitionSize, func(i, j int) { partition[i], partition[j] = partition[j], partition[i] })
+		copy(ids[i:i+partitionSize], partition)
+	}
 }
