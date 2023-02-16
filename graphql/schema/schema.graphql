@@ -160,8 +160,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
-  blurhash: String @experimental
-  aspectRatio: Float @experimental
+  blurhash: String @experimental @goField(forceResolver: true)
+  aspectRatio: Float @experimental @goField(forceResolver: true)
 }
 
 type VideoURLSet {
