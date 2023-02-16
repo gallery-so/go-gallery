@@ -131,6 +131,10 @@ func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist
 	}
 
 	recommendedIDs = recommendedIDs[:100]
+	if len(recommendedIDs) > 100 {
+		recommendedIDs = recommendedIDs[:100]
+	}
+
 	go func() { r.saveCh <- saveMsg{userID, recommendedIDs} }()
 	return recommendedIDs, nil
 }
@@ -175,6 +179,9 @@ func (r *Recommender) readMetadata(ctx context.Context) graphMetadata {
 
 // shuffle shuffles IDs within partitions so that results are in a similar order.
 func shuffle(ids []persist.DBID) {
+	if len(ids) <= 1 {
+		return
+	}
 	partitionSize := 10
 	partition := make([]persist.DBID, partitionSize)
 	for i := 0; i < len(ids); i += partitionSize {

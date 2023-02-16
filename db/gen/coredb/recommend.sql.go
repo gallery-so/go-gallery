@@ -49,23 +49,13 @@ select
 from
 	follows,
 	users as followers,
-	users as followees,
-	-- only recommend users that have content displayed
-	(
-		select
-			owner_user_id
-		from collections
-		where
-			cardinality(nfts) > 0
-		and hidden is false
-		and deleted is false group by owner_user_id) displayed
+	users as followees
 where
 	follows.follower = followers.id
 	and followers.deleted is false
 	and follows.followee = followees.id
 	and followees.deleted is false
 	and follows.deleted = false
-	and followees.id = displayed.owner_user_id
 `
 
 type GetFollowGraphSourceRow struct {

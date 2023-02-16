@@ -34,16 +34,6 @@ func generateGraph(ctx context.Context, queries *db.Queries) (*graph, error) {
 	// Store additional metadata which gets used in the algorithm
 	// for calculating node weights
 	var inDegrees = make(map[persist.DBID]int)
-	var maxIndegree int
-	var maxOutdegree int
-	var totalEdges int
-
-	max := func(a, b int) int {
-		if a > b {
-			return a
-		}
-		return b
-	}
 
 	for _, f := range follows {
 		if _, ok := neighbors[f.Follower]; !ok {
@@ -51,18 +41,12 @@ func generateGraph(ctx context.Context, queries *db.Queries) (*graph, error) {
 		}
 		neighbors[f.Follower] = append(neighbors[f.Follower], f.Followee)
 		inDegrees[f.Followee]++
-		totalEdges++
-		maxIndegree = max(maxIndegree, inDegrees[f.Followee])
-		maxOutdegree = max(maxOutdegree, len(neighbors[f.Follower]))
 	}
 
 	return &graph{
 		Neighbors: neighbors,
 		Metadata: graphMetadata{
-			Indegrees:    inDegrees,
-			MaxIndegree:  maxIndegree,
-			MaxOutdegree: maxOutdegree,
-			TotalEdges:   totalEdges,
+			Indegrees: inDegrees,
 		},
 	}, nil
 }
