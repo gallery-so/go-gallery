@@ -182,11 +182,21 @@ func shuffle(ids []persist.DBID) {
 	if len(ids) <= 1 {
 		return
 	}
-	partitionSize := 10
-	partition := make([]persist.DBID, partitionSize)
-	for i := 0; i < len(ids); i += partitionSize {
-		partition = ids[i : i+partitionSize]
-		rand.Shuffle(partitionSize, func(i, j int) { partition[i], partition[j] = partition[j], partition[i] })
-		copy(ids[i:i+partitionSize], partition)
+
+	size := 24
+	for len(ids) < size {
+		size /= 2
+	}
+
+	subset := make([]persist.DBID, size)
+
+	for i := 0; i < len(ids); i += size {
+		end := i + size
+		if end > len(ids) {
+			end = len(ids)
+		}
+		subset = ids[i:end]
+		rand.Shuffle(end-i, func(i, j int) { subset[i], subset[j] = subset[j], subset[i] })
+		copy(ids[i:end], subset)
 	}
 }
