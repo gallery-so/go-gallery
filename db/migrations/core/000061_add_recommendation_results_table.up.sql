@@ -1,5 +1,3 @@
--- set role to access_rw;
-
 create table if not exists recommendation_results (
   id character varying(255) primary key,
   version int default 0,
