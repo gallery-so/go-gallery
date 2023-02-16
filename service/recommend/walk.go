@@ -23,14 +23,6 @@ const walkSteps = 200000
 // The max number degrees away from the start node before a walk resets
 const maxDepth = 10
 
-// nP and nV controls the early stopping condition. A walk can terminate when the
-// nPth ranked node is visited nV times.
-const nP = 500
-const nV = 20
-
-// visits keeps the number of times a node is visited in a walk
-type visits map[persist.DBID]int
-
 func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryNodes []queryNode, rng *rand.Rand) ([]persist.DBID, error) {
 	span, ctx := tracing.StartSpan(ctx, "recommend", "walk")
 	defer tracing.FinishSpan(span)
@@ -39,8 +31,8 @@ func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryN
 		return []persist.DBID{}, nil
 	}
 
-	walks := make(map[queryNode]visits)
-	totalVisits := make(visits)
+	walks := make(map[queryNode]map[persist.DBID]int)
+	totalVisits := make(map[persist.DBID]int)
 	currentEdges := make(map[persist.DBID]bool)
 
 	for _, node := range queryNodes {
@@ -51,7 +43,7 @@ func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryN
 	steps := allocateSteps(ctx, r, queryNodes)
 
 	for _, node := range queryNodes {
-		walks[node] = walk(ctx, r, currentEdges, originID, node, steps[node.ID], rng)
+		walks[node] = walk(ctx, r, currentEdges, originID, node.ID, steps[node.ID], rng)
 	}
 
 	for _, walk := range walks {
@@ -80,44 +72,43 @@ func walkFrom(ctx context.Context, r *Recommender, originID persist.DBID, queryN
 	return scored, nil
 }
 
-type edge [2]persist.DBID
-
 // walk performs a random walk starting from startNode
-func walk(ctx context.Context, r *Recommender, currentEdges map[persist.DBID]bool, originID persist.DBID, startNode queryNode, steps int, rng *rand.Rand) visits {
-	v := make(visits)
-	currentID := startNode.ID
-	seenEdges := make(map[edge]bool, 2048)
+func walk(ctx context.Context, r *Recommender, currentEdges map[persist.DBID]bool, originID persist.DBID, startID persist.DBID, steps int, rng *rand.Rand) map[persist.DBID]int {
+	neighbors := r.readNeighbors(ctx, startID)
+
+	if len(neighbors) == 0 {
+		return map[persist.DBID]int{}
+	}
+
+	type edge struct{ ID, Next persist.DBID }
+
+	visited := make(map[edge]bool)
+	visits := make(map[persist.DBID]int)
+	current := startID
 	depth := 0
-	for i, threshold := 0, 0; i < steps && threshold < nP; i++ {
-		nodeNeighbors := r.readNeighbors(ctx, currentID)
-		// Restart the walk if there aren't any more neighbors adjacent to node
-		if len(nodeNeighbors) == 0 {
-			currentID = startNode.ID
+	for i := 0; i < steps; i++ {
+		neighbors = r.readNeighbors(ctx, current)
+		if len(neighbors) == 0 {
+			current = startID
+			depth = 0
 			continue
 		}
-		// Select a neighbor from a node at random.
-		e := edge{currentID, nodeNeighbors[rng.Intn(len(nodeNeighbors))]}
-		currentID = e[1]
-		// Only consider edges that haven't been traversed yet, otherwise we would be
-		// favoring nodes that are part of a cycle
-		if _, seen := seenEdges[e]; !seen {
-			seenEdges[e] = true
-			// If the edge was already visited, don't count it as a new visit.
-			// Also, if the node picked is the originID, then skip it.
-			if _, exists := currentEdges[currentID]; !exists && currentID != originID {
-				v[currentID]++
+		currentEdge := edge{current, neighbors[rng.Intn(len(neighbors))]}
+		current = currentEdge.Next
+		if !visited[currentEdge] {
+			visited[currentEdge] = true
+			if current != originID && !currentEdges[current] {
+				visits[current]++
 			}
-		}
-		if v[currentID] >= nV {
-			threshold++
 		}
 		depth++
 		if depth > maxDepth {
-			currentID = startNode.ID
+			current = startID
 			depth = 0
 		}
 	}
-	return v
+
+	return visits
 }
 
 // queryNode represents a starting point on the graph

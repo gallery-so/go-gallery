@@ -130,7 +130,6 @@ func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist
 		return nil, err
 	}
 
-	recommendedIDs = recommendedIDs[:100]
 	if len(recommendedIDs) > 100 {
 		recommendedIDs = recommendedIDs[:100]
 	}

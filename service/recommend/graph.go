@@ -31,14 +31,9 @@ func generateGraph(ctx context.Context, queries *db.Queries) (*graph, error) {
 
 	neighbors := map[persist.DBID][]persist.DBID{}
 
-	// Store additional metadata which gets used in the algorithm
-	// for calculating node weights
 	var inDegrees = make(map[persist.DBID]int)
 
 	for _, f := range follows {
-		if _, ok := neighbors[f.Follower]; !ok {
-			neighbors[f.Follower] = []persist.DBID{}
-		}
 		neighbors[f.Follower] = append(neighbors[f.Follower], f.Followee)
 		inDegrees[f.Followee]++
 	}
