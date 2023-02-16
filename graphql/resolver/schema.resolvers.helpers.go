@@ -1847,12 +1847,14 @@ func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLS
 	mm := mediamapper.For(ctx)
 
 	return &model.PreviewURLSet{
-		Raw:       &preview,
-		Thumbnail: util.ToPointer(mm.GetThumbnailImageUrl(preview)),
-		Small:     util.ToPointer(mm.GetSmallImageUrl(preview)),
-		Medium:    util.ToPointer(mm.GetMediumImageUrl(preview)),
-		Large:     util.ToPointer(mm.GetLargeImageUrl(preview)),
-		SrcSet:    util.ToPointer(mm.GetSrcSet(preview)),
+		Raw:         &preview,
+		Thumbnail:   util.ToPointer(mm.GetThumbnailImageUrl(preview)),
+		Small:       util.ToPointer(mm.GetSmallImageUrl(preview)),
+		Medium:      util.ToPointer(mm.GetMediumImageUrl(preview)),
+		Large:       util.ToPointer(mm.GetLargeImageUrl(preview)),
+		SrcSet:      util.ToPointer(mm.GetSrcSet(preview)),
+		Blurhash:    mm.GetBlurhash(preview),
+		AspectRatio: mm.GetAspectRatio(preview),
 	}
 }
 

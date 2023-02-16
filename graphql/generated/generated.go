@@ -85,6 +85,7 @@ type ResolverRoot interface {
 
 type DirectiveRoot struct {
 	AuthRequired        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	Experimental        func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 	FrontendBuildAuth   func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 	RestrictEnvironment func(ctx context.Context, obj interface{}, next graphql.Resolver, allowed []string) (res interface{}, err error)
 	RetoolAuth          func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
@@ -710,12 +711,14 @@ type ComplexityRoot struct {
 	}
 
 	PreviewURLSet struct {
-		Large     func(childComplexity int) int
-		Medium    func(childComplexity int) int
-		Raw       func(childComplexity int) int
-		Small     func(childComplexity int) int
-		SrcSet    func(childComplexity int) int
-		Thumbnail func(childComplexity int) int
+		AspectRatio func(childComplexity int) int
+		Blurhash    func(childComplexity int) int
+		Large       func(childComplexity int) int
+		Medium      func(childComplexity int) int
+		Raw         func(childComplexity int) int
+		Small       func(childComplexity int) int
+		SrcSet      func(childComplexity int) int
+		Thumbnail   func(childComplexity int) int
 	}
 
 	PublishGalleryPayload struct {
@@ -4074,6 +4077,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreverifyEmailPayload.Result(childComplexity), true
 
+	case "PreviewURLSet.aspectRatio":
+		if e.complexity.PreviewURLSet.AspectRatio == nil {
+			break
+		}
+
+		return e.complexity.PreviewURLSet.AspectRatio(childComplexity), true
+
+	case "PreviewURLSet.blurhash":
+		if e.complexity.PreviewURLSet.Blurhash == nil {
+			break
+		}
+
+		return e.complexity.PreviewURLSet.Blurhash(childComplexity), true
+
 	case "PreviewURLSet.large":
 		if e.complexity.PreviewURLSet.Large == nil {
 			break
@@ -5786,7 +5803,13 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../schema/schema.graphql", Input: `# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
+	{Name: "../schema/schema.graphql", Input: `"""
+Any field decorated with the @experimental directive should not be used in production.
+It will not conform to our rules around breaking changes.
+"""
+directive @experimental on FIELD_DEFINITION
+
+# Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
   forceResolver: Boolean
@@ -5942,6 +5965,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
+  blurhash: String @experimental
+  aspectRatio: Float @experimental
 }
 
 type VideoURLSet {
@@ -10217,6 +10242,10 @@ func (ec *executionContext) fieldContext_AudioMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -18140,6 +18169,10 @@ func (ec *executionContext) fieldContext_GIFMedia_previewURLs(ctx context.Contex
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -18570,6 +18603,10 @@ func (ec *executionContext) fieldContext_Gallery_tokenPreviews(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -20388,6 +20425,10 @@ func (ec *executionContext) fieldContext_GltfMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -20790,6 +20831,10 @@ func (ec *executionContext) fieldContext_HtmlMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -20968,6 +21013,10 @@ func (ec *executionContext) fieldContext_ImageMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -21146,6 +21195,10 @@ func (ec *executionContext) fieldContext_InvalidMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -21324,6 +21377,10 @@ func (ec *executionContext) fieldContext_JsonMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -26901,6 +26958,10 @@ func (ec *executionContext) fieldContext_PdfMedia_previewURLs(ctx context.Contex
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -27360,6 +27421,128 @@ func (ec *executionContext) fieldContext_PreviewURLSet_srcSet(ctx context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PreviewURLSet_blurhash(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return obj.Blurhash, nil
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Experimental == nil {
+				return nil, errors.New("directive experimental is not implemented")
+			}
+			return ec.directives.Experimental(ctx, obj, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*string); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *string`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PreviewURLSet_blurhash(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PreviewURLSet",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PreviewURLSet_aspectRatio(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return obj.AspectRatio, nil
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Experimental == nil {
+				return nil, errors.New("directive experimental is not implemented")
+			}
+			return ec.directives.Experimental(ctx, obj, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*float64); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *float64`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PreviewURLSet_aspectRatio(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PreviewURLSet",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
 		},
 	}
 	return fc, nil
@@ -31614,6 +31797,10 @@ func (ec *executionContext) fieldContext_SyncingMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -31792,6 +31979,10 @@ func (ec *executionContext) fieldContext_TextMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -34503,6 +34694,10 @@ func (ec *executionContext) fieldContext_UnknownMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -36711,6 +36906,10 @@ func (ec *executionContext) fieldContext_VideoMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "blurhash":
+				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -48841,6 +49040,14 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 
 			out.Values[i] = ec._PreviewURLSet_srcSet(ctx, field, obj)
 
+		case "blurhash":
+
+			out.Values[i] = ec._PreviewURLSet_blurhash(ctx, field, obj)
+
+		case "aspectRatio":
+
+			out.Values[i] = ec._PreviewURLSet_aspectRatio(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -54226,6 +54433,22 @@ func (ec *executionContext) marshalOFeedEventOrError2githubᚗcomᚋmikeydubᚋg
 		return graphql.Null
 	}
 	return ec._FeedEventOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v interface{}) (*float64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := graphql.MarshalFloatContext(*v)
+	return graphql.WrapContextMarshaler(ctx, res)
 }
 
 func (ec *executionContext) marshalOFollowInfo2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐFollowInfo(ctx context.Context, sel ast.SelectionSet, v []*model.FollowInfo) graphql.Marshaler {

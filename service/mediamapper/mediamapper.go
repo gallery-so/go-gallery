@@ -75,16 +75,11 @@ func NewMediaMapper() *MediaMapper {
 
 	urlBuilder := imgix.NewURLBuilder(assetDomain, imgix.WithToken(token), imgix.WithLibParam(false))
 
-	defaultParams := []imgix.IxParam{
-		imgix.Param("auto", "format", "compress"),
-		imgix.Param("fit", "max"),
-	}
-
-	thumbnailUrlParams := buildParams(defaultParams, newWidthParam(thumbnailWidth))
-	smallUrlParams := buildParams(defaultParams, newWidthParam(smallWidth))
-	mediumUrlParams := buildParams(defaultParams, newWidthParam(mediumWidth))
-	largeUrlParams := buildParams(defaultParams, newWidthParam(largeWidth))
-	srcSetParams := buildParams(defaultParams, newWidthParam(largeWidth))
+	thumbnailUrlParams := buildParams(getDefaultParams(), newWidthParam(thumbnailWidth))
+	smallUrlParams := buildParams(getDefaultParams(), newWidthParam(smallWidth))
+	mediumUrlParams := buildParams(getDefaultParams(), newWidthParam(mediumWidth))
+	largeUrlParams := buildParams(getDefaultParams(), newWidthParam(largeWidth))
+	srcSetParams := buildParams(getDefaultParams(), newWidthParam(largeWidth))
 
 	return &MediaMapper{
 		urlBuilder:         urlBuilder,
@@ -105,6 +100,13 @@ func setGoogleWidthParams(sourceUrl string, width int) string {
 	}
 
 	return sourceUrl
+}
+
+func getDefaultParams() []imgix.IxParam {
+	return []imgix.IxParam{
+		imgix.Param("auto", "format", "compress"),
+		imgix.Param("fit", "max"),
+	}
 }
 
 func (u *MediaMapper) buildPreviewImageUrl(sourceUrl string, width int, params []imgix.IxParam) string {
@@ -134,6 +136,66 @@ func (u *MediaMapper) GetLargeImageUrl(sourceUrl string) string {
 
 func (u *MediaMapper) GetSrcSet(sourceUrl string) string {
 	return u.urlBuilder.CreateSrcset(sourceUrl, u.srcSetParams)
+}
+
+func (u *MediaMapper) GetBlurhash(sourceUrl string) *string {
+	url := u.urlBuilder.CreateURL(sourceUrl, imgix.Param("fm", "blurhash"))
+
+	req, err := http.NewRequestWithContext(context.Background(), "GET", url, bytes.NewBuffer([]byte{}))
+	req.Header.Set("Accept", "*/*")
+
+	if err != nil {
+		return nil
+	}
+
+	response, err := http.DefaultClient.Do(req)
+
+	if err != nil {
+		return nil
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return nil
+	}
+
+	responseBytes, _ := io.ReadAll(response.Body)
+	responseString := string(responseBytes)
+
+	return &responseString
+}
+
+func (u *MediaMapper) GetAspectRatio(sourceUrl string) *float64 {
+	url := u.urlBuilder.CreateURL(sourceUrl, buildParams(getDefaultParams(), imgix.Param("fm", "json"))...)
+
+	rawResponse, err := http.Get(url)
+
+	if err != nil {
+		return nil
+	}
+
+	if rawResponse.StatusCode != 200 {
+		return nil
+	}
+
+	type ImgixJsonResponse struct {
+		PixelWidth  float64
+		PixelHeight float64
+	}
+
+	var imgixJsonResponse ImgixJsonResponse
+	rseponseBytes, err := io.ReadAll(rawResponse.Body)
+
+	json.Unmarshal(rseponseBytes, &imgixJsonResponse)
+
+	// Make sure we handle the case where there is no image to make sure we don't get infinity
+	if imgixJsonResponse.PixelHeight == 0 || imgixJsonResponse.PixelWidth == 0 {
+		return nil
+	}
+
+	aspectRatio := imgixJsonResponse.PixelWidth / imgixJsonResponse.PixelHeight
+	return &aspectRatio
 }
 
 func PurgeImage(ctx context.Context, u string) error {

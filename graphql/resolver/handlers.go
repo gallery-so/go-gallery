@@ -153,6 +153,12 @@ func RetoolAuthDirectiveHandler() func(ctx context.Context, obj interface{}, nex
 	}
 }
 
+func ExperimentalDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
+		return next(ctx)
+	}
+}
+
 func FrontendBuildAuthDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver) (res interface{}, err error) {
 		gc := util.GinContextFromContext(ctx)
