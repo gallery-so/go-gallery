@@ -14,10 +14,7 @@ type graph struct {
 }
 
 type graphMetadata struct {
-	Indegrees    map[persist.DBID]int
-	MaxIndegree  int `json:"max_indegree"`
-	MaxOutdegree int `json:"max_outdegree"`
-	TotalEdges   int `json:"total_edges"`
+	Indegrees map[persist.DBID]int `json:"indegrees"`
 }
 
 func generateGraph(ctx context.Context, queries *db.Queries) (*graph, error) {
