@@ -14,7 +14,8 @@ import (
 )
 
 const contextKey = "recommend.instance"
-const metadataKey = "____metadata____"
+
+var metadataKey = struct{}{}
 
 var currentGraph sync.Map
 

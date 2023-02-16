@@ -874,9 +874,13 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 		return nil, PageInfo{}, err
 	}
 
+	curUserID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
 	paginator := positionPaginator{}
 	var userIDs []persist.DBID
-	var err error
 
 	// If we have a cursor, we can page through the original set of recommended users
 	if before != nil {
@@ -889,11 +893,6 @@ func (api UserAPI) RecommendUsers(ctx context.Context, before, after *string, fi
 		}
 	} else {
 		// Otherwise make a new recommendation
-		curUserID, err := getAuthenticatedUserID(ctx)
-		if err != nil {
-			return nil, PageInfo{}, err
-		}
-
 		follows, err := api.queries.GetFollowEdgesByUserID(ctx, curUserID)
 		if err != nil {
 			return nil, PageInfo{}, err
