@@ -22,4 +22,4 @@ create materialized view top_recommended_users as (
   limit 100
 );
 
-create unique index top_recommender_users_pk_idx on top_recommended_users (recommended_user_id);
+create unique index top_recommended_users_pk_idx on top_recommended_users (recommended_user_id);
