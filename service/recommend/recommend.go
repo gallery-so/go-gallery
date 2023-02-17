@@ -37,7 +37,7 @@ type Recommender struct {
 }
 
 func NewRecommender(queries *db.Queries) *Recommender {
-	r := &Recommender{}
+	r := &Recommender{saveCh: make(chan saveMsg)}
 
 	r.LoadFunc = func(ctx context.Context) {
 		g, err := generateGraph(ctx, queries)
