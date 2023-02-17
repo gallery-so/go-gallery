@@ -3,15 +3,13 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"net/http"
-	"strings"
-
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/sirupsen/logrus"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -58,18 +56,7 @@ func AddAuthToContext() gin.HandlerFunc {
 			return
 		}
 
-		// See if the user's token is valid based on our current JWT secret
 		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
-
-		if err != nil {
-			// If the token wasn't valid, see if we're rotating an existing key out.
-			// If so, try validating the token with that key.
-			oldKey := viper.GetString("JWT_SECRET_ROTATING_OUT")
-			if strings.TrimSpace(oldKey) != "" {
-				userID, err = auth.JWTParse(jwt, oldKey)
-			}
-		}
-
 		auth.SetAuthStateForCtx(c, userID, err)
 
 		// If we have a successfully authenticated user, add their ID to all subsequent logging
