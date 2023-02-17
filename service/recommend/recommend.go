@@ -131,6 +131,10 @@ func (r *Recommender) RecommendFromFollowing(ctx context.Context, userID persist
 		return nil, err
 	}
 
+	if len(recommendedIDs) == 0 {
+		return r.BootstrapFunc(ctx)
+	}
+
 	if len(recommendedIDs) > 100 {
 		recommendedIDs = recommendedIDs[:100]
 	}
