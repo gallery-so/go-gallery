@@ -690,7 +690,7 @@ interface FeedEventData {
   action: Action
 }
 
-type FeedEvent implements Node {
+type FeedEvent implements Node @key(fields: "dbid") {
   id: ID!
   dbid: DBID!
 

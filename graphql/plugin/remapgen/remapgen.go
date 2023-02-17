@@ -48,7 +48,9 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 		// Unions and interfaces can have other types assigned to them. If there are 1 or more types in our
 		// schema that can be assigned to this union or interface, create a mapping for it!
 		if (def.Kind == ast.Union || def.Kind == ast.Interface) && len(cfg.Schema.GetPossibleTypes(def)) > 0 {
-			types = append(types, typeName)
+			if typeName != "_Entity" {
+				types = append(types, typeName)
+			}
 		}
 	}
 

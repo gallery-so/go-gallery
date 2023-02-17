@@ -64,6 +64,7 @@ services:
       "-c",
       "gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=gallery-local"
     ]
+
   # Uncomment if you want to run tokenprocessing locally as a container
   # tokenprocessing:
   #   build:
