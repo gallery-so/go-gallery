@@ -44,12 +44,12 @@ func (q *Queries) GetFollowEdgesByUserID(ctx context.Context, follower persist.D
 
 const getFollowGraphSource = `-- name: GetFollowGraphSource :many
 select
-	follows.follower,
-	follows.followee
+  follows.follower,
+  follows.followee
 from
-	follows,
-	users as followers,
-	users as followees,
+  follows,
+  users as followers,
+  users as followees,
   (
     select owner_user_id
     from collections
@@ -57,12 +57,12 @@ from
     group by owner_user_id
   ) displaying
 where
-	follows.follower = followers.id
+  follows.follower = followers.id
   and follows.followee = displaying.owner_user_id
-	and followers.deleted is false
-	and follows.followee = followees.id
-	and followees.deleted is false
-	and follows.deleted = false
+  and followers.deleted is false
+  and follows.followee = followees.id
+  and followees.deleted is false
+  and follows.deleted = false
 `
 
 type GetFollowGraphSourceRow struct {
