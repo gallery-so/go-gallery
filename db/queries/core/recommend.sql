@@ -5,9 +5,16 @@ select
 from
 	follows,
 	users as followers,
-	users as followees
+	users as followees,
+  (
+    select owner_user_id
+    from collections
+    where cardinality(nfts) > 0 and deleted = false
+    group by owner_user_id
+  ) displaying
 where
 	follows.follower = followers.id
+  and follows.followee = displaying.owner_user_id
 	and followers.deleted is false
 	and follows.followee = followees.id
 	and followees.deleted is false
