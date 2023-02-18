@@ -1793,6 +1793,16 @@ union MintPremiumCardToWalletPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
+input RegisterPushNotificationTokenInput {
+  token: String!
+}
+
+type RegisterPushNotificationTokenPayload {
+  message: String
+}
+
+union RegisterPushNotificationTokenPayloadOrError = RegisterPushNotificationTokenPayload | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -1909,6 +1919,8 @@ type Mutation {
   moveCollectionToGallery(
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
+
+  registerPushNotificationToken(input: RegisterPushNotificationTokenInput): RegisterPushNotificationTokenPayloadOrError @authRequired
 }
 
 type Subscription {
