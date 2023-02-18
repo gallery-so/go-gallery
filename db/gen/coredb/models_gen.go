@@ -277,23 +277,24 @@ type Token struct {
 }
 
 type User struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	LastUpdated          time.Time
-	CreatedAt            time.Time
-	Username             sql.NullString
-	UsernameIdempotent   sql.NullString
-	Wallets              persist.WalletList
-	Bio                  sql.NullString
-	Traits               pgtype.JSONB
-	Universal            bool
-	NotificationSettings persist.UserNotificationSettings
-	EmailVerified        persist.EmailVerificationStatus
-	EmailUnsubscriptions persist.EmailUnsubscriptions
-	FeaturedGallery      *persist.DBID
-	PrimaryWalletID      persist.DBID
-	UserExperiences      pgtype.JSONB
+	ID                     persist.DBID
+	Deleted                bool
+	Version                sql.NullInt32
+	LastUpdated            time.Time
+	CreatedAt              time.Time
+	Username               sql.NullString
+	UsernameIdempotent     sql.NullString
+	Wallets                persist.WalletList
+	Bio                    sql.NullString
+	Traits                 pgtype.JSONB
+	Universal              bool
+	NotificationSettings   persist.UserNotificationSettings
+	EmailVerified          persist.EmailVerificationStatus
+	EmailUnsubscriptions   persist.EmailUnsubscriptions
+	FeaturedGallery        *persist.DBID
+	PrimaryWalletID        persist.DBID
+	UserExperiences        pgtype.JSONB
+	PushNotificationTokens []string
 }
 
 type UserRole struct {

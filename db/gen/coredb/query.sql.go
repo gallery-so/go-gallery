@@ -28,6 +28,20 @@ func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionT
 	return err
 }
 
+const addPushNotificationTokenToUser = `-- name: AddPushNotificationTokenToUser :exec
+update users set push_notification_tokens = array_append(push_notification_tokens, $1) where id = $2
+`
+
+type AddPushNotificationTokenToUserParams struct {
+	Token  interface{}
+	UserID persist.DBID
+}
+
+func (q *Queries) AddPushNotificationTokenToUser(ctx context.Context, arg AddPushNotificationTokenToUserParams) error {
+	_, err := q.db.Exec(ctx, addPushNotificationTokenToUser, arg.Token, arg.UserID)
+	return err
+}
+
 const addSocialToUser = `-- name: AddSocialToUser :exec
 insert into pii.for_users (user_id, pii_socials) values ($1, $2) on conflict (user_id) where deleted = false do update set pii_socials = for_users.pii_socials || $2
 `
@@ -1978,7 +1992,7 @@ func (q *Queries) GetTokenByTokenIdentifiers(ctx context.Context, arg GetTokenBy
 }
 
 const getTokenOwnerByID = `-- name: GetTokenOwnerByID :one
-SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences FROM tokens t
+SELECT u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.push_notification_tokens FROM tokens t
     JOIN users u ON u.id = t.owner_user_id
     WHERE t.id = $1 AND t.deleted = false AND u.deleted = false
 `
@@ -2004,6 +2018,7 @@ func (q *Queries) GetTokenOwnerByID(ctx context.Context, id persist.DBID) (User,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
+		&i.PushNotificationTokens,
 	)
 	return i, err
 }
@@ -2442,7 +2457,7 @@ func (q *Queries) GetTrendingFeedEventIDs(ctx context.Context, windowEnd time.Ti
 }
 
 const getTrendingUsersByIDs = `-- name: GetTrendingUsersByIDs :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.push_notification_tokens from users join unnest($1::varchar[]) with ordinality t(id, pos) using (id) where deleted = false order by t.pos asc
 `
 
 func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) ([]User, error) {
@@ -2472,6 +2487,7 @@ func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) (
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
+			&i.PushNotificationTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -2484,7 +2500,7 @@ func (q *Queries) GetTrendingUsersByIDs(ctx context.Context, userIds []string) (
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE id = $1 AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, push_notification_tokens FROM users WHERE id = $1 AND deleted = false
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error) {
@@ -2508,12 +2524,13 @@ func (q *Queries) GetUserById(ctx context.Context, id persist.DBID) (User, error
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
+		&i.PushNotificationTokens,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE username_idempotent = lower($1) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, push_notification_tokens FROM users WHERE username_idempotent = lower($1) AND deleted = false
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -2537,6 +2554,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.FeaturedGallery,
 		&i.PrimaryWalletID,
 		&i.UserExperiences,
+		&i.PushNotificationTokens,
 	)
 	return i, err
 }
@@ -2783,7 +2801,7 @@ func (q *Queries) GetUserWithPIIByID(ctx context.Context, userID persist.DBID) (
 }
 
 const getUsersByChainAddresses = `-- name: GetUsersByChainAddresses :many
-select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, users.push_notification_tokens,wallets.address from users, wallets where wallets.address = ANY($1::varchar[]) AND wallets.chain = $2::int AND ARRAY[wallets.id] <@ users.wallets AND users.deleted = false AND wallets.deleted = false
 `
 
 type GetUsersByChainAddressesParams struct {
@@ -2792,24 +2810,25 @@ type GetUsersByChainAddressesParams struct {
 }
 
 type GetUsersByChainAddressesRow struct {
-	ID                   persist.DBID
-	Deleted              bool
-	Version              sql.NullInt32
-	LastUpdated          time.Time
-	CreatedAt            time.Time
-	Username             sql.NullString
-	UsernameIdempotent   sql.NullString
-	Wallets              persist.WalletList
-	Bio                  sql.NullString
-	Traits               pgtype.JSONB
-	Universal            bool
-	NotificationSettings persist.UserNotificationSettings
-	EmailVerified        persist.EmailVerificationStatus
-	EmailUnsubscriptions persist.EmailUnsubscriptions
-	FeaturedGallery      *persist.DBID
-	PrimaryWalletID      persist.DBID
-	UserExperiences      pgtype.JSONB
-	Address              persist.Address
+	ID                     persist.DBID
+	Deleted                bool
+	Version                sql.NullInt32
+	LastUpdated            time.Time
+	CreatedAt              time.Time
+	Username               sql.NullString
+	UsernameIdempotent     sql.NullString
+	Wallets                persist.WalletList
+	Bio                    sql.NullString
+	Traits                 pgtype.JSONB
+	Universal              bool
+	NotificationSettings   persist.UserNotificationSettings
+	EmailVerified          persist.EmailVerificationStatus
+	EmailUnsubscriptions   persist.EmailUnsubscriptions
+	FeaturedGallery        *persist.DBID
+	PrimaryWalletID        persist.DBID
+	UserExperiences        pgtype.JSONB
+	PushNotificationTokens []string
+	Address                persist.Address
 }
 
 func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByChainAddressesParams) ([]GetUsersByChainAddressesRow, error) {
@@ -2839,6 +2858,7 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
+			&i.PushNotificationTokens,
 			&i.Address,
 		); err != nil {
 			return nil, err
@@ -2852,7 +2872,7 @@ func (q *Queries) GetUsersByChainAddresses(ctx context.Context, arg GetUsersByCh
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE id = ANY($2) AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, push_notification_tokens FROM users WHERE id = ANY($2) AND deleted = false
     AND (created_at, id) < ($3, $4)
     AND (created_at, id) > ($5, $6)
     ORDER BY CASE WHEN $7::bool THEN (created_at, id) END ASC,
@@ -2905,6 +2925,7 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
+			&i.PushNotificationTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -3060,7 +3081,7 @@ func (q *Queries) GetUsersWithEmailNotificationsOnForEmailType(ctx context.Conte
 }
 
 const getUsersWithRolePaginate = `-- name: GetUsersWithRolePaginate :many
-select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u, user_roles ur where u.deleted = false and ur.deleted = false
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences, u.push_notification_tokens from users u, user_roles ur where u.deleted = false and ur.deleted = false
     and u.id = ur.user_id and ur.role = $2
     and (u.username_idempotent, u.id) < ($3::varchar, $4)
     and (u.username_idempotent, u.id) > ($5::varchar, $6)
@@ -3114,6 +3135,7 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
+			&i.PushNotificationTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -3126,7 +3148,7 @@ func (q *Queries) GetUsersWithRolePaginate(ctx context.Context, arg GetUsersWith
 }
 
 const getUsersWithTrait = `-- name: GetUsersWithTrait :many
-SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
+SELECT id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, push_notification_tokens FROM users WHERE (traits->$1::string) IS NOT NULL AND deleted = false
 `
 
 func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]User, error) {
@@ -3156,6 +3178,7 @@ func (q *Queries) GetUsersWithTrait(ctx context.Context, dollar_1 string) ([]Use
 			&i.FeaturedGallery,
 			&i.PrimaryWalletID,
 			&i.UserExperiences,
+			&i.PushNotificationTokens,
 		); err != nil {
 			return nil, err
 		}
@@ -3549,6 +3572,20 @@ type RemoveCollectionFromGalleryParams struct {
 
 func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCollectionFromGalleryParams) error {
 	_, err := q.db.Exec(ctx, removeCollectionFromGallery, arg.CollectionID, arg.GalleryID)
+	return err
+}
+
+const removePushNotificationFromUser = `-- name: RemovePushNotificationFromUser :exec
+update users set push_notification_tokens = array_remove(push_notification_tokens, $1) where id = $2
+`
+
+type RemovePushNotificationFromUserParams struct {
+	Token  interface{}
+	UserID persist.DBID
+}
+
+func (q *Queries) RemovePushNotificationFromUser(ctx context.Context, arg RemovePushNotificationFromUserParams) error {
+	_, err := q.db.Exec(ctx, removePushNotificationFromUser, arg.Token, arg.UserID)
 	return err
 }
 

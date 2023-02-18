@@ -213,6 +213,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"RegisterPushNotificationTokenPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(RegisterPushNotificationTokenPayloadOrError)
+		return obj, ok
+	},
+
 	"RemoveAdmirePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RemoveAdmirePayloadOrError)
 		return obj, ok

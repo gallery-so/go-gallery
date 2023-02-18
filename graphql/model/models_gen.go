@@ -182,6 +182,10 @@ type RefreshTokenPayloadOrError interface {
 	IsRefreshTokenPayloadOrError()
 }
 
+type RegisterPushNotificationTokenPayloadOrError interface {
+	IsRegisterPushNotificationTokenPayloadOrError()
+}
+
 type RemoveAdmirePayloadOrError interface {
 	IsRemoveAdmirePayloadOrError()
 }
@@ -842,41 +846,42 @@ type ErrNotAuthorized struct {
 	Cause   AuthorizationError `json:"cause"`
 }
 
-func (ErrNotAuthorized) IsViewerOrError()                              {}
-func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()             {}
-func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()             {}
-func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()         {}
-func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()       {}
-func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()       {}
-func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError()     {}
-func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()              {}
-func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()            {}
-func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()                {}
-func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()            {}
-func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()               {}
-func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                   {}
-func (ErrNotAuthorized) IsError()                                      {}
-func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()                  {}
-func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()               {}
-func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
-func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
-func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()        {}
-func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()              {}
-func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                {}
-func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()            {}
-func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()          {}
-func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()                {}
-func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()           {}
-func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()        {}
-func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()                {}
-func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()               {}
-func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()          {}
-func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()               {}
-func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()         {}
-func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()      {}
-func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()         {}
-func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
-func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
+func (ErrNotAuthorized) IsViewerOrError()                               {}
+func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()              {}
+func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()              {}
+func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()          {}
+func (ErrNotAuthorized) IsUpdateCollectionTokensPayloadOrError()        {}
+func (ErrNotAuthorized) IsUpdateCollectionHiddenPayloadOrError()        {}
+func (ErrNotAuthorized) IsUpdateGalleryCollectionsPayloadOrError()      {}
+func (ErrNotAuthorized) IsUpdateTokenInfoPayloadOrError()               {}
+func (ErrNotAuthorized) IsSetSpamPreferencePayloadOrError()             {}
+func (ErrNotAuthorized) IsAddUserWalletPayloadOrError()                 {}
+func (ErrNotAuthorized) IsRemoveUserWalletsPayloadOrError()             {}
+func (ErrNotAuthorized) IsUpdateUserInfoPayloadOrError()                {}
+func (ErrNotAuthorized) IsSyncTokensPayloadOrError()                    {}
+func (ErrNotAuthorized) IsError()                                       {}
+func (ErrNotAuthorized) IsDeepRefreshPayloadOrError()                   {}
+func (ErrNotAuthorized) IsAddRolesToUserPayloadOrError()                {}
+func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()           {}
+func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()        {}
+func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()         {}
+func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()               {}
+func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                 {}
+func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()             {}
+func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()           {}
+func (ErrNotAuthorized) IsDeleteGalleryPayloadOrError()                 {}
+func (ErrNotAuthorized) IsUpdateGalleryOrderPayloadOrError()            {}
+func (ErrNotAuthorized) IsUpdateFeaturedGalleryPayloadOrError()         {}
+func (ErrNotAuthorized) IsUpdateGalleryPayloadOrError()                 {}
+func (ErrNotAuthorized) IsPublishGalleryPayloadOrError()                {}
+func (ErrNotAuthorized) IsUpdatePrimaryWalletPayloadOrError()           {}
+func (ErrNotAuthorized) IsAdminAddWalletPayloadOrError()                {}
+func (ErrNotAuthorized) IsUpdateUserExperiencePayloadOrError()          {}
+func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()       {}
+func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()          {}
+func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError()  {}
+func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()       {}
+func (ErrNotAuthorized) IsRegisterPushNotificationTokenPayloadOrError() {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1335,6 +1340,16 @@ type RefreshTokenPayload struct {
 }
 
 func (RefreshTokenPayload) IsRefreshTokenPayloadOrError() {}
+
+type RegisterPushNotificationTokenInput struct {
+	Token string `json:"token"`
+}
+
+type RegisterPushNotificationTokenPayload struct {
+	Message *string `json:"message"`
+}
+
+func (RegisterPushNotificationTokenPayload) IsRegisterPushNotificationTokenPayloadOrError() {}
 
 type RemoveAdmirePayload struct {
 	Viewer    *Viewer       `json:"viewer"`
