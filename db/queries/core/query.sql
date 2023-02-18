@@ -839,3 +839,9 @@ update pii.for_users set pii_socials = @socials where user_id = @user_id;
 
 -- name: UpdateEventCaptionByGroup :exec
 update events set caption = @caption where group_id = @group_id and deleted = false;
+
+-- name: AddPushNotificationTokenToUser :exec
+update users set push_notification_tokens = array_append(push_notification_tokens, @token) where id = @user_id;
+
+-- name: RemovePushNotificationFromUser :exec
+update users set push_notification_tokens = array_remove(push_notification_tokens, @token) where id = @user_id;
