@@ -866,3 +866,27 @@ func (api UserAPI) UpdateUserExperience(ctx context.Context, experienceType mode
 		UserID: curUserID,
 	})
 }
+
+func (api UserAPI) AddPushNotificationToUser(ctx context.Context, token string) error {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.queries.AddPushNotificationTokenToUser(ctx, db.AddPushNotificationTokenToUserParams{
+		Token:  token,
+		UserID: userID,
+	})
+}
+
+func (api UserAPI) RemovePushNotificationFromUser(ctx context.Context,  token string) error {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	return api.queries.RemovePushNotificationFromUser(ctx, db.RemovePushNotificationFromUserParams{
+		Token:  token,
+		UserID: userID,
+	})
+}

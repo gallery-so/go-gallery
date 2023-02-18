@@ -7,7 +7,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -16,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -1436,6 +1436,19 @@ func (r *mutationResolver) MoveCollectionToGallery(ctx context.Context, input *m
 		OldGallery: old,
 		NewGallery: new,
 	}, nil
+}
+
+// RegisterPushNotificationToken is the resolver for the registerPushNotificationToken field.
+func (r *mutationResolver) RegisterPushNotificationToken(ctx context.Context, input *model.RegisterPushNotificationTokenInput) (model.RegisterPushNotificationTokenPayloadOrError, error) {
+	user := publicapi.For(ctx).User
+
+	err := user.AddPushNotificationToUser(ctx, input.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	message := "Token has been registered"
+	return model.RegisterPushNotificationTokenPayload{Message: &message}, nil
 }
 
 // Owner is the resolver for the owner field.
