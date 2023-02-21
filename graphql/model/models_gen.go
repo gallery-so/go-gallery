@@ -1890,6 +1890,7 @@ type Viewer struct {
 	Notifications        *NotificationsConnection `json:"notifications"`
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
 	UserExperiences      []*UserExperience        `json:"userExperiences"`
+	SuggestedUsers       *UsersConnection         `json:"suggestedUsers"`
 }
 
 func (Viewer) IsNode()          {}

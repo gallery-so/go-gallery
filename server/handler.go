@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/graphql/apq"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/redis"
 
 	"github.com/bsm/redislock"
@@ -44,25 +45,25 @@ import (
 	"github.com/spf13/viper"
 )
 
-func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, magicClient *magicclient.API) *gin.Engine {
+func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender) *gin.Engine {
 
 	graphqlGroup := router.Group("/glry/graphql")
 
-	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, magicClient)
+	graphqlHandlersInit(graphqlGroup, repos, queries, ethClient, ipfsClient, arweaveClient, stg, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, magicClient, recommender)
 
 	router.GET("/alive", healthCheckHandler())
 
 	return router
 }
 
-func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, magicClient *magicclient.API) {
-	handler := graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, magicClient)
+func graphqlHandlersInit(parent *gin.RouterGroup, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender) {
+	handler := graphqlHandler(repos, queries, ethClient, ipfsClient, arweaveClient, storageClient, mcProvider, throttler, taskClient, pub, lock, secrets, graphqlAPQCache, feedCache, magicClient, recommender)
 	parent.Any("/query", middleware.AddAuthToContext(), handler)
 	parent.Any("/query/:operationName", middleware.AddAuthToContext(), handler)
 	parent.GET("/playground", graphqlPlaygroundHandler())
 }
 
-func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, magicClient *magicclient.API) gin.HandlerFunc {
+func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, mp *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender) gin.HandlerFunc {
 	config := generated.Config{Resolvers: &graphql.Resolver{}}
 	config.Directives.AuthRequired = graphql.AuthRequiredDirectiveHandler()
 	config.Directives.RestrictEnvironment = graphql.RestrictEnvironmentDirectiveHandler()
@@ -154,6 +155,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 		mediamapper.AddTo(c)
 		event.AddTo(c, disableDataloaderCaching, notificationsHandler, queries, taskClient)
 		notifications.AddTo(c, notificationsHandler)
+		recommend.AddTo(c, recommender)
 
 		// Use the request context so dataloaders will add their traces to the request span
 		publicapi.AddTo(c, newPublicAPI(c.Request.Context(), disableDataloaderCaching))

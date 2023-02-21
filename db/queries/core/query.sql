@@ -634,6 +634,14 @@ select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = 
              case when not @paging_forward::bool then (u.username_idempotent, u.id) end desc
     limit $1;
 
+-- name: GetUsersByPositionPaginate :many
+select u.* from users u join unnest(@user_ids::text[]) with ordinality t(id, pos) using(id) where u.deleted = false
+  and t.pos > @cur_before_pos::int
+  and t.pos < @cur_after_pos::int
+  order by case when @paging_forward::bool then t.pos end desc,
+          case when not @paging_forward::bool then t.pos end asc
+  limit sqlc.arg('limit');
+
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
 

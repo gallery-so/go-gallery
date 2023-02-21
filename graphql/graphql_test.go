@@ -55,6 +55,7 @@ func testGraphQL(t *testing.T) {
 		{title: "should get user by username", run: testUserByUsername},
 		{title: "should get user by address", run: testUserByAddress},
 		{title: "should get viewer", run: testViewer},
+		{title: "should get viewer suggested users", run: testSuggestedUsersForViewer},
 		{title: "should add a wallet", run: testAddWallet},
 		{title: "should remove a wallet", run: testRemoveWallet},
 		{title: "should sync tokens", run: testSyncTokens},
@@ -129,10 +130,34 @@ func testViewer(t *testing.T) {
 	c := authedHandlerClient(t, userF.id)
 
 	response, err := viewerQuery(context.Background(), c)
-
 	require.NoError(t, err)
+
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
 	assert.Equal(t, userF.username, *payload.User.Username)
+}
+
+func testSuggestedUsersForViewer(t *testing.T) {
+	userF := newUserFixture(t)
+	userA := newUserFixture(t)
+	userB := newUserFixture(t)
+	userC := newUserFixture(t)
+	ctx := context.Background()
+	clients := server.ClientInit(ctx)
+	provider := server.NewMultichainProvider(clients)
+	recommender := newStubRecommender(t, []persist.DBID{
+		userA.id,
+		userB.id,
+		userC.id,
+	})
+	handler := server.CoreInit(clients, provider, recommender)
+	c := customHandlerClient(t, handler, withJWTOpt(t, userF.id))
+
+	response, err := viewerQuery(ctx, c)
+	require.NoError(t, err)
+
+	payload, _ := (*response.Viewer).(*viewerQueryViewer)
+	suggested := payload.GetSuggestedUsers().GetEdges()
+	assert.Len(t, suggested, 3)
 }
 
 func testAddWallet(t *testing.T) {
@@ -207,7 +232,7 @@ func testSyncTokens(t *testing.T) {
 		Queries:     clients.Queries,
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
-	h := server.CoreInit(clients, &p)
+	h := server.CoreInit(clients, &p, newStubRecommender(t, []persist.DBID{}))
 	c := customHandlerClient(t, h, withJWTOpt(t, userF.id))
 
 	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
@@ -877,7 +902,8 @@ func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput 
 func defaultHandler(t *testing.T) http.Handler {
 	c := server.ClientInit(context.Background())
 	p := server.NewMultichainProvider(c)
-	handler := server.CoreInit(c, p)
+	r := newStubRecommender(t, []persist.DBID{})
+	handler := server.CoreInit(c, p, r)
 	t.Cleanup(c.Close)
 	return handler
 }
