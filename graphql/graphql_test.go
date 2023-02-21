@@ -488,6 +488,12 @@ func testConnectSocialAccount(t *testing.T) {
 	userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
 	assert.Nil(t, userPayload.SocialAccounts.Twitter)
 
+	disconnectResp, err := disconnectSocialAccount(context.Background(), c, SocialAccountTypeTwitter)
+	require.NoError(t, err)
+
+	disconnectPayload := (*disconnectResp.DisconnectSocialAccount).(*disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload)
+	assert.Nil(t, disconnectPayload.Viewer.SocialAccounts.Twitter)
+
 }
 
 func testUpdateGalleryDeleteCollection(t *testing.T) {

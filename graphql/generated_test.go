@@ -523,6 +523,14 @@ func (v *__createUserMutationInput) GetAuthMechanism() AuthMechanism { return v.
 // GetInput returns __createUserMutationInput.Input, and is useful for accessing the field via an interface.
 func (v *__createUserMutationInput) GetInput() CreateUserInput { return v.Input }
 
+// __disconnectSocialAccountInput is used internally by genqlient
+type __disconnectSocialAccountInput struct {
+	AccountType SocialAccountType `json:"accountType"`
+}
+
+// GetAccountType returns __disconnectSocialAccountInput.AccountType, and is useful for accessing the field via an interface.
+func (v *__disconnectSocialAccountInput) GetAccountType() SocialAccountType { return v.AccountType }
+
 // __getAuthNonceMutationInput is used internally by genqlient
 type __getAuthNonceMutationInput struct {
 	Input ChainAddressInput `json:"input"`
@@ -2558,6 +2566,247 @@ func (v *createUserMutationResponse) __premarshalJSON() (*__premarshalcreateUser
 			if err != nil {
 				return nil, fmt.Errorf(
 					"Unable to marshal createUserMutationResponse.CreateUser: %w", err)
+			}
+		}
+	}
+	return &retval, nil
+}
+
+// disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload includes the requested fields of the GraphQL type DisconnectSocialAccountPayload.
+type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload struct {
+	Typename *string                                                                             `json:"__typename"`
+	Viewer   *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewer `json:"viewer"`
+}
+
+// GetTypename returns disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload.Typename, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload) GetTypename() *string {
+	return v.Typename
+}
+
+// GetViewer returns disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload.Viewer, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload) GetViewer() *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewer {
+	return v.Viewer
+}
+
+// disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError includes the requested fields of the GraphQL interface DisconnectSocialAccountPayloadOrError.
+//
+// disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError is implemented by the following types:
+// disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload
+// disconnectSocialAccountDisconnectSocialAccountErrInvalidInput
+// disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
+type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError interface {
+	implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() *string
+}
+
+func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
+}
+func (v *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
+}
+func (v *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
+}
+
+func __unmarshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError(b []byte, v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "DisconnectSocialAccountPayload":
+		*v = new(disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload)
+		return json.Unmarshal(b, *v)
+	case "ErrInvalidInput":
+		*v = new(disconnectSocialAccountDisconnectSocialAccountErrInvalidInput)
+		return json.Unmarshal(b, *v)
+	case "ErrNotAuthorized":
+		*v = new(disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing DisconnectSocialAccountPayloadOrError.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError(v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload:
+		typename = "DisconnectSocialAccountPayload"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload
+		}{typename, v}
+		return json.Marshal(result)
+	case *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput:
+		typename = "ErrInvalidInput"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*disconnectSocialAccountDisconnectSocialAccountErrInvalidInput
+		}{typename, v}
+		return json.Marshal(result)
+	case *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized:
+		typename = "ErrNotAuthorized"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError: "%T"`, v)
+	}
+}
+
+// disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewer includes the requested fields of the GraphQL type Viewer.
+type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewer struct {
+	SocialAccounts *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccounts `json:"socialAccounts"`
+}
+
+// GetSocialAccounts returns disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewer.SocialAccounts, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewer) GetSocialAccounts() *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccounts {
+	return v.SocialAccounts
+}
+
+// disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccounts includes the requested fields of the GraphQL type SocialAccounts.
+type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccounts struct {
+	Twitter *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount `json:"twitter"`
+}
+
+// GetTwitter returns disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccounts.Twitter, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccounts) GetTwitter() *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount {
+	return v.Twitter
+}
+
+// disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount includes the requested fields of the GraphQL type TwitterSocialAccount.
+type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount struct {
+	Username string `json:"username"`
+}
+
+// GetUsername returns disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount.Username, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadViewerSocialAccountsTwitterTwitterSocialAccount) GetUsername() string {
+	return v.Username
+}
+
+// disconnectSocialAccountDisconnectSocialAccountErrInvalidInput includes the requested fields of the GraphQL type ErrInvalidInput.
+type disconnectSocialAccountDisconnectSocialAccountErrInvalidInput struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns disconnectSocialAccountDisconnectSocialAccountErrInvalidInput.Typename, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns disconnectSocialAccountDisconnectSocialAccountErrInvalidInput.Message, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
+type disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized.Typename, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized.Message, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized) GetMessage() string {
+	return v.Message
+}
+
+// disconnectSocialAccountResponse is returned by disconnectSocialAccount on success.
+type disconnectSocialAccountResponse struct {
+	DisconnectSocialAccount *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError `json:"-"`
+}
+
+// GetDisconnectSocialAccount returns disconnectSocialAccountResponse.DisconnectSocialAccount, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountResponse) GetDisconnectSocialAccount() *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError {
+	return v.DisconnectSocialAccount
+}
+
+func (v *disconnectSocialAccountResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*disconnectSocialAccountResponse
+		DisconnectSocialAccount json.RawMessage `json:"disconnectSocialAccount"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.disconnectSocialAccountResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.DisconnectSocialAccount
+		src := firstPass.DisconnectSocialAccount
+		if len(src) != 0 && string(src) != "null" {
+			*dst = new(disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError)
+			err = __unmarshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError(
+				src, *dst)
+			if err != nil {
+				return fmt.Errorf(
+					"Unable to unmarshal disconnectSocialAccountResponse.DisconnectSocialAccount: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshaldisconnectSocialAccountResponse struct {
+	DisconnectSocialAccount json.RawMessage `json:"disconnectSocialAccount"`
+}
+
+func (v *disconnectSocialAccountResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *disconnectSocialAccountResponse) __premarshalJSON() (*__premarshaldisconnectSocialAccountResponse, error) {
+	var retval __premarshaldisconnectSocialAccountResponse
+
+	{
+
+		dst := &retval.DisconnectSocialAccount
+		src := v.DisconnectSocialAccount
+		if src != nil {
+			var err error
+			*dst, err = __marshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError(
+				src)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Unable to marshal disconnectSocialAccountResponse.DisconnectSocialAccount: %w", err)
 			}
 		}
 	}
@@ -7882,6 +8131,51 @@ mutation createUserMutation ($authMechanism: AuthMechanism!, $input: CreateUserI
 	var err error
 
 	var data createUserMutationResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+func disconnectSocialAccount(
+	ctx context.Context,
+	client graphql.Client,
+	accountType SocialAccountType,
+) (*disconnectSocialAccountResponse, error) {
+	req := &graphql.Request{
+		OpName: "disconnectSocialAccount",
+		Query: `
+mutation disconnectSocialAccount ($accountType: SocialAccountType!) {
+	disconnectSocialAccount(accountType: $accountType) {
+		__typename
+		... on Error {
+			__typename
+			message
+		}
+		... on DisconnectSocialAccountPayload {
+			viewer {
+				socialAccounts {
+					twitter {
+						username
+					}
+				}
+			}
+		}
+	}
+}
+`,
+		Variables: &__disconnectSocialAccountInput{
+			AccountType: accountType,
+		},
+	}
+	var err error
+
+	var data disconnectSocialAccountResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(
