@@ -1801,7 +1801,9 @@ type RegisterPushNotificationTokenPayload {
   message: String
 }
 
-union RegisterPushNotificationTokenPayloadOrError = RegisterPushNotificationTokenPayload | ErrNotAuthorized
+union RegisterPushNotificationTokenPayloadOrError =
+    RegisterPushNotificationTokenPayload
+  | ErrNotAuthorized
 
 type Mutation {
   # User Mutations
@@ -1920,7 +1922,9 @@ type Mutation {
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
 
-  registerPushNotificationToken(input: RegisterPushNotificationTokenInput): RegisterPushNotificationTokenPayloadOrError @authRequired
+  registerPushNotificationToken(
+    input: RegisterPushNotificationTokenInput
+  ): RegisterPushNotificationTokenPayloadOrError @authRequired
 }
 
 type Subscription {
