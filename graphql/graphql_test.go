@@ -1,3 +1,4 @@
+//go:generate go get github.com/Khan/genqlient/generate@v0.5.0
 //go:generate go run github.com/Khan/genqlient
 package graphql_test
 
