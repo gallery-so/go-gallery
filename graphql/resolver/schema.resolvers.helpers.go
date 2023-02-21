@@ -1366,18 +1366,27 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 
 	if event.Data.GalleryNewCollections != nil && len(event.Data.GalleryNewCollections) > 0 {
 		for _, collectionID := range event.Data.GalleryNewCollections {
+			var collectorsNote *string
+			if note, ok := event.Data.GalleryNewCollectionCollectorsNotes[collectionID]; ok {
+				collectorsNote = &note
+			}
+			handledNew[collectionID] = true
+			if collectorsNote == nil && (event.Data.GalleryNewCollectionTokenIDs[collectionID] == nil || len(event.Data.GalleryNewCollectionTokenIDs[collectionID]) == 0) {
+				continue
+			}
 			result = append(result, model.CollectionCreatedFeedEventData{
-				EventTime:  &event.CreatedAt,
-				Owner:      &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)}, // remaining fields handled by dedicated resolver
-				Collection: &model.Collection{Dbid: collectionID},                 // remaining fields handled by dedicated resolver
-				Action:     util.ToPointer(persist.ActionCollectionCreated),
-				NewTokens:  nil, // handled by dedicated resolver
+				EventTime:         &event.CreatedAt,
+				Owner:             &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)}, // remaining fields handled by dedicated resolver
+				Collection:        &model.Collection{Dbid: collectionID},                 // remaining fields handled by dedicated resolver
+				Action:            util.ToPointer(persist.ActionCollectionCreated),
+				NewTokens:         nil, // handled by dedicated resolver
+				NewCollectorsNote: collectorsNote,
 				HelperCollectionCreatedFeedEventDataData: model.HelperCollectionCreatedFeedEventDataData{
 					CollectionID: collectionID,
 					TokenIDs:     event.Data.GalleryNewCollectionTokenIDs[collectionID],
 				},
 			})
-			handledNew[collectionID] = true
+
 		}
 	}
 
@@ -1402,6 +1411,9 @@ func feedEventToSubEventDatas(ctx context.Context, event db.FeedEvent) ([]model.
 
 	if event.Data.GalleryNewCollectionCollectorsNotes != nil && len(event.Data.GalleryNewCollectionCollectorsNotes) > 0 {
 		for collectionID, collectorsNote := range event.Data.GalleryNewCollectionCollectorsNotes {
+			if handledNew[collectionID] {
+				continue
+			}
 			result = append(result, model.CollectorsNoteAddedToCollectionFeedEventData{
 				EventTime:         &event.CreatedAt,
 				Owner:             &model.GalleryUser{Dbid: persist.DBID(event.OwnerID)}, // remaining fields handled by dedicated resolver

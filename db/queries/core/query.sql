@@ -772,7 +772,13 @@ with viewers as (
 edit_events as (
   select actor_id
   from events
-  where action in ('CollectionCreated', 'CollectorsNoteAddedToCollection', 'CollectorsNoteAddedToToken', 'TokensAddedToCollection') and created_at >= @window_end
+  where action in (
+    'CollectionCreated',
+    'CollectorsNoteAddedToCollection',
+    'CollectorsNoteAddedToToken',
+    'TokensAddedToCollection',
+    'GalleryInfoUpdated'
+  ) and created_at >= @window_end
   group by actor_id
 )
 select users.id

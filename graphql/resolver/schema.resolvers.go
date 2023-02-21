@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -1442,6 +1443,20 @@ func (r *ownerAtBlockResolver) Owner(ctx context.Context, obj *model.OwnerAtBloc
 	panic(fmt.Errorf("not implemented"))
 }
 
+// Blurhash is the resolver for the blurhash field.
+func (r *previewURLSetResolver) Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error) {
+	mm := mediamapper.For(ctx)
+
+	return mm.GetBlurhash(*obj.Raw), nil
+}
+
+// AspectRatio is the resolver for the aspectRatio field.
+func (r *previewURLSetResolver) AspectRatio(ctx context.Context, obj *model.PreviewURLSet) (*float64, error) {
+	mm := mediamapper.For(ctx)
+
+	return mm.GetAspectRatio(*obj.Raw), nil
+}
+
 // Node is the resolver for the node field.
 func (r *queryResolver) Node(ctx context.Context, id model.GqlID) (model.Node, error) {
 	return nodeFetcher.GetNodeByGqlID(ctx, id)
@@ -2029,6 +2044,9 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // OwnerAtBlock returns generated.OwnerAtBlockResolver implementation.
 func (r *Resolver) OwnerAtBlock() generated.OwnerAtBlockResolver { return &ownerAtBlockResolver{r} }
 
+// PreviewURLSet returns generated.PreviewURLSetResolver implementation.
+func (r *Resolver) PreviewURLSet() generated.PreviewURLSetResolver { return &previewURLSetResolver{r} }
+
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
@@ -2148,6 +2166,7 @@ type galleryUpdatedFeedEventDataResolver struct{ *Resolver }
 type galleryUserResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type ownerAtBlockResolver struct{ *Resolver }
+type previewURLSetResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type removeAdmirePayloadResolver struct{ *Resolver }
 type removeCommentPayloadResolver struct{ *Resolver }

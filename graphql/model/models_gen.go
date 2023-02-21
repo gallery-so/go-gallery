@@ -431,11 +431,12 @@ func (Collection) IsCollectionByIDOrError() {}
 
 type CollectionCreatedFeedEventData struct {
 	HelperCollectionCreatedFeedEventDataData
-	EventTime  *time.Time         `json:"eventTime"`
-	Owner      *GalleryUser       `json:"owner"`
-	Action     *persist.Action    `json:"action"`
-	Collection *Collection        `json:"collection"`
-	NewTokens  []*CollectionToken `json:"newTokens"`
+	EventTime         *time.Time         `json:"eventTime"`
+	Owner             *GalleryUser       `json:"owner"`
+	Action            *persist.Action    `json:"action"`
+	Collection        *Collection        `json:"collection"`
+	NewTokens         []*CollectionToken `json:"newTokens"`
+	NewCollectorsNote *string            `json:"newCollectorsNote"`
 }
 
 func (CollectionCreatedFeedEventData) IsFeedEventData() {}
@@ -961,6 +962,7 @@ type FeedEvent struct {
 func (FeedEvent) IsNode()                 {}
 func (FeedEvent) IsFeedEventOrError()     {}
 func (FeedEvent) IsFeedEventByIDOrError() {}
+func (FeedEvent) IsEntity()               {}
 
 type FeedEventAdmireEdge struct {
 	Node   *Admire    `json:"node"`
@@ -1286,12 +1288,14 @@ type PreverifyEmailPayload struct {
 func (PreverifyEmailPayload) IsPreverifyEmailPayloadOrError() {}
 
 type PreviewURLSet struct {
-	Raw       *string `json:"raw"`
-	Thumbnail *string `json:"thumbnail"`
-	Small     *string `json:"small"`
-	Medium    *string `json:"medium"`
-	Large     *string `json:"large"`
-	SrcSet    *string `json:"srcSet"`
+	Raw         *string  `json:"raw"`
+	Thumbnail   *string  `json:"thumbnail"`
+	Small       *string  `json:"small"`
+	Medium      *string  `json:"medium"`
+	Large       *string  `json:"large"`
+	SrcSet      *string  `json:"srcSet"`
+	Blurhash    *string  `json:"blurhash"`
+	AspectRatio *float64 `json:"aspectRatio"`
 }
 
 type PublishGalleryInput struct {

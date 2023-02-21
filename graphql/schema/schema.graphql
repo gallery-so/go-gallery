@@ -1,3 +1,9 @@
+"""
+Any field decorated with the @experimental directive should not be used in production.
+It will not conform to our rules around breaking changes.
+"""
+directive @experimental on FIELD_DEFINITION
+
 # Use @goField(forceResolver: true) to lazily handle recursive or expensive fields that shouldn't be
 # resolved unless the caller asks for them
 directive @goField(
@@ -154,6 +160,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
+  blurhash: String @experimental @goField(forceResolver: true)
+  aspectRatio: Float @experimental @goField(forceResolver: true)
 }
 
 type VideoURLSet {
@@ -682,7 +690,7 @@ interface FeedEventData {
   action: Action
 }
 
-type FeedEvent implements Node {
+type FeedEvent implements Node @key(fields: "dbid") {
   id: ID!
   dbid: DBID!
 
@@ -737,6 +745,7 @@ type CollectionCreatedFeedEventData implements FeedEventData @goEmbedHelper {
   action: Action
   collection: Collection @goField(forceResolver: true)
   newTokens: [CollectionToken] @goField(forceResolver: true)
+  newCollectorsNote: String
 }
 
 type CollectorsNoteAddedToCollectionFeedEventData implements FeedEventData {
