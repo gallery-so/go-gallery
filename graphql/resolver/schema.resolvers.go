@@ -7,7 +7,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -16,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -948,6 +948,18 @@ func (r *mutationResolver) ConnectSocialAccount(ctx context.Context, input model
 	}
 
 	return output, nil
+}
+
+// DisconnectSocialAccount is the resolver for the disconnectSocialAccount field.
+func (r *mutationResolver) DisconnectSocialAccount(ctx context.Context, accountType persist.SocialProvider) (model.DisconnectSocialAccountPayloadOrError, error) {
+	err := publicapi.For(ctx).Social.DisconnectSocialAccount(ctx, accountType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.DisconnectSocialAccountPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
 }
 
 // UpdateSocialAccountDisplayed is the resolver for the updateSocialAccountDisplayed field.

@@ -88,6 +88,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"DisconnectSocialAccountPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(DisconnectSocialAccountPayloadOrError)
+		return obj, ok
+	},
+
 	"Error": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(Error)
 		return obj, ok
