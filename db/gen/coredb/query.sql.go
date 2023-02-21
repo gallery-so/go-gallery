@@ -762,6 +762,17 @@ func (q *Queries) DeleteUserRoles(ctx context.Context, arg DeleteUserRolesParams
 	return err
 }
 
+const getActorForGroup = `-- name: GetActorForGroup :one
+select actor_id from events where group_id = $1 and deleted = false order by(created_at, id) asc limit 1
+`
+
+func (q *Queries) GetActorForGroup(ctx context.Context, groupID sql.NullString) (sql.NullString, error) {
+	row := q.db.QueryRow(ctx, getActorForGroup, groupID)
+	var actor_id sql.NullString
+	err := row.Scan(&actor_id)
+	return actor_id, err
+}
+
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
 SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE id = $1 AND deleted = false
 `
@@ -3451,7 +3462,7 @@ func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.Nul
 }
 
 const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false)
+SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false)
 `
 
 type IsFeedUserActionBlockedParams struct {
