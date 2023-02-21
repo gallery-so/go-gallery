@@ -941,7 +941,7 @@ type Query {
 
   socialConnections(
     socialAccountType: SocialAccountType!
-    onlyUnfollowing: Boolean
+    excludeAlreadyFollowing: Boolean
     before: String
     after: String
     first: Int

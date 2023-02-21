@@ -746,7 +746,7 @@ type ComplexityRoot struct {
 		GlobalFeed              func(childComplexity int, before *string, after *string, first *int, last *int) int
 		MembershipTiers         func(childComplexity int, forceRefresh *bool) int
 		Node                    func(childComplexity int, id model.GqlID) int
-		SocialConnections       func(childComplexity int, socialAccountType persist.SocialProvider, onlyUnfollowing *bool, before *string, after *string, first *int, last *int) int
+		SocialConnections       func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
 		TokenByID               func(childComplexity int, id persist.DBID) int
 		TrendingFeed            func(childComplexity int, before *string, after *string, first *int, last *int) int
 		TrendingUsers           func(childComplexity int, input model.TrendingUsersInput) int
@@ -1343,7 +1343,7 @@ type QueryResolver interface {
 	ViewerGalleryByID(ctx context.Context, id persist.DBID) (model.ViewerGalleryByIDPayloadOrError, error)
 	TrendingUsers(ctx context.Context, input model.TrendingUsersInput) (model.TrendingUsersPayloadOrError, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
-	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, onlyUnfollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
+	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -4343,7 +4343,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.SocialConnections(childComplexity, args["socialAccountType"].(persist.SocialProvider), args["onlyUnfollowing"].(*bool), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+		return e.complexity.Query.SocialConnections(childComplexity, args["socialAccountType"].(persist.SocialProvider), args["excludeAlreadyFollowing"].(*bool), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "Query.tokenById":
 		if e.complexity.Query.TokenByID == nil {
@@ -6927,7 +6927,7 @@ type Query {
 
   socialConnections(
     socialAccountType: SocialAccountType!
-    onlyUnfollowing: Boolean
+    excludeAlreadyFollowing: Boolean
     before: String
     after: String
     first: Int
@@ -9431,14 +9431,14 @@ func (ec *executionContext) field_Query_socialConnections_args(ctx context.Conte
 	}
 	args["socialAccountType"] = arg0
 	var arg1 *bool
-	if tmp, ok := rawArgs["onlyUnfollowing"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onlyUnfollowing"))
+	if tmp, ok := rawArgs["excludeAlreadyFollowing"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("excludeAlreadyFollowing"))
 		arg1, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["onlyUnfollowing"] = arg1
+	args["excludeAlreadyFollowing"] = arg1
 	var arg2 *string
 	if tmp, ok := rawArgs["before"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
@@ -29285,7 +29285,7 @@ func (ec *executionContext) _Query_socialConnections(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().SocialConnections(rctx, fc.Args["socialAccountType"].(persist.SocialProvider), fc.Args["onlyUnfollowing"].(*bool), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+			return ec.resolvers.Query().SocialConnections(rctx, fc.Args["socialAccountType"].(persist.SocialProvider), fc.Args["excludeAlreadyFollowing"].(*bool), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.AuthRequired == nil {

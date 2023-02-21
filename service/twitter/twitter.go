@@ -211,8 +211,6 @@ func (a *API) getAuthedUser(ctx context.Context, accessToken string) (TwitterIde
 // and optionally return the new access token and refresh token
 func (a *API) WithAuth(ctx context.Context, accessToken string, refreshToken string) (*API, *AccessTokenResponse, error) {
 
-	a.isAuthed = true
-
 	user, err := a.getAuthedUser(ctx, accessToken)
 	if err != nil {
 		if err == errUnauthed {
@@ -228,6 +226,7 @@ func (a *API) WithAuth(ctx context.Context, accessToken string, refreshToken str
 				return nil, nil, err
 			}
 			a.TIDs = user
+			a.isAuthed = true
 			return a, &newAtr, nil
 		}
 		return nil, nil, err
@@ -236,6 +235,7 @@ func (a *API) WithAuth(ctx context.Context, accessToken string, refreshToken str
 	a.TIDs = user
 	a.accessCode = accessToken
 	a.refreshCode = refreshToken
+	a.isAuthed = true
 
 	return a, nil, nil
 }
@@ -245,7 +245,7 @@ func (a *API) GetFollowing(ctx context.Context) ([]TwitterIdentifiers, error) {
 		return nil, errAPINotAuthed
 	}
 
-	redisPath := fmt.Sprintf("twitter-%s-following", a.TIDs.ID)
+	redisPath := fmt.Sprintf("twitter.%s.following", a.TIDs.ID)
 
 	var following []TwitterIdentifiers
 

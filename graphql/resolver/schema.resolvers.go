@@ -1685,8 +1685,8 @@ func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, befo
 }
 
 // SocialConnections is the resolver for the socialConnections field.
-func (r *queryResolver) SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, onlyUnfollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error) {
-	connections, pageInfo, err := publicapi.For(ctx).Social.GetConnectionsPaginate(ctx, socialAccountType, before, after, first, last, onlyUnfollowing)
+func (r *queryResolver) SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error) {
+	connections, pageInfo, err := publicapi.For(ctx).Social.GetConnectionsPaginate(ctx, socialAccountType, before, after, first, last, excludeAlreadyFollowing)
 	if err != nil {
 		return nil, err
 	}

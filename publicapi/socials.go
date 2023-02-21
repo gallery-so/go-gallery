@@ -104,7 +104,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 			SocialIds:           socialIDs,
 			SocialUsernames:     usernames,
 			SocialDisplaynames:  displaynames,
-			Column1:             socialProvider.String(),
+			Social:              socialProvider.String(),
 			SocialProfileImages: profileImages,
 			OnlyUnfollowing:     ouf,
 			CurBeforeFollowing:  params.CursorBeforeBool,
