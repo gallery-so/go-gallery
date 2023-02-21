@@ -20,6 +20,7 @@ import (
 
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
+	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
@@ -220,11 +221,10 @@ func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, ar
 		case errGeneratingThumbnail:
 			resultCh <- cacheResult{mediaType, cached, err}
 		case *googleapi.Error:
-			// Bomb out if we can't access the bucket
-			if caught.Code == http.StatusUnauthorized {
-				panic(caught)
-			}
+			panic(caught) // Bomb out if we can't access the bucket
 		default:
+			logger.For(ctx).Error(err)
+			sentryutil.ReportError(ctx, err)
 			resultCh <- cacheResult{mediaType, cached, err}
 		}
 	}()
@@ -481,10 +481,10 @@ func getThumbnailURL(pCtx context.Context, tokenBucket string, name string, imgU
 }
 
 func objectExists(ctx context.Context, client *storage.Client, bucket, fileName string) (bool, error) {
-	o := client.Bucket(bucket).Object(fileName)
-	_, err := client.Bucket(bucket).Object(fileName).Attrs(ctx)
+	objHandle := client.Bucket(bucket).Object(fileName)
+	_, err := objHandle.Attrs(ctx)
 	if err != nil && err != storage.ErrObjectNotExist {
-		return false, fmt.Errorf("could not get object attrs for %s: %s", o.ObjectName(), err)
+		return false, fmt.Errorf("could not get object attrs for %s: %s", objHandle.ObjectName(), err)
 	}
 	return err != storage.ErrObjectNotExist, nil
 }

@@ -25,7 +25,7 @@ func handlersInitServer(router *gin.Engine, queueChan chan processTokensInput, t
 
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.GET("/get", getContract(contractRepository))
-	contractsGroup.POST("/refresh", updateContractMedia(contractRepository, ethClient))
+	contractsGroup.POST("/refresh", updateContractMetadata(contractRepository, ethClient))
 
 	tasksGroup := router.Group("/tasks")
 	tasksGroup.POST("refresh", processRefreshes(idxer, storageClient))

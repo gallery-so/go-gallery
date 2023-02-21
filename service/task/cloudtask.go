@@ -123,7 +123,7 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 	return submitHttpTask(ctx, client, queue, task, body)
 }
 
-func CreateTaskForTokenProcessing(ctx context.Context, message TokenProcessingUserMessage, client *gcptasks.Client) error {
+func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, message TokenProcessingUserMessage) error {
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForTokenProcessing")
 	defer tracing.FinishSpan(span)
 

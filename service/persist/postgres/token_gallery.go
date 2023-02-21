@@ -301,21 +301,19 @@ func (t *TokenGalleryRepository) BulkUpsertByOwnerUserID(pCtx context.Context, o
 }
 
 // BulkUpsertTokensOfContract upserts all tokens of a contract and deletes the old tokens
-func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery, skipDelete bool) error {
-	now, _, err := t.bulkUpsert(pCtx, pTokens)
+func (t *TokenGalleryRepository) BulkUpsertTokensOfContract(pCtx context.Context, contractID persist.DBID, pTokens []persist.TokenGallery) ([]persist.TokenGallery, error) {
+	now, persistedTokens, err := t.bulkUpsert(pCtx, pTokens)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	// delete tokens of contract before timestamp
-
-	if !skipDelete {
-		_, err = t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(pCtx, contractID, now)
-		if err != nil {
-			return fmt.Errorf("failed to delete tokens: %w", err)
-		}
+	_, err = t.deleteTokensOfContractBeforeTimeStampStmt.ExecContext(pCtx, contractID, now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete tokens: %w", err)
 	}
 
-	return nil
+	return persistedTokens, nil
 }
 
 func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []persist.TokenGallery) (time.Time, []persist.TokenGallery, error) {

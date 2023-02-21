@@ -24,8 +24,8 @@ type GetContractInput struct {
 	Address persist.EthereumAddress `form:"address,required"`
 }
 
-// UpdateContractMediaInput is used to refresh metadata for a given contract
-type UpdateContractMediaInput struct {
+// UpdateContractMetadataInput is used to refresh metadata for a given contract
+type UpdateContractMetadataInput struct {
 	Address persist.EthereumAddress `json:"address,required"`
 }
 
@@ -48,16 +48,16 @@ func getContract(contractsRepo persist.ContractRepository) gin.HandlerFunc {
 	}
 }
 
-func updateContractMedia(contractsRepo persist.ContractRepository, ethClient *ethclient.Client) gin.HandlerFunc {
+func updateContractMetadata(contractsRepo persist.ContractRepository, ethClient *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var input UpdateContractMediaInput
+		var input UpdateContractMetadataInput
 		if err := c.ShouldBindJSON(&input); err != nil {
 			err = util.ErrInvalidInput{Reason: fmt.Sprintf("must specify 'address' field: %v", err)}
 			util.ErrResponse(c, http.StatusBadRequest, err)
 			return
 		}
 
-		err := updateMediaForContract(c, input, ethClient, contractsRepo)
+		err := updateMetadataForContract(c, input, ethClient, contractsRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -67,7 +67,7 @@ func updateContractMedia(contractsRepo persist.ContractRepository, ethClient *et
 	}
 }
 
-func updateMediaForContract(c context.Context, input UpdateContractMediaInput, ethClient *ethclient.Client, contractsRepo persist.ContractRepository) error {
+func updateMetadataForContract(c context.Context, input UpdateContractMetadataInput, ethClient *ethclient.Client, contractsRepo persist.ContractRepository) error {
 	newMetadata, err := rpc.GetTokenContractMetadata(c, input.Address, ethClient)
 	if err != nil {
 		return err

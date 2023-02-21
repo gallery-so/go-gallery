@@ -87,7 +87,6 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get?contract_address=%s&limit=%d&offset=%d", d.indexerBaseURL, contractAddress, limit, offset), nil)
 	if err != nil {
 		return nil, multichain.ChainAgnosticContract{}, err
@@ -305,7 +304,6 @@ func (d *Provider) GetDisplayNameByAddress(ctx context.Context, addr persist.Add
 
 // RefreshToken refreshes the metadata for a given token.
 func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) error {
-
 	input := indexer.UpdateTokenInput{
 		OwnerAddress:    persist.EthereumAddress(ownerAddress.String()),
 		TokenID:         ti.TokenID,
@@ -315,6 +313,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 
 	m, err := json.Marshal(input)
 	if err != nil {
+		panic(err)
 		return err
 	}
 
@@ -322,15 +321,18 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", d.indexerBaseURL), buf)
 	if err != nil {
+		panic(err)
 		return err
 	}
 	res, err := d.httpClient.Do(req)
 	if err != nil {
+		panic(err)
 		return err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
+		panic(util.GetErrFromResp(res))
 		return util.GetErrFromResp(res)
 	}
 
@@ -403,7 +405,7 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 
 // RefreshContract refreshes the metadata for a contract
 func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) error {
-	input := indexer.UpdateContractMediaInput{
+	input := indexer.UpdateContractMetadataInput{
 		Address: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(addr)),
 	}
 

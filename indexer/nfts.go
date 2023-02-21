@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -36,9 +35,7 @@ import (
 
 type manualIndexHandler func(context.Context, persist.TokenID, persist.EthereumAddress, *ethclient.Client) (persist.Token, error)
 
-var errInvalidUpdateMediaInput = errors.New("must provide either owner_address or token_id and contract_address")
-
-var mediaDownloadLock = &sync.Mutex{}
+var errInvalidUpdateMetadataInput = errors.New("must provide either owner_address or token_id and contract_address")
 
 var bigZero = big.NewInt(0)
 
@@ -137,17 +134,6 @@ func (e MetadataUpdateErr) Error() string {
 	return fmt.Sprintf("failed to get metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
 }
 
-// MetadataPreviewUpdateErr is returned when preview creation failed for a token.
-type MetadataPreviewUpdateErr struct {
-	contractAddress persist.Address
-	tokenID         persist.TokenID
-	err             error
-}
-
-func (e MetadataPreviewUpdateErr) Error() string {
-	return fmt.Sprintf("failed to make media for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
-}
-
 func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensInput{}
@@ -196,100 +182,86 @@ type processTokensInput struct {
 	contracts []persist.Contract
 }
 
-func processIncompleteTokens(ctx context.Context, inputs <-chan processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, throttler *throttle.Locker) {
-	wp := workerpool.New(10)
+func processMissingMetadata(ctx context.Context, inputs <-chan processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, throttler *throttle.Locker) {
+	mainPool := workerpool.New(10)
 	for input := range inputs {
 		i := input
-		c, cancel := context.WithTimeout(ctx, time.Second*5)
-		func() {
+		mainPool.Submit(func() {
+			ctx, cancel := context.WithTimeout(ctx, time.Minute*30)
 			defer cancel()
-			err := throttler.Lock(c, i.key)
-			if err == nil {
-				wp.Submit(func() {
-					ctx := sentryutil.NewSentryHubContext(ctx)
-					ctx, cancel := context.WithTimeout(ctx, time.Minute*30)
-					defer cancel()
-					defer throttler.Unlock(ctx, i.key)
-					tokensWithoutMedia := make([]persist.Token, 0, len(i.tokens))
-					contractsWithoutMedia := make([]persist.Contract, 0, len(i.contracts))
-					tokensWithoutMetadataFields := make([]persist.Token, 0, len(i.tokens))
-					for _, token := range i.tokens {
-						// if the media is not servable, we need to update it as well as the fields it is derived from that could be causing it not to be valid
-						// (token URI, metadata, etc.)
-						if !token.Media.IsServable() {
-							tokensWithoutMedia = append(tokensWithoutMedia, token)
-						} else if token.Name == "" || token.Description == "" {
-							// token.Media.IsServable() because the tokens in tokensWithoutMedia will have all their metadata fields updated as well, including the ones that wold be updated for tokensWithoutMetadataFields
-							// we don't want to update them twice.
-							// also, the media being servable guaruntees that the metadata is valid, meaning that we actually have somewhere to look from the metadata fields
-							tokensWithoutMetadataFields = append(tokensWithoutMetadataFields, token)
-						}
-					}
-					for _, contract := range i.contracts {
-						// the contract name is the most important field and the only field we use at the indexer level as far as contract metadata goes, but we may want to consider updating if other fields are empty in the future as well (such as a description if we start retrieving that field from somewhere)
-						if contract.Name == "" {
-							contractsWithoutMedia = append(contractsWithoutMedia, contract)
-						}
-					}
 
-					nwp := workerpool.New(10)
-					for _, token := range tokensWithoutMedia {
-						t := token
-						nwp.Submit(func() {
-							ctx := sentryutil.NewSentryHubContext(ctx)
-							err := refreshTokenMedias(ctx, UpdateTokenInput{TokenID: t.TokenID, ContractAddress: t.ContractAddress}, nftRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
-							if err != nil {
-								logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-									"tokenID":         t.TokenID,
-									"contractAddress": t.ContractAddress,
-								})
-
-								// Don't report errors for tokens with generic handlers because they fail frequently
-								// because of the nature of those URIs.
-								var updateErr MetadataUpdateErr
-								if errors.As(err, &updateErr) {
-									logEntry.Warn("failed to update token media")
-								} else {
-									logEntry.Error("failed to update token media")
-								}
-							}
-						})
-					}
-					for _, contract := range contractsWithoutMedia {
-						c := contract
-						nwp.Submit(func() {
-							ctx := sentryutil.NewSentryHubContext(ctx)
-							err := updateMediaForContract(ctx, UpdateContractMediaInput{Address: c.Address}, ethClient, contractRepository)
-							if err != nil {
-								logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{"contractAddress": c.Address})
-								logEthCallRPCError(logEntry, err, "failed to update contract media")
-							}
-						})
-					}
-					// these tokens have valid metadata and media but are missing metadata fields (name, description)
-					for _, token := range tokensWithoutMetadataFields {
-						t := token
-						nwp.Submit(func() {
-							ctx := sentryutil.NewSentryHubContext(ctx)
-							err := updateMetadataFieldsForToken(ctx, t.TokenID, t.ContractAddress, t.TokenMetadata, nftRepository)
-							if err != nil {
-								logEntry := logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-									"tokenID":         t.TokenID,
-									"contractAddress": t.ContractAddress,
-								})
-								logEntry.Error("failed to update token metadata fields")
-							}
-						})
-					}
-					nwp.StopWait()
-					logger.For(ctx).Infof("Successfully processed %d tokens and %d contracts", len(tokensWithoutMedia), len(contractsWithoutMedia))
-				})
-			} else {
-				logger.For(ctx).WithError(err).Warn("failed to acquire lock")
+			tokensWithoutMetadata := make([]persist.Token, 0, len(i.tokens))
+			for _, token := range i.tokens {
+				if token.Name == "" || token.Description == "" {
+					tokensWithoutMetadata = append(tokensWithoutMetadata, token)
+				}
 			}
-		}()
+
+			contractsWithoutMetadata := make([]persist.Contract, 0, len(i.contracts))
+			for _, contract := range i.contracts {
+				// The contract name is the most important field and the only field we use at the indexer level as far as contract metadata goes,
+				// but we may want to consider updating if other fields are empty in the future as well (such as a description if we start retrieving that field from somewhere)
+				if contract.Name == "" {
+					contractsWithoutMetadata = append(contractsWithoutMetadata, contract)
+				}
+			}
+
+			subpool := workerpool.New(10)
+
+			// Process contracts with missing metadata
+			for _, contract := range contractsWithoutMetadata {
+				c := contract
+				subpool.Submit(func() {
+					ctx := logger.NewContextWithFields(sentryutil.NewSentryHubContext(ctx), logrus.Fields{"contractAddress": c.Address})
+
+					key := contract.Address.String()
+
+					err := throttler.Lock(ctx, key)
+					if err != nil {
+						logger.For(ctx).Warnf("failed to acquire lock, skipping contract: %s", err)
+						return
+					}
+					defer throttler.Unlock(ctx, key)
+
+					updateInput := UpdateContractMetadataInput{Address: c.Address}
+
+					err = updateMetadataForContract(ctx, updateInput, ethClient, contractRepository)
+					if err != nil {
+						logEthCallRPCError(logger.For(ctx).WithError(err), err, "failed to update contract metadata")
+					}
+				})
+			}
+
+			// Process tokens with missing metadata
+			for _, token := range tokensWithoutMetadata {
+				t := token
+				subpool.Submit(func() {
+					ctx := logger.NewContextWithFields(sentryutil.NewSentryHubContext(ctx), logrus.Fields{
+						"tokenDBID":       t.ID,
+						"tokenID":         t.TokenID,
+						"contractAddress": t.ContractAddress,
+					})
+
+					key := fmt.Sprintf("%s-%s-%d", t.TokenID, t.ContractAddress, t.Chain)
+
+					err := throttler.Lock(ctx, key)
+					if err != nil {
+						logger.For(ctx).Warn("failed to acquire lock, skipping token: %s", err)
+						return
+					}
+					defer throttler.Unlock(ctx, key)
+
+					err = updateMetadataFieldsForToken(ctx, t.TokenID, t.ContractAddress, t.TokenMetadata, nftRepository)
+					if err != nil {
+						logger.For(ctx).Error("failed to update token metadata fields: %s", err)
+					}
+				})
+			}
+
+			subpool.StopWait()
+		})
 	}
-	wp.StopWait()
+	mainPool.StopWait()
 }
 
 func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) ([]persist.Token, []persist.Contract, error) {
@@ -470,7 +442,6 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 			update := persist.TokenUpdateAllURIDerivedFieldsInput{
 				TokenURI:    token.TokenURI,
 				Metadata:    token.TokenMetadata,
-				Media:       token.Media,
 				Name:        token.Name,
 				Description: token.Description,
 			}
@@ -489,7 +460,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	for _, asset := range assets {
 		a := asset
 		wp.Submit(func() {
-			errChan <- refreshTokenMedias(ctx, UpdateTokenInput{OwnerAddress: address, TokenID: persist.TokenID(a.TokenID.ToBase16()), ContractAddress: a.Contract.ContractAddress, UpdateAll: true}, tokenRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket)
+			errChan <- refreshTokenMetadatas(ctx, UpdateTokenInput{OwnerAddress: address, TokenID: persist.TokenID(a.TokenID.ToBase16()), ContractAddress: a.Contract.ContractAddress, UpdateAll: true}, tokenRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket)
 		})
 	}
 	for i := 0; i < len(assets); i++ {
@@ -510,7 +481,7 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 			return
 		}
 
-		err := refreshTokenMedias(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+		err := refreshTokenMetadatas(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -620,12 +591,12 @@ func filterTransfers(ctx context.Context, m task.DeepRefreshMessage, transfers [
 	return result
 }
 
-// refreshTokenMedias will find all of the media content for an addresses NFTs and possibly cache it in a storage bucket
-func refreshTokenMedias(c context.Context, input UpdateTokenInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) error {
+// refreshTokenMetadatas will find all of the metadata for an addresses NFTs
+func refreshTokenMetadatas(c context.Context, input UpdateTokenInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) error {
 	c = sentryutil.NewSentryHubContext(c)
 	c = logger.NewContextWithFields(c, logrus.Fields{"tokenID": input.TokenID, "contractAddress": input.ContractAddress})
 	if input.TokenID != "" && input.ContractAddress != "" {
-		logger.For(c).Infof("updating media for token %s-%s", input.TokenID, input.ContractAddress)
+		logger.For(c).Infof("updating metadata for token %s-%s", input.TokenID, input.ContractAddress)
 		var token persist.Token
 
 		if input.OwnerAddress != "" {
@@ -651,7 +622,7 @@ func refreshTokenMedias(c context.Context, input UpdateTokenInput, tokenReposito
 
 		}
 
-		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
 		if err != nil {
 			return err
 		}
@@ -668,33 +639,16 @@ func refreshTokenMedias(c context.Context, input UpdateTokenInput, tokenReposito
 	} else if input.ContractAddress != "" {
 		tokens, err = tokenRepository.GetByContract(c, input.ContractAddress, -1, -1)
 	} else {
-		return errInvalidUpdateMediaInput
+		return errInvalidUpdateMetadataInput
 	}
 	if err != nil {
 		return err
 	}
 
-	if !input.UpdateAll {
-		res := make([]persist.Token, 0, len(tokens))
-		for _, token := range tokens {
-			switch token.Media.MediaType {
-			case persist.MediaTypeVideo:
-				if token.Media.MediaURL == "" || token.Media.ThumbnailURL == "" {
-					res = append(res, token)
-				}
-			default:
-				if token.Media.MediaURL == "" || token.Media.MediaType == "" {
-					res = append(res, token)
-				}
-			}
-		}
-		tokens = res
-	}
-
 	tokenUpdateChan := make(chan tokenFullUpdate)
 	errChan := make(chan error)
 	// iterate over len tokens
-	updateMediaForTokens(c, tokenUpdateChan, errChan, tokens, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+	updateMetadataForTokens(c, tokenUpdateChan, errChan, tokens, ethClient, ipfsClient, arweaveClient)
 	// == len(tokens) * 2
 	for i := 0; i < len(tokens); i++ {
 		select {
@@ -706,15 +660,15 @@ func refreshTokenMedias(c context.Context, input UpdateTokenInput, tokenReposito
 
 		case err := <-errChan:
 			if err != nil {
-				logger.For(c).WithError(err).Error("failed to update media for token")
+				logger.For(c).WithError(err).Error("failed to update metadata for token")
 			}
 		}
 	}
 	return nil
 }
 
-// updateMediaForTokens will return two channels that will collectively receive the length of the tokens passed in
-func updateMediaForTokens(pCtx context.Context, updateChan chan<- tokenFullUpdate, errChan chan<- error, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) {
+// updateMetadataForTokens will return two channels that will collectively receive the length of the tokens passed in
+func updateMetadataForTokens(pCtx context.Context, updateChan chan<- tokenFullUpdate, errChan chan<- error, tokens []persist.Token, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) {
 
 	wp := workerpool.New(10)
 
@@ -727,7 +681,7 @@ func updateMediaForTokens(pCtx context.Context, updateChan chan<- tokenFullUpdat
 				return
 			}
 
-			up, err := getUpdateForToken(pCtx, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, token.Media.MediaType, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+			up, err := getUpdateForToken(pCtx, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
 			if err != nil {
 				errChan <- err
 				return
@@ -741,7 +695,7 @@ func updateMediaForTokens(pCtx context.Context, updateChan chan<- tokenFullUpdat
 	}
 }
 
-func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, mediaType persist.MediaType, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) (tokenFullUpdate, error) {
+func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (tokenFullUpdate, error) {
 	newMetadata := metadata
 	newURI := uri
 
@@ -784,23 +738,12 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 
 	name, description := media.FindNameAndDescription(pCtx, newMetadata)
 
-	image, animation := media.KeywordsForChain(chain, imageKeywords, animationKeywords)
-
-	newMedia, err := media.MakePreviewsForMetadata(pCtx, newMetadata, persist.Address(contractAddress.String()), tokenID, newURI, chain, ipfsClient, arweaveClient, storageClient, tokenBucket, image, animation)
-	if err != nil {
-		return tokenFullUpdate{}, MetadataPreviewUpdateErr{
-			contractAddress: persist.Address(contractAddress),
-			tokenID:         tokenID,
-			err:             err,
-		}
-	}
 	up := tokenFullUpdate{
 		TokenID:         tokenID,
 		ContractAddress: persist.EthereumAddress(contractAddress),
 		Update: persist.TokenUpdateAllURIDerivedFieldsInput{
 			TokenURI:    newURI,
 			Metadata:    newMetadata,
-			Media:       newMedia,
 			Name:        persist.NullString(validate.SanitizationPolicy.Sanitize(name)),
 			Description: persist.NullString(validate.SanitizationPolicy.Sanitize(description)),
 		},
