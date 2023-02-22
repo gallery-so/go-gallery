@@ -2099,15 +2099,21 @@ type UserExperienceType string
 
 const (
 	UserExperienceTypeMultiGalleryAnnouncement UserExperienceType = "MultiGalleryAnnouncement"
+	UserExperienceTypeEmailUpsell              UserExperienceType = "EmailUpsell"
+	UserExperienceTypeMerchStoreUpsell         UserExperienceType = "MerchStoreUpsell"
+	UserExperienceTypeMaintenanceFeb2023       UserExperienceType = "MaintenanceFeb2023"
 )
 
 var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeMultiGalleryAnnouncement,
+	UserExperienceTypeEmailUpsell,
+	UserExperienceTypeMerchStoreUpsell,
+	UserExperienceTypeMaintenanceFeb2023,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023:
 		return true
 	}
 	return false

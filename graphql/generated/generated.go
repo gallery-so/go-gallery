@@ -6487,6 +6487,9 @@ input UnsubscribeFromEmailTypeInput {
 
 enum UserExperienceType {
   MultiGalleryAnnouncement
+  EmailUpsell
+  MerchStoreUpsell
+  MaintenanceFeb2023
 }
 
 type UserExperience {
@@ -15650,6 +15653,8 @@ func (ec *executionContext) fieldContext_DisconnectSocialAccountPayload_viewer(c
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
