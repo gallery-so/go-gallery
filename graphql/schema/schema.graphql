@@ -1804,15 +1804,14 @@ type RegisterPushNotificationTokenPayload {
 }
 
 union RegisterPushNotificationTokenPayloadOrError =
-    RegisterPushNotificationTokenPayload | ErrNotAuthorized
+    RegisterPushNotificationTokenPayload
+  | ErrNotAuthorized
 
 type DisconnectSocialAccountPayload {
   viewer: Viewer
 }
 
-union DisconnectSocialAccountPayloadOrError =
-    DisconnectSocialAccountPayload
-  | ErrInvalidInput
+union DisconnectSocialAccountPayloadOrError = DisconnectSocialAccountPayload | ErrInvalidInput
 
 type Mutation {
   # User Mutations
