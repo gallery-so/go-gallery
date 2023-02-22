@@ -7,7 +7,6 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/mediamapper"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -16,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/publicapi"
 	"github.com/mikeydub/go-gallery/service/emails"
+	"github.com/mikeydub/go-gallery/service/mediamapper"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
@@ -1371,6 +1371,23 @@ func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string,
 	}
 
 	return model.BanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
+}
+
+// UnbanUserFromFeed is the resolver for the unbanUserFromFeed field.
+func (r *mutationResolver) UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = publicapi.For(ctx).Feed.UnBlockUser(ctx, user.ID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return model.UnbanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
 }
 
 // MintPremiumCardToWallet is the resolver for the mintPremiumCardToWallet field.

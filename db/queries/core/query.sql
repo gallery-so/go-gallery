@@ -458,6 +458,9 @@ SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 o
 -- name: BlockUserFromFeed :exec
 INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3);
 
+-- name: UnblockUserFromFeed :exec
+UPDATE feed_blocklist SET deleted = true WHERE user_id = $1;
+
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
 
