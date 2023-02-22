@@ -309,6 +309,10 @@ type ComplexityRoot struct {
 		ID   func(childComplexity int) int
 	}
 
+	DisconnectSocialAccountPayload struct {
+		Viewer func(childComplexity int) int
+	}
+
 	EmailNotificationSettings struct {
 		UnsubscribedFromAll           func(childComplexity int) int
 		UnsubscribedFromNotifications func(childComplexity int) int
@@ -629,6 +633,7 @@ type ComplexityRoot struct {
 		DeepRefresh                     func(childComplexity int, input model.DeepRefreshInput) int
 		DeleteCollection                func(childComplexity int, collectionID persist.DBID) int
 		DeleteGallery                   func(childComplexity int, galleryID persist.DBID) int
+		DisconnectSocialAccount         func(childComplexity int, accountType persist.SocialProvider) int
 		FollowUser                      func(childComplexity int, userID persist.DBID) int
 		GetAuthNonce                    func(childComplexity int, chainAddress persist.ChainAddress) int
 		Login                           func(childComplexity int, authMechanism model.AuthMechanism) int
@@ -1111,6 +1116,7 @@ type ComplexityRoot struct {
 		NotificationSettings func(childComplexity int) int
 		Notifications        func(childComplexity int, before *string, after *string, first *int, last *int) int
 		SocialAccounts       func(childComplexity int) int
+		SuggestedUsers       func(childComplexity int, before *string, after *string, first *int, last *int) int
 		User                 func(childComplexity int) int
 		UserExperiences      func(childComplexity int) int
 		ViewerGalleries      func(childComplexity int) int
@@ -1263,6 +1269,7 @@ type MutationResolver interface {
 	Login(ctx context.Context, authMechanism model.AuthMechanism) (model.LoginPayloadOrError, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	ConnectSocialAccount(ctx context.Context, input model.SocialAuthMechanism, display bool) (model.ConnectSocialAccountPayloadOrError, error)
+	DisconnectSocialAccount(ctx context.Context, accountType persist.SocialProvider) (model.DisconnectSocialAccountPayloadOrError, error)
 	UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error)
 	FollowUser(ctx context.Context, userID persist.DBID) (model.FollowUserPayloadOrError, error)
 	UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error)
@@ -1396,6 +1403,7 @@ type ViewerResolver interface {
 	Notifications(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.NotificationsConnection, error)
 	NotificationSettings(ctx context.Context, obj *model.Viewer) (*model.NotificationSettings, error)
 	UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error)
+	SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 }
 type WalletResolver interface {
 	Tokens(ctx context.Context, obj *model.Wallet) ([]*model.Token, error)
@@ -2244,6 +2252,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.DeletedNode.ID(childComplexity), true
+
+	case "DisconnectSocialAccountPayload.viewer":
+		if e.complexity.DisconnectSocialAccountPayload.Viewer == nil {
+			break
+		}
+
+		return e.complexity.DisconnectSocialAccountPayload.Viewer(childComplexity), true
 
 	case "EmailNotificationSettings.unsubscribedFromAll":
 		if e.complexity.EmailNotificationSettings.UnsubscribedFromAll == nil {
@@ -3459,6 +3474,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.DeleteGallery(childComplexity, args["galleryId"].(persist.DBID)), true
+
+	case "Mutation.disconnectSocialAccount":
+		if e.complexity.Mutation.DisconnectSocialAccount == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_disconnectSocialAccount_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DisconnectSocialAccount(childComplexity, args["accountType"].(persist.SocialProvider)), true
 
 	case "Mutation.followUser":
 		if e.complexity.Mutation.FollowUser == nil {
@@ -5678,6 +5705,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Viewer.SocialAccounts(childComplexity), true
 
+	case "Viewer.suggestedUsers":
+		if e.complexity.Viewer.SuggestedUsers == nil {
+			break
+		}
+
+		args, err := ec.field_Viewer_suggestedUsers_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Viewer.SuggestedUsers(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
+
 	case "Viewer.user":
 		if e.complexity.Viewer.User == nil {
 			break
@@ -6421,6 +6460,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 
   userExperiences: [UserExperience!] @goField(forceResolver: true)
+  suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
+    @goField(forceResolver: true)
 }
 
 type NotificationSettings {
@@ -7690,7 +7731,16 @@ type RegisterPushNotificationTokenPayload {
   message: String
 }
 
-union RegisterPushNotificationTokenPayloadOrError = RegisterPushNotificationTokenPayload | ErrNotAuthorized
+union RegisterPushNotificationTokenPayloadOrError =
+    RegisterPushNotificationTokenPayload | ErrNotAuthorized
+
+type DisconnectSocialAccountPayload {
+  viewer: Viewer
+}
+
+union DisconnectSocialAccountPayloadOrError =
+    DisconnectSocialAccountPayload
+  | ErrInvalidInput
 
 type Mutation {
   # User Mutations
@@ -7745,6 +7795,8 @@ type Mutation {
     input: SocialAuthMechanism!
     display: Boolean! = true
   ): ConnectSocialAccountPayloadOrError @authRequired
+  disconnectSocialAccount(accountType: SocialAccountType!): DisconnectSocialAccountPayloadOrError
+    @authRequired
   updateSocialAccountDisplayed(
     input: UpdateSocialAccountDisplayedInput!
   ): UpdateSocialAccountDisplayedPayloadOrError @authRequired
@@ -7809,7 +7861,9 @@ type Mutation {
     input: MoveCollectionToGalleryInput
   ): MoveCollectionToGalleryPayloadOrError @authRequired
 
-  registerPushNotificationToken(input: RegisterPushNotificationTokenInput): RegisterPushNotificationTokenPayloadOrError @authRequired
+  registerPushNotificationToken(
+    input: RegisterPushNotificationTokenInput
+  ): RegisterPushNotificationTokenPayloadOrError @authRequired
 }
 
 type Subscription {
@@ -8453,6 +8507,21 @@ func (ec *executionContext) field_Mutation_deleteGallery_args(ctx context.Contex
 		}
 	}
 	args["galleryId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_disconnectSocialAccount_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.SocialProvider
+	if tmp, ok := rawArgs["accountType"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("accountType"))
+		arg0, err = ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["accountType"] = arg0
 	return args, nil
 }
 
@@ -9764,6 +9833,48 @@ func (ec *executionContext) field_Viewer_notifications_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Viewer_suggestedUsers_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg2
+	var arg3 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field___Type_enumValues_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -9856,6 +9967,8 @@ func (ec *executionContext) fieldContext_AddUserWalletPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -10249,6 +10362,8 @@ func (ec *executionContext) fieldContext_AdmireFeedEventPayload_viewer(ctx conte
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -13629,6 +13744,8 @@ func (ec *executionContext) fieldContext_CommentOnFeedEventPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -14491,6 +14608,8 @@ func (ec *executionContext) fieldContext_ConnectSocialAccountPayload_viewer(ctx 
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -15245,6 +15364,8 @@ func (ec *executionContext) fieldContext_CreateUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -15525,6 +15646,69 @@ func (ec *executionContext) fieldContext_DeletedNode_dbid(ctx context.Context, f
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type DBID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DisconnectSocialAccountPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.DisconnectSocialAccountPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DisconnectSocialAccountPayload_viewer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Viewer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Viewer)
+	fc.Result = res
+	return ec.marshalOViewer2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐViewer(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DisconnectSocialAccountPayload_viewer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DisconnectSocialAccountPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Viewer_id(ctx, field)
+			case "user":
+				return ec.fieldContext_Viewer_user(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_Viewer_socialAccounts(ctx, field)
+			case "viewerGalleries":
+				return ec.fieldContext_Viewer_viewerGalleries(ctx, field)
+			case "feed":
+				return ec.fieldContext_Viewer_feed(ctx, field)
+			case "email":
+				return ec.fieldContext_Viewer_email(ctx, field)
+			case "notifications":
+				return ec.fieldContext_Viewer_notifications(ctx, field)
+			case "notificationSettings":
+				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
+			case "userExperiences":
+				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
 	}
 	return fc, nil
@@ -18283,6 +18467,8 @@ func (ec *executionContext) fieldContext_FollowUserPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -21856,6 +22042,8 @@ func (ec *executionContext) fieldContext_LoginPayload_viewer(ctx context.Context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -21917,6 +22105,8 @@ func (ec *executionContext) fieldContext_LogoutPayload_viewer(ctx context.Contex
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -24298,6 +24488,77 @@ func (ec *executionContext) fieldContext_Mutation_connectSocialAccount(ctx conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_connectSocialAccount_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_disconnectSocialAccount(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_disconnectSocialAccount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DisconnectSocialAccount(rctx, fc.Args["accountType"].(persist.SocialProvider))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(model.DisconnectSocialAccountPayloadOrError); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.DisconnectSocialAccountPayloadOrError`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(model.DisconnectSocialAccountPayloadOrError)
+	fc.Result = res
+	return ec.marshalODisconnectSocialAccountPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDisconnectSocialAccountPayloadOrError(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_disconnectSocialAccount(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DisconnectSocialAccountPayloadOrError does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_disconnectSocialAccount_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -29768,6 +30029,8 @@ func (ec *executionContext) fieldContext_RemoveAdmirePayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -29931,6 +30194,8 @@ func (ec *executionContext) fieldContext_RemoveCommentPayload_viewer(ctx context
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -30053,6 +30318,8 @@ func (ec *executionContext) fieldContext_RemoveUserWalletsPayload_viewer(ctx con
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -30114,6 +30381,8 @@ func (ec *executionContext) fieldContext_ResendVerificationEmailPayload_viewer(c
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -32205,6 +32474,8 @@ func (ec *executionContext) fieldContext_SyncTokensPayload_viewer(ctx context.Co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -35021,6 +35292,8 @@ func (ec *executionContext) fieldContext_UnfollowUserPayload_viewer(ctx context.
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -35345,6 +35618,8 @@ func (ec *executionContext) fieldContext_UnsubscribeFromEmailTypePayload_viewer(
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -35650,6 +35925,8 @@ func (ec *executionContext) fieldContext_UpdateEmailNotificationSettingsPayload_
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -35711,6 +35988,8 @@ func (ec *executionContext) fieldContext_UpdateEmailPayload_viewer(ctx context.C
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -35772,6 +36051,8 @@ func (ec *executionContext) fieldContext_UpdateFeaturedGalleryPayload_viewer(ctx
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36016,6 +36297,8 @@ func (ec *executionContext) fieldContext_UpdateGalleryOrderPayload_viewer(ctx co
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36138,6 +36421,8 @@ func (ec *executionContext) fieldContext_UpdatePrimaryWalletPayload_viewer(ctx c
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36199,6 +36484,8 @@ func (ec *executionContext) fieldContext_UpdateSocialAccountDisplayedPayload_vie
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36351,6 +36638,8 @@ func (ec *executionContext) fieldContext_UpdateUserExperiencePayload_viewer(ctx 
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -36412,6 +36701,8 @@ func (ec *executionContext) fieldContext_UpdateUserInfoPayload_viewer(ctx contex
 				return ec.fieldContext_Viewer_notificationSettings(ctx, field)
 			case "userExperiences":
 				return ec.fieldContext_Viewer_userExperiences(ctx, field)
+			case "suggestedUsers":
+				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
 		},
@@ -38214,6 +38505,64 @@ func (ec *executionContext) fieldContext_Viewer_userExperiences(ctx context.Cont
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserExperience", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Viewer_suggestedUsers(ctx context.Context, field graphql.CollectedField, obj *model.Viewer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Viewer_suggestedUsers(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Viewer().SuggestedUsers(rctx, obj, fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.UsersConnection)
+	fc.Result = res
+	return ec.marshalOUsersConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUsersConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Viewer_suggestedUsers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Viewer",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_UsersConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_UsersConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UsersConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Viewer_suggestedUsers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -43026,6 +43375,29 @@ func (ec *executionContext) _DeleteGalleryPayloadOrError(ctx context.Context, se
 	}
 }
 
+func (ec *executionContext) _DisconnectSocialAccountPayloadOrError(ctx context.Context, sel ast.SelectionSet, obj model.DisconnectSocialAccountPayloadOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.DisconnectSocialAccountPayload:
+		return ec._DisconnectSocialAccountPayload(ctx, sel, &obj)
+	case *model.DisconnectSocialAccountPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._DisconnectSocialAccountPayload(ctx, sel, obj)
+	case model.ErrInvalidInput:
+		return ec._ErrInvalidInput(ctx, sel, &obj)
+	case *model.ErrInvalidInput:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrInvalidInput(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, obj model.Error) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -46790,6 +47162,31 @@ func (ec *executionContext) _DeletedNode(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var disconnectSocialAccountPayloadImplementors = []string{"DisconnectSocialAccountPayload", "DisconnectSocialAccountPayloadOrError"}
+
+func (ec *executionContext) _DisconnectSocialAccountPayload(ctx context.Context, sel ast.SelectionSet, obj *model.DisconnectSocialAccountPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, disconnectSocialAccountPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DisconnectSocialAccountPayload")
+		case "viewer":
+
+			out.Values[i] = ec._DisconnectSocialAccountPayload_viewer(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var emailNotificationSettingsImplementors = []string{"EmailNotificationSettings"}
 
 func (ec *executionContext) _EmailNotificationSettings(ctx context.Context, sel ast.SelectionSet, obj *model.EmailNotificationSettings) graphql.Marshaler {
@@ -47151,7 +47548,7 @@ func (ec *executionContext) _ErrGalleryNotFound(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError"}
+var errInvalidInputImplementors = []string{"ErrInvalidInput", "UserByUsernameOrError", "UserByIdOrError", "UserByAddressOrError", "CollectionByIdOrError", "CommunityByAddressOrError", "MerchTokensPayloadOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "RefreshTokenPayloadOrError", "RefreshCollectionPayloadOrError", "RefreshContractPayloadOrError", "Error", "CreateUserPayloadOrError", "FollowUserPayloadOrError", "UnfollowUserPayloadOrError", "AdmireFeedEventPayloadOrError", "RemoveAdmirePayloadOrError", "CommentOnFeedEventPayloadOrError", "RemoveCommentPayloadOrError", "VerifyEmailPayloadOrError", "PreverifyEmailPayloadOrError", "UpdateEmailPayloadOrError", "ResendVerificationEmailPayloadOrError", "UpdateEmailNotificationSettingsPayloadOrError", "UnsubscribeFromEmailTypePayloadOrError", "RedeemMerchPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError"}
 
 func (ec *executionContext) _ErrInvalidInput(ctx context.Context, sel ast.SelectionSet, obj *model.ErrInvalidInput) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errInvalidInputImplementors)
@@ -49154,6 +49551,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_connectSocialAccount(ctx, field)
+			})
+
+		case "disconnectSocialAccount":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_disconnectSocialAccount(ctx, field)
 			})
 
 		case "updateSocialAccountDisplayed":
@@ -52687,6 +53090,23 @@ func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, o
 				return innerFunc(ctx)
 
 			})
+		case "suggestedUsers":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Viewer_suggestedUsers(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -54953,6 +55373,13 @@ func (ec *executionContext) marshalODeletedNode2ᚖgithubᚗcomᚋmikeydubᚋgo�
 		return graphql.Null
 	}
 	return ec._DeletedNode(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalODisconnectSocialAccountPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐDisconnectSocialAccountPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.DisconnectSocialAccountPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DisconnectSocialAccountPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOEmail2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐEmail(ctx context.Context, v interface{}) (*persist.Email, error) {

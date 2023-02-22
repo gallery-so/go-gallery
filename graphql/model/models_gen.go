@@ -79,6 +79,10 @@ type DeleteGalleryPayloadOrError interface {
 	IsDeleteGalleryPayloadOrError()
 }
 
+type DisconnectSocialAccountPayloadOrError interface {
+	IsDisconnectSocialAccountPayloadOrError()
+}
+
 type Error interface {
 	IsError()
 }
@@ -670,6 +674,12 @@ type DeletedNode struct {
 
 func (DeletedNode) IsNode() {}
 
+type DisconnectSocialAccountPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
+
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
 	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
@@ -826,6 +836,7 @@ func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
 func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
+func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -1905,6 +1916,7 @@ type Viewer struct {
 	Notifications        *NotificationsConnection `json:"notifications"`
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
 	UserExperiences      []*UserExperience        `json:"userExperiences"`
+	SuggestedUsers       *UsersConnection         `json:"suggestedUsers"`
 }
 
 func (Viewer) IsNode()          {}

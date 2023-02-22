@@ -532,6 +532,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 
   userExperiences: [UserExperience!] @goField(forceResolver: true)
+  suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
+    @goField(forceResolver: true)
 }
 
 type NotificationSettings {
@@ -1802,8 +1804,15 @@ type RegisterPushNotificationTokenPayload {
 }
 
 union RegisterPushNotificationTokenPayloadOrError =
-    RegisterPushNotificationTokenPayload
-  | ErrNotAuthorized
+    RegisterPushNotificationTokenPayload | ErrNotAuthorized
+
+type DisconnectSocialAccountPayload {
+  viewer: Viewer
+}
+
+union DisconnectSocialAccountPayloadOrError =
+    DisconnectSocialAccountPayload
+  | ErrInvalidInput
 
 type Mutation {
   # User Mutations
@@ -1858,6 +1867,8 @@ type Mutation {
     input: SocialAuthMechanism!
     display: Boolean! = true
   ): ConnectSocialAccountPayloadOrError @authRequired
+  disconnectSocialAccount(accountType: SocialAccountType!): DisconnectSocialAccountPayloadOrError
+    @authRequired
   updateSocialAccountDisplayed(
     input: UpdateSocialAccountDisplayedInput!
   ): UpdateSocialAccountDisplayedPayloadOrError @authRequired
