@@ -3613,6 +3613,20 @@ func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCol
 	return err
 }
 
+const removeSocialFromUser = `-- name: RemoveSocialFromUser :exec
+update pii.for_users set pii_socials = pii_socials - $1::varchar where user_id = $2
+`
+
+type RemoveSocialFromUserParams struct {
+	Social string
+	UserID persist.DBID
+}
+
+func (q *Queries) RemoveSocialFromUser(ctx context.Context, arg RemoveSocialFromUserParams) error {
+	_, err := q.db.Exec(ctx, removeSocialFromUser, arg.Social, arg.UserID)
+	return err
+}
+
 const updateCollectionGallery = `-- name: UpdateCollectionGallery :exec
 update collections set gallery_id = $1, last_updated = now() where id = $2 and deleted = false
 `

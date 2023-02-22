@@ -454,6 +454,24 @@ mutation connectSocialAccount($auth: SocialAuthMechanism!, $display: Boolean!) {
   }
 }
 
+mutation disconnectSocialAccount($accountType: SocialAccountType!) {
+  disconnectSocialAccount(accountType: $accountType) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on DisconnectSocialAccountPayload {
+      viewer {
+        socialAccounts {
+          twitter {
+            username
+          }
+        }
+      }
+    }
+  }
+}
+
 mutation updateSocialAccountDisplayed($input: UpdateSocialAccountDisplayedInput!) {
   updateSocialAccountDisplayed(input: $input) {
     ... on Error {

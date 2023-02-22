@@ -839,6 +839,9 @@ insert into pii.socials_auth (id, user_id, provider, access_token, refresh_token
 -- name: AddSocialToUser :exec
 insert into pii.for_users (user_id, pii_socials) values (@user_id, @socials) on conflict (user_id) where deleted = false do update set pii_socials = for_users.pii_socials || @socials;
 
+-- name: RemoveSocialFromUser :exec
+update pii.for_users set pii_socials = pii_socials - @social::varchar where user_id = @user_id;
+
 -- name: GetSocialsByUserID :one
 select pii_socials from pii.user_view where id = $1;
 
