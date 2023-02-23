@@ -249,6 +249,17 @@ type PiiUserView struct {
 	PiiSocials           persist.Socials
 }
 
+type RecommendationResult struct {
+	ID                persist.DBID
+	Version           sql.NullInt32
+	UserID            persist.DBID
+	RecommendedUserID persist.DBID
+	RecommendedCount  sql.NullInt32
+	CreatedAt         time.Time
+	LastUpdated       time.Time
+	Deleted           bool
+}
+
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
@@ -274,6 +285,12 @@ type Token struct {
 	IsUserMarkedSpam     sql.NullBool
 	IsProviderMarkedSpam sql.NullBool
 	LastSynced           time.Time
+}
+
+type TopRecommendedUser struct {
+	RecommendedUserID persist.DBID
+	Frequency         int64
+	LastUpdated       interface{}
 }
 
 type User struct {

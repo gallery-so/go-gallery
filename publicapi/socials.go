@@ -1,6 +1,8 @@
 package publicapi
 
 import (
+	"context"
+
 	"github.com/go-playground/validator/v10"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
@@ -22,4 +24,15 @@ func (s *SocialAPI) NewTwitterAuthenticator(userID persist.DBID, authCode string
 		UserID:   userID,
 		Queries:  s.queries,
 	}
+}
+
+func (s *SocialAPI) DisconnectSocialAccount(ctx context.Context, socialType persist.SocialProvider) error {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+	return s.queries.RemoveSocialFromUser(ctx, db.RemoveSocialFromUserParams{
+		Social: socialType.String(),
+		UserID: userID,
+	})
 }

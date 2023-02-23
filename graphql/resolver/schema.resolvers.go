@@ -950,6 +950,18 @@ func (r *mutationResolver) ConnectSocialAccount(ctx context.Context, input model
 	return output, nil
 }
 
+// DisconnectSocialAccount is the resolver for the disconnectSocialAccount field.
+func (r *mutationResolver) DisconnectSocialAccount(ctx context.Context, accountType persist.SocialProvider) (model.DisconnectSocialAccountPayloadOrError, error) {
+	err := publicapi.For(ctx).Social.DisconnectSocialAccount(ctx, accountType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.DisconnectSocialAccountPayload{
+		Viewer: resolveViewer(ctx),
+	}, nil
+}
+
 // UpdateSocialAccountDisplayed is the resolver for the updateSocialAccountDisplayed field.
 func (r *mutationResolver) UpdateSocialAccountDisplayed(ctx context.Context, input model.UpdateSocialAccountDisplayedInput) (model.UpdateSocialAccountDisplayedPayloadOrError, error) {
 	err := publicapi.For(ctx).User.UpdateUserSocialDisplayed(ctx, input.Type, input.Displayed)
@@ -1926,6 +1938,27 @@ func (r *viewerResolver) NotificationSettings(ctx context.Context, obj *model.Vi
 // UserExperiences is the resolver for the userExperiences field.
 func (r *viewerResolver) UserExperiences(ctx context.Context, obj *model.Viewer) ([]*model.UserExperience, error) {
 	return resolveViewerExperiencesByUserID(ctx, obj.UserId)
+}
+
+// SuggestedUsers is the resolver for the suggestedUsers field.
+func (r *viewerResolver) SuggestedUsers(ctx context.Context, obj *model.Viewer, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.RecommendUsers(ctx, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.UserEdge, len(users))
+	for i, user := range users {
+		edges[i] = &model.UserEdge{
+			Node:   userToModel(ctx, user),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.UsersConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // Tokens is the resolver for the tokens field.
