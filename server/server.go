@@ -128,10 +128,11 @@ func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.
 	lock := redis.NewLockClient(redis.NotificationLockDB)
 	graphqlAPQCache := redis.NewCache(redis.GraphQLAPQ)
 	feedCache := redis.NewCache(redis.FeedDB)
+	socialCache := redis.NewCache(redis.SocialDB)
 
 	recommender.Run(context.Background(), time.NewTicker(time.Hour))
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, c.MagicLinkClient, recommender)
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient, recommender)
 }
 
 func newSecretsClient() *secretmanager.Client {

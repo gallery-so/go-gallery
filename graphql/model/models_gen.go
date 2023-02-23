@@ -214,6 +214,10 @@ type SocialAccount interface {
 	IsSocialAccount()
 }
 
+type SocialConnectionsOrError interface {
+	IsSocialConnectionsOrError()
+}
+
 type SyncTokensForUsernamePayloadOrError interface {
 	IsSyncTokensForUsernamePayloadOrError()
 }
@@ -793,6 +797,7 @@ func (ErrInvalidInput) IsUserByIDOrError()                               {}
 func (ErrInvalidInput) IsUserByAddressOrError()                          {}
 func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
+func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
@@ -1398,6 +1403,30 @@ type SocialAccounts struct {
 type SocialAuthMechanism struct {
 	Twitter *TwitterAuth     `json:"twitter"`
 	Debug   *DebugSocialAuth `json:"debug"`
+}
+
+type SocialConnection struct {
+	HelperSocialConnectionData
+	GalleryUser        *GalleryUser           `json:"galleryUser"`
+	CurrentlyFollowing bool                   `json:"currentlyFollowing"`
+	SocialID           string                 `json:"socialId"`
+	SocialType         persist.SocialProvider `json:"socialType"`
+	DisplayName        string                 `json:"displayName"`
+	SocialUsername     string                 `json:"socialUsername"`
+	ProfileImage       string                 `json:"profileImage"`
+}
+
+func (SocialConnection) IsNode()                     {}
+func (SocialConnection) IsSocialConnectionsOrError() {}
+
+type SocialConnectionsConnection struct {
+	Edges    []*SocialConnectionsEdge `json:"edges"`
+	PageInfo *PageInfo                `json:"pageInfo"`
+}
+
+type SocialConnectionsEdge struct {
+	Node   SocialConnectionsOrError `json:"node"`
+	Cursor *string                  `json:"cursor"`
 }
 
 type SomeoneAdmiredYourFeedEventNotification struct {

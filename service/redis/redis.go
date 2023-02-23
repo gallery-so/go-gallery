@@ -31,6 +31,7 @@ const (
 	EmailRateLimiterDB        = 11
 	GraphQLAPQ                = 12
 	FeedDB                    = 13
+	SocialDB                  = 14
 )
 
 // GetNameForDatabase returns a name for the given database ID, if available.

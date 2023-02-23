@@ -132,6 +132,33 @@ func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersBy
 	return count, err
 }
 
+const countSocialConnections = `-- name: CountSocialConnections :one
+select count(*) from (select user_view.id as user_id from (select unnest($2::varchar[]) as social_id) as s 
+inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id 
+left outer join follows f on f.followee = user_view.id
+where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end 
+and case when $3::bool then not f.followee = $4 else true end) as t
+`
+
+type CountSocialConnectionsParams struct {
+	Column1         string
+	SocialIds       []string
+	OnlyUnfollowing bool
+	UserID          persist.DBID
+}
+
+func (q *Queries) CountSocialConnections(ctx context.Context, arg CountSocialConnectionsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSocialConnections,
+		arg.Column1,
+		arg.SocialIds,
+		arg.OnlyUnfollowing,
+		arg.UserID,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countTokensByContractId = `-- name: CountTokensByContractId :one
 SELECT count(*) FROM tokens JOIN users ON users.id = tokens.owner_user_id WHERE contract = $1 AND (NOT $2::bool OR users.universal = false) AND tokens.deleted = false
 `
@@ -1888,6 +1915,119 @@ func (q *Queries) GetRecentUnseenNotifications(ctx context.Context, arg GetRecen
 			&i.GalleryID,
 			&i.Seen,
 			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSocialAuthByUserID = `-- name: GetSocialAuthByUserID :one
+select id, deleted, version, created_at, last_updated, user_id, provider, access_token, refresh_token from pii.socials_auth where user_id = $1 and provider = $2 and deleted = false
+`
+
+type GetSocialAuthByUserIDParams struct {
+	UserID   persist.DBID
+	Provider persist.SocialProvider
+}
+
+func (q *Queries) GetSocialAuthByUserID(ctx context.Context, arg GetSocialAuthByUserIDParams) (PiiSocialsAuth, error) {
+	row := q.db.QueryRow(ctx, getSocialAuthByUserID, arg.UserID, arg.Provider)
+	var i PiiSocialsAuth
+	err := row.Scan(
+		&i.ID,
+		&i.Deleted,
+		&i.Version,
+		&i.CreatedAt,
+		&i.LastUpdated,
+		&i.UserID,
+		&i.Provider,
+		&i.AccessToken,
+		&i.RefreshToken,
+	)
+	return i, err
+}
+
+const getSocialConnections = `-- name: GetSocialConnections :many
+select s.social_id, s.social_username, s.social_displayname, s.social_profile_image, user_view.id as user_id, user_view.created_at as user_created_at, (f.id is not null)::bool as already_following
+from (select unnest($2::varchar[]) as social_id, unnest($3::varchar[]) as social_username, unnest($4::varchar[]) as social_displayname, unnest($5::varchar[]) as social_profile_image) as s
+    inner join pii.user_view on user_view.pii_socials->$6::text->>'id'::varchar = s.social_id and user_view.deleted = false
+    left outer join follows f on f.follower = $7 and f.followee = user_view.id and f.deleted = false
+where case when $8::bool then f.id is null else true end
+    and (f.id is not null,user_view.created_at,user_view.id) < ($9::bool, $10::timestamptz, $11)
+    and (f.id is not null,user_view.created_at,user_view.id) > ($12::bool, $13::timestamptz, $14)
+order by case when $15::bool then (f.id is not null,user_view.created_at,user_view.id) end asc,
+    case when not $15::bool then (f.id is not null,user_view.created_at,user_view.id) end desc
+limit $1
+`
+
+type GetSocialConnectionsParams struct {
+	Limit               int32
+	SocialIds           []string
+	SocialUsernames     []string
+	SocialDisplaynames  []string
+	SocialProfileImages []string
+	Social              string
+	UserID              persist.DBID
+	OnlyUnfollowing     bool
+	CurBeforeFollowing  bool
+	CurBeforeTime       time.Time
+	CurBeforeID         persist.DBID
+	CurAfterFollowing   bool
+	CurAfterTime        time.Time
+	CurAfterID          persist.DBID
+	PagingForward       bool
+}
+
+type GetSocialConnectionsRow struct {
+	SocialID           interface{}
+	SocialUsername     interface{}
+	SocialDisplayname  interface{}
+	SocialProfileImage interface{}
+	UserID             persist.DBID
+	UserCreatedAt      time.Time
+	AlreadyFollowing   bool
+}
+
+// this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
+// it will also go and search for whether the specified user follows any of the users returned
+func (q *Queries) GetSocialConnections(ctx context.Context, arg GetSocialConnectionsParams) ([]GetSocialConnectionsRow, error) {
+	rows, err := q.db.Query(ctx, getSocialConnections,
+		arg.Limit,
+		arg.SocialIds,
+		arg.SocialUsernames,
+		arg.SocialDisplaynames,
+		arg.SocialProfileImages,
+		arg.Social,
+		arg.UserID,
+		arg.OnlyUnfollowing,
+		arg.CurBeforeFollowing,
+		arg.CurBeforeTime,
+		arg.CurBeforeID,
+		arg.CurAfterFollowing,
+		arg.CurAfterTime,
+		arg.CurAfterID,
+		arg.PagingForward,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSocialConnectionsRow
+	for rows.Next() {
+		var i GetSocialConnectionsRow
+		if err := rows.Scan(
+			&i.SocialID,
+			&i.SocialUsername,
+			&i.SocialDisplayname,
+			&i.SocialProfileImage,
+			&i.UserID,
+			&i.UserCreatedAt,
+			&i.AlreadyFollowing,
 		); err != nil {
 			return nil, err
 		}

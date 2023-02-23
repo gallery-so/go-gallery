@@ -35,19 +35,20 @@ import (
 var errNoAuthMechanismFound = fmt.Errorf("no auth mechanism found")
 
 var nodeFetcher = model.NodeFetcher{
-	OnGallery:        resolveGalleryByGalleryID,
-	OnCollection:     resolveCollectionByCollectionID,
-	OnGalleryUser:    resolveGalleryUserByUserID,
-	OnMembershipTier: resolveMembershipTierByMembershipId,
-	OnToken:          resolveTokenByTokenID,
-	OnWallet:         resolveWalletByAddress,
-	OnContract:       resolveContractByContractID,
-	OnFeedEvent:      resolveFeedEventByEventID,
-	OnAdmire:         resolveAdmireByAdmireID,
-	OnComment:        resolveCommentByCommentID,
-	OnMerchToken:     resolveMerchTokenByTokenID,
-	OnViewer:         resolveViewerByID,
-	OnDeletedNode:    resolveDeletedNodeByID,
+	OnGallery:          resolveGalleryByGalleryID,
+	OnCollection:       resolveCollectionByCollectionID,
+	OnGalleryUser:      resolveGalleryUserByUserID,
+	OnMembershipTier:   resolveMembershipTierByMembershipId,
+	OnToken:            resolveTokenByTokenID,
+	OnWallet:           resolveWalletByAddress,
+	OnContract:         resolveContractByContractID,
+	OnFeedEvent:        resolveFeedEventByEventID,
+	OnAdmire:           resolveAdmireByAdmireID,
+	OnComment:          resolveCommentByCommentID,
+	OnMerchToken:       resolveMerchTokenByTokenID,
+	OnViewer:           resolveViewerByID,
+	OnDeletedNode:      resolveDeletedNodeByID,
+	OnSocialConnection: resolveSocialConnectionByIdentifiers,
 
 	OnCollectionToken: func(ctx context.Context, tokenId string, collectionId string) (*model.CollectionToken, error) {
 		return resolveCollectionTokenByID(ctx, persist.DBID(tokenId), persist.DBID(collectionId))
@@ -1040,6 +1041,13 @@ func resolveViewerByID(ctx context.Context, id string) (*model.Viewer, error) {
 func resolveDeletedNodeByID(ctx context.Context, id persist.DBID) (*model.DeletedNode, error) {
 	return &model.DeletedNode{
 		Dbid: id,
+	}, nil
+}
+
+func resolveSocialConnectionByIdentifiers(ctx context.Context, socialId string, socialType persist.SocialProvider) (*model.SocialConnection, error) {
+	return &model.SocialConnection{
+		SocialID:   socialId,
+		SocialType: socialType,
 	}, nil
 }
 

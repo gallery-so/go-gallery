@@ -828,6 +828,31 @@ type FeedConnection {
   pageInfo: PageInfo!
 }
 
+type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"]) @goEmbedHelper {
+  id: ID!
+
+  galleryUser: GalleryUser @goField(forceResolver: true)
+
+  currentlyFollowing: Boolean!
+  socialId: String!
+  socialType: SocialAccountType!
+  displayName: String!
+  socialUsername: String!
+  profileImage: String!
+}
+
+union SocialConnectionsOrError = SocialConnection | ErrInvalidInput
+
+type SocialConnectionsEdge {
+  node: SocialConnectionsOrError
+  cursor: String
+}
+
+type SocialConnectionsConnection {
+  edges: [SocialConnectionsEdge]
+  pageInfo: PageInfo!
+}
+
 type UserEdge {
   node: GalleryUser
   cursor: String
@@ -918,6 +943,15 @@ type Query {
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
     @retoolAuth
+
+  socialConnections(
+    socialAccountType: SocialAccountType!
+    excludeAlreadyFollowing: Boolean
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 }
 
 input CollectionLayoutInput {

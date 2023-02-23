@@ -120,6 +120,11 @@ type HelperUserEmailData struct {
 	UserId persist.DBID
 }
 
+type HelperSocialConnectionData struct {
+	UserID        persist.DBID
+	UserCreatedAt persist.CreationTime
+}
+
 type ErrInvalidIDFormat struct {
 	message string
 }

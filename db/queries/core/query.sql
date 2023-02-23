@@ -836,7 +836,7 @@ select exists(select 1 from galleries where id = $1 and owner_user_id = $2 and d
 -- name: UserOwnsCollection :one
 select exists(select 1 from collections where id = $1 and owner_user_id = $2 and deleted = false);
 
--- GetSocialAuthByUserID :one
+-- name: GetSocialAuthByUserID :one
 select * from pii.socials_auth where user_id = $1 and provider = $2 and deleted = false;
 
 -- name: UpsertSocialOAuth :exec
@@ -856,3 +856,27 @@ update pii.for_users set pii_socials = @socials where user_id = @user_id;
 
 -- name: UpdateEventCaptionByGroup :exec
 update events set caption = @caption where group_id = @group_id and deleted = false;
+
+-- this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
+-- it will also go and search for whether the specified user follows any of the users returned
+-- name: GetSocialConnections :many
+select s.*, user_view.id as user_id, user_view.created_at as user_created_at, (f.id is not null)::bool as already_following
+from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernames::varchar[]) as social_username, unnest(@social_displaynames::varchar[]) as social_displayname, unnest(@social_profile_images::varchar[]) as social_profile_image) as s
+    inner join pii.user_view on user_view.pii_socials->sqlc.arg('social')::text->>'id'::varchar = s.social_id and user_view.deleted = false
+    left outer join follows f on f.follower = @user_id and f.followee = user_view.id and f.deleted = false
+where case when @only_unfollowing::bool then f.id is null else true end
+    and (f.id is not null,user_view.created_at,user_view.id) < (@cur_before_following::bool, @cur_before_time::timestamptz, @cur_before_id)
+    and (f.id is not null,user_view.created_at,user_view.id) > (@cur_after_following::bool, @cur_after_time::timestamptz, @cur_after_id)
+order by case when @paging_forward::bool then (f.id is not null,user_view.created_at,user_view.id) end asc,
+    case when not @paging_forward::bool then (f.id is not null,user_view.created_at,user_view.id) end desc
+limit $1;
+
+
+-- name: CountSocialConnections :one
+select count(*) from (select user_view.id as user_id from (select unnest(@social_ids::varchar[]) as social_id) as s 
+inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id 
+left outer join follows f on f.followee = user_view.id
+where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end 
+and case when @only_unfollowing::bool then not f.followee = @user_id else true end) as t;
+
+
