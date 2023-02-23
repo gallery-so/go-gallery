@@ -38,6 +38,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -55,8 +56,8 @@ func Init() {
 
 	c := ClientInit(context.Background())
 	provider := NewMultichainProvider(c)
-	router := CoreInit(c, provider)
-
+	recommender := recommend.NewRecommender(c.Queries)
+	router := CoreInit(c, provider, recommender)
 	http.Handle("/", router)
 }
 
@@ -103,7 +104,7 @@ func ClientInit(ctx context.Context) *Clients {
 
 // CoreInit initializes core server functionality. This is abstracted
 // so the test server can also utilize it
-func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
+func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.Recommender) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
 	if viper.GetString("ENV") != "production" {
@@ -129,7 +130,9 @@ func CoreInit(c *Clients, provider *multichain.Provider) *gin.Engine {
 	feedCache := redis.NewCache(redis.FeedDB)
 	socialCache := redis.NewCache(redis.SocialDB)
 
-	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient)
+	recommender.Run(context.Background(), time.NewTicker(time.Hour))
+
+	return handlersInit(router, c.Repos, c.Queries, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, provider, newThrottler(), c.TaskClient, c.PubSubClient, lock, c.SecretClient, graphqlAPQCache, feedCache, socialCache, c.MagicLinkClient, recommender)
 }
 
 func newSecretsClient() *secretmanager.Client {

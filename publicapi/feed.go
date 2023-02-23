@@ -41,13 +41,26 @@ func (api FeedAPI) BlockUser(ctx context.Context, userId persist.DBID, action pe
 		return err
 	}
 
-	err = api.queries.BlockUserFromFeed(ctx, db.BlockUserFromFeedParams{
+	return api.queries.BlockUserFromFeed(ctx, db.BlockUserFromFeedParams{
 		ID:     persist.GenerateID(),
 		UserID: userId,
 		Action: action,
 	})
 
-	return err
+}
+
+func (api FeedAPI) UnBlockUser(ctx context.Context, userId persist.DBID) error {
+	// Validate
+	err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userId": {userId, "required"},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return api.queries.UnblockUserFromFeed(ctx, userId)
+
 }
 
 func (api FeedAPI) GetFeedEventById(ctx context.Context, feedEventID persist.DBID) (*db.FeedEvent, error) {

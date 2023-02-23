@@ -105,6 +105,11 @@ func (b *EventBuilder) NewFeedEventFromTask(ctx context.Context, message task.Fe
 
 func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event) (*db.FeedEvent, error) {
 
+	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, persist.NullStrToDBID(event.ActorID), event.Action)
+	if err != nil || blocked {
+		return nil, err
+	}
+
 	if event.GroupID.String != "" {
 		// if the event is being dispatched immediately, ensure that it is not supposed to be group with other events that are being dispatched immediately
 		wait, err := b.queries.HasLaterGroupedEvent(ctx, db.HasLaterGroupedEventParams{
@@ -131,6 +136,14 @@ func (b *EventBuilder) NewFeedEventFromEvent(ctx context.Context, event db.Event
 }
 
 func (b *EventBuilder) NewFeedEventFromGroup(ctx context.Context, groupID string, action persist.Action) (*db.FeedEvent, error) {
+	actor, err := b.queries.GetActorForGroup(ctx, persist.StrToNullStr(&groupID))
+	if err != nil {
+		return nil, err
+	}
+	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, persist.NullStrToDBID(actor), action)
+	if err != nil || blocked {
+		return nil, err
+	}
 	events, err := b.eventRepo.Queries.GetEventsInGroup(ctx, persist.StrToNullStr(&groupID))
 	if err != nil {
 		return nil, err
@@ -165,11 +178,6 @@ func (b *EventBuilder) createFeedEvent(ctx context.Context, event db.Event) (*db
 }
 
 func (b *EventBuilder) canEvent(ctx context.Context, event db.Event) (bool, error) {
-	blocked, err := b.feedBlocklistRepo.IsBlocked(ctx, persist.NullStrToDBID(event.ActorID), event.Action)
-	if err != nil || blocked {
-		return false, err
-	}
-
 	stillEditing, err := b.isStillEditing(ctx, event)
 	if err != nil {
 		return false, err

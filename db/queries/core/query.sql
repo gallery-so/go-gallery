@@ -334,6 +334,9 @@ select * from events where id = any(select id from activity) order by (created_a
 -- name: GetEventsInGroup :many
 select * from events where group_id = @group_id and deleted = false order by(created_at, id) asc;
 
+-- name: GetActorForGroup :one
+select actor_id from events where group_id = @group_id and deleted = false order by(created_at, id) asc limit 1;
+
 -- name: HasLaterGroupedEvent :one
 select exists(
   select 1 from events where deleted = false
@@ -450,10 +453,13 @@ select * from feed_events where deleted = false
     limit 1;
 
 -- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
+SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false);
 
 -- name: BlockUserFromFeed :exec
 INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3);
+
+-- name: UnblockUserFromFeed :exec
+UPDATE feed_blocklist SET deleted = true WHERE user_id = $1;
 
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
@@ -633,6 +639,14 @@ select u.* from users u, user_roles ur where u.deleted = false and ur.deleted = 
     order by case when @paging_forward::bool then (u.username_idempotent, u.id) end asc,
              case when not @paging_forward::bool then (u.username_idempotent, u.id) end desc
     limit $1;
+
+-- name: GetUsersByPositionPaginate :many
+select u.* from users u join unnest(@user_ids::text[]) with ordinality t(id, pos) using(id) where u.deleted = false
+  and t.pos > @cur_before_pos::int
+  and t.pos < @cur_after_pos::int
+  order by case when @paging_forward::bool then t.pos end desc,
+          case when not @paging_forward::bool then t.pos end asc
+  limit sqlc.arg('limit');
 
 -- name: UpdateUserVerificationStatus :exec
 UPDATE users SET email_verified = $2 WHERE id = $1;
@@ -830,6 +844,9 @@ insert into pii.socials_auth (id, user_id, provider, access_token, refresh_token
 
 -- name: AddSocialToUser :exec
 insert into pii.for_users (user_id, pii_socials) values (@user_id, @socials) on conflict (user_id) where deleted = false do update set pii_socials = for_users.pii_socials || @socials;
+
+-- name: RemoveSocialFromUser :exec
+update pii.for_users set pii_socials = pii_socials - @social::varchar where user_id = @user_id;
 
 -- name: GetSocialsByUserID :one
 select pii_socials from pii.user_view where id = $1;

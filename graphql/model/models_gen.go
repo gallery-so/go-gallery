@@ -79,6 +79,10 @@ type DeleteGalleryPayloadOrError interface {
 	IsDeleteGalleryPayloadOrError()
 }
 
+type DisconnectSocialAccountPayloadOrError interface {
+	IsDisconnectSocialAccountPayloadOrError()
+}
+
 type Error interface {
 	IsError()
 }
@@ -228,6 +232,10 @@ type TokenByIDOrError interface {
 
 type TrendingUsersPayloadOrError interface {
 	IsTrendingUsersPayloadOrError()
+}
+
+type UnbanUserFromFeedPayloadOrError interface {
+	IsUnbanUserFromFeedPayloadOrError()
 }
 
 type UnfollowUserPayloadOrError interface {
@@ -670,6 +678,12 @@ type DeletedNode struct {
 
 func (DeletedNode) IsNode() {}
 
+type DisconnectSocialAccountPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (DisconnectSocialAccountPayload) IsDisconnectSocialAccountPayloadOrError() {}
+
 type EmailNotificationSettings struct {
 	UnsubscribedFromAll           bool `json:"unsubscribedFromAll"`
 	UnsubscribedFromNotifications bool `json:"unsubscribedFromNotifications"`
@@ -827,6 +841,7 @@ func (ErrInvalidInput) IsMoveCollectionToGalleryPayloadOrError()         {}
 func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
+func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -867,6 +882,7 @@ func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()        {}
 func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()              {}
+func (ErrNotAuthorized) IsUnbanUserFromFeedPayloadOrError()            {}
 func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                {}
 func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()          {}
@@ -882,6 +898,7 @@ func (ErrNotAuthorized) IsMoveCollectionToGalleryPayloadOrError()      {}
 func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
+func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1610,6 +1627,12 @@ type TwitterSocialAccount struct {
 
 func (TwitterSocialAccount) IsSocialAccount() {}
 
+type UnbanUserFromFeedPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (UnbanUserFromFeedPayload) IsUnbanUserFromFeedPayloadOrError() {}
+
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`
 	User   *GalleryUser `json:"user"`
@@ -1919,6 +1942,7 @@ type Viewer struct {
 	Notifications        *NotificationsConnection `json:"notifications"`
 	NotificationSettings *NotificationSettings    `json:"notificationSettings"`
 	UserExperiences      []*UserExperience        `json:"userExperiences"`
+	SuggestedUsers       *UsersConnection         `json:"suggestedUsers"`
 }
 
 func (Viewer) IsNode()          {}
@@ -2115,15 +2139,21 @@ type UserExperienceType string
 
 const (
 	UserExperienceTypeMultiGalleryAnnouncement UserExperienceType = "MultiGalleryAnnouncement"
+	UserExperienceTypeEmailUpsell              UserExperienceType = "EmailUpsell"
+	UserExperienceTypeMerchStoreUpsell         UserExperienceType = "MerchStoreUpsell"
+	UserExperienceTypeMaintenanceFeb2023       UserExperienceType = "MaintenanceFeb2023"
 )
 
 var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeMultiGalleryAnnouncement,
+	UserExperienceTypeEmailUpsell,
+	UserExperienceTypeMerchStoreUpsell,
+	UserExperienceTypeMaintenanceFeb2023,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023:
 		return true
 	}
 	return false

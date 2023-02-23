@@ -53,6 +53,13 @@ query viewerQuery {
         type
         experienced
       }
+      suggestedUsers(last: 5) {
+        edges {
+          node {
+            dbid
+          }
+        }
+      }
       user {
         username
         dbid
@@ -440,6 +447,24 @@ mutation connectSocialAccount($auth: SocialAuthMechanism!, $display: Boolean!) {
           twitter {
             username
             display
+          }
+        }
+      }
+    }
+  }
+}
+
+mutation disconnectSocialAccount($accountType: SocialAccountType!) {
+  disconnectSocialAccount(accountType: $accountType) {
+    ... on Error {
+      __typename
+      message
+    }
+    ... on DisconnectSocialAccountPayload {
+      viewer {
+        socialAccounts {
+          twitter {
+            username
           }
         }
       }

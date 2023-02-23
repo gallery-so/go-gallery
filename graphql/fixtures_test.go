@@ -16,6 +16,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
+	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/require"
@@ -205,9 +206,10 @@ func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 		Queries:     clients.Queries,
 		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
 	}
-	h := server.CoreInit(clients, &p)
+	h := server.CoreInit(clients, &p, newStubRecommender(t, []persist.DBID{}))
 	c := customHandlerClient(t, h, withJWTOpt(t, user.id))
 	tokenIDs := syncTokens(t, ctx, c, user.id)
+	t.Cleanup(clients.Close)
 	return userWithTokensFixture{user, tokenIDs}
 }
 
@@ -252,7 +254,7 @@ func newUserWithFeedEventsFixture(t *testing.T) userWithFeedEventsFixture {
 	return userWithFeedEventsFixture{user, feedEvents}
 }
 
-// stubProvider returns the same response for every call made to it
+// stubProvider returns the same set of tokens for every call made to it
 type stubProvider struct{}
 
 func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -287,4 +289,13 @@ func (p *stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, o
 
 func (p *stubProvider) GetTokensByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 	panic("not implemented")
+}
+
+func newStubRecommender(t *testing.T, userIDs []persist.DBID) *recommend.Recommender {
+	return &recommend.Recommender{
+		LoadFunc: func(context.Context) {},
+		BootstrapFunc: func(context.Context) ([]persist.DBID, error) {
+			return userIDs, nil
+		},
+	}
 }

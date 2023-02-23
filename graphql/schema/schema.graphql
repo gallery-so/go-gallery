@@ -532,6 +532,8 @@ type Viewer implements Node @goGqlId(fields: ["userId"]) @goEmbedHelper {
   notificationSettings: NotificationSettings @goField(forceResolver: true)
 
   userExperiences: [UserExperience!] @goField(forceResolver: true)
+  suggestedUsers(before: String, after: String, first: Int, last: Int): UsersConnection
+    @goField(forceResolver: true)
 }
 
 type NotificationSettings {
@@ -583,6 +585,9 @@ input UnsubscribeFromEmailTypeInput {
 
 enum UserExperienceType {
   MultiGalleryAnnouncement
+  EmailUpsell
+  MerchStoreUpsell
+  MaintenanceFeb2023
 }
 
 type UserExperience {
@@ -1603,6 +1608,12 @@ type BanUserFromFeedPayload {
 
 union BanUserFromFeedPayloadOrError = BanUserFromFeedPayload | ErrNotAuthorized
 
+type UnbanUserFromFeedPayload {
+  user: GalleryUser
+}
+
+union UnbanUserFromFeedPayloadOrError = UnbanUserFromFeedPayload | ErrNotAuthorized
+
 input GalleryPositionInput {
   galleryId: DBID!
   position: String!
@@ -1827,6 +1838,15 @@ union MintPremiumCardToWalletPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
+type DisconnectSocialAccountPayload {
+  viewer: Viewer
+}
+
+union DisconnectSocialAccountPayloadOrError =
+    DisconnectSocialAccountPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -1880,6 +1900,8 @@ type Mutation {
     input: SocialAuthMechanism!
     display: Boolean! = true
   ): ConnectSocialAccountPayloadOrError @authRequired
+  disconnectSocialAccount(accountType: SocialAccountType!): DisconnectSocialAccountPayloadOrError
+    @authRequired
   updateSocialAccountDisplayed(
     input: UpdateSocialAccountDisplayedInput!
   ): UpdateSocialAccountDisplayedPayloadOrError @authRequired
@@ -1927,6 +1949,7 @@ type Mutation {
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
     @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
+  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @retoolAuth

@@ -198,3 +198,14 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 	}
 	return tapi, nil
 }
+
+func (s *SocialAPI) DisconnectSocialAccount(ctx context.Context, socialType persist.SocialProvider) error {
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+	return s.queries.RemoveSocialFromUser(ctx, db.RemoveSocialFromUserParams{
+		Social: socialType.String(),
+		UserID: userID,
+	})
+}

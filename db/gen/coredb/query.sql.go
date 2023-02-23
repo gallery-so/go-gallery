@@ -789,6 +789,17 @@ func (q *Queries) DeleteUserRoles(ctx context.Context, arg DeleteUserRolesParams
 	return err
 }
 
+const getActorForGroup = `-- name: GetActorForGroup :one
+select actor_id from events where group_id = $1 and deleted = false order by(created_at, id) asc limit 1
+`
+
+func (q *Queries) GetActorForGroup(ctx context.Context, groupID sql.NullString) (sql.NullString, error) {
+	row := q.db.QueryRow(ctx, getActorForGroup, groupID)
+	var actor_id sql.NullString
+	err := row.Scan(&actor_id)
+	return actor_id, err
+}
+
 const getAdmireByAdmireID = `-- name: GetAdmireByAdmireID :one
 SELECT id, version, feed_event_id, actor_id, deleted, created_at, last_updated FROM admires WHERE id = $1 AND deleted = false
 `
@@ -3056,6 +3067,67 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, arg GetUsersByIDsParams) ([
 	return items, nil
 }
 
+const getUsersByPositionPaginate = `-- name: GetUsersByPositionPaginate :many
+select u.id, u.deleted, u.version, u.last_updated, u.created_at, u.username, u.username_idempotent, u.wallets, u.bio, u.traits, u.universal, u.notification_settings, u.email_verified, u.email_unsubscriptions, u.featured_gallery, u.primary_wallet_id, u.user_experiences from users u join unnest($1::text[]) with ordinality t(id, pos) using(id) where u.deleted = false
+  and t.pos > $2::int
+  and t.pos < $3::int
+  order by case when $4::bool then t.pos end desc,
+          case when not $4::bool then t.pos end asc
+  limit $5
+`
+
+type GetUsersByPositionPaginateParams struct {
+	UserIds       []string
+	CurBeforePos  int32
+	CurAfterPos   int32
+	PagingForward bool
+	Limit         int32
+}
+
+func (q *Queries) GetUsersByPositionPaginate(ctx context.Context, arg GetUsersByPositionPaginateParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsersByPositionPaginate,
+		arg.UserIds,
+		arg.CurBeforePos,
+		arg.CurAfterPos,
+		arg.PagingForward,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Deleted,
+			&i.Version,
+			&i.LastUpdated,
+			&i.CreatedAt,
+			&i.Username,
+			&i.UsernameIdempotent,
+			&i.Wallets,
+			&i.Bio,
+			&i.Traits,
+			&i.Universal,
+			&i.NotificationSettings,
+			&i.EmailVerified,
+			&i.EmailUnsubscriptions,
+			&i.FeaturedGallery,
+			&i.PrimaryWalletID,
+			&i.UserExperiences,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersWithEmailNotificationsOn = `-- name: GetUsersWithEmailNotificationsOn :many
 select id, deleted, version, last_updated, created_at, username, username_idempotent, wallets, bio, traits, universal, notification_settings, email_verified, email_unsubscriptions, featured_gallery, primary_wallet_id, user_experiences, pii_email_address, pii_socials from pii.user_view
     where (email_unsubscriptions->>'all' = 'false' or email_unsubscriptions->>'all' is null)
@@ -3591,7 +3663,7 @@ func (q *Queries) IsFeedEventExistsForGroup(ctx context.Context, groupID sql.Nul
 }
 
 const isFeedUserActionBlocked = `-- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false)
+SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false)
 `
 
 type IsFeedUserActionBlockedParams struct {
@@ -3689,6 +3761,29 @@ type RemoveCollectionFromGalleryParams struct {
 
 func (q *Queries) RemoveCollectionFromGallery(ctx context.Context, arg RemoveCollectionFromGalleryParams) error {
 	_, err := q.db.Exec(ctx, removeCollectionFromGallery, arg.CollectionID, arg.GalleryID)
+	return err
+}
+
+const removeSocialFromUser = `-- name: RemoveSocialFromUser :exec
+update pii.for_users set pii_socials = pii_socials - $1::varchar where user_id = $2
+`
+
+type RemoveSocialFromUserParams struct {
+	Social string
+	UserID persist.DBID
+}
+
+func (q *Queries) RemoveSocialFromUser(ctx context.Context, arg RemoveSocialFromUserParams) error {
+	_, err := q.db.Exec(ctx, removeSocialFromUser, arg.Social, arg.UserID)
+	return err
+}
+
+const unblockUserFromFeed = `-- name: UnblockUserFromFeed :exec
+UPDATE feed_blocklist SET deleted = true WHERE user_id = $1
+`
+
+func (q *Queries) UnblockUserFromFeed(ctx context.Context, userID persist.DBID) error {
+	_, err := q.db.Exec(ctx, unblockUserFromFeed, userID)
 	return err
 }
 
