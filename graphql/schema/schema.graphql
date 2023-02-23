@@ -1574,6 +1574,12 @@ type BanUserFromFeedPayload {
 
 union BanUserFromFeedPayloadOrError = BanUserFromFeedPayload | ErrNotAuthorized
 
+type UnbanUserFromFeedPayload {
+  user: GalleryUser
+}
+
+union UnbanUserFromFeedPayloadOrError = UnbanUserFromFeedPayload | ErrNotAuthorized
+
 input GalleryPositionInput {
   galleryId: DBID!
   position: String!
@@ -1909,6 +1915,7 @@ type Mutation {
   syncTokensForUsername(username: String!, chains: [Chain!]!): SyncTokensForUsernamePayloadOrError
     @retoolAuth
   banUserFromFeed(username: String!, action: String!): BanUserFromFeedPayloadOrError @retoolAuth
+  unbanUserFromFeed(username: String!): UnbanUserFromFeedPayloadOrError @retoolAuth
   mintPremiumCardToWallet(
     input: MintPremiumCardToWalletInput!
   ): MintPremiumCardToWalletPayloadOrError @retoolAuth

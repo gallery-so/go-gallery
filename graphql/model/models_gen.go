@@ -230,6 +230,10 @@ type TrendingUsersPayloadOrError interface {
 	IsTrendingUsersPayloadOrError()
 }
 
+type UnbanUserFromFeedPayloadOrError interface {
+	IsUnbanUserFromFeedPayloadOrError()
+}
+
 type UnfollowUserPayloadOrError interface {
 	IsUnfollowUserPayloadOrError()
 }
@@ -873,6 +877,7 @@ func (ErrNotAuthorized) IsRevokeRolesFromUserPayloadOrError()          {}
 func (ErrNotAuthorized) IsUploadPersistedQueriesPayloadOrError()       {}
 func (ErrNotAuthorized) IsSyncTokensForUsernamePayloadOrError()        {}
 func (ErrNotAuthorized) IsBanUserFromFeedPayloadOrError()              {}
+func (ErrNotAuthorized) IsUnbanUserFromFeedPayloadOrError()            {}
 func (ErrNotAuthorized) IsCreateGalleryPayloadOrError()                {}
 func (ErrNotAuthorized) IsUpdateGalleryInfoPayloadOrError()            {}
 func (ErrNotAuthorized) IsUpdateGalleryHiddenPayloadOrError()          {}
@@ -1592,6 +1597,12 @@ type TwitterSocialAccount struct {
 }
 
 func (TwitterSocialAccount) IsSocialAccount() {}
+
+type UnbanUserFromFeedPayload struct {
+	User *GalleryUser `json:"user"`
+}
+
+func (UnbanUserFromFeedPayload) IsUnbanUserFromFeedPayloadOrError() {}
 
 type UnfollowUserPayload struct {
 	Viewer *Viewer      `json:"viewer"`

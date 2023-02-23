@@ -1385,6 +1385,23 @@ func (r *mutationResolver) BanUserFromFeed(ctx context.Context, username string,
 	return model.BanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
 }
 
+// UnbanUserFromFeed is the resolver for the unbanUserFromFeed field.
+func (r *mutationResolver) UnbanUserFromFeed(ctx context.Context, username string) (model.UnbanUserFromFeedPayloadOrError, error) {
+	user, err := publicapi.For(ctx).User.GetUserByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = publicapi.For(ctx).Feed.UnBlockUser(ctx, user.ID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return model.UnbanUserFromFeedPayload{User: userToModel(ctx, *user)}, nil
+}
+
 // MintPremiumCardToWallet is the resolver for the mintPremiumCardToWallet field.
 func (r *mutationResolver) MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (model.MintPremiumCardToWalletPayloadOrError, error) {
 	tx, err := publicapi.For(ctx).Card.MintPremiumCardToWallet(ctx, input)

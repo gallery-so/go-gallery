@@ -273,6 +273,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"UnbanUserFromFeedPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(UnbanUserFromFeedPayloadOrError)
+		return obj, ok
+	},
+
 	"UnfollowUserPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(UnfollowUserPayloadOrError)
 		return obj, ok

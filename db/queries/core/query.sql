@@ -334,6 +334,9 @@ select * from events where id = any(select id from activity) order by (created_a
 -- name: GetEventsInGroup :many
 select * from events where group_id = @group_id and deleted = false order by(created_at, id) asc;
 
+-- name: GetActorForGroup :one
+select actor_id from events where group_id = @group_id and deleted = false order by(created_at, id) asc limit 1;
+
 -- name: HasLaterGroupedEvent :one
 select exists(
   select 1 from events where deleted = false
@@ -450,10 +453,13 @@ select * from feed_events where deleted = false
     limit 1;
 
 -- name: IsFeedUserActionBlocked :one
-SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND action = $2 AND deleted = false);
+SELECT EXISTS(SELECT 1 FROM feed_blocklist WHERE user_id = $1 AND (action = $2 or action = '') AND deleted = false);
 
 -- name: BlockUserFromFeed :exec
 INSERT INTO feed_blocklist (id, user_id, action) VALUES ($1, $2, $3);
+
+-- name: UnblockUserFromFeed :exec
+UPDATE feed_blocklist SET deleted = true WHERE user_id = $1;
 
 -- name: GetAdmireByAdmireID :one
 SELECT * FROM admires WHERE id = $1 AND deleted = false;
