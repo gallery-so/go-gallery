@@ -2138,10 +2138,11 @@ func (e TokenType) MarshalGQL(w io.Writer) {
 type UserExperienceType string
 
 const (
-	UserExperienceTypeMultiGalleryAnnouncement UserExperienceType = "MultiGalleryAnnouncement"
-	UserExperienceTypeEmailUpsell              UserExperienceType = "EmailUpsell"
-	UserExperienceTypeMerchStoreUpsell         UserExperienceType = "MerchStoreUpsell"
-	UserExperienceTypeMaintenanceFeb2023       UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeMultiGalleryAnnouncement          UserExperienceType = "MultiGalleryAnnouncement"
+	UserExperienceTypeEmailUpsell                       UserExperienceType = "EmailUpsell"
+	UserExperienceTypeMerchStoreUpsell                  UserExperienceType = "MerchStoreUpsell"
+	UserExperienceTypeMaintenanceFeb2023                UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeTwitterConnectionOnboardingUpsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 )
 
 var AllUserExperienceType = []UserExperienceType{
@@ -2149,11 +2150,12 @@ var AllUserExperienceType = []UserExperienceType{
 	UserExperienceTypeEmailUpsell,
 	UserExperienceTypeMerchStoreUpsell,
 	UserExperienceTypeMaintenanceFeb2023,
+	UserExperienceTypeTwitterConnectionOnboardingUpsell,
 }
 
 func (e UserExperienceType) IsValid() bool {
 	switch e {
-	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023:
+	case UserExperienceTypeMultiGalleryAnnouncement, UserExperienceTypeEmailUpsell, UserExperienceTypeMerchStoreUpsell, UserExperienceTypeMaintenanceFeb2023, UserExperienceTypeTwitterConnectionOnboardingUpsell:
 		return true
 	}
 	return false
