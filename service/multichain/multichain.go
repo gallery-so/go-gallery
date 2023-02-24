@@ -14,6 +14,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/spf13/viper"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
@@ -479,9 +480,10 @@ func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders
 func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.TokenGallery) error {
 	tokensToProcess := make([]persist.DBID, 0, len(tokens))
 	// Process net new tokens based on the creation and update time so that new tokens are always handled by tokenprocessing.
-	// Also process existing tokens that may not have had valid media returned on the last sync or are in a syncing state.
+	// Also process tokens that are in a syncing state either from the current sync or tokens that were left syncing for
+	// some reason.
 	for _, token := range tokens {
-		if (token.CreationTime.Time() == token.LastUpdated.Time()) || !token.Media.IsServable() {
+		if (token.CreationTime.Time() == token.LastUpdated.Time()) || token.Media.MediaType == persist.MediaTypeSyncing {
 			tokensToProcess = append(tokensToProcess, token.ID)
 		}
 	}
@@ -489,8 +491,6 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	if len(tokensToProcess) == 0 {
 		return nil
 	}
-
-	logger.For(ctx).Infof("sending %d tokens to tokenprocessing\n", len(tokensToProcess))
 
 	return task.CreateTaskForTokenProcessing(ctx, p.TasksClient, task.TokenProcessingUserMessage{
 		UserID:   userID,
@@ -511,8 +511,7 @@ func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.To
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", "http://localhost:6500"), bytes.NewBuffer(asJSON))
-	// XXX: req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}
@@ -692,7 +691,6 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 	if err != nil {
 		return err
 	}
-
 	for i, provider := range providers {
 		refresher, ok := provider.(tokenFetcherRefresher)
 		if !ok {
@@ -713,16 +711,16 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 
-				currentTokens, err := p.Repos.TokenRepository.GetByTokenIdentifiers(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, 0, 0)
+				currentTokenState, err := p.Repos.TokenRepository.GetByTokenIdentifiers(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, 0, 0)
 				if err != nil {
 					return err
 				}
 
 				// Add existing media to the token if it already exists so theres
-				// something to display for the case when no providers had media for it
-				for _, curToken := range currentTokens {
-					if curToken.Media.IsServable() {
-						refreshedToken.Media = curToken.Media
+				// something to display for when no providers had media for it
+				for _, curState := range currentTokenState {
+					if curState.Media.IsServable() {
+						refreshedToken.Media = curState.Media
 						break
 					}
 				}
@@ -754,9 +752,9 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					return err
 				}
 			}
+
 		}
 	}
-
 	return nil
 }
 

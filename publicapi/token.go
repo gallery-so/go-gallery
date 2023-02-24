@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/gammazero/workerpool"
@@ -109,6 +110,8 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 	}
 
 	queryFunc := func(params boolTimeIDPagingParams) ([]interface{}, error) {
+
+		logger.For(ctx).Infof("GetTokensByContractIdPaginate: %+v", params)
 		tokens, err := api.queries.GetTokensByContractIdPaginate(ctx, db.GetTokensByContractIdPaginateParams{
 			Contract:           contractID,
 			Limit:              params.Limit,

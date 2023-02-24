@@ -246,14 +246,14 @@ func processMissingMetadata(ctx context.Context, inputs <-chan processTokensInpu
 
 					err := throttler.Lock(ctx, key)
 					if err != nil {
-						logger.For(ctx).Warn("failed to acquire lock, skipping token: %s", err)
+						logger.For(ctx).Warnf("failed to acquire lock, skipping token: %s", err)
 						return
 					}
 					defer throttler.Unlock(ctx, key)
 
 					err = updateMetadataFieldsForToken(ctx, t.TokenID, t.ContractAddress, t.TokenMetadata, nftRepository)
 					if err != nil {
-						logger.For(ctx).Error("failed to update token metadata fields: %s", err)
+						logger.For(ctx).Errorf("failed to update token metadata fields: %s", err)
 					}
 				})
 			}

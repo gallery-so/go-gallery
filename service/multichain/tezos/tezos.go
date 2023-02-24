@@ -724,7 +724,9 @@ func (d *Provider) tzBalanceTokensToTokens(pCtx context.Context, tzTokens []tzkt
 }
 
 func makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persist.Address, agnosticMetadata persist.TokenMetadata, ipfsGatewayURL string) persist.Media {
-	med := persist.Media{}
+	med := persist.Media{
+		MediaType: persist.MediaTypeSyncing,
+	}
 	imKeywords, animKeywords := persist.ChainTezos.BaseKeywords()
 	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(imKeywords), media.TezImageKeywords(animKeywords), false)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
