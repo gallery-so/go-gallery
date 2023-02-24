@@ -144,7 +144,7 @@ type TokenGalleryRepository interface {
 	GetByFullIdentifiers(context.Context, TokenID, Address, Chain, DBID) (TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
 	BulkUpsertByOwnerUserID(context.Context, DBID, []Chain, []TokenGallery, bool) error
-	BulkUpsertTokensOfContract(context.Context, DBID, []TokenGallery) error
+	BulkUpsertTokensOfContract(context.Context, DBID, []TokenGallery, bool) error
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, Chain, interface{}) error
 	DeleteByID(context.Context, DBID) error

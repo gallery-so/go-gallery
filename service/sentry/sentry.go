@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -15,12 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 
 	sentrygin "github.com/getsentry/sentry-go/gin"
-	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/util"
 )
 
 const (
-	authContextName   = "auth context"
 	errorContextName  = "error context"
 	eventContextName  = "event context"
 	loggerContextName = "logger context"
@@ -61,26 +58,6 @@ func ReportRemappedError(ctx context.Context, originalErr error, remappedErr int
 
 func ReportError(ctx context.Context, err error) {
 	ReportRemappedError(ctx, err, nil)
-}
-
-func ScrubEventCookies(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event == nil || event.Request == nil {
-		return event
-	}
-
-	var scrubbed []string
-	for _, c := range strings.Split(event.Request.Cookies, "; ") {
-		if strings.HasPrefix(c, auth.JWTCookieKey) {
-			scrubbed = append(scrubbed, auth.JWTCookieKey+"=[filtered]")
-		} else {
-			scrubbed = append(scrubbed, c)
-		}
-	}
-	cookies := strings.Join(scrubbed, "; ")
-
-	event.Request.Cookies = cookies
-	event.Request.Headers["Cookie"] = cookies
-	return event
 }
 
 func ScrubEventHeaders(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
@@ -134,28 +111,6 @@ func UpdateLogErrorEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Ev
 		}
 	}
 	return event
-}
-
-func SetAuthContext(scope *sentry.Scope, gc *gin.Context) {
-	var authCtx sentry.Context
-	var userCtx sentry.User
-
-	if auth.GetUserAuthedFromCtx(gc) {
-		userID := string(auth.GetUserIDFromCtx(gc))
-		authCtx = sentry.Context{
-			"Authenticated": true,
-			"UserID":        userID,
-		}
-		userCtx = sentry.User{ID: userID}
-	} else {
-		authCtx = sentry.Context{
-			"AuthError": auth.GetAuthErrorFromCtx(gc),
-		}
-		userCtx = sentry.User{}
-	}
-
-	scope.SetContext(authContextName, authCtx)
-	scope.SetUser(userCtx)
 }
 
 func SetErrorContext(scope *sentry.Scope, mapped bool, mappedTo string) {

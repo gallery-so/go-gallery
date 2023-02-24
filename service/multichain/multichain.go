@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -386,7 +387,6 @@ outer:
 	}
 
 	_, err = p.processTokensForUser(ctx, tokensFromProviders, addressToContract, user, chains, false)
-
 	return err
 }
 
@@ -408,16 +408,14 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 
 	for i, token := range providerTokens {
 		// Add already existing media to the provider token if it exists so that
-		// we can display media for a token while it is being handled
-		// in the background by tokenprocessing
+		// we can display media for a token while it gets handled by tokenprocessing
 		if dbToken := tokenLookup[token.TokenIdentifiers()]; !token.Media.IsServable() && dbToken.Media.IsServable() {
 			providerTokens[i].Media = dbToken.Media
 		}
 		// There's no available media for the token at this point, so set the state to syncing
-		// so we can show the loading state instead of a broken token until tokenprocessing
-		// picks it up.
-		if !providerTokens[i].Media.IsServable() {
-			providerTokens[i].Media.MediaType = persist.MediaTypeSyncing
+		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
+		if !providerTokens[i].Media.IsServable() && len(providerTokens[i].TokenMetadata) > 0 {
+			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 	}
 
@@ -439,12 +437,12 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 		userTokenOffsets[userID] = [2]int{start, start + len(tokens)}
 	}
 
-	persistedTokens, err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contractID, tokensToUpsert)
+	persistedTokens, err := p.Repos.TokenRepository.BulkUpsertTokensOfContract(ctx, contractID, tokensToUpsert, false)
 	if err != nil {
 		return err
 	}
 
-	// Invariant check to make sure that it is safe to index persistedTokens
+	// Invariant to make sure that its safe to index persistedTokens
 	if len(tokensToUpsert) != len(persistedTokens) {
 		panic("expected the length of tokens inserted to match the input length")
 	}
@@ -479,10 +477,9 @@ func (p *Provider) processTokensForUser(ctx context.Context, tokensFromProviders
 
 func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persist.DBID, tokens []persist.TokenGallery) error {
 	tokensToProcess := make([]persist.DBID, 0, len(tokens))
-	// Process net new tokens based on the creation and update time so that new tokens are always handled by tokenprocessing.
-	// Also process tokens that are in a syncing state either from the current sync or tokens that were left syncing for
-	// some reason.
 	for _, token := range tokens {
+		// Process net new tokens based on the creation and update time so that new tokens are handled at least once by tokenprocessing.
+		// Also process tokens that are in a syncing state either from this sync or tokens that were left syncing for whatever reason.
 		if (token.CreationTime.Time() == token.LastUpdated.Time()) || token.Media.MediaType == persist.MediaTypeSyncing {
 			tokensToProcess = append(tokensToProcess, token.ID)
 		}
@@ -718,10 +715,9 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 
 				// Add existing media to the token if it already exists so theres
 				// something to display for when no providers had media for it
-				for _, curState := range currentTokenState {
-					if curState.Media.IsServable() {
-						refreshedToken.Media = curState.Media
-						break
+				for i := 0; !refreshedToken.Media.IsServable() && i < len(currentTokenState); i++ {
+					if !refreshedToken.Media.IsServable() && currentTokenState[i].Media.IsServable() {
+						refreshedToken.Media = currentTokenState[i].Media
 					}
 				}
 
@@ -1123,24 +1119,33 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			}
 
 			ti := persist.NewTokenIdentifiers(token.ContractAddress, token.TokenID, chainToken.chain)
+			existingToken, seen := seenTokens[ti]
 
-			// If we've never seen the incoming token before, then add it. If we have the token but its not servable
-			// then we replace it entirely with the incoming token.
-			if seen, ok := seenTokens[ti]; !ok || (ok && !seen.Media.IsServable() && token.Media.IsServable()) {
-				seenTokens[ti] = persist.TokenGallery{
-					Media:                token.Media,
-					TokenType:            token.TokenType,
-					Chain:                chainToken.chain,
-					Name:                 persist.NullString(token.Name),
-					Description:          persist.NullString(token.Description),
-					TokenURI:             token.TokenURI,
-					TokenID:              token.TokenID,
-					OwnerUserID:          ownerUser.ID,
-					TokenMetadata:        token.TokenMetadata,
-					Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
-					ExternalURL:          persist.NullString(token.ExternalURL),
-					BlockNumber:          token.BlockNumber,
-					IsProviderMarkedSpam: token.IsSpam,
+			candidateToken := persist.TokenGallery{
+				Media:                token.Media,
+				TokenType:            token.TokenType,
+				Chain:                chainToken.chain,
+				Name:                 persist.NullString(token.Name),
+				Description:          persist.NullString(token.Description),
+				TokenURI:             "", // We don't save tokenURI information
+				TokenID:              token.TokenID,
+				OwnerUserID:          ownerUser.ID,
+				TokenMetadata:        token.TokenMetadata,
+				Contract:             contractAddressIDs[chainToken.chain.NormalizeAddress(token.ContractAddress)],
+				ExternalURL:          persist.NullString(token.ExternalURL),
+				BlockNumber:          token.BlockNumber,
+				IsProviderMarkedSpam: token.IsSpam,
+			}
+
+			// If we've never seen the incoming token before, then add it.
+			if !seen {
+				seenTokens[ti] = candidateToken
+			} else {
+				// If the candidate token has usable media, then replace the existing token.
+				// We only use the token if there is a way to regenerate the media from the metadata it has.
+				hasMediaLinks := hasMediaURLs(ctx, chainToken.chain, token)
+				if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() && hasMediaLinks {
+					seenTokens[ti] = candidateToken
 				}
 			}
 
@@ -1317,4 +1322,15 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	}
 
 	return ret
+}
+
+func findTokenMediaURLs(ctx context.Context, chain persist.Chain, token ChainAgnosticToken) (string, string) {
+	imageKeys, animationKeys := chain.BaseKeywords()
+	imageKeywords, animationKeywords := media.KeywordsForChain(chain, imageKeys, animationKeys)
+	return media.FindImageAndAnimationURLs(ctx, token.TokenID, token.ContractAddress, token.TokenMetadata, "", animationKeywords, imageKeywords, false)
+}
+
+func hasMediaURLs(ctx context.Context, chain persist.Chain, token ChainAgnosticToken) bool {
+	imageURL, animationURL := findTokenMediaURLs(ctx, chain, token)
+	return len(imageURL) > 0 || len(animationURL) > 0
 }

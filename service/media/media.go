@@ -380,7 +380,7 @@ func remapMedia(media persist.Media) persist.Media {
 func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, tokenURI persist.TokenURI, animationKeywords, imageKeywords Keywords, predict bool) (imgURL string, vURL string) {
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
 	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
-		logger.For(ctx).Infof("found media metadata: %s", metaMedia)
+		logger.For(ctx).Debugf("found media metadata: %s", metaMedia)
 		var mediaType persist.MediaType
 
 		if mime, ok := metaMedia["mimeType"].(string); ok {
@@ -398,7 +398,7 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range animationKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
-			logger.For(ctx).Infof("found initial animation url from '%s': %s", keyword, it)
+			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
 			vURL = it
 			break
 		}
@@ -406,14 +406,14 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 
 	for _, keyword := range imageKeywords.ForToken(tokenID, contractAddress) {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
-			logger.For(ctx).Infof("found initial image url from '%s': %s", keyword, it)
+			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
 			imgURL = it
 			break
 		}
 	}
 
 	if imgURL == "" && vURL == "" {
-		logger.For(ctx).Infof("no image url found, using token URI: %s", tokenURI)
+		logger.For(ctx).Debugf("no image url found, using token URI: %s", tokenURI)
 		imgURL = tokenURI.String()
 	}
 
