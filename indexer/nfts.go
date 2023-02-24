@@ -134,7 +134,7 @@ func (e MetadataUpdateErr) Error() string {
 	return fmt.Sprintf("failed to get metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
 }
 
-func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client, storageClient *storage.Client) gin.HandlerFunc {
+func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := &getTokensInput{}
 
@@ -317,7 +317,7 @@ func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo pers
 	}
 }
 
-func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) gin.HandlerFunc {
+func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ValidateWalletNFTsInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -325,7 +325,7 @@ func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractReposi
 			return
 		}
 
-		output, err := validateNFTs(c, input, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket)
+		output, err := validateNFTs(c, input, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -336,7 +336,7 @@ func validateWalletsNFTs(tokenRepository persist.TokenRepository, contractReposi
 }
 
 // validateNFTs will validate the NFTs for the wallet passed in when being compared with opensea
-func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) (ValidateUsersNFTsOutput, error) {
+func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (ValidateUsersNFTsOutput, error) {
 
 	currentNFTs, _, err := tokenRepository.GetByWallet(c, input.Wallet, -1, 0)
 	if err != nil {
@@ -393,7 +393,7 @@ func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenReposit
 			allUnaccountedForAssets = append(allUnaccountedForAssets, asset)
 		}
 
-		if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, input.Wallet, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket); err != nil {
+		if err := processUnaccountedForNFTs(c, allUnaccountedForAssets, input.Wallet, tokenRepository, contractRepository, ethcl, ipfsClient, arweaveClient); err != nil {
 			logger.For(c).WithError(err).Error("failed to process unaccounted for NFTs")
 			return ValidateUsersNFTsOutput{}, err
 		}
@@ -442,6 +442,7 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 			update := persist.TokenUpdateAllURIDerivedFieldsInput{
 				TokenURI:    token.TokenURI,
 				Metadata:    token.TokenMetadata,
+				Media:       token.Media,
 				Name:        token.Name,
 				Description: token.Description,
 			}
@@ -454,13 +455,13 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 	}
 	return msgToAdd, nil
 }
-func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, address persist.EthereumAddress, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string) error {
+func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, address persist.EthereumAddress, tokenRepository persist.TokenRepository, contractRepository persist.ContractRepository, ethcl *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) error {
 	errChan := make(chan error)
 	wp := workerpool.New(10)
 	for _, asset := range assets {
 		a := asset
 		wp.Submit(func() {
-			errChan <- refreshTokenMetadatas(ctx, UpdateTokenInput{OwnerAddress: address, TokenID: persist.TokenID(a.TokenID.ToBase16()), ContractAddress: a.Contract.ContractAddress, UpdateAll: true}, tokenRepository, ethcl, ipfsClient, arweaveClient, stg, tokenBucket)
+			errChan <- refreshTokenMetadatas(ctx, UpdateTokenInput{OwnerAddress: address, TokenID: persist.TokenID(a.TokenID.ToBase16()), ContractAddress: a.Contract.ContractAddress, UpdateAll: true}, tokenRepository, ethcl, ipfsClient, arweaveClient)
 		})
 	}
 	for i := 0; i < len(assets); i++ {
@@ -473,7 +474,7 @@ func processUnaccountedForNFTs(ctx context.Context, assets []opensea.Asset, addr
 	return nil
 }
 
-func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) gin.HandlerFunc {
+func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input := UpdateTokenInput{}
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -481,7 +482,7 @@ func updateTokens(tokenRepository persist.TokenRepository, ethClient *ethclient.
 			return
 		}
 
-		err := refreshTokenMetadatas(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient, storageClient, tokenBucket)
+		err := refreshTokenMetadatas(c, input, tokenRepository, ethClient, ipfsClient, arweaveClient)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -592,7 +593,7 @@ func filterTransfers(ctx context.Context, m task.DeepRefreshMessage, transfers [
 }
 
 // refreshTokenMetadatas will find all of the metadata for an addresses NFTs
-func refreshTokenMetadatas(c context.Context, input UpdateTokenInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) error {
+func refreshTokenMetadatas(c context.Context, input UpdateTokenInput, tokenRepository persist.TokenRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) error {
 	c = sentryutil.NewSentryHubContext(c)
 	c = logger.NewContextWithFields(c, logrus.Fields{"tokenID": input.TokenID, "contractAddress": input.ContractAddress})
 	if input.TokenID != "" && input.ContractAddress != "" {
