@@ -6638,6 +6638,7 @@ enum UserExperienceType {
   EmailUpsell
   MerchStoreUpsell
   MaintenanceFeb2023
+  TwitterConnectionOnboardingUpsell
 }
 
 type UserExperience {

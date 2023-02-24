@@ -448,10 +448,11 @@ func (v *UpdateUserExperienceInput) GetExperienced() bool { return v.Experienced
 type UserExperienceType string
 
 const (
-	UserExperienceTypeMultigalleryannouncement UserExperienceType = "MultiGalleryAnnouncement"
-	UserExperienceTypeEmailupsell              UserExperienceType = "EmailUpsell"
-	UserExperienceTypeMerchstoreupsell         UserExperienceType = "MerchStoreUpsell"
-	UserExperienceTypeMaintenancefeb2023       UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeMultigalleryannouncement          UserExperienceType = "MultiGalleryAnnouncement"
+	UserExperienceTypeEmailupsell                       UserExperienceType = "EmailUpsell"
+	UserExperienceTypeMerchstoreupsell                  UserExperienceType = "MerchStoreUpsell"
+	UserExperienceTypeMaintenancefeb2023                UserExperienceType = "MaintenanceFeb2023"
+	UserExperienceTypeTwitterconnectiononboardingupsell UserExperienceType = "TwitterConnectionOnboardingUpsell"
 )
 
 // __addUserWalletMutationInput is used internally by genqlient
