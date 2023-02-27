@@ -158,11 +158,11 @@ func (a *API) generateAuthTokenFromRefresh(ctx context.Context, refreshToken str
 
 	defer accessResp.Body.Close()
 
+	if accessResp.StatusCode == http.StatusUnauthorized {
+		return AccessTokenResponse{}, errUnauthed
+	}
 	if accessResp.StatusCode != http.StatusOK {
 		err = util.GetErrFromResp(accessResp)
-		if accessResp.StatusCode == http.StatusUnauthorized {
-			return AccessTokenResponse{}, errUnauthed
-		}
 		return AccessTokenResponse{}, fmt.Errorf("failed to get access token, returned status: %s", err)
 	}
 
@@ -189,6 +189,9 @@ func (a *API) getAuthedUser(ctx context.Context, accessToken string) (TwitterIde
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return TwitterIdentifiers{}, errUnauthed
+	}
 	if resp.StatusCode != http.StatusOK {
 		err = util.GetErrFromResp(resp)
 		return TwitterIdentifiers{}, fmt.Errorf("failed to get user me: %s", err)
