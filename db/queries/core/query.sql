@@ -878,5 +878,3 @@ inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.
 left outer join follows f on f.followee = user_view.id
 where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end 
 and case when @only_unfollowing::bool then not f.followee = @user_id else true end) as t;
-
-

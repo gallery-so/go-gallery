@@ -550,3 +550,11 @@ func ToPGJSONB[T any](v T) (pgtype.JSONB, error) {
 	}
 	return pgtype.JSONB{Bytes: marshalled, Status: pgtype.Present}, nil
 }
+
+func GetOptionalValue[T any](optional *T, fallback T) T {
+	if optional != nil {
+		return *optional
+	}
+
+	return fallback
+}

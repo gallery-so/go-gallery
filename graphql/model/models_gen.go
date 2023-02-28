@@ -206,6 +206,18 @@ type RevokeRolesFromUserPayloadOrError interface {
 	IsRevokeRolesFromUserPayloadOrError()
 }
 
+type SearchCommunitiesPayloadOrError interface {
+	IsSearchCommunitiesPayloadOrError()
+}
+
+type SearchGalleriesPayloadOrError interface {
+	IsSearchGalleriesPayloadOrError()
+}
+
+type SearchUsersPayloadOrError interface {
+	IsSearchUsersPayloadOrError()
+}
+
 type SetSpamPreferencePayloadOrError interface {
 	IsSetSpamPreferencePayloadOrError()
 }
@@ -799,6 +811,9 @@ func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
 func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
+func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
+func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
+func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -1384,6 +1399,24 @@ type ResendVerificationEmailPayload struct {
 }
 
 func (ResendVerificationEmailPayload) IsResendVerificationEmailPayloadOrError() {}
+
+type SearchCommunitiesPayload struct {
+	Communities []*Community `json:"communities"`
+}
+
+func (SearchCommunitiesPayload) IsSearchCommunitiesPayloadOrError() {}
+
+type SearchGalleriesPayload struct {
+	Galleries []*Gallery `json:"galleries"`
+}
+
+func (SearchGalleriesPayload) IsSearchGalleriesPayloadOrError() {}
+
+type SearchUsersPayload struct {
+	Users []*GalleryUser `json:"users"`
+}
+
+func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
 
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`

@@ -914,6 +914,30 @@ type TrendingUsersPayload {
 
 union TrendingUsersPayloadOrError = TrendingUsersPayload
 
+type SearchUsersPayload {
+  users: [GalleryUser!]
+}
+
+union SearchUsersPayloadOrError =
+  SearchUsersPayload
+  | ErrInvalidInput
+
+type SearchGalleriesPayload {
+  galleries: [Gallery!]
+}
+
+union SearchGalleriesPayloadOrError =
+  SearchGalleriesPayload
+  | ErrInvalidInput
+
+type SearchCommunitiesPayload {
+  communities: [Community!]
+}
+
+union SearchCommunitiesPayloadOrError =
+  SearchCommunitiesPayload
+  | ErrInvalidInput
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -940,6 +964,9 @@ type Query {
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
   trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
+  searchUsers(query: String!, limit: Int, usernameWeight: Float, bioWeight: Float): SearchUsersPayloadOrError
+  searchGalleries(query: String!, limit: Int, nameWeight: Float, descriptionWeight: Float): SearchGalleriesPayloadOrError
+  searchCommunities(query: String!, limit: Int, nameWeight: Float, descriptionWeight: Float, poapAddressWeight: Float): SearchCommunitiesPayloadOrError
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection

@@ -243,6 +243,21 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"SearchCommunitiesPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SearchCommunitiesPayloadOrError)
+		return obj, ok
+	},
+
+	"SearchGalleriesPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SearchGalleriesPayloadOrError)
+		return obj, ok
+	},
+
+	"SearchUsersPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SearchUsersPayloadOrError)
+		return obj, ok
+	},
+
 	"SetSpamPreferencePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SetSpamPreferencePayloadOrError)
 		return obj, ok
