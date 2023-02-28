@@ -50,9 +50,9 @@ type ResponseStruct struct {
 }
 
 type farcastGalleryAcc struct {
-	galleryUsername string
-	galleryId       string
-	galleryAddress  string
+	GalleryUsername string `json:"gallery_username"`
+	GalleryId       string `json:"gallery_id"`
+	GalleryAddress  string `json:"gallery_address"`
 }
 
 func main() {
@@ -69,7 +69,7 @@ func main() {
 
 	pg := postgres.NewPgxClient()
 
-	rows, err := pg.Query(ctx, `select wallets.address,users.id,users.username from users join wallets on wallets.id = any(users.wallets) where wallets.deleted = false and users.deleted = false and wallets.chain = 0;`)
+	rows, err := pg.Query(ctx, `select wallets.address,users.id,users.username from users join wallets on wallets.id = any(users.wallets) where wallets.deleted = false and users.deleted = false and wallets.chain = 0 and users.universal = false;`)
 	if err != nil {
 		panic(err)
 	}
@@ -80,8 +80,10 @@ func main() {
 	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, providerWs)
 
 	results := make(chan farcastGalleryAcc)
-	wp := workerpool.New(2)
-	for rows.Next() {
+	wp := workerpool.New(10)
+
+	total := 0
+	for ; rows.Next(); total++ {
 		var address, userID, username string
 		err := rows.Scan(&address, &userID, &username)
 		if err != nil {
@@ -99,9 +101,9 @@ func main() {
 
 			if u.Fid != 0 || u.Username != "" {
 				results <- farcastGalleryAcc{
-					galleryUsername: username,
-					galleryId:       userID,
-					galleryAddress:  address,
+					GalleryUsername: username,
+					GalleryId:       userID,
+					GalleryAddress:  username,
 				}
 			}
 		})
@@ -112,14 +114,16 @@ func main() {
 		close(results)
 	}()
 
-	allResults := make([]farcastGalleryAcc, 0)
+	allResults := make([]farcastGalleryAcc, 0, 25)
 	for result := range results {
-		logrus.Infof("Found %s", result.galleryUsername)
+		logrus.Infof("Found %s-%s-%s", result.GalleryUsername, result.GalleryId, result.GalleryAddress)
 		allResults = append(allResults, result)
 	}
 
 	asJSON := map[string]interface{}{
-		"farcaster": allResults,
+		"count":            len(allResults),
+		"out_of":           total,
+		"gallery_accounts": allResults,
 	}
 
 	marshalled, err := json.MarshalIndent(asJSON, "", "  ")
@@ -127,7 +131,7 @@ func main() {
 		panic(err)
 	}
 
-	fi, err := os.Create("lens_galleries.json")
+	fi, err := os.Create("farcaster_galleries.json")
 	if err != nil {
 		panic(err)
 	}

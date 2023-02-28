@@ -231,9 +231,11 @@ type Token struct {
 
 // Media represents a token's media content with processed images from metadata
 type Media struct {
-	ThumbnailURL NullString `json:"thumbnail_url,omitempty"`
-	MediaURL     NullString `json:"media_url,omitempty"`
-	MediaType    MediaType  `json:"media_type"`
+	ThumbnailURL   NullString `json:"thumbnail_url,omitempty"`
+	LivePreviewURL NullString `json:"live_preview_url,omitempty"`
+	MediaURL       NullString `json:"media_url,omitempty"`
+	MediaType      MediaType  `json:"media_type"`
+	AspectRatio    float64    `json:"aspect_ratio"`
 }
 
 // IsServable returns true if the token's Media has enough information to serve it's assets.
