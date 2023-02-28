@@ -260,6 +260,10 @@ type ComplexityRoot struct {
 		TokensInCommunity func(childComplexity int, before *string, after *string, first *int, last *int, onlyGalleryUsers *bool) int
 	}
 
+	CommunitySearchResult struct {
+		Community func(childComplexity int) int
+	}
+
 	ConnectSocialAccountPayload struct {
 		Viewer func(childComplexity int) int
 	}
@@ -496,6 +500,10 @@ type ComplexityRoot struct {
 		NewDescription func(childComplexity int) int
 		NewName        func(childComplexity int) int
 		Owner          func(childComplexity int) int
+	}
+
+	GallerySearchResult struct {
+		Gallery func(childComplexity int) int
 	}
 
 	GalleryUpdatedFeedEventData struct {
@@ -806,15 +814,15 @@ type ComplexityRoot struct {
 	}
 
 	SearchCommunitiesPayload struct {
-		Communities func(childComplexity int) int
+		Results func(childComplexity int) int
 	}
 
 	SearchGalleriesPayload struct {
-		Galleries func(childComplexity int) int
+		Results func(childComplexity int) int
 	}
 
 	SearchUsersPayload struct {
-		Users func(childComplexity int) int
+		Results func(childComplexity int) int
 	}
 
 	SetSpamPreferencePayload struct {
@@ -1118,6 +1126,10 @@ type ComplexityRoot struct {
 		EventTime func(childComplexity int) int
 		Followed  func(childComplexity int) int
 		Owner     func(childComplexity int) int
+	}
+
+	UserSearchResult struct {
+		User func(childComplexity int) int
 	}
 
 	UsersConnection struct {
@@ -2137,6 +2149,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Community.TokensInCommunity(childComplexity, args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int), args["onlyGalleryUsers"].(*bool)), true
 
+	case "CommunitySearchResult.community":
+		if e.complexity.CommunitySearchResult.Community == nil {
+			break
+		}
+
+		return e.complexity.CommunitySearchResult.Community(childComplexity), true
+
 	case "ConnectSocialAccountPayload.viewer":
 		if e.complexity.ConnectSocialAccountPayload.Viewer == nil {
 			break
@@ -2856,6 +2875,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GalleryInfoUpdatedFeedEventData.Owner(childComplexity), true
+
+	case "GallerySearchResult.gallery":
+		if e.complexity.GallerySearchResult.Gallery == nil {
+			break
+		}
+
+		return e.complexity.GallerySearchResult.Gallery(childComplexity), true
 
 	case "GalleryUpdatedFeedEventData.action":
 		if e.complexity.GalleryUpdatedFeedEventData.Action == nil {
@@ -4655,26 +4681,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ResendVerificationEmailPayload.Viewer(childComplexity), true
 
-	case "SearchCommunitiesPayload.communities":
-		if e.complexity.SearchCommunitiesPayload.Communities == nil {
+	case "SearchCommunitiesPayload.results":
+		if e.complexity.SearchCommunitiesPayload.Results == nil {
 			break
 		}
 
-		return e.complexity.SearchCommunitiesPayload.Communities(childComplexity), true
+		return e.complexity.SearchCommunitiesPayload.Results(childComplexity), true
 
-	case "SearchGalleriesPayload.galleries":
-		if e.complexity.SearchGalleriesPayload.Galleries == nil {
+	case "SearchGalleriesPayload.results":
+		if e.complexity.SearchGalleriesPayload.Results == nil {
 			break
 		}
 
-		return e.complexity.SearchGalleriesPayload.Galleries(childComplexity), true
+		return e.complexity.SearchGalleriesPayload.Results(childComplexity), true
 
-	case "SearchUsersPayload.users":
-		if e.complexity.SearchUsersPayload.Users == nil {
+	case "SearchUsersPayload.results":
+		if e.complexity.SearchUsersPayload.Results == nil {
 			break
 		}
 
-		return e.complexity.SearchUsersPayload.Users(childComplexity), true
+		return e.complexity.SearchUsersPayload.Results(childComplexity), true
 
 	case "SetSpamPreferencePayload.tokens":
 		if e.complexity.SetSpamPreferencePayload.Tokens == nil {
@@ -5766,6 +5792,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.UserFollowedUsersFeedEventData.Owner(childComplexity), true
+
+	case "UserSearchResult.user":
+		if e.complexity.UserSearchResult.User == nil {
+			break
+		}
+
+		return e.complexity.UserSearchResult.User(childComplexity), true
 
 	case "UsersConnection.edges":
 		if e.complexity.UsersConnection.Edges == nil {
@@ -7039,29 +7072,35 @@ type TrendingUsersPayload {
 
 union TrendingUsersPayloadOrError = TrendingUsersPayload
 
-type SearchUsersPayload {
-  users: [GalleryUser!]
+type UserSearchResult {
+  user: GalleryUser
 }
 
-union SearchUsersPayloadOrError =
-  SearchUsersPayload
-  | ErrInvalidInput
+type SearchUsersPayload {
+  results: [UserSearchResult!]
+}
+
+union SearchUsersPayloadOrError = SearchUsersPayload | ErrInvalidInput
+
+type GallerySearchResult {
+  gallery: Gallery
+}
 
 type SearchGalleriesPayload {
-  galleries: [Gallery!]
+  results: [GallerySearchResult!]
 }
 
-union SearchGalleriesPayloadOrError =
-  SearchGalleriesPayload
-  | ErrInvalidInput
+union SearchGalleriesPayloadOrError = SearchGalleriesPayload | ErrInvalidInput
+
+type CommunitySearchResult {
+  community: Community
+}
 
 type SearchCommunitiesPayload {
-  communities: [Community!]
+  results: [CommunitySearchResult!]
 }
 
-union SearchCommunitiesPayloadOrError =
-  SearchCommunitiesPayload
-  | ErrInvalidInput
+union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
 type Query {
   node(id: ID!): Node
@@ -7089,9 +7128,25 @@ type Query {
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
   trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
-  searchUsers(query: String!, limit: Int, usernameWeight: Float, bioWeight: Float): SearchUsersPayloadOrError
-  searchGalleries(query: String!, limit: Int, nameWeight: Float, descriptionWeight: Float): SearchGalleriesPayloadOrError
-  searchCommunities(query: String!, limit: Int, nameWeight: Float, descriptionWeight: Float, poapAddressWeight: Float): SearchCommunitiesPayloadOrError
+  searchUsers(
+    query: String!
+    limit: Int
+    usernameWeight: Float
+    bioWeight: Float
+  ): SearchUsersPayloadOrError
+  searchGalleries(
+    query: String!
+    limit: Int
+    nameWeight: Float
+    descriptionWeight: Float
+  ): SearchGalleriesPayloadOrError
+  searchCommunities(
+    query: String!
+    limit: Int
+    nameWeight: Float
+    descriptionWeight: Float
+    poapAddressWeight: Float
+  ): SearchCommunitiesPayloadOrError
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
@@ -15004,6 +15059,77 @@ func (ec *executionContext) fieldContext_Community_owners(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _CommunitySearchResult_community(ctx context.Context, field graphql.CollectedField, obj *model.CommunitySearchResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CommunitySearchResult_community(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Community, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Community)
+	fc.Result = res
+	return ec.marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CommunitySearchResult_community(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommunitySearchResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dbid":
+				return ec.fieldContext_Community_dbid(ctx, field)
+			case "id":
+				return ec.fieldContext_Community_id(ctx, field)
+			case "lastUpdated":
+				return ec.fieldContext_Community_lastUpdated(ctx, field)
+			case "contractAddress":
+				return ec.fieldContext_Community_contractAddress(ctx, field)
+			case "creatorAddress":
+				return ec.fieldContext_Community_creatorAddress(ctx, field)
+			case "chain":
+				return ec.fieldContext_Community_chain(ctx, field)
+			case "name":
+				return ec.fieldContext_Community_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Community_description(ctx, field)
+			case "previewImage":
+				return ec.fieldContext_Community_previewImage(ctx, field)
+			case "profileImageURL":
+				return ec.fieldContext_Community_profileImageURL(ctx, field)
+			case "profileBannerURL":
+				return ec.fieldContext_Community_profileBannerURL(ctx, field)
+			case "badgeURL":
+				return ec.fieldContext_Community_badgeURL(ctx, field)
+			case "tokensInCommunity":
+				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
+			case "owners":
+				return ec.fieldContext_Community_owners(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ConnectSocialAccountPayload_viewer(ctx context.Context, field graphql.CollectedField, obj *model.ConnectSocialAccountPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConnectSocialAccountPayload_viewer(ctx, field)
 	if err != nil {
@@ -19882,6 +20008,67 @@ func (ec *executionContext) fieldContext_GalleryInfoUpdatedFeedEventData_action(
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Action does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GallerySearchResult_gallery(ctx context.Context, field graphql.CollectedField, obj *model.GallerySearchResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GallerySearchResult_gallery(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gallery, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Gallery)
+	fc.Result = res
+	return ec.marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GallerySearchResult_gallery(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GallerySearchResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Gallery_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_Gallery_dbid(ctx, field)
+			case "name":
+				return ec.fieldContext_Gallery_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Gallery_description(ctx, field)
+			case "position":
+				return ec.fieldContext_Gallery_position(ctx, field)
+			case "hidden":
+				return ec.fieldContext_Gallery_hidden(ctx, field)
+			case "tokenPreviews":
+				return ec.fieldContext_Gallery_tokenPreviews(ctx, field)
+			case "owner":
+				return ec.fieldContext_Gallery_owner(ctx, field)
+			case "collections":
+				return ec.fieldContext_Gallery_collections(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Gallery", field.Name)
 		},
 	}
 	return fc, nil
@@ -31029,8 +31216,8 @@ func (ec *executionContext) fieldContext_ResendVerificationEmailPayload_viewer(c
 	return fc, nil
 }
 
-func (ec *executionContext) _SearchCommunitiesPayload_communities(ctx context.Context, field graphql.CollectedField, obj *model.SearchCommunitiesPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SearchCommunitiesPayload_communities(ctx, field)
+func (ec *executionContext) _SearchCommunitiesPayload_results(ctx context.Context, field graphql.CollectedField, obj *model.SearchCommunitiesPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SearchCommunitiesPayload_results(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -31043,7 +31230,7 @@ func (ec *executionContext) _SearchCommunitiesPayload_communities(ctx context.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Communities, nil
+		return obj.Results, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -31052,12 +31239,12 @@ func (ec *executionContext) _SearchCommunitiesPayload_communities(ctx context.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Community)
+	res := resTmp.([]*model.CommunitySearchResult)
 	fc.Result = res
-	return ec.marshalOCommunity2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityᚄ(ctx, field.Selections, res)
+	return ec.marshalOCommunitySearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitySearchResultᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_SearchCommunitiesPayload_communities(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_SearchCommunitiesPayload_results(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SearchCommunitiesPayload",
 		Field:      field,
@@ -31065,43 +31252,17 @@ func (ec *executionContext) fieldContext_SearchCommunitiesPayload_communities(ct
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "dbid":
-				return ec.fieldContext_Community_dbid(ctx, field)
-			case "id":
-				return ec.fieldContext_Community_id(ctx, field)
-			case "lastUpdated":
-				return ec.fieldContext_Community_lastUpdated(ctx, field)
-			case "contractAddress":
-				return ec.fieldContext_Community_contractAddress(ctx, field)
-			case "creatorAddress":
-				return ec.fieldContext_Community_creatorAddress(ctx, field)
-			case "chain":
-				return ec.fieldContext_Community_chain(ctx, field)
-			case "name":
-				return ec.fieldContext_Community_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Community_description(ctx, field)
-			case "previewImage":
-				return ec.fieldContext_Community_previewImage(ctx, field)
-			case "profileImageURL":
-				return ec.fieldContext_Community_profileImageURL(ctx, field)
-			case "profileBannerURL":
-				return ec.fieldContext_Community_profileBannerURL(ctx, field)
-			case "badgeURL":
-				return ec.fieldContext_Community_badgeURL(ctx, field)
-			case "tokensInCommunity":
-				return ec.fieldContext_Community_tokensInCommunity(ctx, field)
-			case "owners":
-				return ec.fieldContext_Community_owners(ctx, field)
+			case "community":
+				return ec.fieldContext_CommunitySearchResult_community(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Community", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type CommunitySearchResult", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _SearchGalleriesPayload_galleries(ctx context.Context, field graphql.CollectedField, obj *model.SearchGalleriesPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SearchGalleriesPayload_galleries(ctx, field)
+func (ec *executionContext) _SearchGalleriesPayload_results(ctx context.Context, field graphql.CollectedField, obj *model.SearchGalleriesPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SearchGalleriesPayload_results(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -31114,7 +31275,7 @@ func (ec *executionContext) _SearchGalleriesPayload_galleries(ctx context.Contex
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Galleries, nil
+		return obj.Results, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -31123,12 +31284,12 @@ func (ec *executionContext) _SearchGalleriesPayload_galleries(ctx context.Contex
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Gallery)
+	res := resTmp.([]*model.GallerySearchResult)
 	fc.Result = res
-	return ec.marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryᚄ(ctx, field.Selections, res)
+	return ec.marshalOGallerySearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallerySearchResultᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_SearchGalleriesPayload_galleries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_SearchGalleriesPayload_results(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SearchGalleriesPayload",
 		Field:      field,
@@ -31136,33 +31297,17 @@ func (ec *executionContext) fieldContext_SearchGalleriesPayload_galleries(ctx co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Gallery_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_Gallery_dbid(ctx, field)
-			case "name":
-				return ec.fieldContext_Gallery_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Gallery_description(ctx, field)
-			case "position":
-				return ec.fieldContext_Gallery_position(ctx, field)
-			case "hidden":
-				return ec.fieldContext_Gallery_hidden(ctx, field)
-			case "tokenPreviews":
-				return ec.fieldContext_Gallery_tokenPreviews(ctx, field)
-			case "owner":
-				return ec.fieldContext_Gallery_owner(ctx, field)
-			case "collections":
-				return ec.fieldContext_Gallery_collections(ctx, field)
+			case "gallery":
+				return ec.fieldContext_GallerySearchResult_gallery(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Gallery", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type GallerySearchResult", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _SearchUsersPayload_users(ctx context.Context, field graphql.CollectedField, obj *model.SearchUsersPayload) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SearchUsersPayload_users(ctx, field)
+func (ec *executionContext) _SearchUsersPayload_results(ctx context.Context, field graphql.CollectedField, obj *model.SearchUsersPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SearchUsersPayload_results(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -31175,7 +31320,7 @@ func (ec *executionContext) _SearchUsersPayload_users(ctx context.Context, field
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Users, nil
+		return obj.Results, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -31184,12 +31329,12 @@ func (ec *executionContext) _SearchUsersPayload_users(ctx context.Context, field
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.GalleryUser)
+	res := resTmp.([]*model.UserSearchResult)
 	fc.Result = res
-	return ec.marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUserᚄ(ctx, field.Selections, res)
+	return ec.marshalOUserSearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserSearchResultᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_SearchUsersPayload_users(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_SearchUsersPayload_results(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SearchUsersPayload",
 		Field:      field,
@@ -31197,46 +31342,10 @@ func (ec *executionContext) fieldContext_SearchUsersPayload_users(ctx context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_GalleryUser_id(ctx, field)
-			case "dbid":
-				return ec.fieldContext_GalleryUser_dbid(ctx, field)
-			case "username":
-				return ec.fieldContext_GalleryUser_username(ctx, field)
-			case "bio":
-				return ec.fieldContext_GalleryUser_bio(ctx, field)
-			case "traits":
-				return ec.fieldContext_GalleryUser_traits(ctx, field)
-			case "universal":
-				return ec.fieldContext_GalleryUser_universal(ctx, field)
-			case "roles":
-				return ec.fieldContext_GalleryUser_roles(ctx, field)
-			case "socialAccounts":
-				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
-			case "tokens":
-				return ec.fieldContext_GalleryUser_tokens(ctx, field)
-			case "tokensByChain":
-				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
-			case "wallets":
-				return ec.fieldContext_GalleryUser_wallets(ctx, field)
-			case "primaryWallet":
-				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
-			case "featuredGallery":
-				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
-			case "galleries":
-				return ec.fieldContext_GalleryUser_galleries(ctx, field)
-			case "badges":
-				return ec.fieldContext_GalleryUser_badges(ctx, field)
-			case "isAuthenticatedUser":
-				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
-			case "followers":
-				return ec.fieldContext_GalleryUser_followers(ctx, field)
-			case "following":
-				return ec.fieldContext_GalleryUser_following(ctx, field)
-			case "feed":
-				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			case "user":
+				return ec.fieldContext_UserSearchResult_user(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type UserSearchResult", field.Name)
 		},
 	}
 	return fc, nil
@@ -38967,6 +39076,87 @@ func (ec *executionContext) fieldContext_UserFollowedUsersFeedEventData_followed
 				return ec.fieldContext_FollowInfo_followedBack(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FollowInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserSearchResult_user(ctx context.Context, field graphql.CollectedField, obj *model.UserSearchResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserSearchResult_user(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GalleryUser)
+	fc.Result = res
+	return ec.marshalOGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UserSearchResult_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserSearchResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_GalleryUser_id(ctx, field)
+			case "dbid":
+				return ec.fieldContext_GalleryUser_dbid(ctx, field)
+			case "username":
+				return ec.fieldContext_GalleryUser_username(ctx, field)
+			case "bio":
+				return ec.fieldContext_GalleryUser_bio(ctx, field)
+			case "traits":
+				return ec.fieldContext_GalleryUser_traits(ctx, field)
+			case "universal":
+				return ec.fieldContext_GalleryUser_universal(ctx, field)
+			case "roles":
+				return ec.fieldContext_GalleryUser_roles(ctx, field)
+			case "socialAccounts":
+				return ec.fieldContext_GalleryUser_socialAccounts(ctx, field)
+			case "tokens":
+				return ec.fieldContext_GalleryUser_tokens(ctx, field)
+			case "tokensByChain":
+				return ec.fieldContext_GalleryUser_tokensByChain(ctx, field)
+			case "wallets":
+				return ec.fieldContext_GalleryUser_wallets(ctx, field)
+			case "primaryWallet":
+				return ec.fieldContext_GalleryUser_primaryWallet(ctx, field)
+			case "featuredGallery":
+				return ec.fieldContext_GalleryUser_featuredGallery(ctx, field)
+			case "galleries":
+				return ec.fieldContext_GalleryUser_galleries(ctx, field)
+			case "badges":
+				return ec.fieldContext_GalleryUser_badges(ctx, field)
+			case "isAuthenticatedUser":
+				return ec.fieldContext_GalleryUser_isAuthenticatedUser(ctx, field)
+			case "followers":
+				return ec.fieldContext_GalleryUser_followers(ctx, field)
+			case "following":
+				return ec.fieldContext_GalleryUser_following(ctx, field)
+			case "feed":
+				return ec.fieldContext_GalleryUser_feed(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type GalleryUser", field.Name)
 		},
 	}
 	return fc, nil
@@ -48443,6 +48633,31 @@ func (ec *executionContext) _Community(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var communitySearchResultImplementors = []string{"CommunitySearchResult"}
+
+func (ec *executionContext) _CommunitySearchResult(ctx context.Context, sel ast.SelectionSet, obj *model.CommunitySearchResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, communitySearchResultImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommunitySearchResult")
+		case "community":
+
+			out.Values[i] = ec._CommunitySearchResult_community(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var connectSocialAccountPayloadImplementors = []string{"ConnectSocialAccountPayload", "ConnectSocialAccountPayloadOrError"}
 
 func (ec *executionContext) _ConnectSocialAccountPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ConnectSocialAccountPayload) graphql.Marshaler {
@@ -50098,6 +50313,31 @@ func (ec *executionContext) _GalleryInfoUpdatedFeedEventData(ctx context.Context
 		case "action":
 
 			out.Values[i] = ec._GalleryInfoUpdatedFeedEventData_action(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var gallerySearchResultImplementors = []string{"GallerySearchResult"}
+
+func (ec *executionContext) _GallerySearchResult(ctx context.Context, sel ast.SelectionSet, obj *model.GallerySearchResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, gallerySearchResultImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GallerySearchResult")
+		case "gallery":
+
+			out.Values[i] = ec._GallerySearchResult_gallery(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -52569,9 +52809,9 @@ func (ec *executionContext) _SearchCommunitiesPayload(ctx context.Context, sel a
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("SearchCommunitiesPayload")
-		case "communities":
+		case "results":
 
-			out.Values[i] = ec._SearchCommunitiesPayload_communities(ctx, field, obj)
+			out.Values[i] = ec._SearchCommunitiesPayload_results(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -52594,9 +52834,9 @@ func (ec *executionContext) _SearchGalleriesPayload(ctx context.Context, sel ast
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("SearchGalleriesPayload")
-		case "galleries":
+		case "results":
 
-			out.Values[i] = ec._SearchGalleriesPayload_galleries(ctx, field, obj)
+			out.Values[i] = ec._SearchGalleriesPayload_results(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -52619,9 +52859,9 @@ func (ec *executionContext) _SearchUsersPayload(ctx context.Context, sel ast.Sel
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("SearchUsersPayload")
-		case "users":
+		case "results":
 
-			out.Values[i] = ec._SearchUsersPayload_users(ctx, field, obj)
+			out.Values[i] = ec._SearchUsersPayload_results(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -54668,6 +54908,31 @@ func (ec *executionContext) _UserFollowedUsersFeedEventData(ctx context.Context,
 	return out
 }
 
+var userSearchResultImplementors = []string{"UserSearchResult"}
+
+func (ec *executionContext) _UserSearchResult(ctx context.Context, sel ast.SelectionSet, obj *model.UserSearchResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userSearchResultImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserSearchResult")
+		case "user":
+
+			out.Values[i] = ec._UserSearchResult_user(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var usersConnectionImplementors = []string{"UsersConnection"}
 
 func (ec *executionContext) _UsersConnection(ctx context.Context, sel ast.SelectionSet, obj *model.UsersConnection) graphql.Marshaler {
@@ -55636,14 +55901,14 @@ func (ec *executionContext) unmarshalNCollectionTokenSettingsInput2ᚖgithubᚗc
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx context.Context, sel ast.SelectionSet, v *model.Community) graphql.Marshaler {
+func (ec *executionContext) marshalNCommunitySearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitySearchResult(ctx context.Context, sel ast.SelectionSet, v *model.CommunitySearchResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._Community(ctx, sel, v)
+	return ec._CommunitySearchResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNCreateCollectionInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCreateCollectionInput(ctx context.Context, v interface{}) (model.CreateCollectionInput, error) {
@@ -55764,16 +56029,6 @@ func (ec *executionContext) marshalNFeedEventData2githubᚗcomᚋmikeydubᚋgo�
 	return ec._FeedEventData(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v *model.Gallery) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._Gallery(ctx, sel, v)
-}
-
 func (ec *executionContext) unmarshalNGalleryPositionInput2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryPositionInputᚄ(ctx context.Context, v interface{}) ([]*model.GalleryPositionInput, error) {
 	var vSlice []interface{}
 	if v != nil {
@@ -55794,6 +56049,16 @@ func (ec *executionContext) unmarshalNGalleryPositionInput2ᚕᚖgithubᚗcomᚋ
 func (ec *executionContext) unmarshalNGalleryPositionInput2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryPositionInput(ctx context.Context, v interface{}) (*model.GalleryPositionInput, error) {
 	res, err := ec.unmarshalInputGalleryPositionInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNGallerySearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallerySearchResult(ctx context.Context, sel ast.SelectionSet, v *model.GallerySearchResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._GallerySearchResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNGalleryUser2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v *model.GalleryUser) graphql.Marshaler {
@@ -56146,6 +56411,16 @@ func (ec *executionContext) unmarshalNUserExperienceType2githubᚗcomᚋmikeydub
 
 func (ec *executionContext) marshalNUserExperienceType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserExperienceType(ctx context.Context, sel ast.SelectionSet, v model.UserExperienceType) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNUserSearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserSearchResult(ctx context.Context, sel ast.SelectionSet, v *model.UserSearchResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserSearchResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNVerifyEmailInput2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐVerifyEmailInput(ctx context.Context, v interface{}) (model.VerifyEmailInput, error) {
@@ -57116,7 +57391,21 @@ func (ec *executionContext) marshalOCommentOnFeedEventPayloadOrError2githubᚗco
 	return ec._CommentOnFeedEventPayloadOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOCommunity2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Community) graphql.Marshaler {
+func (ec *executionContext) marshalOCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx context.Context, sel ast.SelectionSet, v *model.Community) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Community(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByAddressOrError(ctx context.Context, sel ast.SelectionSet, v model.CommunityByAddressOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CommunityByAddressOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCommunitySearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitySearchResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CommunitySearchResult) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -57143,7 +57432,7 @@ func (ec *executionContext) marshalOCommunity2ᚕᚖgithubᚗcomᚋmikeydubᚋgo
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNCommunity2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunity(ctx, sel, v[i])
+			ret[i] = ec.marshalNCommunitySearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunitySearchResult(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -57161,13 +57450,6 @@ func (ec *executionContext) marshalOCommunity2ᚕᚖgithubᚗcomᚋmikeydubᚋgo
 	}
 
 	return ret
-}
-
-func (ec *executionContext) marshalOCommunityByAddressOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐCommunityByAddressOrError(ctx context.Context, sel ast.SelectionSet, v model.CommunityByAddressOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._CommunityByAddressOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOConnectSocialAccountPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐConnectSocialAccountPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.ConnectSocialAccountPayloadOrError) graphql.Marshaler {
@@ -57794,7 +58076,21 @@ func (ec *executionContext) marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgo�
 	return ret
 }
 
-func (ec *executionContext) marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Gallery) graphql.Marshaler {
+func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v *model.Gallery) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Gallery(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryByIDPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GalleryByIDPayloadOrError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._GalleryByIdPayloadOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOGallerySearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallerySearchResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.GallerySearchResult) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -57821,7 +58117,7 @@ func (ec *executionContext) marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgo�
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx, sel, v[i])
+			ret[i] = ec.marshalNGallerySearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallerySearchResult(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -57839,20 +58135,6 @@ func (ec *executionContext) marshalOGallery2ᚕᚖgithubᚗcomᚋmikeydubᚋgo�
 	}
 
 	return ret
-}
-
-func (ec *executionContext) marshalOGallery2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGallery(ctx context.Context, sel ast.SelectionSet, v *model.Gallery) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._Gallery(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOGalleryByIdPayloadOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryByIDPayloadOrError(ctx context.Context, sel ast.SelectionSet, v model.GalleryByIDPayloadOrError) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._GalleryByIdPayloadOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOGalleryUser2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐGalleryUser(ctx context.Context, sel ast.SelectionSet, v []*model.GalleryUser) graphql.Marshaler {
@@ -59497,6 +59779,53 @@ func (ec *executionContext) marshalOUserExperience2ᚕᚖgithubᚗcomᚋmikeydub
 				defer wg.Done()
 			}
 			ret[i] = ec.marshalNUserExperience2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserExperience(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalOUserSearchResult2ᚕᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserSearchResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.UserSearchResult) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNUserSearchResult2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐUserSearchResult(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)

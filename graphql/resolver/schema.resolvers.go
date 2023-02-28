@@ -1703,7 +1703,14 @@ func (r *queryResolver) SearchUsers(ctx context.Context, query string, limit *in
 		return nil, err
 	}
 
-	return model.SearchUsersPayload{Users: usersToModels(ctx, users)}, nil
+	results := make([]*model.UserSearchResult, len(users))
+	for i, user := range users {
+		results[i] = &model.UserSearchResult{
+			User: userToModel(ctx, user),
+		}
+	}
+
+	return model.SearchUsersPayload{Results: results}, nil
 }
 
 // SearchGalleries is the resolver for the searchGalleries field.
@@ -1717,7 +1724,14 @@ func (r *queryResolver) SearchGalleries(ctx context.Context, query string, limit
 		return nil, err
 	}
 
-	return model.SearchGalleriesPayload{Galleries: galleriesToModels(ctx, galleries)}, nil
+	results := make([]*model.GallerySearchResult, len(galleries))
+	for i, gallery := range galleries {
+		results[i] = &model.GallerySearchResult{
+			Gallery: galleryToModel(ctx, gallery),
+		}
+	}
+
+	return model.SearchGalleriesPayload{Results: results}, nil
 }
 
 // SearchCommunities is the resolver for the searchCommunities field.
@@ -1733,7 +1747,15 @@ func (r *queryResolver) SearchCommunities(ctx context.Context, query string, lim
 	}
 
 	forceRefresh := false
-	return model.SearchCommunitiesPayload{Communities: communitiesToModels(ctx, contracts, &forceRefresh)}, nil
+
+	results := make([]*model.CommunitySearchResult, len(contracts))
+	for i, contract := range contracts {
+		results[i] = &model.CommunitySearchResult{
+			Community: communityToModel(ctx, contract, &forceRefresh),
+		}
+	}
+
+	return model.SearchCommunitiesPayload{Results: results}, nil
 }
 
 // UsersByRole is the resolver for the usersByRole field.

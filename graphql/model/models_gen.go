@@ -573,6 +573,10 @@ type Community struct {
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
+type CommunitySearchResult struct {
+	Community *Community `json:"community"`
+}
+
 type ConnectSocialAccountPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -1080,6 +1084,10 @@ type GalleryPositionInput struct {
 	Position  string       `json:"position"`
 }
 
+type GallerySearchResult struct {
+	Gallery *Gallery `json:"gallery"`
+}
+
 type GalleryUpdatedFeedEventData struct {
 	HelperGalleryUpdatedFeedEventDataData
 	EventTime      *time.Time      `json:"eventTime"`
@@ -1401,19 +1409,19 @@ type ResendVerificationEmailPayload struct {
 func (ResendVerificationEmailPayload) IsResendVerificationEmailPayloadOrError() {}
 
 type SearchCommunitiesPayload struct {
-	Communities []*Community `json:"communities"`
+	Results []*CommunitySearchResult `json:"results"`
 }
 
 func (SearchCommunitiesPayload) IsSearchCommunitiesPayloadOrError() {}
 
 type SearchGalleriesPayload struct {
-	Galleries []*Gallery `json:"galleries"`
+	Results []*GallerySearchResult `json:"results"`
 }
 
 func (SearchGalleriesPayload) IsSearchGalleriesPayloadOrError() {}
 
 type SearchUsersPayload struct {
-	Users []*GalleryUser `json:"users"`
+	Results []*UserSearchResult `json:"results"`
 }
 
 func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
@@ -1924,6 +1932,10 @@ type UserFollowedUsersFeedEventData struct {
 }
 
 func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
+
+type UserSearchResult struct {
+	User *GalleryUser `json:"user"`
+}
 
 type UsersConnection struct {
 	Edges    []*UserEdge `json:"edges"`

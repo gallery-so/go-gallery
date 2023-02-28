@@ -914,29 +914,35 @@ type TrendingUsersPayload {
 
 union TrendingUsersPayloadOrError = TrendingUsersPayload
 
-type SearchUsersPayload {
-  users: [GalleryUser!]
+type UserSearchResult {
+  user: GalleryUser
 }
 
-union SearchUsersPayloadOrError =
-  SearchUsersPayload
-  | ErrInvalidInput
+type SearchUsersPayload {
+  results: [UserSearchResult!]
+}
+
+union SearchUsersPayloadOrError = SearchUsersPayload | ErrInvalidInput
+
+type GallerySearchResult {
+  gallery: Gallery
+}
 
 type SearchGalleriesPayload {
-  galleries: [Gallery!]
+  results: [GallerySearchResult!]
 }
 
-union SearchGalleriesPayloadOrError =
-  SearchGalleriesPayload
-  | ErrInvalidInput
+union SearchGalleriesPayloadOrError = SearchGalleriesPayload | ErrInvalidInput
+
+type CommunitySearchResult {
+  community: Community
+}
 
 type SearchCommunitiesPayload {
-  communities: [Community!]
+  results: [CommunitySearchResult!]
 }
 
-union SearchCommunitiesPayloadOrError =
-  SearchCommunitiesPayload
-  | ErrInvalidInput
+union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
 type Query {
   node(id: ID!): Node
@@ -964,9 +970,25 @@ type Query {
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
   trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
-  searchUsers(query: String!, limit: Int, usernameWeight: Float, bioWeight: Float): SearchUsersPayloadOrError
-  searchGalleries(query: String!, limit: Int, nameWeight: Float, descriptionWeight: Float): SearchGalleriesPayloadOrError
-  searchCommunities(query: String!, limit: Int, nameWeight: Float, descriptionWeight: Float, poapAddressWeight: Float): SearchCommunitiesPayloadOrError
+  searchUsers(
+    query: String!
+    limit: Int
+    usernameWeight: Float
+    bioWeight: Float
+  ): SearchUsersPayloadOrError
+  searchGalleries(
+    query: String!
+    limit: Int
+    nameWeight: Float
+    descriptionWeight: Float
+  ): SearchGalleriesPayloadOrError
+  searchCommunities(
+    query: String!
+    limit: Int
+    nameWeight: Float
+    descriptionWeight: Float
+    poapAddressWeight: Float
+  ): SearchCommunitiesPayloadOrError
 
   # Retool Specific
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
