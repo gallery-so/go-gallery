@@ -970,18 +970,37 @@ type Query {
   galleryById(id: DBID!): GalleryByIdPayloadOrError
   viewerGalleryById(id: DBID!): ViewerGalleryByIdPayloadOrError
   trendingUsers(input: TrendingUsersInput!): TrendingUsersPayloadOrError
+  """
+  Search for users with optional weighting. Weights are floats in the [0.0. 1.0] range
+  that help determine how matches will be ranked. usernameWeight defaults to 0.4 and
+  bioWeight defaults to 0.2, meaning that a search result matching a username is considered
+  twice as relevant as a search result matching a bio.
+  """
   searchUsers(
     query: String!
     limit: Int
     usernameWeight: Float
     bioWeight: Float
   ): SearchUsersPayloadOrError
+  """
+  Search for galleries with optional weighting. Weights are floats in the [0.0. 1.0] range
+  that help determine how matches will be ranked. nameWeight defaults to 0.4 and
+  descriptionWeight defaults to 0.2, meaning that a search result matching a gallery name is
+  considered twice as relevant as a search result matching a gallery description.
+  """
   searchGalleries(
     query: String!
     limit: Int
     nameWeight: Float
     descriptionWeight: Float
   ): SearchGalleriesPayloadOrError
+  """
+  Search for communities with optional weighting. Weights are floats in the [0.0. 1.0] range
+  that help determine how matches will be ranked. nameWeight defaults to 0.4, descriptionWeight
+  defaults to 0.2, and poapAddressWeight defaults to 0.1, meaning that a search result matching
+  a community name is considered twice as relevant as a search result matching a community
+  description, and four times as relevant as a search result matching a POAP address string.
+  """
   searchCommunities(
     query: String!
     limit: Int
