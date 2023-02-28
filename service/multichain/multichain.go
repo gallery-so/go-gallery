@@ -450,7 +450,9 @@ func (p *Provider) processTokensForOwnersOfContract(ctx context.Context, contrac
 	errors := make([]error, 0)
 	for userID, offset := range userTokenOffsets {
 		err = p.sendTokensToTokenProcessing(ctx, userID, persistedTokens[offset[0]:offset[1]])
-		errors = append(errors, err)
+		if err != nil {
+			errors = append(errors, err)
+		}
 	}
 
 	if len(errors) > 1 {
