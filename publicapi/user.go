@@ -646,6 +646,46 @@ func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {
 	return nil
 }
 
+func (api UserAPI) FollowAllSocialConnections(ctx context.Context, socialType persist.SocialProvider) error {
+	// Validate
+	curUserID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"socialType": {socialType, "required"},
+	}); err != nil {
+		return err
+	}
+
+	var userIDs []string
+	switch socialType {
+	case persist.SocialProviderTwitter:
+		onlyUnfollowing := true
+		conns, err := For(ctx).Social.GetConnections(ctx, socialType, &onlyUnfollowing)
+		if err != nil {
+			return err
+		}
+		userIDs, _ = util.Map(conns, func(s model.SocialConnection) (string, error) {
+			return s.UserID.String(), nil
+		})
+
+	default:
+		return fmt.Errorf("invalid social type: %s", socialType)
+	}
+
+	newIDs, _ := util.Map(userIDs, func(id string) (string, error) {
+		return persist.GenerateID().String(), nil
+	})
+
+	return api.queries.AddManyFollows(ctx, db.AddManyFollowsParams{
+		Ids:       newIDs,
+		Follower:  curUserID,
+		Followees: userIDs,
+	})
+}
+
 func (api UserAPI) UnfollowUser(ctx context.Context, userID persist.DBID) error {
 	// Validate
 	if err := validate.ValidateFields(api.validator, validate.ValidationMap{

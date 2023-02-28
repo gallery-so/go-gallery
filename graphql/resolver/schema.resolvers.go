@@ -994,6 +994,20 @@ func (r *mutationResolver) FollowUser(ctx context.Context, userID persist.DBID) 
 	return output, err
 }
 
+// FollowAllSocialConnections is the resolver for the followAllSocialConnections field.
+func (r *mutationResolver) FollowAllSocialConnections(ctx context.Context, accountType persist.SocialProvider) (model.FollowAllSocialConnectionsPayloadOrError, error) {
+	err := publicapi.For(ctx).User.FollowAllSocialConnections(ctx, accountType)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.FollowAllSocialConnectionsPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
 // UnfollowUser is the resolver for the unfollowUser field.
 func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error) {
 	err := publicapi.For(ctx).User.UnfollowUser(ctx, userID)
