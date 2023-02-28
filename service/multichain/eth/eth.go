@@ -403,7 +403,7 @@ func (d *Provider) UpdateMediaForWallet(ctx context.Context, wallet persist.Addr
 
 // RefreshContract refreshes the metadata for a contract
 func (d *Provider) RefreshContract(ctx context.Context, addr persist.Address) error {
-	input := indexer.UpdateContractMediaInput{
+	input := indexer.UpdateContractMetadataInput{
 		Address: persist.EthereumAddress(persist.ChainETH.NormalizeAddress(addr)),
 	}
 

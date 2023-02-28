@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/graphql/apq"
+	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/redis"
 
@@ -138,7 +139,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 
 	return func(c *gin.Context) {
 		if hub := sentryutil.SentryHubFromContext(c); hub != nil {
-			sentryutil.SetAuthContext(hub.Scope(), c)
+			auth.SetAuthContext(hub.Scope(), c)
 
 			hub.Scope().AddEventProcessor(func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 				// Filter the request body because queries may contain sensitive data. Other middleware (e.g. RequestReporter)

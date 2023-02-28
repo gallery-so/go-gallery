@@ -253,7 +253,7 @@ func initSentry() {
 		Release:          viper.GetString("GAE_VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-			event = sentryutil.ScrubEventCookies(event, hint)
+			event = auth.ScrubEventCookies(event, hint)
 			event = sentryutil.UpdateErrorFingerprints(event, hint)
 			return event
 		},

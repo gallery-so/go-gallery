@@ -3,13 +3,14 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/sirupsen/logrus"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -149,7 +150,7 @@ func Sentry(reportGinErrors bool) gin.HandlerFunc {
 		// according to Sentry docs, BeforeSend isn't called for tracing transactions. Instead, we
 		// have to use an event processor to scrub JWT cookies from transactions, so add one here.
 		// See: https://develop.sentry.dev/sdk/performance/#interaction-with-beforesend-and-event-processors
-		hub.Scope().AddEventProcessor(sentryutil.ScrubEventCookies)
+		hub.Scope().AddEventProcessor(auth.ScrubEventCookies)
 
 		// Add the cloned hub to the request context so sentrygin will find it
 		c.Request = c.Request.WithContext(sentry.SetHubOnContext(c.Request.Context(), hub))

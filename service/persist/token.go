@@ -238,7 +238,7 @@ type Media struct {
 
 // IsServable returns true if the token's Media has enough information to serve it's assets.
 func (m Media) IsServable() bool {
-	return m.MediaURL != "" && m.MediaType.IsValid() && m.MediaType != ""
+	return m.MediaURL != "" && m.MediaType.IsValid()
 }
 
 // NFT represents an old nft throughout the application
@@ -859,7 +859,7 @@ func (a EthereumAddressAtBlock) Value() (driver.Value, error) {
 
 // IsValid returns true if the media type is not unknown, syncing, or invalid
 func (m MediaType) IsValid() bool {
-	return m != MediaTypeUnknown && m != MediaTypeInvalid && m != MediaTypeSyncing
+	return m != MediaTypeUnknown && m != MediaTypeInvalid && m != MediaTypeSyncing && m != ""
 }
 
 // IsImageLike returns true if the media type is a type that is expected to be like an image and not live render
