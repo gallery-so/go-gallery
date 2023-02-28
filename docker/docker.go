@@ -30,8 +30,49 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 		return nil, err
 	}
 
-	r, err := startService(pool, "postgres")
+	composeFile, err := loadComposeFile()
 	if err != nil {
+		panic(err)
+		return nil, err
+	}
+
+	serviceConf, ok := composeFile.Services["postgres"]
+	if !ok {
+		panic("no postgres in docker-compose")
+		return nil, fmt.Errorf("service=%s not configured in docker-compose.yml", "postgres")
+	}
+
+	// panic(dockerFile)
+	// panic(filepath.Dir(dockerFile))
+
+	pgConf, err := filepath.Abs(util.MustFindFile("./docker/postgres/postgres.conf"))
+	if err != nil {
+		panic(err)
+		return nil, err
+	}
+
+	r, err := pool.BuildAndRunWithOptions(
+		util.MustFindFile("./docker/postgres/DOCKERFILE"),
+		&dockertest.RunOptions{
+			Name:         "postgres",
+			Env:          serviceConf.Environment,
+			Cmd:          serviceConf.Command,
+			ExposedPorts: serviceConf.Expose,
+		},
+		func(c *docker.HostConfig) {
+			c.AutoRemove = true
+			c.RestartPolicy = docker.RestartPolicy{Name: "no"}
+			c.Mounts = []docker.HostMount{
+				{
+					Target: "/etc/postgresql/postgresql.conf",
+					Source: pgConf,
+					Type:   "bind",
+				},
+			}
+		},
+	)
+	if err != nil {
+		panic(err)
 		return nil, err
 	}
 
@@ -40,6 +81,7 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 	port := hostAndPort[1]
 
 	if err := pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
+		panic(err)
 		return nil, err
 	}
 
@@ -184,6 +226,7 @@ type service struct {
 	Environment []string `yaml:"environment"`
 	Command     []string `yaml:"command"`
 	Expose      []string `yaml:"expose"`
+	Volumes     []string `yaml:"volumes"`
 }
 
 func startService(pool *dockertest.Pool, service string) (*dockertest.Resource, error) {

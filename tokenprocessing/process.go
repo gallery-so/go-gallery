@@ -42,11 +42,11 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 
 		ctx := logger.NewContextWithFields(c, logrus.Fields{"userID": input.UserID})
 
-		if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
-			util.ErrResponse(c, http.StatusOK, err)
-			return
-		}
-		defer throttler.Unlock(ctx, input.UserID.String())
+		// XXX: if err := throttler.Lock(ctx, input.UserID.String()); err != nil {
+		// XXX: 	util.ErrResponse(c, http.StatusOK, err)
+		// XXX: 	return
+		// XXX: }
+		// XXX: defer throttler.Unlock(ctx, input.UserID.String())
 
 		wp := workerpool.New(100)
 		for _, tokenID := range input.TokenIDs {
@@ -86,11 +86,11 @@ func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *
 			return
 		}
 		key := fmt.Sprintf("%s-%s-%d", input.TokenID, input.ContractAddress, input.Chain)
-		if err := throttler.Lock(c, key); err != nil {
-			util.ErrResponse(c, http.StatusTooManyRequests, err)
-			return
-		}
-		defer throttler.Unlock(c, key)
+		// XXX: if err := throttler.Lock(c, key); err != nil {
+		// XXX: 	util.ErrResponse(c, http.StatusTooManyRequests, err)
+		// XXX: 	return
+		// XXX: }
+		// XXX: defer throttler.Unlock(c, key)
 
 		wallet, err := walletRepo.GetByChainAddress(c, persist.NewChainAddress(input.OwnerAddress, input.Chain))
 		if err != nil {

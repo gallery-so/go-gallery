@@ -4,10 +4,30 @@ services:
     image: "redis:6"
     ports:
       - "6379:6379"
+  postgres-test:
+    build:
+      context: "docker/postgres"
+      dockerfile: "DOCKERFILE"
+      args:
+        - PGHOST=${PGHOST}
+        - PGPORT=${PGPORT}
+        - PGUSER=${PGUSER}
+        - PGPASSWORD=${PGPASSWORD}
+        - PGDATABASE=${PGDATABASE}
+        - PGTESTUSER=${PGTESTUSER}
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - "${PWD}/docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf"
+    command: ["-c", "config-file=/etc/postgresql/postgresql.conf"]
   postgres:
     build:
-      context: "."
-      dockerfile: "docker/postgres/DOCKERFILE"
+      context: "docker/postgres"
+      dockerfile: "DOCKERFILE"
       args:
         - PGHOST=${PGHOST}
         - PGPORT=${PGPORT}
@@ -22,7 +42,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
     volumes:
-      - "./docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf"
+      - "${PWD}/docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf"
     command: ["-c", "config-file=/etc/postgresql/postgresql.conf"]
   postgres_indexer:
     build:

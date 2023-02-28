@@ -13,5 +13,5 @@ ARG PGPASSWORD=""
 ARG PGDATABASE=postgres
 ARG PGTESTUSER=benny
 ARG PGDATABASE=postgres
-COPY docker/postgres/01_init.sql /docker-entrypoint-initdb.d/01_init.sql
-COPY docker/postgres/02_pg_cron.sql /docker-entrypoint-initdb.d/02_pg_cron.sql
+COPY 01_init.sql /docker-entrypoint-initdb.d/01_init.sql
+COPY postgres.conf /etc/postgresql/postgresql.conf

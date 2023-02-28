@@ -412,16 +412,16 @@ stop-sql-proxy:
 migrate-local-indexerdb:
 	migrate -path ./db/migrations/indexer -database "postgresql://postgres@localhost:5433/postgres?sslmode=disable" up
 
-migrate-local-coredb:
-	migrate -path ./db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" goto 56
-	migrate -path ./db/migrations/core -database "postgresql://gallery_migrator@localhost:5432/postgres?sslmode=disable" up
+# migrate-local-coredb:
+# 	migrate -path ./db/migrations/core -database "postgresql://postgres@localhost:5432/postgres?sslmode=disable" goto 56
+# 	migrate -path ./db/migrations/core -database "postgresql://gallery_migrator@localhost:5432/postgres?sslmode=disable" up
 
 confirm-dev-migrate:
 	@prompt=$(shell bash -c 'read -p "Are you sure you want to apply migrations to the dev DB? Type \"development\" to confirm: " prompt; echo $$prompt'); \
 	if [ "$$prompt" != "development" ]; then exit 1; fi
 
-migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
-	@migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_MIGRATION_USER):$(POSTGRES_MIGRATION_PASSWORD)@localhost:6643/$(POSTGRES_DB)?sslmode=disable" up
+# migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
+# 	@migrate -path ./db/migrations/core -database "postgresql://$(POSTGRES_MIGRATION_USER):$(POSTGRES_MIGRATION_PASSWORD)@localhost:6643/$(POSTGRES_DB)?sslmode=disable" up
 
 confirm-prod-migrate:
 	@prompt=$(shell bash -c 'read -p "Are you sure you want to apply migrations to the production DB? Type \"production\" to confirm: " prompt; echo $$prompt'); \
@@ -432,6 +432,16 @@ migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
 
 fix-sops-macs:
 	@cd secrets; ../scripts/fix-sops-macs.sh
+
+migrate-local-coredb:
+	go run main.go
+
+migrate-dev-coredb:
+	@echo "Superuser username to use for privileged migrations: \c"; \
+	read user; \
+	echo "Password for $$user: \c"; \
+	read pw; \
+	go run main.go
 
 #----------------------------------------------------------------
 # End of targets
