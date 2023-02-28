@@ -18,14 +18,6 @@ type SearchAPI struct {
 	validator *validator.Validate
 }
 
-type SearchUsersOption func(params db.SearchUsersParams)
-
-func (api SearchAPI) withUsernameWeight(weight float32) SearchUsersOption {
-	return func(params db.SearchUsersParams) {
-		params.UsernameWeight = weight
-	}
-}
-
 // SearchUsers searches for users with the given query, limit, and optional weights. Weights may be nil to accept default values.
 // Weighting will probably be removed after we settle on defaults that feel correct!
 func (api SearchAPI) SearchUsers(ctx context.Context, query string, limit int, usernameWeight float32, bioWeight float32) ([]db.User, error) {
