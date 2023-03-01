@@ -52,6 +52,8 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	hostAndPort := strings.Split(r.GetHostPort("5432/tcp"), ":")
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
+	t.Setenv("POSTGRES_SUPERUSER_USER", "postgres")
+	t.Setenv("POSTGRES_SUPERUSER_PASSWORD", "")
 
 	err = migrate.RunCoreDBMigration()
 	if err != nil {
