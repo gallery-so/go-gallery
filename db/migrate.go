@@ -203,14 +203,13 @@ type log struct {
 
 func (l log) Printf(format string, v ...any) {
 	if len(v) > 0 {
-		if parts := strings.Split(v[0].(string), "/"); len(parts) > 0 {
-			v, err := strToVersion(parts[0])
-			if err != nil {
-				panic(err)
-			}
-			if l.superVersions[v] {
-				format = strings.TrimSuffix(format, "\n")
-				format += " [super]\n"
+		if msg, ok := v[0].(string); ok {
+			if parts := strings.Split(msg, "/"); len(parts) > 0 {
+				ver, err := strToVersion(parts[0])
+				if err == nil && l.superVersions[ver] {
+					format = strings.TrimSuffix(format, "\n")
+					format += " [super]\n"
+				}
 			}
 		}
 	}
