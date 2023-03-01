@@ -67,17 +67,11 @@ func superMigrations(dir string) (map[uint]bool, uint, error) {
 }
 
 func currentVersion(m *migrate.Migrate) (uint, error) {
-	curVer, dirty, err := m.Version()
+	curVer, _, err := m.Version()
 	if err != nil && err == migrate.ErrNilVersion {
 		return 0, nil
 	}
-	if err != nil {
-		return 0, err
-	}
-	if dirty {
-		return 0, fmt.Errorf("current version %d is dirty, fix before running", curVer)
-	}
-	return curVer, nil
+	return curVer, err
 }
 
 // RunCoreDBMigration should always be used to migrate the core backend database.
@@ -165,6 +159,16 @@ func RunCoreDBMigration() error {
 	}
 
 	return nil
+}
+
+// RunMigration runs all migrations in the specified directory
+func RunMigration(client *sql.DB, file string) (*migrate.Migrate, error) {
+	m, err := newMigrateInstance(client, file)
+	if err != nil {
+		return nil, err
+	}
+
+	return m, m.Up()
 }
 
 func newMigrateInstance(client *sql.DB, dir string) (*migrate.Migrate, error) {

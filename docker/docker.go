@@ -38,7 +38,7 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 
 	serviceConf, ok := composeFile.Services["postgres"]
 	if !ok {
-		return nil, fmt.Errorf("postgres not configured in docker-compose.yml", "postgres")
+		return nil, errors.New("'postgres' service not configured in docker-compose.yml")
 	}
 
 	pgConf, err := filepath.Abs(util.MustFindFile("./docker/postgres/postgres.conf"))
