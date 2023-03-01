@@ -1479,13 +1479,6 @@ func (r *previewURLSetResolver) Blurhash(ctx context.Context, obj *model.Preview
 	return mm.GetBlurhash(*obj.Raw), nil
 }
 
-// AspectRatio is the resolver for the aspectRatio field.
-func (r *previewURLSetResolver) AspectRatio(ctx context.Context, obj *model.PreviewURLSet) (*float64, error) {
-	mm := mediamapper.For(ctx)
-
-	return mm.GetAspectRatio(*obj.Raw), nil
-}
-
 // Node is the resolver for the node field.
 func (r *queryResolver) Node(ctx context.Context, id model.GqlID) (model.Node, error) {
 	return nodeFetcher.GetNodeByGqlID(ctx, id)
@@ -2239,3 +2232,15 @@ type viewerResolver struct{ *Resolver }
 type walletResolver struct{ *Resolver }
 type chainAddressInputResolver struct{ *Resolver }
 type chainPubKeyInputResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *previewURLSetResolver) AspectRatio(ctx context.Context, obj *model.PreviewURLSet) (*float64, error) {
+	mm := mediamapper.For(ctx)
+
+	return mm.GetAspectRatio(*obj.Raw), nil
+}
