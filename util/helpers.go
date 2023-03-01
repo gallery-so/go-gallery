@@ -207,6 +207,14 @@ func Map[T, U any](xs []T, f func(T) (U, error)) ([]U, error) {
 	return result, nil
 }
 
+func MapKeys[T comparable, V any](m map[T]V) []T {
+	result := make([]T, 0, len(m))
+	for k := range m {
+		result = append(result, k)
+	}
+	return result
+}
+
 // Dedupe removes duplicate elements from a slice, preserving the order of the remaining elements.
 func Dedupe[T comparable](src []T, filterInPlace bool) []T {
 	var result []T
