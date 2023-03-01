@@ -105,9 +105,9 @@ func RunCoreDBMigration() error {
 		return err
 	}
 
-	// migrate updates the version to an older version
-	// even if the current version is ahead of it, so we
-	// need to manually check before applying this migration
+	// migrate updates the version to an older version even if the current
+	// version is ahead of it, so we need to manually check before applying
+	// the migration
 	if curVer < 56 {
 		if err := superMigrate.Migrate(56); err != nil {
 			return err
