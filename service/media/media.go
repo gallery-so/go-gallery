@@ -980,10 +980,11 @@ type dimensions struct {
 
 type errNoStreams struct {
 	url string
+	err error
 }
 
 func (e errNoStreams) Error() string {
-	return fmt.Sprintf("no streams in %s", e.url)
+	return fmt.Sprintf("no streams in %s: %s", e.url, e.err)
 }
 
 func getMediaDimensions(url string) (persist.Dimensions, error) {
@@ -1000,7 +1001,7 @@ func getMediaDimensions(url string) (persist.Dimensions, error) {
 	var d dimensions
 	err = json.Unmarshal(outBuf.Bytes(), &d)
 	if err != nil {
-		return persist.Dimensions{}, err
+		return persist.Dimensions{}, errNoStreams{url: url, err: err}
 	}
 
 	if len(d.Streams) == 0 {
