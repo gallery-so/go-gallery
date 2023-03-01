@@ -15,6 +15,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/asottile/dockerfile"
 	"github.com/go-redis/redis/v8"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -32,29 +33,23 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 
 	composeFile, err := loadComposeFile()
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
 	serviceConf, ok := composeFile.Services["postgres"]
 	if !ok {
-		panic("no postgres in docker-compose")
-		return nil, fmt.Errorf("service=%s not configured in docker-compose.yml", "postgres")
+		return nil, fmt.Errorf("postgres not configured in docker-compose.yml", "postgres")
 	}
-
-	// panic(dockerFile)
-	// panic(filepath.Dir(dockerFile))
 
 	pgConf, err := filepath.Abs(util.MustFindFile("./docker/postgres/postgres.conf"))
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
 	r, err := pool.BuildAndRunWithOptions(
 		util.MustFindFile("./docker/postgres/DOCKERFILE"),
 		&dockertest.RunOptions{
-			Name:         "postgres",
+			Name:         strings.ToLower(fmt.Sprintf("postgres-%s", persist.GenerateID())),
 			Env:          serviceConf.Environment,
 			Cmd:          serviceConf.Command,
 			ExposedPorts: serviceConf.Expose,
@@ -72,7 +67,6 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 		},
 	)
 	if err != nil {
-		panic(err)
 		return nil, err
 	}
 
@@ -81,7 +75,6 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 	port := hostAndPort[1]
 
 	if err := pool.Retry(waitOnDB(host, port, "postgres", "", "postgres")); err != nil {
-		panic(err)
 		return nil, err
 	}
 

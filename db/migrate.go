@@ -124,7 +124,7 @@ func RunCoreDBMigration() error {
 	defer galleryMigrate.Close()
 
 	// Find which migrations need to run as a superuser
-	superVersions, lastSuperVer, err := superMigrations(coreMigrations)
+	superVersions, lastSuperVer, err := superMigrations(util.MustFindFile(coreMigrations))
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func newMigrateInstance(client *sql.DB, dir string) (*migrate.Migrate, error) {
 		return nil, err
 	}
 
-	superVersions, _, err := superMigrations(dir)
+	superVersions, _, err := superMigrations(util.MustFindFile(dir))
 	if err != nil {
 		return nil, err
 	}
