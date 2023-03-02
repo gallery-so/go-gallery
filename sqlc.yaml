@@ -21,7 +21,9 @@ sql:
             go_type: "github.com/mikeydub/go-gallery/service/persist.DBID"
 
   # Backend model gen
-  - schema: "db/migrations/core"
+  - schema:
+    - "db/migrations/core"
+    - "db/migrations/sqlc/core"
     queries: "db/queries/core"
     engine: "postgresql"
     gen:
