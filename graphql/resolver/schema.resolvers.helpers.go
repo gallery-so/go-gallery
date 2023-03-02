@@ -2040,7 +2040,11 @@ func getInvalidMedia(ctx context.Context, media persist.Media) model.InvalidMedi
 }
 
 func mediaToDimensions(media persist.Media) *model.MediaDimensions {
-	aspect := float64(media.Dimensions.Width) / float64(media.Dimensions.Height)
+	var aspect float64
+	if media.Dimensions.Height > 0 && media.Dimensions.Width > 0 {
+		aspect = float64(media.Dimensions.Width) / float64(media.Dimensions.Height)
+	}
+
 	return &model.MediaDimensions{
 		Width:       &media.Dimensions.Height,
 		Height:      &media.Dimensions.Width,

@@ -187,7 +187,6 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res = getRawMedia(pCtx, mediaType, name, vURL, imgURL)
 	}
 
-	res = remapMedia(res)
 	logger.For(pCtx).Infof("media for %s of type %s: %+v", name, mediaType, res)
 	return res, nil
 }
@@ -253,6 +252,8 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 		res.MediaURL = persist.NullString(imageURL)
 	}
 
+	res = remapMedia(res)
+
 	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
@@ -295,6 +296,8 @@ func getGIFMedia(pCtx context.Context, name, tokenBucket string, storageClient *
 		res.MediaURL = persist.NullString(imgURL)
 	}
 
+	res = remapMedia(res)
+
 	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
@@ -323,6 +326,8 @@ func getSvgMedia(pCtx context.Context, name, tokenBucket string, storageClient *
 			res.MediaURL = persist.NullString(imgURL)
 		}
 	}
+
+	res = remapMedia(res)
 
 	res.Dimensions, err = getSvgDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
@@ -413,6 +418,8 @@ func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient
 		}
 	}
 
+	res = remapMedia(res)
+
 	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
@@ -434,10 +441,13 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 	}
 	res.ThumbnailURL = persist.NullString(getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient))
 
+	res = remapMedia(res)
+
 	dimensions, err := getHTMLDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
 	}
+
 	res.Dimensions = dimensions
 
 	return res
@@ -505,6 +515,9 @@ func getRawMedia(pCtx context.Context, mediaType persist.MediaType, name, vURL, 
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
+
+	res = remapMedia(res)
+
 	dimensions, err := getMediaDimensions(res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
@@ -517,7 +530,8 @@ func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
 		path := util.GetURIPath(mediaURL, false)
-		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+		// return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+		return fmt.Sprintf("%s/ipfs/%s", "https://ipfs.io", path)
 	case persist.URITypeArweave:
 		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("https://arweave.net/%s", path)
@@ -958,7 +972,7 @@ func thumbnailVideoToWriter(url string, writer io.Writer) error {
 }
 
 func createLiveRenderPreviewVideo(videoURL string, writer io.Writer) error {
-	c := exec.Command("ffmpeg", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "pipe:1")
+	c := exec.Command("ffmpeg", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
@@ -981,7 +995,6 @@ func (e errNoStreams) Error() string {
 }
 
 func getMediaDimensions(url string) (persist.Dimensions, error) {
-	// ffprobe -show_streams "https://storage.googleapis.com/prod-token-content/image-0x000e49c87d2874431567d38ff9548890ab39baac-1529" -print_format json
 	outBuf := &bytes.Buffer{}
 	c := exec.Command("ffprobe", "-show_streams", url, "-print_format", "json")
 	c.Stderr = os.Stderr
@@ -1001,10 +1014,13 @@ func getMediaDimensions(url string) (persist.Dimensions, error) {
 		return persist.Dimensions{}, errNoStreams{url: url}
 	}
 
-	return persist.Dimensions{
+	dims := persist.Dimensions{
 		Width:  d.Streams[0].Width,
 		Height: d.Streams[0].Height,
-	}, nil
+	}
+
+	logger.For(nil).Debugf("got dimensions %+v for %s", dims, url)
+	return dims, nil
 }
 
 func truncateString(s string, i int) string {

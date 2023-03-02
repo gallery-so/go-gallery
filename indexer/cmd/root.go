@@ -7,6 +7,7 @@ import (
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/appengine"
 
 	"github.com/spf13/cobra"
@@ -91,6 +92,8 @@ var serverCmd = &cobra.Command{
 		defer sentryutil.RecoverAndRaise(nil)
 
 		indexer.InitServer(quietLogs, enableRPC)
+
+		logger.For(nil).WithFields(logrus.Fields{"port": port}).Info("Starting indexer server")
 		if appengine.IsAppEngine() {
 			logger.For(nil).Info("Running in App Engine Mode")
 			appengine.Main()
