@@ -98,7 +98,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 		profileImages, _ := util.Map(initialConnections, func(m model.SocialConnection) (string, error) {
 			return m.ProfileImage, nil
 		})
-		results, err := api.queries.GetSocialConnections(ctx, db.GetSocialConnectionsParams{
+		results, err := api.queries.GetSocialConnectionsPaginate(ctx, db.GetSocialConnectionsPaginateParams{
 			Limit:               params.Limit,
 			UserID:              userID,
 			SocialIds:           socialIDs,
@@ -118,7 +118,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 		if err != nil {
 			return nil, err
 		}
-		return util.Map(results, func(r db.GetSocialConnectionsRow) (interface{}, error) {
+		return util.Map(results, func(r db.GetSocialConnectionsPaginateRow) (interface{}, error) {
 			m := model.SocialConnection{
 				GalleryUser:        &model.GalleryUser{Dbid: r.UserID},
 				CurrentlyFollowing: r.AlreadyFollowing,
@@ -171,6 +171,94 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 	})
 
 	return connections, pageInfo, nil
+}
+
+func (api SocialAPI) GetConnections(ctx context.Context, socialProvider persist.SocialProvider, onlyUnfollowing *bool) ([]model.SocialConnection, error) {
+	// Validate
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"socialProvider": {socialProvider, "required"},
+	}); err != nil {
+		return nil, err
+	}
+
+	ouf := false
+	if onlyUnfollowing != nil {
+		ouf = *onlyUnfollowing
+	}
+
+	userID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var initialConnections []model.SocialConnection
+	var socialIDs []string
+
+	switch socialProvider {
+	case persist.SocialProviderTwitter:
+		tapi, err := api.newTwitterAPIForUser(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		following, err := tapi.GetFollowing(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		initialConnections, _ = util.Map(following, func(t twitter.TwitterIdentifiers) (model.SocialConnection, error) {
+			return model.SocialConnection{
+				SocialID:       t.ID,
+				SocialType:     persist.SocialProviderTwitter,
+				DisplayName:    t.Name,
+				SocialUsername: t.Username,
+				ProfileImage:   t.ProfileImageURL,
+			}, nil
+		})
+		socialIDs, _ = util.Map(following, func(t twitter.TwitterIdentifiers) (string, error) {
+			return t.ID, nil
+		})
+
+		usernames, _ := util.Map(initialConnections, func(m model.SocialConnection) (string, error) {
+			return m.SocialUsername, nil
+		})
+		displaynames, _ := util.Map(initialConnections, func(m model.SocialConnection) (string, error) {
+			return m.DisplayName, nil
+		})
+		profileImages, _ := util.Map(initialConnections, func(m model.SocialConnection) (string, error) {
+			return m.ProfileImage, nil
+		})
+		results, err := api.queries.GetSocialConnections(ctx, db.GetSocialConnectionsParams{
+
+			UserID:              userID,
+			SocialIds:           socialIDs,
+			SocialUsernames:     usernames,
+			SocialDisplaynames:  displaynames,
+			Social:              socialProvider.String(),
+			SocialProfileImages: profileImages,
+			OnlyUnfollowing:     ouf,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return util.Map(results, func(r db.GetSocialConnectionsRow) (model.SocialConnection, error) {
+			m := model.SocialConnection{
+				GalleryUser:        &model.GalleryUser{Dbid: r.UserID},
+				CurrentlyFollowing: r.AlreadyFollowing,
+				SocialType:         socialProvider,
+				SocialID:           r.SocialID.(string),
+				DisplayName:        r.SocialDisplayname.(string),
+				SocialUsername:     r.SocialUsername.(string),
+				ProfileImage:       r.SocialProfileImage.(string),
+				HelperSocialConnectionData: model.HelperSocialConnectionData{
+					UserID:        r.UserID,
+					UserCreatedAt: persist.CreationTime(r.UserCreatedAt),
+				},
+			}
+			return m, nil
+		})
+	default:
+		return nil, fmt.Errorf("unsupported social provider: %s", socialProvider)
+	}
 }
 
 func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DBID) (*twitter.API, error) {

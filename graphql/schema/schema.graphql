@@ -1916,6 +1916,15 @@ union DisconnectSocialAccountPayloadOrError =
   | ErrInvalidInput
   | ErrNotAuthorized
 
+type FollowAllSocialConnectionsPayload {
+  viewer: Viewer
+}
+
+union FollowAllSocialConnectionsPayloadOrError =
+    FollowAllSocialConnectionsPayload
+  | ErrInvalidInput
+  | ErrNotAuthorized
+
 type Mutation {
   # User Mutations
   addUserWallet(
@@ -1976,6 +1985,9 @@ type Mutation {
   ): UpdateSocialAccountDisplayedPayloadOrError @authRequired
 
   followUser(userId: DBID!): FollowUserPayloadOrError @authRequired
+  followAllSocialConnections(
+    accountType: SocialAccountType!
+  ): FollowAllSocialConnectionsPayloadOrError @authRequired
   unfollowUser(userId: DBID!): UnfollowUserPayloadOrError @authRequired
 
   admireFeedEvent(feedEventId: DBID!): AdmireFeedEventPayloadOrError @authRequired

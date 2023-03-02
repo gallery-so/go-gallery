@@ -99,6 +99,10 @@ type FeedEventOrError interface {
 	IsFeedEventOrError()
 }
 
+type FollowAllSocialConnectionsPayloadOrError interface {
+	IsFollowAllSocialConnectionsPayloadOrError()
+}
+
 type FollowUserPayloadOrError interface {
 	IsFollowUserPayloadOrError()
 }
@@ -861,6 +865,7 @@ func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
+func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -918,6 +923,7 @@ func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
+func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1032,6 +1038,12 @@ type FeedEventInteractionsEdge struct {
 	Event  *FeedEvent  `json:"event"`
 	Cursor *string     `json:"cursor"`
 }
+
+type FollowAllSocialConnectionsPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (FollowAllSocialConnectionsPayload) IsFollowAllSocialConnectionsPayloadOrError() {}
 
 type FollowInfo struct {
 	User         *GalleryUser `json:"user"`
