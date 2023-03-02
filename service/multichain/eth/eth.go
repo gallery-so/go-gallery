@@ -339,7 +339,7 @@ func (d *Provider) RefreshToken(ctx context.Context, ti multichain.ChainAgnostic
 
 // DeepRefresh re-indexes a wallet address.
 func (d *Provider) DeepRefresh(ctx context.Context, ownerAddress persist.Address) error {
-	height, err := rpc.RetryGetBlockNumber(ctx, d.ethClient, rpc.DefaultRetry)
+	height, err := rpc.RetryGetBlockNumber(ctx, d.ethClient)
 	if err != nil {
 		return err
 	}

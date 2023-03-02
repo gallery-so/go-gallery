@@ -14,7 +14,6 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"math/big"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,6 +27,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
+	"github.com/mikeydub/go-gallery/util/retry"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -62,13 +62,6 @@ var (
 // rateLimited is the content returned from an RPC call when rate limited.
 var rateLimited = "429 Too Many Requests"
 
-// DefaultRetry is the default retry applied to RPC calls.
-var DefaultRetry = Retry{
-	Base:  4,
-	Cap:   64,
-	Tries: 8,
-}
-
 // Transfer represents a Transfer from the RPC response
 type Transfer struct {
 	BlockNumber     persist.BlockNumber
@@ -94,19 +87,6 @@ type TokenContractMetadata struct {
 type ErrHTTP struct {
 	URL    string
 	Status int
-}
-
-// Retry configures retries for RPC calls.
-type Retry struct {
-	Base  int // min amount of time to sleep per iteration
-	Cap   int // max amount of time to sleep per iteration
-	Tries int // number of times to retry
-}
-
-// Sleep will sleep based on the current iteration.
-func (r Retry) Sleep(i int) {
-	sleep := rand.Intn(minInt(r.Cap, r.Base*powerInt(2, i)))
-	time.Sleep(time.Duration(sleep) * time.Second)
 }
 
 // NewEthClient returns an ethclient.Client
@@ -259,15 +239,15 @@ func GetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, e
 }
 
 // RetryGetBlockNumber calls GetBlockNumber with backoff.
-func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client, retry Retry) (uint64, error) {
+func RetryGetBlockNumber(ctx context.Context, ethClient *ethclient.Client) (uint64, error) {
 	var height uint64
 	var err error
-	for i := 0; i < retry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.Tries; i++ {
 		height, err = GetBlockNumber(ctx, ethClient)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.Sleep(i)
+		retry.DefaultRetry.Sleep(i)
 	}
 	return height, err
 }
@@ -278,15 +258,15 @@ func GetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.Fi
 }
 
 // RetryGetLogs calls GetLogs with backoff.
-func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery, retry Retry) ([]types.Log, error) {
+func RetryGetLogs(ctx context.Context, ethClient *ethclient.Client, query ethereum.FilterQuery) ([]types.Log, error) {
 	logs := make([]types.Log, 0)
 	var err error
-	for i := 0; i < retry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.Tries; i++ {
 		logs, err = GetLogs(ctx, ethClient, query)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.Sleep(i)
+		retry.DefaultRetry.Sleep(i)
 	}
 	return logs, err
 }
@@ -297,7 +277,7 @@ func GetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash com
 }
 
 // RetryGetTransaction calls GetTransaction with backoff.
-func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, retry Retry) (*types.Transaction, bool, error) {
+func RetryGetTransaction(ctx context.Context, ethClient *ethclient.Client, txHash common.Hash, retry retry.Retry) (*types.Transaction, bool, error) {
 	var tx *types.Transaction
 	var pending bool
 	var err error
@@ -336,15 +316,15 @@ func GetTokenContractMetadata(ctx context.Context, address persist.EthereumAddre
 }
 
 // RetryGetTokenContractMetaData calls GetTokenContractMetadata with backoff.
-func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client, retry Retry) (*TokenContractMetadata, error) {
+func RetryGetTokenContractMetadata(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (*TokenContractMetadata, error) {
 	var metadata *TokenContractMetadata
 	var err error
-	for i := 0; i < retry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.Tries; i++ {
 		metadata, err = GetTokenContractMetadata(ctx, contractAddress, ethClient)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.Sleep(i)
+		retry.DefaultRetry.Sleep(i)
 	}
 	return metadata, err
 }
@@ -845,15 +825,15 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 }
 
 // RetryGetTokenURI calls GetTokenURI with backoff.
-func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.TokenID, ethClient *ethclient.Client, retry Retry) (persist.TokenURI, error) {
+func RetryGetTokenURI(ctx context.Context, tokenType persist.TokenType, contractAddress persist.EthereumAddress, tokenID persist.TokenID, ethClient *ethclient.Client) (persist.TokenURI, error) {
 	var u persist.TokenURI
 	var err error
-	for i := 0; i < retry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.Tries; i++ {
 		u, err = GetTokenURI(ctx, tokenType, contractAddress, tokenID, ethClient)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.Sleep(i)
+		retry.DefaultRetry.Sleep(i)
 	}
 	return u, err
 }
@@ -878,15 +858,15 @@ func GetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddre
 }
 
 // RetryGetBalanceOfERC1155Token calls GetBalanceOfERC1155Token with backoff.
-func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client, retry Retry) (*big.Int, error) {
+func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (*big.Int, error) {
 	var balance *big.Int
 	var err error
-	for i := 0; i < retry.Tries; i++ {
+	for i := 0; i < retry.DefaultRetry.Tries; i++ {
 		balance, err = GetBalanceOfERC1155Token(ctx, pOwnerAddress, pContractAddress, pTokenID, ethClient)
 		if !isRateLimitedError(err) {
 			break
 		}
-		retry.Sleep(i)
+		retry.DefaultRetry.Sleep(i)
 	}
 	return balance, err
 }
@@ -1094,23 +1074,6 @@ func valFromSlice(s []interface{}, keyName string) interface{} {
 		}
 	}
 	return nil
-}
-
-// powerInt returns the base-x exponential of y.
-func powerInt(x, y int) int {
-	ret := 1
-	for i := 0; i < y; i++ {
-		ret *= x
-	}
-	return ret
-}
-
-// minInt returns the minimum of two ints.
-func minInt(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
 }
 
 func isRateLimitedError(err error) bool {

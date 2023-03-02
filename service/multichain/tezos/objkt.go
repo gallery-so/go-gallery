@@ -9,6 +9,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/shurcooL/graphql"
 	"github.com/sirupsen/logrus"
 )
@@ -124,7 +125,7 @@ func (p *TezosObjktProvider) GetTokensByWalletAddress(ctx context.Context, owner
 	var query tokensByWalletQuery
 	tokens := make([]tokenNode, 0)
 	for {
-		if err := p.gql.Query(ctx, &query, inputArgs{
+		if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
 			"ownerAddress": graphql.String(tzOwnerAddress),
 			"limit":        graphql.Int(pageSize),
 			"offset":       graphql.Int(offset),
@@ -207,14 +208,14 @@ func (p *TezosObjktProvider) GetTokensByTokenIdentifiersAndOwner(ctx context.Con
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
 
-	tokenInDecimal, err := strconv.ParseInt(tokenIdentifiers.TokenID.String(), 16, 32)
+	tokenInDecimal, err := strconv.ParseInt(tokenIdentifiers.TokenID.String(), 16, 64)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
 
 	var query tokensByIdentifiersQuery
 
-	if err := p.gql.Query(ctx, &query, inputArgs{
+	if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
 		"contractAddress": graphql.String(tokenIdentifiers.ContractAddress),
 		"ownerAddress":    graphql.String(tzOwnerAddress),
 		"tokenID":         graphql.String(strconv.Itoa(int(tokenInDecimal))),
@@ -270,7 +271,7 @@ func (p *TezosObjktProvider) GetTokensByContractAddress(ctx context.Context, con
 	var query tokensByContractQuery
 	tokens := make([]token, 0, maxLimit)
 	for {
-		if err := p.gql.Query(ctx, &query, inputArgs{
+		if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
 			"contractAddress": graphql.String(contractAddress),
 			"limit":           graphql.Int(pageSize),
 			"offset":          graphql.Int(offset),
@@ -349,7 +350,7 @@ func (p *TezosObjktProvider) GetTokensByContractAddressAndOwner(ctx context.Cont
 	var query tokensByContractQuery
 	tokens := make([]token, 0, maxLimit)
 	for {
-		if err := p.gql.Query(ctx, &query, inputArgs{
+		if err := retry.RetryQuery(ctx, p.gql, &query, inputArgs{
 			"contractAddress": graphql.String(contractAddress),
 			"ownerAddress":    graphql.String(owner),
 			"limit":           graphql.Int(pageSize),
