@@ -515,7 +515,7 @@ func getRawMedia(pCtx context.Context, mediaType persist.MediaType, name, vURL, 
 
 func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
-	case persist.URITypeIPFS, persist.URITypeIPFSAPI, persist.URITypeIPFSGateway:
+	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
 		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 	case persist.URITypeArweave:
@@ -777,13 +777,6 @@ func downloadAndCache(pCtx context.Context, mediaURL, name, ipfsPrefix string, i
 		"contentType": contentType,
 	})
 	logger.For(pCtx).Infof("predicted media type from '%s' as '%s' with length %s in %s", mediaURL, mediaType, util.InByteSizeFormat(uint64(contentLength)), time.Since(timeBeforePredict))
-
-	if mediaType != persist.MediaTypeHTML && asURI.Type() == persist.URITypeIPFSGateway {
-		indexAfterGateway := strings.Index(asURI.String(), "/ipfs/")
-		path := asURI.String()[indexAfterGateway+len("/ipfs/"):]
-		asURI = persist.TokenURI(fmt.Sprintf("ipfs://%s", path))
-		logger.For(pCtx).Infof("converted '%s' to '%s'", mediaURL, asURI)
-	}
 
 outer:
 	switch mediaType {

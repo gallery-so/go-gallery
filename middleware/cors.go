@@ -13,7 +13,7 @@ func IsOriginAllowed(requestOrigin string) bool {
 	}
 	allowedOrigins := strings.Split(viper.GetString("ALLOWED_ORIGINS"), ",")
 
-	if util.ContainsString(allowedOrigins, requestOrigin) || (util.ContainsString([]string{"development", "sandbox-backend"}, strings.ToLower(viper.GetString("ENV"))) && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
+	if util.ContainsString(allowedOrigins, requestOrigin) || util.ContainsString([]string{"sandbox"}, strings.ToLower(viper.GetString("ENV"))) || (util.ContainsString([]string{"development"}, strings.ToLower(viper.GetString("ENV"))) && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
 		return true
 	}
 

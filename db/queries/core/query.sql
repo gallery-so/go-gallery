@@ -859,7 +859,7 @@ update events set caption = @caption where group_id = @group_id and deleted = fa
 
 -- this query will take in enoug info to create a sort of fake table of social accounts matching them up to users in gallery with twitter connected.
 -- it will also go and search for whether the specified user follows any of the users returned
--- name: GetSocialConnections :many
+-- name: GetSocialConnectionsPaginate :many
 select s.*, user_view.id as user_id, user_view.created_at as user_created_at, (f.id is not null)::bool as already_following
 from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernames::varchar[]) as social_username, unnest(@social_displaynames::varchar[]) as social_displayname, unnest(@social_profile_images::varchar[]) as social_profile_image) as s
     inner join pii.user_view on user_view.pii_socials->sqlc.arg('social')::text->>'id'::varchar = s.social_id and user_view.deleted = false
@@ -871,6 +871,14 @@ order by case when @paging_forward::bool then (f.id is not null,user_view.create
     case when not @paging_forward::bool then (f.id is not null,user_view.created_at,user_view.id) end desc
 limit $1;
 
+-- name: GetSocialConnections :many
+select s.*, user_view.id as user_id, user_view.created_at as user_created_at, (f.id is not null)::bool as already_following
+from (select unnest(@social_ids::varchar[]) as social_id, unnest(@social_usernames::varchar[]) as social_username, unnest(@social_displaynames::varchar[]) as social_displayname, unnest(@social_profile_images::varchar[]) as social_profile_image) as s
+    inner join pii.user_view on user_view.pii_socials->sqlc.arg('social')::text->>'id'::varchar = s.social_id and user_view.deleted = false
+    left outer join follows f on f.follower = @user_id and f.followee = user_view.id and f.deleted = false
+where case when @only_unfollowing::bool then f.id is null else true end
+order by (f.id is not null,user_view.created_at,user_view.id);
+
 
 -- name: CountSocialConnections :one
 select count(*) from (select user_view.id as user_id from (select unnest(@social_ids::varchar[]) as social_id) as s 
@@ -879,4 +887,5 @@ left outer join follows f on f.followee = user_view.id
 where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end 
 and case when @only_unfollowing::bool then not f.followee = @user_id else true end) as t;
 
-
+-- name: AddManyFollows :exec
+insert into follows (id, follower, followee, deleted) select unnest(@ids::varchar[]), @follower, unnest(@followees::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at;

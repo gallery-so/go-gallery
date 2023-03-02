@@ -8,7 +8,6 @@ import (
 	"time"
 
 	farcaster "github.com/ertan/go-farcaster/pkg"
-	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
@@ -74,13 +73,11 @@ func main() {
 		panic(err)
 	}
 
-	apiUrl := "https://api.farcaster.xyz"
+	apiUrl := "https://api.warpcast.com"
 	mnemonic := viper.GetString("FARCASTER_MNEMONIC")
-	providerWs := viper.GetString("RPC_URL")
-	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, providerWs)
+	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, "")
 
-	results := make(chan farcastGalleryAcc)
-	wp := workerpool.New(10)
+	results := []farcastGalleryAcc{}
 
 	total := 0
 	for ; rows.Next(); total++ {
@@ -90,40 +87,28 @@ func main() {
 			panic(err)
 		}
 
-		wp.Submit(func() {
+		logrus.Infof("Checking %s", address)
+		u, err := fc.Verifications.GetUserByVerification(address)
+		if err != nil {
+			logrus.Errorf("Error getting user by verification: %s", err)
+			continue
+		}
 
-			logrus.Infof("Checking %s", address)
-			u, err := fc.Verifications.GetUserByVerification(address)
-			if err != nil {
-				logrus.Errorf("Error getting user by verification: %s", err)
-				return
-			}
+		if u.Fid != 0 || u.Username != "" {
+			logrus.Infof("Found %s", username)
+			results = append(results, farcastGalleryAcc{
+				GalleryUsername: username,
+				GalleryId:       userID,
+				GalleryAddress:  address,
+			})
+		}
 
-			if u.Fid != 0 || u.Username != "" {
-				results <- farcastGalleryAcc{
-					GalleryUsername: username,
-					GalleryId:       userID,
-					GalleryAddress:  username,
-				}
-			}
-		})
-	}
-
-	go func() {
-		wp.StopWait()
-		close(results)
-	}()
-
-	allResults := make([]farcastGalleryAcc, 0, 25)
-	for result := range results {
-		logrus.Infof("Found %s-%s-%s", result.GalleryUsername, result.GalleryId, result.GalleryAddress)
-		allResults = append(allResults, result)
 	}
 
 	asJSON := map[string]interface{}{
-		"count":            len(allResults),
+		"count":            len(results),
 		"out_of":           total,
-		"gallery_accounts": allResults,
+		"gallery_accounts": results,
 	}
 
 	marshalled, err := json.MarshalIndent(asJSON, "", "  ")

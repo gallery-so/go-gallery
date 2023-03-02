@@ -1476,6 +1476,15 @@ func galleryToModel(ctx context.Context, gallery db.Gallery) *model.Gallery {
 	}
 }
 
+func galleriesToModels(ctx context.Context, galleries []db.Gallery) []*model.Gallery {
+	models := make([]*model.Gallery, len(galleries))
+	for i, gallery := range galleries {
+		models[i] = galleryToModel(ctx, gallery)
+	}
+
+	return models
+}
+
 func layoutToModel(ctx context.Context, layout persist.TokenLayout, version int) *model.CollectionLayout {
 	if version == 0 {
 		// Some older collections predate configurable columns; the default back then was 3
@@ -1540,6 +1549,15 @@ func userToModel(ctx context.Context, user db.User) *model.GalleryUser {
 
 		IsAuthenticatedUser: &isAuthenticatedUser,
 	}
+}
+
+func usersToModels(ctx context.Context, users []db.User) []*model.GalleryUser {
+	models := make([]*model.GalleryUser, len(users))
+	for i, user := range users {
+		models[i] = userToModel(ctx, user)
+	}
+
+	return models
 }
 
 // admireToModel converts a db.Admire to a model.Admire
@@ -1798,6 +1816,15 @@ func communityToModel(ctx context.Context, community db.Contract, forceRefresh *
 		BadgeURL:         util.ToPointer(community.BadgeUrl.String),
 		Owners:           nil, // handled by dedicated resolver
 	}
+}
+
+func communitiesToModels(ctx context.Context, communities []db.Contract, forceRefresh *bool) []*model.Community {
+	models := make([]*model.Community, len(communities))
+	for i, community := range communities {
+		models[i] = communityToModel(ctx, community, forceRefresh)
+	}
+
+	return models
 }
 
 func pageInfoToModel(ctx context.Context, pageInfo publicapi.PageInfo) *model.PageInfo {

@@ -99,6 +99,10 @@ type FeedEventOrError interface {
 	IsFeedEventOrError()
 }
 
+type FollowAllSocialConnectionsPayloadOrError interface {
+	IsFollowAllSocialConnectionsPayloadOrError()
+}
+
 type FollowUserPayloadOrError interface {
 	IsFollowUserPayloadOrError()
 }
@@ -204,6 +208,18 @@ type ResendVerificationEmailPayloadOrError interface {
 
 type RevokeRolesFromUserPayloadOrError interface {
 	IsRevokeRolesFromUserPayloadOrError()
+}
+
+type SearchCommunitiesPayloadOrError interface {
+	IsSearchCommunitiesPayloadOrError()
+}
+
+type SearchGalleriesPayloadOrError interface {
+	IsSearchGalleriesPayloadOrError()
+}
+
+type SearchUsersPayloadOrError interface {
+	IsSearchUsersPayloadOrError()
 }
 
 type SetSpamPreferencePayloadOrError interface {
@@ -562,6 +578,10 @@ type Community struct {
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
+type CommunitySearchResult struct {
+	Community *Community `json:"community"`
+}
+
 type ConnectSocialAccountPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -800,6 +820,9 @@ func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
 func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
+func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
+func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
+func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -843,6 +866,7 @@ func (ErrInvalidInput) IsConnectSocialAccountPayloadOrError()            {}
 func (ErrInvalidInput) IsUpdateSocialAccountDisplayedPayloadOrError()    {}
 func (ErrInvalidInput) IsMintPremiumCardToWalletPayloadOrError()         {}
 func (ErrInvalidInput) IsDisconnectSocialAccountPayloadOrError()         {}
+func (ErrInvalidInput) IsFollowAllSocialConnectionsPayloadOrError()      {}
 
 type ErrInvalidToken struct {
 	Message string `json:"message"`
@@ -900,6 +924,7 @@ func (ErrNotAuthorized) IsConnectSocialAccountPayloadOrError()         {}
 func (ErrNotAuthorized) IsUpdateSocialAccountDisplayedPayloadOrError() {}
 func (ErrNotAuthorized) IsMintPremiumCardToWalletPayloadOrError()      {}
 func (ErrNotAuthorized) IsDisconnectSocialAccountPayloadOrError()      {}
+func (ErrNotAuthorized) IsFollowAllSocialConnectionsPayloadOrError()   {}
 
 type ErrSyncFailed struct {
 	Message string `json:"message"`
@@ -1015,6 +1040,12 @@ type FeedEventInteractionsEdge struct {
 	Cursor *string     `json:"cursor"`
 }
 
+type FollowAllSocialConnectionsPayload struct {
+	Viewer *Viewer `json:"viewer"`
+}
+
+func (FollowAllSocialConnectionsPayload) IsFollowAllSocialConnectionsPayloadOrError() {}
+
 type FollowInfo struct {
 	User         *GalleryUser `json:"user"`
 	FollowedBack *bool        `json:"followedBack"`
@@ -1065,6 +1096,10 @@ func (GalleryInfoUpdatedFeedEventData) IsFeedEventData() {}
 type GalleryPositionInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
 	Position  string       `json:"position"`
+}
+
+type GallerySearchResult struct {
+	Gallery *Gallery `json:"gallery"`
 }
 
 type GalleryUpdatedFeedEventData struct {
@@ -1398,6 +1433,24 @@ type ResendVerificationEmailPayload struct {
 }
 
 func (ResendVerificationEmailPayload) IsResendVerificationEmailPayloadOrError() {}
+
+type SearchCommunitiesPayload struct {
+	Results []*CommunitySearchResult `json:"results"`
+}
+
+func (SearchCommunitiesPayload) IsSearchCommunitiesPayloadOrError() {}
+
+type SearchGalleriesPayload struct {
+	Results []*GallerySearchResult `json:"results"`
+}
+
+func (SearchGalleriesPayload) IsSearchGalleriesPayloadOrError() {}
+
+type SearchUsersPayload struct {
+	Results []*UserSearchResult `json:"results"`
+}
+
+func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
 
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`
@@ -1908,6 +1961,10 @@ type UserFollowedUsersFeedEventData struct {
 }
 
 func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
+
+type UserSearchResult struct {
+	User *GalleryUser `json:"user"`
+}
 
 type UsersConnection struct {
 	Edges    []*UserEdge `json:"edges"`

@@ -113,6 +113,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"FollowAllSocialConnectionsPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(FollowAllSocialConnectionsPayloadOrError)
+		return obj, ok
+	},
+
 	"FollowUserPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(FollowUserPayloadOrError)
 		return obj, ok
@@ -240,6 +245,21 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 
 	"RevokeRolesFromUserPayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(RevokeRolesFromUserPayloadOrError)
+		return obj, ok
+	},
+
+	"SearchCommunitiesPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SearchCommunitiesPayloadOrError)
+		return obj, ok
+	},
+
+	"SearchGalleriesPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SearchGalleriesPayloadOrError)
+		return obj, ok
+	},
+
+	"SearchUsersPayloadOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SearchUsersPayloadOrError)
 		return obj, ok
 	},
 

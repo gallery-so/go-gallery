@@ -994,6 +994,20 @@ func (r *mutationResolver) FollowUser(ctx context.Context, userID persist.DBID) 
 	return output, err
 }
 
+// FollowAllSocialConnections is the resolver for the followAllSocialConnections field.
+func (r *mutationResolver) FollowAllSocialConnections(ctx context.Context, accountType persist.SocialProvider) (model.FollowAllSocialConnectionsPayloadOrError, error) {
+	err := publicapi.For(ctx).User.FollowAllSocialConnections(ctx, accountType)
+	if err != nil {
+		return nil, err
+	}
+
+	output := &model.FollowAllSocialConnectionsPayload{
+		Viewer: resolveViewer(ctx),
+	}
+
+	return output, nil
+}
+
 // UnfollowUser is the resolver for the unfollowUser field.
 func (r *mutationResolver) UnfollowUser(ctx context.Context, userID persist.DBID) (model.UnfollowUserPayloadOrError, error) {
 	err := publicapi.For(ctx).User.UnfollowUser(ctx, userID)
@@ -1683,6 +1697,72 @@ func (r *queryResolver) TrendingUsers(ctx context.Context, input model.TrendingU
 	}
 
 	return model.TrendingUsersPayload{Users: result}, nil
+}
+
+// SearchUsers is the resolver for the searchUsers field.
+func (r *queryResolver) SearchUsers(ctx context.Context, query string, limit *int, usernameWeight *float64, bioWeight *float64) (model.SearchUsersPayloadOrError, error) {
+	limitParam := util.GetOptionalValue(limit, 100)
+	usernameWeightParam := util.GetOptionalValue(usernameWeight, 0.4)
+	bioWeightParam := util.GetOptionalValue(bioWeight, 0.2)
+
+	users, err := publicapi.For(ctx).Search.SearchUsers(ctx, query, limitParam, float32(usernameWeightParam), float32(bioWeightParam))
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]*model.UserSearchResult, len(users))
+	for i, user := range users {
+		results[i] = &model.UserSearchResult{
+			User: userToModel(ctx, user),
+		}
+	}
+
+	return model.SearchUsersPayload{Results: results}, nil
+}
+
+// SearchGalleries is the resolver for the searchGalleries field.
+func (r *queryResolver) SearchGalleries(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64) (model.SearchGalleriesPayloadOrError, error) {
+	limitParam := util.GetOptionalValue(limit, 100)
+	nameWeightParam := util.GetOptionalValue(nameWeight, 0.4)
+	descriptionWeightParam := util.GetOptionalValue(descriptionWeight, 0.2)
+
+	galleries, err := publicapi.For(ctx).Search.SearchGalleries(ctx, query, limitParam, float32(nameWeightParam), float32(descriptionWeightParam))
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]*model.GallerySearchResult, len(galleries))
+	for i, gallery := range galleries {
+		results[i] = &model.GallerySearchResult{
+			Gallery: galleryToModel(ctx, gallery),
+		}
+	}
+
+	return model.SearchGalleriesPayload{Results: results}, nil
+}
+
+// SearchCommunities is the resolver for the searchCommunities field.
+func (r *queryResolver) SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) (model.SearchCommunitiesPayloadOrError, error) {
+	limitParam := util.GetOptionalValue(limit, 100)
+	nameWeightParam := util.GetOptionalValue(nameWeight, 0.4)
+	descriptionWeightParam := util.GetOptionalValue(descriptionWeight, 0.2)
+	poapAddressWeightParam := util.GetOptionalValue(poapAddressWeight, 0.1)
+
+	contracts, err := publicapi.For(ctx).Search.SearchContracts(ctx, query, limitParam, float32(nameWeightParam), float32(descriptionWeightParam), float32(poapAddressWeightParam))
+	if err != nil {
+		return nil, err
+	}
+
+	forceRefresh := false
+
+	results := make([]*model.CommunitySearchResult, len(contracts))
+	for i, contract := range contracts {
+		results[i] = &model.CommunitySearchResult{
+			Community: communityToModel(ctx, contract, &forceRefresh),
+		}
+	}
+
+	return model.SearchCommunitiesPayload{Results: results}, nil
 }
 
 // UsersByRole is the resolver for the usersByRole field.
