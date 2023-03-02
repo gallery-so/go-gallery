@@ -3,7 +3,9 @@ with min_content_score as (
     select score from user_relevance where id is null
 )
 select u.* from users u left join user_relevance on u.id = user_relevance.id,
-    unnest(u.wallets) as wallet_id left join wallets w on w.id = wallet_id and w.deleted = false,
+    -- Adding the search condition to the wallet join statement is a very helpful optimization, but we can't use
+    -- "simple_full_query" at this point in the statement, so we're repeating the "websearch_to_tsquery..." part here
+    unnest(u.wallets) as wallet_id left join wallets w on w.id = wallet_id and w.deleted = false and websearch_to_tsquery('simple', @query) @@ w.fts_address,
     to_tsquery('simple', websearch_to_tsquery('simple', @query)::text || ':*') simple_partial_query,
     websearch_to_tsquery('simple', @query) simple_full_query,
     websearch_to_tsquery('english', @query) english_full_query,
