@@ -8,7 +8,6 @@ import (
 	"time"
 
 	farcaster "github.com/ertan/go-farcaster/pkg"
-	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
@@ -50,9 +49,9 @@ type ResponseStruct struct {
 }
 
 type farcastGalleryAcc struct {
-	galleryUsername string
-	galleryId       string
-	galleryAddress  string
+	GalleryUsername string `json:"gallery_username"`
+	GalleryId       string `json:"gallery_id"`
+	GalleryAddress  string `json:"gallery_address"`
 }
 
 func main() {
@@ -69,57 +68,47 @@ func main() {
 
 	pg := postgres.NewPgxClient()
 
-	rows, err := pg.Query(ctx, `select wallets.address,users.id,users.username from users join wallets on wallets.id = any(users.wallets) where wallets.deleted = false and users.deleted = false and wallets.chain = 0;`)
+	rows, err := pg.Query(ctx, `select wallets.address,users.id,users.username from users join wallets on wallets.id = any(users.wallets) where wallets.deleted = false and users.deleted = false and wallets.chain = 0 and users.universal = false;`)
 	if err != nil {
 		panic(err)
 	}
 
-	apiUrl := "https://api.farcaster.xyz"
+	apiUrl := "https://api.warpcast.com"
 	mnemonic := viper.GetString("FARCASTER_MNEMONIC")
-	providerWs := viper.GetString("RPC_URL")
-	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, providerWs)
+	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, "")
 
-	results := make(chan farcastGalleryAcc)
-	wp := workerpool.New(2)
-	for rows.Next() {
+	results := []farcastGalleryAcc{}
+
+	total := 0
+	for ; rows.Next(); total++ {
 		var address, userID, username string
 		err := rows.Scan(&address, &userID, &username)
 		if err != nil {
 			panic(err)
 		}
 
-		wp.Submit(func() {
+		logrus.Infof("Checking %s", address)
+		u, err := fc.Verifications.GetUserByVerification(address)
+		if err != nil {
+			logrus.Errorf("Error getting user by verification: %s", err)
+			continue
+		}
 
-			logrus.Infof("Checking %s", address)
-			u, err := fc.Verifications.GetUserByVerification(address)
-			if err != nil {
-				logrus.Errorf("Error getting user by verification: %s", err)
-				return
-			}
+		if u.Fid != 0 || u.Username != "" {
+			logrus.Infof("Found %s", username)
+			results = append(results, farcastGalleryAcc{
+				GalleryUsername: username,
+				GalleryId:       userID,
+				GalleryAddress:  address,
+			})
+		}
 
-			if u.Fid != 0 || u.Username != "" {
-				results <- farcastGalleryAcc{
-					galleryUsername: username,
-					galleryId:       userID,
-					galleryAddress:  address,
-				}
-			}
-		})
-	}
-
-	go func() {
-		wp.StopWait()
-		close(results)
-	}()
-
-	allResults := make([]farcastGalleryAcc, 0)
-	for result := range results {
-		logrus.Infof("Found %s", result.galleryUsername)
-		allResults = append(allResults, result)
 	}
 
 	asJSON := map[string]interface{}{
-		"farcaster": allResults,
+		"count":            len(results),
+		"out_of":           total,
+		"gallery_accounts": results,
 	}
 
 	marshalled, err := json.MarshalIndent(asJSON, "", "  ")
@@ -127,7 +116,7 @@ func main() {
 		panic(err)
 	}
 
-	fi, err := os.Create("lens_galleries.json")
+	fi, err := os.Create("farcaster_galleries.json")
 	if err != nil {
 		panic(err)
 	}

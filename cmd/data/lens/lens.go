@@ -35,9 +35,9 @@ type ResponseStruct struct {
 }
 
 type lensGalleryAcc struct {
-	galleryUsername string
-	galleryId       string
-	galleryAddress  string
+	GalleryUsername string `json:"gallery_username"`
+	GalleryId       string `json:"gallery_id"`
+	GalleryAddress  string `json:"gallery_address"`
 }
 
 func main() {
@@ -49,12 +49,18 @@ func main() {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
-		fmt.Printf("Took %s", elapsed)
+		fmt.Printf("Took %s\n", elapsed)
 	}()
 
 	pg := postgres.NewPgxClient()
 
-	rows, err := pg.Query(ctx, `select wallets.address,users.id,users.username from users join wallets on wallets.id = any(users.wallets) where wallets.deleted = false and users.deleted = false and wallets.chain = 0;`)
+	var count int
+	err := pg.QueryRow(ctx, `select count(*) from users join wallets on wallets.id = any(users.wallets) where wallets.deleted = false and users.deleted = false and wallets.chain = 0 and users.universal = false;`).Scan(&count)
+	if err != nil {
+		panic(err)
+	}
+
+	rows, err := pg.Query(ctx, `select wallets.address,users.id,users.username from users join wallets on wallets.id = any(users.wallets) where wallets.deleted = false and users.deleted = false and wallets.chain = 0 and users.universal = false;`)
 	if err != nil {
 		panic(err)
 	}
@@ -88,28 +94,29 @@ func main() {
 		var respData ResponseStruct
 		if err := client.Run(ctx, req, &respData); err != nil {
 			logrus.Errorf("Error getting profile for %s: %s", address, err.Error())
-			return
+			continue
 		}
 
 		if respData.Error != "" {
 			logrus.Errorf("Error getting profile for %s: %s", address, respData.Error)
-			return
+			continue
 		}
 
 		if len(respData.Profiles.Items) > 0 {
 			allResults = append(allResults, lensGalleryAcc{
-				galleryUsername: username,
-				galleryId:       userID,
-				galleryAddress:  address,
+				GalleryUsername: username,
+				GalleryId:       userID,
+				GalleryAddress:  address,
 			})
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(6 * time.Second)
 
 	}
 
 	asJSON := map[string]interface{}{
-		"lensGalleries": allResults,
+		"total":          len(allResults),
+		"lens_galleries": allResults,
 	}
 
 	marshalled, err := json.MarshalIndent(asJSON, "", "  ")

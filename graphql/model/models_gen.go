@@ -210,6 +210,18 @@ type RevokeRolesFromUserPayloadOrError interface {
 	IsRevokeRolesFromUserPayloadOrError()
 }
 
+type SearchCommunitiesPayloadOrError interface {
+	IsSearchCommunitiesPayloadOrError()
+}
+
+type SearchGalleriesPayloadOrError interface {
+	IsSearchGalleriesPayloadOrError()
+}
+
+type SearchUsersPayloadOrError interface {
+	IsSearchUsersPayloadOrError()
+}
+
 type SetSpamPreferencePayloadOrError interface {
 	IsSetSpamPreferencePayloadOrError()
 }
@@ -565,6 +577,10 @@ type Community struct {
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
 
+type CommunitySearchResult struct {
+	Community *Community `json:"community"`
+}
+
 type ConnectSocialAccountPayload struct {
 	Viewer *Viewer `json:"viewer"`
 }
@@ -803,6 +819,9 @@ func (ErrInvalidInput) IsCollectionByIDOrError()                         {}
 func (ErrInvalidInput) IsCommunityByAddressOrError()                     {}
 func (ErrInvalidInput) IsSocialConnectionsOrError()                      {}
 func (ErrInvalidInput) IsMerchTokensPayloadOrError()                     {}
+func (ErrInvalidInput) IsSearchUsersPayloadOrError()                     {}
+func (ErrInvalidInput) IsSearchGalleriesPayloadOrError()                 {}
+func (ErrInvalidInput) IsSearchCommunitiesPayloadOrError()               {}
 func (ErrInvalidInput) IsCreateCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsDeleteCollectionPayloadOrError()                {}
 func (ErrInvalidInput) IsUpdateCollectionInfoPayloadOrError()            {}
@@ -1075,6 +1094,10 @@ func (GalleryInfoUpdatedFeedEventData) IsFeedEventData() {}
 type GalleryPositionInput struct {
 	GalleryID persist.DBID `json:"galleryId"`
 	Position  string       `json:"position"`
+}
+
+type GallerySearchResult struct {
+	Gallery *Gallery `json:"gallery"`
 }
 
 type GalleryUpdatedFeedEventData struct {
@@ -1396,6 +1419,24 @@ type ResendVerificationEmailPayload struct {
 }
 
 func (ResendVerificationEmailPayload) IsResendVerificationEmailPayloadOrError() {}
+
+type SearchCommunitiesPayload struct {
+	Results []*CommunitySearchResult `json:"results"`
+}
+
+func (SearchCommunitiesPayload) IsSearchCommunitiesPayloadOrError() {}
+
+type SearchGalleriesPayload struct {
+	Results []*GallerySearchResult `json:"results"`
+}
+
+func (SearchGalleriesPayload) IsSearchGalleriesPayloadOrError() {}
+
+type SearchUsersPayload struct {
+	Results []*UserSearchResult `json:"results"`
+}
+
+func (SearchUsersPayload) IsSearchUsersPayloadOrError() {}
 
 type SetSpamPreferenceInput struct {
 	Tokens []persist.DBID `json:"tokens"`
@@ -1903,6 +1944,10 @@ type UserFollowedUsersFeedEventData struct {
 }
 
 func (UserFollowedUsersFeedEventData) IsFeedEventData() {}
+
+type UserSearchResult struct {
+	User *GalleryUser `json:"user"`
+}
 
 type UsersConnection struct {
 	Edges    []*UserEdge `json:"edges"`

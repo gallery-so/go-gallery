@@ -67,6 +67,11 @@ type Contract struct {
 	Description      sql.NullString
 }
 
+type ContractRelevance struct {
+	ID    persist.DBID
+	Score int32
+}
+
 type DevMetadataUser struct {
 	UserID          persist.DBID
 	HasEmailAddress persist.Email
@@ -145,6 +150,11 @@ type Gallery struct {
 	Description string
 	Hidden      bool
 	Position    string
+}
+
+type GalleryRelevance struct {
+	ID    persist.DBID
+	Score int32
 }
 
 type LegacyView struct {
@@ -311,6 +321,11 @@ type User struct {
 	FeaturedGallery      *persist.DBID
 	PrimaryWalletID      persist.DBID
 	UserExperiences      pgtype.JSONB
+}
+
+type UserRelevance struct {
+	ID    persist.DBID
+	Score int32
 }
 
 type UserRole struct {
