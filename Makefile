@@ -419,11 +419,12 @@ confirm-dev-migrate:
 	@prompt=$(shell bash -c 'read -p "Are you sure you want to apply migrations to the dev DB? Type \"development\" to confirm: " prompt; echo $$prompt'); \
 	if [ "$$prompt" != "development" ]; then exit 1; fi
 
-migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
+migrate-dev-coredb: # start-dev-sql-proxy confirm-dev-migrate
 	@echo "Superuser username to use for privileged migrations: \c"; \
 	read user; \
 	echo "Password for $$user: \c"; \
-	read pw; \
+	read -r -s pw; \
+	echo "\nrunning migrations..."; \
 	ENV=$(DEV) \
 	POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
 	POSTGRES_MIGRATION_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
@@ -440,7 +441,8 @@ migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
 	@echo "Superuser username to use for privileged migrations: \c"; \
 	read user; \
 	echo "Password for $$user: \c"; \
-	read pw; \
+	read -r -s pw; \
+	echo "\nrunning migrations..."; \
 	ENV=$(PROD) \
 	POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
 	POSTGRES_MIGRATION_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \

@@ -53,7 +53,7 @@ func superMigrations(dir string) (map[uint]bool, uint, error) {
 		scanner := bufio.NewScanner(fle)
 
 		// Only checks the first line of each file
-		if scanner.Scan() && scanner.Text() == sudoFlag {
+		if scanner.Scan() && strings.TrimSpace(scanner.Text()) == sudoFlag {
 			v, err := strToVersion(strings.Split(name, "_")[0])
 			if err != nil {
 				return nil, 0, err
