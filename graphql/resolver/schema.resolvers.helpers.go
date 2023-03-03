@@ -1560,6 +1560,17 @@ func usersToModels(ctx context.Context, users []db.User) []*model.GalleryUser {
 	return models
 }
 
+func usersToEdges(ctx context.Context, users []db.User) []*model.UserEdge {
+	edges := make([]*model.UserEdge, len(users))
+	for i, user := range users {
+		edges[i] = &model.UserEdge{
+			Node:   userToModel(ctx, user),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+	return edges
+}
+
 // admireToModel converts a db.Admire to a model.Admire
 func admireToModel(ctx context.Context, admire db.Admire) *model.Admire {
 

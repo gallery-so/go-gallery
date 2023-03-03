@@ -1117,24 +1117,25 @@ func (GalleryUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryUser struct {
 	HelperGalleryUserData
-	Dbid                persist.DBID    `json:"dbid"`
-	Username            *string         `json:"username"`
-	Bio                 *string         `json:"bio"`
-	Traits              *string         `json:"traits"`
-	Universal           *bool           `json:"universal"`
-	Roles               []*persist.Role `json:"roles"`
-	SocialAccounts      *SocialAccounts `json:"socialAccounts"`
-	Tokens              []*Token        `json:"tokens"`
-	TokensByChain       *ChainTokens    `json:"tokensByChain"`
-	Wallets             []*Wallet       `json:"wallets"`
-	PrimaryWallet       *Wallet         `json:"primaryWallet"`
-	FeaturedGallery     *Gallery        `json:"featuredGallery"`
-	Galleries           []*Gallery      `json:"galleries"`
-	Badges              []*Badge        `json:"badges"`
-	IsAuthenticatedUser *bool           `json:"isAuthenticatedUser"`
-	Followers           []*GalleryUser  `json:"followers"`
-	Following           []*GalleryUser  `json:"following"`
-	Feed                *FeedConnection `json:"feed"`
+	Dbid                persist.DBID     `json:"dbid"`
+	Username            *string          `json:"username"`
+	Bio                 *string          `json:"bio"`
+	Traits              *string          `json:"traits"`
+	Universal           *bool            `json:"universal"`
+	Roles               []*persist.Role  `json:"roles"`
+	SocialAccounts      *SocialAccounts  `json:"socialAccounts"`
+	Tokens              []*Token         `json:"tokens"`
+	TokensByChain       *ChainTokens     `json:"tokensByChain"`
+	Wallets             []*Wallet        `json:"wallets"`
+	PrimaryWallet       *Wallet          `json:"primaryWallet"`
+	FeaturedGallery     *Gallery         `json:"featuredGallery"`
+	Galleries           []*Gallery       `json:"galleries"`
+	Badges              []*Badge         `json:"badges"`
+	IsAuthenticatedUser *bool            `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser   `json:"followers"`
+	Following           []*GalleryUser   `json:"following"`
+	Feed                *FeedConnection  `json:"feed"`
+	SharedFollowers     *UsersConnection `json:"sharedFollowers"`
 }
 
 func (GalleryUser) IsNode()                              {}

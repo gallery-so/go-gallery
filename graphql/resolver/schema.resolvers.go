@@ -453,6 +453,19 @@ func (r *galleryUserResolver) Feed(ctx context.Context, obj *model.GalleryUser, 
 	}, nil
 }
 
+// SharedFollowers is the resolver for the sharedFollowers field.
+func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.UsersConnection, error) {
+	users, pageInfo, err := publicapi.For(ctx).User.SharedFollowers(ctx, obj.UserID, before, after, first, last)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.UsersConnection{
+		Edges:    usersToEdges(ctx, users),
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 // AddUserWallet is the resolver for the addUserWallet field.
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)
@@ -1772,16 +1785,8 @@ func (r *queryResolver) UsersByRole(ctx context.Context, role persist.Role, befo
 		return nil, err
 	}
 
-	edges := make([]*model.UserEdge, len(users))
-	for i, user := range users {
-		edges[i] = &model.UserEdge{
-			Node:   userToModel(ctx, user),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
 	return &model.UsersConnection{
-		Edges:    edges,
+		Edges:    usersToEdges(ctx, users),
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }
@@ -2043,16 +2048,8 @@ func (r *viewerResolver) SuggestedUsers(ctx context.Context, obj *model.Viewer, 
 		return nil, err
 	}
 
-	edges := make([]*model.UserEdge, len(users))
-	for i, user := range users {
-		edges[i] = &model.UserEdge{
-			Node:   userToModel(ctx, user),
-			Cursor: nil, // not used by relay, but relay will complain without this field existing
-		}
-	}
-
 	return &model.UsersConnection{
-		Edges:    edges,
+		Edges:    usersToEdges(ctx, users),
 		PageInfo: pageInfoToModel(ctx, pageInfo),
 	}, nil
 }

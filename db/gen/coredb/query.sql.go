@@ -147,6 +147,30 @@ func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersBy
 	return count, err
 }
 
+const countSharedFollows = `-- name: CountSharedFollows :one
+select count(*)
+from users, follows a, follows b
+where a.follower = $1
+	and a.followee = b.follower
+	and b.followee = $2
+	and users.id = b.follower
+	and a.deleted = false
+	and b.deleted = false
+	and users.deleted = false
+`
+
+type CountSharedFollowsParams struct {
+	Follower persist.DBID
+	Followee persist.DBID
+}
+
+func (q *Queries) CountSharedFollows(ctx context.Context, arg CountSharedFollowsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSharedFollows, arg.Follower, arg.Followee)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSocialConnections = `-- name: CountSocialConnections :one
 select count(*) from (select user_view.id as user_id from (select unnest($2::varchar[]) as social_id) as s 
 inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id 

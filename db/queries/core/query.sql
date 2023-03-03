@@ -889,3 +889,30 @@ and case when @only_unfollowing::bool then not f.followee = @user_id else true e
 
 -- name: AddManyFollows :exec
 insert into follows (id, follower, followee, deleted) select unnest(@ids::varchar[]), @follower, unnest(@followees::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at;
+
+-- name: GetSharedFollowersBatchPaginate :batchmany
+select users.*, a.created_at followed_on
+from users, follows a, follows b
+where a.follower = @follower
+	and a.followee = b.follower
+	and b.followee = @followee
+	and users.id = b.follower
+	and a.deleted = false
+	and b.deleted = false
+	and users.deleted = false
+  and (a.created_at, users.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  and (a.created_at, users.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+order by case when sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end asc,
+        case when not sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end desc
+limit sqlc.arg('limit');
+
+-- name: CountSharedFollows :one
+select count(*)
+from users, follows a, follows b
+where a.follower = @follower
+	and a.followee = b.follower
+	and b.followee = @followee
+	and users.id = b.follower
+	and a.deleted = false
+	and b.deleted = false
+	and users.deleted = false;
