@@ -21,7 +21,6 @@ func init() {
 }
 
 func main() {
-	panic("done")
 	if err := migrate.RunCoreDBMigration(); err != nil {
 		fmt.Fprint(os.Stderr, err)
 	}

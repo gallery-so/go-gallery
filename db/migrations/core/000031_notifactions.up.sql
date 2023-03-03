@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 CREATE TABLE IF NOT EXISTS notifications (
     ID varchar(255) PRIMARY KEY,
     DELETED boolean NOT NULL DEFAULT false,

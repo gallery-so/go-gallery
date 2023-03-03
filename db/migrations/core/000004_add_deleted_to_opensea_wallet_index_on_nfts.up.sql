@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 BEGIN;
 
 DROP INDEX IF EXISTS opensea_id_owner_address_inx;

@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 create table if not exists user_roles (
     id varchar(255) primary key,
     user_id varchar(255) not null references users (id),

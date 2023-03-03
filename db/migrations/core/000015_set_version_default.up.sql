@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 ALTER TABLE access ALTER COLUMN version SET DEFAULT 0;
 ALTER TABLE backups ALTER COLUMN version SET DEFAULT 0;
 ALTER TABLE collection_events ALTER COLUMN version SET DEFAULT 0;

@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 create table if not exists pii_for_users
 (
     user_id       varchar(255) primary key references users (id),

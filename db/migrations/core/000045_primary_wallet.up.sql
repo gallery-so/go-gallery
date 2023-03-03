@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 alter table users add column primary_wallet_id varchar(255) references wallets(id);
 
 -- Delete users that are already marked as deleted that would otherwise

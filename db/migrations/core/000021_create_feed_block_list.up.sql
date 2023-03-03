@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 CREATE TABLE IF NOT EXISTS feed_blocklist (
     ID varchar(255) PRIMARY KEY,
     USER_ID varchar(255) REFERENCES users (id),

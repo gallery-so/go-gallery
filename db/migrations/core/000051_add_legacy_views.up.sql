@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 create table if not exists legacy_views (
   user_id varchar(255) references users(id),
   view_count int,

@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE TABLE IF NOT EXISTS users (

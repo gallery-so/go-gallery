@@ -419,7 +419,7 @@ confirm-dev-migrate:
 	@prompt=$(shell bash -c 'read -p "Are you sure you want to apply migrations to the dev DB? Type \"development\" to confirm: " prompt; echo $$prompt'); \
 	if [ "$$prompt" != "development" ]; then exit 1; fi
 
-migrate-dev-coredb: # start-dev-sql-proxy confirm-dev-migrate
+migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
 	@echo "Superuser username to use for privileged migrations: \c"; \
 	read user; \
 	echo "Password for $$user: \c"; \

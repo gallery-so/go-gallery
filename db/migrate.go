@@ -99,23 +99,24 @@ func RunCoreDBMigration() error {
 		return err
 	}
 
-	// migrate updates the version to an older version even if the current
-	// version is ahead of it, so we need to manually check before applying
-	// the migration
-	if curVer < 56 {
-		if err := superMigrate.Migrate(56); err != nil {
-			return err
+	// The "gallery_migrator" role should be used for non-privileged changes.
+	// The client isn't initted until we have a migration that creates the role.
+	var galleryMigrate *migrate.Migrate
+
+	initMigrator := func() {
+		if galleryMigrate != nil {
+			return
 		}
-		curVer = 56
+		galleryMigrate, err = newMigrateInstance(
+			postgres.NewClient(postgres.WithUser("gallery_migrator")),
+			coreMigrations,
+		)
+		if err != nil {
+			fmt.Printf("failed to create gallery_migrator client, role may not exist: %s", err)
+		}
 	}
 
-	// The "gallery_migrator" role should be used for non-privileged changes.
-	galleryClient := postgres.NewClient(postgres.WithUser("gallery_migrator"))
-	galleryMigrate, err := newMigrateInstance(galleryClient, coreMigrations)
-	if err != nil {
-		return err
-	}
-	defer galleryMigrate.Close()
+	initMigrator()
 
 	// Find which migrations need to run as a superuser
 	superVersions, lastSuperVer, err := superMigrations(util.MustFindFile(coreMigrations))
@@ -133,7 +134,7 @@ func RunCoreDBMigration() error {
 	for ; ver <= lastSuperVer; ver++ {
 		if !superStreak && superVersions[ver] {
 			superStreak = true
-			// Skip running the migration if its already applied
+			// Skip running the migration if its the current version already applied
 			if ver-1 != curVer {
 				if err := galleryMigrate.Migrate(ver - 1); err != nil {
 					return err
@@ -144,6 +145,7 @@ func RunCoreDBMigration() error {
 			if err := superMigrate.Migrate(ver - 1); err != nil {
 				return err
 			}
+			initMigrator()
 		}
 	}
 
@@ -151,6 +153,10 @@ func RunCoreDBMigration() error {
 		if err := superMigrate.Migrate(ver - 1); err != nil {
 			return err
 		}
+	}
+
+	if galleryMigrate == nil {
+		panic("gallery_migrator client never initted!")
 	}
 
 	err = galleryMigrate.Up()
