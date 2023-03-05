@@ -420,17 +420,9 @@ confirm-dev-migrate:
 	if [ "$$prompt" != "development" ]; then exit 1; fi
 
 migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
-	@echo "Superuser username to use for privileged migrations: \c"; \
-	read user; \
-	echo "Password for $$user: \c"; \
-	read -r -s pw; \
-	echo "\nrunning migrations..."; \
-	ENV=$(DEV) \
-	POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
+	@POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
 	POSTGRES_MIGRATION_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6643 \
-	POSTGRES_SUPERUSER_USER=$$user \
-	POSTGRES_SUPERUSER_PASSWORD=$$pw \
 	go run cmd/migrate/main.go
 
 confirm-prod-migrate:
@@ -438,17 +430,9 @@ confirm-prod-migrate:
 	if [ "$$prompt" != "production" ]; then exit 1; fi
 
 migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
-	@echo "Superuser username to use for privileged migrations: \c"; \
-	read user; \
-	echo "Password for $$user: \c"; \
-	read -r -s pw; \
-	echo "\nrunning migrations..."; \
-	ENV=$(PROD) \
-	POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
+	@POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
 	POSTGRES_MIGRATION_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6543 \
-	POSTGRES_SUPERUSER_USER=$$user \
-	POSTGRES_SUPERUSER_PASSWORD=$$pw \
 	go run cmd/migrate/main.go
 
 fix-sops-macs:

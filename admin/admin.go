@@ -21,7 +21,7 @@ import (
 func Init() {
 	setDefaults()
 
-	router := CoreInit(postgres.NewClient())
+	router := CoreInit(postgres.MustCreateClient())
 
 	http.Handle("/", router)
 }

@@ -3,6 +3,7 @@ package migrate
 import (
 	"bufio"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -15,7 +16,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 const sudoFlag = "/* {% require_sudo %} */"
@@ -74,59 +74,110 @@ func currentVersion(m *migrate.Migrate) (uint, error) {
 	return curVer, err
 }
 
-// RunCoreDBMigration should always be used to migrate the core backend database.
-// Because the "gallery_migrator" role was introduced in the 56th migration step,
-// migrations must be done in two passes (using the default "postgres" role for
-// the first 56 migrations, and the "gallery_migrator" role for all subsequent
-// migrations).
-func RunCoreDBMigration() error {
-	coreMigrations := "./db/migrations/core"
+// SuperUserRequired returns true if the superuser role is needed
+// to run migrations based on the database's current state.
+func SuperUserRequired(dir string) (bool, error) {
+	client, err := postgres.NewClient(postgres.WithUser("gallery_migrator"))
+	var errNoRole postgres.ErrRoleDoesNotExist
+	if errors.As(err, &errNoRole) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
 
-	// Migrations up to version 56 should be run with the "postgres" user.
-	// Version 56 introduces the "gallery_migrator" role.
-	superClient := postgres.NewClient(
-		postgres.WithUser(viper.GetString("POSTGRES_SUPERUSER_USER")),
-		postgres.WithPassword(viper.GetString("POSTGRES_SUPERUSER_PASSWORD")),
-	)
-	superMigrate, err := newMigrateInstance(superClient, coreMigrations)
+	migrate, err := newMigrateInstance(client, dir)
+	if err != nil {
+		return false, err
+	}
+
+	curVer, err := currentVersion(migrate)
+	if err != nil {
+		return false, err
+	}
+
+	_, lastSuperVer, err := superMigrations(dir)
+	if err != nil {
+		return false, err
+	}
+
+	return curVer < lastSuperVer, nil
+}
+
+// RunMigrations runs unapplied migrations to the database.
+// An optional client with can be passed if the current set of
+// migrations requires a superuser to run.
+func RunMigrations(superClient *sql.DB, dir string) error {
+	superRequired, err := SuperUserRequired(dir)
 	if err != nil {
 		return err
 	}
-	defer superMigrate.Close()
 
-	curVer, err := currentVersion(superMigrate)
-	if err != nil {
-		return err
+	if superRequired && superClient == nil {
+		return errors.New("superuser is required, but client wasn't provided")
 	}
 
-	// The "gallery_migrator" role should be used for non-privileged changes.
-	// The client isn't initted until we have a migration that creates the role.
+	var superMigrate *migrate.Migrate
 	var galleryMigrate *migrate.Migrate
 
-	initMigrator := func() {
+	loadMigrate := func() error {
 		if galleryMigrate != nil {
-			return
+			return nil
 		}
-		galleryMigrate, err = newMigrateInstance(
-			postgres.NewClient(postgres.WithUser("gallery_migrator")),
-			coreMigrations,
-		)
+		galleryClient, err := postgres.NewClient(postgres.WithUser("gallery_migrator"))
+		var errNoRole postgres.ErrRoleDoesNotExist
+		if errors.As(err, &errNoRole) {
+			return nil
+		}
 		if err != nil {
-			fmt.Printf("failed to create gallery_migrator client, role may not exist: %s", err)
+			return err
 		}
-	}
-
-	initMigrator()
-
-	// Find which migrations need to run as a superuser
-	superVersions, lastSuperVer, err := superMigrations(util.MustFindFile(coreMigrations))
-	if err != nil {
+		galleryMigrate, err = newMigrateInstance(galleryClient, dir)
 		return err
 	}
 
-	// Apply an up migration if there aren't anymore privileged migrations to run
-	if len(superVersions) == 0 || curVer >= lastSuperVer {
+	if superRequired {
+		superMigrate, err = newMigrateInstance(superClient, dir)
+		if err != nil {
+			return err
+		}
+		defer superMigrate.Close()
+
+		if err := loadMigrate(); err != nil {
+			return err
+		}
+		if galleryMigrate != nil {
+			defer galleryMigrate.Close()
+		}
+	} else {
+		// Apply an up migration since a superuser isn't needed
+		galleryClient := postgres.MustCreateClient(postgres.WithUser("gallery_migrator"))
+		galleryMigrate, err = newMigrateInstance(galleryClient, dir)
+		if err != nil {
+			return err
+		}
+		defer galleryMigrate.Close()
 		return galleryMigrate.Up()
+	}
+
+	var curVer uint
+
+	if galleryMigrate != nil {
+		curVer, err = currentVersion(galleryMigrate)
+		if err != nil {
+			return err
+		}
+	} else {
+		curVer, err = currentVersion(superMigrate)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Find which migrations need to run as a superuser
+	superVersions, lastSuperVer, err := superMigrations(util.MustFindFile(dir))
+	if err != nil {
+		return err
 	}
 
 	superStreak := false
@@ -145,7 +196,9 @@ func RunCoreDBMigration() error {
 			if err := superMigrate.Migrate(ver - 1); err != nil {
 				return err
 			}
-			initMigrator()
+			if err := loadMigrate(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -160,11 +213,11 @@ func RunCoreDBMigration() error {
 	}
 
 	err = galleryMigrate.Up()
-	if err != nil && err != migrate.ErrNoChange {
-		return err
+	if err == migrate.ErrNoChange {
+		return nil
 	}
 
-	return nil
+	return err
 }
 
 // RunMigration runs all migrations in the specified directory
