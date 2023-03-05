@@ -180,11 +180,17 @@ func (api TokenAPI) GetTokensByContractIdPaginate(ctx context.Context, contractI
 }
 
 func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID) ([]db.Token, error) {
-	ids := make([]string, len(tokenIDs))
-	for i, t := range tokenIDs {
-		ids[i] = t.String()
+	tokens, errs := api.loaders.TokenByTokenID.LoadAll(tokenIDs)
+	foundTokens := tokens[:0]
+	for i, t := range tokens {
+		if errs[i] == nil {
+			foundTokens = append(foundTokens, t)
+		} else if _, ok := errs[i].(persist.ErrTokenNotFoundByID); !ok {
+			return []db.Token{}, errs[i]
+		}
 	}
-	return api.queries.GetTokensByIDs(ctx, ids)
+
+	return foundTokens, nil
 }
 
 // GetNewTokensByFeedEventID returns new tokens added to a collection from an event.
