@@ -185,6 +185,8 @@ func (api TokenAPI) GetTokensByIDs(ctx context.Context, tokenIDs []persist.DBID)
 	for i, t := range tokens {
 		if errs[i] == nil {
 			foundTokens = append(foundTokens, t)
+		} else if _, ok := errs[i].(persist.ErrTokenNotFoundByID); !ok {
+			return []db.Token{}, errs[i]
 		}
 	}
 
