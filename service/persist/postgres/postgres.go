@@ -83,7 +83,7 @@ func (c *connectionParams) toConnectionString() string {
 
 func newConnectionParamsFromEnv() connectionParams {
 	return connectionParams{
-		user:     viper.GetString("POSTGRES_USER"),
+		user:     "postgres",
 		password: viper.GetString("POSTGRES_PASSWORD"),
 		dbname:   viper.GetString("POSTGRES_DB"),
 		host:     viper.GetString("POSTGRES_HOST"),
