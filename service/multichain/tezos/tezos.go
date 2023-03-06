@@ -23,6 +23,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -162,7 +163,7 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 		if err != nil {
 			return nil, nil, err
 		}
-		resp, err := d.httpClient.Do(req)
+		resp, err := retry.RetryRequest(d.httpClient, req)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -191,7 +192,6 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 	}
 
 	return d.tzBalanceTokensToTokens(ctx, resultTokens, addr.String())
-
 }
 
 // GetTokensByContractAddress retrieves tokens for a contract address on the Tezos Blockchain
@@ -209,7 +209,7 @@ func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddre
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
-		resp, err := d.httpClient.Do(req)
+		resp, err := retry.RetryRequest(d.httpClient, req)
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
@@ -262,7 +262,7 @@ func (d *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
-		resp, err := d.httpClient.Do(req)
+		resp, err := retry.RetryRequest(d.httpClient, req)
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
@@ -314,7 +314,7 @@ func (d *Provider) GetTokensByTokenIdentifiers(ctx context.Context, tokenIdentif
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
-		resp, err := d.httpClient.Do(req)
+		resp, err := retry.RetryRequest(d.httpClient, req)
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
@@ -361,7 +361,7 @@ func (d *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, toke
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
-	resp, err := d.httpClient.Do(req)
+	resp, err := retry.RetryRequest(d.httpClient, req)
 	if err != nil {
 		return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, err
 	}
@@ -398,7 +398,7 @@ func (d *Provider) GetContractByAddress(ctx context.Context, addr persist.Addres
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
-	resp, err := d.httpClient.Do(req)
+	resp, err := retry.RetryRequest(d.httpClient, req)
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
@@ -428,7 +428,7 @@ func (d *Provider) GetOwnedTokensByContract(ctx context.Context, contractAddress
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
-		resp, err := d.httpClient.Do(req)
+		resp, err := retry.RetryRequest(d.httpClient, req)
 		if err != nil {
 			return nil, multichain.ChainAgnosticContract{}, err
 		}
@@ -773,7 +773,7 @@ func (d *Provider) getPublicKeyFromAddress(ctx context.Context, address persist.
 	if err != nil {
 		return "", err
 	}
-	resp, err := d.httpClient.Do(req)
+	resp, err := retry.RetryRequest(d.httpClient, req)
 	if err != nil {
 		return "", err
 	}
