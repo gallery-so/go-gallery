@@ -420,8 +420,8 @@ confirm-dev-migrate:
 	if [ "$$prompt" != "development" ]; then exit 1; fi
 
 migrate-dev-coredb: start-dev-sql-proxy confirm-dev-migrate
-	@POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
-	POSTGRES_MIGRATION_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
+	@POSTGRES_USER=$(POSTGRES_MIGRATION_USER) \
+	POSTGRES_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6643 \
 	go run cmd/migrate/main.go
 
@@ -430,8 +430,8 @@ confirm-prod-migrate:
 	if [ "$$prompt" != "production" ]; then exit 1; fi
 
 migrate-prod-coredb: start-prod-sql-proxy confirm-prod-migrate
-	@POSTGRES_MIGRATION_USER=$(POSTGRES_MIGRATION_USER) \
-	POSTGRES_MIGRATION_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
+	@POSTGRES_USER=$(POSTGRES_MIGRATION_USER) \
+	POSTGRES_PASSWORD=$(POSTGRES_MIGRATION_PASSWORD) \
 	POSTGRES_PORT=6543 \
 	go run cmd/migrate/main.go
 

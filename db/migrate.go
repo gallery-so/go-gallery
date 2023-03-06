@@ -77,7 +77,7 @@ func currentVersion(m *migrate.Migrate) (uint, error) {
 // SuperUserRequired returns true if the superuser role is needed
 // to run migrations based on the database's current state.
 func SuperUserRequired(dir string) (bool, error) {
-	client, err := postgres.NewClient(postgres.WithUser("gallery_migrator"))
+	client, err := postgres.NewClient()
 	var errNoRole postgres.ErrRoleDoesNotExist
 	if errors.As(err, &errNoRole) {
 		return true, nil

@@ -12,8 +12,8 @@ import (
 )
 
 func init() {
-	viper.SetDefault("POSTGRES_MIGRATION_USER", "")
-	viper.SetDefault("POSTGRES_MIGRATION_PASSWORD", "")
+	viper.SetDefault("POSTGRES_USER", "")
+	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("POSTGRES_HOST", "localhost")
 	viper.SetDefault("POSTGRES_PORT", "")
@@ -40,6 +40,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		fmt.Println("\nAttempting to connect...")
 
 		superClient = postgres.MustCreateClient(
 			postgres.WithUser(user),
