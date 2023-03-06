@@ -160,16 +160,24 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
 	}
+
+	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached live render
+	if !imgResult.cached && imgResult.mediaType.IsAnimationLike() {
+		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
+		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+	}
 	// if nothing was cached in the video step and the video step did process a video type, delete the now stale cached video
 	if !vidResult.cached && vidResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("vidResult not cached, deleting cached version if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 	}
 
-	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed therefore any thumbnail is stale
+	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed therefore any thumbnail or liverender is stale
 	if (imgResult.cached || vidResult.cached) && (!imgResult.mediaType.IsAnimationLike() && !vidResult.mediaType.IsAnimationLike()) {
 		logger.For(pCtx).Debug("neither cached, deleting thumbnail if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
+		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 	}
 
 	switch mediaType {
@@ -530,8 +538,7 @@ func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
 		path := util.GetURIPath(mediaURL, false)
-		// return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
-		return fmt.Sprintf("%s/ipfs/%s", "https://ipfs.io", path)
+		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
 	case persist.URITypeArweave:
 		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("https://arweave.net/%s", path)
@@ -747,7 +754,7 @@ func thumbnailAndCache(ctx context.Context, videoURL, bucket, name string, clien
 
 func createLiveRenderAndCache(ctx context.Context, videoURL, bucket, name string, client *storage.Client) error {
 
-	fileName := fmt.Sprintf("live-render-%s", name)
+	fileName := fmt.Sprintf("liverender-%s", name)
 	logger.For(ctx).Infof("caching live render media for '%s'", fileName)
 
 	timeBeforeCopy := time.Now()
