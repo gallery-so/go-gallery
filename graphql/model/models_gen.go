@@ -395,10 +395,11 @@ type AdmireFeedEventPayload struct {
 func (AdmireFeedEventPayload) IsAdmireFeedEventPayloadOrError() {}
 
 type AudioMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (AudioMedia) IsMediaSubtype() {}
@@ -1058,10 +1059,11 @@ type FollowUserPayload struct {
 func (FollowUserPayload) IsFollowUserPayloadOrError() {}
 
 type GIFMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (GIFMedia) IsMediaSubtype() {}
@@ -1145,10 +1147,11 @@ func (GalleryUser) IsAddRolesToUserPayloadOrError()      {}
 func (GalleryUser) IsRevokeRolesFromUserPayloadOrError() {}
 
 type GltfMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (GltfMedia) IsMediaSubtype() {}
@@ -1171,40 +1174,44 @@ type GroupNotificationUsersConnection struct {
 }
 
 type HTMLMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (HTMLMedia) IsMediaSubtype() {}
 func (HTMLMedia) IsMedia()        {}
 
 type ImageMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (ImageMedia) IsMediaSubtype() {}
 func (ImageMedia) IsMedia()        {}
 
 type InvalidMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (InvalidMedia) IsMediaSubtype() {}
 func (InvalidMedia) IsMedia()        {}
 
 type JSONMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (JSONMedia) IsMediaSubtype() {}
@@ -1223,6 +1230,12 @@ type LogoutPayload struct {
 
 type MagicLinkAuth struct {
 	Token string `json:"token"`
+}
+
+type MediaDimensions struct {
+	Width       *int     `json:"width"`
+	Height      *int     `json:"height"`
+	AspectRatio *float64 `json:"aspectRatio"`
 }
 
 type MembershipTier struct {
@@ -1319,10 +1332,11 @@ type PageInfo struct {
 }
 
 type PDFMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (PDFMedia) IsMediaSubtype() {}
@@ -1340,14 +1354,14 @@ type PreverifyEmailPayload struct {
 func (PreverifyEmailPayload) IsPreverifyEmailPayloadOrError() {}
 
 type PreviewURLSet struct {
-	Raw         *string  `json:"raw"`
-	Thumbnail   *string  `json:"thumbnail"`
-	Small       *string  `json:"small"`
-	Medium      *string  `json:"medium"`
-	Large       *string  `json:"large"`
-	SrcSet      *string  `json:"srcSet"`
-	Blurhash    *string  `json:"blurhash"`
-	AspectRatio *float64 `json:"aspectRatio"`
+	Raw        *string `json:"raw"`
+	Thumbnail  *string `json:"thumbnail"`
+	Small      *string `json:"small"`
+	Medium     *string `json:"medium"`
+	Large      *string `json:"large"`
+	SrcSet     *string `json:"srcSet"`
+	LiveRender *string `json:"liveRender"`
+	Blurhash   *string `json:"blurhash"`
 }
 
 type PublishGalleryInput struct {
@@ -1567,20 +1581,22 @@ type SyncTokensPayload struct {
 func (SyncTokensPayload) IsSyncTokensPayloadOrError() {}
 
 type SyncingMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (SyncingMedia) IsMediaSubtype() {}
 func (SyncingMedia) IsMedia()        {}
 
 type TextMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (TextMedia) IsMediaSubtype() {}
@@ -1694,10 +1710,11 @@ type UnfollowUserPayload struct {
 func (UnfollowUserPayload) IsUnfollowUserPayloadOrError() {}
 
 type UnknownMedia struct {
-	PreviewURLs      *PreviewURLSet `json:"previewURLs"`
-	MediaURL         *string        `json:"mediaURL"`
-	MediaType        *string        `json:"mediaType"`
-	ContentRenderURL *string        `json:"contentRenderURL"`
+	PreviewURLs      *PreviewURLSet   `json:"previewURLs"`
+	MediaURL         *string          `json:"mediaURL"`
+	MediaType        *string          `json:"mediaType"`
+	ContentRenderURL *string          `json:"contentRenderURL"`
+	Dimensions       *MediaDimensions `json:"dimensions"`
 }
 
 func (UnknownMedia) IsMediaSubtype() {}
@@ -1965,10 +1982,11 @@ type VerifyEmailPayload struct {
 func (VerifyEmailPayload) IsVerifyEmailPayloadOrError() {}
 
 type VideoMedia struct {
-	PreviewURLs       *PreviewURLSet `json:"previewURLs"`
-	MediaURL          *string        `json:"mediaURL"`
-	MediaType         *string        `json:"mediaType"`
-	ContentRenderURLs *VideoURLSet   `json:"contentRenderURLs"`
+	PreviewURLs       *PreviewURLSet   `json:"previewURLs"`
+	MediaURL          *string          `json:"mediaURL"`
+	MediaType         *string          `json:"mediaType"`
+	ContentRenderURLs *VideoURLSet     `json:"contentRenderURLs"`
+	Dimensions        *MediaDimensions `json:"dimensions"`
 }
 
 func (VideoMedia) IsMediaSubtype() {}

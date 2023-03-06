@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"image"
@@ -15,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -157,16 +160,24 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("image-%s", name), storageClient)
 	}
+
+	// if nothing was cached in the image step and the image step did process an image type, delete the now stale cached live render
+	if !imgResult.cached && imgResult.mediaType.IsAnimationLike() {
+		logger.For(pCtx).Debug("imgResult not cached, deleting cached version if any")
+		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
+	}
 	// if nothing was cached in the video step and the video step did process a video type, delete the now stale cached video
 	if !vidResult.cached && vidResult.mediaType.IsAnimationLike() {
 		logger.For(pCtx).Debug("vidResult not cached, deleting cached version if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("video-%s", name), storageClient)
+		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 	}
 
-	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed therefore any thumbnail is stale
+	// if something was cached but neither media type is animation type, we can assume that there was nothing thumbnailed therefore any thumbnail or liverender is stale
 	if (imgResult.cached || vidResult.cached) && (!imgResult.mediaType.IsAnimationLike() && !vidResult.mediaType.IsAnimationLike()) {
 		logger.For(pCtx).Debug("neither cached, deleting thumbnail if any")
 		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("thumbnail-%s", name), storageClient)
+		go deleteMedia(context.Background(), tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 	}
 
 	switch mediaType {
@@ -184,7 +195,6 @@ func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadat
 		res = getRawMedia(pCtx, mediaType, name, vURL, imgURL)
 	}
 
-	res = remapMedia(res)
 	logger.For(pCtx).Infof("media for %s of type %s: %+v", name, mediaType, res)
 	return res, nil
 }
@@ -249,6 +259,23 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 		logger.For(pCtx).Infof("using imageURL for %s: %s", name, imageURL)
 		res.MediaURL = persist.NullString(imageURL)
 	}
+
+	res = remapMedia(res)
+
+	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
+	if err != nil {
+		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
+	}
+
+	if mediaType == persist.MediaTypeVideo {
+		liveRenderURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("live-render-%s", name), storageClient)
+		if err != nil {
+			logger.For(pCtx).Errorf("failed to get live render URL for %s: %v", name, err)
+		} else {
+			res.LivePreviewURL = persist.NullString(liveRenderURL)
+		}
+	}
+
 	return res
 }
 
@@ -277,6 +304,13 @@ func getGIFMedia(pCtx context.Context, name, tokenBucket string, storageClient *
 		res.MediaURL = persist.NullString(imgURL)
 	}
 
+	res = remapMedia(res)
+
+	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
+	if err != nil {
+		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
+	}
+
 	return res
 }
 
@@ -300,7 +334,75 @@ func getSvgMedia(pCtx context.Context, name, tokenBucket string, storageClient *
 			res.MediaURL = persist.NullString(imgURL)
 		}
 	}
+
+	res = remapMedia(res)
+
+	res.Dimensions, err = getSvgDimensions(pCtx, res.MediaURL.String())
+	if err != nil {
+		logger.For(pCtx).Errorf("failed to get dimensions for svg %s: %v", name, err)
+	}
+
 	return res
+}
+
+type svgDimensions struct {
+	XMLName xml.Name `xml:"svg"`
+	Width   string   `xml:"width,attr"`
+	Height  string   `xml:"height,attr"`
+	Viewbox string   `xml:"viewBox,attr"`
+}
+
+func getSvgDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return persist.Dimensions{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var s svgDimensions
+	if err := xml.NewDecoder(resp.Body).Decode(&s); err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	if (s.Width == "" || s.Height == "") && s.Viewbox == "" {
+		return persist.Dimensions{}, fmt.Errorf("no dimensions found for %s", url)
+	}
+
+	if s.Viewbox != "" {
+		parts := strings.Split(s.Viewbox, " ")
+		if len(parts) != 4 {
+			return persist.Dimensions{}, fmt.Errorf("invalid viewbox for %s", url)
+		}
+		s.Width = parts[2]
+		s.Height = parts[3]
+
+	}
+
+	width, err := strconv.Atoi(s.Width)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	height, err := strconv.Atoi(s.Height)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	return persist.Dimensions{
+		Width:  width,
+		Height: height,
+	}, nil
+
 }
 
 func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient *storage.Client, vURL, imgURL string) persist.Media {
@@ -323,6 +425,14 @@ func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient
 			res.MediaURL = persist.NullString(imgURL)
 		}
 	}
+
+	res = remapMedia(res)
+
+	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
+	if err != nil {
+		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
+	}
+
 	return res
 }
 
@@ -338,7 +448,66 @@ func getHTMLMedia(pCtx context.Context, name, tokenBucket string, storageClient 
 		res.MediaURL = persist.NullString(imgURL)
 	}
 	res.ThumbnailURL = persist.NullString(getThumbnailURL(pCtx, tokenBucket, name, imgURL, storageClient))
+
+	res = remapMedia(res)
+
+	dimensions, err := getHTMLDimensions(pCtx, res.MediaURL.String())
+	if err != nil {
+		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
+	}
+
+	res.Dimensions = dimensions
+
 	return res
+}
+
+type iframeDimensions struct {
+	XMLName xml.Name `xml:"iframe"`
+	Width   string   `xml:"width,attr"`
+	Height  string   `xml:"height,attr"`
+}
+
+func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return persist.Dimensions{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var s iframeDimensions
+	if err := xml.NewDecoder(resp.Body).Decode(&s); err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	if s.Width == "" || s.Height == "" {
+		return persist.Dimensions{}, fmt.Errorf("no dimensions found for %s", url)
+	}
+
+	width, err := strconv.Atoi(s.Width)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	height, err := strconv.Atoi(s.Height)
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	return persist.Dimensions{
+		Width:  width,
+		Height: height,
+	}, nil
+
 }
 
 func getRawMedia(pCtx context.Context, mediaType persist.MediaType, name, vURL, imgURL string) persist.Media {
@@ -354,6 +523,14 @@ func getRawMedia(pCtx context.Context, mediaType persist.MediaType, name, vURL, 
 		logger.For(pCtx).Infof("using imgURL for %s: %s", name, imgURL)
 		res.MediaURL = persist.NullString(imgURL)
 	}
+
+	res = remapMedia(res)
+
+	dimensions, err := getMediaDimensions(res.MediaURL.String())
+	if err != nil {
+		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
+	}
+	res.Dimensions = dimensions
 	return res
 }
 
@@ -575,6 +752,31 @@ func thumbnailAndCache(ctx context.Context, videoURL, bucket, name string, clien
 	return nil
 }
 
+func createLiveRenderAndCache(ctx context.Context, videoURL, bucket, name string, client *storage.Client) error {
+
+	fileName := fmt.Sprintf("liverender-%s", name)
+	logger.For(ctx).Infof("caching live render media for '%s'", fileName)
+
+	timeBeforeCopy := time.Now()
+
+	sw := newObjectWriter(ctx, client, bucket, fileName, "video/mp4")
+
+	logger.For(ctx).Infof("creating live render for %s", videoURL)
+	if err := createLiveRenderPreviewVideo(videoURL, sw); err != nil {
+		return fmt.Errorf("could not write to bucket %s for '%s': %s", bucket, fileName, err)
+	}
+
+	if err := sw.Close(); err != nil {
+		return err
+	}
+
+	logger.For(ctx).Infof("storage copy took %s", time.Since(timeBeforeCopy))
+
+	go purgeIfExists(context.Background(), bucket, fileName, client)
+
+	return nil
+}
+
 func deleteMedia(ctx context.Context, bucket, fileName string, client *storage.Client) error {
 	return client.Bucket(bucket).Object(fileName).Delete(ctx)
 }
@@ -638,6 +840,10 @@ outer:
 		}
 
 		if err := thumbnailAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
+			return mediaType, false, err
+		}
+
+		if err := createLiveRenderAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
 			return mediaType, false, err
 		}
 
@@ -770,6 +976,58 @@ func thumbnailVideoToWriter(url string, writer io.Writer) error {
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
+}
+
+func createLiveRenderPreviewVideo(videoURL string, writer io.Writer) error {
+	c := exec.Command("ffmpeg", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
+	c.Stderr = os.Stderr
+	c.Stdout = writer
+	return c.Run()
+}
+
+type dimensions struct {
+	Streams []struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"streams"`
+}
+
+type errNoStreams struct {
+	url string
+	err error
+}
+
+func (e errNoStreams) Error() string {
+	return fmt.Sprintf("no streams in %s: %s", e.url, e.err)
+}
+
+func getMediaDimensions(url string) (persist.Dimensions, error) {
+	outBuf := &bytes.Buffer{}
+	c := exec.Command("ffprobe", "-show_streams", url, "-print_format", "json")
+	c.Stderr = os.Stderr
+	c.Stdout = outBuf
+	err := c.Run()
+	if err != nil {
+		return persist.Dimensions{}, err
+	}
+
+	var d dimensions
+	err = json.Unmarshal(outBuf.Bytes(), &d)
+	if err != nil {
+		return persist.Dimensions{}, errNoStreams{url: url, err: err}
+	}
+
+	if len(d.Streams) == 0 {
+		return persist.Dimensions{}, errNoStreams{url: url}
+	}
+
+	dims := persist.Dimensions{
+		Width:  d.Streams[0].Width,
+		Height: d.Streams[0].Height,
+	}
+
+	logger.For(nil).Debugf("got dimensions %+v for %s", dims, url)
+	return dims, nil
 }
 
 func truncateString(s string, i int) string {

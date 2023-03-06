@@ -158,6 +158,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 
 	// Don't replace existing usable media if tokenprocessing failed to get new media
 	if t.Media.IsServable() && !newMedia.IsServable() {
+		logger.For(ctx).Debugf("not replacing existing media for %s: cur %v new %v", key, t.Media.IsServable(), newMedia.IsServable())
 		return nil
 	}
 

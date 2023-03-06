@@ -1881,13 +1881,19 @@ func getPreviewUrls(ctx context.Context, media persist.Media) *model.PreviewURLS
 	preview := remapLargeImageUrls(url)
 	mm := mediamapper.For(ctx)
 
+	live := media.LivePreviewURL.String()
+	if media.LivePreviewURL == "" {
+		live = media.MediaURL.String()
+	}
+
 	return &model.PreviewURLSet{
-		Raw:       &preview,
-		Thumbnail: util.ToPointer(mm.GetThumbnailImageUrl(preview)),
-		Small:     util.ToPointer(mm.GetSmallImageUrl(preview)),
-		Medium:    util.ToPointer(mm.GetMediumImageUrl(preview)),
-		Large:     util.ToPointer(mm.GetLargeImageUrl(preview)),
-		SrcSet:    util.ToPointer(mm.GetSrcSet(preview)),
+		Raw:        &preview,
+		Thumbnail:  util.ToPointer(mm.GetThumbnailImageUrl(preview)),
+		Small:      util.ToPointer(mm.GetSmallImageUrl(preview)),
+		Medium:     util.ToPointer(mm.GetMediumImageUrl(preview)),
+		Large:      util.ToPointer(mm.GetLargeImageUrl(preview)),
+		SrcSet:     util.ToPointer(mm.GetSrcSet(preview)),
+		LiveRender: &live,
 	}
 }
 
@@ -1899,6 +1905,7 @@ func getImageMedia(ctx context.Context, media persist.Media) model.ImageMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: &url,
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -1910,6 +1917,7 @@ func getGIFMedia(ctx context.Context, media persist.Media) model.GIFMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: &url,
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -1937,6 +1945,7 @@ func getVideoMedia(ctx context.Context, media persist.Media) model.VideoMedia {
 		MediaURL:          util.ToPointer(media.MediaURL.String()),
 		MediaType:         (*string)(&media.MediaType),
 		ContentRenderURLs: &videoUrls,
+		Dimensions:        mediaToDimensions(media),
 	}
 }
 
@@ -1946,6 +1955,7 @@ func getAudioMedia(ctx context.Context, media persist.Media) model.AudioMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -1955,6 +1965,7 @@ func getTextMedia(ctx context.Context, media persist.Media) model.TextMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -1964,6 +1975,7 @@ func getPdfMedia(ctx context.Context, media persist.Media) model.PDFMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -1973,6 +1985,7 @@ func getHtmlMedia(ctx context.Context, media persist.Media) model.HTMLMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -1982,6 +1995,7 @@ func getJsonMedia(ctx context.Context, media persist.Media) model.JSONMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -1991,6 +2005,7 @@ func getGltfMedia(ctx context.Context, media persist.Media) model.GltfMedia {
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -2000,6 +2015,7 @@ func getUnknownMedia(ctx context.Context, media persist.Media) model.UnknownMedi
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -2009,6 +2025,7 @@ func getSyncingMedia(ctx context.Context, media persist.Media) model.SyncingMedi
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
 	}
 }
 
@@ -2018,5 +2035,19 @@ func getInvalidMedia(ctx context.Context, media persist.Media) model.InvalidMedi
 		MediaURL:         util.ToPointer(media.MediaURL.String()),
 		MediaType:        (*string)(&media.MediaType),
 		ContentRenderURL: (*string)(&media.MediaURL),
+		Dimensions:       mediaToDimensions(media),
+	}
+}
+
+func mediaToDimensions(media persist.Media) *model.MediaDimensions {
+	var aspect float64
+	if media.Dimensions.Height > 0 && media.Dimensions.Width > 0 {
+		aspect = float64(media.Dimensions.Width) / float64(media.Dimensions.Height)
+	}
+
+	return &model.MediaDimensions{
+		Width:       &media.Dimensions.Height,
+		Height:      &media.Dimensions.Width,
+		AspectRatio: &aspect,
 	}
 }

@@ -120,6 +120,7 @@ type ComplexityRoot struct {
 
 	AudioMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -481,6 +482,7 @@ type ComplexityRoot struct {
 
 	GIFMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -544,6 +546,7 @@ type ComplexityRoot struct {
 
 	GltfMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -561,6 +564,7 @@ type ComplexityRoot struct {
 
 	HtmlMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -568,6 +572,7 @@ type ComplexityRoot struct {
 
 	ImageMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -575,6 +580,7 @@ type ComplexityRoot struct {
 
 	InvalidMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -582,6 +588,7 @@ type ComplexityRoot struct {
 
 	JsonMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -594,6 +601,12 @@ type ComplexityRoot struct {
 
 	LogoutPayload struct {
 		Viewer func(childComplexity int) int
+	}
+
+	MediaDimensions struct {
+		AspectRatio func(childComplexity int) int
+		Height      func(childComplexity int) int
+		Width       func(childComplexity int) int
 	}
 
 	MembershipTier struct {
@@ -727,6 +740,7 @@ type ComplexityRoot struct {
 
 	PdfMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -738,14 +752,14 @@ type ComplexityRoot struct {
 	}
 
 	PreviewURLSet struct {
-		AspectRatio func(childComplexity int) int
-		Blurhash    func(childComplexity int) int
-		Large       func(childComplexity int) int
-		Medium      func(childComplexity int) int
-		Raw         func(childComplexity int) int
-		Small       func(childComplexity int) int
-		SrcSet      func(childComplexity int) int
-		Thumbnail   func(childComplexity int) int
+		Blurhash   func(childComplexity int) int
+		Large      func(childComplexity int) int
+		LiveRender func(childComplexity int) int
+		Medium     func(childComplexity int) int
+		Raw        func(childComplexity int) int
+		Small      func(childComplexity int) int
+		SrcSet     func(childComplexity int) int
+		Thumbnail  func(childComplexity int) int
 	}
 
 	PublishGalleryPayload struct {
@@ -927,6 +941,7 @@ type ComplexityRoot struct {
 
 	SyncingMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -934,6 +949,7 @@ type ComplexityRoot struct {
 
 	TextMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -1026,6 +1042,7 @@ type ComplexityRoot struct {
 
 	UnknownMedia struct {
 		ContentRenderURL func(childComplexity int) int
+		Dimensions       func(childComplexity int) int
 		MediaType        func(childComplexity int) int
 		MediaURL         func(childComplexity int) int
 		PreviewURLs      func(childComplexity int) int
@@ -1148,6 +1165,7 @@ type ComplexityRoot struct {
 
 	VideoMedia struct {
 		ContentRenderURLs func(childComplexity int) int
+		Dimensions        func(childComplexity int) int
 		MediaType         func(childComplexity int) int
 		MediaURL          func(childComplexity int) int
 		PreviewURLs       func(childComplexity int) int
@@ -1364,7 +1382,6 @@ type OwnerAtBlockResolver interface {
 }
 type PreviewURLSetResolver interface {
 	Blurhash(ctx context.Context, obj *model.PreviewURLSet) (*string, error)
-	AspectRatio(ctx context.Context, obj *model.PreviewURLSet) (*float64, error)
 }
 type QueryResolver interface {
 	Node(ctx context.Context, id model.GqlID) (model.Node, error)
@@ -1572,6 +1589,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AudioMedia.ContentRenderURL(childComplexity), true
+
+	case "AudioMedia.dimensions":
+		if e.complexity.AudioMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.AudioMedia.Dimensions(childComplexity), true
 
 	case "AudioMedia.mediaType":
 		if e.complexity.AudioMedia.MediaType == nil {
@@ -2770,6 +2794,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GIFMedia.ContentRenderURL(childComplexity), true
 
+	case "GIFMedia.dimensions":
+		if e.complexity.GIFMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.GIFMedia.Dimensions(childComplexity), true
+
 	case "GIFMedia.mediaType":
 		if e.complexity.GIFMedia.MediaType == nil {
 			break
@@ -3095,6 +3126,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.GltfMedia.ContentRenderURL(childComplexity), true
 
+	case "GltfMedia.dimensions":
+		if e.complexity.GltfMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.GltfMedia.Dimensions(childComplexity), true
+
 	case "GltfMedia.mediaType":
 		if e.complexity.GltfMedia.MediaType == nil {
 			break
@@ -3151,6 +3189,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.HtmlMedia.ContentRenderURL(childComplexity), true
 
+	case "HtmlMedia.dimensions":
+		if e.complexity.HtmlMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.HtmlMedia.Dimensions(childComplexity), true
+
 	case "HtmlMedia.mediaType":
 		if e.complexity.HtmlMedia.MediaType == nil {
 			break
@@ -3178,6 +3223,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ImageMedia.ContentRenderURL(childComplexity), true
+
+	case "ImageMedia.dimensions":
+		if e.complexity.ImageMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.ImageMedia.Dimensions(childComplexity), true
 
 	case "ImageMedia.mediaType":
 		if e.complexity.ImageMedia.MediaType == nil {
@@ -3207,6 +3259,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.InvalidMedia.ContentRenderURL(childComplexity), true
 
+	case "InvalidMedia.dimensions":
+		if e.complexity.InvalidMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.InvalidMedia.Dimensions(childComplexity), true
+
 	case "InvalidMedia.mediaType":
 		if e.complexity.InvalidMedia.MediaType == nil {
 			break
@@ -3234,6 +3293,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.JsonMedia.ContentRenderURL(childComplexity), true
+
+	case "JsonMedia.dimensions":
+		if e.complexity.JsonMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.JsonMedia.Dimensions(childComplexity), true
 
 	case "JsonMedia.mediaType":
 		if e.complexity.JsonMedia.MediaType == nil {
@@ -3276,6 +3342,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.LogoutPayload.Viewer(childComplexity), true
+
+	case "MediaDimensions.aspectRatio":
+		if e.complexity.MediaDimensions.AspectRatio == nil {
+			break
+		}
+
+		return e.complexity.MediaDimensions.AspectRatio(childComplexity), true
+
+	case "MediaDimensions.height":
+		if e.complexity.MediaDimensions.Height == nil {
+			break
+		}
+
+		return e.complexity.MediaDimensions.Height(childComplexity), true
+
+	case "MediaDimensions.width":
+		if e.complexity.MediaDimensions.Width == nil {
+			break
+		}
+
+		return e.complexity.MediaDimensions.Width(childComplexity), true
 
 	case "MembershipTier.assetUrl":
 		if e.complexity.MembershipTier.AssetURL == nil {
@@ -4215,6 +4302,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PdfMedia.ContentRenderURL(childComplexity), true
 
+	case "PdfMedia.dimensions":
+		if e.complexity.PdfMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.PdfMedia.Dimensions(childComplexity), true
+
 	case "PdfMedia.mediaType":
 		if e.complexity.PdfMedia.MediaType == nil {
 			break
@@ -4250,13 +4344,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PreverifyEmailPayload.Result(childComplexity), true
 
-	case "PreviewURLSet.aspectRatio":
-		if e.complexity.PreviewURLSet.AspectRatio == nil {
-			break
-		}
-
-		return e.complexity.PreviewURLSet.AspectRatio(childComplexity), true
-
 	case "PreviewURLSet.blurhash":
 		if e.complexity.PreviewURLSet.Blurhash == nil {
 			break
@@ -4270,6 +4357,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.PreviewURLSet.Large(childComplexity), true
+
+	case "PreviewURLSet.liveRender":
+		if e.complexity.PreviewURLSet.LiveRender == nil {
+			break
+		}
+
+		return e.complexity.PreviewURLSet.LiveRender(childComplexity), true
 
 	case "PreviewURLSet.medium":
 		if e.complexity.PreviewURLSet.Medium == nil {
@@ -5146,6 +5240,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SyncingMedia.ContentRenderURL(childComplexity), true
 
+	case "SyncingMedia.dimensions":
+		if e.complexity.SyncingMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.SyncingMedia.Dimensions(childComplexity), true
+
 	case "SyncingMedia.mediaType":
 		if e.complexity.SyncingMedia.MediaType == nil {
 			break
@@ -5173,6 +5274,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.TextMedia.ContentRenderURL(childComplexity), true
+
+	case "TextMedia.dimensions":
+		if e.complexity.TextMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.TextMedia.Dimensions(childComplexity), true
 
 	case "TextMedia.mediaType":
 		if e.complexity.TextMedia.MediaType == nil {
@@ -5566,6 +5674,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UnknownMedia.ContentRenderURL(childComplexity), true
 
+	case "UnknownMedia.dimensions":
+		if e.complexity.UnknownMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.UnknownMedia.Dimensions(childComplexity), true
+
 	case "UnknownMedia.mediaType":
 		if e.complexity.UnknownMedia.MediaType == nil {
 			break
@@ -5852,6 +5967,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.VideoMedia.ContentRenderURLs(childComplexity), true
+
+	case "VideoMedia.dimensions":
+		if e.complexity.VideoMedia.Dimensions == nil {
+			break
+		}
+
+		return e.complexity.VideoMedia.Dimensions(childComplexity), true
 
 	case "VideoMedia.mediaType":
 		if e.complexity.VideoMedia.MediaType == nil {
@@ -6343,8 +6465,8 @@ type PreviewURLSet {
   medium: String
   large: String
   srcSet: String
+  liveRender: String
   blurhash: String @experimental @goField(forceResolver: true)
-  aspectRatio: Float @experimental @goField(forceResolver: true)
 }
 
 type VideoURLSet {
@@ -6352,6 +6474,12 @@ type VideoURLSet {
   small: String
   medium: String
   large: String
+}
+
+type MediaDimensions {
+  width: Int
+  height: Int
+  aspectRatio: Float
 }
 
 interface Media {
@@ -6367,6 +6495,9 @@ interface Media {
 
   # All Media types will also have something like contentRenderURL or contentRenderURLs,
   # which are the URL(s) that should actually be used for rendering the media's content
+
+  # The dimensions of the media, if known
+  dimensions: MediaDimensions
 }
 
 type ImageMedia implements Media {
@@ -6375,6 +6506,7 @@ type ImageMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type GIFMedia implements Media {
@@ -6383,6 +6515,7 @@ type GIFMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type VideoMedia implements Media {
@@ -6391,6 +6524,7 @@ type VideoMedia implements Media {
   mediaType: String
 
   contentRenderURLs: VideoURLSet
+  dimensions: MediaDimensions
 }
 
 type AudioMedia implements Media {
@@ -6399,6 +6533,7 @@ type AudioMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type TextMedia implements Media {
@@ -6407,6 +6542,7 @@ type TextMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type PdfMedia implements Media {
@@ -6415,6 +6551,7 @@ type PdfMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type HtmlMedia implements Media {
@@ -6423,6 +6560,7 @@ type HtmlMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type JsonMedia implements Media {
@@ -6431,6 +6569,7 @@ type JsonMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type GltfMedia implements Media {
@@ -6439,6 +6578,7 @@ type GltfMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type UnknownMedia implements Media {
@@ -6447,6 +6587,7 @@ type UnknownMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type SyncingMedia implements Media {
@@ -6455,6 +6596,7 @@ type SyncingMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 type InvalidMedia implements Media {
@@ -6463,6 +6605,7 @@ type InvalidMedia implements Media {
   mediaType: String
 
   contentRenderURL: String
+  dimensions: MediaDimensions
 }
 
 enum TokenType {
@@ -11109,10 +11252,10 @@ func (ec *executionContext) fieldContext_AudioMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -11238,6 +11381,55 @@ func (ec *executionContext) fieldContext_AudioMedia_contentRenderURL(ctx context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AudioMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.AudioMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AudioMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AudioMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AudioMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -19315,10 +19507,10 @@ func (ec *executionContext) fieldContext_GIFMedia_previewURLs(ctx context.Contex
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -19444,6 +19636,55 @@ func (ec *executionContext) fieldContext_GIFMedia_contentRenderURL(ctx context.C
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GIFMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.GIFMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GIFMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GIFMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GIFMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -19749,10 +19990,10 @@ func (ec *executionContext) fieldContext_Gallery_tokenPreviews(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -21632,10 +21873,10 @@ func (ec *executionContext) fieldContext_GltfMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -21761,6 +22002,55 @@ func (ec *executionContext) fieldContext_GltfMedia_contentRenderURL(ctx context.
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GltfMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.GltfMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GltfMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GltfMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GltfMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -22038,10 +22328,10 @@ func (ec *executionContext) fieldContext_HtmlMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -22172,6 +22462,55 @@ func (ec *executionContext) fieldContext_HtmlMedia_contentRenderURL(ctx context.
 	return fc, nil
 }
 
+func (ec *executionContext) _HtmlMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.HTMLMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_HtmlMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_HtmlMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HtmlMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ImageMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ImageMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -22220,10 +22559,10 @@ func (ec *executionContext) fieldContext_ImageMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -22354,6 +22693,55 @@ func (ec *executionContext) fieldContext_ImageMedia_contentRenderURL(ctx context
 	return fc, nil
 }
 
+func (ec *executionContext) _ImageMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.ImageMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ImageMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ImageMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ImageMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _InvalidMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_InvalidMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -22402,10 +22790,10 @@ func (ec *executionContext) fieldContext_InvalidMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -22536,6 +22924,55 @@ func (ec *executionContext) fieldContext_InvalidMedia_contentRenderURL(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _InvalidMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.InvalidMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_InvalidMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_InvalidMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InvalidMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _JsonMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_JsonMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -22584,10 +23021,10 @@ func (ec *executionContext) fieldContext_JsonMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -22713,6 +23150,55 @@ func (ec *executionContext) fieldContext_JsonMedia_contentRenderURL(ctx context.
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _JsonMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.JSONMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_JsonMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_JsonMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JsonMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -22880,6 +23366,129 @@ func (ec *executionContext) fieldContext_LogoutPayload_viewer(ctx context.Contex
 				return ec.fieldContext_Viewer_suggestedUsers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Viewer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MediaDimensions_width(ctx context.Context, field graphql.CollectedField, obj *model.MediaDimensions) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MediaDimensions_width(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Width, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MediaDimensions_width(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MediaDimensions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MediaDimensions_height(ctx context.Context, field graphql.CollectedField, obj *model.MediaDimensions) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MediaDimensions_height(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MediaDimensions_height(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MediaDimensions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MediaDimensions_aspectRatio(ctx context.Context, field graphql.CollectedField, obj *model.MediaDimensions) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AspectRatio, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MediaDimensions_aspectRatio(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MediaDimensions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
 		},
 	}
 	return fc, nil
@@ -28382,10 +28991,10 @@ func (ec *executionContext) fieldContext_PdfMedia_previewURLs(ctx context.Contex
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -28511,6 +29120,55 @@ func (ec *executionContext) fieldContext_PdfMedia_contentRenderURL(ctx context.C
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PdfMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.PDFMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PdfMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PdfMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PdfMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -28850,6 +29508,47 @@ func (ec *executionContext) fieldContext_PreviewURLSet_srcSet(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _PreviewURLSet_liveRender(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LiveRender, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PreviewURLSet_liveRender(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PreviewURLSet",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PreviewURLSet_blurhash(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
 	if err != nil {
@@ -28906,67 +29605,6 @@ func (ec *executionContext) fieldContext_PreviewURLSet_blurhash(ctx context.Cont
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _PreviewURLSet_aspectRatio(ctx context.Context, field graphql.CollectedField, obj *model.PreviewURLSet) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.PreviewURLSet().AspectRatio(rctx, obj)
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.Experimental == nil {
-				return nil, errors.New("directive experimental is not implemented")
-			}
-			return ec.directives.Experimental(ctx, obj, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*float64); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *float64`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*float64)
-	fc.Result = res
-	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_PreviewURLSet_aspectRatio(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "PreviewURLSet",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Float does not have child fields")
 		},
 	}
 	return fc, nil
@@ -34273,10 +34911,10 @@ func (ec *executionContext) fieldContext_SyncingMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -34407,6 +35045,55 @@ func (ec *executionContext) fieldContext_SyncingMedia_contentRenderURL(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _SyncingMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.SyncingMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SyncingMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SyncingMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SyncingMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TextMedia_previewURLs(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_TextMedia_previewURLs(ctx, field)
 	if err != nil {
@@ -34455,10 +35142,10 @@ func (ec *executionContext) fieldContext_TextMedia_previewURLs(ctx context.Conte
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -34584,6 +35271,55 @@ func (ec *executionContext) fieldContext_TextMedia_contentRenderURL(ctx context.
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TextMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.TextMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TextMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TextMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TextMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -37253,10 +37989,10 @@ func (ec *executionContext) fieldContext_UnknownMedia_previewURLs(ctx context.Co
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -37382,6 +38118,55 @@ func (ec *executionContext) fieldContext_UnknownMedia_contentRenderURL(ctx conte
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UnknownMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.UnknownMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UnknownMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UnknownMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UnknownMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -39564,10 +40349,10 @@ func (ec *executionContext) fieldContext_VideoMedia_previewURLs(ctx context.Cont
 				return ec.fieldContext_PreviewURLSet_large(ctx, field)
 			case "srcSet":
 				return ec.fieldContext_PreviewURLSet_srcSet(ctx, field)
+			case "liveRender":
+				return ec.fieldContext_PreviewURLSet_liveRender(ctx, field)
 			case "blurhash":
 				return ec.fieldContext_PreviewURLSet_blurhash(ctx, field)
-			case "aspectRatio":
-				return ec.fieldContext_PreviewURLSet_aspectRatio(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PreviewURLSet", field.Name)
 		},
@@ -39703,6 +40488,55 @@ func (ec *executionContext) fieldContext_VideoMedia_contentRenderURLs(ctx contex
 				return ec.fieldContext_VideoURLSet_large(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type VideoURLSet", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _VideoMedia_dimensions(ctx context.Context, field graphql.CollectedField, obj *model.VideoMedia) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_VideoMedia_dimensions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dimensions, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaDimensions)
+	fc.Result = res
+	return ec.marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_VideoMedia_dimensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VideoMedia",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "width":
+				return ec.fieldContext_MediaDimensions_width(ctx, field)
+			case "height":
+				return ec.fieldContext_MediaDimensions_height(ctx, field)
+			case "aspectRatio":
+				return ec.fieldContext_MediaDimensions_aspectRatio(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaDimensions", field.Name)
 		},
 	}
 	return fc, nil
@@ -47836,6 +48670,10 @@ func (ec *executionContext) _AudioMedia(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = ec._AudioMedia_contentRenderURL(ctx, field, obj)
 
+		case "dimensions":
+
+			out.Values[i] = ec._AudioMedia_dimensions(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -50418,6 +51256,10 @@ func (ec *executionContext) _GIFMedia(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = ec._GIFMedia_contentRenderURL(ctx, field, obj)
 
+		case "dimensions":
+
+			out.Values[i] = ec._GIFMedia_dimensions(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -50983,6 +51825,10 @@ func (ec *executionContext) _GltfMedia(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._GltfMedia_contentRenderURL(ctx, field, obj)
 
+		case "dimensions":
+
+			out.Values[i] = ec._GltfMedia_dimensions(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -51078,6 +51924,10 @@ func (ec *executionContext) _HtmlMedia(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._HtmlMedia_contentRenderURL(ctx, field, obj)
 
+		case "dimensions":
+
+			out.Values[i] = ec._HtmlMedia_dimensions(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -51114,6 +51964,10 @@ func (ec *executionContext) _ImageMedia(ctx context.Context, sel ast.SelectionSe
 		case "contentRenderURL":
 
 			out.Values[i] = ec._ImageMedia_contentRenderURL(ctx, field, obj)
+
+		case "dimensions":
+
+			out.Values[i] = ec._ImageMedia_dimensions(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -51152,6 +52006,10 @@ func (ec *executionContext) _InvalidMedia(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._InvalidMedia_contentRenderURL(ctx, field, obj)
 
+		case "dimensions":
+
+			out.Values[i] = ec._InvalidMedia_dimensions(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -51188,6 +52046,10 @@ func (ec *executionContext) _JsonMedia(ctx context.Context, sel ast.SelectionSet
 		case "contentRenderURL":
 
 			out.Values[i] = ec._JsonMedia_contentRenderURL(ctx, field, obj)
+
+		case "dimensions":
+
+			out.Values[i] = ec._JsonMedia_dimensions(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -51242,6 +52104,39 @@ func (ec *executionContext) _LogoutPayload(ctx context.Context, sel ast.Selectio
 		case "viewer":
 
 			out.Values[i] = ec._LogoutPayload_viewer(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var mediaDimensionsImplementors = []string{"MediaDimensions"}
+
+func (ec *executionContext) _MediaDimensions(ctx context.Context, sel ast.SelectionSet, obj *model.MediaDimensions) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mediaDimensionsImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MediaDimensions")
+		case "width":
+
+			out.Values[i] = ec._MediaDimensions_width(ctx, field, obj)
+
+		case "height":
+
+			out.Values[i] = ec._MediaDimensions_height(ctx, field, obj)
+
+		case "aspectRatio":
+
+			out.Values[i] = ec._MediaDimensions_aspectRatio(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -52079,6 +52974,10 @@ func (ec *executionContext) _PdfMedia(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = ec._PdfMedia_contentRenderURL(ctx, field, obj)
 
+		case "dimensions":
+
+			out.Values[i] = ec._PdfMedia_dimensions(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -52159,6 +53058,10 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 
 			out.Values[i] = ec._PreviewURLSet_srcSet(ctx, field, obj)
 
+		case "liveRender":
+
+			out.Values[i] = ec._PreviewURLSet_liveRender(ctx, field, obj)
+
 		case "blurhash":
 			field := field
 
@@ -52169,23 +53072,6 @@ func (ec *executionContext) _PreviewURLSet(ctx context.Context, sel ast.Selectio
 					}
 				}()
 				res = ec._PreviewURLSet_blurhash(ctx, field, obj)
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
-		case "aspectRatio":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._PreviewURLSet_aspectRatio(ctx, field, obj)
 				return res
 			}
 
@@ -53843,6 +54729,10 @@ func (ec *executionContext) _SyncingMedia(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._SyncingMedia_contentRenderURL(ctx, field, obj)
 
+		case "dimensions":
+
+			out.Values[i] = ec._SyncingMedia_dimensions(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -53879,6 +54769,10 @@ func (ec *executionContext) _TextMedia(ctx context.Context, sel ast.SelectionSet
 		case "contentRenderURL":
 
 			out.Values[i] = ec._TextMedia_contentRenderURL(ctx, field, obj)
+
+		case "dimensions":
+
+			out.Values[i] = ec._TextMedia_dimensions(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -54502,6 +55396,10 @@ func (ec *executionContext) _UnknownMedia(ctx context.Context, sel ast.Selection
 		case "contentRenderURL":
 
 			out.Values[i] = ec._UnknownMedia_contentRenderURL(ctx, field, obj)
+
+		case "dimensions":
+
+			out.Values[i] = ec._UnknownMedia_dimensions(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -55284,6 +56182,10 @@ func (ec *executionContext) _VideoMedia(ctx context.Context, sel ast.SelectionSe
 		case "contentRenderURLs":
 
 			out.Values[i] = ec._VideoMedia_contentRenderURLs(ctx, field, obj)
+
+		case "dimensions":
+
+			out.Values[i] = ec._VideoMedia_dimensions(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -58724,6 +59626,13 @@ func (ec *executionContext) unmarshalOMagicLinkAuth2ᚖgithubᚗcomᚋmikeydub�
 	}
 	res, err := ec.unmarshalInputMagicLinkAuth(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOMediaDimensions2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaDimensions(ctx context.Context, sel ast.SelectionSet, v *model.MediaDimensions) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MediaDimensions(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMediaSubtype2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐMediaSubtype(ctx context.Context, sel ast.SelectionSet, v model.MediaSubtype) graphql.Marshaler {

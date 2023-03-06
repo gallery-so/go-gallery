@@ -1493,13 +1493,6 @@ func (r *previewURLSetResolver) Blurhash(ctx context.Context, obj *model.Preview
 	return mm.GetBlurhash(*obj.Raw), nil
 }
 
-// AspectRatio is the resolver for the aspectRatio field.
-func (r *previewURLSetResolver) AspectRatio(ctx context.Context, obj *model.PreviewURLSet) (*float64, error) {
-	mm := mediamapper.For(ctx)
-
-	return mm.GetAspectRatio(*obj.Raw), nil
-}
-
 // Node is the resolver for the node field.
 func (r *queryResolver) Node(ctx context.Context, id model.GqlID) (model.Node, error) {
 	return nodeFetcher.GetNodeByGqlID(ctx, id)
