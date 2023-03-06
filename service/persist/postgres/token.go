@@ -16,28 +16,29 @@ import (
 
 // TokenRepository represents a postgres repository for tokens
 type TokenRepository struct {
-	db                                         *sql.DB
-	getByWalletStmt                            *sql.Stmt
-	getByWalletPaginateStmt                    *sql.Stmt
-	getOwnedByContractStmt                     *sql.Stmt
-	getOwnedByContractPaginateStmt             *sql.Stmt
-	getByContractStmt                          *sql.Stmt
-	getByContractPaginateStmt                  *sql.Stmt
-	getByTokenIdentifiersStmt                  *sql.Stmt
-	getByTokenIdentifiersPaginateStmt          *sql.Stmt
-	getByIdentifiersStmt                       *sql.Stmt
-	getMetadataByTokenIdentifiersStmt          *sql.Stmt
-	updateMediaUnsafeStmt                      *sql.Stmt
-	updateOwnerUnsafeStmt                      *sql.Stmt
-	updateBalanceUnsafeStmt                    *sql.Stmt
-	updateURIDerivedByTokenIdentifiersStmt     *sql.Stmt
-	updateMediaByTokenIdentifiersStmt          *sql.Stmt
-	updateMetadataFieldsByTokenIdentifiersStmt *sql.Stmt
-	mostRecentBlockStmt                        *sql.Stmt
-	upsert721Stmt                              *sql.Stmt
-	upsert1155Stmt                             *sql.Stmt
-	deleteStmt                                 *sql.Stmt
-	deleteByIDStmt                             *sql.Stmt
+	db                                           *sql.DB
+	getByWalletStmt                              *sql.Stmt
+	getByWalletPaginateStmt                      *sql.Stmt
+	getOwnedByContractStmt                       *sql.Stmt
+	getOwnedByContractPaginateStmt               *sql.Stmt
+	getByContractStmt                            *sql.Stmt
+	getByContractPaginateStmt                    *sql.Stmt
+	getByTokenIdentifiersStmt                    *sql.Stmt
+	getByTokenIdentifiersPaginateStmt            *sql.Stmt
+	getByIdentifiersStmt                         *sql.Stmt
+	getMetadataByTokenIdentifiersStmt            *sql.Stmt
+	updateMediaUnsafeStmt                        *sql.Stmt
+	updateOwnerUnsafeStmt                        *sql.Stmt
+	updateBalanceUnsafeStmt                      *sql.Stmt
+	updateURIDerivedFieldsByTokenIdentifiersStmt *sql.Stmt
+	updateURIByTokenIdentifiersStmt              *sql.Stmt
+	updateMediaByTokenIdentifiersStmt            *sql.Stmt
+	updateMetadataFieldsByTokenIdentifiersStmt   *sql.Stmt
+	mostRecentBlockStmt                          *sql.Stmt
+	upsert721Stmt                                *sql.Stmt
+	upsert1155Stmt                               *sql.Stmt
+	deleteStmt                                   *sql.Stmt
+	deleteByIDStmt                               *sql.Stmt
 }
 
 // NewTokenRepository creates a new TokenRepository
@@ -87,6 +88,9 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE TOKEN_ID = $7 AND CONTRACT_ADDRESS = $8;`)
 	checkNoErr(err)
 
+	updateURIByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT_ADDRESS = $4;`)
+	checkNoErr(err)
+
 	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT_ADDRESS = $4 AND DELETED = false;`)
 	checkNoErr(err)
 
@@ -109,28 +113,29 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	checkNoErr(err)
 
 	return &TokenRepository{
-		db:                                         db,
-		getByWalletStmt:                            getByWalletStmt,
-		getByWalletPaginateStmt:                    getByWalletPaginateStmt,
-		getOwnedByContractStmt:                     getOwnedByContractStmt,
-		getOwnedByContractPaginateStmt:             getOwnedByContractPaginateStmt,
-		getByContractStmt:                          getByContractStmt,
-		getByContractPaginateStmt:                  getByContractPaginateStmt,
-		getByTokenIdentifiersStmt:                  getByTokenIdentifiersStmt,
-		getByTokenIdentifiersPaginateStmt:          getByTokenIdentifiersPaginateStmt,
-		getMetadataByTokenIdentifiersStmt:          getMetadataByTokenIdentifiersStmt,
-		updateMediaUnsafeStmt:                      updateMediaUnsafeStmt,
-		updateOwnerUnsafeStmt:                      updateOwnerUnsafeStmt,
-		updateBalanceUnsafeStmt:                    updateBalanceUnsafeStmt,
-		updateURIDerivedByTokenIdentifiersStmt:     updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt,
-		updateMediaByTokenIdentifiersStmt:          updateMediaByTokenIdentifiersUnsafeStmt,
-		updateMetadataFieldsByTokenIdentifiersStmt: updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
-		mostRecentBlockStmt:                        mostRecentBlockStmt,
-		upsert721Stmt:                              upsert721Stmt,
-		upsert1155Stmt:                             upsert1155Stmt,
-		deleteStmt:                                 deleteStmt,
-		deleteByIDStmt:                             deleteByIDStmt,
-		getByIdentifiersStmt:                       getByIdentifiersStmt,
+		db:                                           db,
+		getByWalletStmt:                              getByWalletStmt,
+		getByWalletPaginateStmt:                      getByWalletPaginateStmt,
+		getOwnedByContractStmt:                       getOwnedByContractStmt,
+		getOwnedByContractPaginateStmt:               getOwnedByContractPaginateStmt,
+		getByContractStmt:                            getByContractStmt,
+		getByContractPaginateStmt:                    getByContractPaginateStmt,
+		getByTokenIdentifiersStmt:                    getByTokenIdentifiersStmt,
+		getByTokenIdentifiersPaginateStmt:            getByTokenIdentifiersPaginateStmt,
+		getMetadataByTokenIdentifiersStmt:            getMetadataByTokenIdentifiersStmt,
+		updateMediaUnsafeStmt:                        updateMediaUnsafeStmt,
+		updateOwnerUnsafeStmt:                        updateOwnerUnsafeStmt,
+		updateBalanceUnsafeStmt:                      updateBalanceUnsafeStmt,
+		updateURIDerivedFieldsByTokenIdentifiersStmt: updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt,
+		updateURIByTokenIdentifiersStmt:              updateURIByTokenIdentifiersUnsafeStmt,
+		updateMediaByTokenIdentifiersStmt:            updateMediaByTokenIdentifiersUnsafeStmt,
+		updateMetadataFieldsByTokenIdentifiersStmt:   updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
+		mostRecentBlockStmt:                          mostRecentBlockStmt,
+		upsert721Stmt:                                upsert721Stmt,
+		upsert1155Stmt:                               upsert1155Stmt,
+		deleteStmt:                                   deleteStmt,
+		deleteByIDStmt:                               deleteByIDStmt,
+		getByIdentifiersStmt:                         getByIdentifiersStmt,
 	}
 
 }
@@ -488,7 +493,10 @@ func (t *TokenRepository) UpdateByTokenIdentifiers(pCtx context.Context, pTokenI
 	// this all makes me feel sticky because it is not doubled up on the UpdateByID method, but I am assuming that this will all become irrelevant soon with the sqlc refactor by ezra
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateURIDerivedByTokenIdentifiersStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
+		res, err = t.updateURIDerivedFieldsByTokenIdentifiersStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
+	case persist.TokenUpdateURIInput:
+		update := pUpdate.(persist.TokenUpdateURIInput)
+		res, err = t.updateURIByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.LastUpdated, pTokenID, pContractAddress)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		res, err = t.updateMediaByTokenIdentifiersStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pTokenID, pContractAddress)

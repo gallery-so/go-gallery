@@ -29,7 +29,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 )
 
@@ -72,7 +71,7 @@ type tokenFullUpdate struct {
 	TokenDBID       persist.DBID
 	TokenID         persist.TokenID
 	ContractAddress persist.EthereumAddress
-	Update          persist.TokenUpdateAllURIDerivedFieldsInput
+	Update          persist.TokenUpdateURIInput
 }
 
 type tokenMetadataFieldsUpdate struct {
@@ -108,30 +107,6 @@ type ValidateWalletNFTsInput struct {
 type ValidateUsersNFTsOutput struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
-}
-
-// UniqueMetadataUpdateErr is returned when an update for an address with a custom handler
-// i.e. CryptoPunks, Autoglyphs, etc. fails to update a token.
-type UniqueMetadataUpdateErr struct {
-	contractAddress persist.Address
-	tokenID         persist.TokenID
-	err             error
-}
-
-func (e UniqueMetadataUpdateErr) Error() string {
-	return fmt.Sprintf("failed to get unique metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
-}
-
-// MetadataUpdateErr is returned when an update for an address with a "standard" metadata URI
-// i.e. JSON, SVG, IPFS, HTTP, etc. fails to update.
-type MetadataUpdateErr struct {
-	contractAddress persist.Address
-	tokenID         persist.TokenID
-	err             error
-}
-
-func (e MetadataUpdateErr) Error() string {
-	return fmt.Sprintf("failed to get metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
 }
 
 func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenRepository, contractRepository persist.ContractRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client) gin.HandlerFunc {
@@ -623,7 +598,7 @@ func refreshTokenMetadatas(c context.Context, input UpdateTokenInput, tokenRepos
 
 		}
 
-		up, err := getUpdateForToken(c, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
+		up, err := getUpdateForToken(c, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
 		if err != nil {
 			return err
 		}
@@ -682,7 +657,7 @@ func updateMetadataForTokens(pCtx context.Context, updateChan chan<- tokenFullUp
 				return
 			}
 
-			up, err := getUpdateForToken(pCtx, uniqueMetadataHandlers, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
+			up, err := getUpdateForToken(pCtx, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
 			if err != nil {
 				errChan <- err
 				return
@@ -696,8 +671,8 @@ func updateMetadataForTokens(pCtx context.Context, updateChan chan<- tokenFullUp
 	}
 }
 
-func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (tokenFullUpdate, error) {
-	newMetadata := metadata
+func getUpdateForToken(pCtx context.Context, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (tokenFullUpdate, error) {
+
 	newURI := uri
 
 	u, err := rpc.GetTokenURI(pCtx, tokenType, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient)
@@ -713,40 +688,11 @@ func getUpdateForToken(pCtx context.Context, uniqueHandlers uniqueMetadatas, tok
 		logEthCallRPCError(logEntry, err, fmt.Sprintf("error getting token URI"))
 	}
 
-	if handler, ok := uniqueHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
-		logger.For(pCtx).Infof("Using %v metadata handler for %s", handler, contractAddress)
-		u, md, err := handler(pCtx, newURI, persist.EthereumAddress(contractAddress.String()), tokenID, ethClient, ipfsClient, arweaveClient)
-		if err != nil {
-			return tokenFullUpdate{}, UniqueMetadataUpdateErr{
-				contractAddress: persist.Address(contractAddress),
-				tokenID:         tokenID,
-				err:             err,
-			}
-		}
-		newMetadata = md
-		newURI = u
-	} else {
-		md, err := rpc.GetMetadataFromURI(pCtx, newURI, ipfsClient, arweaveClient)
-		if err != nil {
-			return tokenFullUpdate{}, MetadataUpdateErr{
-				contractAddress: persist.Address(contractAddress),
-				tokenID:         tokenID,
-				err:             err,
-			}
-		}
-		newMetadata = md
-	}
-
-	name, description := media.FindNameAndDescription(pCtx, newMetadata)
-
 	up := tokenFullUpdate{
 		TokenID:         tokenID,
 		ContractAddress: persist.EthereumAddress(contractAddress),
-		Update: persist.TokenUpdateAllURIDerivedFieldsInput{
-			TokenURI:    newURI,
-			Metadata:    newMetadata,
-			Name:        persist.NullString(validate.SanitizationPolicy.Sanitize(name)),
-			Description: persist.NullString(validate.SanitizationPolicy.Sanitize(description)),
+		Update: persist.TokenUpdateURIInput{
+			TokenURI: newURI,
 		},
 	}
 	return up, nil

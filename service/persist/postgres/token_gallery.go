@@ -31,6 +31,7 @@ type TokenGalleryRepository struct {
 	updateMediaStmt                                     *sql.Stmt
 	updateInfoByTokenIdentifiersUnsafeStmt              *sql.Stmt
 	updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt *sql.Stmt
+	updateURIByTokenIdentifiersUnsafeStmt               *sql.Stmt
 	updateMediaByTokenIdentifiersUnsafeStmt             *sql.Stmt
 	updateMetadataFieldsByTokenIdentifiersUnsafeStmt    *sql.Stmt
 	deleteByIdentifiersStmt                             *sql.Stmt
@@ -83,7 +84,10 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 	updateInfoByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET COLLECTORS_NOTE = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
 	checkNoErr(err)
 
-	updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = '', TOKEN_METADATA = $2, NAME = $3, DESCRIPTION = $4, LAST_UPDATED = $5 WHERE TOKEN_ID = $6 AND CONTRACT = $7 AND DELETED = false;`)
+	updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, TOKEN_URI = $2, TOKEN_METADATA = $3, NAME = $4, DESCRIPTION = $5, LAST_UPDATED = $6 WHERE TOKEN_ID = $7 AND CONTRACT = $8 AND DELETED = false;`)
+	checkNoErr(err)
+
+	updateURITokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET TOKEN_URI = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
 	checkNoErr(err)
 
 	updateMediaByTokenIdentifiersUnsafeStmt, err := db.PrepareContext(ctx, `UPDATE tokens SET MEDIA = $1, LAST_UPDATED = $2 WHERE TOKEN_ID = $3 AND CONTRACT = $4 AND DELETED = false;`)
@@ -127,6 +131,7 @@ func NewTokenGalleryRepository(db *sql.DB, queries *db.Queries) *TokenGalleryRep
 		updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt: updateURIDerivedFieldsByTokenIdentifiersUnsafeStmt,
 		updateMediaByTokenIdentifiersUnsafeStmt:             updateMediaByTokenIdentifiersUnsafeStmt,
 		updateMetadataFieldsByTokenIdentifiersUnsafeStmt:    updateMetadataFieldsByTokenIdentifiersUnsafeStmt,
+		updateURIByTokenIdentifiersUnsafeStmt:               updateURITokenIdentifiersUnsafeStmt,
 		deleteByIdentifiersStmt:                             deleteByIdentifiersStmt,
 		getByTokenIDStmt:                                    getByTokenIDStmt,
 		getByTokenIDPaginateStmt:                            getByTokenIDPaginateStmt,
@@ -496,6 +501,7 @@ func (t *TokenGalleryRepository) UpdateByID(pCtx context.Context, pID persist.DB
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
 		res, err = t.updateMediaStmt.ExecContext(pCtx, update.Media, update.Metadata, update.LastUpdated, pID, pUserID)
+
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)
 	}
@@ -528,7 +534,10 @@ func (t *TokenGalleryRepository) UpdateByTokenIdentifiersUnsafe(pCtx context.Con
 		res, err = t.updateInfoByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.CollectorsNote, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateAllURIDerivedFieldsInput:
 		update := pUpdate.(persist.TokenUpdateAllURIDerivedFieldsInput)
-		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+		res, err = t.updateAllMetadataFieldsByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.TokenURI, update.Metadata, update.Name, update.Description, update.LastUpdated, pTokenID, contractID)
+	case persist.TokenUpdateURIInput:
+		update := pUpdate.(persist.TokenUpdateURIInput)
+		res, err = t.updateURIByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.TokenURI, update.LastUpdated, pTokenID, contractID)
 	case persist.TokenUpdateMediaInput:
 		update := pUpdate.(persist.TokenUpdateMediaInput)
 		res, err = t.updateMediaByTokenIdentifiersUnsafeStmt.ExecContext(pCtx, update.Media, update.LastUpdated, pTokenID, contractID)

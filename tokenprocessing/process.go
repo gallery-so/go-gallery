@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
+	"github.com/mikeydub/go-gallery/service/rpc"
 
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
@@ -32,7 +34,7 @@ type ProcessMediaForTokenInput struct {
 	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
 }
 
-func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -64,7 +66,7 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
 				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
-				err := processToken(ctx, key, t, contract.Address, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords)
+				err := processToken(ctx, key, t, contract.Address, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords)
 				if err != nil {
 					logger.For(c).Errorf("Error processing token: %s", err)
 				}
@@ -78,7 +80,7 @@ func processMediaForUsersTokensOfChain(tokenRepo *postgres.TokenGalleryRepositor
 	}
 }
 
-func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *postgres.UserRepository, walletRepo *postgres.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input ProcessMediaForTokenInput
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -112,7 +114,7 @@ func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *
 			return
 		}
 
-		err = processToken(ctx, key, t, input.ContractAddress, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+		err = processToken(ctx, key, t, input.ContractAddress, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -122,7 +124,7 @@ func processMediaForToken(tokenRepo *postgres.TokenGalleryRepository, userRepo *
 	}
 }
 
-func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
 	ctx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
@@ -134,9 +136,38 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
+	newMetadata := t.TokenMetadata
+	newURI := t.TokenURI
+
+	if len(t.TokenMetadata) == 0 || t.TokenMetadata == nil {
+		if handler, ok := uniqueMetadataHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
+			logger.For(ctx).Infof("Using %v metadata handler for %s", handler, contractAddress)
+			u, md, err := handler(ctx, t.TokenURI, persist.EthereumAddress(contractAddress.String()), t.TokenID, ethClient, ipfsClient, arweaveClient)
+			if err != nil {
+				return UniqueMetadataUpdateErr{
+					contractAddress: persist.Address(contractAddress),
+					tokenID:         t.TokenID,
+					err:             err,
+				}
+			}
+			newMetadata = md
+			newURI = u
+		} else {
+			md, err := rpc.GetMetadataFromURI(ctx, newURI, ipfsClient, arweaveClient)
+			if err != nil {
+				return MetadataUpdateErr{
+					contractAddress: persist.Address(contractAddress),
+					tokenID:         t.TokenID,
+					err:             err,
+				}
+			}
+			newMetadata = md
+		}
+	}
+
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
 
-	name, description := media.FindNameAndDescription(ctx, t.TokenMetadata)
+	name, description := media.FindNameAndDescription(ctx, newMetadata)
 
 	if name == "" {
 		name = t.Name.String()
@@ -147,7 +178,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	}
 
 	totalTimeOfMedia := time.Now()
-	newMedia, err := media.MakePreviewsForMetadata(ctx, t.TokenMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
+	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), newURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
 	if err != nil {
 		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
 		newMedia = persist.Media{
@@ -163,8 +194,8 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
 		Media:       newMedia,
-		Metadata:    t.TokenMetadata,
-		TokenURI:    t.TokenURI,
+		Metadata:    newMetadata,
+		TokenURI:    newURI,
 		Name:        persist.NullString(name),
 		Description: persist.NullString(description),
 		LastUpdated: persist.LastUpdatedTime{},

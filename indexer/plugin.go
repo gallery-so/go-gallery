@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/bits-and-blooms/bloom"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -21,6 +22,7 @@ import (
 
 const (
 	pluginPoolSize    = 32
+	pluginTimeout     = 2 * time.Minute
 	bloomFilterSize   = 100000
 	falsePositiveRate = 0.01
 )
@@ -125,6 +127,8 @@ func RunPluginReceiver[T, V orderedBlockChainData](ctx context.Context, wg *sync
 				}
 			}()
 		}
+
+		logger.For(ctx).WithFields(logrus.Fields{"incoming_type": fmt.Sprintf("%T", *new(T)), "outgoing_type": fmt.Sprintf("%T", *new(V))}).Info("plugin finished receiving")
 	}()
 
 }
@@ -149,6 +153,8 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
+				innerCtx, cancel := context.WithTimeout(ctx, pluginTimeout)
+				defer cancel()
 				child := span.StartChild("plugin.uriPlugin")
 				child.Description = "handleMessage"
 
@@ -159,7 +165,7 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 					panic(err)
 				}
 
-				dbURI, _, _, err := tokenRepo.GetMetadataByTokenIdentifiers(ctx, tid, ct)
+				dbURI, _, _, err := tokenRepo.GetMetadataByTokenIdentifiers(innerCtx, tid, ct)
 				if err == nil {
 					if dbURI != "" {
 						uri = dbURI
@@ -167,7 +173,7 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 				}
 
 				if uri == "" && rpcEnabled {
-					uri = getURI(ctx, msg.transfer.ContractAddress, msg.transfer.TokenID, msg.transfer.TokenType, ethClient)
+					uri = getURI(innerCtx, msg.transfer.ContractAddress, msg.transfer.TokenID, msg.transfer.TokenType, ethClient)
 				}
 
 				out <- tokenURI{
@@ -180,11 +186,11 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 				}
 
 				tracing.FinishSpan(child)
-
 			})
 		}
 
 		wp.StopWait()
+		logger.For(ctx).Info("uri plugin finished sending")
 	}()
 
 	return urisPlugin{
@@ -213,14 +219,16 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
+				innerCtx, cancel := context.WithTimeout(ctx, pluginTimeout)
+				defer cancel()
 				child := span.StartChild("plugin.balancePlugin")
 				child.Description = "handleMessage"
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
 					if rpcEnabled {
-						bals, err := getBalances(ctx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
+						bals, err := getBalances(innerCtx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
 						if err != nil {
-							logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+							logger.For(innerCtx).WithError(err).WithFields(logrus.Fields{
 								"fromAddress":     msg.transfer.From,
 								"tokenIdentifier": msg.key,
 								"block":           msg.transfer.BlockNumber,
@@ -229,7 +237,7 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 							out <- bals
 						}
 					} else {
-						bals := balancesFromRepo(ctx, tokenRepo, msg)
+						bals := balancesFromRepo(innerCtx, tokenRepo, msg)
 						out <- bals
 					}
 				}
@@ -239,6 +247,8 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 		}
 
 		wp.StopWait()
+
+		logger.For(ctx).Info("balance plugin finished sending")
 	}()
 
 	return balancesPlugin{
@@ -267,6 +277,7 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 		for msg := range in {
 			msg := msg
 			wp.Submit(func() {
+
 				child := span.StartChild("plugin.ownerPlugin")
 				child.Description = "handleMessage"
 
@@ -286,6 +297,7 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 		}
 
 		wp.StopWait()
+		logger.For(ctx).Info("owners plugin finished sending")
 	}()
 
 	return ownersPlugin{
@@ -333,6 +345,7 @@ func newPreviousOwnersPlugin(ctx context.Context) previousOwnersPlugin {
 		}
 
 		wp.StopWait()
+		logger.For(ctx).Info("previous owners plugin finished sending")
 	}()
 
 	return previousOwnersPlugin{
@@ -389,6 +402,8 @@ func newRefreshPlugin(ctx context.Context, addressFilterRepo refresh.AddressFilt
 		wp.StopWait()
 
 		out <- errForTokenAtBlockAndIndex{err: addressFilterRepo.BulkUpsert(ctx, filters)}
+
+		logger.For(ctx).Info("refresh plugin finished sending")
 	}()
 
 	return refreshPlugin{
