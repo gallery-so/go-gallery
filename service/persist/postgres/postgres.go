@@ -21,6 +21,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+type ErrRoleDoesNotExist struct {
+	role string
+}
+
+func (e ErrRoleDoesNotExist) Error() string {
+	return fmt.Sprintf("role '%s' does not exist", e.role)
+}
+
 type connectionParams struct {
 	user     string
 	password string
@@ -115,8 +123,16 @@ func WithPort(port int) ConnectionOption {
 	}
 }
 
-// NewClient creates a new postgres client
-func NewClient(opts ...ConnectionOption) *sql.DB {
+// MustCreateClient panics when it fails to create a new database connection
+func MustCreateClient(opts ...ConnectionOption) *sql.DB {
+	db, err := NewClient(opts...)
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+func NewClient(opts ...ConnectionOption) (*sql.DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -127,17 +143,19 @@ func NewClient(opts ...ConnectionOption) *sql.DB {
 
 	db, err := sql.Open("pgx", params.toConnectionString())
 	if err != nil {
-		logger.For(nil).WithError(err).Fatal("could not open database connection")
-		panic(err)
+		return nil, err
 	}
 
 	db.SetMaxOpenConns(50)
 
 	err = db.PingContext(ctx)
-	if err != nil {
-		panic(err)
+	if err != nil && strings.Contains(err.Error(), fmt.Sprintf("role \"%s\" does not exist", params.user)) {
+		return nil, ErrRoleDoesNotExist{params.user}
 	}
-	return db
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 // NewPgxClient creates a new postgres client via pgx

@@ -15,6 +15,7 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -76,7 +77,7 @@ func usePostgres(t *testing.T) {
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
 
-	err = migrate.RunCoreDBMigration()
+	err = migrate.RunMigrations(postgres.MustCreateClient(postgres.WithUser("postgres")), "./db/migrations/core")
 	require.NoError(t, err)
 
 	t.Cleanup(func() { r.Close() })

@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 DROP INDEX IF EXISTS  token_id_contract_address_owner_user_id_idx;
 
 DROP INDEX IF EXISTS  token_id_contract_address_idx;

@@ -81,7 +81,7 @@ func (c *Clients) Close() {
 }
 
 func ClientInit(ctx context.Context) *Clients {
-	pq := postgres.NewClient()
+	pq := postgres.MustCreateClient()
 	pgx := postgres.NewPgxClient()
 	return &Clients{
 		Repos:           postgres.NewRepositories(pq, pgx),

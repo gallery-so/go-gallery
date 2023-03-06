@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 CREATE TABLE IF NOT EXISTS user_events (
     ID varchar(255) PRIMARY KEY,
     USER_ID varchar(255),

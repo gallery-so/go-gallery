@@ -53,7 +53,7 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 	t.Setenv("POSTGRES_HOST", hostAndPort[0])
 	t.Setenv("POSTGRES_PORT", hostAndPort[1])
 
-	err = migrate.RunCoreDBMigration()
+	err = migrate.RunMigrations(postgres.MustCreateClient(postgres.WithUser("postgres")), "./db/migrations/core")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func setupTest(t *testing.T) (*assert.Assertions, *sql.DB, *pgxpool.Pool) {
 		r.Close()
 	})
 
-	db := postgres.NewClient()
+	db := postgres.MustCreateClient()
 	pgx := postgres.NewPgxClient()
 
 	seedNotifications(context.Background(), t, coredb.New(pgx), newRepos(db, pgx))

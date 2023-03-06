@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 ALTER TABLE tokens DROP COLUMN IF EXISTS contract_address;
 ALTER TABLE tokens ADD COLUMN contract varchar(255);
 DROP INDEX IF EXISTS token_id_contract_address_chain_owner_user_id_idx;

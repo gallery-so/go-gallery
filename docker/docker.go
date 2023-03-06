@@ -15,6 +15,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/asottile/dockerfile"
 	"github.com/go-redis/redis/v8"
+	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/docker"
@@ -30,7 +31,41 @@ func StartPostgres() (resource *dockertest.Resource, err error) {
 		return nil, err
 	}
 
-	r, err := startService(pool, "postgres")
+	composeFile, err := loadComposeFile()
+	if err != nil {
+		return nil, err
+	}
+
+	serviceConf, ok := composeFile.Services["postgres"]
+	if !ok {
+		return nil, errors.New("'postgres' service not configured in docker-compose.yml")
+	}
+
+	pgConf, err := filepath.Abs(util.MustFindFile("./docker/postgres/postgres.conf"))
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := pool.BuildAndRunWithOptions(
+		util.MustFindFile("./docker/postgres/DOCKERFILE"),
+		&dockertest.RunOptions{
+			Name:         strings.ToLower(fmt.Sprintf("postgres-%s", persist.GenerateID())),
+			Env:          serviceConf.Environment,
+			Cmd:          serviceConf.Command,
+			ExposedPorts: serviceConf.Expose,
+		},
+		func(c *docker.HostConfig) {
+			c.AutoRemove = true
+			c.RestartPolicy = docker.RestartPolicy{Name: "no"}
+			c.Mounts = []docker.HostMount{
+				{
+					Target: "/etc/postgresql/postgresql.conf",
+					Source: pgConf,
+					Type:   "bind",
+				},
+			}
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +219,7 @@ type service struct {
 	Environment []string `yaml:"environment"`
 	Command     []string `yaml:"command"`
 	Expose      []string `yaml:"expose"`
+	Volumes     []string `yaml:"volumes"`
 }
 
 func startService(pool *dockertest.Pool, service string) (*dockertest.Resource, error) {

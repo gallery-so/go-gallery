@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 CREATE TABLE IF NOT EXISTS events (
     ID varchar(255) PRIMARY KEY,
     VERSION int NOT NULL DEFAULT 0,

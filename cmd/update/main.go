@@ -23,7 +23,7 @@ func main() {
 
 	start := time.Now()
 
-	pgClient := postgres.NewClient()
+	pgClient := postgres.MustCreateClient()
 
 	rows, err := pgClient.Query("SELECT ADDRESS FROM wallets WHERE DELETED = false ORDER BY ADDRESS;")
 	if err != nil {

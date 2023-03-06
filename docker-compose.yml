@@ -6,8 +6,8 @@ services:
       - "6379:6379"
   postgres:
     build:
-      context: "."
-      dockerfile: "docker/postgres/DOCKERFILE"
+      context: "docker/postgres"
+      dockerfile: "DOCKERFILE"
       args:
         - PGHOST=${PGHOST}
         - PGPORT=${PGPORT}
@@ -21,6 +21,9 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
+    volumes:
+      - "${PWD}/docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf"
+    command: ["-c", "config-file=/etc/postgresql/postgresql.conf"]
   postgres_indexer:
     build:
       context: "."

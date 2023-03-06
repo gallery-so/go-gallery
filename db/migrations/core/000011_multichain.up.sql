@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 CREATE TABLE IF NOT EXISTS wallets (
     ID varchar(255) PRIMARY KEY,
     CREATED_AT timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,

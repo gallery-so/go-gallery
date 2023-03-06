@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 create schema if not exists pii;
 
 alter table pii_for_users set schema pii;

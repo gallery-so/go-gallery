@@ -1,5 +1,8 @@
 FROM postgres:14
 
+RUN apt-get update
+RUN apt-get -y install postgresql-14-cron
+
 ENV POSTGRES_HOST_AUTH_METHOD trust
 ENV POSTGRES_USER postgres
 ENV POSTGRES_DB postgres
@@ -10,4 +13,5 @@ ARG PGPASSWORD=""
 ARG PGDATABASE=postgres
 ARG PGTESTUSER=benny
 ARG PGDATABASE=postgres
-COPY docker/postgres/01_init.sql /docker-entrypoint-initdb.d/01_init.sql
+COPY 01_init.sql /docker-entrypoint-initdb.d/01_init.sql
+COPY postgres.conf /etc/postgresql/postgresql.conf

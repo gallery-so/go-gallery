@@ -154,7 +154,7 @@ func ValidateEnv() {
 }
 
 func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository, refresh.AddressFilterRepository) {
-	pgClient := postgres.NewClient()
+	pgClient := postgres.MustCreateClient()
 	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))}
 }
 

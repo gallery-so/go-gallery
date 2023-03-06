@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 alter table galleries add column if not exists name varchar not null default '';
 alter table galleries add column if not exists description varchar not null default '';
 alter table galleries add column if not exists hidden boolean not null default false;

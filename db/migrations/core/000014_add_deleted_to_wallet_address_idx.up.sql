@@ -1,3 +1,4 @@
+/* {% require_sudo %} */
 BEGIN;
 
 DROP INDEX IF EXISTS wallet_address_idx;
