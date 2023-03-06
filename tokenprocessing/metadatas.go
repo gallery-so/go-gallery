@@ -43,30 +43,6 @@ type uniqueMetadataHandler func(context.Context, persist.TokenURI, persist.Ether
 
 type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
 
-// UniqueMetadataUpdateErr is returned when an update for an address with a custom handler
-// i.e. CryptoPunks, Autoglyphs, etc. fails to update a token.
-type UniqueMetadataUpdateErr struct {
-	contractAddress persist.Address
-	tokenID         persist.TokenID
-	err             error
-}
-
-func (e UniqueMetadataUpdateErr) Error() string {
-	return fmt.Sprintf("failed to get unique metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
-}
-
-// MetadataUpdateErr is returned when an update for an address with a "standard" metadata URI
-// i.e. JSON, SVG, IPFS, HTTP, etc. fails to update.
-type MetadataUpdateErr struct {
-	contractAddress persist.Address
-	tokenID         persist.TokenID
-	err             error
-}
-
-func (e MetadataUpdateErr) Error() string {
-	return fmt.Sprintf("failed to get metadata for address=%s;token=%s: %s", e.contractAddress, e.tokenID, e.err)
-}
-
 /**
  * The drawing instructions for the nine different symbols are as follows:
  *

@@ -139,30 +139,20 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	newMetadata := t.TokenMetadata
 	newURI := t.TokenURI
 
-	if len(t.TokenMetadata) == 0 || t.TokenMetadata == nil {
-		if handler, ok := uniqueMetadataHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
-			logger.For(ctx).Infof("Using %v metadata handler for %s", handler, contractAddress)
-			u, md, err := handler(ctx, t.TokenURI, persist.EthereumAddress(contractAddress.String()), t.TokenID, ethClient, ipfsClient, arweaveClient)
-			if err != nil {
-				return UniqueMetadataUpdateErr{
-					contractAddress: persist.Address(contractAddress),
-					tokenID:         t.TokenID,
-					err:             err,
-				}
-			}
-			newMetadata = md
-			newURI = u
-		} else {
-			md, err := rpc.GetMetadataFromURI(ctx, newURI, ipfsClient, arweaveClient)
-			if err != nil {
-				return MetadataUpdateErr{
-					contractAddress: persist.Address(contractAddress),
-					tokenID:         t.TokenID,
-					err:             err,
-				}
-			}
-			newMetadata = md
+	if handler, ok := uniqueMetadataHandlers[persist.EthereumAddress(contractAddress.String())]; ok {
+		logger.For(ctx).Infof("Using %v metadata handler for %s", handler, contractAddress)
+		u, md, err := handler(ctx, t.TokenURI, persist.EthereumAddress(contractAddress.String()), t.TokenID, ethClient, ipfsClient, arweaveClient)
+		if err != nil {
+			logger.For(ctx).Errorf("Error getting metadata from handler: %s", err)
 		}
+		newMetadata = md
+		newURI = u
+	} else {
+		md, err := rpc.GetMetadataFromURI(ctx, newURI, ipfsClient, arweaveClient)
+		if err != nil {
+			logger.For(ctx).Errorf("Error getting metadata from URI: %s", err)
+		}
+		newMetadata = md
 	}
 
 	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
