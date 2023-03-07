@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/socialauth"
+	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/spf13/viper"
 
 	"cloud.google.com/go/storage"
@@ -20,6 +21,7 @@ import (
 	"github.com/everFinance/goar"
 	"github.com/go-playground/validator/v10"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/jinzhu/copier"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/graphql/model"
@@ -28,7 +30,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/membership"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/mikeydub/go-gallery/service/user"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
 	"roci.dev/fracdex"
@@ -616,6 +617,81 @@ func (api UserAPI) GetFollowingByUserId(ctx context.Context, userID persist.DBID
 	}
 
 	return following, nil
+}
+
+func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, before, after *string, first, last *int) ([]db.User, PageInfo, error) {
+	// Validate
+	curUserID, err := getAuthenticatedUserID(ctx)
+	if err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validate.ValidateFields(api.validator, validate.ValidationMap{
+		"userID": {userID, "required"},
+	}); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	if err := validatePaginationParams(api.validator, first, last); err != nil {
+		return nil, PageInfo{}, err
+	}
+
+	queryFunc := func(params timeIDPagingParams) ([]any, error) {
+		keys, err := api.loaders.SharedFollowersByUserIDs.Load(db.GetSharedFollowersBatchPaginateParams{
+			Follower:      curUserID,
+			Followee:      userID,
+			CurBeforeTime: params.CursorBeforeTime,
+			CurBeforeID:   params.CursorBeforeID,
+			CurAfterTime:  params.CursorAfterTime,
+			CurAfterID:    params.CursorAfterID,
+			PagingForward: params.PagingForward,
+			Limit:         params.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		results := make([]any, len(keys))
+		for i, key := range keys {
+			results[i] = key
+		}
+
+		return results, nil
+	}
+
+	countFunc := func() (int, error) {
+		total, err := api.queries.CountSharedFollows(ctx, db.CountSharedFollowsParams{
+			Follower: curUserID,
+			Followee: userID,
+		})
+		return int(total), err
+	}
+
+	cursorFunc := func(i any) (time.Time, persist.DBID, error) {
+		if row, ok := i.(db.GetSharedFollowersBatchPaginateRow); ok {
+			return row.FollowedOn, row.ID, nil
+		}
+		return time.Time{}, "", fmt.Errorf("node is not a db.GetSharedFollowersBatchPaginateRow")
+	}
+
+	paginator := timeIDPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  countFunc,
+	}
+
+	results, pageInfo, err := paginator.paginate(before, after, first, last)
+
+	users := make([]db.User, len(results))
+	for i, result := range results {
+		if row, ok := result.(db.GetSharedFollowersBatchPaginateRow); ok {
+			var u db.User
+			copier.Copy(&u, &row)
+			users[i] = u
+		}
+	}
+
+	return users, pageInfo, nil
 }
 
 func (api UserAPI) FollowUser(ctx context.Context, userID persist.DBID) error {

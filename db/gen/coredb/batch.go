@@ -11,6 +11,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/persist"
 )
@@ -1541,6 +1542,135 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 }
 
 func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getSharedFollowersBatchPaginate = `-- name: GetSharedFollowersBatchPaginate :batchmany
+select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, a.created_at followed_on
+from users, follows a, follows b
+where a.follower = $1
+	and a.followee = b.follower
+	and b.followee = $2
+	and users.id = b.follower
+	and a.deleted = false
+	and b.deleted = false
+	and users.deleted = false
+  and (a.created_at, users.id) < ($3, $4)
+  and (a.created_at, users.id) > ($5, $6)
+order by case when $7::bool then (a.created_at, users.id) end asc,
+        case when not $7::bool then (a.created_at, users.id) end desc
+limit $8
+`
+
+type GetSharedFollowersBatchPaginateBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetSharedFollowersBatchPaginateParams struct {
+	Follower      persist.DBID
+	Followee      persist.DBID
+	CurBeforeTime time.Time
+	CurBeforeID   persist.DBID
+	CurAfterTime  time.Time
+	CurAfterID    persist.DBID
+	PagingForward bool
+	Limit         int32
+}
+
+type GetSharedFollowersBatchPaginateRow struct {
+	ID                   persist.DBID
+	Deleted              bool
+	Version              sql.NullInt32
+	LastUpdated          time.Time
+	CreatedAt            time.Time
+	Username             sql.NullString
+	UsernameIdempotent   sql.NullString
+	Wallets              persist.WalletList
+	Bio                  sql.NullString
+	Traits               pgtype.JSONB
+	Universal            bool
+	NotificationSettings persist.UserNotificationSettings
+	EmailVerified        persist.EmailVerificationStatus
+	EmailUnsubscriptions persist.EmailUnsubscriptions
+	FeaturedGallery      *persist.DBID
+	PrimaryWalletID      persist.DBID
+	UserExperiences      pgtype.JSONB
+	FollowedOn           time.Time
+}
+
+func (q *Queries) GetSharedFollowersBatchPaginate(ctx context.Context, arg []GetSharedFollowersBatchPaginateParams) *GetSharedFollowersBatchPaginateBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Follower,
+			a.Followee,
+			a.CurBeforeTime,
+			a.CurBeforeID,
+			a.CurAfterTime,
+			a.CurAfterID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(getSharedFollowersBatchPaginate, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetSharedFollowersBatchPaginateBatchResults{br, len(arg), false}
+}
+
+func (b *GetSharedFollowersBatchPaginateBatchResults) Query(f func(int, []GetSharedFollowersBatchPaginateRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []GetSharedFollowersBatchPaginateRow
+		if b.closed {
+			if f != nil {
+				f(t, items, errors.New("batch already closed"))
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetSharedFollowersBatchPaginateRow
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.LastUpdated,
+					&i.CreatedAt,
+					&i.Username,
+					&i.UsernameIdempotent,
+					&i.Wallets,
+					&i.Bio,
+					&i.Traits,
+					&i.Universal,
+					&i.NotificationSettings,
+					&i.EmailVerified,
+					&i.EmailUnsubscriptions,
+					&i.FeaturedGallery,
+					&i.PrimaryWalletID,
+					&i.UserExperiences,
+					&i.FollowedOn,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetSharedFollowersBatchPaginateBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

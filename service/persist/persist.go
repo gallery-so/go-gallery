@@ -80,7 +80,12 @@ func (d *DBID) Scan(i interface{}) error {
 		*d = DBID(it)
 		return nil
 	}
-	*d = DBID(i.(string))
+	switch v := i.(type) {
+	case DBID:
+		*d = v
+	case string:
+		*d = DBID(v)
+	}
 	return nil
 }
 

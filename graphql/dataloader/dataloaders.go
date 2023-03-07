@@ -37,15 +37,17 @@
 //go:generate go run github.com/gallery-so/dataloaden FeedEventInteractionCountLoader github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchParams []github.com/mikeydub/go-gallery/db/gen/coredb.CountInteractionsByFeedEventIDBatchRow
 //go:generate go run github.com/gallery-so/dataloaden IntLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID int
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
+//go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
 
 package dataloader
 
 import (
 	"context"
 	"database/sql"
-	"github.com/mikeydub/go-gallery/service/tracing"
 	"sync"
 	"time"
+
+	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/jackc/pgx/v4"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
@@ -94,6 +96,7 @@ type Loaders struct {
 	ContractByChainAddress           *ContractLoaderByChainAddress
 	FollowersByUserID                *UsersLoaderByID
 	FollowingByUserID                *UsersLoaderByID
+	SharedFollowersByUserIDs         *SharedFollowersLoaderByIDs
 	GlobalFeed                       *GlobalFeedLoader
 	PersonalFeedByUserID             *PersonalFeedLoader
 	UserFeedByUserID                 *UserFeedLoader
@@ -213,6 +216,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.FollowersByUserID = NewUsersLoaderByID(defaults, loadFollowersByUserId(q))
 
 	loaders.FollowingByUserID = NewUsersLoaderByID(defaults, loadFollowingByUserId(q))
+
+	loaders.SharedFollowersByUserIDs = NewSharedFollowersLoaderByIDs(defaults, loadSharedFollowersByIDs(q))
 
 	loaders.TokenByTokenID = NewTokenLoaderByID(defaults, loadTokenByTokenID(q), TokenLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(token db.Token) persist.DBID { return token.ID },
@@ -618,6 +623,23 @@ func loadFollowingByUserId(q *db.Queries) func(context.Context, []persist.DBID) 
 		})
 
 		return following, errors
+	}
+}
+
+func loadSharedFollowersByIDs(q *db.Queries) func(context.Context, []db.GetSharedFollowersBatchPaginateParams) ([][]db.GetSharedFollowersBatchPaginateRow, []error) {
+	return func(ctx context.Context, params []db.GetSharedFollowersBatchPaginateParams) ([][]db.GetSharedFollowersBatchPaginateRow, []error) {
+		users := make([][]db.GetSharedFollowersBatchPaginateRow, len(params))
+		errors := make([]error, len(users))
+
+		b := q.GetSharedFollowersBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, u []db.GetSharedFollowersBatchPaginateRow, err error) {
+			users[i] = u
+			errors[i] = err
+		})
+
+		return users, errors
 	}
 }
 
