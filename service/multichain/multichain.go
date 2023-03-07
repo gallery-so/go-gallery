@@ -184,6 +184,11 @@ type deepRefresher interface {
 	DeepRefresh(ctx context.Context, address persist.Address) error
 }
 
+// tokenMetadataFetcher supports fetching token metadata
+type tokenMetadataFetcher interface {
+	GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error)
+}
+
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
 
 // NewProvider creates a new MultiChainDataRetriever
@@ -206,6 +211,7 @@ var chainValidation map[persist.Chain]validation = map[persist.Chain]validation{
 		tokenRefresher:        true,
 		tokenFetcherRefresher: true,
 		contractRefresher:     true,
+		tokenMetadataFetcher:  true,
 	},
 	persist.ChainTezos: {
 		tokensFetcher:         true,
@@ -223,6 +229,7 @@ type validation struct {
 	tokensFetcher         bool
 	tokenRefresher        bool
 	tokenFetcherRefresher bool
+	tokenMetadataFetcher  bool
 	contractRefresher     bool
 }
 
@@ -271,6 +278,10 @@ func validateProviders(ctx context.Context, providers []interface{}) map[persist
 			if _, ok := p.(contractRefresher); ok {
 				hasImplementor.contractRefresher = true
 				requirements.contractRefresher = true
+			}
+			if _, ok := p.(tokenMetadataFetcher); ok {
+				hasImplementor.tokenMetadataFetcher = true
+				requirements.tokenMetadataFetcher = true
 			}
 		}
 
@@ -607,6 +618,29 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 	}
 
 	return p.processTokensForUser(ctx, tokensFromProviders, addressToContract, user, []persist.Chain{wallet.Chain()}, true)
+}
+
+// GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain) (persist.TokenMetadata, error) {
+	if _, ok := d.Chains[chain]; !ok {
+		return nil, nil
+	}
+
+	for _, provider := range d.Chains[chain] {
+
+		if metadataFetcher, ok := provider.(tokenMetadataFetcher); ok {
+			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, tokenID)
+			if err != nil {
+				return nil, err
+			}
+			if metadata != nil && len(metadata) > 0 {
+				return metadata, nil
+			}
+		}
+
+	}
+
+	return nil, nil
 }
 
 // DeepRefresh re-indexes a user's wallets.

@@ -21,6 +21,7 @@ func handlersInitServer(router *gin.Engine, queueChan chan processTokensInput, t
 	nftsGroup.POST("/refresh", updateTokens(tokenRepository, ethClient, ipfsClient, arweaveClient))
 	nftsGroup.POST("/validate", validateWalletsNFTs(tokenRepository, contractRepository, ethClient, ipfsClient, arweaveClient))
 	nftsGroup.GET("/get", getTokens(queueChan, tokenRepository, contractRepository, ipfsClient, ethClient, arweaveClient))
+	nftsGroup.GET("/get/metadata", getTokenMetadata(tokenRepository, ipfsClient, ethClient, arweaveClient))
 
 	contractsGroup := router.Group("/contracts")
 	contractsGroup.GET("/get", getContract(contractRepository))

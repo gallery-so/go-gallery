@@ -89,10 +89,19 @@ type getTokensInput struct {
 	Limit           int64                   `form:"limit"`
 }
 
+type getTokenMetadataInput struct {
+	TokenID         persist.TokenID         `form:"token_id" binding:"required"`
+	ContractAddress persist.EthereumAddress `form:"contract_address" binding:"required"`
+}
+
 // GetTokensOutput is the response of the get tokens handler
 type GetTokensOutput struct {
 	NFTs      []persist.Token    `json:"nfts"`
 	Contracts []persist.Contract `json:"contracts"`
+}
+
+type GetTokenMetadataOutput struct {
+	Metadata persist.TokenMetadata `json:"metadata"`
 }
 
 // ValidateWalletNFTsInput is the input for the validate users NFTs endpoint that will return
@@ -148,6 +157,91 @@ func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenR
 		}()
 
 		c.JSON(http.StatusOK, GetTokensOutput{NFTs: tokens, Contracts: contracts})
+	}
+}
+
+func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.Shell, ethClient *ethclient.Client, arweaveClient *goar.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input := &getTokenMetadataInput{}
+
+		if err := c.ShouldBindQuery(input); err != nil {
+			util.ErrResponse(c, http.StatusBadRequest, err)
+			return
+		}
+		ctx := logger.NewContextWithFields(c, logrus.Fields{
+			"tokenID":         input.TokenID,
+			"contractAddress": input.ContractAddress,
+		})
+
+		ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+		defer cancel()
+
+		curTokens, err := nftRepository.GetByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, -1, 0)
+		if err != nil {
+			util.ErrResponse(c, http.StatusInternalServerError, err)
+			return
+		}
+
+		if len(curTokens) == 0 {
+			util.ErrResponse(c, http.StatusNotFound, util.ErrInvalidInput{Reason: "token not found"})
+			return
+		}
+
+		firstWithValidTokenURI, ok := util.FindFirst(curTokens, func(t persist.Token) bool {
+			return t.TokenURI != ""
+		})
+
+		firstWithValidTokenType, _ := util.FindFirst(curTokens, func(t persist.Token) bool {
+			return t.TokenType != ""
+		})
+
+		newURI := firstWithValidTokenURI.TokenURI
+
+		if !ok {
+			newURI, err = rpc.GetTokenURI(ctx, firstWithValidTokenType.TokenType, input.ContractAddress, input.TokenID, ethClient)
+			if err != nil {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
+			if newURI == "" {
+				util.ErrResponse(c, http.StatusNotFound, errNoMetadataFound{contract: input.ContractAddress, tokenID: input.TokenID})
+				return
+			}
+		}
+
+		newMetadata := firstWithValidTokenURI.TokenMetadata
+
+		if handler, ok := uniqueMetadataHandlers[persist.EthereumAddress(input.ContractAddress.String())]; ok {
+			logger.For(ctx).Infof("Using %v metadata handler for %s", handler, input.ContractAddress)
+			u, md, err := handler(ctx, newURI, persist.EthereumAddress(input.ContractAddress.String()), input.TokenID, ethClient, ipfsClient, arweaveClient)
+			if err != nil {
+				logger.For(ctx).Errorf("Error getting metadata from handler: %s", err)
+			} else {
+				newMetadata = md
+				newURI = u
+			}
+		} else if newURI != "" {
+			md, err := rpc.GetMetadataFromURI(ctx, newURI, ipfsClient, arweaveClient)
+			if err != nil {
+				logger.For(ctx).Errorf("Error getting metadata from URI: %s", err)
+			} else {
+				newMetadata = md
+			}
+		}
+
+		if newMetadata == nil || len(newMetadata) == 0 {
+			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{contract: input.ContractAddress, tokenID: input.TokenID})
+			return
+		}
+
+		if err := nftRepository.UpdateByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, persist.TokenUpdateAllURIDerivedFieldsInput{
+			Metadata: newMetadata,
+			TokenURI: newURI,
+		}); err != nil {
+			logger.For(ctx).Errorf("Error updating token metadata: %s", err)
+		}
+
+		c.JSON(http.StatusOK, GetTokenMetadataOutput{Metadata: newMetadata})
 	}
 }
 

@@ -1,4 +1,4 @@
-package tokenprocessing
+package indexer
 
 import (
 	"bytes"
@@ -42,6 +42,15 @@ const cryptoPunksImageContractAddress = "0x16f5a35647d6f03d5d3da7b35409d65ba03af
 type uniqueMetadataHandler func(context.Context, persist.TokenURI, persist.EthereumAddress, persist.TokenID, *ethclient.Client, *shell.Shell, *goar.Client) (persist.TokenURI, persist.TokenMetadata, error)
 
 type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
+
+type errNoMetadataFound struct {
+	contract persist.EthereumAddress
+	tokenID  persist.TokenID
+}
+
+func (e errNoMetadataFound) Error() string {
+	return fmt.Sprintf("no metadata found for contract %s and tokenID %s", e.contract, e.tokenID)
+}
 
 /**
  * The drawing instructions for the nine different symbols are as follows:

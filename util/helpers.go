@@ -263,6 +263,15 @@ func SetConditionalValue[T any](value *T, param *T, conditional *bool) {
 	}
 }
 
+func FindFirst[T any](s []T, f func(T) bool) (T, bool) {
+	for _, v := range s {
+		if f(v) {
+			return v, true
+		}
+	}
+	return *new(T), false
+}
+
 // StringToPointerIfNotEmpty returns a pointer to the string if it is a non-empty string
 func StringToPointerIfNotEmpty(str string) *string {
 	if str == "" {
