@@ -657,7 +657,7 @@ func updateMetadataForTokens(pCtx context.Context, updateChan chan<- tokenFullUp
 				return
 			}
 
-			up, err := getUpdateForToken(pCtx, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
+			up, err := getUpdateForToken(pCtx, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenURI, ethClient, ipfsClient, arweaveClient)
 			if err != nil {
 				errChan <- err
 				return
@@ -671,7 +671,7 @@ func updateMetadataForTokens(pCtx context.Context, updateChan chan<- tokenFullUp
 	}
 }
 
-func getUpdateForToken(pCtx context.Context, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, metadata persist.TokenMetadata, uri persist.TokenURI, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (tokenFullUpdate, error) {
+func getUpdateForToken(pCtx context.Context, tokenType persist.TokenType, chain persist.Chain, tokenID persist.TokenID, contractAddress persist.EthereumAddress, uri persist.TokenURI, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client) (tokenFullUpdate, error) {
 
 	newURI := uri
 
