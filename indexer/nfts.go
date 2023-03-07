@@ -598,7 +598,7 @@ func refreshTokenMetadatas(c context.Context, input UpdateTokenInput, tokenRepos
 
 		}
 
-		up, err := getUpdateForToken(c, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenMetadata, token.TokenURI, ethClient, ipfsClient, arweaveClient)
+		up, err := getUpdateForToken(c, token.TokenType, token.Chain, token.TokenID, token.ContractAddress, token.TokenURI, ethClient, ipfsClient, arweaveClient)
 		if err != nil {
 			return err
 		}

@@ -183,9 +183,8 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	}
 
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
-		Media:    newMedia,
-		Metadata: newMetadata,
-
+		Media:       newMedia,
+		Metadata:    newMetadata,
 		Name:        persist.NullString(name),
 		Description: persist.NullString(description),
 		LastUpdated: persist.LastUpdatedTime{},
