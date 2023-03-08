@@ -96,6 +96,9 @@ type GalleryUser implements Node @goEmbedHelper {
   sharedFollowers(before: String, after: String, first: Int, last: Int): UsersConnection
     @authRequired
     @goField(forceResolver: true)
+  sharedCommunities(before: String, after: String, first: Int, last: Int): CommunitiesConnection
+    @authRequired
+    @goField(forceResolver: true)
 }
 
 type Wallet implements Node {
@@ -885,6 +888,16 @@ type UserEdge {
 
 type UsersConnection {
   edges: [UserEdge]
+  pageInfo: PageInfo!
+}
+
+type CommunityEdge {
+  node: Community
+  cursor: String
+}
+
+type CommunitiesConnection {
+  edges: [CommunityEdge]
   pageInfo: PageInfo!
 }
 

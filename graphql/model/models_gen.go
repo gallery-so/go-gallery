@@ -558,6 +558,11 @@ type CommentOnFeedEventPayload struct {
 
 func (CommentOnFeedEventPayload) IsCommentOnFeedEventPayloadOrError() {}
 
+type CommunitiesConnection struct {
+	Edges    []*CommunityEdge `json:"edges"`
+	PageInfo *PageInfo        `json:"pageInfo"`
+}
+
 type Community struct {
 	HelperCommunityData
 	Dbid              persist.DBID            `json:"dbid"`
@@ -577,6 +582,11 @@ type Community struct {
 
 func (Community) IsNode()                      {}
 func (Community) IsCommunityByAddressOrError() {}
+
+type CommunityEdge struct {
+	Node   *Community `json:"node"`
+	Cursor *string    `json:"cursor"`
+}
 
 type CommunitySearchResult struct {
 	Community *Community `json:"community"`
@@ -1117,25 +1127,26 @@ func (GalleryUpdatedFeedEventData) IsFeedEventData() {}
 
 type GalleryUser struct {
 	HelperGalleryUserData
-	Dbid                persist.DBID     `json:"dbid"`
-	Username            *string          `json:"username"`
-	Bio                 *string          `json:"bio"`
-	Traits              *string          `json:"traits"`
-	Universal           *bool            `json:"universal"`
-	Roles               []*persist.Role  `json:"roles"`
-	SocialAccounts      *SocialAccounts  `json:"socialAccounts"`
-	Tokens              []*Token         `json:"tokens"`
-	TokensByChain       *ChainTokens     `json:"tokensByChain"`
-	Wallets             []*Wallet        `json:"wallets"`
-	PrimaryWallet       *Wallet          `json:"primaryWallet"`
-	FeaturedGallery     *Gallery         `json:"featuredGallery"`
-	Galleries           []*Gallery       `json:"galleries"`
-	Badges              []*Badge         `json:"badges"`
-	IsAuthenticatedUser *bool            `json:"isAuthenticatedUser"`
-	Followers           []*GalleryUser   `json:"followers"`
-	Following           []*GalleryUser   `json:"following"`
-	Feed                *FeedConnection  `json:"feed"`
-	SharedFollowers     *UsersConnection `json:"sharedFollowers"`
+	Dbid                persist.DBID           `json:"dbid"`
+	Username            *string                `json:"username"`
+	Bio                 *string                `json:"bio"`
+	Traits              *string                `json:"traits"`
+	Universal           *bool                  `json:"universal"`
+	Roles               []*persist.Role        `json:"roles"`
+	SocialAccounts      *SocialAccounts        `json:"socialAccounts"`
+	Tokens              []*Token               `json:"tokens"`
+	TokensByChain       *ChainTokens           `json:"tokensByChain"`
+	Wallets             []*Wallet              `json:"wallets"`
+	PrimaryWallet       *Wallet                `json:"primaryWallet"`
+	FeaturedGallery     *Gallery               `json:"featuredGallery"`
+	Galleries           []*Gallery             `json:"galleries"`
+	Badges              []*Badge               `json:"badges"`
+	IsAuthenticatedUser *bool                  `json:"isAuthenticatedUser"`
+	Followers           []*GalleryUser         `json:"followers"`
+	Following           []*GalleryUser         `json:"following"`
+	Feed                *FeedConnection        `json:"feed"`
+	SharedFollowers     *UsersConnection       `json:"sharedFollowers"`
+	SharedCommunities   *CommunitiesConnection `json:"sharedCommunities"`
 }
 
 func (GalleryUser) IsNode()                              {}

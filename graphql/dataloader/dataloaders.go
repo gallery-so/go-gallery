@@ -38,6 +38,7 @@
 //go:generate go run github.com/gallery-so/dataloaden IntLoaderByID github.com/mikeydub/go-gallery/service/persist.DBID int
 //go:generate go run github.com/gallery-so/dataloaden AdmireLoaderByActorAndFeedEvent github.com/mikeydub/go-gallery/db/gen/coredb.GetAdmireByActorIDAndFeedEventIDParams github.com/mikeydub/go-gallery/db/gen/coredb.Admire
 //go:generate go run github.com/gallery-so/dataloaden SharedFollowersLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedFollowersBatchPaginateRow
+//go:generate go run github.com/gallery-so/dataloaden SharedContractsLoaderByIDs github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateParams []github.com/mikeydub/go-gallery/db/gen/coredb.GetSharedContractsBatchPaginateRow
 
 package dataloader
 
@@ -97,6 +98,7 @@ type Loaders struct {
 	FollowersByUserID                *UsersLoaderByID
 	FollowingByUserID                *UsersLoaderByID
 	SharedFollowersByUserIDs         *SharedFollowersLoaderByIDs
+	SharedContractsByUserIDs         *SharedContractsLoaderByIDs
 	GlobalFeed                       *GlobalFeedLoader
 	PersonalFeedByUserID             *PersonalFeedLoader
 	UserFeedByUserID                 *UserFeedLoader
@@ -218,6 +220,8 @@ func NewLoaders(ctx context.Context, q *db.Queries, disableCaching bool) *Loader
 	loaders.FollowingByUserID = NewUsersLoaderByID(defaults, loadFollowingByUserId(q))
 
 	loaders.SharedFollowersByUserIDs = NewSharedFollowersLoaderByIDs(defaults, loadSharedFollowersByIDs(q))
+
+	loaders.SharedContractsByUserIDs = NewSharedContractsLoaderByIDs(defaults, loadSharedContractsByIDs(q))
 
 	loaders.TokenByTokenID = NewTokenLoaderByID(defaults, loadTokenByTokenID(q), TokenLoaderByIDCacheSubscriptions{
 		AutoCacheWithKey: func(token db.Token) persist.DBID { return token.ID },
@@ -640,6 +644,23 @@ func loadSharedFollowersByIDs(q *db.Queries) func(context.Context, []db.GetShare
 		})
 
 		return users, errors
+	}
+}
+
+func loadSharedContractsByIDs(q *db.Queries) func(context.Context, []db.GetSharedContractsBatchPaginateParams) ([][]db.GetSharedContractsBatchPaginateRow, []error) {
+	return func(ctx context.Context, params []db.GetSharedContractsBatchPaginateParams) ([][]db.GetSharedContractsBatchPaginateRow, []error) {
+		contracts := make([][]db.GetSharedContractsBatchPaginateRow, len(params))
+		errors := make([]error, len(contracts))
+
+		b := q.GetSharedContractsBatchPaginate(ctx, params)
+		defer b.Close()
+
+		b.Query(func(i int, c []db.GetSharedContractsBatchPaginateRow, err error) {
+			contracts[i] = c
+			errors[i] = err
+		})
+
+		return contracts, errors
 	}
 }
 

@@ -1546,6 +1546,134 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const getSharedContractsBatchPaginate = `-- name: GetSharedContractsBatchPaginate :batchmany
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, a.displayed displayed_by_user_a, b.displayed displayed_by_user_b, a.owned_count
+from contracts, owned_contracts a, owned_contracts b
+where a.user_id = $1
+	and b.user_id = $2
+	and a.contract_id = b.contract_id
+	and a.contract_id = contracts.id
+	and (a.displayed, b.displayed, a.owned_count) < ($3, $4, $5::int)
+	and (a.displayed, b.displayed, a.owned_count) > ($6, $7, $8::int)
+order by case when $9::bool then (a.displayed, b.displayed, a.owned_count) end asc,
+        case when not $9::bool then (a.displayed, b.displayed, a.owned_count) end desc
+limit $10
+`
+
+type GetSharedContractsBatchPaginateBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetSharedContractsBatchPaginateParams struct {
+	UserA                     string
+	UserB                     string
+	CurBeforeDisplayedByUserA bool
+	CurBeforeDisplayedByUserB bool
+	CurBeforeOwnedCount       int32
+	CurAfterDisplayedByUserA  bool
+	CurAfterDisplayedByUserB  bool
+	CurAfterOwnedCount        int32
+	PagingForward             bool
+	Limit                     int32
+}
+
+type GetSharedContractsBatchPaginateRow struct {
+	ID               persist.DBID
+	Deleted          bool
+	Version          sql.NullInt32
+	CreatedAt        time.Time
+	LastUpdated      time.Time
+	Name             sql.NullString
+	Symbol           sql.NullString
+	Address          persist.Address
+	CreatorAddress   persist.Address
+	Chain            persist.Chain
+	ProfileBannerUrl sql.NullString
+	ProfileImageUrl  sql.NullString
+	BadgeUrl         sql.NullString
+	Description      sql.NullString
+	DisplayedByUserA bool
+	DisplayedByUserB bool
+	OwnedCount       int64
+}
+
+func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.UserA,
+			a.UserB,
+			a.CurBeforeDisplayedByUserA,
+			a.CurBeforeDisplayedByUserB,
+			a.CurBeforeOwnedCount,
+			a.CurAfterDisplayedByUserA,
+			a.CurAfterDisplayedByUserB,
+			a.CurAfterOwnedCount,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(getSharedContractsBatchPaginate, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetSharedContractsBatchPaginateBatchResults{br, len(arg), false}
+}
+
+func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSharedContractsBatchPaginateRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []GetSharedContractsBatchPaginateRow
+		if b.closed {
+			if f != nil {
+				f(t, items, errors.New("batch already closed"))
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetSharedContractsBatchPaginateRow
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Name,
+					&i.Symbol,
+					&i.Address,
+					&i.CreatorAddress,
+					&i.Chain,
+					&i.ProfileBannerUrl,
+					&i.ProfileImageUrl,
+					&i.BadgeUrl,
+					&i.Description,
+					&i.DisplayedByUserA,
+					&i.DisplayedByUserB,
+					&i.OwnedCount,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetSharedContractsBatchPaginateBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const getSharedFollowersBatchPaginate = `-- name: GetSharedFollowersBatchPaginate :batchmany
 select users.id, users.deleted, users.version, users.last_updated, users.created_at, users.username, users.username_idempotent, users.wallets, users.bio, users.traits, users.universal, users.notification_settings, users.email_verified, users.email_unsubscriptions, users.featured_gallery, users.primary_wallet_id, users.user_experiences, a.created_at followed_on
 from users, follows a, follows b

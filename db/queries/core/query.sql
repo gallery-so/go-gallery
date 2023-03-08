@@ -916,3 +916,24 @@ where a.follower = @follower
 	and a.deleted = false
 	and b.deleted = false
 	and users.deleted = false;
+
+-- name: GetSharedContractsBatchPaginate :batchmany
+select contracts.*, a.displayed displayed_by_user_a, b.displayed displayed_by_user_b, a.owned_count
+from contracts, owned_contracts a, owned_contracts b
+where a.user_id = @user_a
+	and b.user_id = @user_b
+	and a.contract_id = b.contract_id
+	and a.contract_id = contracts.id
+	and (a.displayed, b.displayed, a.owned_count) < (sqlc.arg('cur_before_displayed_by_user_a'), sqlc.arg('cur_before_displayed_by_user_b'), sqlc.arg('cur_before_owned_count')::int)
+	and (a.displayed, b.displayed, a.owned_count) > (sqlc.arg('cur_after_displayed_by_user_a'), sqlc.arg('cur_after_displayed_by_user_b'), sqlc.arg('cur_after_owned_count')::int)
+order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count) end asc,
+        case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count) end desc
+limit sqlc.arg('limit');
+
+-- name: CountSharedContracts :one
+select count(*)
+from contracts, owned_contracts a, owned_contracts b
+where a.user_id = @user_a
+	and b.user_id = @user_b
+	and a.contract_id = b.contract_id
+	and a.contract_id = contracts.id;

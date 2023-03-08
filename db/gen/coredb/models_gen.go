@@ -218,6 +218,14 @@ type Notification struct {
 	Amount      int32
 }
 
+type OwnedContract struct {
+	UserID      persist.DBID
+	ContractID  persist.DBID
+	OwnedCount  int64
+	Displayed   bool
+	LastUpdated time.Time
+}
+
 type PiiForUser struct {
 	UserID          persist.DBID
 	PiiEmailAddress persist.Email

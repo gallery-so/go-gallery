@@ -466,6 +466,28 @@ func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.Ga
 	}, nil
 }
 
+// SharedCommunities is the resolver for the sharedCommunities field.
+func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
+	communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
+	fmt.Printf("communities=%d\n", len(communities))
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*model.CommunityEdge, len(communities))
+	for i, community := range communities {
+		edges[i] = &model.CommunityEdge{
+			Node:   communityToModel(ctx, community, util.ToPointer(false)),
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}
+	}
+
+	return &model.CommunitiesConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
+}
+
 // AddUserWallet is the resolver for the addUserWallet field.
 func (r *mutationResolver) AddUserWallet(ctx context.Context, chainAddress persist.ChainAddress, authMechanism model.AuthMechanism) (model.AddUserWalletPayloadOrError, error) {
 	api := publicapi.For(ctx)

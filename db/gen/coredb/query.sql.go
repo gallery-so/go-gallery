@@ -147,6 +147,27 @@ func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersBy
 	return count, err
 }
 
+const countSharedContracts = `-- name: CountSharedContracts :one
+select count(*)
+from contracts, owned_contracts a, owned_contracts b
+where a.user_id = $1
+	and b.user_id = $2
+	and a.contract_id = b.contract_id
+	and a.contract_id = contracts.id
+`
+
+type CountSharedContractsParams struct {
+	UserA string
+	UserB string
+}
+
+func (q *Queries) CountSharedContracts(ctx context.Context, arg CountSharedContractsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSharedContracts, arg.UserA, arg.UserB)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSharedFollows = `-- name: CountSharedFollows :one
 select count(*)
 from users, follows a, follows b
