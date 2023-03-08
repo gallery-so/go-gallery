@@ -768,7 +768,7 @@ with last_refreshed as (
 		from events, last_refreshed, jsonb_array_elements_text(data->'collection_token_ids') added, tokens
 		where actor_id = $1
 			and action = 'TokensAddedToCollection'
-			and events.created_at >= last_refreshed.last_updated
+			and events.created_at > last_refreshed.last_updated
 			and added.value = tokens.id
 			and events.deleted = false
 			and tokens.deleted = false

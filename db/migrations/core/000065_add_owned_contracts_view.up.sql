@@ -11,7 +11,7 @@ create materialized view owned_contracts as (
       contracts.id = tokens.contract
       and collections.owner_user_id = tokens.owner_user_id
       and collections.deleted = false
-      and tokens.id = any (collections.nfts)
+      and tokens.id = any(collections.nfts)
       group by 1, 2
       having count(collections.id) > 0
   )
