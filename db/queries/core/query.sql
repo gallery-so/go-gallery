@@ -146,10 +146,25 @@ SELECT DISTINCT ON (contracts.id) contracts.* FROM contracts, tokens
     AND tokens.deleted = false AND contracts.deleted = false;
 
 -- name: GetContractsDisplayedByUserIDBatch :batchmany
-select distinct on (contracts.id) contracts.* from contracts, tokens
-    inner join collections c on tokens.id = any(c.nfts) and c.deleted = false
-    where tokens.owner_user_id = $1 and tokens.contract = contracts.id and c.owner_user_id = tokens.owner_user_id
-    and tokens.deleted = false and contracts.deleted = false;
+with last_refreshed as (
+		select last_updated from owned_contracts limit 1
+	),
+	displayed as (
+		select contract_id
+		from owned_contracts
+		where owned_contracts.user_id = @user_id and displayed = true
+		union
+		select tokens.contract as contract_id
+		from events, last_refreshed, jsonb_array_elements_text(data->'collection_token_ids') added, tokens
+		where actor_id = @user_id
+			and action = 'TokensAddedToCollection'
+			and events.created_at >= last_refreshed.last_updated
+			and added.value = tokens.id
+			and events.deleted = false
+			and tokens.deleted = false
+	)
+select contracts.* from contracts, displayed
+where contracts.id = displayed.contract_id and contracts.deleted = false;
 
 -- name: GetFollowersByUserIdBatch :batchmany
 SELECT u.* FROM follows f
@@ -919,21 +934,51 @@ where a.follower = @follower
 
 -- name: GetSharedContractsBatchPaginate :batchmany
 select contracts.*, a.displayed displayed_by_user_a, b.displayed displayed_by_user_b, a.owned_count
-from contracts, owned_contracts a, owned_contracts b
-where a.user_id = @user_a
-	and b.user_id = @user_b
+from owned_contracts a, owned_contracts b, contracts
+left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+where a.user_id = @user_a_id
+	and b.user_id = @user_b_id
 	and a.contract_id = b.contract_id
 	and a.contract_id = contracts.id
-	and (a.displayed, b.displayed, a.owned_count) < (sqlc.arg('cur_before_displayed_by_user_a'), sqlc.arg('cur_before_displayed_by_user_b'), sqlc.arg('cur_before_owned_count')::int)
-	and (a.displayed, b.displayed, a.owned_count) > (sqlc.arg('cur_after_displayed_by_user_a'), sqlc.arg('cur_after_displayed_by_user_b'), sqlc.arg('cur_after_owned_count')::int)
-order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count) end asc,
-        case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count) end desc
+  and marketplace_contracts.contract_id is null
+  and contracts.name is not null
+  and contracts.name != ''
+  and contracts.name != 'Unidentified contract'
+	and (
+    a.displayed,
+    b.displayed,
+    a.owned_count,
+    contracts.id
+  ) < (
+    sqlc.arg('cur_before_displayed_by_user_a'),
+    sqlc.arg('cur_before_displayed_by_user_b'),
+    sqlc.arg('cur_before_owned_count')::int,
+    sqlc.arg('cur_before_contract_id')
+  )
+	and (
+    a.displayed,
+    b.displayed,
+    a.owned_count,
+    contracts.id
+  ) > (
+    sqlc.arg('cur_after_displayed_by_user_a'),
+    sqlc.arg('cur_after_displayed_by_user_b'),
+    sqlc.arg('cur_after_owned_count')::int,
+    sqlc.arg('cur_after_contract_id')
+  )
+order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc,
+        case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc
 limit sqlc.arg('limit');
 
 -- name: CountSharedContracts :one
 select count(*)
-from contracts, owned_contracts a, owned_contracts b
-where a.user_id = @user_a
-	and b.user_id = @user_b
+from owned_contracts a, owned_contracts b, contracts
+left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+where a.user_id = @user_a_id
+	and b.user_id = @user_b_id
 	and a.contract_id = b.contract_id
-	and a.contract_id = contracts.id;
+	and a.contract_id = contracts.id
+  and marketplace_contracts.contract_id is null
+  and contracts.name is not null
+  and contracts.name != ''
+  and contracts.name != 'Unidentified contract';

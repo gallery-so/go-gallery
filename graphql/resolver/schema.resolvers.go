@@ -469,7 +469,6 @@ func (r *galleryUserResolver) SharedFollowers(ctx context.Context, obj *model.Ga
 // SharedCommunities is the resolver for the sharedCommunities field.
 func (r *galleryUserResolver) SharedCommunities(ctx context.Context, obj *model.GalleryUser, before *string, after *string, first *int, last *int) (*model.CommunitiesConnection, error) {
 	communities, pageInfo, err := publicapi.For(ctx).User.SharedCommunities(ctx, obj.UserID, before, after, first, last)
-	fmt.Printf("communities=%d\n", len(communities))
 	if err != nil {
 		return nil, err
 	}

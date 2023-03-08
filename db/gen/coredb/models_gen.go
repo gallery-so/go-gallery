@@ -165,6 +165,10 @@ type LegacyView struct {
 	Deleted     sql.NullBool
 }
 
+type MarketplaceContract struct {
+	ContractID persist.DBID
+}
+
 type Membership struct {
 	ID          persist.DBID
 	Deleted     bool

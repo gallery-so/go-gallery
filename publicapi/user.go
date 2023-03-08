@@ -711,21 +711,22 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 		return nil, PageInfo{}, err
 	}
 
-	queryFunc := func(params sharedCommunitiesPaginatorParams) ([]any, error) {
+	queryFunc := func(params sharedContractsPaginatorParams) ([]any, error) {
 		keys, err := api.loaders.SharedContractsByUserIDs.Load(db.GetSharedContractsBatchPaginateParams{
-			UserA:                     curUserID.String(),
-			UserB:                     userID.String(),
+			UserAID:                   curUserID,
+			UserBID:                   userID,
 			CurBeforeDisplayedByUserA: params.CursorBeforeDisplayedByUserA,
 			CurBeforeDisplayedByUserB: params.CursorBeforeDisplayedByUserB,
 			CurBeforeOwnedCount:       int32(params.CursorBeforeOwnedCount),
+			CurBeforeContractID:       params.CursorBeforeContractID,
 			CurAfterDisplayedByUserA:  params.CursorAfterDisplayedByUserA,
 			CurAfterDisplayedByUserB:  params.CursorAfterDisplayedByUserB,
 			CurAfterOwnedCount:        int32(params.CursorAfterOwnedCount),
+			CurAfterContractID:        params.CursorAfterContractID,
 			PagingForward:             params.PagingForward,
 			Limit:                     params.Limit,
 		})
 		if err != nil {
-			panic(err)
 			return nil, err
 		}
 
@@ -734,28 +735,25 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 			results[i] = key
 		}
 
-		panic(fmt.Sprintf("keys=%+v\n", keys))
-
 		return results, nil
 	}
 
 	countFunc := func() (int, error) {
 		total, err := api.queries.CountSharedContracts(ctx, db.CountSharedContractsParams{
-			UserA: curUserID.String(),
-			UserB: userID.String(),
+			UserAID: curUserID,
+			UserBID: userID,
 		})
-		fmt.Printf("sharedCount=%d\n", total)
 		return int(total), err
 	}
 
-	cursorFunc := func(i any) (bool, bool, int, error) {
+	cursorFunc := func(i any) (bool, bool, int, persist.DBID, error) {
 		if row, ok := i.(db.GetSharedContractsBatchPaginateRow); ok {
-			return row.DisplayedByUserA, row.DisplayedByUserB, int(row.OwnedCount), nil
+			return row.DisplayedByUserA, row.DisplayedByUserB, int(row.OwnedCount), row.ID, nil
 		}
-		return false, false, 0, fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
+		return false, false, 0, "", fmt.Errorf("node is not a db.GetSharedContractsBatchPaginateRow")
 	}
 
-	paginator := sharedCommunitiesPaginator{
+	paginator := sharedContractsPaginator{
 		QueryFunc:  queryFunc,
 		CursorFunc: cursorFunc,
 		CountFunc:  countFunc,
@@ -769,8 +767,6 @@ func (api UserAPI) SharedCommunities(ctx context.Context, userID persist.DBID, b
 			var c db.Contract
 			copier.Copy(&c, &row)
 			contracts[i] = c
-		} else {
-			panic("WTF")
 		}
 	}
 

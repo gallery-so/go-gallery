@@ -252,76 +252,87 @@ func (p *timeIDPaginator) paginate(before *string, after *string, first *int, la
 	return paginator.paginate(before, after, first, last)
 }
 
-type sharedCommunitiesPaginatorParams struct {
+type sharedContractsPaginatorParams struct {
 	Limit                        int32
 	CursorBeforeDisplayedByUserA bool
 	CursorBeforeDisplayedByUserB bool
 	CursorBeforeOwnedCount       int
+	CursorBeforeContractID       persist.DBID
 	CursorAfterDisplayedByUserA  bool
 	CursorAfterDisplayedByUserB  bool
 	CursorAfterOwnedCount        int
+	CursorAfterContractID        persist.DBID
 	PagingForward                bool
 }
 
-type sharedCommunitiesPaginator struct {
+type sharedContractsPaginator struct {
 	// QueryFunc returns paginated results for the given paging parameters
-	QueryFunc func(params sharedCommunitiesPaginatorParams) ([]interface{}, error)
+	QueryFunc func(params sharedContractsPaginatorParams) ([]interface{}, error)
 
 	// CursorFunc returns:
-	//  * A bool indicating that userA displays the communitiy on their gallery
-	//  * A bool indicating that userB displays the communnity on their gallery
-	//  * An int indicating how many tokens userA owns for a community
-	CursorFunc func(node interface{}) (bool, bool, int, error)
+	//  * A bool indicating that userA displays the contract on their gallery
+	//  * A bool indicating that userB displays the contract on their gallery
+	//  * An int indicating how many tokens userA owns for a contract
+	//  * A DBID indicating the ID of the contract
+	CursorFunc func(node interface{}) (bool, bool, int, persist.DBID, error)
 
 	// CountFunc returns the total number of items that can be paginated. May be nil, in which
 	// case the resulting PageInfo will omit the total field.
 	CountFunc func() (count int, err error)
 }
 
-func (p *sharedCommunitiesPaginator) encodeCursor(displayedA, displayedB bool, i int) (string, error) {
+func (p *sharedContractsPaginator) encodeCursor(displayedA, displayedB bool, i int, contractID persist.DBID) (string, error) {
 	encoder := newCursorEncoder()
 	encoder.appendBool(displayedA)
 	encoder.appendBool(displayedB)
 	encoder.appendInt64(int64(i))
+	encoder.appendDBID(contractID)
 	return encoder.AsBase64(), nil
 }
 
-func (p *sharedCommunitiesPaginator) decodeCursor(cursor string) (bool, bool, int, error) {
+func (p *sharedContractsPaginator) decodeCursor(cursor string) (bool, bool, int, persist.DBID, error) {
 	decoder, err := newCursorDecoder(cursor)
 	if err != nil {
-		return false, false, 0, nil
+		return false, false, 0, "", nil
 	}
 
 	displayedA, err := decoder.readBool()
 	if err != nil {
-		return false, false, 0, nil
+		return false, false, 0, "", nil
 	}
 
 	displayedB, err := decoder.readBool()
 	if err != nil {
-		return false, false, 0, nil
+		return false, false, 0, "", nil
 	}
 
-	i, err := decoder.readInt64()
+	ownedCount, err := decoder.readInt64()
 	if err != nil {
-		return false, false, 0, nil
+		return false, false, 0, "", nil
 	}
 
-	return displayedA, displayedB, int(i), nil
+	contractID, err := decoder.readDBID()
+	if err != nil {
+		return false, false, 0, "", nil
+	}
+
+	return displayedA, displayedB, int(ownedCount), contractID, nil
 }
 
-func (p *sharedCommunitiesPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+func (p *sharedContractsPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
 		cursorBeforeDisplayedByUserA := true
 		cursorBeforeDisplayedByUserB := true
 		cursorBeforeOwnedCount := math.MaxInt32
+		cursorBeforeContractID := defaultCursorBeforeID
 		cursorAfterDisplayedByUserA := false
 		cursorAfterDisplayedByUserB := false
 		cursorAfterOwnedCount := -1
+		cursorAfterContractID := defaultCursorAfterID
 
 		var err error
 		if before != nil {
-			cursorBeforeDisplayedByUserA, cursorBeforeDisplayedByUserB, cursorBeforeOwnedCount, err = p.decodeCursor(*before)
+			cursorBeforeDisplayedByUserA, cursorBeforeDisplayedByUserB, cursorBeforeOwnedCount, cursorBeforeContractID, err = p.decodeCursor(*before)
 			if err != nil {
 				panic(err)
 				return nil, err
@@ -329,21 +340,23 @@ func (p *sharedCommunitiesPaginator) paginate(before *string, after *string, fir
 		}
 
 		if after != nil {
-			cursorAfterDisplayedByUserA, cursorAfterDisplayedByUserB, cursorAfterOwnedCount, err = p.decodeCursor(*after)
+			cursorAfterDisplayedByUserA, cursorAfterDisplayedByUserB, cursorAfterOwnedCount, cursorAfterContractID, err = p.decodeCursor(*after)
 			if err != nil {
 				panic(err)
 				return nil, err
 			}
 		}
 
-		queryParams := sharedCommunitiesPaginatorParams{
+		queryParams := sharedContractsPaginatorParams{
 			Limit:                        limit,
 			CursorBeforeDisplayedByUserA: cursorBeforeDisplayedByUserA,
 			CursorBeforeDisplayedByUserB: cursorBeforeDisplayedByUserB,
 			CursorBeforeOwnedCount:       cursorBeforeOwnedCount,
+			CursorBeforeContractID:       cursorBeforeContractID,
 			CursorAfterDisplayedByUserA:  cursorAfterDisplayedByUserA,
 			CursorAfterDisplayedByUserB:  cursorAfterDisplayedByUserB,
 			CursorAfterOwnedCount:        cursorAfterOwnedCount,
+			CursorAfterContractID:        cursorAfterContractID,
 			PagingForward:                pagingForward,
 		}
 
@@ -351,12 +364,12 @@ func (p *sharedCommunitiesPaginator) paginate(before *string, after *string, fir
 	}
 
 	cursorFunc := func(node interface{}) (string, error) {
-		nodeBool, nodeTime, nodeID, err := p.CursorFunc(node)
+		displayedUserA, displayedUserB, ownedCount, contractID, err := p.CursorFunc(node)
 		if err != nil {
 			return "", err
 		}
 
-		return p.encodeCursor(nodeBool, nodeTime, nodeID)
+		return p.encodeCursor(displayedUserA, displayedUserB, ownedCount, contractID)
 	}
 
 	paginator := keysetPaginator{
