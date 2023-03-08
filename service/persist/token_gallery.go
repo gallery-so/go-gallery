@@ -122,6 +122,13 @@ type TokenUpdateAllURIDerivedFieldsInput struct {
 	Description NullString    `json:"description"`
 }
 
+// TokenUpdateURIInput represents an update to just a token's URI field
+type TokenUpdateURIInput struct {
+	LastUpdated LastUpdatedTime `json:"last_updated"`
+
+	TokenURI TokenURI `json:"token_uri"`
+}
+
 // TokenUpdateMediaInput represents an update to just a token's media fields
 type TokenUpdateMediaInput struct {
 	LastUpdated LastUpdatedTime `json:"last_updated"`
@@ -143,8 +150,8 @@ type TokenGalleryRepository interface {
 	GetByTokenIdentifiers(context.Context, TokenID, Address, Chain, int64, int64) ([]TokenGallery, error)
 	GetByFullIdentifiers(context.Context, TokenID, Address, Chain, DBID) (TokenGallery, error)
 	GetByTokenID(context.Context, TokenID, int64, int64) ([]TokenGallery, error)
-	BulkUpsertByOwnerUserID(context.Context, DBID, []Chain, []TokenGallery, bool) error
-	BulkUpsertTokensOfContract(context.Context, DBID, []TokenGallery, bool) error
+	BulkUpsertByOwnerUserID(context.Context, DBID, []Chain, []TokenGallery, bool) ([]TokenGallery, error)
+	BulkUpsertTokensOfContract(context.Context, DBID, []TokenGallery, bool) ([]TokenGallery, error)
 	UpdateByID(context.Context, DBID, DBID, interface{}) error
 	UpdateByTokenIdentifiersUnsafe(context.Context, TokenID, Address, Chain, interface{}) error
 	DeleteByID(context.Context, DBID) error

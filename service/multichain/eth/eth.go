@@ -85,6 +85,31 @@ func (d *Provider) GetTokensByWalletAddress(ctx context.Context, addr persist.Ad
 
 }
 
+// GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/nfts/get/metadata?contract_address=%s&token_id=%s", d.indexerBaseURL, contractAddress, tokenID), nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return nil, util.GetErrFromResp(res)
+	}
+
+	var tokens indexer.GetTokenMetadataOutput
+	err = json.NewDecoder(res.Body).Decode(&tokens)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens.Metadata, nil
+}
+
 // GetTokensByContractAddress retrieves tokens for a contract address on the Ethereum Blockchain
 func (d *Provider) GetTokensByContractAddress(ctx context.Context, contractAddress persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
 

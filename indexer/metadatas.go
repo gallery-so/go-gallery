@@ -26,6 +26,14 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 )
 
+var uniqueMetadataHandlers = uniqueMetadatas{
+	persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
+	persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
+	persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
+	persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"): cryptopunks,
+	persist.EthereumAddress("0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7"): zora,
+}
+
 var white = color.RGBA{255, 255, 255, 255}
 var black = color.RGBA{2, 4, 8, 0}
 
@@ -34,6 +42,15 @@ const cryptoPunksImageContractAddress = "0x16f5a35647d6f03d5d3da7b35409d65ba03af
 type uniqueMetadataHandler func(context.Context, persist.TokenURI, persist.EthereumAddress, persist.TokenID, *ethclient.Client, *shell.Shell, *goar.Client) (persist.TokenURI, persist.TokenMetadata, error)
 
 type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
+
+type errNoMetadataFound struct {
+	contract persist.EthereumAddress
+	tokenID  persist.TokenID
+}
+
+func (e errNoMetadataFound) Error() string {
+	return fmt.Sprintf("no metadata found for contract %s and tokenID %s", e.contract, e.tokenID)
+}
 
 /**
  * The drawing instructions for the nine different symbols are as follows:
@@ -106,7 +123,8 @@ func autoglyphs(ctx context.Context, turi persist.TokenURI, addr persist.Ethereu
 	}, nil
 }
 
-/**
+/*
+*
 *  The drawing instructions for the nine different symbols are as follows:
 *
 *    .  Draw nothing in the cell.

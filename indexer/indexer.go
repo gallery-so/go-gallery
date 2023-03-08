@@ -26,13 +26,11 @@ import (
 	"github.com/mikeydub/go-gallery/contracts"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/validate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -61,13 +59,6 @@ var (
 		transferBatchEventHash,
 		transferEventHash,
 		transferSingleEventHash,
-	}
-	uniqueMetadataHandlers = uniqueMetadatas{
-		persist.EthereumAddress("0xd4e4078ca3495de5b1d4db434bebc5a986197782"): autoglyphs,
-		persist.EthereumAddress("0x60f3680350f65beb2752788cb48abfce84a4759e"): colorglyphs,
-		persist.EthereumAddress("0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85"): ens,
-		persist.EthereumAddress("0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb"): cryptopunks,
-		persist.EthereumAddress("0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7"): zora,
 	}
 )
 
@@ -212,8 +203,7 @@ type indexer struct {
 
 	isListening bool // Indicates if the indexer is waiting for new blocks
 
-	uniqueMetadatas uniqueMetadatas
-	getLogsFunc     getLogsFunc
+	getLogsFunc getLogsFunc
 }
 
 // newIndexer sets up an indexer for retrieving the specified events that will process tokens
@@ -241,8 +231,6 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		maxBlock: maxBlock,
 
 		eventHashes: pEvents,
-
-		uniqueMetadatas: uniqueMetadataHandlers,
 
 		getLogsFunc: getLogsFunc,
 	}
@@ -319,6 +307,14 @@ func (i *indexer) catchUp(ctx context.Context, topics [][]common.Hash) {
 	wp := workerpool.New(defaultWorkerPoolSize)
 	defer wp.StopWait()
 
+	go func() {
+		time.Sleep(10 * time.Second)
+		for wp.WaitingQueueSize() > 0 {
+			logger.For(ctx).Infof("Catching up: waiting for %d workers to finish", wp.WaitingQueueSize())
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
 	from := i.lastSyncedChunk
 	for ; from < atomic.LoadUint64(&i.mostRecentBlock); from += blocksPerLogsCall {
 		input := from
@@ -385,7 +381,7 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
-	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in}
+	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.previousOwners.in, plugins.uris.in, plugins.refresh.in}
 	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, plugins.refresh.out)
@@ -817,20 +813,18 @@ func (i *indexer) processTokens(ctx context.Context,
 
 	logger.For(ctx).Info("Done recieving field data, converting fields into tokens...")
 
-	i.createTokens(ctx, ownersMap, previousOwnersMap, balancesMap, make(map[persist.EthereumTokenIdentifiers]tokenMetadata), urisMap, map[persist.EthereumTokenIdentifiers]tokenMedia{})
+	i.createTokens(ctx, ownersMap, previousOwnersMap, balancesMap, urisMap)
 }
 
 func (i *indexer) createTokens(ctx context.Context,
 	ownersMap map[persist.EthereumTokenIdentifiers]ownerAtBlock,
 	previousOwnersMap map[persist.EthereumTokenIdentifiers]*previousOwnersAtBlock,
 	balancesMap map[persist.EthereumTokenIdentifiers]*tokenBalancesAtBlock,
-	metadatasMap map[persist.EthereumTokenIdentifiers]tokenMetadata,
 	urisMap map[persist.EthereumTokenIdentifiers]tokenURI,
-	mediasMap map[persist.EthereumTokenIdentifiers]tokenMedia,
 ) {
 	defer recoverAndWait(ctx)
 
-	tokens := i.fieldMapsToTokens(ctx, ownersMap, previousOwnersMap, balancesMap, metadatasMap, urisMap, mediasMap)
+	tokens := i.fieldMapsToTokens(ctx, ownersMap, previousOwnersMap, balancesMap, urisMap)
 	if tokens == nil || len(tokens) == 0 {
 		logger.For(ctx).Info("No tokens to process")
 		return
@@ -916,7 +910,9 @@ func urisPluginReceiver(cur tokenURI, inc tokenURI) tokenURI {
 
 func refreshesPluginReceiver(ctx context.Context) PluginReceiver[errForTokenAtBlockAndIndex, errForTokenAtBlockAndIndex] {
 	return func(cur errForTokenAtBlockAndIndex, inc errForTokenAtBlockAndIndex) errForTokenAtBlockAndIndex {
-		logger.For(ctx).WithError(inc.err).Error("failed to save filter")
+		if inc.err != nil {
+			logger.For(ctx).WithError(inc.err).Error("failed to save filter")
+		}
 		return inc
 	}
 }
@@ -925,9 +921,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 	owners map[persist.EthereumTokenIdentifiers]ownerAtBlock,
 	previousOwners map[persist.EthereumTokenIdentifiers]*previousOwnersAtBlock,
 	balances map[persist.EthereumTokenIdentifiers]*tokenBalancesAtBlock,
-	metadatas map[persist.EthereumTokenIdentifiers]tokenMetadata,
 	uris map[persist.EthereumTokenIdentifiers]tokenURI,
-	medias map[persist.EthereumTokenIdentifiers]tokenMedia,
 ) []persist.Token {
 	totalBalances := 0
 	for _, v := range balances {
@@ -945,33 +939,20 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 		for i, w := range previousOwners[k].owners {
 			previousOwnerAddresses[i] = persist.EthereumAddressAtBlock{Address: w.owner, Block: w.boi.blockNumber}
 		}
-		delete(previousOwners, k)
-		metadata := metadatas[k]
-
-		name, description := media.FindNameAndDescription(ctx, metadata.md)
-
-		delete(metadatas, k)
 
 		uri := uris[k]
 		delete(uris, k)
-
-		media := medias[k]
-		delete(medias, k)
 
 		t := persist.Token{
 			TokenID:          tokenID,
 			ContractAddress:  contractAddress,
 			OwnerAddress:     v.owner,
 			Quantity:         persist.HexString("1"),
-			Name:             persist.NullString(validate.SanitizationPolicy.Sanitize(name)),
-			Description:      persist.NullString(validate.SanitizationPolicy.Sanitize(description)),
 			OwnershipHistory: previousOwnerAddresses,
 			TokenType:        persist.TokenTypeERC721,
-			TokenMetadata:    metadata.md,
 			TokenURI:         uri.uri,
 			Chain:            i.chain,
 			BlockNumber:      v.boi.blockNumber,
-			Media:            media.media,
 		}
 
 		result = append(result, t)
@@ -984,17 +965,8 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 			continue
 		}
 
-		metadata := metadatas[k]
-
-		name, description := media.FindNameAndDescription(ctx, metadata.md)
-
-		delete(metadatas, k)
-
 		uri := uris[k]
 		delete(uris, k)
-
-		media := medias[k]
-		delete(medias, k)
 
 		for addr, balance := range v.balances {
 
@@ -1004,13 +976,11 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 				OwnerAddress:    addr,
 				Quantity:        persist.HexString(balance.amnt.Text(16)),
 				TokenType:       persist.TokenTypeERC1155,
-				TokenMetadata:   metadata.md,
-				TokenURI:        uri.uri,
-				Name:            persist.NullString(validate.SanitizationPolicy.Sanitize(name)),
-				Description:     persist.NullString(validate.SanitizationPolicy.Sanitize(description)),
-				Chain:           i.chain,
-				BlockNumber:     balance.block,
-				Media:           media.media,
+
+				TokenURI: uri.uri,
+
+				Chain:       i.chain,
+				BlockNumber: balance.block,
 			}
 			result = append(result, t)
 			delete(balances, k)

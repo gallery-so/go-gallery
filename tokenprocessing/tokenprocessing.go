@@ -50,7 +50,7 @@ func coreInitServer() *gin.Engine {
 	c := server.ClientInit(context.Background())
 	mc := server.NewMultichainProvider(c)
 
-	return handlersInitServer(router, mc, c.Repos, c.IPFSClient, c.ArweaveClient, c.StorageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
