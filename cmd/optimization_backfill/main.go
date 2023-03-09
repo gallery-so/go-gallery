@@ -12,16 +12,14 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/gammazero/workerpool"
-	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/service/media"
+	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -41,12 +39,48 @@ func main() {
 	}()
 	ctx := context.Background()
 	pg := postgres.NewPgxClient()
-	stg := media.NewStorageClient(ctx)
 
-	ffWp := workerpool.New(10)
+	var totalTokenCount int
 
-	rows, err := pg.Query(ctx, `select tokens.id, tokens.media, contracts.address, tokens.token_id from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false and tokens.media is not null and not tokens.media->>'media_type' = '' and not tokens.media->>'media_url' = '' and not tokens.media->>'media_type' = 'unknown' and not tokens.media->>'media_type' = 'invalid' order by tokens.last_updated desc;`)
+	err := pg.QueryRow(ctx, `select count(*) from tokens where tokens.deleted = false and tokens.media is not null and not tokens.media->>'media_type' = '' and not tokens.media->>'media_url' = '' and not tokens.media->>'media_type' = 'unknown' and not tokens.media->>'media_type' = 'invalid';`).Scan(&totalTokenCount)
 	if err != nil {
+		logrus.Errorf("error getting total token count: %v", err)
+		panic(err)
+	}
+
+	var limit int
+	var offset int
+
+	var rows pgx.Rows
+
+	if viper.GetString("CLOUD_RUN_JOB") != "" {
+		logrus.Infof("running as cloud run job")
+
+		jobIndex := viper.GetInt("CLOUD_RUN_TASK_INDEX")
+		jobCount := viper.GetInt("CLOUD_RUN_TASK_COUNT")
+
+		// given the totalTokenCount, and the jobCount, we can calculate the offset and limit for this job
+		// we want to evenly distribute the work across the jobs
+		// so we can calculate the limit by dividing the totalTokenCount by the jobCount
+		// and the offset by multiplying the jobIndex by the limit
+
+		limit = totalTokenCount / jobCount
+		offset = jobIndex * limit
+
+		logrus.Infof("jobIndex: %d, jobCount: %d, totalTokenCount: %d, limit: %d, offset: %d", jobIndex, jobCount, totalTokenCount, limit, offset)
+
+		rows, err = pg.Query(ctx, `select tokens.id, tokens.media from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false and tokens.media is not null and not tokens.media->>'media_type' = '' and not tokens.media->>'media_url' = '' and not tokens.media->>'media_type' = 'unknown' and not tokens.media->>'media_type' = 'invalid' order by tokens.last_updated desc limit $1 offset $2;`, limit, offset)
+	} else {
+		logrus.Infof("running as local job")
+		limit = 1000
+		offset = 120000
+		rows, err = pg.Query(ctx, `select tokens.id, tokens.media from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false and tokens.media is not null and not tokens.media->>'media_type' = '' and not tokens.media->>'media_url' = '' and not tokens.media->>'media_type' = 'unknown' and not tokens.media->>'media_type' = 'invalid' order by tokens.last_updated desc limit $1 offset $2;`, limit, offset)
+	}
+
+	logrus.Info("querying for tokens...")
+
+	if err != nil {
+		logrus.Errorf("error getting tokens: %v", err)
 		panic(err)
 	}
 	defer rows.Close()
@@ -54,75 +88,58 @@ func main() {
 	results := make(chan updateTokenMedia)
 
 	wp := workerpool.New(100)
-	for rows.Next() {
+
+	logrus.Infof("processing (%d) tokens...", totalTokenCount)
+
+	totalTokens := 0
+
+	for ; rows.Next(); totalTokens++ {
+
 		var tokenDBID persist.DBID
 		var media persist.Media
-		var contractAddress string
-		var tokenID string
-		err := rows.Scan(&tokenDBID, &media, &contractAddress, &tokenID)
+
+		err := rows.Scan(&tokenDBID, &media)
 		if err != nil {
-			logger.For(nil).Errorf("failed to scan row: %s", err)
+			logrus.Errorf("failed to scan row: %s", err)
 			continue
 		}
 
+		logrus.Infof("found %s (%s)", media.MediaURL, tokenDBID)
+
 		if media.Dimensions.Height != 0 && media.Dimensions.Width != 0 {
-			logger.For(nil).Infof("skipping %s (%s %s-%s) as it already has dimensions", media.MediaURL, tokenDBID, contractAddress, tokenID)
+			logrus.Infof("skipping %s (%s) as it already has dimensions", media.MediaURL, tokenDBID)
 			continue
 		}
 
 		if media.MediaURL == "" {
-			logger.For(nil).Infof("skipping %s (%s %s-%s) as it has no media url", media.MediaURL, tokenDBID, contractAddress, tokenID)
+			logrus.Infof("skipping %s (%s) as it has no media url", media.MediaURL, tokenDBID)
 			continue
 		}
 
 		if media.MediaType == "" || media.MediaType == persist.MediaTypeInvalid || media.MediaType == persist.MediaTypeUnknown {
-			logger.For(nil).Infof("skipping %s (%s %s-%s) as it has an unsupported media type: %s", media.MediaURL, tokenDBID, contractAddress, tokenID, media.MediaType)
+			logrus.Infof("skipping %s (%s) as it has an unsupported media type: %s", media.MediaURL, tokenDBID, media.MediaType)
 			continue
 		}
 
 		wp.Submit(func() {
 
-			var liveRenderChan chan persist.NullString
-
-			logger.For(nil).Infof("processing %s (%s %s-%s)", media.MediaURL, tokenDBID, contractAddress, tokenID)
+			logrus.Infof("processing %s (%s)", media.MediaURL, tokenDBID)
 			switch media.MediaType {
 			case persist.MediaTypeSVG:
 				dims, err := getSvgDimensions(ctx, media.MediaURL.String())
 				if err != nil {
-					logger.For(nil).Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
+					logrus.Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
 					return
 				}
 				media.Dimensions = dims
 			case persist.MediaTypeHTML:
 				dims, err := getHTMLDimensions(ctx, media.MediaURL.String())
 				if err != nil {
-					logger.For(nil).Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
+					logrus.Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
 					return
 				}
 				media.Dimensions = dims
 
-			case persist.MediaTypeVideo:
-
-				name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
-				liveRenderChan = make(chan persist.NullString)
-
-				ffWp.Submit(func() {
-					timeoutContext, cancel := context.WithTimeout(ctx, 30*time.Second)
-					defer cancel()
-					liveRenderChan <- func() persist.NullString {
-						err := createLiveRenderAndCache(timeoutContext, media.MediaURL.String(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name, stg)
-						if err != nil {
-							logger.For(nil).Errorf("failed to create live render for %s: %s", media.MediaURL, err)
-							return persist.NullString("")
-						}
-						return persist.NullString(fmt.Sprintf("https://storage.googleapis.com/%s/liverender-%s", viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name))
-					}()
-				})
-
-				media.LivePreviewURL = <-liveRenderChan
-				logger.For(nil).Infof("created live render for %s: %s", media.MediaURL, media.LivePreviewURL)
-
-				fallthrough
 			default:
 
 				func() {
@@ -130,58 +147,65 @@ func main() {
 					defer cancel()
 					dims, err := getMediaDimensions(timeoutContext, media.MediaURL.String())
 					if err != nil {
-						logger.For(nil).Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
+						logrus.Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
 						return
 					}
 					media.Dimensions = dims
 				}()
 			}
 
-			logger.For(nil).Infof("got dimensions for %s (%s %s-%s): %+v", media.MediaURL, tokenDBID, contractAddress, tokenID, media.Dimensions)
+			logrus.Infof("got dimensions for %s (%s): %+v", media.MediaURL, tokenDBID, media.Dimensions)
 
 			results <- updateTokenMedia{
 				TokenDBID: tokenDBID,
 				Media:     media,
 			}
 
-			logger.For(nil).Infof("finished processing %s (%s %s-%s)", media.MediaURL, tokenDBID, contractAddress, tokenID)
+			logrus.Infof("finished processing %s (%s)", media.MediaURL, tokenDBID)
 
 		})
 	}
+
+	logrus.Infof("finished kicking off processes for %d tokens", totalTokens)
 
 	go func() {
 		defer close(results)
-
 		wp.StopWait()
+		logrus.Info("finished processing all tokens")
 	}()
 
-	updateWp := workerpool.New(100)
+	logrus.Info("updating tokens...")
 
-	errCount := &atomic.Uint32{}
-
+	allResults := make([]updateTokenMedia, 0, limit)
 	for result := range results {
 		up := result
-		updateWp.Submit(func() {
-			if up.Media.Dimensions.Height == 0 || up.Media.Dimensions.Width == 0 {
-				logger.For(nil).Errorf("not updating %s (%s) as it has no dimensions", up.Media.MediaURL, up.TokenDBID)
-				return
-			}
-			logger.For(nil).Infof("updating %s (%s)", up.Media.MediaURL, up.TokenDBID)
-			_, err := pg.Exec(ctx, `update tokens set media = $1 where id = $2;`, up.Media, up.TokenDBID)
-			if err != nil {
-				logger.For(nil).Errorf("failed to update token %s: %s", up.TokenDBID, err)
-				errCount.Add(1)
-			}
 
-			if errCount.Load() > 1000 {
-				panic("too many errors")
-			}
+		if up.Media.Dimensions.Height == 0 || up.Media.Dimensions.Width == 0 {
+			logrus.Errorf("not updating %s (%s) as it has no dimensions", up.Media.MediaURL, up.TokenDBID)
+			continue
+		}
+		logrus.Infof("updating %s (%s)", up.Media.MediaURL, up.TokenDBID)
 
-			logger.For(nil).Infof("updated %s (%s)", up.Media.MediaURL, up.TokenDBID)
-		})
+		allResults = append(allResults, up)
 	}
 
-	updateWp.StopWait()
+	logrus.Infof("preparing to update %d tokens with dimension data", len(allResults))
+
+	allIDs, _ := util.Map(allResults, func(up updateTokenMedia) (persist.DBID, error) {
+		return up.TokenDBID, nil
+	})
+
+	allMedias, _ := util.Map(allResults, func(up updateTokenMedia) (persist.Media, error) {
+		return up.Media, nil
+	})
+
+	_, err = pg.Exec(ctx, `update tokens set media = t.media from (select unnest($1::varchar[]) as id, unnest($2::jsonb[]) as media) as t where tokens.id = t.id;`, allIDs, allMedias)
+	if err != nil {
+		logrus.Errorf("failed to update tokens: %s", err)
+		panic(err)
+	}
+
+	logrus.Infof("finished backfilling tokens")
 }
 
 func setDefaults() {
@@ -192,11 +216,14 @@ func setDefaults() {
 	viper.SetDefault("POSTGRES_PASSWORD", "")
 	viper.SetDefault("POSTGRES_DB", "postgres")
 	viper.SetDefault("GCLOUD_TOKEN_CONTENT_BUCKET", "dev-token-content")
+	viper.SetDefault("CLOUD_RUN_JOB", "")
+	viper.SetDefault("CLOUD_RUN_TASK_INDEX", 0)
+	viper.SetDefault("CLOUD_RUN_TASK_COUNT", 1)
 
 	viper.AutomaticEnv()
 
 	if viper.GetString("ENV") != "local" {
-		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
+		logrus.Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"
 		if len(os.Args) > 1 {
@@ -247,7 +274,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 		break
 	}
 
-	logger.For(nil).Debugf("got dimensions %+v for %s", dims, url)
+	logrus.Debugf("got dimensions %+v for %s", dims, url)
 	return dims, nil
 }
 
@@ -372,41 +399,4 @@ func getHTMLDimensions(ctx context.Context, url string) (persist.Dimensions, err
 		Height: height,
 	}, nil
 
-}
-
-func createLiveRenderAndCache(ctx context.Context, videoURL, bucket, name string, client *storage.Client) error {
-
-	fileName := fmt.Sprintf("liverender-%s", name)
-	logger.For(ctx).Infof("caching live render media for '%s'", fileName)
-
-	timeBeforeCopy := time.Now()
-
-	sw := newObjectWriter(ctx, client, bucket, fileName, "video/mp4")
-
-	logger.For(ctx).Infof("creating live render for %s", videoURL)
-	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
-		return fmt.Errorf("could not write to bucket %s for '%s': %s", bucket, fileName, err)
-	}
-
-	if err := sw.Close(); err != nil {
-		return err
-	}
-
-	logger.For(ctx).Infof("storage copy took %s", time.Since(timeBeforeCopy))
-
-	return nil
-}
-
-func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
-	c := exec.CommandContext(ctx, "ffmpeg", "-timeout", "30", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
-	c.Stderr = os.Stderr
-	c.Stdout = writer
-	return c.Run()
-}
-
-func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName, contentType string) *storage.Writer {
-	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
-	writer.ObjectAttrs.ContentType = contentType
-	writer.CacheControl = "no-cache, no-store"
-	return writer
 }
