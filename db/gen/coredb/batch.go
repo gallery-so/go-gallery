@@ -757,22 +757,26 @@ func (b *GetContractsByUserIDBatchBatchResults) Close() error {
 
 const getContractsDisplayedByUserIDBatch = `-- name: GetContractsDisplayedByUserIDBatch :batchmany
 with last_refreshed as (
-		select last_updated from owned_contracts limit 1
-	),
-	displayed as (
-		select contract_id
-		from owned_contracts
-		where owned_contracts.user_id = $1 and displayed = true
-		union
-		select tokens.contract as contract_id
-		from events, last_refreshed, jsonb_array_elements_text(data->'collection_token_ids') added, tokens
-		where actor_id = $1
-			and action = 'TokensAddedToCollection'
-			and events.created_at > last_refreshed.last_updated
-			and added.value = tokens.id
-			and events.deleted = false
-			and tokens.deleted = false
-	)
+  select last_updated from owned_contracts limit 1
+),
+displayed as (
+  select contract_id
+  from owned_contracts
+  where owned_contracts.user_id = $1 and displayed = true
+  union
+  select contracts.id
+  from last_refreshed, galleries, contracts, tokens
+  join collections on tokens.id = any(collections.nfts) and collections.deleted = false
+  where tokens.owner_user_id = $1
+    and tokens.contract = contracts.id
+    and collections.owner_user_id = tokens.owner_user_id
+    and galleries.owner_user_id = tokens.owner_user_id
+    and tokens.deleted = false
+    and galleries.deleted = false
+    and contracts.deleted = false
+    and galleries.last_updated > last_refreshed.last_updated
+    and collections.last_updated > last_refreshed.last_updated
+)
 select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description from contracts, displayed
 where contracts.id = displayed.contract_id and contracts.deleted = false
 `
@@ -1562,7 +1566,7 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
 }
 
 const getSharedContractsBatchPaginate = `-- name: GetSharedContractsBatchPaginate :batchmany
-select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, a.displayed displayed_by_user_a, b.displayed displayed_by_user_b, a.owned_count
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = $1

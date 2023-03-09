@@ -334,7 +334,6 @@ func (p *sharedContractsPaginator) paginate(before *string, after *string, first
 		if before != nil {
 			cursorBeforeDisplayedByUserA, cursorBeforeDisplayedByUserB, cursorBeforeOwnedCount, cursorBeforeContractID, err = p.decodeCursor(*before)
 			if err != nil {
-				panic(err)
 				return nil, err
 			}
 		}
@@ -342,7 +341,6 @@ func (p *sharedContractsPaginator) paginate(before *string, after *string, first
 		if after != nil {
 			cursorAfterDisplayedByUserA, cursorAfterDisplayedByUserB, cursorAfterOwnedCount, cursorAfterContractID, err = p.decodeCursor(*after)
 			if err != nil {
-				panic(err)
 				return nil, err
 			}
 		}
