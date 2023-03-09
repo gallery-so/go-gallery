@@ -756,10 +756,29 @@ func (b *GetContractsByUserIDBatchBatchResults) Close() error {
 }
 
 const getContractsDisplayedByUserIDBatch = `-- name: GetContractsDisplayedByUserIDBatch :batchmany
-select distinct on (contracts.id) contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description from contracts, tokens
-    inner join collections c on tokens.id = any(c.nfts) and c.deleted = false
-    where tokens.owner_user_id = $1 and tokens.contract = contracts.id and c.owner_user_id = tokens.owner_user_id
-    and tokens.deleted = false and contracts.deleted = false
+with last_refreshed as (
+  select last_updated from owned_contracts limit 1
+),
+displayed as (
+  select contract_id
+  from owned_contracts
+  where owned_contracts.user_id = $1 and displayed = true
+  union
+  select contracts.id
+  from last_refreshed, galleries, contracts, tokens
+  join collections on tokens.id = any(collections.nfts) and collections.deleted = false
+  where tokens.owner_user_id = $1
+    and tokens.contract = contracts.id
+    and collections.owner_user_id = tokens.owner_user_id
+    and galleries.owner_user_id = tokens.owner_user_id
+    and tokens.deleted = false
+    and galleries.deleted = false
+    and contracts.deleted = false
+    and galleries.last_updated > last_refreshed.last_updated
+    and collections.last_updated > last_refreshed.last_updated
+)
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description from contracts, displayed
+where contracts.id = displayed.contract_id and contracts.deleted = false
 `
 
 type GetContractsDisplayedByUserIDBatchBatchResults struct {
@@ -768,16 +787,16 @@ type GetContractsDisplayedByUserIDBatchBatchResults struct {
 	closed bool
 }
 
-func (q *Queries) GetContractsDisplayedByUserIDBatch(ctx context.Context, ownerUserID []persist.DBID) *GetContractsDisplayedByUserIDBatchBatchResults {
+func (q *Queries) GetContractsDisplayedByUserIDBatch(ctx context.Context, userID []persist.DBID) *GetContractsDisplayedByUserIDBatchBatchResults {
 	batch := &pgx.Batch{}
-	for _, a := range ownerUserID {
+	for _, a := range userID {
 		vals := []interface{}{
 			a,
 		}
 		batch.Queue(getContractsDisplayedByUserIDBatch, vals...)
 	}
 	br := q.db.SendBatch(ctx, batch)
-	return &GetContractsDisplayedByUserIDBatchBatchResults{br, len(ownerUserID), false}
+	return &GetContractsDisplayedByUserIDBatchBatchResults{br, len(userID), false}
 }
 
 func (b *GetContractsDisplayedByUserIDBatchBatchResults) Query(f func(int, []Contract, error)) {
@@ -1542,6 +1561,163 @@ func (b *GetOwnersByContractIdBatchPaginateBatchResults) Query(f func(int, []Use
 }
 
 func (b *GetOwnersByContractIdBatchPaginateBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const getSharedContractsBatchPaginate = `-- name: GetSharedContractsBatchPaginate :batchmany
+select contracts.id, contracts.deleted, contracts.version, contracts.created_at, contracts.last_updated, contracts.name, contracts.symbol, contracts.address, contracts.creator_address, contracts.chain, contracts.profile_banner_url, contracts.profile_image_url, contracts.badge_url, contracts.description, a.displayed as displayed_by_user_a, b.displayed as displayed_by_user_b, a.owned_count
+from owned_contracts a, owned_contracts b, contracts
+left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+where a.user_id = $1
+	and b.user_id = $2
+	and a.contract_id = b.contract_id
+	and a.contract_id = contracts.id
+  and marketplace_contracts.contract_id is null
+  and contracts.name is not null
+  and contracts.name != ''
+  and contracts.name != 'Unidentified contract'
+	and (
+    a.displayed,
+    b.displayed,
+    a.owned_count,
+    contracts.id
+  ) < (
+    $3,
+    $4,
+    $5::int,
+    $6
+  )
+	and (
+    a.displayed,
+    b.displayed,
+    a.owned_count,
+    contracts.id
+  ) > (
+    $7,
+    $8,
+    $9::int,
+    $10
+  )
+order by case when $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc,
+        case when not $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc
+limit $12
+`
+
+type GetSharedContractsBatchPaginateBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type GetSharedContractsBatchPaginateParams struct {
+	UserAID                   persist.DBID
+	UserBID                   persist.DBID
+	CurBeforeDisplayedByUserA bool
+	CurBeforeDisplayedByUserB bool
+	CurBeforeOwnedCount       int32
+	CurBeforeContractID       persist.DBID
+	CurAfterDisplayedByUserA  bool
+	CurAfterDisplayedByUserB  bool
+	CurAfterOwnedCount        int32
+	CurAfterContractID        persist.DBID
+	PagingForward             bool
+	Limit                     int32
+}
+
+type GetSharedContractsBatchPaginateRow struct {
+	ID               persist.DBID
+	Deleted          bool
+	Version          sql.NullInt32
+	CreatedAt        time.Time
+	LastUpdated      time.Time
+	Name             sql.NullString
+	Symbol           sql.NullString
+	Address          persist.Address
+	CreatorAddress   persist.Address
+	Chain            persist.Chain
+	ProfileBannerUrl sql.NullString
+	ProfileImageUrl  sql.NullString
+	BadgeUrl         sql.NullString
+	Description      sql.NullString
+	DisplayedByUserA bool
+	DisplayedByUserB bool
+	OwnedCount       int64
+}
+
+func (q *Queries) GetSharedContractsBatchPaginate(ctx context.Context, arg []GetSharedContractsBatchPaginateParams) *GetSharedContractsBatchPaginateBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.UserAID,
+			a.UserBID,
+			a.CurBeforeDisplayedByUserA,
+			a.CurBeforeDisplayedByUserB,
+			a.CurBeforeOwnedCount,
+			a.CurBeforeContractID,
+			a.CurAfterDisplayedByUserA,
+			a.CurAfterDisplayedByUserB,
+			a.CurAfterOwnedCount,
+			a.CurAfterContractID,
+			a.PagingForward,
+			a.Limit,
+		}
+		batch.Queue(getSharedContractsBatchPaginate, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &GetSharedContractsBatchPaginateBatchResults{br, len(arg), false}
+}
+
+func (b *GetSharedContractsBatchPaginateBatchResults) Query(f func(int, []GetSharedContractsBatchPaginateRow, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		var items []GetSharedContractsBatchPaginateRow
+		if b.closed {
+			if f != nil {
+				f(t, items, errors.New("batch already closed"))
+			}
+			continue
+		}
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetSharedContractsBatchPaginateRow
+				if err := rows.Scan(
+					&i.ID,
+					&i.Deleted,
+					&i.Version,
+					&i.CreatedAt,
+					&i.LastUpdated,
+					&i.Name,
+					&i.Symbol,
+					&i.Address,
+					&i.CreatorAddress,
+					&i.Chain,
+					&i.ProfileBannerUrl,
+					&i.ProfileImageUrl,
+					&i.BadgeUrl,
+					&i.Description,
+					&i.DisplayedByUserA,
+					&i.DisplayedByUserB,
+					&i.OwnedCount,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
+		if f != nil {
+			f(t, items, err)
+		}
+	}
+}
+
+func (b *GetSharedContractsBatchPaginateBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }

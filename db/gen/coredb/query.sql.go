@@ -147,6 +147,32 @@ func (q *Queries) CountOwnersByContractId(ctx context.Context, arg CountOwnersBy
 	return count, err
 }
 
+const countSharedContracts = `-- name: CountSharedContracts :one
+select count(*)
+from owned_contracts a, owned_contracts b, contracts
+left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
+where a.user_id = $1
+	and b.user_id = $2
+	and a.contract_id = b.contract_id
+	and a.contract_id = contracts.id
+  and marketplace_contracts.contract_id is null
+  and contracts.name is not null
+  and contracts.name != ''
+  and contracts.name != 'Unidentified contract'
+`
+
+type CountSharedContractsParams struct {
+	UserAID persist.DBID
+	UserBID persist.DBID
+}
+
+func (q *Queries) CountSharedContracts(ctx context.Context, arg CountSharedContractsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countSharedContracts, arg.UserAID, arg.UserBID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSharedFollows = `-- name: CountSharedFollows :one
 select count(*)
 from users, follows a, follows b

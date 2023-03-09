@@ -165,6 +165,10 @@ type LegacyView struct {
 	Deleted     sql.NullBool
 }
 
+type MarketplaceContract struct {
+	ContractID persist.DBID
+}
+
 type Membership struct {
 	ID          persist.DBID
 	Deleted     bool
@@ -216,6 +220,14 @@ type Notification struct {
 	GalleryID   persist.DBID
 	Seen        bool
 	Amount      int32
+}
+
+type OwnedContract struct {
+	UserID      persist.DBID
+	ContractID  persist.DBID
+	OwnedCount  int64
+	Displayed   bool
+	LastUpdated time.Time
 }
 
 type PiiForUser struct {
