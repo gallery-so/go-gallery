@@ -941,14 +941,14 @@ select contracts.*, a.displayed as displayed_by_user_a, b.displayed as displayed
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = @user_a_id
-	and b.user_id = @user_b_id
-	and a.contract_id = b.contract_id
-	and a.contract_id = contracts.id
+  and b.user_id = @user_b_id
+  and a.contract_id = b.contract_id
+  and a.contract_id = contracts.id
   and marketplace_contracts.contract_id is null
   and contracts.name is not null
   and contracts.name != ''
   and contracts.name != 'Unidentified contract'
-	and (
+  and (
     a.displayed,
     b.displayed,
     a.owned_count,
@@ -959,7 +959,7 @@ where a.user_id = @user_a_id
     sqlc.arg('cur_before_owned_count')::int,
     sqlc.arg('cur_before_contract_id')
   )
-	and (
+  and (
     a.displayed,
     b.displayed,
     a.owned_count,
@@ -979,9 +979,9 @@ select count(*)
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = @user_a_id
-	and b.user_id = @user_b_id
-	and a.contract_id = b.contract_id
-	and a.contract_id = contracts.id
+  and b.user_id = @user_b_id
+  and a.contract_id = b.contract_id
+  and a.contract_id = contracts.id
   and marketplace_contracts.contract_id is null
   and contracts.name is not null
   and contracts.name != ''
