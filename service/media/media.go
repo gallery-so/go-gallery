@@ -1035,9 +1035,17 @@ func getMediaDimensions(url string) (persist.Dimensions, error) {
 		return persist.Dimensions{}, errNoStreams{url: url}
 	}
 
-	dims := persist.Dimensions{
-		Width:  d.Streams[0].Width,
-		Height: d.Streams[0].Height,
+	dims := persist.Dimensions{}
+
+	for _, s := range d.Streams {
+		if s.Height == 0 || s.Width == 0 {
+			continue
+		}
+		dims = persist.Dimensions{
+			Width:  s.Width,
+			Height: s.Height,
+		}
+		break
 	}
 
 	logger.For(nil).Debugf("got dimensions %+v for %s", dims, url)

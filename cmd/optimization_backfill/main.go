@@ -12,7 +12,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -42,7 +42,8 @@ func main() {
 	ctx := context.Background()
 	pg := postgres.NewPgxClient()
 	stg := media.NewStorageClient(ctx)
-	ffMu := &sync.Mutex{}
+
+	ffWp := workerpool.New(10)
 
 	rows, err := pg.Query(ctx, `select tokens.id, tokens.media, contracts.address, tokens.token_id from tokens join contracts on contracts.id = tokens.contract where tokens.deleted = false and tokens.media is not null and not tokens.media->>'media_type' = '' and not tokens.media->>'media_url' = '' and not tokens.media->>'media_type' = 'unknown' and not tokens.media->>'media_type' = 'invalid' order by tokens.last_updated desc;`)
 	if err != nil {
@@ -52,7 +53,7 @@ func main() {
 
 	results := make(chan updateTokenMedia)
 
-	wp := workerpool.New(50)
+	wp := workerpool.New(100)
 	for rows.Next() {
 		var tokenDBID persist.DBID
 		var media persist.Media
@@ -80,6 +81,9 @@ func main() {
 		}
 
 		wp.Submit(func() {
+
+			var liveRenderChan chan persist.NullString
+
 			logger.For(nil).Infof("processing %s (%s %s-%s)", media.MediaURL, tokenDBID, contractAddress, tokenID)
 			switch media.MediaType {
 			case persist.MediaTypeSVG:
@@ -98,25 +102,39 @@ func main() {
 				media.Dimensions = dims
 
 			case persist.MediaTypeVideo:
-				if strings.HasSuffix(media.MediaURL.String(), "https://storage.googleapis.com") {
-					name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
-					func() {
-						ffMu.Lock()
-						defer ffMu.Unlock()
-						err := createLiveRenderAndCache(ctx, media.MediaURL.String(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name, stg)
+
+				name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
+				liveRenderChan = make(chan persist.NullString)
+
+				ffWp.Submit(func() {
+					timeoutContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+					defer cancel()
+					liveRenderChan <- func() persist.NullString {
+						err := createLiveRenderAndCache(timeoutContext, media.MediaURL.String(), viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name, stg)
 						if err != nil {
 							logger.For(nil).Errorf("failed to create live render for %s: %s", media.MediaURL, err)
+							return persist.NullString("")
 						}
+						return persist.NullString(fmt.Sprintf("https://storage.googleapis.com/%s/liverender-%s", viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), name))
 					}()
-				}
+				})
+
+				media.LivePreviewURL = <-liveRenderChan
+				logger.For(nil).Infof("created live render for %s: %s", media.MediaURL, media.LivePreviewURL)
+
 				fallthrough
 			default:
-				dims, err := getMediaDimensions(media.MediaURL.String())
-				if err != nil {
-					logger.For(nil).Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
-					return
-				}
-				media.Dimensions = dims
+
+				func() {
+					timeoutContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+					defer cancel()
+					dims, err := getMediaDimensions(timeoutContext, media.MediaURL.String())
+					if err != nil {
+						logger.For(nil).Errorf("failed to get dimensions for %s: %s", media.MediaURL, err)
+						return
+					}
+					media.Dimensions = dims
+				}()
 			}
 
 			logger.For(nil).Infof("got dimensions for %s (%s %s-%s): %+v", media.MediaURL, tokenDBID, contractAddress, tokenID, media.Dimensions)
@@ -131,7 +149,15 @@ func main() {
 		})
 	}
 
+	go func() {
+		defer close(results)
+
+		wp.StopWait()
+	}()
+
 	updateWp := workerpool.New(100)
+
+	errCount := &atomic.Uint32{}
 
 	for result := range results {
 		up := result
@@ -144,13 +170,17 @@ func main() {
 			_, err := pg.Exec(ctx, `update tokens set media = $1 where id = $2;`, up.Media, up.TokenDBID)
 			if err != nil {
 				logger.For(nil).Errorf("failed to update token %s: %s", up.TokenDBID, err)
+				errCount.Add(1)
+			}
+
+			if errCount.Load() > 1000 {
+				panic("too many errors")
 			}
 
 			logger.For(nil).Infof("updated %s (%s)", up.Media.MediaURL, up.TokenDBID)
 		})
 	}
 
-	wp.StopWait()
 	updateWp.StopWait()
 }
 
@@ -184,9 +214,9 @@ type dimensions struct {
 	} `json:"streams"`
 }
 
-func getMediaDimensions(url string) (persist.Dimensions, error) {
+func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
 	outBuf := &bytes.Buffer{}
-	c := exec.Command("ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
+	c := exec.CommandContext(ctx, "ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
 	c.Stderr = os.Stderr
 	c.Stdout = outBuf
 	err := c.Run()
@@ -204,9 +234,17 @@ func getMediaDimensions(url string) (persist.Dimensions, error) {
 		return persist.Dimensions{}, fmt.Errorf("no streams found in ffprobe output: %w", err)
 	}
 
-	dims := persist.Dimensions{
-		Width:  d.Streams[0].Width,
-		Height: d.Streams[0].Height,
+	dims := persist.Dimensions{}
+
+	for _, s := range d.Streams {
+		if s.Height == 0 || s.Width == 0 {
+			continue
+		}
+		dims = persist.Dimensions{
+			Width:  s.Width,
+			Height: s.Height,
+		}
+		break
 	}
 
 	logger.For(nil).Debugf("got dimensions %+v for %s", dims, url)
@@ -346,7 +384,7 @@ func createLiveRenderAndCache(ctx context.Context, videoURL, bucket, name string
 	sw := newObjectWriter(ctx, client, bucket, fileName, "video/mp4")
 
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
-	if err := createLiveRenderPreviewVideo(videoURL, sw); err != nil {
+	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
 		return fmt.Errorf("could not write to bucket %s for '%s': %s", bucket, fileName, err)
 	}
 
@@ -359,8 +397,8 @@ func createLiveRenderAndCache(ctx context.Context, videoURL, bucket, name string
 	return nil
 }
 
-func createLiveRenderPreviewVideo(videoURL string, writer io.Writer) error {
-	c := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1", "</dev/null")
+func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
+	c := exec.CommandContext(ctx, "ffmpeg", "-timeout", "30", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
