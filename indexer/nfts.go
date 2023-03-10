@@ -204,7 +204,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 				return
 			}
 			if newURI == "" {
-				util.ErrResponse(c, http.StatusNotFound, errNoMetadataFound{contract: input.ContractAddress, tokenID: input.TokenID})
+				util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 				return
 			}
 		}
@@ -230,7 +230,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 		}
 
 		if newMetadata == nil || len(newMetadata) == 0 {
-			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{contract: input.ContractAddress, tokenID: input.TokenID})
+			util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 			return
 		}
 
