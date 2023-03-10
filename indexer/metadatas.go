@@ -44,12 +44,12 @@ type uniqueMetadataHandler func(context.Context, persist.TokenURI, persist.Ether
 type uniqueMetadatas map[persist.EthereumAddress]uniqueMetadataHandler
 
 type errNoMetadataFound struct {
-	contract persist.EthereumAddress
-	tokenID  persist.TokenID
+	Contract persist.EthereumAddress `json:"contract"`
+	TokenID  persist.TokenID         `json:"tokenID"`
 }
 
 func (e errNoMetadataFound) Error() string {
-	return fmt.Sprintf("no metadata found for contract %s and tokenID %s", e.contract, e.tokenID)
+	return fmt.Sprintf("no metadata found for contract %s and tokenID %s", e.Contract, e.TokenID)
 }
 
 /**
