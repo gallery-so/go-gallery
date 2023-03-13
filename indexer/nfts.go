@@ -92,6 +92,7 @@ type getTokensInput struct {
 type getTokenMetadataInput struct {
 	TokenID         persist.TokenID         `form:"token_id" binding:"required"`
 	ContractAddress persist.EthereumAddress `form:"contract_address" binding:"required"`
+	OwnerAddress    persist.EthereumAddress `form:"address"`
 }
 
 // GetTokensOutput is the response of the get tokens handler
@@ -178,13 +179,20 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 		curTokens, err := nftRepository.GetByTokenIdentifiers(ctx, input.TokenID, input.ContractAddress, -1, 0)
 		if err != nil {
-			util.ErrResponse(c, http.StatusInternalServerError, err)
-			return
+			if _, ok := err.(persist.ErrTokenNotFoundByTokenIdentifiers); !ok {
+				util.ErrResponse(c, http.StatusInternalServerError, err)
+				return
+			}
 		}
 
-		if len(curTokens) == 0 {
-			util.ErrResponse(c, http.StatusNotFound, util.ErrInvalidInput{Reason: "token not found"})
-			return
+		if len(curTokens) == 0 && input.OwnerAddress != "" {
+			t, err := manuallyIndexToken(c, input.TokenID, input.ContractAddress, input.OwnerAddress, ethClient, nftRepository)
+			if err != nil {
+				logger.For(ctx).Error("error manually indexing token", err)
+			} else {
+				logger.For(ctx).Infof("manually indexed token: %s-%s (token type: %s)", input.ContractAddress, input.TokenID, t.TokenType)
+				curTokens = []persist.Token{t}
+			}
 		}
 
 		firstWithValidTokenURI, ok := util.FindFirst(curTokens, func(t persist.Token) bool {
@@ -197,7 +205,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 		newURI := firstWithValidTokenURI.TokenURI
 
-		if !ok {
+		if !ok || newURI == "" {
 			newURI, err = rpc.GetTokenURI(ctx, firstWithValidTokenType.TokenType, input.ContractAddress, input.TokenID, ethClient)
 			if err != nil {
 				util.ErrResponse(c, http.StatusInternalServerError, err)

@@ -820,7 +820,15 @@ func GetTokenURI(ctx context.Context, pTokenType persist.TokenType, pContractAdd
 		return persist.TokenURI(strings.ReplaceAll(turi, "\x00", "")), nil
 
 	default:
-		return "", fmt.Errorf("unknown token type: %s", pTokenType)
+		if tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC721, pContractAddress, pTokenID, ethClient); err == nil {
+			return tokenURI, nil
+		}
+
+		if tokenURI, err := GetTokenURI(ctx, persist.TokenTypeERC1155, pContractAddress, pTokenID, ethClient); err == nil {
+			return tokenURI, nil
+		}
+
+		return "", fmt.Errorf("unsupported token type: %s", pTokenType)
 	}
 }
 

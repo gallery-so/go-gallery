@@ -13,7 +13,7 @@ import (
 
 func handlersInitServer(router *gin.Engine, mc *multichain.Provider, repos *postgres.Repositories, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) *gin.Engine {
 	mediaGroup := router.Group("/media")
-	mediaGroup.POST("/process", processMediaForUsersTokensOfChain(mc, repos.TokenRepository, repos.ContractRepository, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, throttler))
+	mediaGroup.POST("/process", processMediaForUsersTokensOfChain(mc, repos.TokenRepository, repos.ContractRepository, repos.WalletRepository, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, throttler))
 	mediaGroup.POST("/process/token", processMediaForToken(mc, repos.TokenRepository, repos.UserRepository, repos.WalletRepository, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, throttler))
 	ownersGroup := router.Group("/owners")
 	ownersGroup.POST("/process/contract", processOwnersForContractTokens(mc, repos.ContractRepository, throttler))

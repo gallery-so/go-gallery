@@ -239,6 +239,24 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 	return multichain.ChainAgnosticToken{}, multichain.ChainAgnosticContract{}, fmt.Errorf("no tokens found for %s", ti)
 }
 
+// GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+	assetsChan := make(chan assetsReceieved)
+	go func() {
+		defer close(assetsChan)
+		FetchAssets(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
+	}()
+	tokens, _, err := assetsToTokens(ctx, "", assetsChan, d.ethClient)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tokens) > 0 {
+		return tokens[0].TokenMetadata, nil
+	}
+	return nil, fmt.Errorf("no tokens found for %s", ti)
+}
+
 // GetContractByAddress returns a contract for a contract address
 func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Address) (multichain.ChainAgnosticContract, error) {
 	c, err := FetchContractByAddress(ctx, persist.EthereumAddress(contract), 0)

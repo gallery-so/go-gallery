@@ -262,7 +262,7 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 
 	res = remapMedia(res)
 
-	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
+	res.Dimensions, err = getMediaDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
 	}
@@ -306,7 +306,7 @@ func getGIFMedia(pCtx context.Context, name, tokenBucket string, storageClient *
 
 	res = remapMedia(res)
 
-	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
+	res.Dimensions, err = getMediaDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
 	}
@@ -441,7 +441,7 @@ func getImageMedia(pCtx context.Context, name, tokenBucket string, storageClient
 
 	res = remapMedia(res)
 
-	res.Dimensions, err = getMediaDimensions(res.MediaURL.String())
+	res.Dimensions, err = getMediaDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
 	}
@@ -539,7 +539,7 @@ func getRawMedia(pCtx context.Context, mediaType persist.MediaType, name, vURL, 
 
 	res = remapMedia(res)
 
-	dimensions, err := getMediaDimensions(res.MediaURL.String())
+	dimensions, err := getMediaDimensions(pCtx, res.MediaURL.String())
 	if err != nil {
 		logger.For(pCtx).Errorf("failed to get dimensions for %s: %v", name, err)
 	}
@@ -857,7 +857,7 @@ outer:
 		}
 
 		if err := createLiveRenderAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
-			return mediaType, false, err
+			logger.For(pCtx).Warnf("could not create live render for %s: %s", name, err)
 		}
 
 		logger.For(pCtx).Infof("cached video and thumbnail for %s in %s", name, time.Since(timeBeforeCache))
@@ -1015,9 +1015,9 @@ func (e errNoStreams) Error() string {
 	return fmt.Sprintf("no streams in %s: %s", e.url, e.err)
 }
 
-func getMediaDimensions(url string) (persist.Dimensions, error) {
+func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, error) {
 	outBuf := &bytes.Buffer{}
-	c := exec.Command("ffprobe", "-show_streams", url, "-print_format", "json")
+	c := exec.CommandContext(ctx, "ffprobe", "-hide_banner", "-loglevel", "error", "-show_streams", url, "-print_format", "json")
 	c.Stderr = os.Stderr
 	c.Stdout = outBuf
 	err := c.Run()
@@ -1028,11 +1028,11 @@ func getMediaDimensions(url string) (persist.Dimensions, error) {
 	var d dimensions
 	err = json.Unmarshal(outBuf.Bytes(), &d)
 	if err != nil {
-		return persist.Dimensions{}, errNoStreams{url: url, err: err}
+		return persist.Dimensions{}, fmt.Errorf("failed to unmarshal ffprobe output: %w", err)
 	}
 
 	if len(d.Streams) == 0 {
-		return persist.Dimensions{}, errNoStreams{url: url}
+		return persist.Dimensions{}, fmt.Errorf("no streams found in ffprobe output: %w", err)
 	}
 
 	dims := persist.Dimensions{}
@@ -1048,7 +1048,7 @@ func getMediaDimensions(url string) (persist.Dimensions, error) {
 		break
 	}
 
-	logger.For(nil).Debugf("got dimensions %+v for %s", dims, url)
+	logrus.Debugf("got dimensions %+v for %s", dims, url)
 	return dims, nil
 }
 
