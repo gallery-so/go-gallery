@@ -33,7 +33,7 @@ type ProcessMediaForTokenInput struct {
 	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
 }
 
-func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
+func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input task.TokenProcessingUserMessage
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -65,7 +65,7 @@ func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postg
 			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
 				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
-				err := processToken(ctx, key, t, contract.Address, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords)
+				err := processToken(ctx, key, t, contract.Address, "", mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords)
 				if err != nil {
 					logger.For(c).Errorf("Error processing token: %s", err)
 				}
@@ -113,7 +113,7 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 			return
 		}
 
-		err = processToken(ctx, key, t, input.ContractAddress, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+		err = processToken(ctx, key, t, input.ContractAddress, input.OwnerAddress, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -123,7 +123,7 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 	}
 }
 
-func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
 	ctx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
@@ -137,7 +137,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 
 	newMetadata := t.TokenMetadata
 
-	mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, t.TokenID, t.Chain)
+	mcMetadata, err := mc.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, t.TokenID, ownerAddress, t.Chain)
 	if err != nil {
 		logger.For(ctx).Errorf("error getting metadata from chain: %s", err)
 	} else if mcMetadata != nil && len(mcMetadata) > 0 {

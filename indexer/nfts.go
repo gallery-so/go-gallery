@@ -183,7 +183,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			return
 		}
 
-		if len(curTokens) == 0 {
+		if len(curTokens) == 0 && input.OwnerAddress != "" {
 			t, err := manuallyIndexToken(c, input.TokenID, input.ContractAddress, input.OwnerAddress, ethClient, nftRepository)
 			if err != nil {
 				logger.For(ctx).Error(ctx, "error manually indexing token", err)
