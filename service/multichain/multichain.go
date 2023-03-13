@@ -186,7 +186,7 @@ type deepRefresher interface {
 
 // tokenMetadataFetcher supports fetching token metadata
 type tokenMetadataFetcher interface {
-	GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID) (persist.TokenMetadata, error)
+	GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error)
 }
 
 type ChainOverrideMap = map[persist.Chain]*persist.Chain
@@ -621,7 +621,7 @@ func (p *Provider) GetTokensOfContractForWallet(ctx context.Context, contractAdd
 }
 
 // GetTokenMetadataByTokenIdentifiers will get the metadata for a given token identifier
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, chain persist.Chain) (persist.TokenMetadata, error) {
+func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contractAddress persist.Address, tokenID persist.TokenID, ownerAddress persist.Address, chain persist.Chain) (persist.TokenMetadata, error) {
 	if _, ok := d.Chains[chain]; !ok {
 		return nil, nil
 	}
@@ -629,7 +629,7 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 	for _, provider := range d.Chains[chain] {
 
 		if metadataFetcher, ok := provider.(tokenMetadataFetcher); ok {
-			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, contractAddress, tokenID)
+			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
 			if err != nil {
 				return nil, err
 			}
