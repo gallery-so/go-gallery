@@ -857,7 +857,7 @@ outer:
 		}
 
 		if err := createLiveRenderAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
-			return mediaType, false, err
+			logger.For(pCtx).Warnf("could not create live render for %s: %s", name, err)
 		}
 
 		logger.For(pCtx).Infof("cached video and thumbnail for %s in %s", name, time.Since(timeBeforeCache))
