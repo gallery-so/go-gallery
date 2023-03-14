@@ -152,9 +152,9 @@ select count(*)
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = $1
-	and b.user_id = $2
-	and a.contract_id = b.contract_id
-	and a.contract_id = contracts.id
+  and b.user_id = $2
+  and a.contract_id = b.contract_id
+  and a.contract_id = contracts.id
   and marketplace_contracts.contract_id is null
   and contracts.name is not null
   and contracts.name != ''

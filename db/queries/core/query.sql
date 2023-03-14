@@ -919,10 +919,10 @@ where a.follower = @follower
 	and a.deleted = false
 	and b.deleted = false
 	and users.deleted = false
-  and (a.created_at, users.id) < (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
-  and (a.created_at, users.id) > (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
-order by case when sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end asc,
-        case when not sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end desc
+  and (a.created_at, users.id) > (sqlc.arg('cur_before_time'), sqlc.arg('cur_before_id'))
+  and (a.created_at, users.id) < (sqlc.arg('cur_after_time'), sqlc.arg('cur_after_id'))
+order by case when sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end desc,
+        case when not sqlc.arg('paging_forward')::bool then (a.created_at, users.id) end asc
 limit sqlc.arg('limit');
 
 -- name: CountSharedFollows :one
@@ -953,7 +953,7 @@ where a.user_id = @user_a_id
     b.displayed,
     a.owned_count,
     contracts.id
-  ) < (
+  ) > (
     sqlc.arg('cur_before_displayed_by_user_a'),
     sqlc.arg('cur_before_displayed_by_user_b'),
     sqlc.arg('cur_before_owned_count')::int,
@@ -964,14 +964,14 @@ where a.user_id = @user_a_id
     b.displayed,
     a.owned_count,
     contracts.id
-  ) > (
+  ) < (
     sqlc.arg('cur_after_displayed_by_user_a'),
     sqlc.arg('cur_after_displayed_by_user_b'),
     sqlc.arg('cur_after_owned_count')::int,
     sqlc.arg('cur_after_contract_id')
   )
-order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc,
-        case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc
+order by case when sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc,
+        case when not sqlc.arg('paging_forward')::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
 limit sqlc.arg('limit');
 
 -- name: CountSharedContracts :one
