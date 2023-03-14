@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
@@ -1176,13 +1175,8 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			// If we've never seen the incoming token before, then add it.
 			if !seen {
 				seenTokens[ti] = candidateToken
-			} else {
-				// If the candidate token has usable media, then replace the existing token.
-				// We only use the token if there is a way to regenerate the media from the metadata it has.
-				hasMediaLinks := hasMediaURLs(ctx, chainToken.chain, token)
-				if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() && hasMediaLinks {
-					seenTokens[ti] = candidateToken
-				}
+			} else if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() {
+				seenTokens[ti] = candidateToken
 			}
 
 			var found bool
@@ -1358,15 +1352,4 @@ func dedupeWallets(wallets []persist.Wallet) []persist.Wallet {
 	}
 
 	return ret
-}
-
-func findTokenMediaURLs(ctx context.Context, chain persist.Chain, token ChainAgnosticToken) (string, string) {
-	imageKeys, animationKeys := chain.BaseKeywords()
-	imageKeywords, animationKeywords := media.KeywordsForChain(chain, imageKeys, animationKeys)
-	return media.FindImageAndAnimationURLs(ctx, token.TokenID, token.ContractAddress, token.TokenMetadata, "", animationKeywords, imageKeywords, false)
-}
-
-func hasMediaURLs(ctx context.Context, chain persist.Chain, token ChainAgnosticToken) bool {
-	imageURL, animationURL := findTokenMediaURLs(ctx, chain, token)
-	return len(imageURL) > 0 || len(animationURL) > 0
 }

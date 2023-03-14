@@ -300,11 +300,11 @@ func loadFromFile(path string) (*bloom.BloomFilter, error) {
 	}
 
 	f, err := os.Open(path)
-	defer f.Close()
-
 	if err != nil {
 		return nil, err
 	}
+
+	defer f.Close()
 
 	var bf bloom.BloomFilter
 	bf.ReadFrom(f)

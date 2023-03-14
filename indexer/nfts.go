@@ -430,7 +430,7 @@ func validateNFTs(c context.Context, input ValidateWalletNFTsInput, tokenReposit
 		output.Message += newMsg
 	}
 
-	openseaAssets, err := opensea.FetchAssetsForWallet(c, input.Wallet, "", 0, nil)
+	openseaAssets, err := opensea.FetchAssetsForWallet(c, input.Wallet)
 	if err != nil {
 		return ValidateUsersNFTsOutput{}, err
 	}
