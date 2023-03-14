@@ -410,6 +410,17 @@ func (i *indexer) checkTokensExistForLogs(ctx context.Context, logs []types.Log)
 				return
 			}
 			for _, ti := range tis {
+				if ti.tokenType == persist.TokenTypeERC1155 {
+					balance, err := rpc.GetBalanceOfERC1155Token(ctx, ti.ownerAddress, ti.contractAddress, ti.tokenID, i.ethClient)
+					if err != nil {
+						logger.For(ctx).Errorf("error getting balance of ERC1155 token: %s", err)
+						return
+					}
+					if balance.Cmp(big.NewInt(0)) == 0 {
+						logger.For(ctx).Errorf("balance of ERC1155 token is 0, skipping check")
+						return
+					}
+				}
 				exists, err := i.tokenRepo.TokenExistsByTokenIdentifiers(ctx, ti.tokenID, ti.contractAddress)
 				if err != nil {
 					logger.For(ctx).Errorf("error checking if token exists: %s", err)
@@ -428,7 +439,12 @@ func (i *indexer) checkTokensExistForLogs(ctx context.Context, logs []types.Log)
 	}()
 
 	for log := range doesNotExist {
-		logger.For(ctx).Errorf("token does not exist for log: %v", log)
+		marshalled, err := json.Marshal(log)
+		if err != nil {
+			panic(err)
+		}
+
+		logger.For(ctx).Errorf("token does not exist for log: %s", marshalled)
 	}
 
 }
@@ -461,6 +477,7 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 	}
 
 	logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock.Uint64())
+
 	return logsTo
 }
 
@@ -515,6 +532,7 @@ func (i *indexer) processLogs(ctx context.Context, transfersChan chan<- []transf
 	defer close(transfersChan)
 	defer recoverAndWait(ctx)
 	defer sentryutil.RecoverAndRaise(ctx)
+
 	transfers := logsToTransfers(ctx, logsTo)
 
 	logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
@@ -544,6 +562,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 				TokenType:       persist.TokenTypeERC721,
 				TxHash:          pLog.TxHash,
 				BlockHash:       pLog.BlockHash,
+				TxIndex:         pLog.TxIndex,
 			})
 
 			logger.For(ctx).Debugf("Processed transfer event in %s", time.Since(initial))
@@ -579,6 +598,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 				TokenType:       persist.TokenTypeERC1155,
 				TxHash:          pLog.TxHash,
 				BlockHash:       pLog.BlockHash,
+				TxIndex:         pLog.TxIndex,
 			})
 			logger.For(ctx).Debugf("Processed single transfer event in %s", time.Since(initial))
 		case strings.EqualFold(pLog.Topics[0].Hex(), string(transferBatchEventHash)):
@@ -615,6 +635,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 					BlockNumber:     persist.BlockNumber(pLog.BlockNumber),
 					TxHash:          pLog.TxHash,
 					BlockHash:       pLog.BlockHash,
+					TxIndex:         pLog.TxIndex,
 				})
 			}
 			logger.For(ctx).Debugf("Processed batch event in %s", time.Since(initial))
@@ -632,6 +653,7 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 type tokenIdentifiers struct {
 	tokenID         persist.TokenID
 	contractAddress persist.EthereumAddress
+	ownerAddress    persist.EthereumAddress
 	tokenType       persist.TokenType
 }
 
@@ -648,6 +670,7 @@ func getTokenIdentifiersFromLog(ctx context.Context, log types.Log) ([]tokenIden
 		ti := tokenIdentifiers{
 			tokenID:         persist.TokenID(log.Topics[3].Hex()),
 			contractAddress: persist.EthereumAddress(log.Address.Hex()),
+			ownerAddress:    persist.EthereumAddress(log.Topics[2].Hex()),
 			tokenType:       persist.TokenTypeERC721,
 		}
 
@@ -672,6 +695,7 @@ func getTokenIdentifiersFromLog(ctx context.Context, log types.Log) ([]tokenIden
 		ti := tokenIdentifiers{
 			tokenID:         persist.TokenID(id.Text(16)),
 			contractAddress: persist.EthereumAddress(log.Address.Hex()),
+			ownerAddress:    persist.EthereumAddress(log.Topics[3].Hex()),
 			tokenType:       persist.TokenTypeERC1155,
 		}
 
@@ -699,6 +723,7 @@ func getTokenIdentifiersFromLog(ctx context.Context, log types.Log) ([]tokenIden
 			ti := tokenIdentifiers{
 				tokenID:         persist.TokenID(ids[j].Text(16)),
 				contractAddress: persist.EthereumAddress(log.Address.Hex()),
+				ownerAddress:    persist.EthereumAddress(log.Topics[3].Hex()),
 				tokenType:       persist.TokenTypeERC1155,
 			}
 
@@ -829,6 +854,7 @@ func (i *indexer) processTransfers(ctx context.Context, transfers []transfersAtB
 
 	for _, transferAtBlock := range transfers {
 		for _, transfer := range transferAtBlock.transfers {
+
 			initial := time.Now()
 			contractAddress := persist.EthereumAddress(transfer.ContractAddress.String())
 			from := transfer.From
@@ -1056,6 +1082,7 @@ func (i *indexer) fieldMapsToTokens(ctx context.Context,
 			logger.For(ctx).WithError(err).Errorf("error getting parts from %s: - %s | val: %+v", k, err, v)
 			continue
 		}
+
 		previousOwnerAddresses := make([]persist.EthereumAddressAtBlock, len(previousOwners[k].owners))
 		for i, w := range previousOwners[k].owners {
 			previousOwnerAddresses[i] = persist.EthereumAddressAtBlock{Address: w.owner, Block: w.boi.blockNumber}
