@@ -1,7 +1,6 @@
 package opensea
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -26,11 +25,12 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
+	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
-var openseaURL, _ = url.Parse("https://api.opensea.io/api/v1/assets")
+var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")
 
 var eip1271MagicValue = [4]byte{0x16, 0x26, 0xBA, 0x7E}
 
@@ -39,7 +39,7 @@ type Provider struct {
 	ethClient  *ethclient.Client
 }
 
-// TokenID represents a token ID from Opensea. It is separate from persist.TokenID becuase opensea returns token IDs in base 10 format instead of what we want, base 16
+// TokenID represents a token ID from Opensea. It is separate from persist.TokenID because opensea returns token IDs in base 10 format instead of what we want, base 16
 type TokenID string
 
 // Assets is a list of NFTs from OpenSea
@@ -113,8 +113,9 @@ type Order struct {
 
 // Collection is a collection from OpenSea
 type Collection struct {
-	Name          string                  `json:"name"`
-	PayoutAddress persist.EthereumAddress `json:"payout_address"`
+	Name                  string                  `json:"name"`
+	PayoutAddress         persist.EthereumAddress `json:"payout_address"`
+	PrimaryAssetContracts []Contract              `json:"primary_asset_contracts"`
 }
 
 // Contract represents an NFT contract from Opensea
@@ -159,7 +160,7 @@ func (p *Provider) GetTokensByWalletAddress(ctx context.Context, address persist
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		FetchAssets(ctx, assetsChan, persist.EthereumAddress(address.String()), "", "", "", 0, nil)
+		streamAssetsForWallet(ctx, assetsChan, persist.EthereumAddress(address))
 	}()
 
 	return assetsToTokens(ctx, address, assetsChan, p.ethClient)
@@ -170,7 +171,7 @@ func (p *Provider) GetTokensByContractAddress(ctx context.Context, address persi
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(address), "", "", 0, nil)
+		streamAssetsForContract(ctx, assetsChan, persist.EthereumAddress(address))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -188,7 +189,7 @@ func (p *Provider) GetTokensByContractAddressAndOwner(ctx context.Context, owner
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		FetchAssets(ctx, assetsChan, persist.EthereumAddress(owner), persist.EthereumAddress(address), "", "", 0, nil)
+		streamAssetsForContractAddressAndOwner(ctx, assetsChan, persist.EthereumAddress(owner), persist.EthereumAddress(address))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -206,7 +207,7 @@ func (p *Provider) GetTokensByTokenIdentifiers(ctx context.Context, ti multichai
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		FetchAssets(ctx, assetsChan, "", persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
+		streamAssetsForTokenIdentifiers(ctx, assetsChan, persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -223,7 +224,7 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 	assetsChan := make(chan assetsReceieved)
 	go func() {
 		defer close(assetsChan)
-		FetchAssets(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
+		streamAssetsForTokenIdentifiersAndOwner(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()))
 	}()
 	tokens, contracts, err := assetsToTokens(ctx, "", assetsChan, p.ethClient)
 	if err != nil {
@@ -240,26 +241,17 @@ func (p *Provider) GetTokensByTokenIdentifiersAndOwner(ctx context.Context, ti m
 }
 
 // GetTokenMetadataByTokenIdentifiers retrieves a token's metadata for a given contract address and token ID
-func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
-	assetsChan := make(chan assetsReceieved)
-	go func() {
-		defer close(assetsChan)
-		FetchAssets(ctx, assetsChan, persist.EthereumAddress(ownerAddress), persist.EthereumAddress(ti.ContractAddress), TokenID(ti.TokenID.Base10String()), "", 0, nil)
-	}()
-	tokens, _, err := assetsToTokens(ctx, "", assetsChan, d.ethClient)
+func (p *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, ti multichain.ChainAgnosticIdentifiers, ownerAddress persist.Address) (persist.TokenMetadata, error) {
+	token, _, err := p.GetTokensByTokenIdentifiersAndOwner(ctx, ti, ownerAddress)
 	if err != nil {
 		return nil, err
 	}
-
-	if len(tokens) > 0 {
-		return tokens[0].TokenMetadata, nil
-	}
-	return nil, fmt.Errorf("no tokens found for %s", ti)
+	return token.TokenMetadata, nil
 }
 
 // GetContractByAddress returns a contract for a contract address
 func (p *Provider) GetContractByAddress(ctx context.Context, contract persist.Address) (multichain.ChainAgnosticContract, error) {
-	c, err := FetchContractByAddress(ctx, persist.EthereumAddress(contract), 0)
+	c, err := FetchContractByAddress(ctx, persist.EthereumAddress(contract))
 	if err != nil {
 		return multichain.ChainAgnosticContract{}, err
 	}
@@ -391,221 +383,182 @@ func verifySignature(pSignatureStr string,
 	default:
 		return false, errors.New("wallet type not supported")
 	}
-
 }
 
-// FetchAssetsForWallet recursively fetches all assets for a wallet
-func FetchAssetsForWallet(pCtx context.Context, pWalletAddress persist.EthereumAddress, pCursor string, retry int, alreadyReceived map[int]string) ([]Asset, error) {
-
-	if alreadyReceived == nil {
-		alreadyReceived = make(map[int]string)
-	}
-
-	result := []Asset{}
-
-	dir := "desc"
-
-	logger.For(pCtx).Debugf("Fetching assets for wallet %s with cursor %s, retry %d, dir %s,and alreadyReceived %d", pWalletAddress, pCursor, retry, dir, len(alreadyReceived))
-
-	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/assets?owner=%s&order_direction=%s&limit=%d", pWalletAddress, dir, 50)
-	if pCursor != "" {
-		urlStr = fmt.Sprintf("%s&cursor=%s", urlStr, pCursor)
-	}
-
-	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
+func FetchAssetsForWallet(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
+	collections, err := FetchCollectionsForAddress(ctx, address)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
 
-	resp, err := http.DefaultClient.Do(req)
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setOwner(url, address)
+	for _, collection := range collections {
+		for _, contract := range collection.PrimaryAssetContracts {
+			addContractAddress(url, contract.Address)
+		}
+	}
+
+	req, err := authRequest(ctx, url.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return paginateAssets(req)
+}
+
+func FetchAssetsForContract(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setContractAddress(url, address)
+
+	req, err := authRequest(ctx, url.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return paginateAssets(req)
+}
+
+func FetchAssetsForContractAddressAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress) ([]Asset, error) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setOwner(url, ownerAddress)
+	setContractAddress(url, contractAddress)
+
+	req, err := authRequest(ctx, url.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return paginateAssets(req)
+}
+
+func FetchAssetsForTokenIdentifiers(ctx context.Context, contractAddress persist.EthereumAddress, tokenID TokenID) ([]Asset, error) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setContractAddress(url, contractAddress)
+	setTokenID(url, tokenID)
+
+	req, err := authRequest(ctx, url.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return paginateAssets(req)
+}
+
+func FetchAssetsForTokenIdentifiersAndOwner(ctx context.Context, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID) ([]Asset, error) {
+	url := baseURL.JoinPath("assets")
+	setPagingParams(url)
+	setOwner(url, ownerAddress)
+	setContractAddress(url, contractAddress)
+	setTokenID(url, tokenID)
+
+	req, err := authRequest(ctx, url.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return paginateAssets(req)
+}
+
+// FetchCollectionsForAddress returns all collections that `address` has at least one token for
+func FetchCollectionsForAddress(ctx context.Context, address persist.EthereumAddress) ([]Collection, error) {
+	url := baseURL.JoinPath("collections")
+	setAssetOwner(url, address)
+
+	req, err := authRequest(ctx, url.String())
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := retry.RetryRequest(http.DefaultClient, req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		if resp.StatusCode == 429 {
-			if retry < 3 {
-				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				return FetchAssetsForWallet(pCtx, pWalletAddress, pCursor, retry+1, alreadyReceived)
-			}
-			return nil, fmt.Errorf("opensea api rate limit exceeded")
-		}
-		bs := new(bytes.Buffer)
-		_, err := bs.ReadFrom(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("unexpected status code: %d - %s", resp.StatusCode, bs.String())
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, util.BodyAsError(resp)
 	}
-	response := Assets{}
-	err = util.UnmarshallBody(&response, resp.Body)
+
+	collections := []Collection{}
+	err = util.UnmarshallBody(&collections, resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	nextCursor := response.Next
-
-	doneReceiving := false
-	for _, asset := range response.Assets {
-		if it, ok := alreadyReceived[asset.ID]; ok {
-			logger.For(pCtx).Debugf("response already received asset: %s", it)
-			doneReceiving = true
-			continue
-		}
-		result = append(result, asset)
-		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%s|len-%d|dir-%s", asset.ID, pCursor, len(result), dir)
-	}
-	if doneReceiving {
-		return result, nil
-	}
-	if len(response.Assets) == 50 {
-		next, err := FetchAssetsForWallet(pCtx, pWalletAddress, nextCursor, 0, alreadyReceived)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, next...)
-	}
-	return result, nil
-}
-
-// FetchAssets fetches assets by its token identifiers
-func FetchAssets(pCtx context.Context, assetsChan chan<- assetsReceieved, pWalletAddress, pContractAddress persist.EthereumAddress, pTokenID TokenID, pCursor string, retry int, alreadyReceived map[int]string) {
-
-	if alreadyReceived == nil {
-		alreadyReceived = make(map[int]string)
-	}
-	result := []Asset{}
-
-	dir := "desc"
-
-	url := *openseaURL
-	query := url.Query()
-	if pTokenID != "" {
-		query.Set("token_ids", string(pTokenID))
-	}
-	if pContractAddress != "" {
-		query.Set("asset_contract_address", string(pContractAddress))
-	}
-	if pWalletAddress != "" {
-		query.Set("owner", string(pWalletAddress))
-	}
-	query.Set("order_direction", dir)
-	query.Set("limit", "50")
-	if pCursor != "" {
-		query.Set("cursor", pCursor)
-	}
-
-	url.RawQuery = query.Encode()
-
-	urlStr := url.String()
-
-	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: fmt.Errorf("failed to create request for url: %s - %s", urlStr, err)}
-	}
-	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: fmt.Errorf("failed to fetch assets for wallet %s: %s - url %s", pWalletAddress, err, urlStr)}
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		if resp.StatusCode == 429 {
-			if retry < 3 {
-				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, pCursor, retry+1, alreadyReceived)
-				return
-			}
-			assetsChan <- assetsReceieved{err: fmt.Errorf("opensea api rate limit exceeded - url %s", urlStr)}
-			return
-		}
-		bs := new(bytes.Buffer)
-		_, err := bs.ReadFrom(resp.Body)
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-			return
-		}
-		assetsChan <- assetsReceieved{err: fmt.Errorf("unexpected status code for url %s: %d - %s", urlStr, resp.StatusCode, bs.String())}
-		return
-	}
-	response := Assets{}
-	err = util.UnmarshallBody(&response, resp.Body)
-	if err != nil {
-		assetsChan <- assetsReceieved{err: err}
-		return
-	}
-
-	nextCursor := response.Next
-
-	doneReceiving := false
-	for _, asset := range response.Assets {
-		if it, ok := alreadyReceived[asset.ID]; ok {
-			logger.For(pCtx).Debugf("response already received asset: %s", it)
-			doneReceiving = true
-			continue
-		}
-		result = append(result, asset)
-		alreadyReceived[asset.ID] = fmt.Sprintf("asset-%d|offset-%s|len-%d|dir-%s", asset.ID, pCursor, len(result), dir)
-	}
-
-	assetsChan <- assetsReceieved{assets: result}
-
-	if doneReceiving {
-		return
-	}
-
-	if len(response.Assets) == 50 {
-		FetchAssets(pCtx, assetsChan, pWalletAddress, pContractAddress, pTokenID, nextCursor, 0, alreadyReceived)
-		if err != nil {
-			assetsChan <- assetsReceieved{err: err}
-			return
-		}
-	}
+	return collections, nil
 }
 
 // FetchContractByAddress fetches a contract by address
-func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress, retry int) (Contract, error) {
+func FetchContractByAddress(pCtx context.Context, pContract persist.EthereumAddress) (Contract, error) {
+	url := baseURL.JoinPath("asset_contract")
 
-	logger.For(pCtx).Debugf("Fetching contract for address %s", pContract)
-
-	urlStr := fmt.Sprintf("https://api.opensea.io/api/v1/asset_contract/%s", pContract)
-
-	req, err := http.NewRequestWithContext(pCtx, "GET", urlStr, nil)
+	req, err := authRequest(pCtx, url.String())
 	if err != nil {
 		return Contract{}, err
 	}
-	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := retry.RetryRequest(http.DefaultClient, req)
 	if err != nil {
 		return Contract{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		if resp.StatusCode == 429 {
-			if retry < 3 {
-				time.Sleep(time.Second * 3 * time.Duration(retry+1))
-				return FetchContractByAddress(pCtx, pContract, retry+1)
-			}
-			return Contract{}, fmt.Errorf("opensea api rate limit exceeded")
-		}
-		bs := new(bytes.Buffer)
-		_, err := bs.ReadFrom(resp.Body)
-		if err != nil {
-			return Contract{}, err
-		}
-		return Contract{}, fmt.Errorf("unexpected status code: %d - %s", resp.StatusCode, bs.String())
+
+	if resp.StatusCode != http.StatusOK {
+		return Contract{}, util.BodyAsError(resp)
 	}
-	response := Contract{}
-	err = util.UnmarshallBody(&response, resp.Body)
+
+	contract := Contract{}
+	err = util.UnmarshallBody(&contract, resp.Body)
 	if err != nil {
 		return Contract{}, err
 	}
 
-	return response, nil
+	return contract, nil
+}
+
+func streamAssetsForWallet(ctx context.Context, assetsChan chan<- assetsReceieved, address persist.EthereumAddress) {
+	assets, err := FetchAssetsForWallet(ctx, address)
+	if err != nil {
+		assetsChan <- assetsReceieved{err: err}
+	}
+	assetsChan <- assetsReceieved{assets: assets}
+}
+
+func streamAssetsForContract(ctx context.Context, assetsChan chan<- assetsReceieved, address persist.EthereumAddress) {
+	assets, err := FetchAssetsForContract(ctx, address)
+	if err != nil {
+		assetsChan <- assetsReceieved{err: err}
+	}
+	assetsChan <- assetsReceieved{assets: assets}
+}
+
+func streamAssetsForContractAddressAndOwner(ctx context.Context, assetsChan chan<- assetsReceieved, ownerAddress, contractAddress persist.EthereumAddress) {
+	assets, err := FetchAssetsForContractAddressAndOwner(ctx, ownerAddress, contractAddress)
+	if err != nil {
+		assetsChan <- assetsReceieved{err: err}
+	}
+	assetsChan <- assetsReceieved{assets: assets}
+}
+
+func streamAssetsForTokenIdentifiers(ctx context.Context, assetsChan chan<- assetsReceieved, contractAddress persist.EthereumAddress, tokenID TokenID) {
+	assets, err := FetchAssetsForTokenIdentifiers(ctx, contractAddress, tokenID)
+	if err != nil {
+		assetsChan <- assetsReceieved{err: err}
+	}
+	assetsChan <- assetsReceieved{assets: assets}
+}
+
+func streamAssetsForTokenIdentifiersAndOwner(ctx context.Context, assetsChan chan<- assetsReceieved, ownerAddress, contractAddress persist.EthereumAddress, tokenID TokenID) {
+	assets, err := FetchAssetsForTokenIdentifiersAndOwner(ctx, ownerAddress, contractAddress, tokenID)
+	if err != nil {
+		assetsChan <- assetsReceieved{err: err}
+	}
+	assetsChan <- assetsReceieved{assets: assets}
 }
 
 func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsChan <-chan assetsReceieved, ethClient *ethclient.Client) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
@@ -780,4 +733,87 @@ func firstNonEmptyString(strs ...string) string {
 		}
 	}
 	return ""
+}
+
+// authRequest returns a http.Request with authorization headers
+func authRequest(ctx context.Context, url string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
+	return req, nil
+}
+
+func paginateAssets(req *http.Request) ([]Asset, error) {
+	result := make([]Asset, 0)
+	for {
+		resp, err := retry.RetryRequest(http.DefaultClient, req)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, util.BodyAsError(resp)
+		}
+
+		assets := Assets{}
+
+		err = util.UnmarshallBody(&assets, resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, asset := range assets.Assets {
+			result = append(result, asset)
+		}
+
+		// No more pages to paginate
+		if assets.Next == "" {
+			return result, nil
+		}
+
+		query := req.URL.Query()
+		query.Set("cursor", assets.Next)
+		req.URL.RawQuery = query.Encode()
+	}
+}
+
+func setPagingParams(url *url.URL) {
+	query := url.Query()
+	query.Set("order_direction", "desc")
+	query.Set("limit", "50")
+	url.RawQuery = query.Encode()
+}
+
+func setOwner(url *url.URL, address persist.EthereumAddress) {
+	query := url.Query()
+	query.Set("owner", address.String())
+	url.RawQuery = query.Encode()
+}
+
+func setAssetOwner(url *url.URL, address persist.EthereumAddress) {
+	query := url.Query()
+	query.Set("asset_owner", address.String())
+	url.RawQuery = query.Encode()
+}
+
+func setContractAddress(url *url.URL, address persist.EthereumAddress) {
+	query := url.Query()
+	query.Set("asset_contract_address", address.String())
+	url.RawQuery = query.Encode()
+}
+
+func addContractAddress(url *url.URL, address persist.EthereumAddress) {
+	query := url.Query()
+	query.Add("asset_contract_addresses", address.String())
+	url.RawQuery = query.Encode()
+}
+
+func setTokenID(url *url.URL, tokenID TokenID) {
+	query := url.Query()
+	query.Add("token_ids", string(tokenID))
+	url.RawQuery = query.Encode()
 }

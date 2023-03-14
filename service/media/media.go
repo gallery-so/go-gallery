@@ -231,7 +231,7 @@ func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, ar
 		case errGeneratingThumbnail:
 			resultCh <- cacheResult{mediaType, cached, err}
 		case *googleapi.Error:
-			panic(caught) // Bomb out if we can't access the bucket
+			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
 			logger.For(ctx).Error(err)
 			sentryutil.ReportError(ctx, err)
