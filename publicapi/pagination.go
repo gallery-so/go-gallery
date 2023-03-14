@@ -252,6 +252,64 @@ func (p *timeIDPaginator) paginate(before *string, after *string, first *int, la
 	return paginator.paginate(before, after, first, last)
 }
 
+type sharedFollowersPaginator struct{ timeIDPaginator }
+
+func (p *sharedFollowersPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
+	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
+		// The shared followers query orders results in descending order when
+		// paging forward (vs. ascending order which is more typical).
+		curBeforeTime := time.Date(1970, 1, 1, 1, 1, 1, 1, time.UTC)
+		curBeforeID := persist.DBID("")
+		curAfterTime := time.Date(3000, 1, 1, 1, 1, 1, 1, time.UTC)
+		curAfterID := persist.DBID("")
+
+		var err error
+		if before != nil {
+			curBeforeTime, curBeforeID, err = p.decodeCursor(*before)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if after != nil {
+			loc, _ := time.LoadLocation("UTC")
+			curAfterTime, curAfterID, err = p.decodeCursor(*after)
+			curAfterTime = curAfterTime.In(loc)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		queryParams := timeIDPagingParams{
+			Limit:            limit,
+			CursorBeforeTime: curBeforeTime,
+			CursorBeforeID:   curBeforeID,
+			CursorAfterTime:  curAfterTime,
+			CursorAfterID:    curAfterID,
+			PagingForward:    pagingForward,
+		}
+
+		return p.QueryFunc(queryParams)
+	}
+
+	cursorFunc := func(node interface{}) (string, error) {
+		nodeTime, nodeID, err := p.CursorFunc(node)
+		if err != nil {
+			return "", err
+		}
+
+		return p.encodeCursor(nodeTime, nodeID)
+	}
+
+	paginator := keysetPaginator{
+		QueryFunc:  queryFunc,
+		CursorFunc: cursorFunc,
+		CountFunc:  p.CountFunc,
+	}
+
+	return paginator.paginate(before, after, first, last)
+}
+
 type sharedContractsPaginatorParams struct {
 	Limit                        int32
 	CursorBeforeDisplayedByUserA bool
@@ -293,27 +351,27 @@ func (p *sharedContractsPaginator) encodeCursor(displayedA, displayedB bool, i i
 func (p *sharedContractsPaginator) decodeCursor(cursor string) (bool, bool, int, persist.DBID, error) {
 	decoder, err := newCursorDecoder(cursor)
 	if err != nil {
-		return false, false, 0, "", nil
+		return false, false, 0, "", err
 	}
 
 	displayedA, err := decoder.readBool()
 	if err != nil {
-		return false, false, 0, "", nil
+		return false, false, 0, "", err
 	}
 
 	displayedB, err := decoder.readBool()
 	if err != nil {
-		return false, false, 0, "", nil
+		return false, false, 0, "", err
 	}
 
 	ownedCount, err := decoder.readInt64()
 	if err != nil {
-		return false, false, 0, "", nil
+		return false, false, 0, "", err
 	}
 
 	contractID, err := decoder.readDBID()
 	if err != nil {
-		return false, false, 0, "", nil
+		return false, false, 0, "", err
 	}
 
 	return displayedA, displayedB, int(ownedCount), contractID, nil
@@ -321,13 +379,13 @@ func (p *sharedContractsPaginator) decodeCursor(cursor string) (bool, bool, int,
 
 func (p *sharedContractsPaginator) paginate(before *string, after *string, first *int, last *int) ([]interface{}, PageInfo, error) {
 	queryFunc := func(limit int32, pagingForward bool) ([]interface{}, error) {
-		cursorBeforeDisplayedByUserA := true
-		cursorBeforeDisplayedByUserB := true
-		cursorBeforeOwnedCount := math.MaxInt32
+		cursorBeforeDisplayedByUserA := false
+		cursorBeforeDisplayedByUserB := false
+		cursorBeforeOwnedCount := -1
 		cursorBeforeContractID := defaultCursorBeforeID
-		cursorAfterDisplayedByUserA := false
-		cursorAfterDisplayedByUserB := false
-		cursorAfterOwnedCount := -1
+		cursorAfterDisplayedByUserA := true
+		cursorAfterDisplayedByUserB := true
+		cursorAfterOwnedCount := math.MaxInt32
 		cursorAfterContractID := defaultCursorAfterID
 
 		var err error

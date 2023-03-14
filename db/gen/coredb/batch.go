@@ -1570,37 +1570,37 @@ select contracts.id, contracts.deleted, contracts.version, contracts.created_at,
 from owned_contracts a, owned_contracts b, contracts
 left join marketplace_contracts on contracts.id = marketplace_contracts.contract_id
 where a.user_id = $1
-	and b.user_id = $2
-	and a.contract_id = b.contract_id
-	and a.contract_id = contracts.id
+  and b.user_id = $2
+  and a.contract_id = b.contract_id
+  and a.contract_id = contracts.id
   and marketplace_contracts.contract_id is null
   and contracts.name is not null
   and contracts.name != ''
   and contracts.name != 'Unidentified contract'
-	and (
-    a.displayed,
-    b.displayed,
-    a.owned_count,
-    contracts.id
-  ) < (
-    $3,
-    $4,
-    $5::int,
-    $6
-  )
-	and (
+  and (
     a.displayed,
     b.displayed,
     a.owned_count,
     contracts.id
   ) > (
+    $3,
+    $4,
+    $5::int,
+    $6
+  )
+  and (
+    a.displayed,
+    b.displayed,
+    a.owned_count,
+    contracts.id
+  ) < (
     $7,
     $8,
     $9::int,
     $10
   )
-order by case when $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc,
-        case when not $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc
+order by case when $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end desc,
+        case when not $11::bool then (a.displayed, b.displayed, a.owned_count, contracts.id) end asc
 limit $12
 `
 
@@ -1732,10 +1732,10 @@ where a.follower = $1
 	and a.deleted = false
 	and b.deleted = false
 	and users.deleted = false
-  and (a.created_at, users.id) < ($3, $4)
-  and (a.created_at, users.id) > ($5, $6)
-order by case when $7::bool then (a.created_at, users.id) end asc,
-        case when not $7::bool then (a.created_at, users.id) end desc
+  and (a.created_at, users.id) > ($3, $4)
+  and (a.created_at, users.id) < ($5, $6)
+order by case when $7::bool then (a.created_at, users.id) end desc,
+        case when not $7::bool then (a.created_at, users.id) end asc
 limit $8
 `
 

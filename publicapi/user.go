@@ -674,10 +674,12 @@ func (api UserAPI) SharedFollowers(ctx context.Context, userID persist.DBID, bef
 		return time.Time{}, "", fmt.Errorf("node is not a db.GetSharedFollowersBatchPaginateRow")
 	}
 
-	paginator := timeIDPaginator{
-		QueryFunc:  queryFunc,
-		CursorFunc: cursorFunc,
-		CountFunc:  countFunc,
+	paginator := sharedFollowersPaginator{
+		timeIDPaginator{
+			QueryFunc:  queryFunc,
+			CursorFunc: cursorFunc,
+			CountFunc:  countFunc,
+		},
 	}
 
 	results, pageInfo, err := paginator.paginate(before, after, first, last)
