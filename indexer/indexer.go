@@ -813,7 +813,7 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedChunk, mostRecentBlock)
 
-	i.lastSyncedChunk = mostRecentBlock
+	i.updateLastSynced(mostRecentBlock - (mostRecentBlock % blocksPerLogsCall))
 
 	logsToCheckAgainst <- resultLogs
 }
