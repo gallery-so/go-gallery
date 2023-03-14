@@ -417,7 +417,7 @@ func (i *indexer) checkTokensExistForLogs(ctx context.Context, logs []types.Log)
 						return
 					}
 					if balance.Cmp(big.NewInt(0)) == 0 {
-						logger.For(ctx).Errorf("balance of ERC1155 token is 0, skipping check")
+						logger.For(ctx).Debugf("balance of ERC1155 token is 0, skipping check")
 						return
 					}
 				}
