@@ -205,13 +205,13 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 		newURI := firstWithValidTokenURI.TokenURI
 
+		asEthAddress := persist.EthereumAddress(input.ContractAddress.String())
+		handler, hasCustomHandler := uniqueMetadataHandlers[asEthAddress]
+
 		if !ok || newURI == "" {
 			newURI, err = rpc.GetTokenURI(ctx, firstWithValidTokenType.TokenType, input.ContractAddress, input.TokenID, ethClient)
-			if err != nil {
-				util.ErrResponse(c, http.StatusInternalServerError, err)
-				return
-			}
-			if newURI == "" {
+			// It's possible to fetch metadata for some contracts even if URI data is missing.
+			if !hasCustomHandler && (err != nil || newURI == "") {
 				util.ErrResponse(c, http.StatusInternalServerError, errNoMetadataFound{Contract: input.ContractAddress, TokenID: input.TokenID})
 				return
 			}
@@ -219,9 +219,9 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 
 		newMetadata := firstWithValidTokenURI.TokenMetadata
 
-		if handler, ok := uniqueMetadataHandlers[persist.EthereumAddress(input.ContractAddress.String())]; ok {
+		if hasCustomHandler {
 			logger.For(ctx).Infof("Using %v metadata handler for %s", handler, input.ContractAddress)
-			u, md, err := handler(ctx, newURI, persist.EthereumAddress(input.ContractAddress.String()), input.TokenID, ethClient, ipfsClient, arweaveClient)
+			u, md, err := handler(ctx, newURI, asEthAddress, input.TokenID, ethClient, ipfsClient, arweaveClient)
 			if err != nil {
 				logger.For(ctx).Errorf("Error getting metadata from handler: %s", err)
 			} else {
