@@ -437,7 +437,7 @@ func (i *indexer) listenForNewBlocks(ctx context.Context) {
 	defer sentryutil.RecoverAndRaise(ctx)
 
 	for {
-		<-time.After(time.Minute * 2)
+		<-time.After(time.Minute * 12)
 		finalBlockUint, err := rpc.RetryGetBlockNumber(ctx, i.ethClient)
 		if err != nil {
 			panic(fmt.Sprintf("error getting block number: %s", err))
