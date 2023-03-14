@@ -26,6 +26,7 @@ type TokenRepository struct {
 	getByTokenIdentifiersStmt                    *sql.Stmt
 	getByTokenIdentifiersPaginateStmt            *sql.Stmt
 	getByIdentifiersStmt                         *sql.Stmt
+	getExistsByTokenIdentifiersStmt              *sql.Stmt
 	getMetadataByTokenIdentifiersStmt            *sql.Stmt
 	updateMediaUnsafeStmt                        *sql.Stmt
 	updateOwnerUnsafeStmt                        *sql.Stmt
@@ -71,6 +72,9 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	checkNoErr(err)
 
 	getByIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
+	checkNoErr(err)
+
+	getExistsByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2);`)
 	checkNoErr(err)
 
 	getMetadataByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI,TOKEN_METADATA,MEDIA FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
@@ -136,6 +140,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		deleteStmt:                                   deleteStmt,
 		deleteByIDStmt:                               deleteByIDStmt,
 		getByIdentifiersStmt:                         getByIdentifiersStmt,
+		getExistsByTokenIdentifiersStmt:              getExistsByTokenIdentifiersStmt,
 	}
 
 }
@@ -291,6 +296,16 @@ func (t *TokenRepository) GetByIdentifiers(pCtx context.Context, pTokenID persis
 		return persist.Token{}, err
 	}
 	return token, nil
+}
+
+// TokenExistsByTokenIdentifiers gets a token by its token ID and contract address and owner address
+func (t *TokenRepository) TokenExistsByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.EthereumAddress) (bool, error) {
+	var exists bool
+	err := t.getExistsByTokenIdentifiersStmt.QueryRowContext(pCtx, pTokenID, pContractAddress).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 // GetMetadataByTokenIdentifiers gets the token URI, token metadata, and media for a token

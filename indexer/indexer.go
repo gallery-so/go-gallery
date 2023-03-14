@@ -194,9 +194,6 @@ type indexer struct {
 
 	eventHashes []eventHash
 
-	polledLogs   []types.Log
-	lastSavedLog uint64
-
 	mostRecentBlock uint64  // Current height of the blockchain
 	lastSyncedChunk uint64  // Start block of the last chunk handled by the indexer
 	maxBlock        *uint64 // If provided, the indexer will only index up to maxBlock
@@ -225,8 +222,6 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		tokenBucket: viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
 
 		chain: pChain,
-
-		polledLogs: []types.Log{},
 
 		maxBlock: maxBlock,
 
@@ -290,7 +285,6 @@ func (i *indexer) Start(ctx context.Context) {
 	logger.For(ctx).Info("Catching up to latest block")
 	i.isListening = false
 	i.catchUp(ctx, topics)
-	i.lastSavedLog = i.lastSyncedChunk
 
 	if !rpcEnabled {
 		logger.For(ctx).Info("Running in cached logs only mode, not listening for new logs")
@@ -362,6 +356,7 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.uris.in, plugins.refresh.in, plugins.previousOwners.in}
 
+	logsToCheckAgainst := make(chan []types.Log)
 	go func() {
 		ctx := sentryutil.NewSentryHubContext(ctx)
 		span, ctx := tracing.StartSpan(ctx, "indexer.logs", "processLogs")
@@ -369,9 +364,13 @@ func (i *indexer) startPipeline(ctx context.Context, start persist.BlockNumber, 
 
 		logs := i.fetchLogs(ctx, start, topics)
 		i.processLogs(ctx, transfers, logs)
+		logsToCheckAgainst <- logs
 	}()
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, plugins.refresh.out)
+
+	check := <-logsToCheckAgainst
+	i.checkTokensExistForLogs(ctx, check)
 	logger.For(ctx).Warnf("Finished processing %d blocks from block %d in %s", blocksPerLogsCall, start.Uint64(), time.Since(startTime))
 }
 
@@ -382,9 +381,56 @@ func (i *indexer) startNewBlocksPipeline(ctx context.Context, topics [][]common.
 	transfers := make(chan []transfersAtBlock)
 	plugins := NewTransferPlugins(ctx, i.ethClient, i.tokenRepo, i.addressFilterRepo)
 	enabledPlugins := []chan<- PluginMsg{plugins.balances.in, plugins.owners.in, plugins.previousOwners.in, plugins.uris.in, plugins.refresh.in}
-	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, topics)
+	logsToCheckAgainst := make(chan []types.Log)
+	go i.pollNewLogs(sentryutil.NewSentryHubContext(ctx), transfers, logsToCheckAgainst, topics)
 	go i.processAllTransfers(sentryutil.NewSentryHubContext(ctx), transfers, enabledPlugins)
 	i.processTokens(ctx, plugins.uris.out, plugins.owners.out, plugins.previousOwners.out, plugins.balances.out, plugins.refresh.out)
+
+	check := <-logsToCheckAgainst
+	i.checkTokensExistForLogs(ctx, check)
+}
+
+func (i *indexer) checkTokensExistForLogs(ctx context.Context, logs []types.Log) {
+	span, ctx := tracing.StartSpan(ctx, "indexer.checkTokensExistForLogs", "checkTokensExistForLogs")
+	defer tracing.FinishSpan(span)
+
+	doesNotExist := make(chan types.Log)
+
+	wp := workerpool.New(defaultWorkerPoolSize)
+
+	for _, log := range logs {
+		log := log
+		wp.Submit(func() {
+			ctx := sentryutil.NewSentryHubContext(ctx)
+			defer recoverAndWait(ctx)
+			defer sentryutil.RecoverAndRaise(ctx)
+			tis, err := getTokenIdentifiersFromLog(ctx, log)
+			if err != nil {
+				logger.For(ctx).Errorf("error getting token identifiers from log: %s", err)
+				return
+			}
+			for _, ti := range tis {
+				exists, err := i.tokenRepo.TokenExistsByTokenIdentifiers(ctx, ti.tokenID, ti.contractAddress)
+				if err != nil {
+					logger.For(ctx).Errorf("error checking if token exists: %s", err)
+					return
+				}
+				if !exists {
+					doesNotExist <- log
+				}
+			}
+		})
+	}
+
+	go func() {
+		wp.StopWait()
+		close(doesNotExist)
+	}()
+
+	for log := range doesNotExist {
+		logger.For(ctx).Errorf("token does not exist for log: %v", log)
+	}
+
 }
 
 func (i *indexer) listenForNewBlocks(ctx context.Context) {
@@ -583,7 +629,94 @@ func logsToTransfers(ctx context.Context, pLogs []types.Log) []rpc.Transfer {
 	return result
 }
 
-func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, topics [][]common.Hash) {
+type tokenIdentifiers struct {
+	tokenID         persist.TokenID
+	contractAddress persist.EthereumAddress
+	tokenType       persist.TokenType
+}
+
+func getTokenIdentifiersFromLog(ctx context.Context, log types.Log) ([]tokenIdentifiers, error) {
+
+	result := make([]tokenIdentifiers, 0, 10)
+	switch {
+	case strings.EqualFold(log.Topics[0].Hex(), string(transferEventHash)):
+
+		if len(log.Topics) < 4 {
+			return nil, fmt.Errorf("invalid log topics length: %d: %+v", len(log.Topics), log)
+		}
+
+		ti := tokenIdentifiers{
+			tokenID:         persist.TokenID(log.Topics[3].Hex()),
+			contractAddress: persist.EthereumAddress(log.Address.Hex()),
+			tokenType:       persist.TokenTypeERC721,
+		}
+
+		result = append(result, ti)
+
+	case strings.EqualFold(log.Topics[0].Hex(), string(transferSingleEventHash)):
+		if len(log.Topics) < 4 {
+			return nil, fmt.Errorf("invalid log topics length: %d: %+v", len(log.Topics), log)
+		}
+
+		eventData := map[string]interface{}{}
+		err := erc1155ABI.UnpackIntoMap(eventData, "TransferSingle", log.Data)
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("Failed to unpack TransferSingle event")
+			panic(err)
+		}
+
+		id, ok := eventData["id"].(*big.Int)
+		if !ok {
+			panic("Failed to unpack TransferSingle event, id not found")
+		}
+		ti := tokenIdentifiers{
+			tokenID:         persist.TokenID(id.Text(16)),
+			contractAddress: persist.EthereumAddress(log.Address.Hex()),
+			tokenType:       persist.TokenTypeERC1155,
+		}
+
+		result = append(result, ti)
+
+	case strings.EqualFold(log.Topics[0].Hex(), string(transferBatchEventHash)):
+		if len(log.Topics) < 4 {
+			return nil, fmt.Errorf("invalid log topics length: %d: %+v", len(log.Topics), log)
+		}
+
+		eventData := map[string]interface{}{}
+		err := erc1155ABI.UnpackIntoMap(eventData, "TransferBatch", log.Data)
+		if err != nil {
+			logger.For(ctx).WithError(err).Error("Failed to unpack TransferBatch event")
+			panic(err)
+		}
+
+		ids, ok := eventData["ids"].([]*big.Int)
+		if !ok {
+			panic("Failed to unpack TransferBatch event, ids not found")
+		}
+
+		for j := 0; j < len(ids); j++ {
+
+			ti := tokenIdentifiers{
+				tokenID:         persist.TokenID(ids[j].Text(16)),
+				contractAddress: persist.EthereumAddress(log.Address.Hex()),
+				tokenType:       persist.TokenTypeERC1155,
+			}
+
+			result = append(result, ti)
+		}
+	default:
+		logger.For(ctx).WithFields(logrus.Fields{
+			"address":   log.Address,
+			"block":     log.BlockNumber,
+			"eventType": log.Topics[0]},
+		).Warn("unknown event")
+	}
+
+	return result, nil
+
+}
+
+func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transfersAtBlock, logsToCheckAgainst chan<- []types.Log, topics [][]common.Hash) {
 	span, ctx := tracing.StartSpan(ctx, "indexer.logs", "pollLogs")
 	defer tracing.FinishSpan(span)
 	defer close(transfersChan)
@@ -597,79 +730,67 @@ func (i *indexer) pollNewLogs(ctx context.Context, transfersChan chan<- []transf
 
 	logger.For(ctx).Infof("Subscribing to new logs from block %d starting with block %d", mostRecentBlock, i.lastSyncedChunk)
 
+	// this chan will take in every log that we get when polling for logs in this pipeline
+	allLogsInPoll := make(chan []types.Log)
+
 	wp := workerpool.New(10)
-	for j := i.lastSyncedChunk; j <= mostRecentBlock; j += blocksPerLogsCall {
+	// starting at the last chunk that we synced, poll for logs in chunks of blocksPerLogsCall
+	for j := i.lastSyncedChunk; j+blocksPerLogsCall <= mostRecentBlock; j += blocksPerLogsCall {
 		curBlock := j
-		wp.Submit(
-			func() {
-				ctx := sentryutil.NewSentryHubContext(ctx)
-				defer sentryutil.RecoverAndRaise(ctx)
+		wp.Submit(func() {
+			ctx := sentryutil.NewSentryHubContext(ctx)
+			defer sentryutil.RecoverAndRaise(ctx)
 
-				nextBlock := curBlock + blocksPerLogsCall
-				rpcCtx, cancel := context.WithTimeout(ctx, time.Second*30)
-				defer cancel()
+			nextBlock := curBlock + blocksPerLogsCall
 
-				logsTo, err := rpc.RetryGetLogs(rpcCtx, i.ethClient, ethereum.FilterQuery{
-					FromBlock: persist.BlockNumber(curBlock).BigInt(),
-					ToBlock:   persist.BlockNumber(nextBlock).BigInt(),
-					Topics:    topics,
-				})
-				if err != nil {
-					errData := map[string]interface{}{
-						"from": curBlock,
-						"to":   nextBlock,
-						"err":  err.Error(),
-					}
-					logger.For(ctx).WithError(err).Error(errData)
-					return
-				}
+			rpcCtx, cancel := context.WithTimeout(ctx, time.Second*30)
+			defer cancel()
 
-				if mostRecentBlock-i.lastSavedLog >= blocksPerLogsCall {
-					blockLimit := i.lastSavedLog + blocksPerLogsCall
-					sort.SliceStable(logsTo, func(i, j int) bool {
-						return logsTo[i].BlockNumber < logsTo[j].BlockNumber
-					})
-					var indexToCut int
-					for indexToCut = 0; indexToCut < len(logsTo); indexToCut++ {
-						if logsTo[indexToCut].BlockNumber >= blockLimit {
-							break
-						}
-					}
-					i.polledLogs = append(i.polledLogs, logsTo[:indexToCut]...)
-					go saveLogsInBlockRange(ctx, strconv.Itoa(int(i.lastSavedLog)), strconv.Itoa(int(blockLimit)), i.polledLogs, i.storageClient)
-					i.lastSavedLog = blockLimit
-					i.polledLogs = logsTo[indexToCut:]
-				} else {
-					i.polledLogs = append(i.polledLogs, logsTo...)
-				}
-
-				logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock)
-
-				transfers := logsToTransfers(ctx, logsTo)
-
-				logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
-
-				transfersAtBlocks := transfersToTransfersAtBlock(transfers)
-
-				logger.For(ctx).Debugf("Sending %d total transfers to transfers channel", len(transfers))
-				interval := len(transfersAtBlocks) / 4
-				if interval == 0 {
-					interval = 1
-				}
-				for j := 0; j < len(transfersAtBlocks); j += interval {
-					to := j + interval
-					if to > len(transfersAtBlocks) {
-						to = len(transfersAtBlocks)
-					}
-					transfersChan <- transfersAtBlocks[j:to]
-				}
-
+			logsTo, err := rpc.RetryGetLogs(rpcCtx, i.ethClient, ethereum.FilterQuery{
+				FromBlock: persist.BlockNumber(curBlock).BigInt(),
+				ToBlock:   persist.BlockNumber(nextBlock).BigInt(),
+				Topics:    topics,
 			})
+			if err != nil {
+				errData := map[string]interface{}{
+					"from": curBlock,
+					"to":   nextBlock,
+					"err":  err.Error(),
+				}
+				logger.For(ctx).WithError(err).Error(errData)
+				return
+			}
+
+			go saveLogsInBlockRange(ctx, strconv.Itoa(int(curBlock)), strconv.Itoa(int(nextBlock)), logsTo, i.storageClient)
+
+			logger.For(ctx).Infof("Found %d logs at block %d", len(logsTo), curBlock)
+
+			transfers := logsToTransfers(ctx, logsTo)
+
+			logger.For(ctx).Infof("Processed %d logs into %d transfers", len(logsTo), len(transfers))
+
+			logger.For(ctx).Debugf("Sending %d total transfers to transfers channel", len(transfers))
+			transfersChan <- transfersToTransfersAtBlock(transfers)
+			allLogsInPoll <- logsTo
+
+		})
 	}
-	wp.StopWait()
+	go func() {
+		wp.StopWait()
+		close(allLogsInPoll)
+	}()
+
+	resultLogs := []types.Log{}
+	// combine all logs into one slice
+	for logs := range allLogsInPoll {
+		resultLogs = append(resultLogs, logs...)
+	}
+
 	logger.For(ctx).Infof("Processed logs from %d to %d.", i.lastSyncedChunk, mostRecentBlock)
 
 	i.lastSyncedChunk = mostRecentBlock
+
+	logsToCheckAgainst <- resultLogs
 }
 
 // TRANSFERS FUNCS -------------------------------------------------------------
