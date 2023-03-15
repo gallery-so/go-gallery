@@ -424,7 +424,7 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		}
 		// There's no available media for the token at this point, so set the state to syncing
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
-		if !providerTokens[i].Media.IsServable() && len(providerTokens[i].TokenMetadata) > 0 {
+		if !providerTokens[i].Media.IsServable() {
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 	}
