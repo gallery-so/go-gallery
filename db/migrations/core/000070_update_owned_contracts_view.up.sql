@@ -23,8 +23,7 @@ create materialized view owned_contracts as (
       users.id,
       contracts.id
   ),
-  displayed_contracts as (
-    with displayed_tokens as (
+  displayed_tokens as (
       select
         owned_contracts.user_id,
         owned_contracts.contract_id,
@@ -42,11 +41,12 @@ create materialized view owned_contracts as (
         owned_contracts.user_id,
         owned_contracts.contract_id,
         tokens.id
-    )
+  ),
+  displayed_contracts as (
     select user_id, contract_id, count(token_id) as displayed_count from displayed_tokens
-      group by
-        user_id,
-        contract_id
+    group by
+      user_id,
+      contract_id
   )
   select
       owned_contracts.user_id,
