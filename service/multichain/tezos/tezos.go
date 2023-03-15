@@ -727,8 +727,8 @@ func makeTempMedia(ctx context.Context, tokenID persist.TokenID, contract persis
 	med := persist.Media{
 		MediaType: persist.MediaTypeSyncing,
 	}
-	imKeywords, animKeywords := persist.ChainTezos.BaseKeywords()
-	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, agnosticMetadata, "", media.TezAnimationKeywords(imKeywords), media.TezImageKeywords(animKeywords), false)
+
+	img, anim := media.FindImageAndAnimationURLs(ctx, tokenID, contract, persist.ChainTezos, agnosticMetadata, "", false)
 	if persist.TokenURI(anim).Type() == persist.URITypeIPFS {
 		removedIPFS := strings.Replace(anim, "ipfs://", "", 1)
 		removedIPFS = strings.Replace(removedIPFS, "ipfs/", "", 1)
@@ -858,7 +858,8 @@ func IsSigned(ctx context.Context, token multichain.ChainAgnosticToken) bool {
 // The tzkt API sometimes returns completely empty metadata, in which case we want to fallback
 // to an alternative provider.
 func ContainsTezosKeywords(ctx context.Context, token multichain.ChainAgnosticToken) bool {
-	imageKeywords, animationKeywords := persist.ChainTezos.BaseKeywords()
+
+	imageKeywords, animationKeywords := media.KeywordsFor(token.TokenID, token.ContractAddress, persist.ChainTezos)
 	for field, val := range token.TokenMetadata {
 
 		for _, keyword := range imageKeywords {

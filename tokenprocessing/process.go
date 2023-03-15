@@ -25,12 +25,10 @@ import (
 )
 
 type ProcessMediaForTokenInput struct {
-	TokenID           persist.TokenID `json:"token_id" binding:"required"`
-	ContractAddress   persist.Address `json:"contract_address" binding:"required"`
-	Chain             persist.Chain   `json:"chain"`
-	OwnerAddress      persist.Address `json:"owner_address" binding:"required"`
-	ImageKeywords     []string        `json:"image_keywords" binding:"required"`
-	AnimationKeywords []string        `json:"animation_keywords" binding:"required"`
+	TokenID         persist.TokenID `json:"token_id" binding:"required"`
+	ContractAddress persist.Address `json:"contract_address" binding:"required"`
+	Chain           persist.Chain   `json:"chain"`
+	OwnerAddress    persist.Address `json:"owner_address" binding:"required"`
 }
 
 func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postgres.TokenGalleryRepository, contractRepo *postgres.ContractGalleryRepository, walletRepo persist.WalletRepository, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, throttler *throttle.Locker) gin.HandlerFunc {
@@ -64,8 +62,7 @@ func processMediaForUsersTokensOfChain(mc *multichain.Provider, tokenRepo *postg
 
 			wp.Submit(func() {
 				key := fmt.Sprintf("%s-%s-%d", t.TokenID, contract.Address, t.Chain)
-				imageKeywords, animationKeywords := t.Chain.BaseKeywords()
-				err := processToken(ctx, key, t, contract.Address, "", mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, imageKeywords, animationKeywords)
+				err := processToken(ctx, key, t, contract.Address, "", mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo)
 				if err != nil {
 					logger.For(c).Errorf("Error processing token: %s", err)
 				}
@@ -113,7 +110,7 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 			return
 		}
 
-		err = processToken(ctx, key, t, input.ContractAddress, input.OwnerAddress, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo, input.ImageKeywords, input.AnimationKeywords)
+		err = processToken(ctx, key, t, input.ContractAddress, input.OwnerAddress, mc, ethClient, ipfsClient, arweaveClient, stg, tokenBucket, tokenRepo)
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -123,7 +120,7 @@ func processMediaForToken(mc *multichain.Provider, tokenRepo *postgres.TokenGall
 	}
 }
 
-func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository, imageKeywords, animationKeywords []string) error {
+func processToken(c context.Context, key string, t persist.TokenGallery, contractAddress, ownerAddress persist.Address, mc *multichain.Provider, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, tokenBucket string, tokenRepo *postgres.TokenGalleryRepository) error {
 	ctx := logger.NewContextWithFields(c, logrus.Fields{
 		"tokenDBID":       t.ID,
 		"tokenID":         t.TokenID,
@@ -144,8 +141,6 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		newMetadata = mcMetadata
 	}
 
-	image, animation := media.KeywordsForChain(t.Chain, imageKeywords, animationKeywords)
-
 	name, description := media.FindNameAndDescription(ctx, newMetadata)
 
 	if name == "" {
@@ -157,7 +152,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	}
 
 	totalTimeOfMedia := time.Now()
-	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket, image, animation)
+	newMedia, err := media.MakePreviewsForMetadata(ctx, newMetadata, contractAddress, persist.TokenID(t.TokenID.String()), t.TokenURI, t.Chain, ipfsClient, arweaveClient, stg, tokenBucket)
 	if err != nil {
 		logger.For(ctx).Errorf("error processing media for %s: %s", key, err)
 		newMedia = persist.Media{

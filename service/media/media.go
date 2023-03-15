@@ -42,14 +42,6 @@ import (
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
 
-type Keywords interface {
-	ForToken(tokenID persist.TokenID, contract persist.Address) []string
-}
-
-type DefaultKeywords []string
-type TezImageKeywords []string
-type TezAnimationKeywords []string
-
 type errUnsupportedURL struct {
 	url string
 }
@@ -114,9 +106,9 @@ func NewStorageClient(ctx context.Context) *storage.Client {
 }
 
 // MakePreviewsForMetadata uses a metadata map to generate media content and cache resized versions of the media content.
-func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, tokenURI persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string, imageKeywords, animationKeywords Keywords) (persist.Media, error) {
+func MakePreviewsForMetadata(pCtx context.Context, metadata persist.TokenMetadata, contractAddress persist.Address, tokenID persist.TokenID, tokenURI persist.TokenURI, chain persist.Chain, ipfsClient *shell.Shell, arweaveClient *goar.Client, storageClient *storage.Client, tokenBucket string) (persist.Media, error) {
 	name := fmt.Sprintf("%s-%s", contractAddress, tokenID)
-	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, metadata, tokenURI, animationKeywords, imageKeywords, true)
+	imgURL, vURL := FindImageAndAnimationURLs(pCtx, tokenID, contractAddress, chain, metadata, tokenURI, true)
 	logger.For(pCtx).Infof("got imgURL=%s;videoURL=%s", imgURL, vURL)
 
 	var (
@@ -567,7 +559,8 @@ func remapMedia(media persist.Media) persist.Media {
 	return media
 }
 
-func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, metadata persist.TokenMetadata, tokenURI persist.TokenURI, animationKeywords, imageKeywords Keywords, predict bool) (imgURL string, vURL string) {
+func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, metadata persist.TokenMetadata, tokenURI persist.TokenURI, predict bool) (imgURL string, vURL string) {
+
 	ctx = logger.NewContextWithFields(ctx, logrus.Fields{"tokenID": tokenID, "contractAddress": contractAddress})
 	if metaMedia, ok := metadata["media"].(map[string]interface{}); ok {
 		logger.For(ctx).Debugf("found media metadata: %s", metaMedia)
@@ -586,7 +579,9 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 		}
 	}
 
-	for _, keyword := range animationKeywords.ForToken(tokenID, contractAddress) {
+	image, anim := KeywordsFor(tokenID, contractAddress, chain)
+
+	for _, keyword := range anim {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" {
 			logger.For(ctx).Debugf("found initial animation url from '%s': %s", keyword, it)
 			vURL = it
@@ -594,7 +589,7 @@ func FindImageAndAnimationURLs(ctx context.Context, tokenID persist.TokenID, con
 		}
 	}
 
-	for _, keyword := range imageKeywords.ForToken(tokenID, contractAddress) {
+	for _, keyword := range image {
 		if it, ok := util.GetValueFromMapUnsafe(metadata, keyword, util.DefaultSearchDepth).(string); ok && it != "" && it != vURL {
 			logger.For(ctx).Debugf("found initial image url from '%s': %s", keyword, it)
 			imgURL = it
@@ -1060,53 +1055,6 @@ func truncateString(s string, i int) string {
 	return s
 }
 
-func (d DefaultKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
-	return d
-}
-
-const (
-	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
-	fxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
-	fxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
-)
-
-func IsHicEtNunc(contract persist.Address) bool {
-	return contract == hicEtNunc
-}
-
-func IsFxHash(contract persist.Address) bool {
-	return contract == fxHash || contract == fxHash2
-}
-
-func (i TezImageKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
-	switch {
-	case IsHicEtNunc(contract):
-		return []string{"artifactUri", "displayUri", "image"}
-	case IsFxHash(contract):
-		return []string{"displayUri", "artifactUri", "image", "uri"}
-	default:
-		return i
-	}
-}
-
-func (a TezAnimationKeywords) ForToken(tokenID persist.TokenID, contract persist.Address) []string {
-	switch {
-	case IsFxHash(contract):
-		return []string{"artifactUri", "displayUri"}
-	default:
-		return a
-	}
-}
-
-func KeywordsForChain(chain persist.Chain, imageKeywords []string, animationKeywords []string) (Keywords, Keywords) {
-	switch chain {
-	case persist.ChainTezos:
-		return TezImageKeywords(imageKeywords), TezAnimationKeywords(animationKeywords)
-	default:
-		return DefaultKeywords(imageKeywords), DefaultKeywords(animationKeywords)
-	}
-}
-
 func (e errUnsupportedURL) Error() string {
 	return fmt.Sprintf("unsupported url %s", e.url)
 }
@@ -1124,4 +1072,49 @@ func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileNa
 	writer.ObjectAttrs.ContentType = contentType
 	writer.CacheControl = "no-cache, no-store"
 	return writer
+}
+
+const (
+	hicEtNunc = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"
+	fxHash    = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"
+	fxHash2   = "KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi"
+)
+
+func IsHicEtNunc(contract persist.Address) bool {
+	return contract == hicEtNunc
+}
+
+func IsFxHash(contract persist.Address) bool {
+	return contract == fxHash || contract == fxHash2
+}
+
+// KeywordsFor are the keywords that are default for discovering media for a given chain and token ID and contract
+func KeywordsFor(tokenID persist.TokenID, contract persist.Address, chain persist.Chain) (image []string, anim []string) {
+	switch chain {
+	case persist.ChainTezos:
+
+		var image []string
+
+		switch {
+		case IsHicEtNunc(contract):
+			image = []string{"artifactUri", "displayUri", "image"}
+		case IsFxHash(contract):
+			image = []string{"displayUri", "artifactUri", "image", "uri"}
+		default:
+			image = []string{"displayUri", "image", "thumbnailUri", "artifactUri", "uri"}
+		}
+
+		var animation []string
+
+		switch {
+		case IsFxHash(contract):
+			animation = []string{"artifactUri", "displayUri"}
+		default:
+			animation = []string{"artifactUri", "displayUri", "uri", "image"}
+		}
+
+		return image, animation
+	default:
+		return []string{"image"}, []string{"animation", "video"}
+	}
 }

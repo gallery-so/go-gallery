@@ -127,18 +127,9 @@ func (api ContractAPI) RefreshOwnersAsync(ctx context.Context, contractID persis
 		return err
 	}
 
-	contract, err := api.loaders.ContractByContractID.Load(contractID)
-	if err != nil {
-		return err
-	}
-
-	im, anim := contract.Chain.BaseKeywords()
-
 	in := task.TokenProcessingContractTokensMessage{
-		ContractID:        contractID,
-		Imagekeywords:     im,
-		Animationkeywords: anim,
-		ForceRefresh:      forceRefresh,
+		ContractID:   contractID,
+		ForceRefresh: forceRefresh,
 	}
 	return task.CreateTaskForContractOwnerProcessing(ctx, in, api.taskClient)
 }
