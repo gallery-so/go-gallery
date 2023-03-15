@@ -26,6 +26,7 @@ type TokenRepository struct {
 	getByTokenIdentifiersStmt                    *sql.Stmt
 	getByTokenIdentifiersPaginateStmt            *sql.Stmt
 	getByIdentifiersStmt                         *sql.Stmt
+	getExistsByTokenIdentifiersStmt              *sql.Stmt
 	getMetadataByTokenIdentifiersStmt            *sql.Stmt
 	updateMediaUnsafeStmt                        *sql.Stmt
 	updateOwnerUnsafeStmt                        *sql.Stmt
@@ -73,6 +74,9 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	getByIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
 	checkNoErr(err)
 
+	getExistsByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT EXISTS(SELECT 1 FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2);`)
+	checkNoErr(err)
+
 	getMetadataByTokenIdentifiersStmt, err := db.PrepareContext(ctx, `SELECT TOKEN_URI,TOKEN_METADATA,MEDIA FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 ORDER BY BLOCK_NUMBER DESC LIMIT 1;`)
 	checkNoErr(err)
 
@@ -106,7 +110,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 	upsert1155Stmt, err := db.PrepareContext(ctx, `INSERT INTO tokens (ID,MEDIA,TOKEN_TYPE,CHAIN,NAME,DESCRIPTION,TOKEN_ID,TOKEN_URI,QUANTITY,OWNER_ADDRESS,OWNERSHIP_HISTORY,TOKEN_METADATA,CONTRACT_ADDRESS,EXTERNAL_URL,BLOCK_NUMBER,VERSION,CREATED_AT,LAST_UPDATED) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT (TOKEN_ID,CONTRACT_ADDRESS,OWNER_ADDRESS) WHERE TOKEN_TYPE = 'ERC-1155' DO UPDATE SET MEDIA = EXCLUDED.MEDIA,TOKEN_TYPE = EXCLUDED.TOKEN_TYPE,CHAIN = EXCLUDED.CHAIN,NAME = EXCLUDED.NAME,DESCRIPTION = EXCLUDED.DESCRIPTION,TOKEN_URI = EXCLUDED.TOKEN_URI,QUANTITY = EXCLUDED.QUANTITY,OWNER_ADDRESS = EXCLUDED.OWNER_ADDRESS,OWNERSHIP_HISTORY = EXCLUDED.OWNERSHIP_HISTORY,TOKEN_METADATA = EXCLUDED.TOKEN_METADATA,EXTERNAL_URL = EXCLUDED.EXTERNAL_URL,BLOCK_NUMBER = EXCLUDED.BLOCK_NUMBER,VERSION = EXCLUDED.VERSION,CREATED_AT = EXCLUDED.CREATED_AT,LAST_UPDATED = EXCLUDED.LAST_UPDATED;`)
 	checkNoErr(err)
 
-	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3;`)
+	deleteStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE TOKEN_ID = $1 AND CONTRACT_ADDRESS = $2 AND OWNER_ADDRESS = $3 and TOKEN_TYPE = $4;`)
 	checkNoErr(err)
 
 	deleteByIDStmt, err := db.PrepareContext(ctx, `DELETE FROM tokens WHERE ID = $1;`)
@@ -136,6 +140,7 @@ func NewTokenRepository(db *sql.DB) *TokenRepository {
 		deleteStmt:                                   deleteStmt,
 		deleteByIDStmt:                               deleteByIDStmt,
 		getByIdentifiersStmt:                         getByIdentifiersStmt,
+		getExistsByTokenIdentifiersStmt:              getExistsByTokenIdentifiersStmt,
 	}
 
 }
@@ -293,6 +298,16 @@ func (t *TokenRepository) GetByIdentifiers(pCtx context.Context, pTokenID persis
 	return token, nil
 }
 
+// TokenExistsByTokenIdentifiers gets a token by its token ID and contract address and owner address
+func (t *TokenRepository) TokenExistsByTokenIdentifiers(pCtx context.Context, pTokenID persist.TokenID, pContractAddress persist.EthereumAddress) (bool, error) {
+	var exists bool
+	err := t.getExistsByTokenIdentifiersStmt.QueryRowContext(pCtx, pTokenID, pContractAddress).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 // GetMetadataByTokenIdentifiers gets the token URI, token metadata, and media for a token
 func (t *TokenRepository) GetMetadataByTokenIdentifiers(ctx context.Context, tokenID persist.TokenID, contractAddress persist.EthereumAddress) (uri persist.TokenURI, metadata persist.TokenMetadata, med persist.Media, err error) {
 	err = t.getMetadataByTokenIdentifiersStmt.QueryRowContext(ctx, tokenID, contractAddress).Scan(&uri, &metadata, &med)
@@ -351,7 +366,7 @@ func (t *TokenRepository) BulkUpsert(pCtx context.Context, pTokens []persist.Tok
 	for _, token := range erc1155Tokens {
 		if token.Quantity == "" || token.Quantity == "0" || token.Quantity == "<nil>" {
 			logger.For(pCtx).Debugf("Deleting token %s for 0 quantity", persist.NewTokenIdentifiers(persist.Address(token.ContractAddress.String()), token.TokenID, token.Chain))
-			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress); err != nil {
+			if err := t.deleteTokenUnsafe(pCtx, token.TokenID, token.ContractAddress, token.OwnerAddress, token.TokenType); err != nil {
 				return err
 			}
 		}
@@ -443,7 +458,7 @@ func (t *TokenRepository) upsertERC1155Tokens(pCtx context.Context, pTokens []pe
 func (t *TokenRepository) Upsert(pCtx context.Context, pToken persist.Token) error {
 	var err error
 	if pToken.Quantity == "0" {
-		_, err = t.deleteStmt.ExecContext(pCtx, pToken.TokenID, pToken.ContractAddress, pToken.OwnerAddress)
+		_, err = t.deleteStmt.ExecContext(pCtx, pToken.TokenID, pToken.ContractAddress, pToken.OwnerAddress, pToken.TokenType)
 	} else {
 		if pToken.TokenType == persist.TokenTypeERC1155 {
 			_, err = t.upsert1155Stmt.ExecContext(pCtx, persist.GenerateID(), pToken.Media, pToken.TokenType, pToken.Chain, pToken.Name, pToken.Description, pToken.TokenID, pToken.TokenURI, pToken.Quantity, pToken.OwnerAddress, pToken.OwnershipHistory, pToken.TokenMetadata, pToken.ContractAddress, pToken.ExternalURL, pToken.BlockNumber, pToken.Version, pToken.CreationTime, pToken.LastUpdated)
@@ -534,8 +549,8 @@ func (t *TokenRepository) DeleteByID(pCtx context.Context, pID persist.DBID) err
 	return err
 }
 
-func (t *TokenRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.EthereumAddress) error {
-	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerAddress)
+func (t *TokenRepository) deleteTokenUnsafe(pCtx context.Context, pTokenID persist.TokenID, pContractAddress, pOwnerAddress persist.EthereumAddress, pTokenType persist.TokenType) error {
+	_, err := t.deleteStmt.ExecContext(pCtx, pTokenID, pContractAddress, pOwnerAddress, pTokenType)
 	return err
 }
 
