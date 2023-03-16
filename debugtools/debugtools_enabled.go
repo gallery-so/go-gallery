@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/socialauth"
@@ -22,13 +23,13 @@ const Enabled bool = true
 
 func init() {
 	// An additional safeguard against running debug tools in production
-	if viper.GetString("ENV") == "production" {
+	if env.Get[string](context.Background(), "ENV") == "production" {
 		panic(errors.New("debug tools may not be enabled in a production environment"))
 	}
 }
 
 func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult, error) {
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		return nil, errors.New("DebugAuthenticator may only be used in a local environment")
 	}
 	wallets := make([]auth.AuthenticatedAddress, len(d.ChainAddresses))
@@ -48,7 +49,7 @@ func (d DebugAuthenticator) Authenticate(ctx context.Context) (*auth.AuthResult,
 }
 
 func (d DebugSocialAuthenticator) Authenticate(ctx context.Context) (*socialauth.SocialAuthResult, error) {
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		return nil, errors.New("DebugSocialAuthenticator may only be used in a local environment")
 	}
 

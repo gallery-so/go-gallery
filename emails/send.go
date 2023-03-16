@@ -11,6 +11,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -21,6 +22,12 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 )
+
+func init() {
+	env.RegisterEnvValidation("FROM_EMAIL", []string{"required", "email"})
+	env.RegisterEnvValidation("SENDGRID_VERIFICATION_TEMPLATE_ID", []string{"required"})
+	env.RegisterEnvValidation("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", []string{"required"})
+}
 
 const emailsAtATime = 10_000
 

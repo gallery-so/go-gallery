@@ -2,6 +2,7 @@ package validate
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -134,6 +135,7 @@ func RegisterCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("chain", ChainValidator)
 	v.RegisterValidation("role", IsValidRole)
 	v.RegisterValidation("created_collections", CreatedCollectionsValidator)
+	v.RegisterValidation("http", HTTPValidator)
 	v.RegisterAlias("collection_name", "max=200")
 	v.RegisterAlias("collection_note", "max=600")
 	v.RegisterAlias("token_note", "max=1200")
@@ -248,6 +250,27 @@ var NonceValidator validator.Func = func(fl validator.FieldLevel) bool {
 		return true
 	}
 	return len(nonce) >= 10 && len(nonce) <= 150
+}
+
+// HTTPValidator validates a string ensuring it is an HTTP url
+var HTTPValidator validator.Func = func(fl validator.FieldLevel) bool {
+	s := fl.Field().String()
+
+	if s == "" {
+		return true
+	}
+
+	_, err := url.ParseRequestURI(s)
+	if err != nil {
+		return false
+	}
+
+	u, err := url.Parse(s)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return false
+	}
+
+	return true
 }
 
 // UsernameValidator ensures that usernames are not reserved, are alphanumeric with the exception of underscores and periods, and do not contain consecutive periods or underscores

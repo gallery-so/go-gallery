@@ -11,11 +11,17 @@ import (
 	farcaster "github.com/ertan/go-farcaster/pkg"
 	"github.com/ertan/go-farcaster/pkg/users"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	env.RegisterEnvValidation("ENV", []string{"required", "oneof=local development production"})
+	env.RegisterEnvValidation("FARCASTER_MNEMONIC", []string{"required"})
+}
 
 type farcastGalleryAcc struct {
 	galleryUsername string
@@ -39,7 +45,7 @@ func main() {
 
 	// apiUrl := "https://api.farcaster.xyz"
 	apiUrl := "https://api.warpcast.com"
-	mnemonic := viper.GetString("FARCASTER_MNEMONIC")
+	mnemonic := env.Get[string](ctx, "FARCASTER_MNEMONIC")
 
 	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, "")
 	fcUsers := []users.User{}
@@ -149,7 +155,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

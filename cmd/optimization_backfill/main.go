@@ -16,12 +16,17 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	env.RegisterEnvValidation("ENV", []string{"required", "oneof=local development production"})
+}
 
 type updateTokenMedia struct {
 	TokenDBID persist.DBID
@@ -53,7 +58,7 @@ func main() {
 
 	var rows pgx.Rows
 
-	if viper.GetString("CLOUD_RUN_JOB") != "" {
+	if env.Get[string](context.Background(), "CLOUD_RUN_JOB") != "" {
 		logrus.Infof("running as cloud run job")
 
 		jobIndex := viper.GetInt("CLOUD_RUN_TASK_INDEX")
@@ -222,7 +227,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		logrus.Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

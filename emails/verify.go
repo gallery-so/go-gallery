@@ -9,11 +9,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	env.RegisterEnvValidation("SENDGRID_DEFAULT_LIST_ID", []string{"required"})
+	env.RegisterEnvValidation("SENDGRID_API_KEY", []string{"required"})
+}
 
 type VerifyEmailInput struct {
 	JWT string `json:"jwt" binding:"required"`

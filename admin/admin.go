@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/util"
 
 	"cloud.google.com/go/storage"
@@ -16,6 +17,10 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
+
+func init() {
+	env.RegisterEnvValidation("ENV", []string{"required", "oneof=local development production"})
+}
 
 // Init initializes the server
 func Init() {
@@ -33,7 +38,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 
 	log.SetReportCaller(true)
 
-	if viper.GetString("ENV") != "production" {
+	if env.Get[string](context.Background(), "ENV") != "production" {
 		log.SetLevel(log.DebugLevel)
 		gin.SetMode(gin.DebugMode)
 	}
@@ -43,7 +48,7 @@ func CoreInit(pqClient *sql.DB) *gin.Engine {
 
 	var s *storage.Client
 	var err error
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		s, err = storage.NewClient(context.Background())
 	} else {
 		s, err = storage.NewClient(context.Background(), option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/prod/service-key.json")))
