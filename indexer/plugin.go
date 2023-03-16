@@ -77,7 +77,7 @@ func NewTransferPlugins(ctx context.Context, ethClient *ethclient.Client, tokenR
 	return TransferPlugins{
 		uris:           newURIsPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
 		balances:       newBalancesPlugin(sentryutil.NewSentryHubContext(ctx), ethClient, tokenRepo),
-		owners:         newOwnerPlugin(sentryutil.NewSentryHubContext(ctx)),
+		owners:         newOwnerPlugin(sentryutil.NewSentryHubContext(ctx), ethClient),
 		refresh:        newRefreshPlugin(sentryutil.NewSentryHubContext(ctx), addressFilterRepo),
 		previousOwners: newPreviousOwnersPlugin(sentryutil.NewSentryHubContext(ctx)),
 	}
@@ -226,7 +226,7 @@ func newBalancesPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRe
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC1155 {
 					if rpcEnabled {
-						bals, err := getBalances(innerCtx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.To, ethClient)
+						bals, err := getBalances(innerCtx, msg.transfer.ContractAddress, msg.transfer.From, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.TxIndex, msg.transfer.To, ethClient)
 						if err != nil {
 							logger.For(innerCtx).WithError(err).WithFields(logrus.Fields{
 								"fromAddress":     msg.transfer.From,
@@ -263,7 +263,7 @@ type ownersPlugin struct {
 	out chan ownerAtBlock
 }
 
-func newOwnerPlugin(ctx context.Context) ownersPlugin {
+func newOwnerPlugin(ctx context.Context, ethClient *ethclient.Client) ownersPlugin {
 	in := make(chan PluginMsg)
 	out := make(chan ownerAtBlock)
 
@@ -282,13 +282,24 @@ func newOwnerPlugin(ctx context.Context) ownersPlugin {
 				child.Description = "handleMessage"
 
 				if persist.TokenType(msg.transfer.TokenType) == persist.TokenTypeERC721 {
-					out <- ownerAtBlock{
-						ti:    msg.key,
-						owner: msg.transfer.To,
-						boi: blockchainOrderInfo{
-							blockNumber: msg.transfer.BlockNumber,
-							txIndex:     msg.transfer.TxIndex,
-						},
+					if rpcEnabled {
+						owner, err := getOwner(ctx, msg.transfer.ContractAddress, msg.transfer.TokenID, msg.key, msg.transfer.BlockNumber, msg.transfer.TxIndex, ethClient)
+						if err != nil {
+							logger.For(ctx).WithError(err).WithFields(logrus.Fields{
+								"tokenIdentifier": msg.key,
+								"block":           msg.transfer.BlockNumber,
+							}).Errorf("error getting owner of %s", msg.key)
+						}
+						out <- owner
+					} else {
+						out <- ownerAtBlock{
+							ti:    msg.key,
+							owner: msg.transfer.To,
+							boi: blockchainOrderInfo{
+								blockNumber: msg.transfer.BlockNumber,
+								txIndex:     msg.transfer.TxIndex,
+							},
+						}
 					}
 				}
 
