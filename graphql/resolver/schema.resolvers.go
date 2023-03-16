@@ -1830,6 +1830,11 @@ func (r *queryResolver) SocialConnections(ctx context.Context, socialAccountType
 	}, nil
 }
 
+// SocialQueries is the resolver for the socialQueries field.
+func (r *queryResolver) SocialQueries(ctx context.Context) (*model.SocialQueries, error) {
+	return &model.SocialQueries{}, nil
+}
+
 // FeedEvent is the resolver for the feedEvent field.
 func (r *removeAdmirePayloadResolver) FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error) {
 	return resolveFeedEventByEventID(ctx, obj.FeedEvent.Dbid)
@@ -1858,6 +1863,24 @@ func (r *setSpamPreferencePayloadResolver) Tokens(ctx context.Context, obj *mode
 // GalleryUser is the resolver for the galleryUser field.
 func (r *socialConnectionResolver) GalleryUser(ctx context.Context, obj *model.SocialConnection) (*model.GalleryUser, error) {
 	return resolveGalleryUserByUserID(ctx, obj.UserID)
+}
+
+// SocialConnections is the resolver for the socialConnections field.
+func (r *socialQueriesResolver) SocialConnections(ctx context.Context, obj *model.SocialQueries, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error) {
+	connections, pageInfo, err := publicapi.For(ctx).Social.GetConnectionsPaginate(ctx, socialAccountType, before, after, first, last, excludeAlreadyFollowing)
+	if err != nil {
+		return nil, err
+	}
+	edges, _ := util.Map(connections, func(c model.SocialConnection) (*model.SocialConnectionsEdge, error) {
+		return &model.SocialConnectionsEdge{
+			Node:   c,
+			Cursor: nil, // not used by relay, but relay will complain without this field existing
+		}, nil
+	})
+	return &model.SocialConnectionsConnection{
+		Edges:    edges,
+		PageInfo: pageInfoToModel(ctx, pageInfo),
+	}, nil
 }
 
 // FeedEvent is the resolver for the feedEvent field.
@@ -2211,6 +2234,9 @@ func (r *Resolver) SocialConnection() generated.SocialConnectionResolver {
 	return &socialConnectionResolver{r}
 }
 
+// SocialQueries returns generated.SocialQueriesResolver implementation.
+func (r *Resolver) SocialQueries() generated.SocialQueriesResolver { return &socialQueriesResolver{r} }
+
 // SomeoneAdmiredYourFeedEventNotification returns generated.SomeoneAdmiredYourFeedEventNotificationResolver implementation.
 func (r *Resolver) SomeoneAdmiredYourFeedEventNotification() generated.SomeoneAdmiredYourFeedEventNotificationResolver {
 	return &someoneAdmiredYourFeedEventNotificationResolver{r}
@@ -2313,6 +2339,7 @@ type removeAdmirePayloadResolver struct{ *Resolver }
 type removeCommentPayloadResolver struct{ *Resolver }
 type setSpamPreferencePayloadResolver struct{ *Resolver }
 type socialConnectionResolver struct{ *Resolver }
+type socialQueriesResolver struct{ *Resolver }
 type someoneAdmiredYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneCommentedOnYourFeedEventNotificationResolver struct{ *Resolver }
 type someoneFollowedYouBackNotificationResolver struct{ *Resolver }

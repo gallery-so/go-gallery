@@ -869,7 +869,7 @@ type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"
   profileImage: String!
 }
 
-union SocialConnectionsOrError = SocialConnection | ErrInvalidInput | ErrorNeedsToReconnectSocial
+union SocialConnectionsOrError = SocialConnection | ErrInvalidInput
 
 type SocialConnectionsEdge {
   node: SocialConnectionsOrError
@@ -981,6 +981,11 @@ type SearchCommunitiesPayload {
 
 union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
+union SocialQueriesOrError =
+    SocialConnectionsConnection
+  | ErrNotAuthorized
+  | ErrNeedsToReconnectSocial
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -1050,6 +1055,19 @@ type Query {
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
     @retoolAuth
 
+  socialConnections(
+    socialAccountType: SocialAccountType!
+    excludeAlreadyFollowing: Boolean
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
+
+  socialQueries: SocialQueries @authRequired
+}
+
+type SocialQueries {
   socialConnections(
     socialAccountType: SocialAccountType!
     excludeAlreadyFollowing: Boolean
@@ -1300,7 +1318,7 @@ type ErrInvalidToken implements Error {
   message: String!
 }
 
-type ErrorNeedsToReconnectSocial implements Error {
+type ErrNeedsToReconnectSocial implements Error {
   socialAccountType: SocialAccountType!
   message: String!
 }
@@ -1934,7 +1952,7 @@ union UpdateSocialAccountDisplayedPayloadOrError =
     UpdateSocialAccountDisplayedPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 input MintPremiumCardToWalletInput {
   tokenId: String!
@@ -1949,7 +1967,7 @@ union MintPremiumCardToWalletPayloadOrError =
     MintPremiumCardToWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 type DisconnectSocialAccountPayload {
   viewer: Viewer
@@ -1959,7 +1977,7 @@ union DisconnectSocialAccountPayloadOrError =
     DisconnectSocialAccountPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 type FollowAllSocialConnectionsPayload {
   viewer: Viewer
@@ -1969,7 +1987,7 @@ union FollowAllSocialConnectionsPayloadOrError =
     FollowAllSocialConnectionsPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 type Mutation {
   # User Mutations

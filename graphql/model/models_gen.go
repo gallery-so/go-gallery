@@ -234,6 +234,10 @@ type SocialConnectionsOrError interface {
 	IsSocialConnectionsOrError()
 }
 
+type SocialQueriesOrError interface {
+	IsSocialQueriesOrError()
+}
+
 type SyncTokensForUsernamePayloadOrError interface {
 	IsSyncTokensForUsernamePayloadOrError()
 }
@@ -885,6 +889,18 @@ type ErrInvalidToken struct {
 func (ErrInvalidToken) IsAuthorizationError() {}
 func (ErrInvalidToken) IsError()              {}
 
+type ErrNeedsToReconnectSocial struct {
+	SocialAccountType persist.SocialProvider `json:"socialAccountType"`
+	Message           string                 `json:"message"`
+}
+
+func (ErrNeedsToReconnectSocial) IsSocialQueriesOrError()                       {}
+func (ErrNeedsToReconnectSocial) IsError()                                      {}
+func (ErrNeedsToReconnectSocial) IsUpdateSocialAccountDisplayedPayloadOrError() {}
+func (ErrNeedsToReconnectSocial) IsMintPremiumCardToWalletPayloadOrError()      {}
+func (ErrNeedsToReconnectSocial) IsDisconnectSocialAccountPayloadOrError()      {}
+func (ErrNeedsToReconnectSocial) IsFollowAllSocialConnectionsPayloadOrError()   {}
+
 type ErrNoCookie struct {
 	Message string `json:"message"`
 }
@@ -898,6 +914,7 @@ type ErrNotAuthorized struct {
 }
 
 func (ErrNotAuthorized) IsViewerOrError()                              {}
+func (ErrNotAuthorized) IsSocialQueriesOrError()                       {}
 func (ErrNotAuthorized) IsCreateCollectionPayloadOrError()             {}
 func (ErrNotAuthorized) IsDeleteCollectionPayloadOrError()             {}
 func (ErrNotAuthorized) IsUpdateCollectionInfoPayloadOrError()         {}
@@ -990,18 +1007,6 @@ type ErrUsernameNotAvailable struct {
 func (ErrUsernameNotAvailable) IsUpdateUserInfoPayloadOrError() {}
 func (ErrUsernameNotAvailable) IsError()                        {}
 func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
-
-type ErrorNeedsToReconnectSocial struct {
-	SocialAccountType persist.SocialProvider `json:"socialAccountType"`
-	Message           string                 `json:"message"`
-}
-
-func (ErrorNeedsToReconnectSocial) IsSocialConnectionsOrError()                   {}
-func (ErrorNeedsToReconnectSocial) IsError()                                      {}
-func (ErrorNeedsToReconnectSocial) IsUpdateSocialAccountDisplayedPayloadOrError() {}
-func (ErrorNeedsToReconnectSocial) IsMintPremiumCardToWalletPayloadOrError()      {}
-func (ErrorNeedsToReconnectSocial) IsDisconnectSocialAccountPayloadOrError()      {}
-func (ErrorNeedsToReconnectSocial) IsFollowAllSocialConnectionsPayloadOrError()   {}
 
 type FeedConnection struct {
 	Edges    []*FeedEdge `json:"edges"`
@@ -1515,9 +1520,15 @@ type SocialConnectionsConnection struct {
 	PageInfo *PageInfo                `json:"pageInfo"`
 }
 
+func (SocialConnectionsConnection) IsSocialQueriesOrError() {}
+
 type SocialConnectionsEdge struct {
 	Node   SocialConnectionsOrError `json:"node"`
 	Cursor *string                  `json:"cursor"`
+}
+
+type SocialQueries struct {
+	SocialConnections *SocialConnectionsConnection `json:"socialConnections"`
 }
 
 type SomeoneAdmiredYourFeedEventNotification struct {

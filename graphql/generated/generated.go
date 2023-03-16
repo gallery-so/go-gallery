@@ -68,6 +68,7 @@ type ResolverRoot interface {
 	RemoveCommentPayload() RemoveCommentPayloadResolver
 	SetSpamPreferencePayload() SetSpamPreferencePayloadResolver
 	SocialConnection() SocialConnectionResolver
+	SocialQueries() SocialQueriesResolver
 	SomeoneAdmiredYourFeedEventNotification() SomeoneAdmiredYourFeedEventNotificationResolver
 	SomeoneCommentedOnYourFeedEventNotification() SomeoneCommentedOnYourFeedEventNotificationResolver
 	SomeoneFollowedYouBackNotification() SomeoneFollowedYouBackNotificationResolver
@@ -388,6 +389,11 @@ type ComplexityRoot struct {
 		Message func(childComplexity int) int
 	}
 
+	ErrNeedsToReconnectSocial struct {
+		Message           func(childComplexity int) int
+		SocialAccountType func(childComplexity int) int
+	}
+
 	ErrNoCookie struct {
 		Message func(childComplexity int) int
 	}
@@ -419,11 +425,6 @@ type ComplexityRoot struct {
 
 	ErrUsernameNotAvailable struct {
 		Message func(childComplexity int) int
-	}
-
-	ErrorNeedsToReconnectSocial struct {
-		Message           func(childComplexity int) int
-		SocialAccountType func(childComplexity int) int
 	}
 
 	FeedConnection struct {
@@ -800,6 +801,7 @@ type ComplexityRoot struct {
 		SearchGalleries         func(childComplexity int, query string, limit *int, nameWeight *float64, descriptionWeight *float64) int
 		SearchUsers             func(childComplexity int, query string, limit *int, usernameWeight *float64, bioWeight *float64) int
 		SocialConnections       func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
+		SocialQueries           func(childComplexity int) int
 		TokenByID               func(childComplexity int, id persist.DBID) int
 		TrendingFeed            func(childComplexity int, before *string, after *string, first *int, last *int) int
 		TrendingUsers           func(childComplexity int, input model.TrendingUsersInput) int
@@ -888,6 +890,10 @@ type ComplexityRoot struct {
 	SocialConnectionsEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
+	}
+
+	SocialQueries struct {
+		SocialConnections func(childComplexity int, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) int
 	}
 
 	SomeoneAdmiredYourFeedEventNotification struct {
@@ -1429,6 +1435,7 @@ type QueryResolver interface {
 	SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) (model.SearchCommunitiesPayloadOrError, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
+	SocialQueries(ctx context.Context) (*model.SocialQueries, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -1441,6 +1448,9 @@ type SetSpamPreferencePayloadResolver interface {
 }
 type SocialConnectionResolver interface {
 	GalleryUser(ctx context.Context, obj *model.SocialConnection) (*model.GalleryUser, error)
+}
+type SocialQueriesResolver interface {
+	SocialConnections(ctx context.Context, obj *model.SocialQueries, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
 }
 type SomeoneAdmiredYourFeedEventNotificationResolver interface {
 	FeedEvent(ctx context.Context, obj *model.SomeoneAdmiredYourFeedEventNotification) (*model.FeedEvent, error)
@@ -2525,6 +2535,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ErrInvalidToken.Message(childComplexity), true
 
+	case "ErrNeedsToReconnectSocial.message":
+		if e.complexity.ErrNeedsToReconnectSocial.Message == nil {
+			break
+		}
+
+		return e.complexity.ErrNeedsToReconnectSocial.Message(childComplexity), true
+
+	case "ErrNeedsToReconnectSocial.socialAccountType":
+		if e.complexity.ErrNeedsToReconnectSocial.SocialAccountType == nil {
+			break
+		}
+
+		return e.complexity.ErrNeedsToReconnectSocial.SocialAccountType(childComplexity), true
+
 	case "ErrNoCookie.message":
 		if e.complexity.ErrNoCookie.Message == nil {
 			break
@@ -2587,20 +2611,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ErrUsernameNotAvailable.Message(childComplexity), true
-
-	case "ErrorNeedsToReconnectSocial.message":
-		if e.complexity.ErrorNeedsToReconnectSocial.Message == nil {
-			break
-		}
-
-		return e.complexity.ErrorNeedsToReconnectSocial.Message(childComplexity), true
-
-	case "ErrorNeedsToReconnectSocial.socialAccountType":
-		if e.complexity.ErrorNeedsToReconnectSocial.SocialAccountType == nil {
-			break
-		}
-
-		return e.complexity.ErrorNeedsToReconnectSocial.SocialAccountType(childComplexity), true
 
 	case "FeedConnection.edges":
 		if e.complexity.FeedConnection.Edges == nil {
@@ -4674,6 +4684,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.SocialConnections(childComplexity, args["socialAccountType"].(persist.SocialProvider), args["excludeAlreadyFollowing"].(*bool), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
+	case "Query.socialQueries":
+		if e.complexity.Query.SocialQueries == nil {
+			break
+		}
+
+		return e.complexity.Query.SocialQueries(childComplexity), true
+
 	case "Query.tokenById":
 		if e.complexity.Query.TokenByID == nil {
 			break
@@ -5003,6 +5020,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SocialConnectionsEdge.Node(childComplexity), true
+
+	case "SocialQueries.socialConnections":
+		if e.complexity.SocialQueries.SocialConnections == nil {
+			break
+		}
+
+		args, err := ec.field_SocialQueries_socialConnections_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.SocialQueries.SocialConnections(childComplexity, args["socialAccountType"].(persist.SocialProvider), args["excludeAlreadyFollowing"].(*bool), args["before"].(*string), args["after"].(*string), args["first"].(*int), args["last"].(*int)), true
 
 	case "SomeoneAdmiredYourFeedEventNotification.admirers":
 		if e.complexity.SomeoneAdmiredYourFeedEventNotification.Admirers == nil {
@@ -7259,7 +7288,7 @@ type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"
   profileImage: String!
 }
 
-union SocialConnectionsOrError = SocialConnection | ErrInvalidInput | ErrorNeedsToReconnectSocial
+union SocialConnectionsOrError = SocialConnection | ErrInvalidInput
 
 type SocialConnectionsEdge {
   node: SocialConnectionsOrError
@@ -7371,6 +7400,11 @@ type SearchCommunitiesPayload {
 
 union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
+union SocialQueriesOrError =
+    SocialConnectionsConnection
+  | ErrNotAuthorized
+  | ErrNeedsToReconnectSocial
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -7440,6 +7474,19 @@ type Query {
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
     @retoolAuth
 
+  socialConnections(
+    socialAccountType: SocialAccountType!
+    excludeAlreadyFollowing: Boolean
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
+
+  socialQueries: SocialQueries @authRequired
+}
+
+type SocialQueries {
   socialConnections(
     socialAccountType: SocialAccountType!
     excludeAlreadyFollowing: Boolean
@@ -7690,7 +7737,7 @@ type ErrInvalidToken implements Error {
   message: String!
 }
 
-type ErrorNeedsToReconnectSocial implements Error {
+type ErrNeedsToReconnectSocial implements Error {
   socialAccountType: SocialAccountType!
   message: String!
 }
@@ -8324,7 +8371,7 @@ union UpdateSocialAccountDisplayedPayloadOrError =
     UpdateSocialAccountDisplayedPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 input MintPremiumCardToWalletInput {
   tokenId: String!
@@ -8339,7 +8386,7 @@ union MintPremiumCardToWalletPayloadOrError =
     MintPremiumCardToWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 type DisconnectSocialAccountPayload {
   viewer: Viewer
@@ -8349,7 +8396,7 @@ union DisconnectSocialAccountPayloadOrError =
     DisconnectSocialAccountPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 type FollowAllSocialConnectionsPayload {
   viewer: Viewer
@@ -8359,7 +8406,7 @@ union FollowAllSocialConnectionsPayloadOrError =
     FollowAllSocialConnectionsPayload
   | ErrInvalidInput
   | ErrNotAuthorized
-  | ErrorNeedsToReconnectSocial
+  | ErrNeedsToReconnectSocial
 
 type Mutation {
   # User Mutations
@@ -10491,6 +10538,66 @@ func (ec *executionContext) field_Query_viewerGalleryById_args(ctx context.Conte
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_SocialQueries_socialConnections_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 persist.SocialProvider
+	if tmp, ok := rawArgs["socialAccountType"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("socialAccountType"))
+		arg0, err = ec.unmarshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["socialAccountType"] = arg0
+	var arg1 *bool
+	if tmp, ok := rawArgs["excludeAlreadyFollowing"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("excludeAlreadyFollowing"))
+		arg1, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["excludeAlreadyFollowing"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["before"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["before"] = arg2
+	var arg3 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg3, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg3
+	var arg4 *int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg4
+	var arg5 *int
+	if tmp, ok := rawArgs["last"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("last"))
+		arg5, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["last"] = arg5
 	return args, nil
 }
 
@@ -17774,6 +17881,94 @@ func (ec *executionContext) fieldContext_ErrInvalidToken_message(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _ErrNeedsToReconnectSocial_socialAccountType(ctx context.Context, field graphql.CollectedField, obj *model.ErrNeedsToReconnectSocial) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrNeedsToReconnectSocial_socialAccountType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SocialAccountType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(persist.SocialProvider)
+	fc.Result = res
+	return ec.marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrNeedsToReconnectSocial_socialAccountType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrNeedsToReconnectSocial",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SocialAccountType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ErrNeedsToReconnectSocial_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNeedsToReconnectSocial) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ErrNeedsToReconnectSocial_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ErrNeedsToReconnectSocial_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ErrNeedsToReconnectSocial",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ErrNoCookie_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrNoCookie) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ErrNoCookie_message(ctx, field)
 	if err != nil {
@@ -18160,94 +18355,6 @@ func (ec *executionContext) _ErrUsernameNotAvailable_message(ctx context.Context
 func (ec *executionContext) fieldContext_ErrUsernameNotAvailable_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ErrUsernameNotAvailable",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ErrorNeedsToReconnectSocial_socialAccountType(ctx context.Context, field graphql.CollectedField, obj *model.ErrorNeedsToReconnectSocial) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ErrorNeedsToReconnectSocial_socialAccountType(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.SocialAccountType, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(persist.SocialProvider)
-	fc.Result = res
-	return ec.marshalNSocialAccountType2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋserviceᚋpersistᚐSocialProvider(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ErrorNeedsToReconnectSocial_socialAccountType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ErrorNeedsToReconnectSocial",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type SocialAccountType does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ErrorNeedsToReconnectSocial_message(ctx context.Context, field graphql.CollectedField, obj *model.ErrorNeedsToReconnectSocial) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ErrorNeedsToReconnectSocial_message(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ErrorNeedsToReconnectSocial_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ErrorNeedsToReconnectSocial",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -31875,6 +31982,70 @@ func (ec *executionContext) fieldContext_Query_socialConnections(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_socialQueries(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_socialQueries(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().SocialQueries(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.SocialQueries); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.SocialQueries`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.SocialQueries)
+	fc.Result = res
+	return ec.marshalOSocialQueries2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialQueries(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_socialQueries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "socialConnections":
+				return ec.fieldContext_SocialQueries_socialConnections(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SocialQueries", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query__entities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query__entities(ctx, field)
 	if err != nil {
@@ -33643,6 +33814,84 @@ func (ec *executionContext) fieldContext_SocialConnectionsEdge_cursor(ctx contex
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SocialQueries_socialConnections(ctx context.Context, field graphql.CollectedField, obj *model.SocialQueries) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SocialQueries_socialConnections(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.SocialQueries().SocialConnections(rctx, obj, fc.Args["socialAccountType"].(persist.SocialProvider), fc.Args["excludeAlreadyFollowing"].(*bool), fc.Args["before"].(*string), fc.Args["after"].(*string), fc.Args["first"].(*int), fc.Args["last"].(*int))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.AuthRequired == nil {
+				return nil, errors.New("directive authRequired is not implemented")
+			}
+			return ec.directives.AuthRequired(ctx, obj, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.SocialConnectionsConnection); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.SocialConnectionsConnection`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.SocialConnectionsConnection)
+	fc.Result = res
+	return ec.marshalOSocialConnectionsConnection2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialConnectionsConnection(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SocialQueries_socialConnections(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SocialQueries",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_SocialConnectionsConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_SocialConnectionsConnection_pageInfo(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SocialConnectionsConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_SocialQueries_socialConnections_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -46885,13 +47134,13 @@ func (ec *executionContext) _DisconnectSocialAccountPayloadOrError(ctx context.C
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrorNeedsToReconnectSocial:
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, &obj)
-	case *model.ErrorNeedsToReconnectSocial:
+	case model.ErrNeedsToReconnectSocial:
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, &obj)
+	case *model.ErrNeedsToReconnectSocial:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, obj)
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -47006,13 +47255,13 @@ func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, ob
 			return graphql.Null
 		}
 		return ec._ErrInvalidToken(ctx, sel, obj)
-	case model.ErrorNeedsToReconnectSocial:
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, &obj)
-	case *model.ErrorNeedsToReconnectSocial:
+	case model.ErrNeedsToReconnectSocial:
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, &obj)
+	case *model.ErrNeedsToReconnectSocial:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, obj)
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, obj)
 	case model.ErrDoesNotOwnRequiredToken:
 		return ec._ErrDoesNotOwnRequiredToken(ctx, sel, &obj)
 	case *model.ErrDoesNotOwnRequiredToken:
@@ -47210,13 +47459,13 @@ func (ec *executionContext) _FollowAllSocialConnectionsPayloadOrError(ctx contex
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrorNeedsToReconnectSocial:
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, &obj)
-	case *model.ErrorNeedsToReconnectSocial:
+	case model.ErrNeedsToReconnectSocial:
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, &obj)
+	case *model.ErrNeedsToReconnectSocial:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, obj)
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -47680,13 +47929,13 @@ func (ec *executionContext) _MintPremiumCardToWalletPayloadOrError(ctx context.C
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrorNeedsToReconnectSocial:
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, &obj)
-	case *model.ErrorNeedsToReconnectSocial:
+	case model.ErrNeedsToReconnectSocial:
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, &obj)
+	case *model.ErrNeedsToReconnectSocial:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, obj)
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -48393,13 +48642,36 @@ func (ec *executionContext) _SocialConnectionsOrError(ctx context.Context, sel a
 			return graphql.Null
 		}
 		return ec._ErrInvalidInput(ctx, sel, obj)
-	case model.ErrorNeedsToReconnectSocial:
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, &obj)
-	case *model.ErrorNeedsToReconnectSocial:
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _SocialQueriesOrError(ctx context.Context, sel ast.SelectionSet, obj model.SocialQueriesOrError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.SocialConnectionsConnection:
+		return ec._SocialConnectionsConnection(ctx, sel, &obj)
+	case *model.SocialConnectionsConnection:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, obj)
+		return ec._SocialConnectionsConnection(ctx, sel, obj)
+	case model.ErrNotAuthorized:
+		return ec._ErrNotAuthorized(ctx, sel, &obj)
+	case *model.ErrNotAuthorized:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNotAuthorized(ctx, sel, obj)
+	case model.ErrNeedsToReconnectSocial:
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, &obj)
+	case *model.ErrNeedsToReconnectSocial:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -48958,13 +49230,13 @@ func (ec *executionContext) _UpdateSocialAccountDisplayedPayloadOrError(ctx cont
 			return graphql.Null
 		}
 		return ec._ErrNotAuthorized(ctx, sel, obj)
-	case model.ErrorNeedsToReconnectSocial:
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, &obj)
-	case *model.ErrorNeedsToReconnectSocial:
+	case model.ErrNeedsToReconnectSocial:
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, &obj)
+	case *model.ErrNeedsToReconnectSocial:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._ErrorNeedsToReconnectSocial(ctx, sel, obj)
+		return ec._ErrNeedsToReconnectSocial(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -51371,6 +51643,41 @@ func (ec *executionContext) _ErrInvalidToken(ctx context.Context, sel ast.Select
 	return out
 }
 
+var errNeedsToReconnectSocialImplementors = []string{"ErrNeedsToReconnectSocial", "SocialQueriesOrError", "Error", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
+
+func (ec *executionContext) _ErrNeedsToReconnectSocial(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNeedsToReconnectSocial) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, errNeedsToReconnectSocialImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ErrNeedsToReconnectSocial")
+		case "socialAccountType":
+
+			out.Values[i] = ec._ErrNeedsToReconnectSocial_socialAccountType(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "message":
+
+			out.Values[i] = ec._ErrNeedsToReconnectSocial_message(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var errNoCookieImplementors = []string{"ErrNoCookie", "AuthorizationError", "Error"}
 
 func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNoCookie) graphql.Marshaler {
@@ -51399,7 +51706,7 @@ func (ec *executionContext) _ErrNoCookie(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
+var errNotAuthorizedImplementors = []string{"ErrNotAuthorized", "ViewerOrError", "SocialQueriesOrError", "CreateCollectionPayloadOrError", "DeleteCollectionPayloadOrError", "UpdateCollectionInfoPayloadOrError", "UpdateCollectionTokensPayloadOrError", "UpdateCollectionHiddenPayloadOrError", "UpdateGalleryCollectionsPayloadOrError", "UpdateTokenInfoPayloadOrError", "SetSpamPreferencePayloadOrError", "AddUserWalletPayloadOrError", "RemoveUserWalletsPayloadOrError", "UpdateUserInfoPayloadOrError", "SyncTokensPayloadOrError", "Error", "DeepRefreshPayloadOrError", "AddRolesToUserPayloadOrError", "RevokeRolesFromUserPayloadOrError", "UploadPersistedQueriesPayloadOrError", "SyncTokensForUsernamePayloadOrError", "BanUserFromFeedPayloadOrError", "UnbanUserFromFeedPayloadOrError", "CreateGalleryPayloadOrError", "UpdateGalleryInfoPayloadOrError", "UpdateGalleryHiddenPayloadOrError", "DeleteGalleryPayloadOrError", "UpdateGalleryOrderPayloadOrError", "UpdateFeaturedGalleryPayloadOrError", "UpdateGalleryPayloadOrError", "PublishGalleryPayloadOrError", "UpdatePrimaryWalletPayloadOrError", "AdminAddWalletPayloadOrError", "UpdateUserExperiencePayloadOrError", "MoveCollectionToGalleryPayloadOrError", "ConnectSocialAccountPayloadOrError", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
 
 func (ec *executionContext) _ErrNotAuthorized(ctx context.Context, sel ast.SelectionSet, obj *model.ErrNotAuthorized) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errNotAuthorizedImplementors)
@@ -51587,41 +51894,6 @@ func (ec *executionContext) _ErrUsernameNotAvailable(ctx context.Context, sel as
 		case "message":
 
 			out.Values[i] = ec._ErrUsernameNotAvailable_message(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var errorNeedsToReconnectSocialImplementors = []string{"ErrorNeedsToReconnectSocial", "SocialConnectionsOrError", "Error", "UpdateSocialAccountDisplayedPayloadOrError", "MintPremiumCardToWalletPayloadOrError", "DisconnectSocialAccountPayloadOrError", "FollowAllSocialConnectionsPayloadOrError"}
-
-func (ec *executionContext) _ErrorNeedsToReconnectSocial(ctx context.Context, sel ast.SelectionSet, obj *model.ErrorNeedsToReconnectSocial) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errorNeedsToReconnectSocialImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ErrorNeedsToReconnectSocial")
-		case "socialAccountType":
-
-			out.Values[i] = ec._ErrorNeedsToReconnectSocial_socialAccountType(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "message":
-
-			out.Values[i] = ec._ErrorNeedsToReconnectSocial_message(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -54600,6 +54872,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "socialQueries":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_socialQueries(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "_entities":
 			field := field
 
@@ -55123,7 +55415,7 @@ func (ec *executionContext) _SocialConnection(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var socialConnectionsConnectionImplementors = []string{"SocialConnectionsConnection"}
+var socialConnectionsConnectionImplementors = []string{"SocialConnectionsConnection", "SocialQueriesOrError"}
 
 func (ec *executionContext) _SocialConnectionsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.SocialConnectionsConnection) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, socialConnectionsConnectionImplementors)
@@ -55173,6 +55465,44 @@ func (ec *executionContext) _SocialConnectionsEdge(ctx context.Context, sel ast.
 
 			out.Values[i] = ec._SocialConnectionsEdge_cursor(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var socialQueriesImplementors = []string{"SocialQueries"}
+
+func (ec *executionContext) _SocialQueries(ctx context.Context, sel ast.SelectionSet, obj *model.SocialQueries) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, socialQueriesImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SocialQueries")
+		case "socialConnections":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SocialQueries_socialConnections(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -61304,6 +61634,13 @@ func (ec *executionContext) marshalOSocialConnectionsOrError2githubᚗcomᚋmike
 		return graphql.Null
 	}
 	return ec._SocialConnectionsOrError(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOSocialQueries2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialQueries(ctx context.Context, sel ast.SelectionSet, v *model.SocialQueries) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SocialQueries(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {
