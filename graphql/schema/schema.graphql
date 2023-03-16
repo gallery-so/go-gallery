@@ -981,6 +981,11 @@ type SearchCommunitiesPayload {
 
 union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
+union SocialQueriesOrError =
+    SocialQueries
+  | ErrNotAuthorized
+  | ErrNeedsToReconnectSocial
+
 type Query {
   node(id: ID!): Node
   viewer: ViewerOrError @authRequired
@@ -1050,6 +1055,19 @@ type Query {
   usersByRole(role: Role!, before: String, after: String, first: Int, last: Int): UsersConnection
     @retoolAuth
 
+  socialConnections(
+    socialAccountType: SocialAccountType!
+    excludeAlreadyFollowing: Boolean
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
+
+  socialQueries: SocialQueriesOrError @authRequired
+}
+
+type SocialQueries {
   socialConnections(
     socialAccountType: SocialAccountType!
     excludeAlreadyFollowing: Boolean
@@ -1297,6 +1315,11 @@ type ErrNoCookie implements Error {
 }
 
 type ErrInvalidToken implements Error {
+  message: String!
+}
+
+type ErrNeedsToReconnectSocial implements Error {
+  socialAccountType: SocialAccountType!
   message: String!
 }
 
@@ -1929,6 +1952,7 @@ union UpdateSocialAccountDisplayedPayloadOrError =
     UpdateSocialAccountDisplayedPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrNeedsToReconnectSocial
 
 input MintPremiumCardToWalletInput {
   tokenId: String!
@@ -1943,6 +1967,7 @@ union MintPremiumCardToWalletPayloadOrError =
     MintPremiumCardToWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrNeedsToReconnectSocial
 
 type DisconnectSocialAccountPayload {
   viewer: Viewer
@@ -1952,6 +1977,7 @@ union DisconnectSocialAccountPayloadOrError =
     DisconnectSocialAccountPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrNeedsToReconnectSocial
 
 type FollowAllSocialConnectionsPayload {
   viewer: Viewer
@@ -1961,6 +1987,7 @@ union FollowAllSocialConnectionsPayloadOrError =
     FollowAllSocialConnectionsPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrNeedsToReconnectSocial
 
 type Mutation {
   # User Mutations

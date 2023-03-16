@@ -20,6 +20,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/notifications"
 	"github.com/mikeydub/go-gallery/service/socialauth"
+	"github.com/mikeydub/go-gallery/service/twitter"
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/mikeydub/go-gallery/debugtools"
@@ -163,6 +164,8 @@ func errorToGraphqlType(ctx context.Context, err error, gqlTypeName string) (gql
 		mappedErr = model.ErrUnknownAction{Message: message}
 	case persist.ErrGalleryNotFound:
 		mappedErr = model.ErrGalleryNotFound{Message: message}
+	case twitter.ErrInvalidRefreshToken:
+		mappedErr = model.ErrNeedsToReconnectSocial{SocialAccountType: persist.SocialProviderTwitter, Message: message}
 	}
 
 	if mappedErr != nil {
