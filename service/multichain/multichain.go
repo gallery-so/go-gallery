@@ -625,21 +625,19 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		return nil, nil
 	}
 
-	for _, provider := range d.Chains[chain] {
+	var metadata persist.TokenMetadata
+	var err error
 
+	for _, provider := range d.Chains[chain] {
 		if metadataFetcher, ok := provider.(tokenMetadataFetcher); ok {
-			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-			if err != nil {
-				return nil, err
-			}
-			if metadata != nil && len(metadata) > 0 {
+			metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+			if err == nil && len(metadata) > 0 {
 				return metadata, nil
 			}
 		}
-
 	}
 
-	return nil, nil
+	return metadata, err
 }
 
 // DeepRefresh re-indexes a user's wallets.
