@@ -1111,10 +1111,6 @@ func (e errUnsupportedMediaType) Error() string {
 	return fmt.Sprintf("unsupported media type %s", e.mediaType)
 }
 
-func (e errGeneratingThumbnail) Error() string {
-	return fmt.Sprintf("error generating thumbnail for url %s: %s", e.url, e.err)
-}
-
 func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName, contentType string) *storage.Writer {
 	writer := client.Bucket(bucket).Object(fileName).NewWriter(ctx)
 	writer.ObjectAttrs.ContentType = contentType
