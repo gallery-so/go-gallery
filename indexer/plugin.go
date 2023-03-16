@@ -289,8 +289,17 @@ func newOwnerPlugin(ctx context.Context, ethClient *ethclient.Client) ownersPlug
 								"tokenIdentifier": msg.key,
 								"block":           msg.transfer.BlockNumber,
 							}).Errorf("error getting owner of %s", msg.key)
+							out <- ownerAtBlock{
+								ti:    msg.key,
+								owner: msg.transfer.To,
+								boi: blockchainOrderInfo{
+									blockNumber: msg.transfer.BlockNumber,
+									txIndex:     msg.transfer.TxIndex,
+								},
+							}
+						} else {
+							out <- owner
 						}
-						out <- owner
 					} else {
 						out <- ownerAtBlock{
 							ti:    msg.key,
