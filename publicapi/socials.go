@@ -284,7 +284,7 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 		}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("error creating twitter api: %w", err)
+		return nil, err
 	}
 
 	return tapi, nil
