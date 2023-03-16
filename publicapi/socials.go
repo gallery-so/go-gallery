@@ -116,7 +116,7 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 			PagingForward:       params.PagingForward,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting social connections: %w", err)
 		}
 		return util.Map(results, func(r db.GetSocialConnectionsPaginateRow) (interface{}, error) {
 			m := model.SocialConnection{
@@ -140,11 +140,14 @@ func (api SocialAPI) GetConnectionsPaginate(ctx context.Context, socialProvider 
 
 		c, err := api.queries.CountSocialConnections(ctx, db.CountSocialConnectionsParams{
 			SocialIds:       socialIDs,
-			Column1:         socialProvider.String(),
+			Social:          socialProvider.String(),
 			OnlyUnfollowing: ouf,
 			UserID:          userID,
 		})
-		return int(c), err
+		if err != nil {
+			return 0, fmt.Errorf("error counting social connections: %w", err)
+		}
+		return int(c), nil
 	}
 
 	cursorFunc := func(i interface{}) (bool, time.Time, persist.DBID, error) {
@@ -264,12 +267,12 @@ func (api SocialAPI) GetConnections(ctx context.Context, socialProvider persist.
 func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DBID) (*twitter.API, error) {
 	socialAuth, err := api.queries.GetSocialAuthByUserID(ctx, db.GetSocialAuthByUserIDParams{UserID: userID, Provider: persist.SocialProviderTwitter})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting social auth: %w", err)
 	}
 
 	tapi, newSocials, err := twitter.NewAPI(api.queries, api.redis).WithAuth(ctx, socialAuth.AccessToken.String, socialAuth.RefreshToken.String)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating twitter api: %w", err)
 	}
 
 	if newSocials != nil {
@@ -281,7 +284,7 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 			RefreshToken: util.ToNullString(newSocials.RefreshToken),
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error updating social auth: %w", err)
 		}
 	}
 	return tapi, nil

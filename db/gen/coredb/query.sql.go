@@ -29,6 +29,7 @@ func (q *Queries) AddCollectionToGallery(ctx context.Context, arg AddCollectionT
 }
 
 const addManyFollows = `-- name: AddManyFollows :exec
+
 insert into follows (id, follower, followee, deleted) select unnest($1::varchar[]), $2, unnest($3::varchar[]), false on conflict (follower, followee) where deleted = false do update set deleted = false, last_updated = now() returning last_updated > created_at
 `
 
@@ -38,6 +39,11 @@ type AddManyFollowsParams struct {
 	Followees []string
 }
 
+// select count(*) from (select user_view.id as user_id from (select unnest(@social_ids::varchar[]) as social_id) as s
+// inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id
+// left outer join follows f on f.followee = user_view.id
+// where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end
+// and case when @only_unfollowing::bool then not f.followee = @user_id else true end) as t;
 func (q *Queries) AddManyFollows(ctx context.Context, arg AddManyFollowsParams) error {
 	_, err := q.db.Exec(ctx, addManyFollows, arg.Ids, arg.Follower, arg.Followees)
 	return err
@@ -198,26 +204,26 @@ func (q *Queries) CountSharedFollows(ctx context.Context, arg CountSharedFollows
 }
 
 const countSocialConnections = `-- name: CountSocialConnections :one
-select count(*) from (select user_view.id as user_id from (select unnest($2::varchar[]) as social_id) as s 
-inner join pii.user_view on user_view.pii_socials->$1::text->>'id'::varchar = s.social_id 
-left outer join follows f on f.followee = user_view.id
-where user_view.deleted = false and case when f.id is not null then f.deleted = false else true end 
-and case when $3::bool then not f.followee = $4 else true end) as t
+select count(*)
+from (select unnest($1::varchar[]) as social_id) as s
+    inner join pii.user_view on user_view.pii_socials->$2::text->>'id'::varchar = s.social_id and user_view.deleted = false
+    left outer join follows f on f.follower = $3 and f.followee = user_view.id and f.deleted = false
+where case when $4::bool then f.id is null else true end
 `
 
 type CountSocialConnectionsParams struct {
-	Column1         string
 	SocialIds       []string
-	OnlyUnfollowing bool
+	Social          string
 	UserID          persist.DBID
+	OnlyUnfollowing bool
 }
 
 func (q *Queries) CountSocialConnections(ctx context.Context, arg CountSocialConnectionsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countSocialConnections,
-		arg.Column1,
 		arg.SocialIds,
-		arg.OnlyUnfollowing,
+		arg.Social,
 		arg.UserID,
+		arg.OnlyUnfollowing,
 	)
 	var count int64
 	err := row.Scan(&count)
