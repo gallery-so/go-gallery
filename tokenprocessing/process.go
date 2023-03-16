@@ -172,6 +172,10 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		return nil
 	}
 
+	if !persist.TokenURI(newMedia.ThumbnailURL).IsRenderable() && persist.TokenURI(t.Media.ThumbnailURL).IsRenderable() {
+		newMedia.ThumbnailURL = t.Media.ThumbnailURL
+	}
+
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{
 		Media:       newMedia,
 		Metadata:    newMetadata,

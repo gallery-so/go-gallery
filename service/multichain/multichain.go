@@ -1174,7 +1174,15 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			if !seen {
 				seenTokens[ti] = candidateToken
 			} else if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() {
+				if persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && !persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
+					candidateToken.Media.ThumbnailURL = existingToken.Media.ThumbnailURL
+				}
 				seenTokens[ti] = candidateToken
+			} else if existingToken.Media.IsServable() {
+				if !persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
+					existingToken.Media.ThumbnailURL = candidateToken.Media.ThumbnailURL
+				}
+				seenTokens[ti] = existingToken
 			}
 
 			var found bool
