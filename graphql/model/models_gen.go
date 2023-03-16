@@ -991,6 +991,18 @@ func (ErrUsernameNotAvailable) IsUpdateUserInfoPayloadOrError() {}
 func (ErrUsernameNotAvailable) IsError()                        {}
 func (ErrUsernameNotAvailable) IsCreateUserPayloadOrError()     {}
 
+type ErrorNeedsToReconnectSocial struct {
+	SocialAccountType persist.SocialProvider `json:"socialAccountType"`
+	Message           string                 `json:"message"`
+}
+
+func (ErrorNeedsToReconnectSocial) IsSocialConnectionsOrError()                   {}
+func (ErrorNeedsToReconnectSocial) IsError()                                      {}
+func (ErrorNeedsToReconnectSocial) IsUpdateSocialAccountDisplayedPayloadOrError() {}
+func (ErrorNeedsToReconnectSocial) IsMintPremiumCardToWalletPayloadOrError()      {}
+func (ErrorNeedsToReconnectSocial) IsDisconnectSocialAccountPayloadOrError()      {}
+func (ErrorNeedsToReconnectSocial) IsFollowAllSocialConnectionsPayloadOrError()   {}
+
 type FeedConnection struct {
 	Edges    []*FeedEdge `json:"edges"`
 	PageInfo *PageInfo   `json:"pageInfo"`

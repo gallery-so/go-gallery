@@ -869,7 +869,7 @@ type SocialConnection implements Node @goGqlId(fields: ["socialId", "socialType"
   profileImage: String!
 }
 
-union SocialConnectionsOrError = SocialConnection | ErrInvalidInput
+union SocialConnectionsOrError = SocialConnection | ErrInvalidInput | ErrorNeedsToReconnectSocial
 
 type SocialConnectionsEdge {
   node: SocialConnectionsOrError
@@ -1297,6 +1297,11 @@ type ErrNoCookie implements Error {
 }
 
 type ErrInvalidToken implements Error {
+  message: String!
+}
+
+type ErrorNeedsToReconnectSocial implements Error {
+  socialAccountType: SocialAccountType!
   message: String!
 }
 
@@ -1929,6 +1934,7 @@ union UpdateSocialAccountDisplayedPayloadOrError =
     UpdateSocialAccountDisplayedPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrorNeedsToReconnectSocial
 
 input MintPremiumCardToWalletInput {
   tokenId: String!
@@ -1943,6 +1949,7 @@ union MintPremiumCardToWalletPayloadOrError =
     MintPremiumCardToWalletPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrorNeedsToReconnectSocial
 
 type DisconnectSocialAccountPayload {
   viewer: Viewer
@@ -1952,6 +1959,7 @@ union DisconnectSocialAccountPayloadOrError =
     DisconnectSocialAccountPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrorNeedsToReconnectSocial
 
 type FollowAllSocialConnectionsPayload {
   viewer: Viewer
@@ -1961,6 +1969,7 @@ union FollowAllSocialConnectionsPayloadOrError =
     FollowAllSocialConnectionsPayload
   | ErrInvalidInput
   | ErrNotAuthorized
+  | ErrorNeedsToReconnectSocial
 
 type Mutation {
   # User Mutations

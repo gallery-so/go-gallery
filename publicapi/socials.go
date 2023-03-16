@@ -271,10 +271,6 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 	}
 
 	tapi, newSocials, err := twitter.NewAPI(api.queries, api.redis).WithAuth(ctx, socialAuth.AccessToken.String, socialAuth.RefreshToken.String)
-	if err != nil {
-		return nil, fmt.Errorf("error creating twitter api: %w", err)
-	}
-
 	if newSocials != nil {
 		err = api.queries.UpsertSocialOAuth(ctx, coredb.UpsertSocialOAuthParams{
 			ID:           persist.GenerateID(),
@@ -287,6 +283,10 @@ func (api SocialAPI) newTwitterAPIForUser(ctx context.Context, userID persist.DB
 			return nil, fmt.Errorf("error updating social auth: %w", err)
 		}
 	}
+	if err != nil {
+		return nil, fmt.Errorf("error creating twitter api: %w", err)
+	}
+
 	return tapi, nil
 }
 
