@@ -231,7 +231,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 		} else if newURI != "" {
 			md, err := rpc.GetMetadataFromURI(ctx, newURI, ipfsClient, arweaveClient)
 			if err != nil {
-				logger.For(ctx).Errorf("Error getting metadata from URI: %s", err)
+				logger.For(ctx).Errorf("Error getting metadata from URI: %s (%s)", err, newURI)
 			} else {
 				newMetadata = md
 			}
@@ -246,7 +246,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 			Metadata: newMetadata,
 			TokenURI: newURI,
 		}); err != nil {
-			logger.For(ctx).Errorf("Error updating token metadata: %s", err)
+			logger.For(ctx).Errorf("Error updating token metadata: %s (uri: %s)", err, newURI)
 		}
 
 		c.JSON(http.StatusOK, GetTokenMetadataOutput{Metadata: newMetadata})

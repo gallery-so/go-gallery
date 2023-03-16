@@ -132,7 +132,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		"chain":           t.Chain,
 	})
 	totalTime := time.Now()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Hour)
 	defer cancel()
 
 	newMetadata := t.TokenMetadata
