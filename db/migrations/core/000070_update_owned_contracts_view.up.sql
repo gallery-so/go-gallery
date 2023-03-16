@@ -54,7 +54,7 @@ create materialized view owned_contracts as (
       owned_contracts.contract_id,
       owned_contracts.owned_count,
       coalesce(displayed_contracts.displayed_count, 0) as displayed_count,
-      displayed_contracts.displayed_count is not null as displayed,
+      (displayed_contracts.displayed_count is not null)::bool as displayed,
       now()::timestamptz as last_updated
   from owned_contracts
     left join displayed_contracts on
