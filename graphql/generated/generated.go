@@ -1435,7 +1435,7 @@ type QueryResolver interface {
 	SearchCommunities(ctx context.Context, query string, limit *int, nameWeight *float64, descriptionWeight *float64, poapAddressWeight *float64) (model.SearchCommunitiesPayloadOrError, error)
 	UsersByRole(ctx context.Context, role persist.Role, before *string, after *string, first *int, last *int) (*model.UsersConnection, error)
 	SocialConnections(ctx context.Context, socialAccountType persist.SocialProvider, excludeAlreadyFollowing *bool, before *string, after *string, first *int, last *int) (*model.SocialConnectionsConnection, error)
-	SocialQueries(ctx context.Context) (*model.SocialQueries, error)
+	SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error)
 }
 type RemoveAdmirePayloadResolver interface {
 	FeedEvent(ctx context.Context, obj *model.RemoveAdmirePayload) (*model.FeedEvent, error)
@@ -7401,7 +7401,7 @@ type SearchCommunitiesPayload {
 union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
 union SocialQueriesOrError =
-    SocialConnectionsConnection
+    SocialQueries
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
@@ -7483,7 +7483,7 @@ type Query {
     last: Int
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
-  socialQueries: SocialQueries @authRequired
+  socialQueries: SocialQueriesOrError @authRequired
 }
 
 type SocialQueries {
@@ -32013,10 +32013,10 @@ func (ec *executionContext) _Query_socialQueries(ctx context.Context, field grap
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*model.SocialQueries); ok {
+		if data, ok := tmp.(model.SocialQueriesOrError); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/mikeydub/go-gallery/graphql/model.SocialQueries`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be github.com/mikeydub/go-gallery/graphql/model.SocialQueriesOrError`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -32024,9 +32024,9 @@ func (ec *executionContext) _Query_socialQueries(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*model.SocialQueries)
+	res := resTmp.(model.SocialQueriesOrError)
 	fc.Result = res
-	return ec.marshalOSocialQueries2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialQueries(ctx, field.Selections, res)
+	return ec.marshalOSocialQueriesOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialQueriesOrError(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_socialQueries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -32036,11 +32036,7 @@ func (ec *executionContext) fieldContext_Query_socialQueries(ctx context.Context
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "socialConnections":
-				return ec.fieldContext_SocialQueries_socialConnections(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type SocialQueries", field.Name)
+			return nil, errors.New("field of type SocialQueriesOrError does not have child fields")
 		},
 	}
 	return fc, nil
@@ -48651,13 +48647,13 @@ func (ec *executionContext) _SocialQueriesOrError(ctx context.Context, sel ast.S
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case model.SocialConnectionsConnection:
-		return ec._SocialConnectionsConnection(ctx, sel, &obj)
-	case *model.SocialConnectionsConnection:
+	case model.SocialQueries:
+		return ec._SocialQueries(ctx, sel, &obj)
+	case *model.SocialQueries:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._SocialConnectionsConnection(ctx, sel, obj)
+		return ec._SocialQueries(ctx, sel, obj)
 	case model.ErrNotAuthorized:
 		return ec._ErrNotAuthorized(ctx, sel, &obj)
 	case *model.ErrNotAuthorized:
@@ -55415,7 +55411,7 @@ func (ec *executionContext) _SocialConnection(ctx context.Context, sel ast.Selec
 	return out
 }
 
-var socialConnectionsConnectionImplementors = []string{"SocialConnectionsConnection", "SocialQueriesOrError"}
+var socialConnectionsConnectionImplementors = []string{"SocialConnectionsConnection"}
 
 func (ec *executionContext) _SocialConnectionsConnection(ctx context.Context, sel ast.SelectionSet, obj *model.SocialConnectionsConnection) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, socialConnectionsConnectionImplementors)
@@ -55476,7 +55472,7 @@ func (ec *executionContext) _SocialConnectionsEdge(ctx context.Context, sel ast.
 	return out
 }
 
-var socialQueriesImplementors = []string{"SocialQueries"}
+var socialQueriesImplementors = []string{"SocialQueries", "SocialQueriesOrError"}
 
 func (ec *executionContext) _SocialQueries(ctx context.Context, sel ast.SelectionSet, obj *model.SocialQueries) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, socialQueriesImplementors)
@@ -61636,11 +61632,11 @@ func (ec *executionContext) marshalOSocialConnectionsOrError2githubᚗcomᚋmike
 	return ec._SocialConnectionsOrError(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOSocialQueries2ᚖgithubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialQueries(ctx context.Context, sel ast.SelectionSet, v *model.SocialQueries) graphql.Marshaler {
+func (ec *executionContext) marshalOSocialQueriesOrError2githubᚗcomᚋmikeydubᚋgoᚑgalleryᚋgraphqlᚋmodelᚐSocialQueriesOrError(ctx context.Context, sel ast.SelectionSet, v model.SocialQueriesOrError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._SocialQueries(ctx, sel, v)
+	return ec._SocialQueriesOrError(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {

@@ -982,7 +982,7 @@ type SearchCommunitiesPayload {
 union SearchCommunitiesPayloadOrError = SearchCommunitiesPayload | ErrInvalidInput
 
 union SocialQueriesOrError =
-    SocialConnectionsConnection
+    SocialQueries
   | ErrNotAuthorized
   | ErrNeedsToReconnectSocial
 
@@ -1064,7 +1064,7 @@ type Query {
     last: Int
   ): SocialConnectionsConnection @goField(forceResolver: true) @authRequired
 
-  socialQueries: SocialQueries @authRequired
+  socialQueries: SocialQueriesOrError @authRequired
 }
 
 type SocialQueries {

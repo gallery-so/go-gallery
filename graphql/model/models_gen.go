@@ -1520,8 +1520,6 @@ type SocialConnectionsConnection struct {
 	PageInfo *PageInfo                `json:"pageInfo"`
 }
 
-func (SocialConnectionsConnection) IsSocialQueriesOrError() {}
-
 type SocialConnectionsEdge struct {
 	Node   SocialConnectionsOrError `json:"node"`
 	Cursor *string                  `json:"cursor"`
@@ -1530,6 +1528,8 @@ type SocialConnectionsEdge struct {
 type SocialQueries struct {
 	SocialConnections *SocialConnectionsConnection `json:"socialConnections"`
 }
+
+func (SocialQueries) IsSocialQueriesOrError() {}
 
 type SomeoneAdmiredYourFeedEventNotification struct {
 	HelperSomeoneAdmiredYourFeedEventNotificationData

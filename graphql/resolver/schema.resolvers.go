@@ -1831,7 +1831,7 @@ func (r *queryResolver) SocialConnections(ctx context.Context, socialAccountType
 }
 
 // SocialQueries is the resolver for the socialQueries field.
-func (r *queryResolver) SocialQueries(ctx context.Context) (*model.SocialQueries, error) {
+func (r *queryResolver) SocialQueries(ctx context.Context) (model.SocialQueriesOrError, error) {
 	return &model.SocialQueries{}, nil
 }
 
