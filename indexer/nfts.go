@@ -208,7 +208,7 @@ func getTokenMetadata(nftRepository persist.TokenRepository, ipfsClient *shell.S
 		asEthAddress := persist.EthereumAddress(input.ContractAddress.String())
 		handler, hasCustomHandler := uniqueMetadataHandlers[asEthAddress]
 
-		if !ok || newURI == "" {
+		if !ok || newURI == "" || newURI.Type() == persist.URITypeInvalid || newURI.Type() == persist.URITypeUnknown {
 			newURI, err = rpc.GetTokenURI(ctx, firstWithValidTokenType.TokenType, input.ContractAddress, input.TokenID, ethClient)
 			// It's possible to fetch metadata for some contracts even if URI data is missing.
 			if !hasCustomHandler && (err != nil || newURI == "") {

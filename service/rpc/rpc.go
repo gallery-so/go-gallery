@@ -520,7 +520,8 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		// query unescape asString first
 		asString, err := url.QueryUnescape(asString)
 		if err != nil {
-			return nil, err
+			logger.For(ctx).Errorf("error unescaping uri: %s", err)
+			asString = turi.String()
 		}
 		idx := strings.IndexByte(asString, ',')
 		if idx == -1 {

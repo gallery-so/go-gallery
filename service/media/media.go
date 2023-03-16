@@ -268,7 +268,7 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 	}
 
 	if mediaType == persist.MediaTypeVideo {
-		liveRenderURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("live-render-%s", name), storageClient)
+		liveRenderURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		if err != nil {
 			logger.For(pCtx).Errorf("failed to get live render URL for %s: %v", name, err)
 		} else {
@@ -564,6 +564,9 @@ func remapPaths(mediaURL string) string {
 func remapMedia(media persist.Media) persist.Media {
 	media.MediaURL = persist.NullString(remapPaths(strings.TrimSpace(media.MediaURL.String())))
 	media.ThumbnailURL = persist.NullString(remapPaths(strings.TrimSpace(media.ThumbnailURL.String())))
+	if !persist.TokenURI(media.ThumbnailURL).IsRenderable() {
+		media.ThumbnailURL = persist.NullString("")
+	}
 	return media
 }
 

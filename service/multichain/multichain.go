@@ -507,7 +507,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	})
 }
 
-func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
 	input := map[string]interface{}{
 		"token_id":           tokenID,
 		"contract_address":   contractAddress,
@@ -766,7 +766,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}
 
 				image, anim := ti.Chain.BaseKeywords()
-				err = p.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
+				err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
 				if err != nil {
 					return err
 				}
