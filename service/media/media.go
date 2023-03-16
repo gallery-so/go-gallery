@@ -853,14 +853,14 @@ outer:
 		}
 
 		if err := thumbnailAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
-			return mediaType, false, err
+			logger.For(pCtx).Warnf("could not create thumbnail for %s: %s", name, err)
 		}
 
 		if err := createLiveRenderAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
 			logger.For(pCtx).Warnf("could not create live render for %s: %s", name, err)
 		}
 
-		logger.For(pCtx).Infof("cached video and thumbnail for %s in %s", name, time.Since(timeBeforeCache))
+		logger.For(pCtx).Infof("cached video for %s in %s", name, time.Since(timeBeforeCache))
 		return persist.MediaTypeVideo, true, nil
 	case persist.MediaTypeSVG:
 		timeBeforeCache := time.Now()

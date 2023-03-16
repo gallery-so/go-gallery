@@ -151,7 +151,7 @@ type verifier interface {
 
 type walletHooker interface {
 	// WalletCreated is called when a wallet is created
-	WalletCreated(context.Context, persist.DBID, persist.Address, persist.WalletType, persist.Chain) error
+	WalletCreated(context.Context, persist.DBID, persist.Address, persist.WalletType) error
 }
 
 // tokensFetcher supports fetching tokens for syncing
@@ -424,7 +424,7 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		}
 		// There's no available media for the token at this point, so set the state to syncing
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
-		if !providerTokens[i].Media.IsServable() && len(providerTokens[i].TokenMetadata) > 0 {
+		if !providerTokens[i].Media.IsServable() {
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
 		}
 	}
@@ -691,7 +691,7 @@ func (d *Provider) RunWalletCreationHooks(ctx context.Context, userID persist.DB
 	for _, provider := range d.Chains[chain] {
 
 		if hooker, ok := provider.(walletHooker); ok {
-			if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType, chain); err != nil {
+			if err := hooker.WalletCreated(ctx, userID, walletAddress, walletType); err != nil {
 				return err
 			}
 		}

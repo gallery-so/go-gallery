@@ -343,6 +343,7 @@ type TokenRepository interface {
 	UpdateByID(context.Context, DBID, interface{}) error
 	UpdateByTokenIdentifiers(context.Context, TokenID, EthereumAddress, interface{}) error
 	MostRecentBlock(context.Context) (BlockNumber, error)
+	TokenExistsByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (bool, error)
 }
 
 // ErrTokenNotFoundByTokenIdentifiers is an error that is returned when a token is not found by its identifiers (token ID and contract address)
