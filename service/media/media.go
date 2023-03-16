@@ -58,11 +58,6 @@ type errUnsupportedMediaType struct {
 	mediaType persist.MediaType
 }
 
-type errGeneratingThumbnail struct {
-	err error
-	url string
-}
-
 type mediaWithContentType struct {
 	mediaType   persist.MediaType
 	contentType string
@@ -228,8 +223,6 @@ func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, ar
 			}
 		case *net.DNSError:
 			resultCh <- cacheResult{persist.MediaTypeInvalid, cached, err}
-		case errGeneratingThumbnail:
-			resultCh <- cacheResult{mediaType, cached, err}
 		case *googleapi.Error:
 			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
@@ -833,7 +826,7 @@ outer:
 	timeBeforeDataReader := time.Now()
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return persist.MediaTypeUnknown, false, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
+		return mediaType, false, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
 	}
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
