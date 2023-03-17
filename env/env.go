@@ -2,7 +2,6 @@ package env
 
 import (
 	"context"
-	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -30,11 +29,12 @@ func Get[T any](ctx context.Context, name string) T {
 		}
 	}
 
+	if !viper.IsSet(name) {
+		return *new(T)
+	}
+
 	it, ok := viper.Get(name).(T)
 	if !ok {
-		if reflect.ValueOf(it).IsZero() {
-			return *new(T)
-		}
 		logger.For(ctx).Errorf("invalid env var: %s, expected type: %T", name, it)
 		return *new(T)
 	}

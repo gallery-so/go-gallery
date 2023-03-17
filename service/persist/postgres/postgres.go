@@ -19,7 +19,6 @@ import (
 	// register postgres driver
 	_ "github.com/jackc/pgx/v4/stdlib"
 	// _ "github.com/lib/pq"
-	"github.com/spf13/viper"
 )
 
 type ErrRoleDoesNotExist struct {
@@ -89,7 +88,7 @@ func newConnectionParamsFromEnv() connectionParams {
 		password: env.Get[string](ctx, "POSTGRES_PASSWORD"),
 		dbname:   env.Get[string](ctx, "POSTGRES_DB"),
 		host:     env.Get[string](ctx, "POSTGRES_HOST"),
-		port:     viper.GetInt("POSTGRES_PORT"),
+		port:     env.Get[int](ctx, "POSTGRES_PORT"),
 	}
 }
 

@@ -108,7 +108,7 @@ func initSentry() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              env.Get[string](context.Background(), "SENTRY_DSN"),
 		Environment:      env.Get[string](context.Background(), "ENV"),
-		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
+		TracesSampleRate: env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE"),
 		Release:          env.Get[string](context.Background(), "VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {

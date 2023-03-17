@@ -8,7 +8,6 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
 )
 
 // this wouldn't be necessary if we were using go 1.18 because we could have the auth.ParseJWT function use generics to return the correct type
@@ -43,7 +42,7 @@ func jwtGenerate(pUserID persist.DBID, email string) (string, error) {
 	signingKeyBytesLst := []byte(env.Get[string](context.Background(), "JWT_SECRET"))
 
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + viper.GetInt64("JWT_TTL") // expire N number of secs from now
+	expiresAtUNIXint := creationTimeUNIXint + env.Get[int64](context.Background(), "JWT_TTL") // expire N number of secs from now
 	claims := jwtClaims{
 		pUserID,
 		email,

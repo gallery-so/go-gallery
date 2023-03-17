@@ -61,7 +61,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.Get[int](context.Background(), "CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
@@ -110,7 +110,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	queueChan := make(chan processTokensInput)
 	t := newThrottler()
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.Get[int](ctx, "CHAIN")), defaultTransferEvents, nil, nil, nil)
 
 	go processMissingMetadata(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, env.Get[string](ctx, "GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
@@ -178,7 +178,7 @@ func initSentry() {
 			if ctx.Span.Op == rpc.GethSocketOpName {
 				return sentry.UniformTracesSampler(0.01).Sample(ctx)
 			}
-			return sentry.UniformTracesSampler(viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
+			return sentry.UniformTracesSampler(env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
 		}),
 		Release:          env.Get[string](context.Background(), "VERSION"),
 		AttachStacktrace: true,

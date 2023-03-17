@@ -58,8 +58,8 @@ func main() {
 	if env.Get[string](context.Background(), "CLOUD_RUN_JOB") != "" {
 		logrus.Infof("running as cloud run job")
 
-		jobIndex := viper.GetInt("CLOUD_RUN_TASK_INDEX")
-		jobCount := viper.GetInt("CLOUD_RUN_TASK_COUNT")
+		jobIndex := env.Get[int](ctx, "CLOUD_RUN_TASK_INDEX")
+		jobCount := env.Get[int](ctx, "CLOUD_RUN_TASK_COUNT")
 
 		// given the totalTokenCount, and the jobCount, we can calculate the offset and limit for this job
 		// we want to evenly distribute the work across the jobs

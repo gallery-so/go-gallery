@@ -6,12 +6,12 @@ import (
 	"time"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/service/tracing"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -87,7 +87,7 @@ func NewEventBuilder(queries *db.Queries) *EventBuilder {
 		eventRepo:         &postgres.EventRepository{Queries: queries},
 		feedRepo:          &postgres.FeedRepository{Queries: queries},
 		feedBlocklistRepo: &postgres.FeedBlocklistRepository{Queries: queries},
-		windowSize:        viper.GetDuration("FEED_WINDOW_SIZE") * time.Second,
+		windowSize:        env.Get[time.Duration](context.Background(), "FEED_WINDOW_SIZE") * time.Second,
 	}
 }
 
@@ -210,7 +210,7 @@ func (b *EventBuilder) createUserFollowedUsersFeedEvent(ctx context.Context, eve
 	if event.GroupID.String != "" {
 		events, err = b.eventRepo.Queries.GetEventsInGroup(ctx, event.GroupID)
 	} else {
-		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, viper.GetInt("FEED_WINDOW_SIZE"), persist.ActionList{event.Action}, false)
+		events, err = b.eventRepo.EventsInWindow(ctx, event.ID, env.Get[int](ctx, "FEED_WINDOW_SIZE"), persist.ActionList{event.Action}, false)
 	}
 	if err != nil {
 		return nil, err
@@ -241,7 +241,7 @@ func (b *EventBuilder) createGalleryUpdatedFeedEvent(ctx context.Context, event 
 	if event.GroupID.String != "" {
 		events, err = b.queries.GetEventsInGroup(ctx, event.GroupID)
 	} else {
-		events, err = b.eventRepo.EventsInWindowForGallery(ctx, event.ID, event.GalleryID, viper.GetInt("FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
+		events, err = b.eventRepo.EventsInWindowForGallery(ctx, event.ID, event.GalleryID, env.Get[int](ctx, "FEED_WINDOW_SIZE"), groupingConfig[persist.ActionGalleryUpdated], false)
 	}
 	if err != nil {
 		return nil, err
