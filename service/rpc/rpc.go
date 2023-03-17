@@ -25,6 +25,7 @@ import (
 	"golang.org/x/image/bmp"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util/retry"
@@ -43,7 +44,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -94,7 +94,7 @@ func NewEthClient() *ethclient.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	rpcClient, err := rpc.DialContext(ctx, viper.GetString("RPC_URL"))
+	rpcClient, err := rpc.DialContext(ctx, env.Get[string](ctx, "RPC_URL"))
 	if err != nil {
 		panic(err)
 	}
@@ -105,12 +105,12 @@ func NewEthClient() *ethclient.Client {
 
 // NewEthHTTPClient returns a new http client with request tracing enabled
 func NewEthHTTPClient() *ethclient.Client {
-	if !strings.HasPrefix(viper.GetString("RPC_URL"), "http") {
+	if !strings.HasPrefix(env.Get[string](context.Background(), "RPC_URL"), "http") {
 		return NewEthClient()
 	}
 
 	httpClient := newHTTPClientForRPC(false, sentryutil.TransactionNameSafe("gethRPC"))
-	rpcClient, err := rpc.DialHTTPWithClient(viper.GetString("RPC_URL"), httpClient)
+	rpcClient, err := rpc.DialHTTPWithClient(env.Get[string](context.Background(), "RPC_URL"), httpClient)
 	if err != nil {
 		panic(err)
 	}
@@ -120,7 +120,7 @@ func NewEthHTTPClient() *ethclient.Client {
 
 // NewEthSocketClient returns a new websocket client with request tracing enabled
 func NewEthSocketClient() *ethclient.Client {
-	if !strings.HasPrefix(viper.GetString("RPC_URL"), "wss") {
+	if !strings.HasPrefix(env.Get[string](context.Background(), "RPC_URL"), "wss") {
 		return NewEthClient()
 	}
 
@@ -158,7 +158,7 @@ func (h metricsHandler) Log(r *log.Record) error {
 
 // NewIPFSShell returns an IPFS shell
 func NewIPFSShell() *shell.Shell {
-	sh := shell.NewShellWithClient(viper.GetString("IPFS_API_URL"), newClientForIPFS(viper.GetString("IPFS_PROJECT_ID"), viper.GetString("IPFS_PROJECT_SECRET"), false))
+	sh := shell.NewShellWithClient(env.Get[string](context.Background(), "IPFS_API_URL"), newClientForIPFS(env.Get[string](context.Background(), "IPFS_PROJECT_ID"), env.Get[string](context.Background(), "IPFS_PROJECT_SECRET"), false))
 	sh.SetTimeout(time.Minute * 2)
 	return sh
 }
@@ -646,7 +646,7 @@ func GetIPFSResponse(pCtx context.Context, ipfsClient *shell.Shell, path string)
 
 	// Via HTTP gateway
 	go func() {
-		url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+		url := fmt.Sprintf("%s/ipfs/%s", env.Get[string](pCtx, "IPFS_URL"), path)
 		req, err := http.NewRequestWithContext(pCtx, "GET", url, nil)
 		if err != nil {
 			responseCh <- err
@@ -768,7 +768,7 @@ func getContentHeaders(ctx context.Context, url string) (contentType string, con
 
 // GetIPFSHeaders returns the headers for the given IPFS hash
 func GetIPFSHeaders(ctx context.Context, path string) (contentType string, contentLength int64, err error) {
-	url := fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+	url := fmt.Sprintf("%s/ipfs/%s", env.Get[string](ctx, "IPFS_URL"), path)
 	return getContentHeaders(ctx, url)
 }
 

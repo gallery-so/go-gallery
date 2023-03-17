@@ -6,6 +6,7 @@ import (
 
 	magicclient "github.com/magiclabs/magic-admin-go/client"
 	"github.com/magiclabs/magic-admin-go/token"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -17,7 +18,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
 )
 
 type AuthAPI struct {
@@ -46,7 +46,7 @@ func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce
 }
 
 func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
-	if !debugtools.Enabled || viper.GetString("ENV") != "local" {
+	if !debugtools.Enabled || env.Get[string](ctx, "ENV") != "local" {
 		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
 	}
 

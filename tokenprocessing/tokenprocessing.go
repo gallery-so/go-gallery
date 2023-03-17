@@ -8,6 +8,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -39,7 +40,7 @@ func coreInitServer() *gin.Engine {
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	if viper.GetString("ENV") != "production" {
+	if env.Get[string](context.Background(), "ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -50,7 +51,7 @@ func coreInitServer() *gin.Engine {
 	c := server.ClientInit(context.Background())
 	mc := server.NewMultichainProvider(c)
 
-	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.Get[string](context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {
@@ -75,7 +76,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"
@@ -86,7 +87,7 @@ func setDefaults() {
 		util.LoadEncryptedEnvFile(envFile)
 	}
 
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("VERSION", "")
 	}
@@ -97,7 +98,7 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	if viper.GetString("ENV") == "local" {
+	if env.Get[string](context.Background(), "ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -105,10 +106,10 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              viper.GetString("SENTRY_DSN"),
-		Environment:      viper.GetString("ENV"),
+		Dsn:              env.Get[string](context.Background(), "SENTRY_DSN"),
+		Environment:      env.Get[string](context.Background(), "ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
-		Release:          viper.GetString("VERSION"),
+		Release:          env.Get[string](context.Background(), "VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)

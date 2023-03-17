@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/task"
-	"github.com/spf13/viper"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gammazero/workerpool"
@@ -23,6 +23,10 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 )
+
+func init() {
+	env.RegisterEnvValidation("TOKEN_PROCESSING_URL", []string{"required"})
+}
 
 const staleCommunityTime = time.Minute * 30
 
@@ -520,7 +524,7 @@ func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.To
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", viper.GetString("TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/media/process/token", env.Get[string](ctx, "TOKEN_PROCESSING_URL")), bytes.NewBuffer(asJSON))
 	if err != nil {
 		return err
 	}

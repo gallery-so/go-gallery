@@ -3,6 +3,8 @@ package publicapi
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"cloud.google.com/go/storage"
@@ -12,7 +14,6 @@ import (
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
 )
 
 type MiscAPI struct {
@@ -27,10 +28,10 @@ type MiscAPI struct {
 func (api MiscAPI) GetGeneralAllowlist(ctx context.Context) ([]persist.EthereumAddress, error) {
 	// Nothing to validate
 
-	bucket := viper.GetString("SNAPSHOT_BUCKET")
+	bucket := env.Get[string](ctx, "SNAPSHOT_BUCKET")
 	logger.For(ctx).Infof("Proxying snapshot from bucket %s", bucket)
 
-	obj := api.storageClient.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
+	obj := api.storageClient.Bucket(env.Get[string](ctx, "SNAPSHOT_BUCKET")).Object("snapshot.json")
 
 	r, err := obj.NewReader(ctx)
 	if err != nil {

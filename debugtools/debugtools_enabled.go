@@ -16,7 +16,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/socialauth"
-	"github.com/spf13/viper"
 )
 
 const Enabled bool = true

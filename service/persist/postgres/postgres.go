@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v4"
@@ -67,9 +68,9 @@ func (c *connectionParams) toConnectionString() string {
 	//	return numNotEmpty
 	//}
 	//
-	//dbServerCa := viper.GetString("POSTGRES_SERVER_CA")
-	//dbClientKey := viper.GetString("POSTGRES_CLIENT_KEY")
-	//dbClientCert := viper.GetString("POSTGRES_CLIENT_CERT")
+	//dbServerCa := env.Get[string](ctx, "POSTGRES_SERVER_CA")
+	//dbClientKey := env.Get[string](ctx, "POSTGRES_CLIENT_KEY")
+	//dbClientCert := env.Get[string](ctx, "POSTGRES_CLIENT_CERT")
 	//
 	//numSSLParams := countNonEmptyStrings(dbServerCa, dbClientKey, dbClientCert)
 	//if numSSLParams == 0 {
@@ -82,11 +83,12 @@ func (c *connectionParams) toConnectionString() string {
 }
 
 func newConnectionParamsFromEnv() connectionParams {
+	ctx := context.Background()
 	return connectionParams{
-		user:     viper.GetString("POSTGRES_USER"),
-		password: viper.GetString("POSTGRES_PASSWORD"),
-		dbname:   viper.GetString("POSTGRES_DB"),
-		host:     viper.GetString("POSTGRES_HOST"),
+		user:     env.Get[string](ctx, "POSTGRES_USER"),
+		password: env.Get[string](ctx, "POSTGRES_PASSWORD"),
+		dbname:   env.Get[string](ctx, "POSTGRES_DB"),
+		host:     env.Get[string](ctx, "POSTGRES_HOST"),
 		port:     viper.GetInt("POSTGRES_PORT"),
 	}
 }

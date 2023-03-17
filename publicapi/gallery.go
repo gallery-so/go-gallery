@@ -10,11 +10,11 @@ import (
 
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/spf13/viper"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-playground/validator/v10"
@@ -659,7 +659,7 @@ func getExternalID(ctx context.Context) *string {
 	gc := util.GinContextFromContext(ctx)
 	if ip := net.ParseIP(gc.ClientIP()); ip != nil && !ip.IsPrivate() {
 		hash := sha256.New()
-		hash.Write([]byte(viper.GetString("BACKEND_SECRET") + ip.String()))
+		hash.Write([]byte(env.Get[string](ctx, "BACKEND_SECRET") + ip.String()))
 		res, _ := hash.(encoding.BinaryMarshaler).MarshalBinary()
 		externalID := base64.StdEncoding.EncodeToString(res)
 		return &externalID

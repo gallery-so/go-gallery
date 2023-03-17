@@ -3,9 +3,11 @@ package membership
 import (
 	"context"
 	"fmt"
-	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"net/http"
 	"time"
+
+	"github.com/mikeydub/go-gallery/env"
+	"github.com/mikeydub/go-gallery/service/persist/postgres"
 
 	"github.com/mikeydub/go-gallery/service/logger"
 
@@ -17,7 +19,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/multichain/opensea"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 // MembershipTierIDs is a list of all membership tiers
@@ -97,7 +98,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.EthereumAddress, tokenI
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
+	req.Header.Set("X-API-KEY", env.Get[string](context.Background(), "OPENSEA_API_KEY"))
 
 	resp, err := client.Do(req)
 	if err != nil {

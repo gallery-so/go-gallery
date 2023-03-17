@@ -11,9 +11,9 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/bits-and-blooms/bloom"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
-	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -112,7 +112,7 @@ func NewBlockFilterManager(ctx context.Context, sc *storage.Client) *BlockFilter
 		blocksPerLogFile: DefaultConfig.BlocksPerCachedLog,
 		chunkSize:        DefaultConfig.ChunkSize,
 		fetchWorkerSize:  DefaultConfig.ChunkWorkerSize,
-		repo:             &AddressFilterRepository{sc.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))},
+		repo:             &AddressFilterRepository{sc.Bucket(env.Get[string](ctx, "GCLOUD_TOKEN_LOGS_BUCKET"))},
 		fetchers:         make(map[persist.BlockNumber]*filterFetcher),
 		baseDir:          baseDir,
 		mu:               &mu,

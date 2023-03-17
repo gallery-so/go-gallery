@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/spf13/viper"
 )
@@ -66,7 +67,7 @@ func JWTGeneratePipeline(pCtx context.Context, pUserID persist.DBID) (string, er
 
 func jwtGenerate(pIssuerStr string, pUserID persist.DBID) (string, error) {
 
-	signingKeyBytesLst := []byte(viper.GetString("JWT_SECRET"))
+	signingKeyBytesLst := []byte(env.Get[string](context.Background(), "JWT_SECRET"))
 
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
 	expiresAtUNIXint := creationTimeUNIXint + viper.GetInt64("JWT_TTL") // expire N number of secs from now

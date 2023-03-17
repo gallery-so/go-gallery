@@ -7,11 +7,11 @@ import (
 	"math/big"
 
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -30,7 +30,7 @@ type CardAPI struct {
 
 func (api *CardAPI) MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (string, error) {
 
-	cardAddress := viper.GetString("PREMIUM_CONTRACT_ADDRESS")
+	cardAddress := env.Get[string](ctx, "PREMIUM_CONTRACT_ADDRESS")
 
 	cards, err := contracts.NewPremiumCards(common.HexToAddress(cardAddress), api.ethClient)
 	if err != nil {
@@ -42,8 +42,8 @@ func (api *CardAPI) MintPremiumCardToWallet(ctx context.Context, input model.Min
 		return "", fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	if chainID.Cmp(big.NewInt(1)) == 0 && viper.GetString("ENV") == "production" {
-		privateKey := viper.GetString("ETH_PRIVATE_KEY")
+	if chainID.Cmp(big.NewInt(1)) == 0 && env.Get[string](ctx, "ENV") == "production" {
+		privateKey := env.Get[string](ctx, "ETH_PRIVATE_KEY")
 
 		key, err := crypto.HexToECDSA(privateKey)
 		if err != nil {

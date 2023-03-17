@@ -7,8 +7,8 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 var errRetoolUnauthorized = errors.New("not authorized")
@@ -34,7 +34,7 @@ func RetoolAuthorized(ctx context.Context) error {
 	password := usernameAndPasswordParts[1]
 	passwordBytes := []byte(password)
 
-	if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("RETOOL_AUTH_TOKEN")), passwordBytes); cmp != 1 {
+	if cmp := subtle.ConstantTimeCompare([]byte(env.Get[string](ctx, "RETOOL_AUTH_TOKEN")), passwordBytes); cmp != 1 {
 		return errRetoolUnauthorized
 	}
 

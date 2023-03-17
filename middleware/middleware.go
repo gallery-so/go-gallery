@@ -7,6 +7,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/tracing"
@@ -16,7 +17,6 @@ import (
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 var mixpanelDistinctIDs = map[string]string{}
@@ -28,7 +28,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 // AdminRequired is a middleware that checks if the user is authenticated as an admin
 func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.GetHeader("Authorization") != viper.GetString("ADMIN_PASS") {
+		if c.GetHeader("Authorization") != env.Get[string](c, "ADMIN_PASS") {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "Unauthorized"})
 			return
 		}
@@ -57,7 +57,7 @@ func AddAuthToContext() gin.HandlerFunc {
 			return
 		}
 
-		userID, err := auth.JWTParse(jwt, viper.GetString("JWT_SECRET"))
+		userID, err := auth.JWTParse(jwt, env.Get[string](c, "JWT_SECRET"))
 		auth.SetAuthStateForCtx(c, userID, err)
 
 		// If we have a successfully authenticated user, add their ID to all subsequent logging

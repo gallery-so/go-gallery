@@ -19,7 +19,6 @@ import (
 	"github.com/sendgrid/rest"
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
-	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -84,12 +83,12 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 
 		//logger.For(c).Debugf("sending verification email to %s with token %s", emailAddress, j)
 
-		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
+		from := mail.NewEmail("Gallery", env.Get[string](c, "FROM_EMAIL"))
 		to := mail.NewEmail(userWithPII.Username.String, emailAddress)
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
-		m.SetTemplateID(viper.GetString("SENDGRID_VERIFICATION_TEMPLATE_ID"))
+		m.SetTemplateID(env.Get[string](c, "SENDGRID_VERIFICATION_TEMPLATE_ID"))
 		p.DynamicTemplateData = map[string]interface{}{
 			"username":          userWithPII.Username.String,
 			"verificationToken": j,
@@ -147,11 +146,11 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 }
 
 func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client) error {
-	sub := psub.Subscription(viper.GetString("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
-
 	ctx := context.Background()
+	sub := psub.Subscription(env.Get[string](ctx, "PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
+
 	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		err := sendNotificationEmailsToAllUsers(ctx, queries, s, viper.GetString("ENV") == "production")
+		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.Get[string](ctx, "ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			msg.Nack()
@@ -253,12 +252,12 @@ outer:
 
 	if sendRealEmail {
 		// send email
-		from := mail.NewEmail("Gallery", viper.GetString("FROM_EMAIL"))
+		from := mail.NewEmail("Gallery", env.Get[string](c, "FROM_EMAIL"))
 		to := mail.NewEmail(u.Username.String, emailRecipient.String())
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
-		m.SetTemplateID(viper.GetString("SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
+		m.SetTemplateID(env.Get[string](c, "SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
 		p.DynamicTemplateData = asMap
 		m.AddPersonalizations(p)
 		p.AddTos(to)

@@ -8,19 +8,19 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/spf13/viper"
+	"github.com/mikeydub/go-gallery/env"
 )
 
 func prepareRequest(ctx context.Context, body []byte) (*http.Request, error) {
-	url := fmt.Sprintf("%s/channels/%s/messages", viper.GetString("DISCORD_API"), viper.GetString("CHANNEL_ID"))
+	url := fmt.Sprintf("%s/channels/%s/messages", env.Get[string](ctx, "DISCORD_API"), env.Get[string](ctx, "CHANNEL_ID"))
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bot "+viper.GetString("BOT_TOKEN"))
-	req.Header.Set("User-Agent", viper.GetString("AGENT_NAME"))
+	req.Header.Set("Authorization", "Bot "+env.Get[string](ctx, "BOT_TOKEN"))
+	req.Header.Set("User-Agent", env.Get[string](ctx, "AGENT_NAME"))
 	req.Header.Set("Content-Type", "application/json")
 	return req, nil
 }

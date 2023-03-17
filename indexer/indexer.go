@@ -24,6 +24,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
@@ -32,8 +33,11 @@ import (
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
+
+func init() {
+	env.RegisterEnvValidation("GCLOUD_TOKEN_CONTENT_BUCKET", []string{"required"})
+}
 
 const (
 	// transferEventHash represents the keccak256 hash of Transfer(address,address,uint256)
@@ -222,7 +226,7 @@ func newIndexer(ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveCli
 		dbMu:              &sync.Mutex{},
 		stateMu:           &sync.Mutex{},
 
-		tokenBucket: viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"),
+		tokenBucket: env.Get[string](context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET"),
 
 		chain: pChain,
 
@@ -420,7 +424,7 @@ func (i *indexer) fetchLogs(ctx context.Context, startingBlock persist.BlockNumb
 
 func (i *indexer) defaultGetLogs(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 	var logsTo []types.Log
-	reader, err := i.storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
+	reader, err := i.storageClient.Bucket(env.Get[string](ctx, "GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%d-%d", curBlock, nextBlock)).NewReader(ctx)
 	if err != nil {
 		logger.For(ctx).WithError(err).Warn("error getting logs from GCP")
 	} else {
@@ -1130,7 +1134,7 @@ func transfersToTransfersAtBlock(transfers []rpc.Transfer) []transfersAtBlock {
 
 func saveLogsInBlockRange(ctx context.Context, curBlock, nextBlock string, logsTo []types.Log, storageClient *storage.Client) {
 	logger.For(ctx).Infof("Saving logs in block range %s to %s", curBlock, nextBlock)
-	obj := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
+	obj := storageClient.Bucket(env.Get[string](ctx, "GCLOUD_TOKEN_LOGS_BUCKET")).Object(fmt.Sprintf("%s-%s", curBlock, nextBlock))
 	obj.Delete(ctx)
 	storageWriter := obj.NewWriter(ctx)
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/apq"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/recommend"
@@ -43,7 +44,6 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 func handlersInit(router *gin.Engine, repos *postgres.Repositories, queries *db.Queries, ethClient *ethclient.Client, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client, mcProvider *multichain.Provider, throttler *throttle.Locker, taskClient *cloudtasks.Client, pub *pubsub.Client, lock *redislock.Client, secrets *secretmanager.Client, graphqlAPQCache *redis.Cache, feedCache *redis.Cache, socialCache *redis.Cache, magicClient *magicclient.API, recommender *recommend.Recommender) *gin.Engine {
@@ -112,7 +112,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 
 	// Request/response logging is spammy in a local environment and can typically be better handled via browser debug tools.
 	// It might be worth logging top-level queries and mutations in a single log line, though.
-	enableLogging := viper.GetString("ENV") != "local"
+	enableLogging := env.Get[string](context.Background(), "ENV") != "local"
 
 	h.AroundOperations(graphql.RequestReporter(schema.Schema(), enableLogging, true))
 	h.AroundResponses(graphql.ResponseReporter(enableLogging, true))

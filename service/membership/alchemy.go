@@ -9,9 +9,9 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/everFinance/goar"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 type alchemyGetOwnersForTokensResponse struct {
@@ -32,7 +32,7 @@ type indexerTokenResponse struct {
 }
 
 // func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.Address) ([]persist.Address, error) {
-// 	alchemyURL := viper.GetString("CONTRACT_INTERACTION_URL") + "/getOwnersForToken"
+// 	alchemyURL := env.Get[string](ctx, "CONTRACT_INTERACTION_URL") + "/getOwnersForToken"
 
 // 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?contractAddress=%s&tokenId=%s", alchemyURL, contractAddress, fmt.Sprintf("0x0%s", tid)), nil)
 // 	if err != nil {
@@ -54,7 +54,7 @@ type indexerTokenResponse struct {
 // }
 
 // func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.Address, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
-// 	alchemyURL := viper.GetString("CONTRACT_INTERACTION_URL") + "/getNFTMetadata"
+// 	alchemyURL := env.Get[string](ctx, "CONTRACT_INTERACTION_URL") + "/getNFTMetadata"
 
 // 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?contractAddress=%s&tokenId=%s", alchemyURL, contractAddress, tid), nil)
 // 	if err != nil {
@@ -96,7 +96,7 @@ type indexerTokenResponse struct {
 // }
 
 func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress) ([]persist.EthereumAddress, error) {
-	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s", viper.GetString("INDEXER_HOST"), tid, contractAddress)
+	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s", env.Get[string](ctx, "INDEXER_HOST"), tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -125,7 +125,7 @@ func getOwnersForToken(ctx context.Context, tid persist.TokenID, contractAddress
 }
 
 func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress persist.EthereumAddress, ipfsClient *shell.Shell, arweaveClient *goar.Client, stg *storage.Client) (alchemyNFTMetadata, error) {
-	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s&limit=1", viper.GetString("INDEXER_HOST"), tid, contractAddress)
+	url := fmt.Sprintf("%s/nfts/get?token_id=%s&contract_address=%s&limit=1", env.Get[string](ctx, "INDEXER_HOST"), tid, contractAddress)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

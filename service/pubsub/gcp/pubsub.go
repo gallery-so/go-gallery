@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
 
 	"cloud.google.com/go/pubsub"
-	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,10 +26,10 @@ func NewPubSub(pCtx context.Context, opts ...option.ClientOption) (*PubSub, erro
 
 func NewClient(ctx context.Context) *pubsub.Client {
 	options := []option.ClientOption{}
-	projectID := viper.GetString("GOOGLE_CLOUD_PROJECT")
+	projectID := env.Get[string](ctx, "GOOGLE_CLOUD_PROJECT")
 
-	if viper.GetString("ENV") == "local" {
-		if host := viper.GetString("PUBSUB_EMULATOR_HOST"); host != "" {
+	if env.Get[string](ctx, "ENV") == "local" {
+		if host := env.Get[string](ctx, "PUBSUB_EMULATOR_HOST"); host != "" {
 			projectID = "gallery-local"
 			options = append(
 				options,

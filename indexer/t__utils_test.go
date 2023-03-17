@@ -13,12 +13,12 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/option"
 )
@@ -76,7 +76,7 @@ func newMockIndexer(db *sql.DB, pool *pgxpool.Pool) *indexer {
 	rpcEnabled = true
 	ethClient := rpc.NewEthSocketClient()
 	storageClient := newStorageClient(context.Background())
-	bucket := storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))
+	bucket := storageClient.Bucket(env.Get[string](context.Background(), "GCLOUD_TOKEN_LOGS_BUCKET"))
 
 	i := newIndexer(ethClient, nil, nil, nil, postgres.NewTokenRepository(db), postgres.NewContractRepository(db), refresh.AddressFilterRepository{Bucket: bucket}, persist.ChainETH, defaultTransferEvents, func(ctx context.Context, curBlock, nextBlock *big.Int, topics [][]common.Hash) ([]types.Log, error) {
 		transferAgainLogs := []types.Log{{

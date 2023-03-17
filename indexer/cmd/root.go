@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/logger"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -11,7 +12,6 @@ import (
 	"google.golang.org/appengine"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -51,7 +51,7 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("[from-block] must be less than [to-block]")
 		}
 
-		if !cmd.Flags().Lookup("to-block").Changed && (!enableRPC && viper.GetString("ENV") != "production") {
+		if !cmd.Flags().Lookup("to-block").Changed && (!enableRPC && env.Get[string](cmd.Context(), "ENV") != "production") {
 			return fmt.Errorf("`flags in group [from-block, to-block] must all be set when [enable-rpc] is not set")
 		}
 

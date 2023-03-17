@@ -2,27 +2,24 @@ package env
 
 import (
 	"context"
+	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/service/logger"
-	"github.com/mikeydub/go-gallery/util"
-	"github.com/mikeydub/go-gallery/validate"
 	"github.com/spf13/viper"
 )
 
-// TODO cmd+f and replace "viper.GetString(" with "env.Get[string]("
-
 var validators = map[string][]string{}
 
-var v = validate.WithCustomValidators()
+var v = validator.New()
 
 func init() {
 	v.RegisterValidation("required_for_env", RequiredForEnv)
 }
 
 func RegisterEnvValidation(name string, tags []string) {
-	validators[name] = util.Dedupe(append(validators[name], tags...), true)
+	validators[name] = dedupe(append(validators[name], tags...))
 }
 
 func Get[T any](ctx context.Context, name string) T {
@@ -35,6 +32,9 @@ func Get[T any](ctx context.Context, name string) T {
 
 	it, ok := viper.Get(name).(T)
 	if !ok {
+		if reflect.ValueOf(it).IsZero() {
+			return *new(T)
+		}
 		logger.For(ctx).Errorf("invalid env var: %s, expected type: %T", name, it)
 		return *new(T)
 	}
@@ -54,4 +54,17 @@ var RequiredForEnv validator.Func = func(fl validator.FieldLevel) bool {
 	}
 
 	return spl[1] == Get[string](context.Background(), "ENV")
+}
+
+func dedupe(src []string) []string {
+	result := src[:0]
+
+	seen := make(map[string]bool)
+	for _, x := range src {
+		if !seen[x] {
+			result = append(result, x)
+			seen[x] = true
+		}
+	}
+	return result
 }

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/mediamapper"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
@@ -36,9 +37,12 @@ import (
 	"github.com/mikeydub/go-gallery/service/rpc"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/qmuntal/gltf"
-	"github.com/spf13/viper"
 	htransport "google.golang.org/api/transport/http"
 )
+
+func init() {
+	env.RegisterEnvValidation("IPFS_URL", []string{"required"})
+}
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")
 
@@ -85,7 +89,7 @@ var postfixesToMediaTypes = map[string]mediaWithContentType{
 func NewStorageClient(ctx context.Context) *storage.Client {
 	opts := append([]option.ClientOption{}, option.WithScopes([]string{storage.ScopeFullControl}...))
 
-	if viper.GetString("ENV") == "local" {
+	if env.Get[string](ctx, "ENV") == "local" {
 		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
 		if err != nil {
 			logger.For(ctx).WithError(err).Error("failed to find service key file (local), running without storage client")
@@ -551,7 +555,7 @@ func remapPaths(mediaURL string) string {
 	switch persist.TokenURI(mediaURL).Type() {
 	case persist.URITypeIPFS, persist.URITypeIPFSAPI:
 		path := util.GetURIPath(mediaURL, false)
-		return fmt.Sprintf("%s/ipfs/%s", viper.GetString("IPFS_URL"), path)
+		return fmt.Sprintf("%s/ipfs/%s", env.Get[string](context.Background(), "IPFS_URL"), path)
 	case persist.URITypeArweave:
 		path := util.GetURIPath(mediaURL, false)
 		return fmt.Sprintf("https://arweave.net/%s", path)

@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/socialauth"
 	"github.com/mikeydub/go-gallery/service/user"
-	"github.com/spf13/viper"
 
 	"cloud.google.com/go/storage"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -207,7 +207,7 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 }
 
 func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	address, tokenIDs := parseAddressTokens(viper.GetString("PREMIUM_CONTRACT_ADDRESS"))
+	address, tokenIDs := parseAddressTokens(env.Get[string](ctx, "PREMIUM_CONTRACT_ADDRESS"))
 	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
 		UserID:                userID,
 		MembershipAddress:     persist.Address(address),

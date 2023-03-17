@@ -10,6 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/dataloader"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -44,7 +45,7 @@ func coreInitServer() *gin.Engine {
 
 	loaders := dataloader.NewLoaders(context.Background(), queries, false)
 
-	sendgridClient := sendgrid.NewSendClient(viper.GetString("SENDGRID_API_KEY"))
+	sendgridClient := sendgrid.NewSendClient(env.Get[string](context.Background(), "SENDGRID_API_KEY"))
 
 	http.DefaultClient = &http.Client{Transport: tracing.NewTracingTransport(http.DefaultTransport, false)}
 
@@ -52,7 +53,7 @@ func coreInitServer() *gin.Engine {
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	if viper.GetString("ENV") != "production" {
+	if env.Get[string](context.Background(), "ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -61,13 +62,13 @@ func coreInitServer() *gin.Engine {
 
 	var pub *pubsub.Client
 	var err error
-	if viper.GetString("ENV") == "local" {
-		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"), option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
+	if env.Get[string](context.Background(), "ENV") == "local" {
+		pub, err = pubsub.NewClient(context.Background(), env.Get[string](context.Background(), "GOOGLE_CLOUD_PROJECT"), option.WithCredentialsJSON(util.LoadEncryptedServiceKey("./secrets/dev/service-key-dev.json")))
 		if err != nil {
 			panic(err)
 		}
 	} else {
-		pub, err = pubsub.NewClient(context.Background(), viper.GetString("GOOGLE_CLOUD_PROJECT"))
+		pub, err = pubsub.NewClient(context.Background(), env.Get[string](context.Background(), "GOOGLE_CLOUD_PROJECT"))
 		if err != nil {
 			panic(err)
 		}
@@ -104,7 +105,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"
@@ -115,7 +116,7 @@ func setDefaults() {
 		util.LoadEncryptedEnvFile(envFile)
 	}
 
-	if viper.GetString("ENV") != "local" {
+	if env.Get[string](context.Background(), "ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 		util.VarNotSetTo("VERSION", "")
 		util.VarNotSetTo("SENDGRID_API_KEY", "")
@@ -129,7 +130,7 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	if viper.GetString("ENV") == "local" {
+	if env.Get[string](context.Background(), "ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -137,10 +138,10 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              viper.GetString("SENTRY_DSN"),
-		Environment:      viper.GetString("ENV"),
+		Dsn:              env.Get[string](context.Background(), "SENTRY_DSN"),
+		Environment:      env.Get[string](context.Background(), "ENV"),
 		TracesSampleRate: viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE"),
-		Release:          viper.GetString("VERSION"),
+		Release:          env.Get[string](context.Background(), "VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
@@ -159,11 +160,11 @@ func initLogger() {
 	logger.SetLoggerOptions(func(l *logrus.Logger) {
 		l.SetReportCaller(true)
 
-		if viper.GetString("ENV") != "production" {
+		if env.Get[string](context.Background(), "ENV") != "production" {
 			l.SetLevel(logrus.DebugLevel)
 		}
 
-		if viper.GetString("ENV") == "local" {
+		if env.Get[string](context.Background(), "ENV") == "local" {
 			l.SetFormatter(&logrus.TextFormatter{DisableQuote: true})
 		} else {
 			// Use a JSONFormatter for non-local environments because Google Cloud Logging works well with JSON-formatted log entries
@@ -174,5 +175,5 @@ func initLogger() {
 }
 
 func isDevEnv() bool {
-	return viper.GetString("ENV") != "production"
+	return env.Get[string](context.Background(), "ENV") != "production"
 }
