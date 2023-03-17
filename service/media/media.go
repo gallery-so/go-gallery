@@ -62,11 +62,6 @@ type errUnsupportedMediaType struct {
 	mediaType persist.MediaType
 }
 
-type errGeneratingThumbnail struct {
-	err error
-	url string
-}
-
 type mediaWithContentType struct {
 	mediaType   persist.MediaType
 	contentType string
@@ -232,8 +227,6 @@ func downloadMediaFromURL(ctx context.Context, storageClient *storage.Client, ar
 			}
 		case *net.DNSError:
 			resultCh <- cacheResult{persist.MediaTypeInvalid, cached, err}
-		case errGeneratingThumbnail:
-			resultCh <- cacheResult{mediaType, cached, err}
 		case *googleapi.Error:
 			panic(fmt.Errorf("googleAPI error %s: %s", caught, err))
 		default:
@@ -272,7 +265,7 @@ func getAuxilaryMedia(pCtx context.Context, name, tokenBucket string, storageCli
 	}
 
 	if mediaType == persist.MediaTypeVideo {
-		liveRenderURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("live-render-%s", name), storageClient)
+		liveRenderURL, err := getMediaServingURL(pCtx, tokenBucket, fmt.Sprintf("liverender-%s", name), storageClient)
 		if err != nil {
 			logger.For(pCtx).Errorf("failed to get live render URL for %s: %v", name, err)
 		} else {
@@ -568,6 +561,9 @@ func remapPaths(mediaURL string) string {
 func remapMedia(media persist.Media) persist.Media {
 	media.MediaURL = persist.NullString(remapPaths(strings.TrimSpace(media.MediaURL.String())))
 	media.ThumbnailURL = persist.NullString(remapPaths(strings.TrimSpace(media.ThumbnailURL.String())))
+	if !persist.TokenURI(media.ThumbnailURL).IsRenderable() {
+		media.ThumbnailURL = persist.NullString("")
+	}
 	return media
 }
 
@@ -747,15 +743,15 @@ func cacheRawAnimationMedia(ctx context.Context, reader io.Reader, bucket, fileN
 func thumbnailAndCache(ctx context.Context, videoURL, bucket, name string, client *storage.Client) error {
 
 	fileName := fmt.Sprintf("thumbnail-%s", name)
-	logger.For(ctx).Infof("caching raw media for '%s'", fileName)
+	logger.For(ctx).Infof("caching thumbnail for '%s'", fileName)
 
 	timeBeforeCopy := time.Now()
 
 	sw := newObjectWriter(ctx, client, bucket, fileName, "image/jpeg")
 
 	logger.For(ctx).Infof("thumbnailing %s", videoURL)
-	if err := thumbnailVideoToWriter(videoURL, sw); err != nil {
-		return fmt.Errorf("could not write to bucket %s for '%s': %s", bucket, fileName, err)
+	if err := thumbnailVideoToWriter(ctx, videoURL, sw); err != nil {
+		return fmt.Errorf("could not thumbnail to bucket %s for '%s': %s", bucket, fileName, err)
 	}
 
 	if err := sw.Close(); err != nil {
@@ -779,8 +775,8 @@ func createLiveRenderAndCache(ctx context.Context, videoURL, bucket, name string
 	sw := newObjectWriter(ctx, client, bucket, fileName, "video/mp4")
 
 	logger.For(ctx).Infof("creating live render for %s", videoURL)
-	if err := createLiveRenderPreviewVideo(videoURL, sw); err != nil {
-		return fmt.Errorf("could not write to bucket %s for '%s': %s", bucket, fileName, err)
+	if err := createLiveRenderPreviewVideo(ctx, videoURL, sw); err != nil {
+		return fmt.Errorf("could not live render to bucket %s for '%s': %s", bucket, fileName, err)
 	}
 
 	if err := sw.Close(); err != nil {
@@ -834,7 +830,7 @@ outer:
 	timeBeforeDataReader := time.Now()
 	reader, err := rpc.GetDataFromURIAsReader(pCtx, asURI, ipfsClient, arweaveClient)
 	if err != nil {
-		return persist.MediaTypeUnknown, false, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
+		return mediaType, false, fmt.Errorf("could not get reader for %s: %s", mediaURL, err)
 	}
 	logger.For(pCtx).Infof("got reader for %s in %s", name, time.Since(timeBeforeDataReader))
 	defer reader.Close()
@@ -857,14 +853,14 @@ outer:
 		}
 
 		if err := thumbnailAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
-			return mediaType, false, err
+			logger.For(pCtx).Errorf("could not create thumbnail for %s: %s", name, err)
 		}
 
 		if err := createLiveRenderAndCache(pCtx, videoURL, bucket, name, storageClient); err != nil {
-			logger.For(pCtx).Warnf("could not create live render for %s: %s", name, err)
+			logger.For(pCtx).Errorf("could not create live render for %s: %s", name, err)
 		}
 
-		logger.For(pCtx).Infof("cached video and thumbnail for %s in %s", name, time.Since(timeBeforeCache))
+		logger.For(pCtx).Infof("cached video for %s in %s", name, time.Since(timeBeforeCache))
 		return persist.MediaTypeVideo, true, nil
 	case persist.MediaTypeSVG:
 		timeBeforeCache := time.Now()
@@ -989,15 +985,15 @@ func GuessMediaType(bs []byte) (persist.MediaType, string) {
 
 }
 
-func thumbnailVideoToWriter(url string, writer io.Writer) error {
-	c := exec.Command("ffmpeg", "-seekable", "1", "-i", url, "-ss", "00:00:00.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
+func thumbnailVideoToWriter(ctx context.Context, url string, writer io.Writer) error {
+	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", url, "-ss", "00:00:00.000", "-vframes", "1", "-f", "mjpeg", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
 }
 
-func createLiveRenderPreviewVideo(videoURL string, writer io.Writer) error {
-	c := exec.Command("ffmpeg", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
+func createLiveRenderPreviewVideo(ctx context.Context, videoURL string, writer io.Writer) error {
+	c := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", videoURL, "-ss", "00:00:00.000", "-t", "00:00:05.000", "-filter:v", "scale=720:-1", "-movflags", "frag_keyframe+empty_moov", "-c:a", "copy", "-f", "mp4", "pipe:1")
 	c.Stderr = os.Stderr
 	c.Stdout = writer
 	return c.Run()
@@ -1052,7 +1048,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 		break
 	}
 
-	logrus.Debugf("got dimensions %+v for %s", dims, url)
+	logger.For(ctx).Debugf("got dimensions %+v for %s", dims, url)
 	return dims, nil
 }
 
@@ -1117,10 +1113,6 @@ func (e errUnsupportedURL) Error() string {
 
 func (e errUnsupportedMediaType) Error() string {
 	return fmt.Sprintf("unsupported media type %s", e.mediaType)
-}
-
-func (e errGeneratingThumbnail) Error() string {
-	return fmt.Sprintf("error generating thumbnail for url %s: %s", e.url, e.err)
 }
 
 func newObjectWriter(ctx context.Context, client *storage.Client, bucket, fileName, contentType string) *storage.Writer {

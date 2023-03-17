@@ -2598,6 +2598,7 @@ func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPa
 // disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayload
 // disconnectSocialAccountDisconnectSocialAccountErrInvalidInput
 // disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
+// disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial
 type disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError interface {
 	implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -2609,6 +2610,8 @@ func (v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPa
 func (v *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
 }
 func (v *disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
+}
+func (v *disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial) implementsGraphQLInterfacedisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError() {
 }
 
 func __unmarshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError(b []byte, v *disconnectSocialAccountDisconnectSocialAccountDisconnectSocialAccountPayloadOrError) error {
@@ -2633,6 +2636,9 @@ func __unmarshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAc
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrNeedsToReconnectSocial":
+		*v = new(disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -2669,6 +2675,14 @@ func __marshaldisconnectSocialAccountDisconnectSocialAccountDisconnectSocialAcco
 		result := struct {
 			TypeName string `json:"__typename"`
 			*disconnectSocialAccountDisconnectSocialAccountErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial:
+		typename = "ErrNeedsToReconnectSocial"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -2722,6 +2736,22 @@ func (v *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput) GetTypen
 
 // GetMessage returns disconnectSocialAccountDisconnectSocialAccountErrInvalidInput.Message, and is useful for accessing the field via an interface.
 func (v *disconnectSocialAccountDisconnectSocialAccountErrInvalidInput) GetMessage() string {
+	return v.Message
+}
+
+// disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial includes the requested fields of the GraphQL type ErrNeedsToReconnectSocial.
+type disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial.Typename, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial.Message, and is useful for accessing the field via an interface.
+func (v *disconnectSocialAccountDisconnectSocialAccountErrNeedsToReconnectSocial) GetMessage() string {
 	return v.Message
 }
 
@@ -5263,6 +5293,22 @@ func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput
 	return v.Message
 }
 
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial includes the requested fields of the GraphQL type ErrNeedsToReconnectSocial.
+type updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial struct {
+	Typename *string `json:"__typename"`
+	Message  string  `json:"message"`
+}
+
+// GetTypename returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial.Typename, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial) GetTypename() *string {
+	return v.Typename
+}
+
+// GetMessage returns updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial.Message, and is useful for accessing the field via an interface.
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial) GetMessage() string {
+	return v.Message
+}
+
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized includes the requested fields of the GraphQL type ErrNotAuthorized.
 type updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized struct {
 	Typename *string `json:"__typename"`
@@ -5301,6 +5347,7 @@ func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAcc
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayload
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput
 // updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized
+// updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial
 type updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError interface {
 	implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
@@ -5312,6 +5359,8 @@ func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAcc
 func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrInvalidInput) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
 }
 func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
+}
+func (v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial) implementsGraphQLInterfaceupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError() {
 }
 
 func __unmarshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError(b []byte, v *updateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSocialAccountDisplayedPayloadOrError) error {
@@ -5336,6 +5385,9 @@ func __unmarshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSo
 		return json.Unmarshal(b, *v)
 	case "ErrNotAuthorized":
 		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized)
+		return json.Unmarshal(b, *v)
+	case "ErrNeedsToReconnectSocial":
+		*v = new(updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -5372,6 +5424,14 @@ func __marshalupdateSocialAccountDisplayedUpdateSocialAccountDisplayedUpdateSoci
 		result := struct {
 			TypeName string `json:"__typename"`
 			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNotAuthorized
+		}{typename, v}
+		return json.Marshal(result)
+	case *updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial:
+		typename = "ErrNeedsToReconnectSocial"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*updateSocialAccountDisplayedUpdateSocialAccountDisplayedErrNeedsToReconnectSocial
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:

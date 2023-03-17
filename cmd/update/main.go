@@ -64,7 +64,7 @@ func processAddresses(addresses <-chan persist.Address, wg *sync.WaitGroup) {
 		a := address
 		wp.Submit(func() {
 			logrus.Infof("processing address %s", a)
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 			defer cancel()
 
 			body := indexer.UpdateTokenInput{

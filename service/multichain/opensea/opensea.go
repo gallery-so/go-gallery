@@ -390,19 +390,9 @@ func verifySignature(pSignatureStr string,
 }
 
 func FetchAssetsForWallet(ctx context.Context, address persist.EthereumAddress) ([]Asset, error) {
-	collections, err := FetchCollectionsForAddress(ctx, address)
-	if err != nil {
-		return nil, err
-	}
-
 	url := baseURL.JoinPath("assets")
 	setPagingParams(url)
 	setOwner(url, address)
-	for _, collection := range collections {
-		for _, contract := range collection.PrimaryAssetContracts {
-			addContractAddress(url, contract.Address)
-		}
-	}
 
 	req, err := authRequest(ctx, url.String())
 	if err != nil {
@@ -599,7 +589,7 @@ func assetsToTokens(ctx context.Context, ownerAddress persist.Address, assetsCha
 					case "ERC1155":
 						tokenType = persist.TokenTypeERC1155
 					default:
-						errChan <- fmt.Errorf("unknown token type: %s", nft.Contract.ContractSchemaName)
+						logger.For(ctx).Warnf("unknown token type: %s", nft.Contract.ContractSchemaName)
 						return
 					}
 

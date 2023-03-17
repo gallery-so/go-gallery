@@ -52,7 +52,7 @@ type DeepRefreshMessage struct {
 }
 
 type ValidateNFTsMessage struct {
-	OwnerAddress persist.EthereumAddress `json:"owner_address"`
+	OwnerAddress persist.EthereumAddress `json:"wallet"`
 }
 
 func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMessage, client *gcptasks.Client) error {
