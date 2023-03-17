@@ -507,7 +507,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	})
 }
 
-func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
 	input := map[string]interface{}{
 		"token_id":           tokenID,
 		"contract_address":   contractAddress,
@@ -766,7 +766,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}
 
 				image, anim := ti.Chain.BaseKeywords()
-				err = p.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
+				err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
 				if err != nil {
 					return err
 				}
@@ -1174,7 +1174,15 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			if !seen {
 				seenTokens[ti] = candidateToken
 			} else if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() {
+				if persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && !persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
+					candidateToken.Media.ThumbnailURL = existingToken.Media.ThumbnailURL
+				}
 				seenTokens[ti] = candidateToken
+			} else if existingToken.Media.IsServable() {
+				if !persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
+					existingToken.Media.ThumbnailURL = candidateToken.Media.ThumbnailURL
+				}
+				seenTokens[ti] = existingToken
 			}
 
 			var found bool

@@ -132,7 +132,7 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 		"chain":           t.Chain,
 	})
 	totalTime := time.Now()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Hour)
 	defer cancel()
 
 	newMetadata := t.TokenMetadata
@@ -170,6 +170,10 @@ func processToken(c context.Context, key string, t persist.TokenGallery, contrac
 	if t.Media.IsServable() && !newMedia.IsServable() {
 		logger.For(ctx).Debugf("not replacing existing media for %s: cur %v new %v", key, t.Media.IsServable(), newMedia.IsServable())
 		return nil
+	}
+
+	if !persist.TokenURI(newMedia.ThumbnailURL).IsRenderable() && persist.TokenURI(t.Media.ThumbnailURL).IsRenderable() {
+		newMedia.ThumbnailURL = t.Media.ThumbnailURL
 	}
 
 	up := persist.TokenUpdateAllURIDerivedFieldsInput{

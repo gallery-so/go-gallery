@@ -520,7 +520,8 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 		// query unescape asString first
 		asString, err := url.QueryUnescape(asString)
 		if err != nil {
-			return nil, err
+			logger.For(ctx).Errorf("error unescaping uri: %s", err)
+			asString = turi.String()
 		}
 		idx := strings.IndexByte(asString, ',')
 		if idx == -1 {
@@ -559,10 +560,10 @@ func GetDataFromURIAsReader(ctx context.Context, turi persist.TokenURI, ipfsClie
 func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *persist.TokenMetadata, ipfsClient *shell.Shell, arweaveClient *goar.Client) error {
 
 	d, _ := ctx.Deadline()
-	logger.For(ctx).Debugf("Getting data from URI: %s -timeout: %s", turi.String(), time.Until(d))
+	logger.For(ctx).Debugf("Getting metadata from URI: %s -timeout: %s", turi.String(), time.Until(d))
 	asString := turi.String()
 
-	logger.For(ctx).Debugf("Getting data from %s with type %s", asString, turi.Type())
+	logger.For(ctx).Debugf("Getting metadata from %s with type %s", asString, turi.Type())
 
 	switch turi.Type() {
 	case persist.URITypeBase64JSON:
@@ -570,7 +571,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
 		}
 
 		return json.Unmarshal(util.RemoveBOM(decoded), into)
@@ -578,7 +579,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		b64data := asString[strings.IndexByte(asString, ',')+1:]
 		decoded, err := base64.StdEncoding.DecodeString(string(b64data))
 		if err != nil {
-			return fmt.Errorf("error decoding base64 data: %s \n\n%s", err, b64data)
+			return fmt.Errorf("error decoding base64 metadata: %s \n\n%s", err, b64data)
 		}
 		into = &persist.TokenMetadata{"image": string(decoded)}
 		return nil
@@ -608,7 +609,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		}
 		resp, err := defaultHTTPClient.Do(req)
 		if err != nil {
-			return fmt.Errorf("error getting data from http: %s", err)
+			return fmt.Errorf("error getting metadata from http: %s", err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode > 399 || resp.StatusCode < 200 {
@@ -635,7 +636,7 @@ func DecodeMetadataFromURI(ctx context.Context, turi persist.TokenURI, into *per
 		return json.Unmarshal(util.RemoveBOM([]byte(asString[idx:])), into)
 
 	default:
-		return fmt.Errorf("unknown token URI type: %s", turi.Type())
+		return fmt.Errorf("unknown token URI type for metadata: %s", turi.Type())
 	}
 
 }
