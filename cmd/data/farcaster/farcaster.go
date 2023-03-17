@@ -17,7 +17,7 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("ENV", []string{"required", "oneof=local development production"})
+
 	env.RegisterEnvValidation("FARCASTER_MNEMONIC", []string{"required"})
 }
 

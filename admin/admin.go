@@ -18,10 +18,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-func init() {
-	env.RegisterEnvValidation("ENV", []string{"required", "oneof=local development production"})
-}
-
 // Init initializes the server
 func Init() {
 	setDefaults()

@@ -25,10 +25,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-func init() {
-	env.RegisterEnvValidation("ENV", []string{"required", "oneof=local development production"})
-}
-
 type updateTokenMedia struct {
 	TokenDBID persist.DBID
 	Media     persist.Media
