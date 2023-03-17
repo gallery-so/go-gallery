@@ -879,6 +879,39 @@ func RetryGetBalanceOfERC1155Token(ctx context.Context, pOwnerAddress, pContract
 	return balance, err
 }
 
+// GetOwnerOfERC721Token returns the Owner of an ERC721 token
+func GetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
+	contract := common.HexToAddress(string(pContractAddress))
+
+	instance, err := contracts.NewIERC721Caller(contract, ethClient)
+	if err != nil {
+		return "", err
+	}
+
+	owner, err := instance.OwnerOf(&bind.CallOpts{
+		Context: ctx,
+	}, pTokenID.BigInt())
+	if err != nil {
+		return "", err
+	}
+
+	return persist.EthereumAddress(strings.ToLower(owner.String())), nil
+}
+
+// RetryGetOwnerOfERC721Token calls GetOwnerOfERC721Token with backoff.
+func RetryGetOwnerOfERC721Token(ctx context.Context, pContractAddress persist.EthereumAddress, pTokenID persist.TokenID, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
+	var owner persist.EthereumAddress
+	var err error
+	for i := 0; i < retry.DefaultRetry.Tries; i++ {
+		owner, err = GetOwnerOfERC721Token(ctx, pContractAddress, pTokenID, ethClient)
+		if !isRateLimitedError(err) {
+			break
+		}
+		retry.DefaultRetry.Sleep(i)
+	}
+	return owner, err
+}
+
 // GetContractCreator returns the address of the contract creator
 func GetContractCreator(ctx context.Context, contractAddress persist.EthereumAddress, ethClient *ethclient.Client) (persist.EthereumAddress, error) {
 	highestBlock, err := ethClient.BlockNumber(ctx)
