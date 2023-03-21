@@ -278,6 +278,11 @@ var typeConversionMap = map[string]func(object interface{}) (objectAsType interf
 		return obj, ok
 	},
 
+	"SocialQueriesOrError": func(object interface{}) (interface{}, bool) {
+		obj, ok := object.(SocialQueriesOrError)
+		return obj, ok
+	},
+
 	"SyncTokensForUsernamePayloadOrError": func(object interface{}) (interface{}, bool) {
 		obj, ok := object.(SyncTokensForUsernamePayloadOrError)
 		return obj, ok

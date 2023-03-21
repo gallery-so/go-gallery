@@ -507,7 +507,7 @@ func (p *Provider) sendTokensToTokenProcessing(ctx context.Context, userID persi
 	})
 }
 
-func (p *Provider) processMedialessToken(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
+func (p *Provider) processTokenMedia(ctx context.Context, tokenID persist.TokenID, contractAddress persist.Address, chain persist.Chain, ownerAddress persist.Address, imageKeywords, animationKeywords []string) error {
 	input := map[string]interface{}{
 		"token_id":           tokenID,
 		"contract_address":   contractAddress,
@@ -625,21 +625,19 @@ func (d *Provider) GetTokenMetadataByTokenIdentifiers(ctx context.Context, contr
 		return nil, nil
 	}
 
-	for _, provider := range d.Chains[chain] {
+	var metadata persist.TokenMetadata
+	var err error
 
+	for _, provider := range d.Chains[chain] {
 		if metadataFetcher, ok := provider.(tokenMetadataFetcher); ok {
-			metadata, err := metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
-			if err != nil {
-				return nil, err
-			}
-			if metadata != nil && len(metadata) > 0 {
+			metadata, err = metadataFetcher.GetTokenMetadataByTokenIdentifiers(ctx, ChainAgnosticIdentifiers{ContractAddress: contractAddress, TokenID: tokenID}, ownerAddress)
+			if err == nil && len(metadata) > 0 {
 				return metadata, nil
 			}
 		}
-
 	}
 
-	return nil, nil
+	return metadata, err
 }
 
 // DeepRefresh re-indexes a user's wallets.
@@ -768,7 +766,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 				}
 
 				image, anim := ti.Chain.BaseKeywords()
-				err = p.processMedialessToken(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
+				err = p.processTokenMedia(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, refreshedToken.OwnerAddress, image, anim)
 				if err != nil {
 					return err
 				}
@@ -1176,7 +1174,15 @@ func tokensToNewDedupedTokens(ctx context.Context, tokens []chainTokens, contrac
 			if !seen {
 				seenTokens[ti] = candidateToken
 			} else if !existingToken.Media.IsServable() && candidateToken.Media.IsServable() {
+				if persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && !persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
+					candidateToken.Media.ThumbnailURL = existingToken.Media.ThumbnailURL
+				}
 				seenTokens[ti] = candidateToken
+			} else if existingToken.Media.IsServable() {
+				if !persist.TokenURI(existingToken.Media.ThumbnailURL).IsRenderable() && persist.TokenURI(candidateToken.Media.ThumbnailURL).IsRenderable() {
+					existingToken.Media.ThumbnailURL = candidateToken.Media.ThumbnailURL
+				}
+				seenTokens[ti] = existingToken
 			}
 
 			var found bool

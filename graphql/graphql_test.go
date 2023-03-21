@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
 	genql "github.com/Khan/genqlient/graphql"
@@ -343,6 +344,9 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, update2Reponse.UpdateGallery)
+
+	// Wait for event handlers to store update events
+	time.Sleep(time.Second)
 
 	// publish
 	publishResponse, err := publishGalleryMutation(context.Background(), c, PublishGalleryInput{
@@ -691,6 +695,9 @@ func testTrendingUsers(t *testing.T) {
 		}
 		return actual
 	}
+
+	// Wait for event handlers to store views
+	time.Sleep(time.Second)
 
 	t.Run("should pull the last 5 days", func(t *testing.T) {
 		actual := getTrending(t, "LAST_5_DAYS")

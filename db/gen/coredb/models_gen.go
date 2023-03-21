@@ -223,11 +223,13 @@ type Notification struct {
 }
 
 type OwnedContract struct {
-	UserID      persist.DBID
-	ContractID  persist.DBID
-	OwnedCount  int64
-	Displayed   bool
-	LastUpdated time.Time
+	UserID         persist.DBID
+	UserCreatedAt  time.Time
+	ContractID     persist.DBID
+	OwnedCount     int64
+	DisplayedCount int64
+	Displayed      bool
+	LastUpdated    time.Time
 }
 
 type PiiForUser struct {
@@ -280,6 +282,13 @@ type RecommendationResult struct {
 	CreatedAt         time.Time
 	LastUpdated       time.Time
 	Deleted           bool
+}
+
+type ScrubbedPiiForUser struct {
+	UserID          persist.DBID
+	PiiEmailAddress persist.Email
+	Deleted         bool
+	PiiSocials      persist.Socials
 }
 
 type Token struct {

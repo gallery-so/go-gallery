@@ -63,6 +63,14 @@ type TwitterIdentifiers struct {
 var errUnauthed = errors.New("unauthorized to use twitter API")
 var errAPINotAuthed = errors.New("not authenticated with twitter, use (*API).WithAuth to authenticate")
 
+type ErrInvalidRefreshToken struct {
+	err error
+}
+
+func (e ErrInvalidRefreshToken) Error() string {
+	return fmt.Sprintf("invalid refresh token: %v", e.err)
+}
+
 func NewAPI(queries *coredb.Queries, redis *redis.Cache) *API {
 	httpClient := &http.Client{}
 	httpClient.Transport = tracing.NewTracingTransport(http.DefaultTransport, false)
@@ -152,8 +160,7 @@ func (a *API) generateAuthTokenFromRefresh(ctx context.Context, refreshToken str
 	accessResp, err := http.DefaultClient.Do(accessReq)
 	if err != nil {
 		err = util.GetErrFromResp(accessResp)
-		return AccessTokenResponse{}, fmt.Errorf("failed to get access token: %s", err)
-
+		return AccessTokenResponse{}, fmt.Errorf("failed to get access token from refresh: %s", err)
 	}
 
 	defer accessResp.Body.Close()
@@ -163,7 +170,7 @@ func (a *API) generateAuthTokenFromRefresh(ctx context.Context, refreshToken str
 	}
 	if accessResp.StatusCode != http.StatusOK {
 		err = util.GetErrFromResp(accessResp)
-		return AccessTokenResponse{}, fmt.Errorf("failed to get access token, returned status: %s", err)
+		return AccessTokenResponse{}, ErrInvalidRefreshToken{err: fmt.Errorf("failed to get access token from refresh, returned status: %s", err)}
 	}
 
 	var accessToken AccessTokenResponse
@@ -226,7 +233,7 @@ func (a *API) WithAuth(ctx context.Context, accessToken string, refreshToken str
 			a.refreshCode = newAtr.RefreshToken
 			user, err = a.getAuthedUser(ctx, newAtr.AccessToken)
 			if err != nil {
-				return nil, nil, err
+				return nil, &newAtr, err
 			}
 			a.TIDs = user
 			a.isAuthed = true

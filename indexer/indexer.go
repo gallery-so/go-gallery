@@ -878,7 +878,7 @@ func (i *indexer) processTransfers(ctx context.Context, transfers []transfersAtB
 
 }
 
-func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, from persist.EthereumAddress, tokenID persist.TokenID, key persist.EthereumTokenIdentifiers, blockNumber persist.BlockNumber, to persist.EthereumAddress, ethClient *ethclient.Client) (tokenBalances, error) {
+func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, from persist.EthereumAddress, tokenID persist.TokenID, key persist.EthereumTokenIdentifiers, blockNumber persist.BlockNumber, txIndex uint, to persist.EthereumAddress, ethClient *ethclient.Client) (tokenBalances, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 
@@ -900,7 +900,22 @@ func getBalances(ctx context.Context, contractAddress persist.EthereumAddress, f
 
 	// MaxUint because there is no txIndex, this is simply the most up to date balance on the blockchain so it should always be ahead of any other information at this block
 	// CurBlock becuase the RPC functions return the current balance, not the balance of the block being processed
-	bal := tokenBalances{key, blockchainOrderInfo{blockNumber: blockNumber}, from, to, fromBalance, toBalance}
+	bal := tokenBalances{key, blockchainOrderInfo{blockNumber: blockNumber, txIndex: txIndex}, from, to, fromBalance, toBalance}
+	return bal, nil
+}
+
+func getOwner(ctx context.Context, contractAddress persist.EthereumAddress, tokenID persist.TokenID, key persist.EthereumTokenIdentifiers, blockNumber persist.BlockNumber, txIndex uint, ethClient *ethclient.Client) (ownerAtBlock, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+
+	owner, err := rpc.RetryGetOwnerOfERC721Token(ctx, contractAddress, tokenID, ethClient)
+	if err != nil {
+		return ownerAtBlock{}, err
+	}
+
+	// MaxUint because there is no txIndex, this is simply the most up to date balance on the blockchain so it should always be ahead of any other information at this block
+	// CurBlock becuase the RPC functions return the current balance, not the balance of the block being processed
+	bal := ownerAtBlock{key, blockchainOrderInfo{blockNumber: blockNumber, txIndex: txIndex}, owner}
 	return bal, nil
 }
 

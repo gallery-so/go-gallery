@@ -16,6 +16,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
@@ -154,14 +155,14 @@ func main() {
 				}()
 			}
 
-			logrus.Infof("got dimensions for %s (%s): %+v", media.MediaURL, tokenDBID, media.Dimensions)
+			logger.For(ctx).Infof("got dimensions for %s (%s): %+v", media.MediaURL, tokenDBID, media.Dimensions)
 
 			results <- updateTokenMedia{
 				TokenDBID: tokenDBID,
 				Media:     media,
 			}
 
-			logrus.Infof("finished processing %s (%s)", media.MediaURL, tokenDBID)
+			logger.For(ctx).Infof("finished processing %s (%s)", media.MediaURL, tokenDBID)
 
 		})
 	}
@@ -274,7 +275,7 @@ func getMediaDimensions(ctx context.Context, url string) (persist.Dimensions, er
 		break
 	}
 
-	logrus.Debugf("got dimensions %+v for %s", dims, url)
+	logger.For(ctx).Debugf("got dimensions %+v for %s", dims, url)
 	return dims, nil
 }
 

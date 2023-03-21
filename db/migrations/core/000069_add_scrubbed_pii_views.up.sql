@@ -47,3 +47,5 @@ create view scrubbed_pii.for_users as (
             join scrubbed_email_address e on e.user_id = p.user_id
             join scrubbed_socials s on s.user_id = p.user_id
 );
+
+set role to access_rw;
