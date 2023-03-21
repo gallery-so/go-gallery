@@ -291,6 +291,15 @@ type ScrubbedPiiForUser struct {
 	PiiSocials      persist.Socials
 }
 
+type SpamUserScore struct {
+	UserID        persist.DBID
+	Score         int32
+	DecidedIsSpam sql.NullBool
+	DecidedAt     sql.NullTime
+	Deleted       bool
+	CreatedAt     time.Time
+}
+
 type Token struct {
 	ID                   persist.DBID
 	Deleted              bool
