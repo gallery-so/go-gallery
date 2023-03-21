@@ -417,7 +417,6 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 	}
 
 	newTokens := make(map[persist.TokenIdentifiers]bool)
-	syncingTokens := make([]persist.DBID, 0, len(providerTokens))
 
 	for i, token := range providerTokens {
 		existingToken, exists := tokenLookup[token.TokenIdentifiers()]
@@ -431,7 +430,6 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.
 		if !exists && !token.Media.IsServable() {
 			providerTokens[i].Media = persist.Media{MediaType: persist.MediaTypeSyncing}
-			syncingTokens = append(syncingTokens, token.ID)
 		}
 
 		if !exists {
