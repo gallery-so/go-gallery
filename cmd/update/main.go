@@ -19,7 +19,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("INDEXER_HOST", []string{"required", "http"})
+	env.RegisterValidation("INDEXER_HOST", "required", "http")
 }
 func main() {
 

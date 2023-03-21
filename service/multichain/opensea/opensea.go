@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("OPENSEA_API_KEY", []string{"required"})
+	env.RegisterValidation("OPENSEA_API_KEY", "required")
 }
 
 var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")

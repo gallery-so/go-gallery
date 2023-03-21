@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("SNAPSHOT_BUCKET", []string{"required"})
+	env.RegisterValidation("SNAPSHOT_BUCKET", "required")
 }
 
 var rwMutex = &sync.RWMutex{}

@@ -19,7 +19,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("FARCASTER_MNEMONIC", []string{"required"})
+	env.RegisterValidation("FARCASTER_MNEMONIC", "required")
 }
 
 type farcastGalleryAcc struct {

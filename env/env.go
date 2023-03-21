@@ -20,7 +20,7 @@ func init() {
 	v.RegisterValidation("required_for_env", RequiredForEnv)
 }
 
-func RegisterValidation(name string, tags []string) {
+func RegisterValidation(name string, tags ...string) {
 	validatorsMu.Lock()
 	defer validatorsMu.Unlock()
 	validators[name] = dedupe(append(validators[name], tags...))

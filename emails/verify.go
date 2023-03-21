@@ -16,8 +16,8 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("SENDGRID_DEFAULT_LIST_ID", []string{"required"})
-	env.RegisterValidation("SENDGRID_API_KEY", []string{"required"})
+	env.RegisterValidation("SENDGRID_DEFAULT_LIST_ID", "required")
+	env.RegisterValidation("SENDGRID_API_KEY", "required")
 }
 
 type VerifyEmailInput struct {

@@ -49,8 +49,8 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("TOKEN_PROCESSING_URL", []string{"required"})
-	env.RegisterValidation("INDEXER_HOST", []string{"required"})
+	env.RegisterValidation("TOKEN_PROCESSING_URL", "required")
+	env.RegisterValidation("INDEXER_HOST", "required")
 }
 
 // Init initializes the server

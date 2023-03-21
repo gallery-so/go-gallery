@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("EMAILS_HOST", []string{"required"})
+	env.RegisterValidation("EMAILS_HOST", "required")
 }
 
 func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, error) {

@@ -41,7 +41,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("IPFS_URL", []string{"required"})
+	env.RegisterValidation("IPFS_URL", "required")
 }
 
 var errAlreadyHasMedia = errors.New("token already has preview and thumbnail URLs")

@@ -36,7 +36,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("GCLOUD_TOKEN_CONTENT_BUCKET", []string{"required"})
+	env.RegisterValidation("GCLOUD_TOKEN_CONTENT_BUCKET", "required")
 }
 
 const (

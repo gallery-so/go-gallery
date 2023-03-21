@@ -23,9 +23,9 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("FROM_EMAIL", []string{"required", "email"})
-	env.RegisterValidation("SENDGRID_VERIFICATION_TEMPLATE_ID", []string{"required"})
-	env.RegisterValidation("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", []string{"required"})
+	env.RegisterValidation("FROM_EMAIL", "required", "email")
+	env.RegisterValidation("SENDGRID_VERIFICATION_TEMPLATE_ID", "required")
+	env.RegisterValidation("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", "required")
 }
 
 const emailsAtATime = 10_000

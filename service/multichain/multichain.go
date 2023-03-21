@@ -25,7 +25,7 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("TOKEN_PROCESSING_URL", []string{"required"})
+	env.RegisterValidation("TOKEN_PROCESSING_URL", "required")
 }
 
 const staleCommunityTime = time.Minute * 30

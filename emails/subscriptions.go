@@ -19,8 +19,8 @@ import (
 )
 
 func init() {
-	env.RegisterValidation("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", []string{"required"})
-	env.RegisterValidation("SENDGRID_API_KEY", []string{"required"})
+	env.RegisterValidation("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", "required")
+	env.RegisterValidation("SENDGRID_API_KEY", "required")
 }
 
 var emailTypes = []model.EmailUnsubscriptionType{model.EmailUnsubscriptionTypeAll, model.EmailUnsubscriptionTypeNotifications}
