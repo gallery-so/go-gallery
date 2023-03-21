@@ -28,7 +28,7 @@ type errUserDoesNotHaveRequiredNFT struct {
 // AdminRequired is a middleware that checks if the user is authenticated as an admin
 func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.GetHeader("Authorization") != env.Get[string](c, "ADMIN_PASS") {
+		if c.GetHeader("Authorization") != env.GetString(c, "ADMIN_PASS") {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, util.ErrorResponse{Error: "Unauthorized"})
 			return
 		}
@@ -57,7 +57,7 @@ func AddAuthToContext() gin.HandlerFunc {
 			return
 		}
 
-		userID, err := auth.JWTParse(jwt, env.Get[string](c, "JWT_SECRET"))
+		userID, err := auth.JWTParse(jwt, env.GetString(c, "JWT_SECRET"))
 		auth.SetAuthStateForCtx(c, userID, err)
 
 		// If we have a successfully authenticated user, add their ID to all subsequent logging

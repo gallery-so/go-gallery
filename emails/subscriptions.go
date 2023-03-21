@@ -19,8 +19,8 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", []string{"required"})
-	env.RegisterEnvValidation("SENDGRID_API_KEY", []string{"required"})
+	env.RegisterValidation("SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID", []string{"required"})
+	env.RegisterValidation("SENDGRID_API_KEY", []string{"required"})
 }
 
 var emailTypes = []model.EmailUnsubscriptionType{model.EmailUnsubscriptionTypeAll, model.EmailUnsubscriptionTypeNotifications}
@@ -79,9 +79,9 @@ func updateSubscriptions(queries *coredb.Queries) gin.HandlerFunc {
 
 				errGroup.Go(func() error {
 					if input.Unsubs.Notifications {
-						return addEmailToUnsubscribeGroup(c, emailAddress, env.Get[string](c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+						return addEmailToUnsubscribeGroup(c, emailAddress, env.GetString(c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 					}
-					return removeEmailFromUnsubscribeGroup(c, emailAddress, env.Get[string](c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+					return removeEmailFromUnsubscribeGroup(c, emailAddress, env.GetString(c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
@@ -156,7 +156,7 @@ func unsubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			case model.EmailUnsubscriptionTypeNotifications:
 				unsubs.Notifications = true
 				errGroup.Go(func() error {
-					return addEmailToUnsubscribeGroup(c, emailAddress, env.Get[string](c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+					return addEmailToUnsubscribeGroup(c, emailAddress, env.GetString(c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
@@ -231,7 +231,7 @@ func resubscribe(queries *coredb.Queries) gin.HandlerFunc {
 			case model.EmailUnsubscriptionTypeNotifications:
 				unsubs.Notifications = false
 				errGroup.Go(func() error {
-					return removeEmailFromUnsubscribeGroup(c, emailAddress, env.Get[string](c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
+					return removeEmailFromUnsubscribeGroup(c, emailAddress, env.GetString(c, "SENDGRID_UNSUBSCRIBE_NOTIFICATIONS_GROUP_ID"))
 				})
 			default:
 				util.ErrResponse(c, http.StatusBadRequest, fmt.Errorf("unsupported email type: %s", emailType))
@@ -272,7 +272,7 @@ func addEmailToGlobalUnsubscribeGroup(ctx context.Context, email string) error {
 }
 
 func unsubscribeSendgrid(ctx context.Context, email string, url string) error {
-	request := sendgrid.GetRequest(env.Get[string](ctx, "SENDGRID_API_KEY"), url, "https://api.sendgrid.com")
+	request := sendgrid.GetRequest(env.GetString(ctx, "SENDGRID_API_KEY"), url, "https://api.sendgrid.com")
 	request.Method = "POST"
 
 	emails := unsubscribeGroupRecipients{
@@ -308,7 +308,7 @@ func removeEmailFromGlobalUnsubscribeGroup(ctx context.Context, email string) er
 }
 
 func sendSendgridDeleteRequest(ctx context.Context, url string) error {
-	request := sendgrid.GetRequest(env.Get[string](ctx, "SENDGRID_API_KEY"), url, "https://api.sendgrid.com")
+	request := sendgrid.GetRequest(env.GetString(ctx, "SENDGRID_API_KEY"), url, "https://api.sendgrid.com")
 	request.Method = "DELETE"
 
 	response, err := sendgrid.API(request)

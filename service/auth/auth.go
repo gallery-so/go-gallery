@@ -279,7 +279,7 @@ func (e MagicLinkAuthenticator) Authenticate(pCtx context.Context) (*AuthResult,
 }
 
 func NewMagicLinkClient() *magicclient.API {
-	return magicclient.New(env.Get[string](context.Background(), "MAGIC_LINK_SECRET_KEY"), magic.NewDefaultClient())
+	return magicclient.New(env.GetString(context.Background(), "MAGIC_LINK_SECRET_KEY"), magic.NewDefaultClient())
 }
 
 // Login logs in a user with a given authentication scheme
@@ -418,7 +418,7 @@ func SetJWTCookie(c *gin.Context, token string) {
 
 	clientIsLocalhost := c.Request.Header.Get("Origin") == "http://localhost:3000"
 
-	if env.Get[string](context.Background(), "ENV") != "production" || clientIsLocalhost {
+	if env.GetString(context.Background(), "ENV") != "production" || clientIsLocalhost {
 		mode = http.SameSiteNoneMode
 		domain = ""
 		httpOnly = false

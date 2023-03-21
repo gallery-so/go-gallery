@@ -55,7 +55,7 @@ func main() {
 
 	var rows pgx.Rows
 
-	if env.Get[string](context.Background(), "CLOUD_RUN_JOB") != "" {
+	if env.GetString(context.Background(), "CLOUD_RUN_JOB") != "" {
 		logrus.Infof("running as cloud run job")
 
 		jobIndex := env.Get[int](ctx, "CLOUD_RUN_TASK_INDEX")
@@ -224,7 +224,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if env.Get[string](context.Background(), "ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logrus.Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

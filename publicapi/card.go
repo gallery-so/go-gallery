@@ -30,7 +30,7 @@ type CardAPI struct {
 
 func (api *CardAPI) MintPremiumCardToWallet(ctx context.Context, input model.MintPremiumCardToWalletInput) (string, error) {
 
-	cardAddress := env.Get[string](ctx, "PREMIUM_CONTRACT_ADDRESS")
+	cardAddress := env.GetString(ctx, "PREMIUM_CONTRACT_ADDRESS")
 
 	cards, err := contracts.NewPremiumCards(common.HexToAddress(cardAddress), api.ethClient)
 	if err != nil {
@@ -42,8 +42,8 @@ func (api *CardAPI) MintPremiumCardToWallet(ctx context.Context, input model.Min
 		return "", fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	if chainID.Cmp(big.NewInt(1)) == 0 && env.Get[string](ctx, "ENV") == "production" {
-		privateKey := env.Get[string](ctx, "ETH_PRIVATE_KEY")
+	if chainID.Cmp(big.NewInt(1)) == 0 && env.GetString(ctx, "ENV") == "production" {
+		privateKey := env.GetString(ctx, "ETH_PRIVATE_KEY")
 
 		key, err := crypto.HexToECDSA(privateKey)
 		if err != nil {

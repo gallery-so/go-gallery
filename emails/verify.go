@@ -16,8 +16,8 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("SENDGRID_DEFAULT_LIST_ID", []string{"required"})
-	env.RegisterEnvValidation("SENDGRID_API_KEY", []string{"required"})
+	env.RegisterValidation("SENDGRID_DEFAULT_LIST_ID", []string{"required"})
+	env.RegisterValidation("SENDGRID_API_KEY", []string{"required"})
 }
 
 type VerifyEmailInput struct {
@@ -122,7 +122,7 @@ func verifyEmail(queries *coredb.Queries) gin.HandlerFunc {
 			return
 		}
 
-		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), env.Get[string](c, "SENDGRID_DEFAULT_LIST_ID"))
+		err = addEmailToSendgridList(c, userWithPII.PiiEmailAddress.String(), env.GetString(c, "SENDGRID_DEFAULT_LIST_ID"))
 		if err != nil {
 			util.ErrResponse(c, http.StatusInternalServerError, err)
 			return
@@ -174,7 +174,7 @@ type sendgridContact struct {
 
 func addEmailToSendgridList(ctx context.Context, email string, listID string) error {
 
-	request := sendgrid.GetRequest(env.Get[string](ctx, "SENDGRID_API_KEY"), "/v3/marketing/contacts", "https://api.sendgrid.com")
+	request := sendgrid.GetRequest(env.GetString(ctx, "SENDGRID_API_KEY"), "/v3/marketing/contacts", "https://api.sendgrid.com")
 	request.Method = "PUT"
 
 	contacts := sendgridContacts{
@@ -269,7 +269,7 @@ func validateEmail(ctx context.Context, email persist.Email, source string) (sen
 
 	var result sendgridEmailValidationResult
 
-	request := sendgrid.GetRequest(env.Get[string](ctx, "SENDGRID_VALIDATION_KEY"), "/v3/validations/email", "https://api.sendgrid.com")
+	request := sendgrid.GetRequest(env.GetString(ctx, "SENDGRID_VALIDATION_KEY"), "/v3/validations/email", "https://api.sendgrid.com")
 	request.Method = "POST"
 
 	val := sendgridEmailValidation{

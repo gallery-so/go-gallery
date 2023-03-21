@@ -492,7 +492,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 // WalletCreated runs whenever a new wallet is created
 func (d *Provider) WalletCreated(ctx context.Context, userID persist.DBID, wallet persist.Address, walletType persist.WalletType) error {
-	if env.Get[string](ctx, "ENV") == "local" {
+	if env.GetString(ctx, "ENV") == "local" {
 		return nil
 	}
 	input := task.ValidateNFTsMessage{OwnerAddress: persist.EthereumAddress(wallet.String())}

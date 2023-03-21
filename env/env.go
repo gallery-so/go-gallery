@@ -3,6 +3,7 @@ package env
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -13,21 +14,29 @@ var validators = map[string][]string{}
 
 var v = validator.New()
 
+var validatorsMu = &sync.Mutex{}
+
 func init() {
 	v.RegisterValidation("required_for_env", RequiredForEnv)
 }
 
-func RegisterEnvValidation(name string, tags []string) {
+func RegisterValidation(name string, tags []string) {
+	validatorsMu.Lock()
+	defer validatorsMu.Unlock()
 	validators[name] = dedupe(append(validators[name], tags...))
 }
 
 func Get[T any](ctx context.Context, name string) T {
-	for _, tag := range validators[name] {
-		err := v.Var(name, tag)
-		if err != nil {
-			logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
+	func() {
+		validatorsMu.Lock()
+		defer validatorsMu.Unlock()
+		for _, tag := range validators[name] {
+			err := v.Var(name, tag)
+			if err != nil {
+				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
+			}
 		}
-	}
+	}()
 
 	if !viper.IsSet(name) {
 		return *new(T)
@@ -40,6 +49,10 @@ func Get[T any](ctx context.Context, name string) T {
 	}
 
 	return it
+}
+
+func GetString(ctx context.Context, name string) string {
+	return Get[string](ctx, name)
 }
 
 var RequiredForEnv validator.Func = func(fl validator.FieldLevel) bool {

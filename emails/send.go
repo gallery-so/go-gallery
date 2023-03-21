@@ -23,9 +23,9 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("FROM_EMAIL", []string{"required", "email"})
-	env.RegisterEnvValidation("SENDGRID_VERIFICATION_TEMPLATE_ID", []string{"required"})
-	env.RegisterEnvValidation("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", []string{"required"})
+	env.RegisterValidation("FROM_EMAIL", []string{"required", "email"})
+	env.RegisterValidation("SENDGRID_VERIFICATION_TEMPLATE_ID", []string{"required"})
+	env.RegisterValidation("PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION", []string{"required"})
 }
 
 const emailsAtATime = 10_000
@@ -83,12 +83,12 @@ func sendVerificationEmail(dataloaders *dataloader.Loaders, queries *coredb.Quer
 
 		//logger.For(c).Debugf("sending verification email to %s with token %s", emailAddress, j)
 
-		from := mail.NewEmail("Gallery", env.Get[string](c, "FROM_EMAIL"))
+		from := mail.NewEmail("Gallery", env.GetString(c, "FROM_EMAIL"))
 		to := mail.NewEmail(userWithPII.Username.String, emailAddress)
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
-		m.SetTemplateID(env.Get[string](c, "SENDGRID_VERIFICATION_TEMPLATE_ID"))
+		m.SetTemplateID(env.GetString(c, "SENDGRID_VERIFICATION_TEMPLATE_ID"))
 		p.DynamicTemplateData = map[string]interface{}{
 			"username":          userWithPII.Username.String,
 			"verificationToken": j,
@@ -147,10 +147,10 @@ func adminSendNotificationEmail(queries *coredb.Queries, s *sendgrid.Client) gin
 
 func autoSendNotificationEmails(queries *coredb.Queries, s *sendgrid.Client, psub *pubsub.Client) error {
 	ctx := context.Background()
-	sub := psub.Subscription(env.Get[string](ctx, "PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
+	sub := psub.Subscription(env.GetString(ctx, "PUBSUB_NOTIFICATIONS_EMAILS_SUBSCRIPTION"))
 
 	return sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.Get[string](ctx, "ENV") == "production")
+		err := sendNotificationEmailsToAllUsers(ctx, queries, s, env.GetString(ctx, "ENV") == "production")
 		if err != nil {
 			logger.For(ctx).Errorf("error sending notification emails: %s", err)
 			msg.Nack()
@@ -252,12 +252,12 @@ outer:
 
 	if sendRealEmail {
 		// send email
-		from := mail.NewEmail("Gallery", env.Get[string](c, "FROM_EMAIL"))
+		from := mail.NewEmail("Gallery", env.GetString(c, "FROM_EMAIL"))
 		to := mail.NewEmail(u.Username.String, emailRecipient.String())
 		m := mail.NewV3Mail()
 		m.SetFrom(from)
 		p := mail.NewPersonalization()
-		m.SetTemplateID(env.Get[string](c, "SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
+		m.SetTemplateID(env.GetString(c, "SENDGRID_NOTIFICATIONS_TEMPLATE_ID"))
 		p.DynamicTemplateData = asMap
 		m.AddPersonalizations(p)
 		p.AddTos(to)

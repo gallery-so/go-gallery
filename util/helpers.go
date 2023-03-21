@@ -450,7 +450,7 @@ func FindFirstFieldFromMap(it map[string]interface{}, fields ...string) interfac
 
 // VarNotSetTo panics if an environment variable is not set or set to `emptyVal`.
 func VarNotSetTo(envVar, emptyVal string) {
-	setTo := env.Get[string](context.Background(), envVar)
+	setTo := env.GetString(context.Background(), envVar)
 	if setTo == emptyVal || setTo == "" {
 		panic(fmt.Sprintf("%s must be set", envVar))
 	}
@@ -509,7 +509,7 @@ func ResolveEnvFile(service string, env string) string {
 
 // LoadEncryptedEnvFile configures the environment with the configured input file.
 func LoadEncryptedEnvFile(filePath string) {
-	if env.Get[string](context.Background(), "ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
@@ -531,7 +531,7 @@ func LoadEncryptedEnvFile(filePath string) {
 
 // LoadEnvFile configures the environment with the configured input file.
 func LoadEnvFile(filePath string) {
-	if env.Get[string](context.Background(), "ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}

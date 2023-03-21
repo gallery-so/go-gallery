@@ -46,7 +46,7 @@ func (api AuthAPI) NewNonceAuthenticator(chainAddress persist.ChainPubKey, nonce
 }
 
 func (api AuthAPI) NewDebugAuthenticator(ctx context.Context, debugParams model.DebugAuth) (auth.Authenticator, error) {
-	if !debugtools.Enabled || env.Get[string](ctx, "ENV") != "local" {
+	if !debugtools.Enabled || env.GetString(ctx, "ENV") != "local" {
 		return nil, fmt.Errorf("debug auth is only allowed in local environments with debugtools enabled")
 	}
 

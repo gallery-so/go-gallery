@@ -98,7 +98,7 @@ func OpenseaFetchMembershipCards(contractAddress persist.EthereumAddress, tokenI
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-API-KEY", env.Get[string](context.Background(), "OPENSEA_API_KEY"))
+	req.Header.Set("X-API-KEY", env.GetString(context.Background(), "OPENSEA_API_KEY"))
 
 	resp, err := client.Do(req)
 	if err != nil {

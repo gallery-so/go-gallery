@@ -659,7 +659,7 @@ func getExternalID(ctx context.Context) *string {
 	gc := util.GinContextFromContext(ctx)
 	if ip := net.ParseIP(gc.ClientIP()); ip != nil && !ip.IsPrivate() {
 		hash := sha256.New()
-		hash.Write([]byte(env.Get[string](ctx, "BACKEND_SECRET") + ip.String()))
+		hash.Write([]byte(env.GetString(ctx, "BACKEND_SECRET") + ip.String()))
 		res, _ := hash.(encoding.BinaryMarshaler).MarshalBinary()
 		externalID := base64.StdEncoding.EncodeToString(res)
 		return &externalID

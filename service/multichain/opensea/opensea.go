@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("OPENSEA_API_KEY", []string{"required"})
+	env.RegisterValidation("OPENSEA_API_KEY", []string{"required"})
 }
 
 var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")
@@ -735,7 +735,7 @@ func authRequest(ctx context.Context, url string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-API-KEY", env.Get[string](ctx, "OPENSEA_API_KEY"))
+	req.Header.Set("X-API-KEY", env.GetString(ctx, "OPENSEA_API_KEY"))
 	return req, nil
 }
 

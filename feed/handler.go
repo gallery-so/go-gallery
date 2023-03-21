@@ -28,7 +28,7 @@ func taskRequired() gin.HandlerFunc {
 		}
 
 		creds := c.Request.Header.Get("Authorization")
-		if creds != "Basic "+env.Get[string](context.Background(), "FEED_SECRET") {
+		if creds != "Basic "+env.GetString(context.Background(), "FEED_SECRET") {
 			c.AbortWithError(http.StatusOK, errors.New("unauthorized request"))
 			return
 		}

@@ -26,7 +26,7 @@ func jwtParse(pJWTtokenStr string) (persist.DBID, string, error) {
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
 		&claims,
 		func(pJWTtoken *jwt.Token) (interface{}, error) {
-			return []byte(env.Get[string](context.Background(), "JWT_SECRET")), nil
+			return []byte(env.GetString(context.Background(), "JWT_SECRET")), nil
 		})
 
 	if err != nil || !JWTtoken.Valid {
@@ -39,7 +39,7 @@ func jwtParse(pJWTtokenStr string) (persist.DBID, string, error) {
 func jwtGenerate(pUserID persist.DBID, email string) (string, error) {
 	issuer := "gallery"
 
-	signingKeyBytesLst := []byte(env.Get[string](context.Background(), "JWT_SECRET"))
+	signingKeyBytesLst := []byte(env.GetString(context.Background(), "JWT_SECRET"))
 
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
 	expiresAtUNIXint := creationTimeUNIXint + env.Get[int64](context.Background(), "JWT_TTL") // expire N number of secs from now

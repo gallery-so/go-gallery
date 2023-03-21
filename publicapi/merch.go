@@ -69,7 +69,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 		return nil, err
 	}
 
-	merchAddress := env.Get[string](ctx, "MERCH_CONTRACT_ADDRESS")
+	merchAddress := env.GetString(ctx, "MERCH_CONTRACT_ADDRESS")
 
 	tokens, err := api.multichainProvider.GetTokensOfContractForWallet(ctx, persist.Address(merchAddress), persist.NewChainAddress(address, persist.ChainETH), 0, 0)
 	if err != nil {
@@ -155,7 +155,7 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 		return nil, err
 	}
 
-	merchAddress := env.Get[string](ctx, "MERCH_CONTRACT_ADDRESS")
+	merchAddress := env.GetString(ctx, "MERCH_CONTRACT_ADDRESS")
 
 	token, err := api.queries.GetTokenByTokenIdentifiers(ctx, db.GetTokenByTokenIdentifiersParams{
 		TokenHex:        tokenID,
@@ -243,7 +243,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	// check if user owns tokens
 
-	merchAddress := env.Get[string](ctx, "MERCH_CONTRACT_ADDRESS")
+	merchAddress := env.GetString(ctx, "MERCH_CONTRACT_ADDRESS")
 
 	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
 	if err != nil {
@@ -282,8 +282,8 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	if chainID.Cmp(big.NewInt(1)) == 0 && env.Get[string](ctx, "ENV") == "production" {
-		privateKey := env.Get[string](ctx, "ETH_PRIVATE_KEY")
+	if chainID.Cmp(big.NewInt(1)) == 0 && env.GetString(ctx, "ENV") == "production" {
+		privateKey := env.GetString(ctx, "ETH_PRIVATE_KEY")
 
 		key, err := crypto.HexToECDSA(privateKey)
 		if err != nil {

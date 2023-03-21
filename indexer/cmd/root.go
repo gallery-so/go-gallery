@@ -51,7 +51,7 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("[from-block] must be less than [to-block]")
 		}
 
-		if !cmd.Flags().Lookup("to-block").Changed && (!enableRPC && env.Get[string](cmd.Context(), "ENV") != "production") {
+		if !cmd.Flags().Lookup("to-block").Changed && (!enableRPC && env.GetString(cmd.Context(), "ENV") != "production") {
 			return fmt.Errorf("`flags in group [from-block, to-block] must all be set when [enable-rpc] is not set")
 		}
 

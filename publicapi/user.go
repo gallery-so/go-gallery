@@ -207,7 +207,7 @@ func (api UserAPI) GetUsersWithTrait(ctx context.Context, trait string) ([]db.Us
 }
 
 func (api *UserAPI) GetUserRolesByUserID(ctx context.Context, userID persist.DBID) ([]persist.Role, error) {
-	address, tokenIDs := parseAddressTokens(env.Get[string](ctx, "PREMIUM_CONTRACT_ADDRESS"))
+	address, tokenIDs := parseAddressTokens(env.GetString(ctx, "PREMIUM_CONTRACT_ADDRESS"))
 	return api.queries.GetUserRolesByUserId(ctx, db.GetUserRolesByUserIdParams{
 		UserID:                userID,
 		MembershipAddress:     persist.Address(address),

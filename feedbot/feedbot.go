@@ -31,9 +31,9 @@ func coreInit() *gin.Engine {
 	router := gin.Default()
 	router.Use(middleware.ErrLogger(), middleware.Sentry(true), middleware.Tracing())
 
-	gql := graphql.NewClient(env.Get[string](context.Background(), "GALLERY_API"), http.DefaultClient)
+	gql := graphql.NewClient(env.GetString(context.Background(), "GALLERY_API"), http.DefaultClient)
 
-	if env.Get[string](context.Background(), "ENV") != "production" {
+	if env.GetString(context.Background(), "ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 	}
 
@@ -54,13 +54,13 @@ func setDefaults() {
 	viper.AutomaticEnv()
 
 	util.VarNotSetTo("BOT_TOKEN", "")
-	if env.Get[string](context.Background(), "ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 	}
 }
 
 func initSentry() {
-	if env.Get[string](context.Background(), "ENV") == "local" {
+	if env.GetString(context.Background(), "ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -68,8 +68,8 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              env.Get[string](context.Background(), "SENTRY_DSN"),
-		Environment:      env.Get[string](context.Background(), "ENV"),
+		Dsn:              env.GetString(context.Background(), "SENTRY_DSN"),
+		Environment:      env.GetString(context.Background(), "ENV"),
 		TracesSampleRate: env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {

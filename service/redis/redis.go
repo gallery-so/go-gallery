@@ -58,8 +58,8 @@ func GetNameForDatabase(databaseId int) string {
 func NewClient(db int) *redis.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	redisURL := env.Get[string](ctx, "REDIS_URL")
-	redisPass := env.Get[string](ctx, "REDIS_PASS")
+	redisURL := env.GetString(ctx, "REDIS_URL")
+	redisPass := env.GetString(ctx, "REDIS_PASS")
 	client := redis.NewClient(&redis.Options{
 		Addr:     redisURL,
 		Password: redisPass,

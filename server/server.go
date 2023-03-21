@@ -49,8 +49,8 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("TOKEN_PROCESSING_URL", []string{"required"})
-	env.RegisterEnvValidation("INDEXER_HOST", []string{"required"})
+	env.RegisterValidation("TOKEN_PROCESSING_URL", []string{"required"})
+	env.RegisterValidation("INDEXER_HOST", []string{"required"})
 }
 
 // Init initializes the server
@@ -113,7 +113,7 @@ func ClientInit(ctx context.Context) *Clients {
 func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.Recommender) *gin.Engine {
 	logger.For(nil).Info("initializing server...")
 
-	if env.Get[string](context.Background(), "ENV") != "production" {
+	if env.GetString(context.Background(), "ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -144,7 +144,7 @@ func CoreInit(c *Clients, provider *multichain.Provider, recommender *recommend.
 func newSecretsClient() *secretmanager.Client {
 	options := []option.ClientOption{}
 
-	if env.Get[string](context.Background(), "ENV") == "local" {
+	if env.GetString(context.Background(), "ENV") == "local" {
 		fi, err := util.LoadEncryptedServiceKeyOrError("./secrets/dev/service-key-dev.json")
 		if err != nil {
 			logger.For(nil).WithError(err).Error("error finding service key, running without secrets client")
@@ -222,7 +222,7 @@ func SetDefaults() {
 
 	viper.AutomaticEnv()
 
-	if env.Get[string](context.Background(), "ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"
@@ -233,7 +233,7 @@ func SetDefaults() {
 		util.LoadEncryptedEnvFile(envFile)
 	}
 
-	if env.Get[string](context.Background(), "ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		util.VarNotSetTo("IMGIX_SECRET", "")
 		util.VarNotSetTo("ADMIN_PASS", "TEST_ADMIN_PASS")
 		util.VarNotSetTo("SENTRY_DSN", "")
@@ -245,7 +245,7 @@ func SetDefaults() {
 }
 
 func initSentry() {
-	if env.Get[string](context.Background(), "ENV") == "local" {
+	if env.GetString(context.Background(), "ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -254,10 +254,10 @@ func initSentry() {
 
 	err := sentry.Init(sentry.ClientOptions{
 		MaxSpans:         100000,
-		Dsn:              env.Get[string](context.Background(), "SENTRY_DSN"),
-		Environment:      env.Get[string](context.Background(), "ENV"),
+		Dsn:              env.GetString(context.Background(), "SENTRY_DSN"),
+		Environment:      env.GetString(context.Background(), "ENV"),
 		TracesSampleRate: env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE"),
-		Release:          env.Get[string](context.Background(), "GAE_VERSION"),
+		Release:          env.GetString(context.Background(), "GAE_VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)
@@ -274,16 +274,16 @@ func initSentry() {
 func NewMultichainProvider(c *Clients) *multichain.Provider {
 	ethChain := persist.ChainETH
 	overrides := multichain.ChainOverrideMap{persist.ChainPOAP: &ethChain}
-	ethProvider := eth.NewProvider(env.Get[string](context.Background(), "INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
+	ethProvider := eth.NewProvider(env.GetString(context.Background(), "INDEXER_HOST"), c.HTTPClient, c.EthClient, c.TaskClient)
 	openseaProvider := opensea.NewProvider(c.EthClient, c.HTTPClient)
 	tezosProvider := multichain.FallbackProvider{
-		Primary:  tezos.NewProvider(env.Get[string](context.Background(), "TEZOS_API_URL"), env.Get[string](context.Background(), "TOKEN_PROCESSING_URL"), env.Get[string](context.Background(), "IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.Get[string](context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET")),
-		Fallback: tezos.NewObjktProvider(env.Get[string](context.Background(), "IPFS_URL")),
+		Primary:  tezos.NewProvider(env.GetString(context.Background(), "TEZOS_API_URL"), env.GetString(context.Background(), "TOKEN_PROCESSING_URL"), env.GetString(context.Background(), "IPFS_URL"), c.HTTPClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString(context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET")),
+		Fallback: tezos.NewObjktProvider(env.GetString(context.Background(), "IPFS_URL")),
 		Eval: func(ctx context.Context, token multichain.ChainAgnosticToken) bool {
 			return tezos.IsSigned(ctx, token) && tezos.ContainsTezosKeywords(ctx, token)
 		},
 	}
-	poapProvider := poap.NewProvider(c.HTTPClient, env.Get[string](context.Background(), "POAP_API_KEY"), env.Get[string](context.Background(), "POAP_AUTH_TOKEN"))
+	poapProvider := poap.NewProvider(c.HTTPClient, env.GetString(context.Background(), "POAP_API_KEY"), env.GetString(context.Background(), "POAP_AUTH_TOKEN"))
 	cache := redis.NewCache(redis.CommunitiesDB)
 	return multichain.NewProvider(context.Background(), c.Repos, c.Queries, cache, c.TaskClient,
 		overrides,

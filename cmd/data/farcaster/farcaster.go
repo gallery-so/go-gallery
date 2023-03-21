@@ -17,7 +17,7 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("FARCASTER_MNEMONIC", []string{"required"})
+	env.RegisterValidation("FARCASTER_MNEMONIC", []string{"required"})
 }
 
 /*
@@ -79,7 +79,7 @@ func main() {
 	}
 
 	apiUrl := "https://api.warpcast.com"
-	mnemonic := env.Get[string](ctx, "FARCASTER_MNEMONIC")
+	mnemonic := env.GetString(ctx, "FARCASTER_MNEMONIC")
 	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, "")
 
 	results := []farcastGalleryAcc{}
@@ -145,7 +145,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if env.Get[string](context.Background(), "ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

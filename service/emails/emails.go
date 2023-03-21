@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	env.RegisterEnvValidation("EMAILS_HOST", []string{"required"})
+	env.RegisterValidation("EMAILS_HOST", []string{"required"})
 }
 
 func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, error) {
@@ -29,7 +29,7 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 
 	buf := bytes.NewBuffer(body)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/verify", env.Get[string](ctx, "EMAILS_HOST")), buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/verify", env.GetString(ctx, "EMAILS_HOST")), buf)
 	if err != nil {
 		return emails.VerifyEmailOutput{}, err
 	}
@@ -57,7 +57,7 @@ func VerifyEmail(ctx context.Context, token string) (emails.VerifyEmailOutput, e
 func PreverifyEmail(ctx context.Context, email persist.Email, source string) (emails.PreverifyEmailOutput, error) {
 	var result emails.PreverifyEmailOutput
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/preverify?email=%s&source=%s", env.Get[string](ctx, "EMAILS_HOST"), email, source), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/preverify?email=%s&source=%s", env.GetString(ctx, "EMAILS_HOST"), email, source), nil)
 	if err != nil {
 		return result, err
 	}
@@ -94,7 +94,7 @@ func UnsubscribeByJWT(ctx context.Context, jwt string, unsubTypes []model.EmailU
 
 	buf := bytes.NewBuffer(body)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/unsubscribe", env.Get[string](ctx, "EMAILS_HOST")), buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/unsubscribe", env.GetString(ctx, "EMAILS_HOST")), buf)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func UpdateUnsubscriptionsByUserID(ctx context.Context, userID persist.DBID, uns
 
 	buf := bytes.NewBuffer(body)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/subscriptions", env.Get[string](ctx, "EMAILS_HOST")), buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/subscriptions", env.GetString(ctx, "EMAILS_HOST")), buf)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func RequestVerificationEmail(ctx context.Context, userID persist.DBID) error {
 
 	buf := bytes.NewBuffer(body)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/send/verification", env.Get[string](ctx, "EMAILS_HOST")), buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/send/verification", env.GetString(ctx, "EMAILS_HOST")), buf)
 	if err != nil {
 		return err
 	}
