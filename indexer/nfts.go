@@ -509,31 +509,16 @@ func processAccountedForNFTs(ctx context.Context, tokens []persist.Token, tokenR
 			continue
 		}
 
-		metadata, err := rpc.GetMetadataFromURI(ctx, token.TokenURI, ipfsClient, arweaveClient)
-		if err == nil {
-			token.TokenMetadata = metadata
-			needsUpdate = true
-		} else {
-			logger.For(ctx).WithError(err).WithFields(logrus.Fields{
-				"tokenID":         token.TokenID,
-				"contractAddress": token.ContractAddress,
-			}).Errorf("failed to get token metadata for token %s-%s with uri %s: %v", token.ContractAddress, token.TokenID, token.TokenURI, err)
-			msgToAdd += fmt.Sprintf("failed to get token metadata for token %s-%s with uri %s: %v", token.ContractAddress, token.TokenID, token.TokenURI, err)
-			continue
-		}
-
 		if needsUpdate {
-			update := persist.TokenUpdateAllURIDerivedFieldsInput{
-				TokenURI:    token.TokenURI,
-				Metadata:    token.TokenMetadata,
-				Media:       token.Media,
-				Name:        token.Name,
-				Description: token.Description,
+
+			update := persist.TokenUpdateURIInput{
+				TokenURI: token.TokenURI,
 			}
 
 			if err := tokenRepository.UpdateByID(ctx, token.ID, update); err != nil {
-				return "", fmt.Errorf("failed to update token %s: %v", token.TokenID, err)
+				return "", fmt.Errorf("failed to update token URI %s: %v", token.TokenID, err)
 			}
+
 		}
 
 	}

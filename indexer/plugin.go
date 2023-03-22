@@ -165,7 +165,7 @@ func newURIsPlugin(ctx context.Context, ethClient *ethclient.Client, tokenRepo p
 					panic(err)
 				}
 
-				dbURI, _, _, err := tokenRepo.GetMetadataByTokenIdentifiers(innerCtx, tid, ct)
+				dbURI, err := tokenRepo.GetURIByTokenIdentifiers(innerCtx, tid, ct)
 				if err == nil {
 					if dbURI != "" {
 						uri = dbURI

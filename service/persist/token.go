@@ -206,8 +206,6 @@ type Token struct {
 	Deleted      NullBool        `json:"-"`
 	LastUpdated  LastUpdatedTime `json:"last_updated"`
 
-	Media Media `json:"media"`
-
 	TokenType TokenType `json:"token_type"`
 
 	Chain Chain `json:"chain"`
@@ -339,8 +337,8 @@ type TokenRepository interface {
 	GetByContract(context.Context, EthereumAddress, int64, int64) ([]Token, error)
 	GetOwnedByContract(context.Context, EthereumAddress, EthereumAddress, int64, int64) ([]Token, Contract, error)
 	GetByTokenIdentifiers(context.Context, TokenID, EthereumAddress, int64, int64) ([]Token, error)
+	GetURIByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, error)
 	GetByIdentifiers(context.Context, TokenID, EthereumAddress, EthereumAddress) (Token, error)
-	GetMetadataByTokenIdentifiers(context.Context, TokenID, EthereumAddress) (TokenURI, TokenMetadata, Media, error)
 	DeleteByID(context.Context, DBID) error
 	BulkUpsert(context.Context, []Token) error
 	Upsert(context.Context, Token) error

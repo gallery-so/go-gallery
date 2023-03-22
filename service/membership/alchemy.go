@@ -11,6 +11,7 @@ import (
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
+	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -155,9 +156,11 @@ func getTokenMetadata(ctx context.Context, tid persist.TokenID, contractAddress 
 	if !ok {
 		name = ""
 	}
+
+	it, _ := util.FindFirstFieldFromMap(token.TokenMetadata, "image", "image_url", "thumbnail", "thumbnail_url").(string)
 	return alchemyNFTMetadata{
 		Name:  name,
-		Image: token.Media.ThumbnailURL.String(),
+		Image: it,
 	}, nil
 
 }
