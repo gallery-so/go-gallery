@@ -71,7 +71,6 @@ $(DEPLOY)-$(DEV)-indexer-server   : SERVICE_FILE := indexer-server-env.yaml
 $(DEPLOY)-$(DEV)-admin            : SERVICE_FILE := app-dev-admin.yaml
 $(DEPLOY)-$(DEV)-feed             : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(DEV)-tokenprocessing  : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(DEV)-dummymetadata : SERVICE_FILE := dummymetadata-env.yaml
 $(DEPLOY)-$(DEV)-emails           : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(DEV)-feedbot          : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(DEV)-routing-rules    : SERVICE_FILE := dispatch.yaml
@@ -83,7 +82,7 @@ $(DEPLOY)-$(PROD)-admin           : SERVICE_FILE := app-prod-admin.yaml
 $(DEPLOY)-$(PROD)-feed            : SERVICE_FILE := feed-env.yaml
 $(DEPLOY)-$(PROD)-feedbot         : SERVICE_FILE := feedbot-env.yaml
 $(DEPLOY)-$(PROD)-tokenprocessing : SERVICE_FILE := tokenprocessing-env.yaml
-$(DEPLOY)-$(PROD)-dummymetadata : SERVICE_FILE := dummymetadata-env.yaml
+$(DEPLOY)-$(PROD)-dummymetadata   : SERVICE_FILE := dummymetadata-env.yaml
 $(DEPLOY)-$(PROD)-emails          : SERVICE_FILE := emails-server-env.yaml
 $(DEPLOY)-$(PROD)-routing-rules   : SERVICE_FILE := dispatch.yaml
 $(DEPLOY)-$(DEV)-graphql-gateway   : SERVICE_FILE := graphql-gateway.yml
@@ -109,15 +108,14 @@ $(DEPLOY)-%-tokenprocessing            : MEMORY         := $(TOKENPROCESSING_MEM
 $(DEPLOY)-%-tokenprocessing            : CONCURRENCY    := $(TOKENPROCESSING_CONCURRENCY)
 $(DEPLOY)-$(DEV)-tokenprocessing       : SERVICE        := tokenprocessing-dev
 $(DEPLOY)-$(PROD)-tokenprocessing      : SERVICE        := tokenprocessing-v2
-$(DEPLOY)-%-dummymetadata              : REPO           := tokenprocessing
+$(DEPLOY)-%-dummymetadata              : REPO           := dummymetadata
 $(DEPLOY)-%-dummymetadata              : DOCKER_FILE    := $(DOCKER_DIR)/dummymetadata/Dockerfile
 $(DEPLOY)-%-dummymetadata              : PORT           := 8500
 $(DEPLOY)-%-dummymetadata              : TIMEOUT        := $(DUMMYMETADATA_TIMEOUT)
 $(DEPLOY)-%-dummymetadata              : CPU            := $(DUMMYMETADATA_CPU)
 $(DEPLOY)-%-dummymetadata              : MEMORY         := $(DUMMYMETADATA_MEMORY)
 $(DEPLOY)-%-dummymetadata              : CONCURRENCY    := $(DUMMYMETADATA_CONCURRENCY)
-$(DEPLOY)-$(DEV)-dummymetadata         : SERVICE        := dummymetadata-dev
-$(DEPLOY)-$(PROD)-dummymetadata        : SERVICE        := dummymetadata
+$(DEPLOY)-%-dummymetadata              : SERVICE        := dummymetadata
 $(DEPLOY)-%-indexer-server             : REPO           := indexer-api
 $(DEPLOY)-%-indexer-server             : DOCKER_FILE    := $(DOCKER_DIR)/indexer_api/Dockerfile
 $(DEPLOY)-%-indexer-server             : PORT           := 6000
@@ -300,7 +298,6 @@ $(DEPLOY)-$(DEV)-backend          : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-bac
 $(DEPLOY)-$(DEV)-indexer          : _set-project-$(ENV) _$(DEPLOY)-indexer _$(RELEASE)-indexer
 $(DEPLOY)-$(DEV)-indexer-server   : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-indexer-server _$(RELEASE)-indexer-server
 $(DEPLOY)-$(DEV)-tokenprocessing  : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-tokenprocessing _$(RELEASE)-tokenprocessing
-$(DEPLOY)-$(DEV)-dummymetadata    : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-dummymetadata _$(RELEASE)-dummymetadata
 $(DEPLOY)-$(DEV)-emails           : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-emails _$(RELEASE)-emails
 $(DEPLOY)-$(DEV)-admin            : _set-project-$(ENV) _$(DEPLOY)-admin
 $(DEPLOY)-$(DEV)-feed             : _set-project-$(ENV) _$(DOCKER)-$(DEPLOY)-feed _$(RELEASE)-feed

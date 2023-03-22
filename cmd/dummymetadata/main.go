@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"cloud.google.com/go/profiler"
-	"github.com/mikeydub/go-gallery/dummymetadata"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/tests/integration/dummymetadata"
 
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"google.golang.org/appengine"
