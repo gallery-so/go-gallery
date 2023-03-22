@@ -8,10 +8,14 @@ import (
 
 	storage "cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
+
+func init() {
+	env.RegisterValidation("SNAPSHOT_BUCKET", "required")
+}
 
 var rwMutex = &sync.RWMutex{}
 
@@ -55,14 +59,14 @@ func updateSnapshot(stg *storage.Client) gin.HandlerFunc {
 }
 
 func getSnapshotReader(c context.Context, stg *storage.Client) (*storage.Reader, error) {
-	r, err := stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json").NewReader(c)
+	r, err := stg.Bucket(env.GetString(c, "SNAPSHOT_BUCKET")).Object("snapshot.json").NewReader(c)
 	if err != nil {
 		return nil, err
 	}
 	return r, nil
 }
 func writeSnapshot(c context.Context, stg *storage.Client, snapshot []string) error {
-	obj := stg.Bucket(viper.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
+	obj := stg.Bucket(env.GetString(c, "SNAPSHOT_BUCKET")).Object("snapshot.json")
 	obj.Delete(c)
 	w := obj.NewWriter(c)
 	w.CacheControl = "no-store"

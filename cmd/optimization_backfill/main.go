@@ -16,6 +16,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/jackc/pgx/v4"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -54,11 +55,11 @@ func main() {
 
 	var rows pgx.Rows
 
-	if viper.GetString("CLOUD_RUN_JOB") != "" {
+	if env.GetString(context.Background(), "CLOUD_RUN_JOB") != "" {
 		logrus.Infof("running as cloud run job")
 
-		jobIndex := viper.GetInt("CLOUD_RUN_TASK_INDEX")
-		jobCount := viper.GetInt("CLOUD_RUN_TASK_COUNT")
+		jobIndex := env.Get[int](ctx, "CLOUD_RUN_TASK_INDEX")
+		jobCount := env.Get[int](ctx, "CLOUD_RUN_TASK_COUNT")
 
 		// given the totalTokenCount, and the jobCount, we can calculate the offset and limit for this job
 		// we want to evenly distribute the work across the jobs
@@ -223,7 +224,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logrus.Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

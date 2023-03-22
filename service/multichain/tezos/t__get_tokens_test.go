@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/spf13/viper"
 )
 
 func TestGetTokensForWallet_Success(t *testing.T) {
@@ -19,7 +19,7 @@ func TestGetTokensForWallet_Success(t *testing.T) {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 	storage := newStorageClient(ctx)
-	p := NewProvider(viper.GetString("TEZOS_API_URL"), viper.GetString("TOKEN_PROCESSING_URL"), viper.GetString("IPFS_GATEWAY_URL"), http.DefaultClient, ipfsClient, arweaveClient, storage, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"))
+	p := NewProvider(env.GetString(ctx, "TEZOS_API_URL"), env.GetString(ctx, "TOKEN_PROCESSING_URL"), env.GetString(ctx, "IPFS_GATEWAY_URL"), http.DefaultClient, ipfsClient, arweaveClient, storage, env.GetString(ctx, "GCLOUD_TOKEN_CONTENT_BUCKET"))
 
 	powerUsers := []persist.Address{"tz1hyNv7RBzNPGLpKfdwHRc6NhLW6VbzXP3N", "tz1YHsinBJHMj1YFN7UrCsVAgTcaJCH86PjK", "tz1bPMztWzs449CuEmVTY3BprhHMtm4NUQPJ"}
 

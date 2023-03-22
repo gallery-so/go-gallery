@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
@@ -17,6 +18,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+func init() {
+	env.RegisterValidation("INDEXER_HOST", "required", "http")
+}
 func main() {
 
 	setDefaults()
@@ -72,7 +76,7 @@ func processAddresses(addresses <-chan persist.Address, wg *sync.WaitGroup) {
 				panic(err)
 			}
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", viper.GetString("INDEXER_HOST")), bytes.NewBuffer(j))
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/nfts/refresh", env.GetString(ctx, "INDEXER_HOST")), bytes.NewBuffer(j))
 			if err != nil {
 				logrus.Errorf("error creating req: %s", err)
 				return

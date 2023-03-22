@@ -13,6 +13,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/magiclabs/magic-admin-go/token"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/graphql/model"
 	"github.com/mikeydub/go-gallery/service/emails"
 	"github.com/mikeydub/go-gallery/service/logger"
@@ -24,7 +25,6 @@ import (
 	"github.com/mikeydub/go-gallery/validate"
 
 	"github.com/mikeydub/go-gallery/debugtools"
-	"github.com/spf13/viper"
 
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
 	"github.com/mikeydub/go-gallery/publicapi"
@@ -183,7 +183,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 	authApi := publicapi.For(ctx).Auth
 
 	if debugtools.Enabled {
-		if viper.GetString("ENV") == "local" && m.Debug != nil {
+		if env.GetString(ctx, "ENV") == "local" && m.Debug != nil {
 			return authApi.NewDebugAuthenticator(ctx, *m.Debug)
 		}
 	}
@@ -212,7 +212,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m model.SocialAuthMechanism) (socialauth.Authenticator, error) {
 
 	if debugtools.Enabled {
-		if viper.GetString("ENV") == "local" && m.Debug != nil {
+		if env.GetString(ctx, "ENV") == "local" && m.Debug != nil {
 			return debugtools.NewDebugSocialAuthenticator(m.Debug.Provider, m.Debug.ID, map[string]interface{}{"username": m.Debug.Username}), nil
 		}
 	}

@@ -58,7 +58,7 @@ type RefreshNFTsInput struct {
 // }
 
 // func ownsGeneral(ethClient *ethclient.Client) gin.HandlerFunc {
-// 	general, err := contracts.NewIERC1155Caller(common.HexToAddress(viper.GetString("GENERAL_ADDRESS")), ethClient)
+// 	general, err := contracts.NewIERC1155Caller(common.HexToAddress(env.GetString(ctx, "GENERAL_ADDRESS")), ethClient)
 // 	if err != nil {
 // 		panic(err)
 // 	}

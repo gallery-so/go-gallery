@@ -1,13 +1,14 @@
 package feed
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"github.com/gin-gonic/gin"
 	db "github.com/mikeydub/go-gallery/db/gen/coredb"
-	"github.com/spf13/viper"
+	"github.com/mikeydub/go-gallery/env"
 )
 
 // TaskRequired checks that the request came from Cloud Tasks.
@@ -27,7 +28,7 @@ func taskRequired() gin.HandlerFunc {
 		}
 
 		creds := c.Request.Header.Get("Authorization")
-		if creds != "Basic "+viper.GetString("FEED_SECRET") {
+		if creds != "Basic "+env.GetString(context.Background(), "FEED_SECRET") {
 			c.AbortWithError(http.StatusOK, errors.New("unauthorized request"))
 			return
 		}

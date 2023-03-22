@@ -10,6 +10,7 @@ import (
 
 	"reflect"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/publicapi"
 
 	gqlgen "github.com/99designs/gqlgen/graphql"
@@ -26,7 +27,6 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/segmentio/ksuid"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"github.com/vektah/gqlparser/v2/validator"
@@ -186,7 +186,7 @@ func FrontendBuildAuthDirectiveHandler() func(ctx context.Context, obj interface
 		password := usernameAndPasswordParts[1]
 		passwordBytes := []byte(password)
 
-		if cmp := subtle.ConstantTimeCompare([]byte(viper.GetString("FRONTEND_APQ_UPLOAD_AUTH_TOKEN")), passwordBytes); cmp != 1 {
+		if cmp := subtle.ConstantTimeCompare([]byte(env.GetString(ctx, "FRONTEND_APQ_UPLOAD_AUTH_TOKEN")), passwordBytes); cmp != 1 {
 			return authError, nil
 		}
 
@@ -240,10 +240,11 @@ func AuthRequiredDirectiveHandler() func(ctx context.Context, obj interface{}, n
 }
 
 func RestrictEnvironmentDirectiveHandler() func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
-	env := viper.GetString("ENV")
-	restrictionErr := errors.New("schema restriction: functionality not allowed in the current environment")
 
+	restrictionErr := errors.New("schema restriction: functionality not allowed in the current environment")
+	env := env.GetString(context.Background(), "ENV")
 	return func(ctx context.Context, obj interface{}, next gqlgen.Resolver, allowed []string) (res interface{}, err error) {
+
 		for _, allowedEnv := range allowed {
 			if strings.EqualFold(env, allowedEnv) {
 				return next(ctx)

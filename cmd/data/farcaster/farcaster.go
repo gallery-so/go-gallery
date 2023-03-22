@@ -8,12 +8,17 @@ import (
 	"time"
 
 	farcaster "github.com/ertan/go-farcaster/pkg"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	env.RegisterValidation("FARCASTER_MNEMONIC", "required")
+}
 
 /*
 {
@@ -74,7 +79,7 @@ func main() {
 	}
 
 	apiUrl := "https://api.warpcast.com"
-	mnemonic := viper.GetString("FARCASTER_MNEMONIC")
+	mnemonic := env.GetString(ctx, "FARCASTER_MNEMONIC")
 	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, "")
 
 	results := []farcastGalleryAcc{}
@@ -140,7 +145,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if viper.GetString("ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

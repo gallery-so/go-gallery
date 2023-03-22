@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"html"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/shurcooL/graphql"
-	"github.com/spf13/viper"
 )
 
 type PostRenderSender struct {
@@ -326,7 +326,7 @@ func (s *PostSender) Send(ctx context.Context, post string) error {
 }
 
 func userURL(username string) string {
-	return fmt.Sprintf("%s/%s", viper.GetString("GALLERY_HOST"), username)
+	return fmt.Sprintf("%s/%s", env.GetString(context.Background(), "GALLERY_HOST"), username)
 }
 
 func collectionURL(username, collectionID string) string {

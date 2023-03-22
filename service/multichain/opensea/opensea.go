@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gammazero/workerpool"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/media"
@@ -27,8 +28,11 @@ import (
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/mikeydub/go-gallery/util/retry"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
+
+func init() {
+	env.RegisterValidation("OPENSEA_API_KEY", "required")
+}
 
 var baseURL, _ = url.Parse("https://api.opensea.io/api/v1")
 
@@ -731,7 +735,7 @@ func authRequest(ctx context.Context, url string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-API-KEY", viper.GetString("OPENSEA_API_KEY"))
+	req.Header.Set("X-API-KEY", env.GetString(ctx, "OPENSEA_API_KEY"))
 	return req, nil
 }
 

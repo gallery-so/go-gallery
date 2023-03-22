@@ -13,9 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/imgix/imgix-go/v2"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 const contextKey = "mediamapper.instance"
@@ -66,7 +66,7 @@ func newWidthParam(width int) imgix.IxParam {
 }
 
 func NewMediaMapper() *MediaMapper {
-	token := viper.GetString("IMGIX_SECRET")
+	token := env.GetString(context.Background(), "IMGIX_SECRET")
 	if token == "" {
 		// panic(errors.New("IMGIX_SECRET must be set in order to generate image URLs"))
 		logger.For(nil).Error("IMGIX_SECRET must be set in order to generate image URLs")
@@ -218,7 +218,7 @@ func PurgeImage(ctx context.Context, u string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/vnd.api+json")
-	req.Header.Set("Authorization", "Bearer "+viper.GetString("IMGIX_API_KEY"))
+	req.Header.Set("Authorization", "Bearer "+env.GetString(ctx, "IMGIX_API_KEY"))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

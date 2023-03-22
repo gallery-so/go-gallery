@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -28,7 +29,6 @@ import (
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/task"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -492,7 +492,7 @@ func (d *Provider) ValidateTokensForWallet(ctx context.Context, wallet persist.A
 
 // WalletCreated runs whenever a new wallet is created
 func (d *Provider) WalletCreated(ctx context.Context, userID persist.DBID, wallet persist.Address, walletType persist.WalletType) error {
-	if viper.GetString("ENV") == "local" {
+	if env.GetString(ctx, "ENV") == "local" {
 		return nil
 	}
 	input := task.ValidateNFTsMessage{OwnerAddress: persist.EthereumAddress(wallet.String())}

@@ -1,19 +1,20 @@
 package middleware
 
 import (
+	"context"
 	"strings"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 func IsOriginAllowed(requestOrigin string) bool {
-	if viper.GetString("ENV") == "local" {
+	if env.GetString(context.Background(), "ENV") == "local" {
 		return true
 	}
-	allowedOrigins := strings.Split(viper.GetString("ALLOWED_ORIGINS"), ",")
+	allowedOrigins := strings.Split(env.GetString(context.Background(), "ALLOWED_ORIGINS"), ",")
 
-	if util.ContainsString(allowedOrigins, requestOrigin) || util.ContainsString([]string{"sandbox"}, strings.ToLower(viper.GetString("ENV"))) || (util.ContainsString([]string{"development"}, strings.ToLower(viper.GetString("ENV"))) && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
+	if util.ContainsString(allowedOrigins, requestOrigin) || util.ContainsString([]string{"sandbox"}, strings.ToLower(env.GetString(context.Background(), "ENV"))) || (util.ContainsString([]string{"development"}, strings.ToLower(env.GetString(context.Background(), "ENV"))) && strings.HasSuffix(requestOrigin, "-gallery-so.vercel.app")) {
 		return true
 	}
 

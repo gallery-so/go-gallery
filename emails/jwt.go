@@ -1,12 +1,13 @@
 package emails
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/persist"
-	"github.com/spf13/viper"
 )
 
 // this wouldn't be necessary if we were using go 1.18 because we could have the auth.ParseJWT function use generics to return the correct type
@@ -25,7 +26,7 @@ func jwtParse(pJWTtokenStr string) (persist.DBID, string, error) {
 	JWTtoken, err := jwt.ParseWithClaims(pJWTtokenStr,
 		&claims,
 		func(pJWTtoken *jwt.Token) (interface{}, error) {
-			return []byte(viper.GetString("JWT_SECRET")), nil
+			return []byte(env.GetString(context.Background(), "JWT_SECRET")), nil
 		})
 
 	if err != nil || !JWTtoken.Valid {
@@ -38,10 +39,10 @@ func jwtParse(pJWTtokenStr string) (persist.DBID, string, error) {
 func jwtGenerate(pUserID persist.DBID, email string) (string, error) {
 	issuer := "gallery"
 
-	signingKeyBytesLst := []byte(viper.GetString("JWT_SECRET"))
+	signingKeyBytesLst := []byte(env.GetString(context.Background(), "JWT_SECRET"))
 
 	creationTimeUNIXint := time.Now().UnixNano() / 1000000000
-	expiresAtUNIXint := creationTimeUNIXint + viper.GetInt64("JWT_TTL") // expire N number of secs from now
+	expiresAtUNIXint := creationTimeUNIXint + env.Get[int64](context.Background(), "JWT_TTL") // expire N number of secs from now
 	claims := jwtClaims{
 		pUserID,
 		email,

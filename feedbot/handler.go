@@ -1,13 +1,14 @@
 package feedbot
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/shurcooL/graphql"
-	"github.com/spf13/viper"
 )
 
 type errBadTaskRequest struct {
@@ -35,7 +36,7 @@ func TaskRequired() gin.HandlerFunc {
 		}
 
 		creds := c.Request.Header.Get("Authorization")
-		if creds != "Basic "+viper.GetString("FEEDBOT_SECRET") {
+		if creds != "Basic "+env.GetString(context.Background(), "FEEDBOT_SECRET") {
 			c.AbortWithError(http.StatusOK, errors.New("unauthorized request"))
 			return
 		}

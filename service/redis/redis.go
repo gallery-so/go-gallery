@@ -7,10 +7,10 @@ import (
 
 	"github.com/bsm/redislock"
 
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/tracing"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/spf13/viper"
 )
 
 type ErrKeyNotFound struct {
@@ -58,8 +58,8 @@ func GetNameForDatabase(databaseId int) string {
 func NewClient(db int) *redis.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	redisURL := viper.GetString("REDIS_URL")
-	redisPass := viper.GetString("REDIS_PASS")
+	redisURL := env.GetString(ctx, "REDIS_URL")
+	redisPass := env.GetString(ctx, "REDIS_PASS")
 	client := redis.NewClient(&redis.Options{
 		Addr:     redisURL,
 		Password: redisPass,

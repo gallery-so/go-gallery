@@ -6,10 +6,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 const loggerContextKey = "logger.logger"

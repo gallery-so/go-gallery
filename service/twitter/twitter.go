@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/mikeydub/go-gallery/db/gen/coredb"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/redis"
 	"github.com/mikeydub/go-gallery/service/tracing"
 	"github.com/mikeydub/go-gallery/util"
-	"github.com/spf13/viper"
 )
 
 const maxFollowingReturn = 1000
@@ -102,7 +102,7 @@ func (a *API) generateAuthTokenFromCode(ctx context.Context, authCode string) (A
 	q := url.Values{}
 	q.Set("code", authCode)
 	q.Set("grant_type", "authorization_code")
-	q.Set("redirect_uri", viper.GetString("TWITTER_AUTH_REDIRECT_URI"))
+	q.Set("redirect_uri", env.GetString(ctx, "TWITTER_AUTH_REDIRECT_URI"))
 	q.Set("code_verifier", "challenge")
 	encoded := q.Encode()
 
@@ -115,7 +115,7 @@ func (a *API) generateAuthTokenFromCode(ctx context.Context, authCode string) (A
 	accessReq.Header.Set("Content-Length", fmt.Sprintf("%d", len(encoded)))
 	accessReq.Header.Set("Accept", "*/*")
 
-	accessReq.SetBasicAuth(viper.GetString("TWITTER_CLIENT_ID"), viper.GetString("TWITTER_CLIENT_SECRET"))
+	accessReq.SetBasicAuth(env.GetString(ctx, "TWITTER_CLIENT_ID"), env.GetString(ctx, "TWITTER_CLIENT_SECRET"))
 
 	accessResp, err := http.DefaultClient.Do(accessReq)
 	if err != nil {
@@ -155,7 +155,7 @@ func (a *API) generateAuthTokenFromRefresh(ctx context.Context, refreshToken str
 	accessReq.Header.Set("Content-Length", fmt.Sprintf("%d", len(encoded)))
 	accessReq.Header.Set("Accept", "*/*")
 
-	accessReq.SetBasicAuth(viper.GetString("TWITTER_CLIENT_ID"), viper.GetString("TWITTER_CLIENT_SECRET"))
+	accessReq.SetBasicAuth(env.GetString(ctx, "TWITTER_CLIENT_ID"), env.GetString(ctx, "TWITTER_CLIENT_SECRET"))
 
 	accessResp, err := http.DefaultClient.Do(accessReq)
 	if err != nil {

@@ -9,12 +9,12 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/mikeydub/go-gallery/contracts"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/validate"
-	"github.com/spf13/viper"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
@@ -69,7 +69,7 @@ func (api MerchAPI) GetMerchTokens(ctx context.Context, address persist.Address)
 		return nil, err
 	}
 
-	merchAddress := viper.GetString("MERCH_CONTRACT_ADDRESS")
+	merchAddress := env.GetString(ctx, "MERCH_CONTRACT_ADDRESS")
 
 	tokens, err := api.multichainProvider.GetTokensOfContractForWallet(ctx, persist.Address(merchAddress), persist.NewChainAddress(address, persist.ChainETH), 0, 0)
 	if err != nil {
@@ -155,7 +155,7 @@ func (api MerchAPI) GetMerchTokenByTokenID(ctx context.Context, tokenID persist.
 		return nil, err
 	}
 
-	merchAddress := viper.GetString("MERCH_CONTRACT_ADDRESS")
+	merchAddress := env.GetString(ctx, "MERCH_CONTRACT_ADDRESS")
 
 	token, err := api.queries.GetTokenByTokenIdentifiers(ctx, db.GetTokenByTokenIdentifiersParams{
 		TokenHex:        tokenID,
@@ -243,7 +243,7 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 
 	// check if user owns tokens
 
-	merchAddress := viper.GetString("MERCH_CONTRACT_ADDRESS")
+	merchAddress := env.GetString(ctx, "MERCH_CONTRACT_ADDRESS")
 
 	mer, err := contracts.NewMerch(common.HexToAddress(merchAddress), api.ethClient)
 	if err != nil {
@@ -282,8 +282,8 @@ func (api MerchAPI) RedeemMerchItems(ctx context.Context, tokenIDs []persist.Tok
 		return nil, fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	if chainID.Cmp(big.NewInt(1)) == 0 && viper.GetString("ENV") == "production" {
-		privateKey := viper.GetString("ETH_PRIVATE_KEY")
+	if chainID.Cmp(big.NewInt(1)) == 0 && env.GetString(ctx, "ENV") == "production" {
+		privateKey := env.GetString(ctx, "ETH_PRIVATE_KEY")
 
 		key, err := crypto.HexToECDSA(privateKey)
 		if err != nil {

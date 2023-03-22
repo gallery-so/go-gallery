@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/indexer/refresh"
 	"github.com/mikeydub/go-gallery/middleware"
 	"github.com/mikeydub/go-gallery/service/auth"
@@ -45,7 +46,7 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.AddHook(sentryutil.SentryLoggerHook)
 		logger.SetLevel(logrus.InfoLevel)
-		if viper.GetString("ENV") != "production" && !quietLogs {
+		if env.GetString(context.Background(), "ENV") != "production" && !quietLogs {
 			logger.SetLevel(logrus.DebugLevel)
 		}
 	})
@@ -56,17 +57,17 @@ func coreInit(fromBlock, toBlock *uint64, quietLogs, enableRPC bool) (*gin.Engin
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	if viper.GetString("ENV") == "production" || enableRPC {
+	if env.GetString(context.Background(), "ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.Get[int](context.Background(), "CHAIN")), defaultTransferEvents, nil, fromBlock, toBlock)
 
 	router := gin.Default()
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	if viper.GetString("ENV") != "production" {
+	if env.GetString(context.Background(), "ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 	}
 
@@ -80,7 +81,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	logger.InitWithGCPDefaults()
 	logger.SetLoggerOptions(func(logger *logrus.Logger) {
 		logger.SetLevel(logrus.InfoLevel)
-		if viper.GetString("ENV") != "production" && !quietLogs {
+		if env.GetString(ctx, "ENV") != "production" && !quietLogs {
 			logger.SetLevel(logrus.DebugLevel)
 		}
 	})
@@ -91,7 +92,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	ipfsClient := rpc.NewIPFSShell()
 	arweaveClient := rpc.NewArweaveClient()
 
-	if viper.GetString("ENV") == "production" || enableRPC {
+	if env.GetString(ctx, "ENV") == "production" || enableRPC {
 		rpcEnabled = true
 	}
 
@@ -99,7 +100,7 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 
 	router.Use(middleware.GinContextToContext(), middleware.Sentry(true), middleware.Tracing(), middleware.HandleCORS(), middleware.ErrLogger())
 
-	if viper.GetString("ENV") != "production" {
+	if env.GetString(ctx, "ENV") != "production" {
 		gin.SetMode(gin.DebugMode)
 		logrus.SetLevel(logrus.DebugLevel)
 	}
@@ -109,9 +110,9 @@ func coreInitServer(quietLogs, enableRPC bool) *gin.Engine {
 	queueChan := make(chan processTokensInput)
 	t := newThrottler()
 
-	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(viper.GetInt("CHAIN")), defaultTransferEvents, nil, nil, nil)
+	i := newIndexer(ethClient, ipfsClient, arweaveClient, s, tokenRepo, contractRepo, addressFilterRepo, persist.Chain(env.Get[int](ctx, "CHAIN")), defaultTransferEvents, nil, nil, nil)
 
-	go processMissingMetadata(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	go processMissingMetadata(ctx, queueChan, tokenRepo, contractRepo, ipfsClient, ethClient, arweaveClient, s, env.GetString(ctx, "GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 	return handlersInitServer(router, queueChan, tokenRepo, contractRepo, ethClient, ipfsClient, arweaveClient, s, i)
 }
 
@@ -139,7 +140,7 @@ func SetDefaults() {
 }
 
 func LoadConfigFile(service string, manualEnv string) {
-	if viper.GetString("ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 		return
 	}
@@ -148,14 +149,14 @@ func LoadConfigFile(service string, manualEnv string) {
 
 func ValidateEnv() {
 	util.VarNotSetTo("RPC_URL", "")
-	if viper.GetString("ENV") != "local" {
+	if env.GetString(context.Background(), "ENV") != "local" {
 		util.VarNotSetTo("SENTRY_DSN", "")
 	}
 }
 
 func newRepos(storageClient *storage.Client) (persist.TokenRepository, persist.ContractRepository, refresh.AddressFilterRepository) {
 	pgClient := postgres.MustCreateClient()
-	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(viper.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))}
+	return postgres.NewTokenRepository(pgClient), postgres.NewContractRepository(pgClient), refresh.AddressFilterRepository{Bucket: storageClient.Bucket(env.GetString(context.Background(), "GCLOUD_TOKEN_LOGS_BUCKET"))}
 }
 
 func newThrottler() *throttle.Locker {
@@ -163,7 +164,7 @@ func newThrottler() *throttle.Locker {
 }
 
 func initSentry() {
-	if viper.GetString("ENV") == "local" {
+	if env.GetString(context.Background(), "ENV") == "local" {
 		logger.For(nil).Info("skipping sentry init")
 		return
 	}
@@ -171,15 +172,15 @@ func initSentry() {
 	logger.For(nil).Info("initializing sentry...")
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:         viper.GetString("SENTRY_DSN"),
-		Environment: viper.GetString("ENV"),
+		Dsn:         env.GetString(context.Background(), "SENTRY_DSN"),
+		Environment: env.GetString(context.Background(), "ENV"),
 		TracesSampler: sentry.TracesSamplerFunc(func(ctx sentry.SamplingContext) sentry.Sampled {
 			if ctx.Span.Op == rpc.GethSocketOpName {
 				return sentry.UniformTracesSampler(0.01).Sample(ctx)
 			}
-			return sentry.UniformTracesSampler(viper.GetFloat64("SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
+			return sentry.UniformTracesSampler(env.Get[float64](context.Background(), "SENTRY_TRACES_SAMPLE_RATE")).Sample(ctx)
 		}),
-		Release:          viper.GetString("VERSION"),
+		Release:          env.GetString(context.Background(), "VERSION"),
 		AttachStacktrace: true,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			event = auth.ScrubEventCookies(event, hint)

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/mikeydub/go-gallery/env"
 	"github.com/mikeydub/go-gallery/service/media"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/rpc"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,7 +79,7 @@ func TestIndexLogs_Success(t *testing.T) {
 		mediaTypeHasExpectedType(t, a, nil, persist.MediaTypeImage, predicted)
 
 		image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
-		med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
+		med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, env.GetString(ctx, "GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
 		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeImage, med.MediaType)
 		a.Empty(med.ThumbnailURL)
 		a.NotEmpty(med.MediaURL)
@@ -98,7 +98,7 @@ func TestIndexLogs_Success(t *testing.T) {
 		mediaHasContent(t, a, err, metadata)
 
 		image, animation := media.KeywordsForChain(persist.ChainETH, imageKeywords, animationKeywords)
-		med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, viper.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
+		med, err := media.MakePreviewsForMetadata(ctx, metadata, persist.Address(token.ContractAddress), token.TokenID, uri, persist.ChainETH, ipfsShell, arweaveClient, stg, env.GetString(ctx, "GCLOUD_TOKEN_CONTENT_BUCKET"), image, animation)
 		mediaTypeHasExpectedType(t, a, err, persist.MediaTypeSVG, med.MediaType)
 		a.Empty(med.ThumbnailURL)
 		a.Contains(med.MediaURL.String(), "https://")
