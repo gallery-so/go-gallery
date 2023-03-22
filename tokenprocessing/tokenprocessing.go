@@ -13,6 +13,7 @@ import (
 	"github.com/mikeydub/go-gallery/server"
 	"github.com/mikeydub/go-gallery/service/auth"
 	"github.com/mikeydub/go-gallery/service/logger"
+	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/redis"
 	sentryutil "github.com/mikeydub/go-gallery/service/sentry"
 	"github.com/mikeydub/go-gallery/service/throttle"
@@ -24,13 +25,15 @@ import (
 
 // InitServer initializes the mediaprocessing server
 func InitServer() {
-	router := coreInitServer()
+	setDefaults()
+	c := server.ClientInit(context.Background())
+	provider := server.NewMultichainProvider(c)
+	router := CoreInitServer(c, provider)
 	logger.For(nil).Info("Starting tokenprocessing server...")
 	http.Handle("/", router)
 }
 
-func coreInitServer() *gin.Engine {
-	setDefaults()
+func CoreInitServer(c *server.Clients, provider *multichain.Provider) *gin.Engine {
 	initSentry()
 	logger.InitWithGCPDefaults()
 
@@ -48,10 +51,8 @@ func coreInitServer() *gin.Engine {
 	logger.For(nil).Info("Registering handlers...")
 
 	t := newThrottler()
-	c := server.ClientInit(context.Background())
-	mc := server.NewMultichainProvider(c)
 
-	return handlersInitServer(router, mc, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString("GCLOUD_TOKEN_CONTENT_BUCKET"), t)
+	return handlersInitServer(router, provider, c.Repos, c.EthClient, c.IPFSClient, c.ArweaveClient, c.StorageClient, env.GetString(context.Background(), "GCLOUD_TOKEN_CONTENT_BUCKET"), t)
 }
 
 func setDefaults() {

@@ -2,23 +2,21 @@ package graphql_test
 
 import (
 	"context"
-	"fmt"
 	"net/http/httptest"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 
 	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	migrate "github.com/mikeydub/go-gallery/db"
 	"github.com/mikeydub/go-gallery/docker"
 	"github.com/mikeydub/go-gallery/server"
-	"github.com/mikeydub/go-gallery/service/multichain"
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/service/persist/postgres"
 	"github.com/mikeydub/go-gallery/service/pubsub/gcp"
-	"github.com/mikeydub/go-gallery/service/recommend"
 	"github.com/mikeydub/go-gallery/service/task"
+	"github.com/mikeydub/go-gallery/tests/integration/dummymetadata"
+	"github.com/mikeydub/go-gallery/tokenprocessing"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/require"
 )
@@ -29,16 +27,9 @@ type fixture func(t *testing.T)
 // testWithFixtures sets up each fixture before running the test
 func testWithFixtures(test func(t *testing.T), fixtures ...fixture) func(t *testing.T) {
 	return func(t *testing.T) {
-		var wg sync.WaitGroup
 		for _, fixture := range fixtures {
-			fixture := fixture
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				fixture(t)
-			}()
+			fixture(t)
 		}
-		wg.Wait()
 		test(t)
 	}
 }
@@ -146,8 +137,16 @@ func usePubSub(t *testing.T) {
 	t.Cleanup(func() { r.Close() })
 }
 
+// useTokenProcessing starts a HTTP server for tokenprocessing
+func useTokenProcessing(t *testing.T) {
+	t.Helper()
+	server := httptest.NewServer(tokenprocessing.CoreInitServer())
+	t.Setenv("TOKEN_PROCESSING_URL", server.URL)
+	t.Cleanup(func() { server.Close() })
+}
+
 type serverFixture struct {
-	server *httptest.Server
+	*httptest.Server
 }
 
 // newServerFixture starts a new HTTP server for end-to-end tests
@@ -158,9 +157,17 @@ func newServerFixture(t *testing.T) serverFixture {
 	return serverFixture{server}
 }
 
+// newMetadataServerFixture starts a HTTP server for fetching static metadata
+func useMetadataServer(t *testing.T) serverFixture {
+	t.Helper()
+	server := httptest.NewServer(dummymetadata.CoreInitServer())
+	t.Cleanup(func() { server.Close() })
+	return serverFixture{server}
+}
+
 type nonceFixture struct {
-	wallet wallet
-	nonce  string
+	Wallet wallet
+	Nonce  string
 }
 
 // newNonceFixture generates a new nonce
@@ -174,10 +181,10 @@ func newNonceFixture(t *testing.T) nonceFixture {
 }
 
 type userFixture struct {
-	wallet    wallet
-	username  string
-	id        persist.DBID
-	galleryID persist.DBID
+	Wallet    wallet
+	Username  string
+	ID        persist.DBID
+	GalleryID persist.DBID
 }
 
 // newUserFixture generates a new user
@@ -192,7 +199,7 @@ func newUserFixture(t *testing.T) userFixture {
 
 type userWithTokensFixture struct {
 	userFixture
-	tokenIDs []persist.DBID
+	TokenIDs []persist.DBID
 }
 
 // newUserWithTokensFixture generates a new user with tokens synced
@@ -200,23 +207,15 @@ func newUserWithTokensFixture(t *testing.T) userWithTokensFixture {
 	t.Helper()
 	user := newUserFixture(t)
 	ctx := context.Background()
-	clients := server.ClientInit(ctx)
-	p := multichain.Provider{
-		Repos:       clients.Repos,
-		TasksClient: clients.TaskClient,
-		Queries:     clients.Queries,
-		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
-	}
-	h := server.CoreInit(clients, &p, newStubRecommender(t, []persist.DBID{}))
-	c := customHandlerClient(t, h, withJWTOpt(t, user.id))
-	tokenIDs := syncTokens(t, ctx, c, user.id)
-	t.Cleanup(clients.Close)
+	h := handlerWithProviders(t, sendTokensNOOP, defaultStubProvider(user.Wallet.Address))
+	c := customHandlerClient(t, h, withJWTOpt(t, user.ID))
+	tokenIDs := syncTokens(t, ctx, c, user.ID)
 	return userWithTokensFixture{user, tokenIDs}
 }
 
 type userWithFeedEventsFixture struct {
 	userWithTokensFixture
-	feedEventIDs []persist.DBID
+	FeedEventIDs []persist.DBID
 }
 
 // newUserWithFeedEventsFixture generates a new user with feed events pre-generated
@@ -225,78 +224,32 @@ func newUserWithFeedEventsFixture(t *testing.T) userWithFeedEventsFixture {
 	serverF := newServerFixture(t)
 	user := newUserWithTokensFixture(t)
 	ctx := context.Background()
-	c := authedServerClient(t, serverF.server.URL, user.id)
+	c := authedServerClient(t, serverF.Server.URL, user.ID)
 	// At the moment, we rely on captioning to ensure that that feed events are
 	// generated near instantly so that we don't have to add arbitrary sleep
 	// times during tests.
 	createCollection(t, ctx, c, CreateCollectionInput{
-		GalleryId:     user.galleryID,
-		Tokens:        user.tokenIDs,
+		GalleryId:     user.GalleryID,
+		Tokens:        user.TokenIDs,
 		Layout:        defaultLayout(),
-		TokenSettings: defaultTokenSettings(user.tokenIDs),
+		TokenSettings: defaultTokenSettings(user.TokenIDs),
 		Caption:       util.ToPointer("this is a caption"),
 	})
 	createCollection(t, ctx, c, CreateCollectionInput{
-		GalleryId:     user.galleryID,
-		Tokens:        user.tokenIDs,
+		GalleryId:     user.GalleryID,
+		Tokens:        user.TokenIDs,
 		Layout:        defaultLayout(),
-		TokenSettings: defaultTokenSettings(user.tokenIDs),
+		TokenSettings: defaultTokenSettings(user.TokenIDs),
 		Caption:       util.ToPointer("this is a caption"),
 	})
 	createCollection(t, ctx, c, CreateCollectionInput{
-		GalleryId:     user.galleryID,
-		Tokens:        user.tokenIDs,
+		GalleryId:     user.GalleryID,
+		Tokens:        user.TokenIDs,
 		Layout:        defaultLayout(),
-		TokenSettings: defaultTokenSettings(user.tokenIDs),
+		TokenSettings: defaultTokenSettings(user.TokenIDs),
 		Caption:       util.ToPointer("this is a caption"),
 	})
 	feedEvents := globalFeedEvents(t, ctx, c, 3)
 	require.Len(t, feedEvents, 3)
 	return userWithFeedEventsFixture{user, feedEvents}
-}
-
-// stubProvider returns the same set of tokens for every call made to it
-type stubProvider struct{}
-
-func (p *stubProvider) GetTokensByWalletAddress(ctx context.Context, address persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, []multichain.ChainAgnosticContract, error) {
-	contract := multichain.ChainAgnosticContract{
-		Address: "0x123",
-		Name:    "testContract",
-		Symbol:  "TEST",
-	}
-
-	tokens := []multichain.ChainAgnosticToken{}
-
-	for i := 0; i < 10; i++ {
-		tokens = append(tokens, multichain.ChainAgnosticToken{
-			Name:            fmt.Sprintf("testToken%d", i),
-			TokenID:         persist.TokenID(fmt.Sprintf("%X", i)),
-			Quantity:        "1",
-			ContractAddress: contract.Address,
-			OwnerAddress:    address,
-		})
-	}
-
-	return tokens, []multichain.ChainAgnosticContract{contract}, nil
-}
-
-func (p *stubProvider) GetTokensByContractAddress(ctx context.Context, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	panic("not implemented")
-}
-
-func (p *stubProvider) GetTokensByContractAddressAndOwner(ctx context.Context, owner persist.Address, contract persist.Address, limit, offset int) ([]multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	panic("not implemented")
-}
-
-func (p *stubProvider) GetTokensByTokenIdentifiersAndOwner(context.Context, multichain.ChainAgnosticIdentifiers, persist.Address) (multichain.ChainAgnosticToken, multichain.ChainAgnosticContract, error) {
-	panic("not implemented")
-}
-
-func newStubRecommender(t *testing.T, userIDs []persist.DBID) *recommend.Recommender {
-	return &recommend.Recommender{
-		LoadFunc: func(context.Context) {},
-		BootstrapFunc: func(context.Context) ([]persist.DBID, error) {
-			return userIDs, nil
-		},
-	}
 }

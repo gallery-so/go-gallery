@@ -26,6 +26,7 @@ import (
 	"github.com/mikeydub/go-gallery/service/persist"
 	"github.com/mikeydub/go-gallery/util"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,6 +42,11 @@ func TestMain(t *testing.T) {
 			title:    "test GraphQL",
 			run:      testGraphQL,
 			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useNotificationTopics},
+		},
+		{
+			title:    "test syncing tokens",
+			run:      testTokenSyncs,
+			fixtures: []fixture{useDefaultEnv, usePostgres, useRedis, useTokenQueue, useTokenProcessing},
 		},
 	}
 	for _, test := range tests {
@@ -60,7 +66,6 @@ func testGraphQL(t *testing.T) {
 		{title: "should get viewer suggested users", run: testSuggestedUsersForViewer},
 		{title: "should add a wallet", run: testAddWallet},
 		{title: "should remove a wallet", run: testRemoveWallet},
-		{title: "should sync tokens", run: testSyncTokens},
 		{title: "should create a collection", run: testCreateCollection},
 		{title: "views from multiple users are rolled up", run: testViewsAreRolledUp},
 		{title: "update gallery and create a feed event", run: testUpdateGalleryWithPublish},
@@ -79,12 +84,28 @@ func testGraphQL(t *testing.T) {
 	}
 }
 
+func testTokenSyncs(t *testing.T) {
+	tests := []testCase{
+		{title: "should sync new tokens", run: testSyncNewTokens},
+		{title: "should submit new tokens to tokenprocessing", run: testSyncOnlySubmitsNewTokens},
+		{title: "should not submit old tokens to tokenprocessing", run: testSyncSkipsSubmittingOldTokens},
+		{title: "should delete old tokens", run: testSyncDeletesOldTokens},
+		{title: "should combine all tokens from providers", run: testSyncShouldCombineProviders},
+		{title: "should merge duplicates within provider", run: testSyncShouldMergeDuplicatesInProvider},
+		{title: "should merge duplicates across providers", run: testSyncShouldMergeDuplicatesAcrossProviders},
+		{title: "should process media", run: testSyncShouldProcessMedia},
+	}
+	for _, test := range tests {
+		t.Run(test.title, testWithFixtures(test.run, test.fixtures...))
+	}
+}
+
 func testCreateUser(t *testing.T) {
 	nonceF := newNonceFixture(t)
 	c := defaultHandlerClient(t)
 	username := "user" + persist.GenerateID().String()
 
-	response, err := createUserMutation(context.Background(), c, authMechanismInput(nonceF.wallet, nonceF.nonce),
+	response, err := createUserMutation(context.Background(), c, authMechanismInput(nonceF.Wallet, nonceF.Nonce),
 		CreateUserInput{
 			Username: username,
 		},
@@ -97,45 +118,45 @@ func testCreateUser(t *testing.T) {
 
 func testUserByUsername(t *testing.T) {
 	userF := newUserFixture(t)
-	response, err := userByUsernameQuery(context.Background(), defaultHandlerClient(t), userF.username)
+	response, err := userByUsernameQuery(context.Background(), defaultHandlerClient(t), userF.Username)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserByUsername).(*userByUsernameQueryUserByUsernameGalleryUser)
-	assert.Equal(t, userF.username, *payload.Username)
-	assert.Equal(t, userF.id, payload.Dbid)
+	assert.Equal(t, userF.Username, *payload.Username)
+	assert.Equal(t, userF.ID, payload.Dbid)
 }
 
 func testUserByAddress(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
-	response, err := userByAddressQuery(context.Background(), c, chainAddressInput(userF.wallet.address))
+	response, err := userByAddressQuery(context.Background(), c, chainAddressInput(userF.Wallet.Address))
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserByAddress).(*userByAddressQueryUserByAddressGalleryUser)
-	assert.Equal(t, userF.username, *payload.Username)
-	assert.Equal(t, userF.id, payload.Dbid)
+	assert.Equal(t, userF.Username, *payload.Username)
+	assert.Equal(t, userF.ID, payload.Dbid)
 }
 
 func testUserByID(t *testing.T) {
 	userF := newUserFixture(t)
-	response, err := userByIdQuery(context.Background(), defaultHandlerClient(t), userF.id)
+	response, err := userByIdQuery(context.Background(), defaultHandlerClient(t), userF.ID)
 
 	require.NoError(t, err)
 	payload, _ := (*response.UserById).(*userByIdQueryUserByIdGalleryUser)
-	assert.Equal(t, userF.username, *payload.Username)
-	assert.Equal(t, userF.id, payload.Dbid)
+	assert.Equal(t, userF.Username, *payload.Username)
+	assert.Equal(t, userF.ID, payload.Dbid)
 }
 
 func testViewer(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	response, err := viewerQuery(context.Background(), c)
 	require.NoError(t, err)
 
 	payload, _ := (*response.Viewer).(*viewerQueryViewer)
-	assert.Equal(t, userF.username, *payload.User.Username)
+	assert.Equal(t, userF.Username, *payload.User.Username)
 }
 
 func testSuggestedUsersForViewer(t *testing.T) {
@@ -147,12 +168,12 @@ func testSuggestedUsersForViewer(t *testing.T) {
 	clients := server.ClientInit(ctx)
 	provider := server.NewMultichainProvider(clients)
 	recommender := newStubRecommender(t, []persist.DBID{
-		userA.id,
-		userB.id,
-		userC.id,
+		userA.ID,
+		userB.ID,
+		userC.ID,
 	})
 	handler := server.CoreInit(clients, provider, recommender)
-	c := customHandlerClient(t, handler, withJWTOpt(t, userF.id))
+	c := customHandlerClient(t, handler, withJWTOpt(t, userF.ID))
 
 	response, err := viewerQuery(ctx, c)
 	require.NoError(t, err)
@@ -166,15 +187,15 @@ func testAddWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToAdd := newWallet(t)
 	ctx := context.Background()
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 	nonce := newNonce(t, ctx, c, walletToAdd)
 
-	response, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToAdd.address), authMechanismInput(walletToAdd, nonce))
+	response, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToAdd.Address), authMechanismInput(walletToAdd, nonce))
 
 	require.NoError(t, err)
 	payload, _ := (*response.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload)
 	wallets := payload.Viewer.User.Wallets
-	assert.Equal(t, walletToAdd.address, *wallets[len(wallets)-1].ChainAddress.Address)
+	assert.Equal(t, walletToAdd.Address, *wallets[len(wallets)-1].ChainAddress.Address)
 	assert.Equal(t, Chain("Ethereum"), *wallets[len(wallets)-1].ChainAddress.Chain)
 	assert.Len(t, wallets, 2)
 }
@@ -183,9 +204,9 @@ func testRemoveWallet(t *testing.T) {
 	userF := newUserFixture(t)
 	walletToRemove := newWallet(t)
 	ctx := context.Background()
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 	nonce := newNonce(t, ctx, c, walletToRemove)
-	addResponse, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToRemove.address), authMechanismInput(walletToRemove, nonce))
+	addResponse, err := addUserWalletMutation(ctx, c, chainAddressInput(walletToRemove.Address), authMechanismInput(walletToRemove, nonce))
 	require.NoError(t, err)
 	wallets := (*addResponse.AddUserWallet).(*addUserWalletMutationAddUserWalletAddUserWalletPayload).Viewer.User.Wallets
 	lastWallet := wallets[len(wallets)-1]
@@ -203,20 +224,20 @@ func testLogin(t *testing.T) {
 	userF := newUserFixture(t)
 	ctx := context.Background()
 	c := defaultHandlerClient(t)
-	nonce := newNonce(t, ctx, c, userF.wallet)
+	nonce := newNonce(t, ctx, c, userF.Wallet)
 
-	response, err := loginMutation(ctx, c, authMechanismInput(userF.wallet, nonce))
+	response, err := loginMutation(ctx, c, authMechanismInput(userF.Wallet, nonce))
 
 	require.NoError(t, err)
 	payload, _ := (*response.Login).(*loginMutationLoginLoginPayload)
 	assert.NotEmpty(t, readCookie(t, c.response, auth.JWTCookieKey))
-	assert.Equal(t, userF.username, *payload.Viewer.User.Username)
-	assert.Equal(t, userF.id, payload.Viewer.User.Dbid)
+	assert.Equal(t, userF.Username, *payload.Viewer.User.Username)
+	assert.Equal(t, userF.ID, payload.Viewer.User.Dbid)
 }
 
 func testLogout(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	response, err := logoutMutation(context.Background(), c)
 
@@ -225,57 +246,38 @@ func testLogout(t *testing.T) {
 	assert.Nil(t, response.Logout.Viewer)
 }
 
-func testSyncTokens(t *testing.T) {
-	userF := newUserFixture(t)
-	clients := server.ClientInit(context.Background())
-	p := multichain.Provider{
-		Repos:       clients.Repos,
-		TasksClient: clients.TaskClient,
-		Queries:     clients.Queries,
-		Chains:      map[persist.Chain][]interface{}{persist.ChainETH: {&stubProvider{}}},
-	}
-	h := server.CoreInit(clients, &p, newStubRecommender(t, []persist.DBID{}))
-	c := customHandlerClient(t, h, withJWTOpt(t, userF.id))
-
-	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
-
-	require.NoError(t, err)
-	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
-	assert.NotEmpty(t, payload.Viewer.User.Tokens)
-}
-
 func testCreateCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	response, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
-		GalleryId:      userF.galleryID,
+		GalleryId:      userF.GalleryID,
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
-		Tokens:         userF.tokenIDs,
+		Tokens:         userF.TokenIDs,
 		Layout:         defaultLayout(),
-		TokenSettings:  defaultTokenSettings(userF.tokenIDs),
+		TokenSettings:  defaultTokenSettings(userF.TokenIDs),
 		Caption:        nil,
 	})
 
 	require.NoError(t, err)
 	payload := (*response.CreateCollection).(*createCollectionMutationCreateCollectionCreateCollectionPayload)
 	assert.NotEmpty(t, payload.Collection.Dbid)
-	assert.Len(t, payload.Collection.Tokens, len(userF.tokenIDs))
+	assert.Len(t, payload.Collection.Tokens, len(userF.TokenIDs))
 }
 
 func testUpdateGalleryWithPublish(t *testing.T) {
 	serverF := newServerFixture(t)
 	userF := newUserWithTokensFixture(t)
-	c := authedServerClient(t, serverF.server.URL, userF.id)
+	c := authedServerClient(t, serverF.URL, userF.ID)
 
 	colResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
-		GalleryId:      userF.galleryID,
+		GalleryId:      userF.GalleryID,
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
-		Tokens:         userF.tokenIDs[:1],
+		Tokens:         userF.TokenIDs[:1],
 		Layout:         defaultLayout(),
-		TokenSettings:  defaultTokenSettings(userF.tokenIDs[:1]),
+		TokenSettings:  defaultTokenSettings(userF.TokenIDs[:1]),
 		Caption:        nil,
 	})
 
@@ -285,12 +287,12 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	assert.Len(t, colPay.Collection.Tokens, 1)
 
 	updateReponse, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
-		GalleryId: userF.galleryID,
+		GalleryId: userF.GalleryID,
 		Name:      util.ToPointer("newName"),
 		UpdatedCollections: []*UpdateCollectionInput{
 			{
 				Dbid:           colPay.Collection.Dbid,
-				Tokens:         userF.tokenIDs[:2],
+				Tokens:         userF.TokenIDs[:2],
 				Name:           "yes",
 				CollectorsNote: "no",
 				Layout: CollectionLayoutInput{
@@ -302,13 +304,13 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 						},
 					},
 				},
-				TokenSettings: defaultTokenSettings(userF.tokenIDs[:2]),
+				TokenSettings: defaultTokenSettings(userF.TokenIDs[:2]),
 			},
 		},
 		CreatedCollections: []*CreateCollectionInGalleryInput{
 			{
 				GivenID:        "wow",
-				Tokens:         userF.tokenIDs[:3],
+				Tokens:         userF.TokenIDs[:3],
 				CollectorsNote: "this is a note",
 				Name:           "newCollection",
 				Layout: CollectionLayoutInput{
@@ -320,7 +322,7 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 						},
 					},
 				},
-				TokenSettings: defaultTokenSettings(userF.tokenIDs[:3]),
+				TokenSettings: defaultTokenSettings(userF.TokenIDs[:3]),
 			},
 		},
 		Order:  []persist.DBID{colPay.Collection.Dbid, "wow"},
@@ -337,7 +339,7 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 	assert.NotEmpty(t, updatePayload.Gallery.Name)
 
 	update2Reponse, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
-		GalleryId:   userF.galleryID,
+		GalleryId:   userF.GalleryID,
 		Description: util.ToPointer("newDesc"),
 		EditId:      util.ToPointer("edit_id"),
 	})
@@ -350,7 +352,7 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 
 	// publish
 	publishResponse, err := publishGalleryMutation(context.Background(), c, PublishGalleryInput{
-		GalleryId: userF.galleryID,
+		GalleryId: userF.GalleryID,
 		EditId:    "edit_id",
 		Caption:   util.ToPointer("newCaption"),
 	})
@@ -400,7 +402,7 @@ func testUpdateGalleryWithPublish(t *testing.T) {
 
 func testCreateGallery(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	response, err := createGalleryMutation(context.Background(), c, CreateGalleryInput{
 		Name:        util.ToPointer("newGallery"),
@@ -418,15 +420,15 @@ func testCreateGallery(t *testing.T) {
 
 func testMoveCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	createResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
-		GalleryId:      userF.galleryID,
+		GalleryId:      userF.GalleryID,
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
-		Tokens:         userF.tokenIDs,
+		Tokens:         userF.TokenIDs,
 		Layout:         defaultLayout(),
-		TokenSettings:  defaultTokenSettings(userF.tokenIDs),
+		TokenSettings:  defaultTokenSettings(userF.TokenIDs),
 		Caption:        nil,
 	})
 
@@ -460,7 +462,7 @@ func testMoveCollection(t *testing.T) {
 
 func testUpdateUserExperiences(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	response, err := updateUserExperience(context.Background(), c, UpdateUserExperienceInput{
 		ExperienceType: UserExperienceTypeMultigalleryannouncement,
@@ -481,7 +483,7 @@ func testUpdateUserExperiences(t *testing.T) {
 
 func testConnectSocialAccount(t *testing.T) {
 	userF := newUserFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 	dc := defaultHandlerClient(t)
 
 	connectResp, err := connectSocialAccount(context.Background(), c, SocialAuthMechanism{
@@ -513,7 +515,7 @@ func testConnectSocialAccount(t *testing.T) {
 	assert.Equal(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Username, "test")
 	assert.False(t, updateDisplayedPayload.Viewer.SocialAccounts.Twitter.Display)
 
-	userResp, err := userByIdQuery(context.Background(), dc, userF.id)
+	userResp, err := userByIdQuery(context.Background(), dc, userF.ID)
 	require.NoError(t, err)
 	userPayload := (*userResp.UserById).(*userByIdQueryUserByIdGalleryUser)
 	assert.Nil(t, userPayload.SocialAccounts.Twitter)
@@ -528,13 +530,13 @@ func testConnectSocialAccount(t *testing.T) {
 
 func testUpdateGalleryDeleteCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	colResp, err := createCollectionMutation(context.Background(), c, CreateCollectionInput{
-		GalleryId:      userF.galleryID,
+		GalleryId:      userF.GalleryID,
 		Name:           "newCollection",
 		CollectorsNote: "this is a note",
-		Tokens:         userF.tokenIDs[:1],
+		Tokens:         userF.TokenIDs[:1],
 		Layout: CollectionLayoutInput{
 			Sections: []int{0},
 			SectionLayout: []CollectionSectionLayoutInput{
@@ -546,7 +548,7 @@ func testUpdateGalleryDeleteCollection(t *testing.T) {
 		},
 		TokenSettings: []CollectionTokenSettingsInput{
 			{
-				TokenId:    userF.tokenIDs[0],
+				TokenId:    userF.TokenIDs[0],
 				RenderLive: false,
 			},
 		},
@@ -559,7 +561,7 @@ func testUpdateGalleryDeleteCollection(t *testing.T) {
 	assert.Len(t, colPay.Collection.Tokens, 1)
 
 	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
-		GalleryId:          userF.galleryID,
+		GalleryId:          userF.GalleryID,
 		DeletedCollections: []persist.DBID{colPay.Collection.Dbid},
 		Order:              []persist.DBID{},
 	})
@@ -576,10 +578,10 @@ func testUpdateGalleryDeleteCollection(t *testing.T) {
 
 func testUpdateGalleryWithNoNameChange(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
-		GalleryId: userF.galleryID,
+		GalleryId: userF.GalleryID,
 		Name:      util.ToPointer("newName"),
 	})
 
@@ -592,7 +594,7 @@ func testUpdateGalleryWithNoNameChange(t *testing.T) {
 	assert.NotEmpty(t, payload.Gallery.Name)
 
 	response, err = updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
-		GalleryId: userF.galleryID,
+		GalleryId: userF.GalleryID,
 	})
 
 	require.NoError(t, err)
@@ -606,16 +608,16 @@ func testUpdateGalleryWithNoNameChange(t *testing.T) {
 
 func testUpdateGalleryWithNewCollection(t *testing.T) {
 	userF := newUserWithTokensFixture(t)
-	c := authedHandlerClient(t, userF.id)
+	c := authedHandlerClient(t, userF.ID)
 
 	response, err := updateGalleryMutation(context.Background(), c, UpdateGalleryInput{
-		GalleryId: userF.galleryID,
+		GalleryId: userF.GalleryID,
 
 		CreatedCollections: []*CreateCollectionInGalleryInput{
 			{
 				Name:           "yay",
 				CollectorsNote: "this is a note",
-				Tokens:         userF.tokenIDs[:1],
+				Tokens:         userF.TokenIDs[:1],
 				Hidden:         false,
 				Layout: CollectionLayoutInput{
 					Sections: []int{0},
@@ -650,11 +652,11 @@ func testViewsAreRolledUp(t *testing.T) {
 	alice := newUserFixture(t)
 	ctx := context.Background()
 	// bob views gallery
-	client := authedServerClient(t, serverF.server.URL, bob.id)
-	viewGallery(t, ctx, client, userF.galleryID)
+	client := authedServerClient(t, serverF.URL, bob.ID)
+	viewGallery(t, ctx, client, userF.GalleryID)
 	// // alice views gallery
-	client = authedServerClient(t, serverF.server.URL, alice.id)
-	viewGallery(t, ctx, client, userF.galleryID)
+	client = authedServerClient(t, serverF.URL, alice.ID)
+	viewGallery(t, ctx, client, userF.GalleryID)
 
 	// TODO: Actually verify that the views get rolled up
 }
@@ -669,22 +671,22 @@ func testTrendingUsers(t *testing.T) {
 	// view bob a few times
 	for i := 0; i < 5; i++ {
 		viewer := newUserFixture(t)
-		c = authedServerClient(t, serverF.server.URL, viewer.id)
-		viewGallery(t, ctx, c, bob.galleryID)
+		c = authedServerClient(t, serverF.URL, viewer.ID)
+		viewGallery(t, ctx, c, bob.GalleryID)
 	}
 	// view alice a few times
 	for i := 0; i < 3; i++ {
 		viewer := newUserFixture(t)
-		c = authedServerClient(t, serverF.server.URL, viewer.id)
-		viewGallery(t, ctx, c, alice.galleryID)
+		c = authedServerClient(t, serverF.URL, viewer.ID)
+		viewGallery(t, ctx, c, alice.GalleryID)
 	}
 	// view dave a few times
 	for i := 0; i < 1; i++ {
 		viewer := newUserFixture(t)
-		c = authedServerClient(t, serverF.server.URL, viewer.id)
-		viewGallery(t, ctx, c, dave.galleryID)
+		c = authedServerClient(t, serverF.URL, viewer.ID)
+		viewGallery(t, ctx, c, dave.GalleryID)
 	}
-	expected := []persist.DBID{bob.id, alice.id, dave.id}
+	expected := []persist.DBID{bob.ID, alice.ID, dave.ID}
 	getTrending := func(t *testing.T, report ReportWindow) []persist.DBID {
 		resp, err := trendingUsersQuery(ctx, c, TrendingUsersInput{Report: report})
 		require.NoError(t, err)
@@ -718,24 +720,198 @@ func testTrendingUsers(t *testing.T) {
 func testTrendingFeedEvents(t *testing.T) {
 	ctx := context.Background()
 	userF := newUserWithFeedEventsFixture(t)
-	c := authedHandlerClient(t, userF.id)
-	admireFeedEvent(t, ctx, c, userF.feedEventIDs[1])
-	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[1], "a")
-	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[1], "b")
-	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[1], "c")
-	admireFeedEvent(t, ctx, c, userF.feedEventIDs[0])
-	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "a")
-	commentOnFeedEvent(t, ctx, c, userF.feedEventIDs[0], "b")
-	admireFeedEvent(t, ctx, c, userF.feedEventIDs[2])
+	c := authedHandlerClient(t, userF.ID)
+	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[1])
+	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "a")
+	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "b")
+	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[1], "c")
+	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[0])
+	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "a")
+	commentOnFeedEvent(t, ctx, c, userF.FeedEventIDs[0], "b")
+	admireFeedEvent(t, ctx, c, userF.FeedEventIDs[2])
 	expected := []persist.DBID{
-		userF.feedEventIDs[2],
-		userF.feedEventIDs[0],
-		userF.feedEventIDs[1],
+		userF.FeedEventIDs[2],
+		userF.FeedEventIDs[0],
+		userF.FeedEventIDs[1],
 	}
 
 	actual := trendingFeedEvents(t, ctx, c, 10)
 
 	assert.Equal(t, expected, actual)
+}
+
+func testSyncNewTokens(t *testing.T) {
+	userF := newUserFixture(t)
+	provider := defaultStubProvider(userF.Wallet.Address)
+	h := handlerWithProviders(t, sendTokensNOOP, provider)
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+	ctx := context.Background()
+
+	t.Run("should sync new tokens", func(t *testing.T) {
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		require.NoError(t, err)
+		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
+	})
+
+	t.Run("should not duplicate tokens from repeat syncs", func(t *testing.T) {
+		response, err := syncTokensMutation(ctx, c, []Chain{ChainEthereum})
+
+		require.NoError(t, err)
+		payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+		assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
+	})
+}
+
+func testSyncOnlySubmitsNewTokens(t *testing.T) {
+	userF := newUserFixture(t)
+	provider := defaultStubProvider(userF.Wallet.Address)
+	tokenRecorder := sendTokensRecorder{}
+	h := handlerWithProviders(t, tokenRecorder.Send, provider)
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+	tokenRecorder.On("Send", mock.Anything, mock.Anything).Times(1).Return(nil)
+
+	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+
+	require.NoError(t, err)
+	tokenRecorder.AssertExpectations(t)
+	assert.Len(t, tokenRecorder.Tasks[0].TokenIDs, len(provider.Tokens))
+}
+
+func testSyncSkipsSubmittingOldTokens(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	tokenRecorder := sendTokensRecorder{}
+	h := handlerWithProviders(t, tokenRecorder.Send, defaultStubProvider(userF.Wallet.Address))
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+	_, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+
+	require.NoError(t, err)
+	tokenRecorder.AssertNotCalled(t, "Send", mock.Anything, mock.Anything)
+}
+
+func testSyncDeletesOldTokens(t *testing.T) {
+	userF := newUserWithTokensFixture(t)
+	provider := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
+		Address: "0x1337",
+		Name:    "someContract",
+	}, userF.Wallet.Address, 4))
+	h := handlerWithProviders(t, sendTokensNOOP, provider)
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+
+	require.NoError(t, err)
+	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+	assert.Len(t, payload.Viewer.User.Tokens, len(provider.Tokens))
+}
+
+func testSyncShouldCombineProviders(t *testing.T) {
+	userF := newUserFixture(t)
+	providerA := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
+		Address: "0x1337",
+		Name:    "someContract",
+	}, userF.Wallet.Address, 4))
+	providerB := newStubProvider(withContractTokens(multichain.ChainAgnosticContract{
+		Address: "0x1234",
+		Name:    "anotherContract",
+	}, userF.Wallet.Address, 2))
+	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+
+	require.NoError(t, err)
+	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+	assert.Len(t, payload.Viewer.User.Tokens, len(providerA.Tokens)+len(providerB.Tokens))
+}
+
+func testSyncShouldMergeDuplicatesInProvider(t *testing.T) {
+	userF := newUserFixture(t)
+	token := defaultToken(userF.Wallet.Address)
+	provider := newStubProvider(withTokens([]multichain.ChainAgnosticToken{token, token}))
+	h := handlerWithProviders(t, sendTokensNOOP, provider)
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+
+	require.NoError(t, err)
+	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+	assert.Len(t, payload.Viewer.User.Tokens, 1)
+}
+
+func testSyncShouldMergeDuplicatesAcrossProviders(t *testing.T) {
+	userF := newUserFixture(t)
+	token := defaultToken(userF.Wallet.Address)
+	providerA := newStubProvider(withTokens([]multichain.ChainAgnosticToken{token}))
+	providerB := newStubProvider(withTokens([]multichain.ChainAgnosticToken{token}))
+	h := handlerWithProviders(t, sendTokensNOOP, providerA, providerB)
+	c := customHandlerClient(t, h, withJWTOpt(t, userF.ID))
+
+	response, err := syncTokensMutation(context.Background(), c, []Chain{ChainEthereum})
+
+	require.NoError(t, err)
+	payload := (*response.SyncTokens).(*syncTokensMutationSyncTokensSyncTokensPayload)
+	assert.Len(t, payload.Viewer.User.Tokens, 1)
+}
+
+func testSyncShouldProcessMedia(t *testing.T) {
+	t.Run("sync should process image", func(t *testing.T) {
+		userF := newUserFixture(t)
+		token := defaultToken(userF.Wallet.Address)
+		backendProvider := newStubProvider(withTokens([]multichain.ChainAgnosticToken{token}))
+		tokenProcessingProvider := newStubProvider(withFetchMetadata(fetchFromDummyEndpoint("/metadata/image")))
+		c := server.ClientInit(context.Background())
+		mc := newMultichainProvider(c, sendTokensNOOP, tokenProcessingProvider)
+		t.Cleanup(c.Close)
+		h := handlerWithProviders(t, sendTokensToTokenProcessing(c, &mc), backendProvider)
+	})
+
+	t.Run("sync should process video", func(t *testing.T) {
+	})
+
+	t.Run("sync should process iframe", func(t *testing.T) {
+	})
+
+	t.Run("sync should process gif", func(t *testing.T) {
+	})
+
+	t.Run("sync should process bad metadata", func(t *testing.T) {
+	})
+
+	t.Run("sync should process missing metadata", func(t *testing.T) {
+	})
+
+	t.Run("sync should process svg", func(t *testing.T) {
+	})
+
+	t.Run("sync should process base64svg", func(t *testing.T) {
+	})
+
+	t.Run("sync should process ipfs", func(t *testing.T) {
+	})
+
+	t.Run("sync should process bad dns", func(t *testing.T) {
+	})
+
+	t.Run("sync should process different keyword", func(t *testing.T) {
+	})
+
+	t.Run("sync should process wrong keyword", func(t *testing.T) {
+	})
+
+	t.Run("sync should process animation", func(t *testing.T) {
+	})
+
+	t.Run("sync should process pdf", func(t *testing.T) {
+	})
+
+	t.Run("sync should process text", func(t *testing.T) {
+	})
+
+	t.Run("sync should process bad image", func(t *testing.T) {
+	})
 }
 
 // authMechanismInput signs a nonce with an ethereum wallet
@@ -745,7 +921,7 @@ func authMechanismInput(w wallet, nonce string) AuthMechanism {
 			Nonce:     nonce,
 			Signature: w.Sign(nonce),
 			ChainPubKey: ChainPubKeyInput{
-				PubKey: w.address,
+				PubKey: w.Address,
 				Chain:  "Ethereum",
 			},
 		},
@@ -757,13 +933,13 @@ func chainAddressInput(address string) ChainAddressInput {
 }
 
 type wallet struct {
-	pKey    *ecdsa.PrivateKey
-	pubKey  *ecdsa.PublicKey
-	address string
+	PKey    *ecdsa.PrivateKey
+	PubKey  *ecdsa.PublicKey
+	Address string
 }
 
 func (w *wallet) Sign(msg string) string {
-	sig, err := crypto.Sign(crypto.Keccak256([]byte(msg)), w.pKey)
+	sig, err := crypto.Sign(crypto.Keccak256([]byte(msg)), w.PKey)
 	if err != nil {
 		panic(err)
 	}
@@ -780,15 +956,15 @@ func newWallet(t *testing.T) wallet {
 	address := strings.ToLower(crypto.PubkeyToAddress(*pubKey).Hex())
 
 	return wallet{
-		pKey:    pk,
-		pubKey:  pubKey,
-		address: address,
+		PKey:    pk,
+		PubKey:  pubKey,
+		Address: address,
 	}
 }
 
 func newNonce(t *testing.T, ctx context.Context, c graphql.Client, w wallet) string {
 	t.Helper()
-	response, err := getAuthNonceMutation(ctx, c, chainAddressInput(w.address))
+	response, err := getAuthNonceMutation(ctx, c, chainAddressInput(w.Address))
 	require.NoError(t, err)
 	payload := (*response.GetAuthNonce).(*getAuthNonceMutationGetAuthNonce)
 	return *payload.Nonce
@@ -903,6 +1079,17 @@ func defaultLayout() CollectionLayoutInput {
 	}
 }
 
+// defaultToken returns a dummy token owned by the provided address
+func defaultToken(address string) multichain.ChainAgnosticToken {
+	return multichain.ChainAgnosticToken{
+		Name:            "testToken1",
+		TokenID:         "1",
+		Quantity:        "1",
+		ContractAddress: "0x123",
+		OwnerAddress:    persist.Address(address),
+	}
+}
+
 // defaultTokenSettings returns default display token settings
 func defaultTokenSettings(tokens []persist.DBID) []CollectionTokenSettingsInput {
 	settings := make([]CollectionTokenSettingsInput, len(tokens))
@@ -920,6 +1107,25 @@ func defaultHandler(t *testing.T) http.Handler {
 	handler := server.CoreInit(c, p, r)
 	t.Cleanup(c.Close)
 	return handler
+}
+
+// handlerWithProviders returns a GraphQL http.Handler
+func handlerWithProviders(t *testing.T, sendTokens multichain.SendTokens, p ...any) http.Handler {
+	c := server.ClientInit(context.Background())
+	provider := newMultichainProvider(c, sendTokens, p)
+	recommender := newStubRecommender(t, []persist.DBID{})
+	t.Cleanup(c.Close)
+	return server.CoreInit(c, &provider, recommender)
+}
+
+// newMultichainProvider a new multichain provider configured with the given providers
+func newMultichainProvider(c *server.Clients, sendToken multichain.SendTokens, p ...any) multichain.Provider {
+	return multichain.Provider{
+		Repos:      c.Repos,
+		Queries:    c.Queries,
+		Chains:     map[persist.Chain][]any{persist.ChainETH: p},
+		SendTokens: sendToken,
+	}
 }
 
 // defaultHandlerClient returns a GraphQL client attached to a backend GraphQL handler
