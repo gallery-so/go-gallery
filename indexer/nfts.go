@@ -133,7 +133,7 @@ func getTokens(queueChan chan<- processTokensInput, nftRepository persist.TokenR
 			return
 		}
 
-		tokens, contracts, err := getTokensFromDB(c, input, nftRepository, contractRepository)
+		tokens, contracts, err := getTokensFromDB(c, input, ethClient, nftRepository, contractRepository)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if _, ok := err.(persist.ErrTokenNotFoundByTokenIdentifiers); ok {
@@ -341,13 +341,20 @@ func processMissingMetadata(ctx context.Context, inputs <-chan processTokensInpu
 	mainPool.StopWait()
 }
 
-func getTokensFromDB(pCtx context.Context, input *getTokensInput, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) ([]persist.Token, []persist.Contract, error) {
+func getTokensFromDB(pCtx context.Context, input *getTokensInput, ethClient *ethclient.Client, tokenRepo persist.TokenRepository, contractRepo persist.ContractRepository) ([]persist.Token, []persist.Contract, error) {
 	switch {
 	case input.WalletAddress != "":
 		if input.TokenID != "" && input.ContractAddress != "" {
 			token, err := tokenRepo.GetByIdentifiers(pCtx, input.TokenID, input.ContractAddress, input.WalletAddress)
 			if err != nil {
-				return nil, nil, err
+				if _, ok := err.(persist.ErrTokenNotFoundByIdentifiers); ok {
+					token, err = manuallyIndexToken(pCtx, input.TokenID, input.ContractAddress, input.WalletAddress, ethClient, tokenRepo)
+					if err != nil {
+						return nil, nil, err
+					}
+				} else {
+					return nil, nil, err
+				}
 			}
 			contract, err := contractRepo.GetByAddress(pCtx, input.ContractAddress)
 			if err != nil {
