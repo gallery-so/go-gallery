@@ -25,3 +25,5 @@
 !root-certs
 !emails
 !adminapi
+!tests
+!static
