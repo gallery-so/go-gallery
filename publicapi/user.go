@@ -402,7 +402,7 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		IpAddress: gc.ClientIP(),
 	})
 	if err != nil {
-		logger.For(ctx).Warnf("failed to get IP address for userID: %s\n", userID)
+		logger.For(ctx).Warnf("failed to get IP address for userID %s: %s\n", userID, err)
 	}
 
 	// Send event
