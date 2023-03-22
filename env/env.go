@@ -27,17 +27,6 @@ func RegisterValidation(name string, tags ...string) {
 }
 
 func Get[T any](ctx context.Context, name string) T {
-	func() {
-		validatorsMu.Lock()
-		defer validatorsMu.Unlock()
-		for _, tag := range validators[name] {
-			err := v.Var(name, tag)
-			if err != nil {
-				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
-			}
-		}
-	}()
-
 	if !viper.IsSet(name) {
 		return *new(T)
 	}
@@ -47,22 +36,22 @@ func Get[T any](ctx context.Context, name string) T {
 		logger.For(ctx).Errorf("invalid env var: %s, expected type: %T", name, it)
 		return *new(T)
 	}
+
+	func() {
+		validatorsMu.Lock()
+		defer validatorsMu.Unlock()
+		for _, tag := range validators[name] {
+			err := v.Var(it, tag)
+			if err != nil {
+				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
+			}
+		}
+	}()
 
 	return it
 }
 
 func GetIfExists[T any](ctx context.Context, name string) (T, bool) {
-	func() {
-		validatorsMu.Lock()
-		defer validatorsMu.Unlock()
-		for _, tag := range validators[name] {
-			err := v.Var(name, tag)
-			if err != nil {
-				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
-			}
-		}
-	}()
-
 	if !viper.IsSet(name) {
 		return *new(T), false
 	}
@@ -72,6 +61,17 @@ func GetIfExists[T any](ctx context.Context, name string) (T, bool) {
 		logger.For(ctx).Errorf("invalid env var: %s, expected type: %T", name, it)
 		return *new(T), false
 	}
+
+	func() {
+		validatorsMu.Lock()
+		defer validatorsMu.Unlock()
+		for _, tag := range validators[name] {
+			err := v.Var(it, tag)
+			if err != nil {
+				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
+			}
+		}
+	}()
 
 	return it, true
 }
