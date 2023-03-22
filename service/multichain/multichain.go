@@ -424,7 +424,14 @@ func (p *Provider) prepTokensForTokenProcessing(ctx context.Context, tokensFromP
 		// Add already existing media to the provider token if it exists so that
 		// we can display media for a token while it gets handled by tokenprocessing
 		if dbToken := tokenLookup[token.TokenIdentifiers()]; !token.Media.IsServable() && dbToken.Media.IsServable() {
+			if token.Media.Dimensions.Valid() {
+				dbToken.Media.Dimensions = token.Media.Dimensions
+			}
 			providerTokens[i].Media = dbToken.Media
+		} else if dbToken.Media.Dimensions.Valid() && !token.Media.Dimensions.Valid() {
+			med := providerTokens[i].Media
+			med.Dimensions = dbToken.Media.Dimensions
+			providerTokens[i].Media = med
 		}
 		// There's no available media for the token at this point, so set the state to syncing
 		// so we can show the loading state instead of a broken token while tokenprocessing handles it.

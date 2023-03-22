@@ -234,6 +234,10 @@ type Dimensions struct {
 	Height int `json:"height"`
 }
 
+func (d Dimensions) Valid() bool {
+	return d.Width > 0 && d.Height > 0
+}
+
 // Media represents a token's media content with processed images from metadata
 type Media struct {
 	ThumbnailURL   NullString `json:"thumbnail_url,omitempty"`
