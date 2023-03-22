@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,12 +84,25 @@ func (c *connectionParams) toConnectionString() string {
 
 func newConnectionParamsFromEnv() connectionParams {
 	ctx := context.Background()
+	port, ok := env.GetIfExists[int](ctx, "POSTGRES_PORT")
+	if !ok {
+		strPort := env.GetString(ctx, "POSTGRES_PORT")
+		if strPort == "" {
+			port = 5432
+		} else {
+			intPort, err := strconv.Atoi(strPort)
+			if err != nil {
+				panic(err)
+			}
+			port = intPort
+		}
+	}
 	return connectionParams{
 		user:     env.GetString(ctx, "POSTGRES_USER"),
 		password: env.GetString(ctx, "POSTGRES_PASSWORD"),
 		dbname:   env.GetString(ctx, "POSTGRES_DB"),
 		host:     env.GetString(ctx, "POSTGRES_HOST"),
-		port:     env.Get[int](ctx, "POSTGRES_PORT"),
+		port:     port,
 	}
 }
 

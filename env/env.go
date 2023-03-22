@@ -51,6 +51,31 @@ func Get[T any](ctx context.Context, name string) T {
 	return it
 }
 
+func GetIfExists[T any](ctx context.Context, name string) (T, bool) {
+	func() {
+		validatorsMu.Lock()
+		defer validatorsMu.Unlock()
+		for _, tag := range validators[name] {
+			err := v.Var(name, tag)
+			if err != nil {
+				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
+			}
+		}
+	}()
+
+	if !viper.IsSet(name) {
+		return *new(T), false
+	}
+
+	it, ok := viper.Get(name).(T)
+	if !ok {
+		logger.For(ctx).Errorf("invalid env var: %s, expected type: %T", name, it)
+		return *new(T), false
+	}
+
+	return it, true
+}
+
 func GetString(ctx context.Context, name string) string {
 	return Get[string](ctx, name)
 }
