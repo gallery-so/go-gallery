@@ -232,6 +232,12 @@ type OwnedContract struct {
 	LastUpdated    time.Time
 }
 
+type PiiAccountCreationInfo struct {
+	UserID    persist.DBID
+	IpAddress string
+	CreatedAt time.Time
+}
+
 type PiiForUser struct {
 	UserID          persist.DBID
 	PiiEmailAddress persist.Email

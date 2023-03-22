@@ -986,3 +986,7 @@ where a.user_id = @user_a_id
   and contracts.name is not null
   and contracts.name != ''
   and contracts.name != 'Unidentified contract';
+
+-- name: AddPiiAccountCreationInfo :exec
+insert into pii.account_creation_info (user_id, ip_address, created_at) values (@user_id, @ip_address, now())
+  on conflict do nothing;

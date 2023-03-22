@@ -396,6 +396,15 @@ func (api UserAPI) CreateUser(ctx context.Context, authenticator auth.Authentica
 		}
 	}
 
+	gc := util.GinContextFromContext(ctx)
+	err = api.queries.AddPiiAccountCreationInfo(ctx, db.AddPiiAccountCreationInfoParams{
+		UserID:    userID,
+		IpAddress: gc.ClientIP(),
+	})
+	if err != nil {
+		logger.For(ctx).Warnf("failed to get IP address for userID: %s\n", userID)
+	}
+
 	// Send event
 	_, err = dispatchEvent(ctx, db.Event{
 		ActorID:        persist.DBIDToNullStr(userID),
