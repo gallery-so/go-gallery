@@ -43,6 +43,21 @@ func (q *Queries) AddManyFollows(ctx context.Context, arg AddManyFollowsParams) 
 	return err
 }
 
+const addPiiAccountCreationInfo = `-- name: AddPiiAccountCreationInfo :exec
+insert into pii.account_creation_info (user_id, ip_address, created_at) values ($1, $2, now())
+  on conflict do nothing
+`
+
+type AddPiiAccountCreationInfoParams struct {
+	UserID    persist.DBID
+	IpAddress string
+}
+
+func (q *Queries) AddPiiAccountCreationInfo(ctx context.Context, arg AddPiiAccountCreationInfoParams) error {
+	_, err := q.db.Exec(ctx, addPiiAccountCreationInfo, arg.UserID, arg.IpAddress)
+	return err
+}
+
 const addSocialToUser = `-- name: AddSocialToUser :exec
 insert into pii.for_users (user_id, pii_socials) values ($1, $2) on conflict (user_id) where deleted = false do update set pii_socials = for_users.pii_socials || $2
 `
