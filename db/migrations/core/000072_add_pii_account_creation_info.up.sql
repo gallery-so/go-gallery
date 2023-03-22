@@ -6,8 +6,6 @@ create table if not exists pii.account_creation_info (
     created_at timestamptz not null
 );
 
-select cron.schedule('purge-account-creation-info', '@weekly', 'delete from pii.account_creation_info where created_at < now() - interval ''180 days''');
-
 -- Create a scrubbed_pii view of the table
 drop view if exists scrubbed_pii.account_creation_info;
 create view scrubbed_pii.account_creation_info as (
