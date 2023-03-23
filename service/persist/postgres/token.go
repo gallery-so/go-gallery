@@ -489,8 +489,8 @@ func (t *TokenRepository) UpdateByTokenIdentifiers(pCtx context.Context, pTokenI
 	case persist.TokenUpdateURIInput:
 		update := pUpdate.(persist.TokenUpdateURIInput)
 		res, err = t.updateURIByTokenIdentifiersStmt.ExecContext(pCtx, update.TokenURI, update.LastUpdated, pTokenID, pContractAddress)
-	case persist.TokenUpdateMetadataFieldsInput:
-		update := pUpdate.(persist.TokenUpdateMetadataFieldsInput)
+	case persist.TokenUpdateMetadataDerivedFieldsInput:
+		update := pUpdate.(persist.TokenUpdateMetadataDerivedFieldsInput)
 		res, err = t.updateMetadataFieldsByTokenIdentifiersStmt.ExecContext(pCtx, update.Name, update.Description, update.LastUpdated, pTokenID, pContractAddress)
 	default:
 		return fmt.Errorf("unsupported update type: %T", pUpdate)

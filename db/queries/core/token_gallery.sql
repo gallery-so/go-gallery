@@ -13,6 +13,7 @@ insert into tokens
   , token_id
   , quantity
   , ownership_history
+  , media
   , token_metadata
   , external_url
   , block_number
@@ -38,6 +39,7 @@ insert into tokens
     , token_id
     , quantity
     , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
+    , media
     , token_metadata
     , external_url
     , block_number
@@ -65,6 +67,7 @@ insert into tokens
       , @ownership_history::jsonb[] as ownership_history
       , unnest(@ownership_history_start_idx::int[]) as ownership_history_start_idx
       , unnest(@ownership_history_end_idx::int[]) as ownership_history_end_idx
+      , unnest(@media::jsonb[]) as media
       , unnest(@token_metadata::jsonb[]) as token_metadata
       , unnest(@external_url::varchar[]) as external_url
       , unnest(@block_number::bigint[]) as block_number

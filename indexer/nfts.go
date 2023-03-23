@@ -78,7 +78,7 @@ type tokenMetadataFieldsUpdate struct {
 	TokenDBID       persist.DBID
 	TokenID         persist.TokenID
 	ContractAddress persist.EthereumAddress
-	Update          persist.TokenUpdateMetadataFieldsInput
+	Update          persist.TokenUpdateMetadataDerivedFieldsInput
 }
 
 type getTokensInput struct {
@@ -794,7 +794,7 @@ func getUpdateForToken(pCtx context.Context, tokenType persist.TokenType, chain 
 
 func updateMetadataFieldsForToken(pCtx context.Context, tokenID persist.TokenID, contractAddress persist.EthereumAddress, tokenMetadata persist.TokenMetadata, tokenRepo persist.TokenRepository) error {
 	name, desc := media.FindNameAndDescription(pCtx, tokenMetadata)
-	return tokenRepo.UpdateByTokenIdentifiers(pCtx, tokenID, contractAddress, persist.TokenUpdateMetadataFieldsInput{
+	return tokenRepo.UpdateByTokenIdentifiers(pCtx, tokenID, contractAddress, persist.TokenUpdateMetadataDerivedFieldsInput{
 		Name:        persist.NullString(name),
 		Description: persist.NullString(desc),
 	})

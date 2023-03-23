@@ -758,8 +758,7 @@ func (p *Provider) RefreshToken(ctx context.Context, ti persist.TokenIdentifiers
 					}
 				}
 
-				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllURIDerivedFieldsInput{
-					Media:       refreshedToken.Media,
+				if err := p.Repos.TokenRepository.UpdateByTokenIdentifiersUnsafe(ctx, ti.TokenID, ti.ContractAddress, ti.Chain, persist.TokenUpdateAllMetadataFieldsInput{
 					Metadata:    refreshedToken.TokenMetadata,
 					Name:        persist.NullString(refreshedToken.Name),
 					LastUpdated: persist.LastUpdatedTime{},

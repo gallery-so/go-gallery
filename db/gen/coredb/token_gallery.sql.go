@@ -27,6 +27,7 @@ insert into tokens
   , token_id
   , quantity
   , ownership_history
+  , media
   , token_metadata
   , external_url
   , block_number
@@ -52,6 +53,7 @@ insert into tokens
     , token_id
     , quantity
     , ownership_history[ownership_history_start_idx::int:ownership_history_end_idx::int]
+    , media
     , token_metadata
     , external_url
     , block_number
@@ -79,19 +81,20 @@ insert into tokens
       , $12::jsonb[] as ownership_history
       , unnest($13::int[]) as ownership_history_start_idx
       , unnest($14::int[]) as ownership_history_end_idx
-      , unnest($15::jsonb[]) as token_metadata
-      , unnest($16::varchar[]) as external_url
-      , unnest($17::bigint[]) as block_number
-      , unnest($18::varchar[]) as owner_user_id
-      , $19::varchar[] as owned_by_wallets
-      , unnest($20::int[]) as owned_by_wallets_start_idx
-      , unnest($21::int[]) as owned_by_wallets_end_idx
-      , unnest($22::int[]) as chain
-      , unnest($23::varchar[]) as contract
-      , unnest($24::bool[]) as is_user_marked_spam
-      , unnest($25::bool[]) as is_provider_marked_spam
-      , unnest($26::timestamptz[]) as last_synced
-      , unnest($27::varchar[]) as token_uri
+      , unnest($15::jsonb[]) as media
+      , unnest($16::jsonb[]) as token_metadata
+      , unnest($17::varchar[]) as external_url
+      , unnest($18::bigint[]) as block_number
+      , unnest($19::varchar[]) as owner_user_id
+      , $20::varchar[] as owned_by_wallets
+      , unnest($21::int[]) as owned_by_wallets_start_idx
+      , unnest($22::int[]) as owned_by_wallets_end_idx
+      , unnest($23::int[]) as chain
+      , unnest($24::varchar[]) as contract
+      , unnest($25::bool[]) as is_user_marked_spam
+      , unnest($26::bool[]) as is_provider_marked_spam
+      , unnest($27::timestamptz[]) as last_synced
+      , unnest($28::varchar[]) as token_uri
   ) bulk_upsert
 )
 on conflict (token_id, contract, chain, owner_user_id) where deleted = false
@@ -131,6 +134,7 @@ type UpsertTokensParams struct {
 	OwnershipHistory         []pgtype.JSONB
 	OwnershipHistoryStartIdx []int32
 	OwnershipHistoryEndIdx   []int32
+	Media                    []pgtype.JSONB
 	TokenMetadata            []pgtype.JSONB
 	ExternalUrl              []string
 	BlockNumber              []int64
@@ -162,6 +166,7 @@ func (q *Queries) UpsertTokens(ctx context.Context, arg UpsertTokensParams) ([]T
 		arg.OwnershipHistory,
 		arg.OwnershipHistoryStartIdx,
 		arg.OwnershipHistoryEndIdx,
+		arg.Media,
 		arg.TokenMetadata,
 		arg.ExternalUrl,
 		arg.BlockNumber,
