@@ -63,10 +63,10 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 		"Event ID": message.ID,
 	})
 
-	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString(ctx, "FEED_URL"))
+	url := fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEED_URL"))
 	logger.For(ctx).Infof("creating task for feed event %s, scheduling on %s, sending to %s", message.ID, scheduleOn, url)
 
-	queue := env.GetString(ctx, "GCLOUD_FEED_QUEUE")
+	queue := env.GetString("GCLOUD_FEED_QUEUE")
 	task := &taskspb.Task{
 		ScheduleTime: timestamppb.New(scheduleOn),
 		MessageType: &taskspb.Task_HttpRequest{
@@ -76,7 +76,7 @@ func CreateTaskForFeed(ctx context.Context, scheduleOn time.Time, message FeedMe
 				Headers: map[string]string{
 					"Content-type":  "application/json",
 					"sentry-trace":  span.TraceID.String(),
-					"Authorization": "Basic " + env.GetString(ctx, "FEED_SECRET"),
+					"Authorization": "Basic " + env.GetString("FEED_SECRET"),
 				},
 			},
 		},
@@ -98,17 +98,17 @@ func CreateTaskForFeedbot(ctx context.Context, scheduleOn time.Time, message Fee
 		"Event ID": message.FeedEventID,
 	})
 
-	queue := env.GetString(ctx, "GCLOUD_FEEDBOT_TASK_QUEUE")
+	queue := env.GetString("GCLOUD_FEEDBOT_TASK_QUEUE")
 	task := &taskspb.Task{
 		Name:         fmt.Sprintf("%s/tasks/%s", queue, message.FeedEventID.String()),
 		ScheduleTime: timestamppb.New(scheduleOn),
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/tasks/feed-event", env.GetString(ctx, "FEEDBOT_URL")),
+				Url:        fmt.Sprintf("%s/tasks/feed-event", env.GetString("FEEDBOT_URL")),
 				Headers: map[string]string{
 					"Content-type":  "application/json",
-					"Authorization": "Basic " + env.GetString(ctx, "FEEDBOT_SECRET"),
+					"Authorization": "Basic " + env.GetString("FEEDBOT_SECRET"),
 					"sentry-trace":  span.TraceID.String(),
 				},
 			},
@@ -129,12 +129,12 @@ func CreateTaskForTokenProcessing(ctx context.Context, client *gcptasks.Client, 
 
 	tracing.AddEventDataToSpan(span, map[string]interface{}{"User ID": message.UserID})
 
-	queue := env.GetString(ctx, "TOKEN_PROCESSING_QUEUE")
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/media/process", env.GetString(ctx, "TOKEN_PROCESSING_URL")),
+				Url:        fmt.Sprintf("%s/media/process", env.GetString("TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
@@ -159,12 +159,12 @@ func CreateTaskForContractOwnerProcessing(ctx context.Context, message TokenProc
 		"Contract ID": message.ContractID,
 	})
 
-	queue := env.GetString(ctx, "TOKEN_PROCESSING_QUEUE")
+	queue := env.GetString("TOKEN_PROCESSING_QUEUE")
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/owners/process/contract", env.GetString(ctx, "TOKEN_PROCESSING_URL")),
+				Url:        fmt.Sprintf("%s/owners/process/contract", env.GetString("TOKEN_PROCESSING_URL")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
@@ -185,12 +185,12 @@ func CreateTaskForDeepRefresh(ctx context.Context, message DeepRefreshMessage, c
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForDeepRefresh")
 	defer tracing.FinishSpan(span)
 
-	queue := env.GetString(ctx, "GCLOUD_REFRESH_TASK_QUEUE")
+	queue := env.GetString("GCLOUD_REFRESH_TASK_QUEUE")
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/tasks/refresh", env.GetString(ctx, "INDEXER_HOST")),
+				Url:        fmt.Sprintf("%s/tasks/refresh", env.GetString("INDEXER_HOST")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
@@ -211,12 +211,12 @@ func CreateTaskForWalletValidation(ctx context.Context, message ValidateNFTsMess
 	span, ctx := tracing.StartSpan(ctx, "cloudtask.create", "createTaskForWalletValidate")
 	defer tracing.FinishSpan(span)
 
-	queue := env.GetString(ctx, "GCLOUD_WALLET_VALIDATE_QUEUE")
+	queue := env.GetString("GCLOUD_WALLET_VALIDATE_QUEUE")
 	task := &taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
 			HttpRequest: &taskspb.HttpRequest{
 				HttpMethod: taskspb.HttpMethod_POST,
-				Url:        fmt.Sprintf("%s/nfts/validate", env.GetString(ctx, "INDEXER_HOST")),
+				Url:        fmt.Sprintf("%s/nfts/validate", env.GetString("INDEXER_HOST")),
 				Headers: map[string]string{
 					"Content-type": "application/json",
 					"sentry-trace": span.TraceID.String(),
@@ -244,8 +244,8 @@ func NewClient(ctx context.Context) *gcptasks.Client {
 
 	// Configure the client depending on whether or not
 	// the cloud task emulator is used.
-	if env.GetString(ctx, "ENV") == "local" {
-		if host := env.GetString(ctx, "TASK_QUEUE_HOST"); host != "" {
+	if env.GetString("ENV") == "local" {
+		if host := env.GetString("TASK_QUEUE_HOST"); host != "" {
 			copts = append(
 				copts,
 				option.WithEndpoint(host),

@@ -59,14 +59,14 @@ func updateSnapshot(stg *storage.Client) gin.HandlerFunc {
 }
 
 func getSnapshotReader(c context.Context, stg *storage.Client) (*storage.Reader, error) {
-	r, err := stg.Bucket(env.GetString(c, "SNAPSHOT_BUCKET")).Object("snapshot.json").NewReader(c)
+	r, err := stg.Bucket(env.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json").NewReader(c)
 	if err != nil {
 		return nil, err
 	}
 	return r, nil
 }
 func writeSnapshot(c context.Context, stg *storage.Client, snapshot []string) error {
-	obj := stg.Bucket(env.GetString(c, "SNAPSHOT_BUCKET")).Object("snapshot.json")
+	obj := stg.Bucket(env.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
 	obj.Delete(c)
 	w := obj.NewWriter(c)
 	w.CacheControl = "no-store"

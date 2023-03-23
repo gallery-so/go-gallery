@@ -735,7 +735,7 @@ func authRequest(ctx context.Context, url string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-API-KEY", env.GetString(ctx, "OPENSEA_API_KEY"))
+	req.Header.Set("X-API-KEY", env.GetString("OPENSEA_API_KEY"))
 	return req, nil
 }
 

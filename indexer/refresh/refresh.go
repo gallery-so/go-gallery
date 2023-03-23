@@ -112,7 +112,7 @@ func NewBlockFilterManager(ctx context.Context, sc *storage.Client) *BlockFilter
 		blocksPerLogFile: DefaultConfig.BlocksPerCachedLog,
 		chunkSize:        DefaultConfig.ChunkSize,
 		fetchWorkerSize:  DefaultConfig.ChunkWorkerSize,
-		repo:             &AddressFilterRepository{sc.Bucket(env.GetString(ctx, "GCLOUD_TOKEN_LOGS_BUCKET"))},
+		repo:             &AddressFilterRepository{sc.Bucket(env.GetString("GCLOUD_TOKEN_LOGS_BUCKET"))},
 		fetchers:         make(map[persist.BlockNumber]*filterFetcher),
 		baseDir:          baseDir,
 		mu:               &mu,

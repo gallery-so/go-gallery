@@ -147,7 +147,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

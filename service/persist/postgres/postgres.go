@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -68,9 +67,9 @@ func (c *connectionParams) toConnectionString() string {
 	//	return numNotEmpty
 	//}
 	//
-	//dbServerCa := env.GetString(ctx, "POSTGRES_SERVER_CA")
-	//dbClientKey := env.GetString(ctx, "POSTGRES_CLIENT_KEY")
-	//dbClientCert := env.GetString(ctx, "POSTGRES_CLIENT_CERT")
+	//dbServerCa := env.GetString("POSTGRES_SERVER_CA")
+	//dbClientKey := env.GetString("POSTGRES_CLIENT_KEY")
+	//dbClientCert := env.GetString("POSTGRES_CLIENT_CERT")
 	//
 	//numSSLParams := countNonEmptyStrings(dbServerCa, dbClientKey, dbClientCert)
 	//if numSSLParams == 0 {
@@ -83,26 +82,12 @@ func (c *connectionParams) toConnectionString() string {
 }
 
 func newConnectionParamsFromEnv() connectionParams {
-	ctx := context.Background()
-	port, ok := env.GetIfExists[int](ctx, "POSTGRES_PORT")
-	if !ok {
-		strPort := env.GetString(ctx, "POSTGRES_PORT")
-		if strPort == "" {
-			port = 5432
-		} else {
-			intPort, err := strconv.Atoi(strPort)
-			if err != nil {
-				panic(err)
-			}
-			port = intPort
-		}
-	}
 	return connectionParams{
-		user:     env.GetString(ctx, "POSTGRES_USER"),
-		password: env.GetString(ctx, "POSTGRES_PASSWORD"),
-		dbname:   env.GetString(ctx, "POSTGRES_DB"),
-		host:     env.GetString(ctx, "POSTGRES_HOST"),
-		port:     port,
+		user:     env.GetString("POSTGRES_USER"),
+		password: env.GetString("POSTGRES_PASSWORD"),
+		dbname:   env.GetString("POSTGRES_DB"),
+		host:     env.GetString("POSTGRES_HOST"),
+		port:     env.GetInt("POSTGRES_PORT"),
 	}
 }
 

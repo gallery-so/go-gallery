@@ -44,7 +44,7 @@ func main() {
 
 	// apiUrl := "https://api.farcaster.xyz"
 	apiUrl := "https://api.warpcast.com"
-	mnemonic := env.GetString(ctx, "FARCASTER_MNEMONIC")
+	mnemonic := env.GetString("FARCASTER_MNEMONIC")
 
 	fc := farcaster.NewFarcasterClient(apiUrl, mnemonic, "")
 	fcUsers := []users.User{}
@@ -154,7 +154,7 @@ func setDefaults() {
 
 	viper.AutomaticEnv()
 
-	if env.GetString(context.Background(), "ENV") != "local" {
+	if env.GetString("ENV") != "local" {
 		logger.For(nil).Info("running in non-local environment, skipping environment configuration")
 	} else {
 		fi := "local"

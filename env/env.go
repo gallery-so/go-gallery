@@ -1,12 +1,12 @@
 package env
 
 import (
-	"context"
+	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/mikeydub/go-gallery/service/logger"
 	"github.com/spf13/viper"
 )
 
@@ -14,70 +14,46 @@ var validators = map[string][]string{}
 
 var v = validator.New()
 
-var validatorsMu = &sync.Mutex{}
+var mu = &sync.Mutex{}
 
 func init() {
 	v.RegisterValidation("required_for_env", RequiredForEnv)
 }
 
 func RegisterValidation(name string, tags ...string) {
-	validatorsMu.Lock()
-	defer validatorsMu.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	validators[name] = dedupe(append(validators[name], tags...))
 }
 
-func Get[T any](ctx context.Context, name string) T {
-	if !viper.IsSet(name) {
-		return *new(T)
-	}
+func GetBool(name string) bool                         { return get(name, viper.GetBool) }
+func GetDuration(name string) time.Duration            { return get(name, viper.GetDuration) }
+func GetFloat64(name string) float64                   { return get(name, viper.GetFloat64) }
+func GetInt(name string) int                           { return get(name, viper.GetInt) }
+func GetInt64(name string) int64                       { return get(name, viper.GetInt64) }
+func GetSizeInBytes(name string) uint                  { return get(name, viper.GetSizeInBytes) }
+func GetString(name string) string                     { return get(name, viper.GetString) }
+func GetStringMap(name string) map[string]interface{}  { return get(name, viper.GetStringMap) }
+func GetStringMapString(name string) map[string]string { return get(name, viper.GetStringMapString) }
+func GetStringSlice(name string) []string              { return get(name, viper.GetStringSlice) }
+func GetTime(name string) time.Time                    { return get(name, viper.GetTime) }
 
-	it, ok := viper.Get(name).(T)
-	if !ok {
-		logger.For(ctx).Errorf("invalid env var: %s, expected type: %T", name, it)
-		return *new(T)
-	}
-
-	func() {
-		validatorsMu.Lock()
-		defer validatorsMu.Unlock()
-		for _, tag := range validators[name] {
-			err := v.Var(it, tag)
-			if err != nil {
-				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
-			}
-		}
-	}()
-
-	return it
+func GetStringMapStringSlice(name string) map[string][]string {
+	return get(name, viper.GetStringMapStringSlice)
 }
 
-func GetIfExists[T any](ctx context.Context, name string) (T, bool) {
-	if !viper.IsSet(name) {
-		return *new(T), false
-	}
+func get[T any](name string, fetchFunc func(string) T) T {
+	mu.Lock()
+	defer mu.Unlock()
+	val := fetchFunc(name)
 
-	it, ok := viper.Get(name).(T)
-	if !ok {
-		logger.For(ctx).Errorf("invalid env var: %s, expected type: %T", name, it)
-		return *new(T), false
-	}
-
-	func() {
-		validatorsMu.Lock()
-		defer validatorsMu.Unlock()
-		for _, tag := range validators[name] {
-			err := v.Var(it, tag)
-			if err != nil {
-				logger.For(ctx).Errorf("invalid env var: %s, tag: %s, err: %s", name, tag, err.Error())
-			}
+	for _, tag := range validators[name] {
+		if err := v.Var(val, tag); err != nil {
+			panic(fmt.Errorf("invalid env var: %s failed when validating tag %s", name, tag))
 		}
-	}()
+	}
 
-	return it, true
-}
-
-func GetString(ctx context.Context, name string) string {
-	return Get[string](ctx, name)
+	return val
 }
 
 var RequiredForEnv validator.Func = func(fl validator.FieldLevel) bool {
@@ -91,7 +67,7 @@ var RequiredForEnv validator.Func = func(fl validator.FieldLevel) bool {
 		return false
 	}
 
-	return spl[1] == Get[string](context.Background(), "ENV")
+	return spl[1] == GetString("ENV")
 }
 
 func dedupe(src []string) []string {

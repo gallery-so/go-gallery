@@ -183,7 +183,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 	authApi := publicapi.For(ctx).Auth
 
 	if debugtools.Enabled {
-		if env.GetString(ctx, "ENV") == "local" && m.Debug != nil {
+		if env.GetString("ENV") == "local" && m.Debug != nil {
 			return authApi.NewDebugAuthenticator(ctx, *m.Debug)
 		}
 	}
@@ -212,7 +212,7 @@ func (r *Resolver) authMechanismToAuthenticator(ctx context.Context, m model.Aut
 func (r *Resolver) socialAuthMechanismToAuthenticator(ctx context.Context, m model.SocialAuthMechanism) (socialauth.Authenticator, error) {
 
 	if debugtools.Enabled {
-		if env.GetString(ctx, "ENV") == "local" && m.Debug != nil {
+		if env.GetString("ENV") == "local" && m.Debug != nil {
 			return debugtools.NewDebugSocialAuthenticator(m.Debug.Provider, m.Debug.ID, map[string]interface{}{"username": m.Debug.Username}), nil
 		}
 	}

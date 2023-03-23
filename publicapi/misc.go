@@ -28,10 +28,10 @@ type MiscAPI struct {
 func (api MiscAPI) GetGeneralAllowlist(ctx context.Context) ([]persist.EthereumAddress, error) {
 	// Nothing to validate
 
-	bucket := env.GetString(ctx, "SNAPSHOT_BUCKET")
+	bucket := env.GetString("SNAPSHOT_BUCKET")
 	logger.For(ctx).Infof("Proxying snapshot from bucket %s", bucket)
 
-	obj := api.storageClient.Bucket(env.GetString(ctx, "SNAPSHOT_BUCKET")).Object("snapshot.json")
+	obj := api.storageClient.Bucket(env.GetString("SNAPSHOT_BUCKET")).Object("snapshot.json")
 
 	r, err := obj.NewReader(ctx)
 	if err != nil {

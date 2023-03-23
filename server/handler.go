@@ -112,7 +112,7 @@ func graphqlHandler(repos *postgres.Repositories, queries *db.Queries, ethClient
 
 	// Request/response logging is spammy in a local environment and can typically be better handled via browser debug tools.
 	// It might be worth logging top-level queries and mutations in a single log line, though.
-	enableLogging := env.GetString(context.Background(), "ENV") != "local"
+	enableLogging := env.GetString("ENV") != "local"
 
 	h.AroundOperations(graphql.RequestReporter(schema.Schema(), enableLogging, true))
 	h.AroundResponses(graphql.ResponseReporter(enableLogging, true))
