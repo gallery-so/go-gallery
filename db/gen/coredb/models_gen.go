@@ -290,6 +290,12 @@ type RecommendationResult struct {
 	Deleted           bool
 }
 
+type ScrubbedPiiAccountCreationInfo struct {
+	UserID    persist.DBID
+	IpAddress persist.Address
+	CreatedAt time.Time
+}
+
 type ScrubbedPiiForUser struct {
 	UserID          persist.DBID
 	PiiEmailAddress persist.Email

@@ -386,7 +386,6 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		params.Name = append(params.Name, t.Name.String())
 		params.Description = append(params.Description, t.Description.String())
 		params.CollectorsNote = append(params.CollectorsNote, t.CollectorsNote.String())
-		appendJSONB(&params.Media, t.Media, &errors)
 		params.TokenType = append(params.TokenType, t.TokenType.String())
 		params.TokenID = append(params.TokenID, t.TokenID.String())
 		params.Quantity = append(params.Quantity, t.Quantity.String())
@@ -422,7 +421,6 @@ func (t *TokenGalleryRepository) bulkUpsert(pCtx context.Context, pTokens []pers
 		(*t).CreationTime = persist.CreationTime(upserted[i].CreatedAt)
 		(*t).LastUpdated = persist.LastUpdatedTime(upserted[i].LastUpdated)
 		(*t).LastSynced = persist.LastUpdatedTime(upserted[i].LastSynced)
-		(*t).Media = upserted[i].Media
 	}
 
 	return now, tokens, nil
